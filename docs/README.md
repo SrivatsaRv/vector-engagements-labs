@@ -38,7 +38,7 @@ RASP is a synthetic sensor-derived view generated from the run state. It models 
 
 Non-A2A templates use named catalog objects but currently retain generic public-study physics profiles. Their UI and reports no longer inherit A2A platform or weapon data through fallback lookups.
 
-The current visualization uses a local Cartesian coordinate frame. Regional basemaps and authored geographic replay remain separate future presentation contracts; no current base coordinates or operational routes are included in this cut.
+The current visualization uses a local Cartesian coordinate frame. A scenario-driven engine foundation is now isolated behind the contract documented in `docs/browser-engine-architecture.md`; it is not yet the default workbench runtime. Regional basemaps and authored geographic replay remain separate presentation contracts in this baseline.
 
 ## UI acceptance rules
 
