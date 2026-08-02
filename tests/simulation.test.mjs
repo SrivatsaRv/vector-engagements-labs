@@ -8,6 +8,7 @@ import {
   simulate,
   standardAtmosphere,
 } from "../lib/simulation.ts";
+import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 
 test("standard atmosphere produces credible sea-level reference values", () => {
   const atmosphere = standardAtmosphere(0, 0);
@@ -64,4 +65,15 @@ test("distance-exhausted explanation distinguishes start boundary from flown pat
   );
   assert.ok(result.timeOfFlight > 0);
   assert.ok(result.closestApproach < DEFAULT_SCENARIO.range);
+});
+
+test("every configured library baseline completes its stated mission profile", () => {
+  for (const definition of SCENARIO_LIBRARY) {
+    const result = simulate(definition.scenario);
+    assert.equal(
+      result.successful,
+      true,
+      `${definition.id} baseline ended as ${result.outcome}: ${result.reason}`,
+    );
+  }
 });

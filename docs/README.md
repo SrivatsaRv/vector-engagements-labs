@@ -18,6 +18,7 @@ The experience has one continuous enthusiast journey:
 ## Implemented capability
 
 - Eight configured scenario templates stored in `lib/scenarios.ts`.
+- Every template baseline is regression-tested to complete its stated mission profile; comparison variants may still fail when the changed inputs make completion impossible.
 - Named Blue and Red objects with domain and affiliation filters in `lib/object-catalog.ts`.
 - Source-aware A2A platform, subsystem, weapon, compatibility, and study-model records in `lib/capability-data.ts`.
 - Su-30MKI/Astra Mk-I versus PAF F-16C Block 52/AIM-120C-5 as the detailed first A2A slice.

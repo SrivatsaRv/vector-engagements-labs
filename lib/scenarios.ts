@@ -2,7 +2,7 @@ import {
   DEFAULT_SCENARIO,
   type EngagementDomain,
   type Scenario,
-} from "@/lib/simulation";
+} from "./simulation.ts";
 
 export type { EngagementDomain } from "@/lib/simulation";
 export type ScenarioComplexity = "Foundation" | "Intermediate" | "Advanced";
@@ -192,6 +192,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       blueSystemId: "astra-mk1",
       redObjectId: "f-16c-block52-paf",
       redSystemId: "aim-120c5",
+      guidance: "direct",
     }),
   },
   {
@@ -275,6 +276,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       blueSystemId: "kh-31p",
       redObjectId: "p-18-radar",
       profile: "medium",
+      guidance: "direct",
       altitude: 7800,
       targetDelta: -7750,
       range: 44000,
@@ -308,9 +310,9 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     runVariants: fixedRuns,
     presetRationale: {
       profile:
-        "The extended standoff profile provides range margin for the 76 km starting distance.",
+        "The medium standoff study profile is used for the 50 km baseline while the glide-specific engine is being validated.",
       geometry:
-        "The airborne start is 9,200 m above a fixed surface objective; the baseline uses a lofted path.",
+        "The airborne start is 9,000 m above a fixed surface objective; the baseline uses a direct path that completes in the current engine.",
       conditions:
         "Defence interaction is contextual only and does not alter the point-mass physics.",
     },
@@ -322,10 +324,11 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       bluePlatformId: "mirage-2000h",
       blueSystemId: "spice-2000",
       redObjectId: "aircraft-shelter-site",
-      profile: "short",
-      altitude: 9200,
-      targetDelta: -9150,
-      range: 24000,
+      profile: "medium",
+      guidance: "direct",
+      altitude: 9000,
+      targetDelta: -8950,
+      range: 50000,
       aspect: 180,
       launcherSpeed: 265,
       targetSpeed: 0,
@@ -403,7 +406,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     runVariants: movingRuns,
     presetRationale: {
       profile:
-        "The extended-area profile provides range margin for the 92 km starting distance.",
+        "The extended-area profile provides range margin for the 85 km starting distance.",
       geometry:
         "A ground start and 11,900 m altitude difference represent a high-altitude transit.",
       conditions:
@@ -418,9 +421,10 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       blueSystemId: "s-200",
       redObjectId: "jf-17",
       profile: "sustained",
+      guidance: "loft",
       altitude: 100,
       targetDelta: 11900,
-      range: 92000,
+      range: 85000,
       aspect: 155,
       launcherSpeed: 0,
       targetSpeed: 305,
@@ -452,7 +456,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       profile:
         "The extended-range surface-strike study model places the 105 km start inside its 170 km setup boundary.",
       geometry:
-        "Both launcher and objective are fixed near the reference surface; the baseline uses a lofted path.",
+        "Both launcher and objective are fixed near the reference surface; the baseline uses a direct path.",
       conditions:
         "Target motion and evasive maneuver do not apply to a fixed objective.",
     },
@@ -465,6 +469,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       blueSystemId: "brahmos-block-i",
       redObjectId: "p-18-radar",
       profile: "sustained",
+      guidance: "direct",
       altitude: 50,
       targetDelta: 0,
       range: 105000,
@@ -500,7 +505,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       profile:
         "The extended-range surface-strike study model was selected because the 118 km start exceeds the medium model's 100 km setup boundary.",
       geometry:
-        "The launcher and objective are fixed at the reference surface; the baseline lofted path is the comparison case.",
+        "The launcher and objective are fixed at the reference surface; the baseline direct path is the completion case.",
       conditions:
         "Environmental loss is set to 22 for this sensitivity run. Defence interaction is not part of the physics.",
     },
@@ -513,6 +518,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       blueSystemId: "brahmos-block-i",
       redObjectId: "command-site",
       profile: "sustained",
+      guidance: "direct",
       altitude: 50,
       targetDelta: 0,
       range: 118000,
