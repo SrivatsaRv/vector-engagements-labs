@@ -3,21 +3,25 @@ import {
   ArrowRight, Boxes, Check, CircleDot, FileText, GitBranch,
   GraduationCap, Layers3, Play, ShieldCheck, SlidersHorizontal,
 } from "lucide-react";
+import { LandingMiniSim } from "@/components/LandingMiniSim";
+import { ScenarioLibrary } from "@/components/ScenarioLibrary";
 
 export default function LandingPage() {
   return <main className="landing">
     <header className="landing-nav">
       <Link href="/" className="brand"><span>V</span><div><strong>VECTOR</strong><small>Engagement Lab</small></div></Link>
-      <nav><Link href="#how">How it works</Link><Link href="#instructor">Instructor Station</Link><Link href="#method">Method</Link></nav>
+      <nav><Link href="#scenarios">Scenarios</Link><Link href="#how">How it works</Link><Link href="#instructor">Instructor Station</Link><Link href="#method">Method</Link></nav>
       <Link href="/lab" className="nav-cta">Open the lab <ArrowRight size={15}/></Link>
     </header>
 
     <section className="hero">
-      <div className="hero-copy"><span className="overline">Browser-based simulation · public-data models</span><h1>Understand the engagement.<br/>Not just the outcome.</h1><p>Build an abstract air-to-air scenario, watch the geometry develop in three dimensions, test assumptions, and produce a replayable report—without pretending public estimates are verified performance.</p><div className="hero-actions"><Link href="/lab" className="primary-link"><Play size={16}/>Start a guided scenario</Link><Link href="/report" className="secondary-link"><FileText size={16}/>View sample report</Link></div><div className="trust-row"><span><Check size={13}/>No install</span><span><Check size={13}/>No aircraft renders</span><span><Check size={13}/>Assumptions visible</span></div></div>
-      <div className="hero-visual" aria-label="Abstract engagement geometry preview"><div className="visual-toolbar"><span>Crossing target</span><em>00:18.4</em></div><div className="geometry-canvas"><div className="grid-plane"/><i className="path interceptor-path"/><i className="path target-path"/><span className="entity launcher-entity"><b>FRIENDLY</b>FALCON 1</span><span className="entity target-entity"><b>TRACK</b>CONTACT 21</span><span className="entity intercept-entity"><b>INTERCEPTOR</b>MR–AR</span><div className="visual-readout"><small>Closing range</small><strong>18.6 km</strong><small>Energy index</small><strong>74%</strong></div></div><div className="visual-timeline"><i/><span>Motor burn</span><span>Midcourse</span><span>Terminal</span></div></div>
+      <div className="hero-copy"><span className="overline">Browser-based simulation · public-data models</span><h1>Understand the engagement.<br/>Not just the outcome.</h1><p>Build abstract air-to-air, air-to-ground, ground-to-air and ground-to-ground scenarios. Watch the geometry develop, test assumptions, and produce a replayable report without presenting public estimates as verified performance.</p><div className="hero-actions"><Link href="/scenarios" className="primary-link"><Play size={16}/>Choose a scenario</Link><Link href="/report?sample=1" className="secondary-link"><FileText size={16}/>View sample report</Link></div><div className="trust-row"><span><Check size={13}/>No install</span><span><Check size={13}/>Live model preview</span><span><Check size={13}/>Assumptions visible</span></div></div>
+      <LandingMiniSim/>
     </section>
 
     <section className="proof-strip"><span>CONSTRUCT</span><i/><span>SIMULATE</span><i/><span>OBSERVE</span><i/><span>EXPLAIN</span><i/><span>REPORT</span></section>
+
+    <section className="scenario-section" id="scenarios"><div className="scenario-section-heading"><div><span className="overline">Scenario library · versioned templates</span><h2>Begin with the engagement domain.</h2></div><div><p>Every card opens a configured, reproducible lab state. Regional examples use generalized terrain and synthetic sites rather than real installation coordinates.</p><Link href="/scenarios">View all scenarios <ArrowRight size={14}/></Link></div></div><ScenarioLibrary compact/></section>
 
     <section className="landing-section" id="how"><div className="section-heading"><span>One clear loop</span><h2>Built for curious minds,<br/>not aerospace specialists.</h2><p>The guided experience begins with intent and geometry. Advanced variables remain available when you need them.</p></div><div className="journey-grid"><Journey number="01" icon={SlidersHorizontal} title="Build" copy="Choose a training question, initial geometry, target behaviour, and one abstract interceptor class."/><Journey number="02" icon={Play} title="Simulate" copy="Run a deterministic browser model and watch trajectories develop in an abstract 3D space."/><Journey number="03" icon={Layers3} title="Understand" copy="Inspect energy, line of sight, phases, assumptions, and the factors that shaped the outcome."/><Journey number="04" icon={FileText} title="Report" copy="Capture the scenario, model version, replay events, observations, and limitations in one record."/></div></section>
 
@@ -25,7 +29,7 @@ export default function LandingPage() {
 
     <section className="method-section" id="method"><div><ShieldCheck size={22}/><h2>Confidence through transparency</h2></div><div className="method-points"><article><strong>Abstract profiles first</strong><p>The initial library uses generic classes, not claims about named real-world weapons.</p></article><article><strong>Every assumption visible</strong><p>Model scope, exclusions, version, inputs, and source categories travel with the report.</p></article><article><strong>Reproducible by design</strong><p>Scenario values, run seed, events, and results are preserved for replay and comparison.</p></article></div></section>
 
-    <footer className="landing-footer"><div className="brand"><span>V</span><div><strong>VECTOR</strong><small>Engagement Lab</small></div></div><p>Educational simulation using public-data assumptions. Not a verified performance or operational prediction.</p><Link href="/lab">Launch lab <ArrowRight size={14}/></Link></footer>
+    <footer className="landing-footer"><div className="brand"><span>V</span><div><strong>VECTOR</strong><small>Engagement Lab</small></div></div><p>Educational simulation using public-data assumptions. Not a verified performance or operational prediction.</p><Link href="/scenarios">Browse scenarios <ArrowRight size={14}/></Link></footer>
   </main>;
 }
 

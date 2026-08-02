@@ -115,10 +115,11 @@ export function simulate(input: Scenario, profileId: ProfileId = input.profile):
       interceptorSpeed = Math.max(210, interceptorSpeed - (profileId === "sustained" ? 4.2 : 8.5) * dt - input.wind * 0.025);
     }
 
+    const progress = Math.max(0, Math.min(1, 1 - Math.hypot(dx, dy) / Math.max(input.range, 1)));
     const loft = input.guidance === "loft"
-      ? Math.sin(Math.min(1, time / Math.max(5, profile.burn)) * Math.PI) * Math.min(7000, input.range * 0.08)
+      ? Math.sin(progress * Math.PI) * Math.min(7000, input.range * 0.08)
       : 0;
-    const desiredAltitude = Math.max(tz, iz + loft);
+    const desiredAltitude = input.altitude + (tz - input.altitude) * progress + loft;
     iz += Math.max(-140, Math.min(140, (desiredAltitude - iz) * 0.35)) * dt;
     ix += Math.cos(interceptorHeading) * interceptorSpeed * dt;
     iy += Math.sin(interceptorHeading) * interceptorSpeed * dt;
