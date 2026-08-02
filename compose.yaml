@@ -1,0 +1,22 @@
+services:
+  vector:
+    build:
+      context: .
+    ports:
+      - "4317:4317"
+    volumes:
+      - vector_wrangler:/app/.wrangler
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4317/api/catalog').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+volumes:
+  vector_wrangler:

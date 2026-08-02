@@ -1,64 +1,76 @@
 # VECTOR Engagement Lab
 
-VECTOR is a browser simulation for enthusiasts. It provides a public landing page with a playable model, an operational Lab Home, a versioned Scenario Library, guided scenario configuration, abstract three-dimensional engagement replay, advanced experiment tools, condition injection, repeatable run sets, results review, and printable/JSON report generation.
+VECTOR is a local-first browser simulation workbench for defence and aviation enthusiasts. It combines a versioned scenario library, named public-reference objects, source-aware loadouts, a deterministic browser physics model, Real Air Situation Picture views, repeatable experiment tools, and durable reports.
 
-## Scenario Library
+## Product flow
 
-The first-cut library is stored in `lib/scenarios.ts` as typed, version-controlled definitions. It covers A2A, A2G, G2A, and G2G experiment templates. Each definition includes its friendly/opposing roles, target motion, environment, domain-specific capability profile, prepared condition, run variants, version, preset rationale, and complete simulation configuration.
+The experience has one continuous enthusiast journey:
 
-Library cards link to `/lab?scenario={scenario-id}`. The lab preserves that identity through session events and report generation. The report records the scenario ID and version, engine version, profile version, model scope, target profile, theatre, and random seed.
+1. `/` explains what VECTOR does and embeds a live model preview.
+2. `/scenarios` presents eight configured templates across A2A, A2G, G2A, and G2G.
+3. `/workbench?scenario={id}` opens the selected template at Review, ready to run unchanged or edit.
+4. The workbench progresses through **Configure → Run → Results**.
+5. Configuration uses **Brief → Forces → Flight → Conditions → Review**.
+6. A saved run opens `/report?run={id}` with interpretation, replay, provenance, sources, print/PDF, and JSON export.
 
-Reports surface interpretation and public-data status before detailed configuration. The web report includes an interactive 3D replay and a three-profile sensitivity comparison. Print/PDF replaces WebGL with a deterministic vector projection generated from the recorded run; JSON uses a versioned, indented export contract with scenario, result, telemetry, provenance, and limitations.
+`/lab?scenario={id}` is retained as a backward-compatible route alias. `/lab` without a scenario redirects to the library; it is not a second landing page.
 
-When the service layer is introduced, this TypeScript contract becomes the API response shape. Scenario and profile metadata move to D1 or PostgreSQL; larger run artifacts move to R2 or S3-compatible storage. The UI does not need to change its conceptual contract.
+## Implemented capability
+
+- Eight configured scenario templates stored in `lib/scenarios.ts`.
+- Named Blue and Red objects with domain and affiliation filters in `lib/object-catalog.ts`.
+- Source-aware A2A platform, subsystem, weapon, compatibility, and study-model records in `lib/capability-data.ts`.
+- Su-30MKI/Astra Mk-I versus PAF F-16C Block 52/AIM-120C-5 as the detailed first A2A slice.
+- Explicit aircraft variant, weapon, quantity, fuel, radar, data-link, jammer, track source, maneuver, and decision inputs.
+- Separate Model Truth, IAF RASP, and PAF RASP views. Air-picture uncertainty is derived from configured sensor and information state and never presented as truth.
+- Deterministic point-mass simulation with direct/lofted paths, target motion, an educational standard atmosphere, Mach, line-of-sight rate, prepared condition effects, and reproducible telemetry.
+- Advanced enthusiast tools inside the run: repeatable variants, condition injection, observation markers, reset, replay, and results.
+- D1-backed catalog bootstrap and saved-run snapshots through `/api/catalog` and `/api/runs`.
+- Report output that leads with what was tested, who was involved, starting conditions, outcome, interpretation, and next comparison.
+- Interactive Three.js result on screen and a deterministic SVG trajectory projection in print/PDF.
+- Versioned, indented JSON export with inputs, result, telemetry, provenance, sources, and limitations.
+
+## Data and truth boundaries
+
+Public facts and simulation assumptions are separate records. A published conditional maximum figure is never treated as a universal engagement range. Each named weapon uses a visibly labeled VECTOR public-study curve until a stronger public validation basis exists.
+
+RASP is a synthetic sensor-derived view generated from the run state. It models track confidence, age, uncertainty, identification, degradation, and coasting for interface and research purposes; it is not live tracking or a verified radar model.
+
+Non-A2A templates use named catalog objects but currently retain generic public-study physics profiles. Their UI and reports no longer inherit A2A platform or weapon data through fallback lookups.
+
+The current visualization uses a local Cartesian coordinate frame. Regional basemaps and authored geographic replay remain separate future presentation contracts; no current base coordinates or operational routes are included in this cut.
 
 ## UI acceptance rules
 
-- Fit workflows to their task rather than forcing every surface to fill the screen.
-- Scenario configuration keeps its primary action visible and the desktop Run view keeps left controls, canvas, and right detail together.
-- Example and saved-result states are labeled explicitly.
-- View and comparison controls show their scope before activation.
-- Editable controls and derived metrics use distinct visual treatments.
-- React playback updates are capped at 30 Hz while Three.js rendering remains independent.
-- Release verification targets 1366×768, 1440×900, and 1920×1080 with no horizontal overflow or collapsed desktop panels.
-
-## Navigation and workflow language
-
-- `/` explains the product; `/lab` is the operational Lab Home and always presents a clear next action.
-- `/lab?scenario={scenario-id}` opens the workbench only after a template has been chosen.
-- The workbench lifecycle is **Configure → Run → Results**.
-- Configure contains five selectable steps: **Brief → Forces → Flight → Conditions → Review**.
-- A library template opens at Review because it is already configured. Users can run it unchanged or edit any earlier step. Guided entry is an explicit alternative.
-- Advanced experiment tools—condition injection, scenario variants, repeatable run sets, replay, and reporting—remain within the same enthusiast workflow rather than introducing an instructor persona.
+- Primary action visible at 1366×768, 1440×900, and 1920×1080.
+- No horizontal scrolling at those desktop breakpoints.
+- Configure keeps steps, authoring surface, and summary together.
+- Run keeps the left experiment rail, 3D canvas, and right detail rail together.
+- Results on load are explicitly labeled example, saved run, or loading; a missing saved run never silently substitutes example data.
+- Controls show affiliation or view scope before effect.
+- Editable inputs and calculated outputs use different component treatments.
+- Custom object pickers have keyboard, hover, active, disabled, and focus states.
+- React playback updates are capped at 30 Hz; Three.js renders independently.
 
 ## Visual semantics
 
-- Blue means friendly affiliation; red means hostile/opposing affiliation.
-- Green means validated/ready/success state; amber means assumption, caution, or prepared fault.
-- Grey means reference geometry or inactive context.
-- Profile-comparison colors are series identifiers and never recolor force-affiliation tracks.
-- Affiliation follows NATO APP-06 / STANAG 2019 and MIL-STD-2525 conventions. The UI uses a simplified subset rather than claiming full symbol-standard compliance.
+- Blue: friendly/Blue Team affiliation.
+- Red: opposing/Red Team affiliation.
+- Green: ready, sourced, passed, or successful state.
+- Amber: assumption, caution, uncertainty, or prepared condition.
+- Grey: reference geometry or inactive context.
 
-## Product posture
+VECTOR uses this limited affiliation convention consistently but does not claim complete APP-06 or MIL-STD-2525 implementation.
 
-- Domain-specific public model profiles rather than named weapon claims.
-- Abstract entity symbols rather than aircraft renders.
-- Public-data educational approximation with visible method and provenance.
-- Scenario values, engine version, profile version, seed, events, and results travel with reports.
-- No live military tracking, current deployment information, or weapon-control recommendations.
+## Cloudflare architecture
 
-## Cloudflare stack
+- UI and API routes: Cloudflare Worker-compatible vinext build.
+- Structured catalog and saved-run metadata: Cloudflare D1.
+- Future large telemetry or generated artifacts: R2, referenced by D1.
+- Future account/session state: Workers authentication layer plus D1; Durable Objects only where live multi-user session coordination is required.
 
-The application uses the bundled vinext runtime and builds to a Cloudflare Worker-compatible ESM artifact. The current preview keeps scenarios on-device with browser storage. Cloudflare D1 and R2 are intentionally not required for the first playable cut.
-
-## Routes
-
-- `/` — product landing page.
-- `/scenarios` — filterable A2A, A2G, G2A, and G2G Scenario Library.
-- `/lab` — operational Lab Home with one enthusiast workflow and progressive experiment depth.
-- `/lab?scenario={scenario-id}` — lab initialized from a versioned library template.
-- `/report` — printable and JSON-exportable debrief report.
+The current development target is local Cloudflare runtime parity. No external deployment is required to use or verify this cut.
 
 ## Verification
 
-Run `make ci-local` before committing or publishing.
+Run `make ci-local`. It runs lint, production build, and rendered-route tests before a commit.

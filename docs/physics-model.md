@@ -1,33 +1,52 @@
-# Physics model status
+# Physics and air-picture model status
 
-VECTOR currently uses a deterministic browser-side point-mass approximation. It is intended to make geometry, flight-path choice, target motion, remaining speed, and explicit information or environmental conditions inspectable. It is not a verified performance model for a named system.
+VECTOR uses a deterministic browser-side point-mass approximation. It is designed for inspectable sensitivity experiments, not verified prediction of named-system performance.
 
-## Implemented
+## Implemented physics
 
-- Domain-specific profile catalogs for air-to-air, air-to-surface, surface-to-air, and surface-to-surface experiments.
-- Powered acceleration followed by simplified post-burn speed loss.
-- Direct and lofted flight-path options.
-- Line-of-sight guidance demand against moving targets and fixed objectives.
-- Profile range-envelope termination.
-- Target manoeuvre for moving-target templates only.
-- Guidance-interruption and environmental-loss condition injection with visible effects on the computed run.
-- Explicit termination codes and evidence-based result explanations.
-- Reproducible initial conditions and recorded telemetry.
+- Fixed-step three-dimensional point-mass integration.
+- Powered acceleration followed by profile-defined post-burn speed loss.
+- Direct and commanded-loft paths.
+- Moving airborne targets and fixed surface objectives.
+- Heading/aspect, altitude difference, speed, target maneuver demand, and line-of-sight rate.
+- Educational standard-atmosphere calculation for temperature, pressure, density, speed of sound, and Mach.
+- Simplified altitude-density and loadout effects on post-burn loss.
+- Guidance-hold and increased-loss prepared conditions with explicit model effects.
+- Blue tactical decision changes modeled mid-course guidance-update cadence; Red tactical decision scales the selected turn demand. These are declared teaching rules, not doctrine or verified avionics behavior.
+- Reproducible seed, telemetry frames, termination codes, and outcome explanations.
 
-## Not yet modelled
+## Named A2A study models
 
-- Atmosphere tables, altitude-dependent drag, lift, mass depletion, or full six-degree-of-freedom motion.
-- Seeker acquisition, radar propagation, electronic warfare, autopilot lag, control-surface limits, fuzing, warhead effects, terrain masking, or damage.
-- Verified performance envelopes for named real-world systems.
-- Operational routes, current force posture, or strike-quality coordinates.
+Astra Mk-I, AIM-120C-5, and MICA IR have separate public-study parameter records. Their modeled speed, burn time, maneuver authority, loss, and study boundary are assumptions stored independently of public facts. They are not published launch-acceptability regions, no-escape zones, probabilities of kill, or universal ranges.
+
+## RASP
+
+The Real Air Situation Picture layer derives a side-specific estimated track from:
+
+- onboard radar state;
+- data-link or airborne-early-warning source;
+- jammer state;
+- range and model time;
+- prepared information interruption.
+
+It outputs source, classification, identification, confidence, track age, position uncertainty, and tracking/degraded/coasting state. Model Truth remains a separate view. This is a synthetic information-quality model, not radar propagation or operational C2 software.
+
+## Not yet modeled
+
+- Aircraft aerodynamic coefficient tables, mass depletion, store drag, engine maps, and full six-degree-of-freedom flight.
+- Verified instantaneous/sustained turn envelopes for aircraft variants.
+- Radar equation, scan volume, detection probability, track filters, identification logic, terrain masking, or electronic-attack waveforms.
+- Missile seeker acquisition, autopilot lag, control surfaces, fuzing, warhead effects, damage, or probability of kill.
+- Cooperative multi-aircraft tactics, formation geometry, off-board platform movement, or command latency.
+- Live weather, current force posture, operational routes, or strike-quality coordinates.
 
 ## Research path
 
-1. Publish equations, units, integrator tests, and conservation/error checks.
-2. Add atmosphere, drag, propulsion, and changing mass as replaceable model modules.
-3. Separate guidance law, autopilot response, and airframe limits.
-4. Add sensor and seeker models with explicit evidence and uncertainty.
+1. Publish equations, units, integration-error tests, and calibration fixtures.
+2. Replace scalar drag with atmosphere, aerodynamic, propulsion, and changing-mass modules.
+3. Add aircraft energy-maneuverability models and explicit decision-state effects.
+4. Add radar, data-link, seeker, and EW modules with source-level uncertainty.
 5. Add seeded Monte Carlo analysis and sensitivity attribution.
-6. Validate against public reference problems and document calibration boundaries.
+6. Validate against public reference problems and keep calibration claims separate from source facts.
 
-The scenario catalog, visual basemap, authored replay, and analytical simulation remain separate contracts. A scenario selects context and starting state; the engine computes only the behaviours its declared model supports.
+Scenario identity, basemap, authored replay, analytical simulation, air-picture derivation, and presentation state remain separate contracts.

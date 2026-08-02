@@ -2,4 +2,5 @@
 
 ci-local:
 	npm run lint
-	npm run build
+	npm run typecheck
+	npm test

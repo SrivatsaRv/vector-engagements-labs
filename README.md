@@ -1,98 +1,48 @@
-# vinext-starter
+# VECTOR Engagement Lab
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+VECTOR is a local-first browser workbench for public-data engagement experiments. It provides named Blue/Red force configuration, source-aware A2A loadouts, a deterministic Three.js simulation, Model Truth and Real Air Situation Picture views, repeatable run tools, D1 persistence, and printable/JSON reports.
 
-## Prerequisites
+## Run locally
 
-- Node.js `>=22.13.0`
-
-## Quick Start
+Requires Node.js 22.13 or newer.
 
 ```bash
 npm install
-npm run dev
-npm run build
+npm run dev -- --port 4317
 ```
 
-This starter does not use `wrangler.jsonc`.
+Open [http://localhost:4317](http://localhost:4317).
 
-## Included Shape
+Docker is optional:
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+docker compose up --build
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+## Product routes
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+- `/` — landing page with an embedded live model.
+- `/scenarios` — eight configured A2A, A2G, G2A, and G2G templates.
+- `/workbench?scenario=a2a-crossing-intercept` — configured experiment workbench.
+- `/report?sample=1` — explicitly labeled sample report.
+- `/lab` — backward-compatible alias; without a scenario it redirects to the library.
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+## Data and runtime
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+- `lib/capability-data.ts` contains the typed seed catalog for sources, platforms, subsystems, weapons, compatibility, and study models.
+- `db/schema.ts`, `db/bootstrap.ts`, and `drizzle/` define and seed Cloudflare D1.
+- `/api/catalog` reads the structured D1 catalog.
+- `/api/runs` saves and returns reproducible run snapshots.
+- Physics and RASP derivation execute client-side; saved records use the same API locally and on Cloudflare.
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+Public facts and simulation assumptions are intentionally separate. The named-system curves are public-study models, not verified real-world performance or operational predictions.
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+## Verification
 
-## Useful Commands
+```bash
+make ci-local
+```
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+This runs lint, TypeScript checks, a production Cloudflare-compatible build, route rendering tests, and deterministic simulation/RASP tests. `docker build -t vector-lab:local .` validates the optional container path.
 
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+Architecture, physics limits, source contracts, and product language are documented in [`docs/`](docs/README.md).

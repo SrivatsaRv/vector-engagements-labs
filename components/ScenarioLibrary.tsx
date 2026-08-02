@@ -25,11 +25,11 @@ export function ScenarioLibrary({ compact = false }: { compact?: boolean }) {
         const Icon = DOMAIN_ICONS[item.domain];
         return <article className="scenario-card" key={item.id}>
           <header><span className="scenario-domain"><Icon size={14}/>{item.domain}</span><span>{item.complexity}</span></header>
-          <div className="scenario-card-body"><span>{DOMAIN_DETAILS[item.domain].label}</span><h3>{item.title}</h3><p>{item.summary}</p><dl><div><dt className="force-friendly">Friendly</dt><dd>{item.blue}</dd></div><div><dt className="force-hostile">Opposing</dt><dd>{item.red}</dd></div><div><dt>Objective</dt><dd>{item.targetProfile}</dd></div><div><dt>Setting</dt><dd>{item.theatre}</dd></div></dl></div>
-          <footer><span>Model {item.version}</span><Link href={`/lab?scenario=${item.id}`}>Configure run <ArrowRight size={13}/></Link></footer>
+          <div className="scenario-card-body"><span>{DOMAIN_DETAILS[item.domain].label}</span><h3>{item.title}</h3><p>{item.summary}</p><dl><div><dt className="force-friendly">Blue Team</dt><dd>{item.blue}</dd></div><div><dt className="force-hostile">Red Team</dt><dd>{item.red}</dd></div><div><dt>Target object</dt><dd>{item.targetProfile}</dd></div><div><dt>Map setting</dt><dd>{item.theatre}</dd></div></dl></div>
+          <footer><span>Scenario {item.version}</span><Link href={`/workbench?scenario=${item.id}`}>Review and run <ArrowRight size={13}/></Link></footer>
         </article>;
       })}
     </div>
-    <div className="semantic-legend"><span><i className="friendly-key"/>Friendly</span><span><i className="hostile-key"/>Opposing</span><span><i className="validated-key"/>Validated state</span><span><i className="assumption-key"/>Assumption / caution</span></div>
+    <div className="semantic-legend"><span><i className="friendly-key"/>Blue Team</span><span><i className="hostile-key"/>Red Team</span><span><i className="validated-key"/>Ready to run</span><span><i className="assumption-key"/>Model limit / caution</span></div>
   </div>;
 }

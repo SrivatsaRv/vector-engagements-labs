@@ -46,5 +46,5 @@ export function TelemetryChart({ result, time }: { result: SimulationResult; tim
     context.lineWidth = 1;
     context.stroke();
   }, [result, time]);
-  return <canvas ref={canvas} aria-label="Speed and energy telemetry chart" />;
+  return <canvas ref={canvas} aria-label="Weapon speed and normalized weapon speed chart" />;
 }

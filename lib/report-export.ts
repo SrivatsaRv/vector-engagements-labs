@@ -1,4 +1,6 @@
 import type { Scenario, SimulationResult } from "@/lib/simulation";
+import { findPlatform, findWeapon, getSource } from "@/lib/capability-data";
+import { getCatalogObject } from "@/lib/object-catalog";
 
 export type ReportLibraryScenario = {
   id: string;
@@ -13,16 +15,52 @@ export type ReportLibraryScenario = {
 export type ReportData = {
   scenario: Scenario;
   result: SimulationResult;
-  events: Array<{ id: number; time: number; type: string; title: string; detail: string }>;
+  events: Array<{
+    id: number;
+    time: number;
+    type: string;
+    title: string;
+    detail: string;
+  }>;
   createdAt: string;
   engine: string;
   profileVersion: string;
   libraryScenario?: ReportLibraryScenario;
 };
 
-export function buildReportExport(data: ReportData, library: ReportLibraryScenario, sourceState: "example" | "last-saved") {
+export function buildReportExport(
+  data: ReportData,
+  library: ReportLibraryScenario,
+  sourceState: "example" | "last-saved",
+) {
+  const bluePlatform = findPlatform(data.scenario.bluePlatformId);
+  const blueWeapon = findWeapon(data.scenario.blueSystemId);
+  const redPlatform = findPlatform(data.scenario.redObjectId);
+  const redWeapon =
+    data.scenario.domain === "A2A"
+      ? findWeapon(data.scenario.redSystemId)
+      : undefined;
+  const blueObject = getCatalogObject(data.scenario.bluePlatformId);
+  const blueSystem = getCatalogObject(data.scenario.blueSystemId);
+  const redObject = getCatalogObject(data.scenario.redObjectId);
+  const profileFallback = {
+    id: `${data.scenario.blueSystemId}-public-study`,
+    version: "generic-public-study-v0.4",
+    studyLimitKm: null,
+    rationale:
+      "Scenario-specific teaching curve from the VECTOR public-study profile library.",
+  };
+  const weaponModel = blueWeapon?.model ?? profileFallback;
+  const sourceIds = [
+    ...new Set([
+      ...(bluePlatform?.sourceIds ?? blueObject.sourceIds ?? []),
+      ...(blueWeapon?.sourceIds ?? blueSystem.sourceIds ?? []),
+      ...(redPlatform?.sourceIds ?? redObject.sourceIds ?? []),
+      ...(redWeapon?.sourceIds ?? []),
+    ]),
+  ];
   return {
-    schema: "vector.engagement-report.v1",
+    schema: "vector.engagement-report.v2",
     export: {
       generatedAt: new Date().toISOString(),
       sourceState,
@@ -46,7 +84,26 @@ export function buildReportExport(data: ReportData, library: ReportLibraryScenar
         modelScope: library.scope,
       },
       configuration: {
-        profile: data.scenario.profile,
+        blueTeam: {
+          service: bluePlatform?.service ?? blueObject.country,
+          platform: bluePlatform?.designation ?? blueObject.designation,
+          weapon: blueWeapon?.designation ?? blueSystem.designation,
+          weaponQuantity: data.scenario.blueWeaponQuantity,
+          fuelPercent: data.scenario.blueFuelPercent,
+        },
+        redTeam: {
+          service: redPlatform?.service ?? redObject.country,
+          platform: redPlatform?.designation ?? redObject.designation,
+          weapon: redWeapon?.designation ?? null,
+          weaponQuantity: redWeapon ? data.scenario.redWeaponQuantity : 0,
+          fuelPercent: redPlatform ? data.scenario.redFuelPercent : null,
+        },
+        weaponStudyModel: {
+          id: weaponModel.id,
+          version: weaponModel.version,
+          studyLimitKm: weaponModel.studyLimitKm,
+          rationale: weaponModel.rationale,
+        },
         guidance: data.scenario.guidance,
         maneuver: data.scenario.maneuver,
         seed: data.scenario.seed,
@@ -60,17 +117,47 @@ export function buildReportExport(data: ReportData, library: ReportLibraryScenar
           launcherSpeed: { value: data.scenario.launcherSpeed, unit: "m/s" },
           targetSpeed: { value: data.scenario.targetSpeed, unit: "m/s" },
           targetDemand: { value: data.scenario.targetG, unit: "g" },
-          wind: { value: data.scenario.wind, unit: "m/s" },
+          windAndUnmodeledLoss: { value: data.scenario.wind, unit: "index" },
+        },
+        information: {
+          blueRadarMode: data.scenario.blueRadarMode,
+          redRadarMode: data.scenario.redRadarMode,
+          blueTrackSource: data.scenario.blueTrackSource,
+          redTrackSource: data.scenario.redTrackSource,
+          blueDatalink: data.scenario.blueDatalink,
+          redDatalink: data.scenario.redDatalink,
+          blueJammer: data.scenario.blueJammer,
+          redJammer: data.scenario.redJammer,
+        },
+        decisions: {
+          blue: data.scenario.blueDecision,
+          red: data.scenario.redDecision,
+        },
+        environment: {
+          atmosphere: "NASA educational standard atmosphere",
+          temperatureOffset: {
+            value: data.scenario.temperatureOffset,
+            unit: "degC",
+          },
         },
       },
     },
     result: {
       outcome: data.result.outcome,
       reason: data.result.reason,
-      closestApproach: { value: Math.round(data.result.closestApproach), unit: "m" },
-      timeOfFlight: { value: Number(data.result.timeOfFlight.toFixed(1)), unit: "s" },
+      closestApproach: {
+        value: Math.round(data.result.closestApproach),
+        unit: "m",
+      },
+      timeOfFlight: {
+        value: Number(data.result.timeOfFlight.toFixed(1)),
+        unit: "s",
+      },
       endSpeed: { value: Math.round(data.result.endSpeed), unit: "m/s" },
-      peakDemand: { value: Number(data.result.peakDemand.toFixed(1)), unit: "g" },
+      peakDemand: {
+        value: Number(data.result.peakDemand.toFixed(1)),
+        unit: "g",
+      },
     },
     session: {
       createdAt: data.createdAt,
@@ -90,15 +177,18 @@ export function buildReportExport(data: ReportData, library: ReportLibraryScenar
         target: frame.target,
         speed: Math.round(frame.speed),
         range: Math.round(frame.range),
-        energyIndex: Math.round(frame.energy),
+        normalizedWeaponSpeedPercent: Math.round(frame.energy),
         lineOfSightRate: Number(frame.losRate.toFixed(4)),
+        airDensity: Number(frame.airDensity.toFixed(5)),
+        mach: Number(frame.mach.toFixed(3)),
       })),
       units: {
         time: "s",
         position: "m",
         speed: "m/s",
         range: "m",
-        energyIndex: "percent",
+        normalizedWeaponSpeedPercent:
+          "percent of selected study-model maximum speed",
         lineOfSightRate: "rad/s",
       },
     },
@@ -106,8 +196,18 @@ export function buildReportExport(data: ReportData, library: ReportLibraryScenar
       engine: data.engine,
       profileLibrary: data.profileVersion,
       scenarioLibrary: `${library.id}@${library.version}`,
-      sourceClass: "public / illustrative",
-      reviewState: "demonstration",
+      sourceClass: "public / official-source-first",
+      sources: sourceIds
+        .map(getSource)
+        .filter(Boolean)
+        .map((source) => ({
+          id: source!.id,
+          publisher: source!.publisher,
+          title: source!.title,
+          url: source!.url,
+          sourceClass: source!.sourceClass,
+        })),
+      reviewState: "public-study",
     },
     limitations: [
       "Public-data educational approximation.",
@@ -118,6 +218,9 @@ export function buildReportExport(data: ReportData, library: ReportLibraryScenar
   };
 }
 
-export function reportExportFilename(library: ReportLibraryScenario, createdAt: string) {
+export function reportExportFilename(
+  library: ReportLibraryScenario,
+  createdAt: string,
+) {
   return `vector-${library.id}-${createdAt.slice(0, 10)}.json`;
 }
