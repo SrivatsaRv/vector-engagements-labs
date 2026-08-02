@@ -52,7 +52,7 @@ export function LandingMiniSim() {
     <div className="landing-sim-stage">
       <SimulationScene result={result} time={time} profile={definition.scenario.profile} layers={{ interceptor: true, target: true, lineOfSight: true }}/>
       <div className="landing-sim-readout"><span>Closing range</span><strong>{(frame.range / 1000).toFixed(1)} km</strong><span>Energy index</span><strong>{Math.round(frame.energy)}%</strong></div>
-      <div className="landing-sim-entities"><span><i className="blue-force"/><small>BLUE</small>{definition.blue}</span><span><i className="red-force"/><small>RED</small>{definition.red}</span></div>
+      <div className="landing-sim-entities"><span><i className="blue-force"/><small>FRIENDLY</small>{definition.blue}</span><span><i className="red-force"/><small>OPPOSING</small>{definition.red}</span></div>
       <div className="landing-sim-scope"><span>{definition.targetProfile}</span><small>{definition.theatre}</small></div>
     </div>
     <footer className="landing-sim-footer">

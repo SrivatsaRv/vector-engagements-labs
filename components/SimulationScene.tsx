@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { getFrameAt, PROFILES, type ProfileId, type SimulationResult, type Vec3 } from "@/lib/simulation";
+import { getFrameAt, type ProfileId, type SimulationResult, type Vec3 } from "@/lib/simulation";
 
 type Props = {
   result: SimulationResult;
@@ -56,17 +56,17 @@ export function SimulationScene({ result, time, profile, layers }: Props) {
         new THREE.BufferGeometry(),
         new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity }),
       );
-      const interceptorPath = makeLine(PROFILES[profile].color);
-      const targetPath = makeLine(0x27869b);
+      const interceptorPath = makeLine(0x2f6fb5);
+      const targetPath = makeLine(0xa64f43);
       const lineOfSight = makeLine(0x7d8790, 0.55);
       scene.add(interceptorPath, targetPath, lineOfSight);
       const interceptor = new THREE.Mesh(
         new THREE.SphereGeometry(430, 20, 20),
-        new THREE.MeshBasicMaterial({ color: PROFILES[profile].color }),
+        new THREE.MeshBasicMaterial({ color: 0x2f6fb5 }),
       );
       const target = new THREE.Mesh(
         new THREE.BoxGeometry(800, 280, 800),
-        new THREE.MeshBasicMaterial({ color: 0x27869b }),
+        new THREE.MeshBasicMaterial({ color: 0xa64f43 }),
       );
       scene.add(interceptor, target);
 

@@ -48,7 +48,7 @@ export const PROFILES = {
 } as const;
 
 export const DEFAULT_SCENARIO: Scenario = {
-  name: "Crossing target — guided introduction",
+  name: "Crossing-air-target intercept",
   objective: "Understand how launch geometry and target manoeuvre affect the result",
   profile: "medium",
   guidance: "loft",
@@ -70,6 +70,10 @@ function rotateToward(current: number, target: number, maximum: number) {
   return current + delta;
 }
 
+function angularDifference(current: number, previous: number) {
+  return Math.atan2(Math.sin(current - previous), Math.cos(current - previous));
+}
+
 export function simulate(input: Scenario, profileId: ProfileId = input.profile): SimulationResult {
   const profile = PROFILES[profileId];
   const dt = 0.1;
@@ -85,6 +89,7 @@ export function simulate(input: Scenario, profileId: ProfileId = input.profile):
   const tz = input.altitude + input.targetDelta;
   let targetHeading = ((180 - input.aspect) * Math.PI) / 180;
   const targetSpeed = input.targetSpeed;
+  let previousLosAngle = Math.atan2(ty - iy, tx - ix);
   let peakDemand = 0;
   let closestApproach = Number.POSITIVE_INFINITY;
   let outcome: SimulationResult["outcome"] = "Miss";
@@ -104,6 +109,8 @@ export function simulate(input: Scenario, profileId: ProfileId = input.profile):
     const range = Math.hypot(dx, dy, dz);
     closestApproach = Math.min(closestApproach, range);
     const desiredHeading = Math.atan2(dy, dx);
+    const losRate = Math.abs(angularDifference(desiredHeading, previousLosAngle)) / dt;
+    previousLosAngle = desiredHeading;
     const availableG = Math.max(5, profile.turnG * (0.45 + 0.55 * Math.min(interceptorSpeed / profile.maxSpeed, 1)));
     const previousHeading = interceptorHeading;
     interceptorHeading = rotateToward(interceptorHeading, desiredHeading, (availableG * gravity * dt) / Math.max(interceptorSpeed, 100));
@@ -126,7 +133,6 @@ export function simulate(input: Scenario, profileId: ProfileId = input.profile):
 
     const energy = Math.max(0, Math.min(100, ((interceptorSpeed - 210) / (profile.maxSpeed - 210)) * 100));
     const phase = time < profile.burn ? "Motor burn" : energy > 30 ? "Midcourse" : "Terminal";
-    const losRate = Math.abs(Math.atan2(dy, dx) - interceptorHeading) / dt;
     if (Math.round(time * 10) % 5 === 0) {
       frames.push({
         t: time,

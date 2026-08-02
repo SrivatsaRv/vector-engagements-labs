@@ -3,6 +3,7 @@
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { SimulationScene } from "@/components/SimulationScene";
+import { PrintTrajectory } from "@/components/PrintTrajectory";
 import { getFrameAt, PROFILES, simulate, type ProfileId, type Scenario, type SimulationResult } from "@/lib/simulation";
 
 export function ReportReplay({ scenario, result }: { scenario: Scenario; result: SimulationResult }) {
@@ -42,9 +43,10 @@ export function ReportReplay({ scenario, result }: { scenario: Scenario; result:
     <header><div><span>Three-dimensional result</span><strong>Engagement geometry replay</strong></div><p>Drag to orbit. The view uses abstract symbols and the exact run recorded in this report.</p></header>
     <div className="report-replay-stage">
       <SimulationScene result={result} time={time} profile={scenario.profile} layers={{ interceptor: true, target: true, lineOfSight: true }}/>
-      <div className="report-replay-metrics"><ReportReplayMetric label="Time" value={`${time.toFixed(1)} s`}/><ReportReplayMetric label="Phase" value={frame.phase}/><ReportReplayMetric label="Range" value={`${(frame.range / 1000).toFixed(1)} km`}/><ReportReplayMetric label="Energy" value={`${Math.round(frame.energy)}%`}/></div>
-      <div className="report-replay-key"><span><i className="blue-force"/>Interceptor</span><span><i className="report-track"/>Target</span><span><i className="report-los"/>Line of sight</span></div>
+      <div className="report-replay-metrics"><ReportReplayMetric label="Time" value={`${time.toFixed(1)} s`}/><ReportReplayMetric label="Phase" value={frame.phase}/><ReportReplayMetric label="3D separation" value={`${(frame.range / 1000).toFixed(1)} km`}/><ReportReplayMetric label="Energy index" value={`${Math.round(frame.energy)}%`}/></div>
+      <div className="report-replay-key"><span><i className="blue-force"/>Friendly interceptor</span><span><i className="red-force"/>Opposing track</span><span><i className="report-los"/>Line of sight</span></div>
     </div>
+    <PrintTrajectory result={result}/>
     <div className="report-replay-controls">
       <button aria-label={playing ? "Pause report replay" : "Play report replay"} onClick={() => setPlaying((value) => !value)}>{playing ? <Pause size={14}/> : <Play size={14}/>}</button>
       <button aria-label="Restart report replay" onClick={() => { setPlaying(false); setTime(0); }}><RotateCcw size={14}/></button>
