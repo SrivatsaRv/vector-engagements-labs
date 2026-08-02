@@ -1,7 +1,10 @@
-import { DEFAULT_SCENARIO, type Scenario } from "@/lib/simulation";
+import { DEFAULT_SCENARIO, type EngagementDomain, type Scenario } from "@/lib/simulation";
 
-export type EngagementDomain = "A2A" | "A2G" | "G2A" | "G2G";
+export type { EngagementDomain } from "@/lib/simulation";
 export type ScenarioComplexity = "Foundation" | "Intermediate" | "Advanced";
+export type FocusOption = { title: string; description: string; objective: string };
+export type PreparedEvent = { title: string; description: string; duration: number; physicsEffect: "guidance-hold" | "loss-increase" };
+export type RunVariant = { title: string; description: string };
 
 export type ScenarioDefinition = {
   id: string;
@@ -16,6 +19,12 @@ export type ScenarioDefinition = {
   complexity: ScenarioComplexity;
   scope: string;
   tags: string[];
+  targetMotion: "moving" | "fixed";
+  environment: string;
+  focusOptions: FocusOption[];
+  preparedEvent: PreparedEvent;
+  runVariants: [RunVariant, RunVariant, RunVariant];
+  presetRationale: { profile: string; geometry: string; conditions: string };
   scenario: Scenario;
 };
 
@@ -27,6 +36,29 @@ export const DOMAIN_DETAILS: Record<EngagementDomain, { label: string; descripti
 };
 
 const scenario = (patch: Partial<Scenario>): Scenario => ({ ...DEFAULT_SCENARIO, ...patch });
+
+const movingFocus: FocusOption[] = [
+  { title: "Launch window", description: "Compare how starting distance and aspect change the intercept opportunity.", objective: "Compare how starting distance and aspect change the intercept opportunity." },
+  { title: "Target maneuver", description: "Measure how a turn changes closing distance, demand, and completion time.", objective: "Measure how target maneuver changes closing distance and intercept demand." },
+  { title: "Tracking interruption", description: "Mark how an instructor-provided information gap changes the trainee decision.", objective: "Assess the trainee decision when track information is temporarily degraded." },
+];
+const fixedFocus: FocusOption[] = [
+  { title: "Flight path", description: "Compare direct and lofted paths to the same fixed objective.", objective: "Compare direct and lofted paths to the same fixed objective." },
+  { title: "Range margin", description: "Check whether the selected profile covers the starting distance with margin.", objective: "Check whether the selected flight profile covers the starting distance with margin." },
+  { title: "Environmental loss", description: "Measure how the loss assumption changes flight time and terminal speed.", objective: "Measure how the environmental-loss assumption changes flight time and terminal speed." },
+];
+const trackEvent: PreparedEvent = { title: "Track-information interruption", description: "For eight model seconds, guidance holds the last available line-of-sight command instead of receiving updates.", duration: 8, physicsEffect: "guidance-hold" };
+const navigationEvent: PreparedEvent = { title: "Environmental-loss increase", description: "From the selected model time onward, the environmental-loss index increases by eight points.", duration: 0, physicsEffect: "loss-increase" };
+const movingRuns: [RunVariant, RunVariant, RunVariant] = [
+  { title: "Baseline", description: "Configured geometry and target behavior" },
+  { title: "Information interruption", description: "Same physics with an instructor decision cue" },
+  { title: "Higher target demand", description: "Increased target turn demand" },
+];
+const fixedRuns: [RunVariant, RunVariant, RunVariant] = [
+  { title: "Baseline", description: "Configured flight path and loss assumption" },
+  { title: "Direct-path comparison", description: "Same objective using a direct path" },
+  { title: "Higher-loss comparison", description: "Environmental-loss index increased" },
+];
 
 export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
@@ -42,7 +74,13 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     complexity: "Foundation",
     scope: "One launcher, one manoeuvring target and one interceptor.",
     tags: ["fighter vs fighter", "crossing geometry", "energy"],
-    scenario: scenario({ name: "Crossing-air-target intercept", objective: "Understand how launch geometry and target manoeuvre affect the result" }),
+    targetMotion: "moving",
+    environment: "Standard atmosphere · no terrain model",
+    focusOptions: movingFocus,
+    preparedEvent: trackEvent,
+    runVariants: movingRuns,
+    presetRationale: { profile: "The medium-range air-interceptor profile covers the 52 km starting distance inside its 68 km model envelope.", geometry: "A 145° crossing aspect and 1,500 m altitude difference create a crossing-target training problem.", conditions: "A four-g defensive break begins after five model seconds; environmental loss is set to the library baseline." },
+    scenario: scenario({ domain: "A2A", name: "Crossing-air-target intercept", objective: "Compare how starting distance and target maneuver change the intercept opportunity." }),
   },
   {
     id: "a2a-defensive-break",
@@ -57,7 +95,13 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     complexity: "Intermediate",
     scope: "Single engagement with a prepared target manoeuvre.",
     tags: ["fighter vs fighter", "defensive manoeuvre", "timing"],
-    scenario: scenario({ name: "Defensive-break intercept", objective: "Assess how a late defensive break changes the intercept window", profile: "short", guidance: "direct", range: 19000, aspect: 120, maneuver: "break", targetG: 7 }),
+    targetMotion: "moving",
+    environment: "Standard atmosphere · no terrain model",
+    focusOptions: movingFocus,
+    preparedEvent: trackEvent,
+    runVariants: movingRuns,
+    presetRationale: { profile: "The short-range air-interceptor profile keeps the 19 km run inside its 22 km model envelope.", geometry: "A 120° aspect creates a crossing engagement rather than a head-on or tail-chase case.", conditions: "A seven-g target break creates the primary comparison against the baseline run." },
+    scenario: scenario({ domain: "A2A", name: "Defensive-break intercept", objective: "Measure how a late target break changes the intercept window.", profile: "short", guidance: "direct", range: 19000, aspect: 120, maneuver: "break", targetG: 7 }),
   },
   {
     id: "a2g-emitter-corridor",
@@ -72,7 +116,13 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     complexity: "Intermediate",
     scope: "One airborne launch point and one fixed synthetic emitter; no electronic-order-of-battle claim.",
     tags: ["aircraft vs sensor", "fixed target", "approach"],
-    scenario: scenario({ name: "Emitter-approach study", objective: "Compare direct and lofted approach geometry against a fixed emitting sensor", profile: "medium", altitude: 7800, targetDelta: -7750, range: 44000, aspect: 180, launcherSpeed: 250, targetSpeed: 0, maneuver: "steady", targetG: 0 }),
+    targetMotion: "fixed",
+    environment: "Standard atmosphere · fixed objective · no terrain masking",
+    focusOptions: fixedFocus,
+    preparedEvent: navigationEvent,
+    runVariants: fixedRuns,
+    presetRationale: { profile: "The medium standoff profile covers the 44 km starting distance inside its 80 km model envelope.", geometry: "The airborne start is 7,800 m above the fixed objective and uses a direct comparison line.", conditions: "The objective is fixed; target speed and maneuver are locked to zero." },
+    scenario: scenario({ domain: "A2G", name: "Emitter-approach study", objective: "Compare direct and lofted paths to the same fixed emitting objective.", profile: "medium", altitude: 7800, targetDelta: -7750, range: 44000, aspect: 180, launcherSpeed: 250, targetSpeed: 0, maneuver: "steady", targetG: 0 }),
   },
   {
     id: "a2g-protected-node",
@@ -87,7 +137,13 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     complexity: "Advanced",
     scope: "One attack path and one abstract defensive branch; no real installation geometry.",
     tags: ["aircraft vs ground", "protected objective", "route timing"],
-    scenario: scenario({ name: "Protected-node approach", objective: "Understand how range and flight profile alter exposure time against a protected fixed objective", profile: "sustained", altitude: 9200, targetDelta: -9150, range: 76000, aspect: 180, launcherSpeed: 265, targetSpeed: 0, maneuver: "steady", targetG: 0 }),
+    targetMotion: "fixed",
+    environment: "Standard atmosphere · fixed objective · defence represented as instructor context",
+    focusOptions: fixedFocus,
+    preparedEvent: navigationEvent,
+    runVariants: fixedRuns,
+    presetRationale: { profile: "The extended standoff profile provides range margin for the 76 km starting distance.", geometry: "The airborne start is 9,200 m above a fixed surface objective; the baseline uses a lofted path.", conditions: "Defence interaction is contextual only and does not alter the point-mass physics." },
+    scenario: scenario({ domain: "A2G", name: "Protected-node approach", objective: "Compare path choice and exposure time against a fixed protected objective.", profile: "sustained", altitude: 9200, targetDelta: -9150, range: 76000, aspect: 180, launcherSpeed: 265, targetSpeed: 0, maneuver: "steady", targetG: 0 }),
   },
   {
     id: "g2a-point-defence",
@@ -102,7 +158,13 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     complexity: "Foundation",
     scope: "One ground launcher, one sensor-quality assumption and one airborne target.",
     tags: ["SAM scenario", "point defence", "crossing target"],
-    scenario: scenario({ name: "Point air-defence intercept", objective: "Identify how track aspect and range shape a surface-to-air engagement window", profile: "medium", guidance: "loft", altitude: 80, targetDelta: 7920, range: 48000, aspect: 135, launcherSpeed: 0, targetSpeed: 245, maneuver: "weave", targetG: 3 }),
+    targetMotion: "moving",
+    environment: "Standard atmosphere · one active air-defence layer",
+    focusOptions: movingFocus,
+    preparedEvent: trackEvent,
+    runVariants: movingRuns,
+    presetRationale: { profile: "The area-defence profile covers the 48 km starting distance inside its 85 km model envelope.", geometry: "A ground launch against a target 7,920 m higher creates the vertical geometry for this run.", conditions: "The target uses a three-g weaving turn after five model seconds." },
+    scenario: scenario({ domain: "G2A", name: "Point air-defence intercept", objective: "Compare how track aspect and distance change the air-defence engagement window.", profile: "medium", guidance: "loft", altitude: 80, targetDelta: 7920, range: 48000, aspect: 135, launcherSpeed: 0, targetSpeed: 245, maneuver: "weave", targetG: 3 }),
   },
   {
     id: "g2a-layered-screen",
@@ -117,7 +179,13 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     complexity: "Advanced",
     scope: "Layer sequencing is represented in the run plan; the current physics run resolves one active layer at a time.",
     tags: ["layered SAM", "sensor hand-off", "run files"],
-    scenario: scenario({ name: "Layered air-defence sequence", objective: "Practice layer selection and reassessment during a high-altitude transit", profile: "sustained", altitude: 100, targetDelta: 11900, range: 92000, aspect: 155, launcherSpeed: 0, targetSpeed: 305, maneuver: "weave", targetG: 4 }),
+    targetMotion: "moving",
+    environment: "Standard atmosphere · one active layer resolved per run",
+    focusOptions: movingFocus,
+    preparedEvent: trackEvent,
+    runVariants: movingRuns,
+    presetRationale: { profile: "The extended-area profile provides range margin for the 92 km starting distance.", geometry: "A ground start and 11,900 m altitude difference represent a high-altitude transit.", conditions: "Layer hand-off remains a run-plan decision; the physics resolves one selected layer." },
+    scenario: scenario({ domain: "G2A", name: "Layered air-defence sequence", objective: "Compare layer selection and reassessment during a high-altitude transit.", profile: "sustained", altitude: 100, targetDelta: 11900, range: 92000, aspect: 155, launcherSpeed: 0, targetSpeed: 305, maneuver: "weave", targetG: 4 }),
   },
   {
     id: "g2g-supersonic-corridor",
@@ -132,7 +200,13 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     complexity: "Intermediate",
     scope: "Public-data conceptual trajectory only; no named system, precise site or operational route.",
     tags: ["ground strike", "supersonic class", "trajectory"],
-    scenario: scenario({ name: "Surface-strike trajectory", objective: "Compare direct and lofted trajectory assumptions for a synthetic fixed objective", profile: "sustained", altitude: 50, targetDelta: 0, range: 105000, aspect: 180, launcherSpeed: 0, targetSpeed: 0, maneuver: "steady", targetG: 0 }),
+    targetMotion: "fixed",
+    environment: "Standard atmosphere · fixed objective · no terrain model",
+    focusOptions: fixedFocus,
+    preparedEvent: navigationEvent,
+    runVariants: fixedRuns,
+    presetRationale: { profile: "The extended-range surface-strike profile covers the 105 km starting distance inside its 170 km model envelope.", geometry: "Both launcher and objective are fixed near the reference surface; the baseline uses a lofted path.", conditions: "Target motion and evasive maneuver do not apply to a fixed objective." },
+    scenario: scenario({ domain: "G2G", name: "Surface-strike trajectory", objective: "Compare direct and lofted paths to the same fixed objective.", profile: "sustained", altitude: 50, targetDelta: 0, range: 105000, aspect: 180, launcherSpeed: 0, targetSpeed: 0, maneuver: "steady", targetG: 0 }),
   },
   {
     id: "g2g-defended-route",
@@ -147,7 +221,13 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     complexity: "Advanced",
     scope: "Trajectory sensitivity and run comparison only; defence interaction remains an abstract event branch.",
     tags: ["ground to ground", "defended corridor", "comparison"],
-    scenario: scenario({ name: "Defended-corridor comparison", objective: "Test how trajectory choice and assumed environmental loss affect a repeatable fixed-target run", profile: "sustained", altitude: 50, targetDelta: 0, range: 118000, aspect: 180, launcherSpeed: 0, targetSpeed: 0, maneuver: "steady", targetG: 0, wind: 22 }),
+    targetMotion: "fixed",
+    environment: "Standard atmosphere · fixed objective · defence interaction not modeled",
+    focusOptions: fixedFocus,
+    preparedEvent: navigationEvent,
+    runVariants: fixedRuns,
+    presetRationale: { profile: "The extended-range surface-strike profile was selected because 118 km exceeds the medium profile's 100 km envelope.", geometry: "The launcher and objective are fixed at the reference surface; the baseline lofted path is the comparison case.", conditions: "Environmental loss is set to 22 for this sensitivity run. Defence interaction is not part of the physics." },
+    scenario: scenario({ domain: "G2G", name: "Defended-corridor comparison", objective: "Measure how flight path and environmental loss change time and terminal speed at a fixed objective.", profile: "sustained", altitude: 50, targetDelta: 0, range: 118000, aspect: 180, launcherSpeed: 0, targetSpeed: 0, maneuver: "steady", targetG: 0, wind: 22 }),
   },
 ];
 

@@ -1,10 +1,10 @@
 # VECTOR Engagement Lab
 
-VECTOR is a browser simulation for enthusiasts and instructors. It provides a public landing page with a playable model, an operational Lab Home, a versioned Scenario Library, guided scenario design, abstract three-dimensional engagement replay, advanced Instructor Station controls, prepared fault introduction, run-file concepts, debriefing, and printable/JSON report generation.
+VECTOR is a browser simulation for enthusiasts. It provides a public landing page with a playable model, an operational Lab Home, a versioned Scenario Library, guided scenario configuration, abstract three-dimensional engagement replay, advanced experiment tools, condition injection, repeatable run sets, results review, and printable/JSON report generation.
 
 ## Scenario Library
 
-The first-cut library is stored in `lib/scenarios.ts` as typed, version-controlled definitions. It covers A2A, A2G, G2A, and G2G training templates. Each definition includes its Red/Blue roles, target profile, generalized theatre, complexity, model scope, tags, version, and complete simulation configuration.
+The first-cut library is stored in `lib/scenarios.ts` as typed, version-controlled definitions. It covers A2A, A2G, G2A, and G2G experiment templates. Each definition includes its friendly/opposing roles, target motion, environment, domain-specific capability profile, prepared condition, run variants, version, preset rationale, and complete simulation configuration.
 
 Library cards link to `/lab?scenario={scenario-id}`. The lab preserves that identity through session events and report generation. The report records the scenario ID and version, engine version, profile version, model scope, target profile, theatre, and random seed.
 
@@ -15,7 +15,7 @@ When the service layer is introduced, this TypeScript contract becomes the API r
 ## UI acceptance rules
 
 - Fit workflows to their task rather than forcing every surface to fill the screen.
-- Scenario Design keeps its primary action visible and the desktop Conduct view keeps left controls, canvas, and right detail together.
+- Scenario configuration keeps its primary action visible and the desktop Run view keeps left controls, canvas, and right detail together.
 - Example and saved-result states are labeled explicitly.
 - View and comparison controls show their scope before activation.
 - Editable controls and derived metrics use distinct visual treatments.
@@ -26,9 +26,10 @@ When the service layer is introduced, this TypeScript contract becomes the API r
 
 - `/` explains the product; `/lab` is the operational Lab Home and always presents a clear next action.
 - `/lab?scenario={scenario-id}` opens the workbench only after a template has been chosen.
-- The workbench lifecycle is **Design → Validate → Conduct → Debrief**.
-- Design contains five selectable authoring steps: **Intent → Entities → Geometry → Events → Review**. These steps configure one scenario; they are not a second session lifecycle.
-- Pre-populated values are labeled as template starting values.
+- The workbench lifecycle is **Configure → Run → Results**.
+- Configure contains five selectable steps: **Brief → Forces → Flight → Conditions → Review**.
+- A library template opens at Review because it is already configured. Users can run it unchanged or edit any earlier step. Guided entry is an explicit alternative.
+- Advanced experiment tools—condition injection, scenario variants, repeatable run sets, replay, and reporting—remain within the same enthusiast workflow rather than introducing an instructor persona.
 
 ## Visual semantics
 
@@ -40,7 +41,7 @@ When the service layer is introduced, this TypeScript contract becomes the API r
 
 ## Product posture
 
-- Generic interceptor profiles rather than named weapon claims.
+- Domain-specific public model profiles rather than named weapon claims.
 - Abstract entity symbols rather than aircraft renders.
 - Public-data educational approximation with visible method and provenance.
 - Scenario values, engine version, profile version, seed, events, and results travel with reports.
@@ -54,7 +55,7 @@ The application uses the bundled vinext runtime and builds to a Cloudflare Worke
 
 - `/` — product landing page.
 - `/scenarios` — filterable A2A, A2G, G2A, and G2G Scenario Library.
-- `/lab` — operational Lab Home with guided and Instructor Station entry paths.
+- `/lab` — operational Lab Home with one enthusiast workflow and progressive experiment depth.
 - `/lab?scenario={scenario-id}` — lab initialized from a versioned library template.
 - `/report` — printable and JSON-exportable debrief report.
 
