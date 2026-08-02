@@ -1,22 +1,16 @@
-# Cloudflare runtime mapping
+# Runtime and deployment mapping
 
-| VECTOR capability                            | Cloudflare component                                                     | Current status                                            |
-| -------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------- |
-| Landing, scenario library, workbench, report | Workers-compatible vinext application                                    | Implemented                                               |
-| Catalog, compatibility, assertions           | D1                                                                       | Implemented with runtime bootstrap and Drizzle migrations |
-| Saved run snapshots                          | D1                                                                       | Implemented                                               |
-| Large telemetry/replay artifacts             | R2                                                                       | Planned; keep only object keys and checksums in D1        |
-| Profile/account service                      | Worker API + D1                                                          | Planned                                                   |
-| Authentication                               | Cloudflare Access for private deployments or application auth in Workers | Planned                                                   |
-| Live shared experiment room                  | Durable Object                                                           | Optional; only needed for synchronized multi-user state   |
-| Caching/static assets                        | Workers cache/CDN                                                        | Available through deployment                              |
+| Capability | Local Compose | Cloudflare-oriented deployment |
+| --- | --- | --- |
+| Web UI and API | Versioned VECTOR image on port 4317 | Worker-compatible vinext build |
+| Catalog and snapshots | PostgreSQL 16 + PostGIS 3.4 | PostgreSQL reached through Hyperdrive |
+| Browser physics | Client main thread today | Same; Web Worker/WASM migration does not change contracts |
+| Static assets | Local application | Cloudflare CDN/cache |
+| Large artifacts | Files/JSON download today | R2 when durable artifact custody is required |
+| Multi-user synchronization | Not present | Durable Objects only if multiplayer is later authorized |
 
-## Deployment decision
+Cloudflare does not run the PostgreSQL container. Hyperdrive supplies the Worker with a database connection string and connection management. Local development uses the same binding shape with a direct Compose connection. The app and physics do not require a server round trip per model step.
 
-The current workload should remain on Cloudflare: the physics runs client-side, APIs are short catalog/snapshot operations, and D1 fits the structured metadata. A dedicated Hetzner service becomes useful only when server-side Monte Carlo batches, native/WASM jobs exceeding Worker limits, large model inference, or long-running authoritative simulation are introduced. That compute can remain a separate worker service while Cloudflare continues to serve the UI, identity edge, catalog, and artifact index.
+Compose is intentionally small: one PostGIS service, one one-shot migration/seed service using the same application image, and one web service. The web container serves the built Worker bundle through Wrangler's local Cloudflare runtime; it does not run the HMR development server. Images are explicitly versioned; PostGIS is digest pinned; startup is gated by database health and successful migration.
 
-## Local parity
-
-Local development uses the Cloudflare-compatible vinext runtime and local D1 state. The public UI must not depend on a remote service to conduct a deterministic run. Run records are saved through the same `/api/runs` contract used in deployment.
-
-`docker compose up --build` provides an optional local container at `http://localhost:4317`. The container still runs the Cloudflare-compatible application and keeps local Wrangler/D1 state in a named volume. Docker Compose is a development and self-hosting convenience; it is not the Cloudflare production deployment unit.
+A Hetzner or similar budget server remains a valid PostgreSQL origin and can also host the complete Compose stack. Server-side native batches are a future compute concern, not a reason to move interactive playback out of the browser.

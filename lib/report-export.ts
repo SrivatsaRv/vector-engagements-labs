@@ -1,6 +1,7 @@
 import type { Scenario, SimulationResult } from "@/lib/simulation";
 import { findPlatform, findWeapon, getSource } from "@/lib/capability-data";
 import { getCatalogObject } from "@/lib/object-catalog";
+import { findWeaponSimulationModel } from "@/lib/simulation-models";
 
 export type ReportLibraryScenario = {
   id: string;
@@ -25,6 +26,12 @@ export type ReportData = {
   createdAt: string;
   engine: string;
   profileVersion: string;
+  packageProvenance?: {
+    schemaVersion: string;
+    contentHash: string;
+    draftRevision: number;
+    frameHash?: string;
+  };
   libraryScenario?: ReportLibraryScenario;
 };
 
@@ -45,12 +52,26 @@ export function buildReportExport(
   const redObject = getCatalogObject(data.scenario.redObjectId);
   const profileFallback = {
     id: `${data.scenario.blueSystemId}-public-study`,
-    version: "generic-public-study-v0.4",
-    studyLimitKm: null,
+    version: "unavailable",
     rationale:
-      "Scenario-specific teaching curve from the VECTOR public-study profile library.",
+      "No coefficient record was available when this export was generated.",
   };
-  const weaponModel = blueWeapon?.model ?? profileFallback;
+  const simulationModel = findWeaponSimulationModel(
+    data.scenario.blueSystemId,
+  );
+  const weaponModel = simulationModel ?? profileFallback;
+  const modelCoefficients = simulationModel
+    ? {
+        launchMassKg: simulationModel.launchMassKg,
+        dryMassKg: simulationModel.dryMassKg,
+        poweredFlightSeconds: simulationModel.poweredFlightSeconds,
+        thrustNewtons: simulationModel.thrustNewtons,
+        referenceAreaM2: simulationModel.referenceAreaM2,
+        dragCoefficient: simulationModel.dragCoefficient,
+        navigationConstant: simulationModel.navigationConstant,
+        maximumCommandG: simulationModel.maximumCommandG,
+      }
+    : null;
   const sourceIds = [
     ...new Set([
       ...(bluePlatform?.sourceIds ?? blueObject.sourceIds ?? []),
@@ -101,8 +122,8 @@ export function buildReportExport(
         weaponStudyModel: {
           id: weaponModel.id,
           version: weaponModel.version,
-          studyLimitKm: weaponModel.studyLimitKm,
           rationale: weaponModel.rationale,
+          coefficients: modelCoefficients,
         },
         guidance: data.scenario.guidance,
         maneuver: data.scenario.maneuver,
@@ -110,6 +131,10 @@ export function buildReportExport(
         geometry: {
           launchRange: { value: data.scenario.range, unit: "m" },
           launchAltitude: { value: data.scenario.altitude, unit: "m" },
+          commandedCruiseAltitude: {
+            value: data.scenario.cruiseAltitude,
+            unit: "m",
+          },
           targetAltitudeDelta: { value: data.scenario.targetDelta, unit: "m" },
           aspect: { value: data.scenario.aspect, unit: "deg" },
         },
@@ -117,7 +142,7 @@ export function buildReportExport(
           launcherSpeed: { value: data.scenario.launcherSpeed, unit: "m/s" },
           targetSpeed: { value: data.scenario.targetSpeed, unit: "m/s" },
           targetDemand: { value: data.scenario.targetG, unit: "g" },
-          windAndUnmodeledLoss: { value: data.scenario.wind, unit: "index" },
+          eastWind: { value: data.scenario.wind, unit: "m/s" },
         },
         information: {
           blueRadarMode: data.scenario.blueRadarMode,
@@ -194,6 +219,10 @@ export function buildReportExport(
     },
     provenance: {
       engine: data.engine,
+      scenarioSchema: data.packageProvenance?.schemaVersion ?? "unrecorded",
+      scenarioContentHash: data.packageProvenance?.contentHash ?? "unrecorded",
+      draftRevision: data.packageProvenance?.draftRevision ?? 0,
+      frameHash: data.packageProvenance?.frameHash ?? "recorded by saved-run envelope",
       profileLibrary: data.profileVersion,
       scenarioLibrary: `${library.id}@${library.version}`,
       sourceClass: "public / official-source-first",

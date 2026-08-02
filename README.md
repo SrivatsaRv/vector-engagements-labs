@@ -1,48 +1,56 @@
 # VECTOR Engagement Lab
 
-VECTOR is a local-first browser workbench for public-data engagement experiments. It provides named Blue/Red force configuration, source-aware A2A loadouts, a deterministic Three.js simulation, Model Truth and Real Air Situation Picture views, repeatable run tools, D1 persistence, and printable/JSON reports.
+VECTOR is a local-first browser workbench for public-data engagement experiments. A normalized PostgreSQL/PostGIS catalog resolves versioned scenario packages; deterministic physics, map/3D playback, telemetry, comparison, and reporting execute from one browser-engine frame contract.
 
-## Run locally
+## Run the complete local stack
 
-Requires Node.js 22.13 or newer.
+Docker Compose starts the pinned PostGIS database, applies checksum-tracked migrations, loads idempotent fixtures, and serves the built Worker bundle through the local Cloudflare runtime on port 4317.
 
 ```bash
-npm install
+docker compose up --build -d
+docker compose ps
+```
+
+Open [http://localhost:4317](http://localhost:4317). The database is exposed locally on port `55433` for inspection. Images use explicit versions: `reachdefence/vector-engagement-lab:0.1.0`, `node:22.18.0-bookworm-slim`, and digest-pinned `postgis/postgis:16-3.4`.
+
+Useful routes:
+
+- `/` — product entry and scenario quick start
+- `/scenarios` — eight versioned templates
+- `/workbench?scenario=a2a-crossing-intercept` — Construct, Simulate, Observe, Explain, Compare, Report
+- `/math` — published equations, model limits, and reproducibility contract
+- `/symbols` — tactical symbol and lifecycle reference
+
+For host-side development, start the database and seed it first:
+
+```bash
+make db-up
 npm run dev -- --port 4317
 ```
 
-Open [http://localhost:4317](http://localhost:4317).
+## Canonical product journey
 
-Docker is optional:
+**Enter → Construct → Simulate → Observe → Explain → Compare → Report**.
 
-```bash
-docker compose up --build
-```
+“Define,” “Place,” “Configure,” and “Model” are sections within Construct, not competing top-level workflows. Reports require an explicit conducted and saved run; `/report?sample=1` is the only example-data mode.
 
-## Product routes
+## Runtime boundaries
 
-- `/` — landing page with an embedded live model.
-- `/scenarios` — eight configured A2A, A2G, G2A, and G2G templates.
-- `/workbench?scenario=a2a-crossing-intercept` — configured experiment workbench.
-- `/report?sample=1` — explicitly labeled sample report.
-- `/lab` — backward-compatible alias; without a scenario it redirects to the library.
+- PostgreSQL/PostGIS: sources, objects, compatibility, model coefficients, public-reference installations, template versions, and saved run snapshots.
+- Scenario compiler: resolves builder state and catalog records into one immutable engine package.
+- Browser engine: fixed-step 3DOF/point-mass integration and event lifecycle.
+- Presentation: MapLibre, Three.js, telemetry, RASP, explanation, comparison, and report consume the same sampled frames.
+- Carried weapons are inventory until their launch event. They become visible tracks only when spawned with inherited launcher position and velocity.
 
-## Data and runtime
-
-- `lib/capability-data.ts` contains the typed seed catalog for sources, platforms, subsystems, weapons, compatibility, and study models.
-- `db/schema.ts`, `db/bootstrap.ts`, and `drizzle/` define and seed Cloudflare D1.
-- `/api/catalog` reads the structured D1 catalog.
-- `/api/runs` saves and returns reproducible run snapshots.
-- Physics and RASP derivation execute client-side; saved records use the same API locally and on Cloudflare.
-
-Public facts and simulation assumptions are intentionally separate. The named-system curves are public-study models, not verified real-world performance or operational predictions.
+`lib/capability-data.ts`, `lib/installations.ts`, `lib/scenarios.ts`, and `lib/simulation-models.ts` are deterministic seed/test fixtures. Runtime catalog reads come from `/api/catalog`; saved snapshots use `/api/runs`.
 
 ## Verification
 
 ```bash
 make ci-local
+make integration-local
 ```
 
-This runs lint, TypeScript checks, a production Cloudflare-compatible build, route rendering tests, and deterministic simulation/RASP tests. `docker build -t vector-lab:local .` validates the optional container path.
+The first command runs lint, type checks, production build, route checks, and deterministic engine tests. The second applies migrations/seeds and validates PostGIS SRID, row coverage, scenario count, and model foreign keys.
 
-Architecture, physics limits, source contracts, and product language are documented in [`docs/`](docs/README.md).
+See [`docs/`](docs/README.md) for product language, catalog contracts, engine mathematics, deployment mapping, and current limitations.

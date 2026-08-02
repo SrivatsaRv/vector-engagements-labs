@@ -57,16 +57,20 @@ export type EngineEntityDefinition = {
     launchMassKg: number;
     dryMassKg: number;
     thrustNewtons: number;
+    thrustTaperSpeedMps: number;
     referenceAreaM2: number;
     dragCoefficient: number;
     navigationConstant: number;
     maximumCommandG: number;
     seekerActivationRangeM: number;
     datalinkUpdateSeconds: number;
+    commandedCruiseAltitudeM: number;
   };
   sensor?: {
     detectionRadiusM: number;
     trackingRadiusM: number;
+    engagementRadiusM: number;
+    minimumRangeM: number;
     minimumAltitudeM: number;
     maximumAltitudeM: number;
   };

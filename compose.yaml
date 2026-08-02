@@ -1,22 +1,72 @@
 services:
+  database:
+    image: postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
+    platform: linux/amd64
+    init: true
+    labels:
+      com.reachdefence.product: vector-engagement-lab
+      com.reachdefence.component: catalog-database
+      com.reachdefence.version: 0.1.0
+    environment:
+      POSTGRES_DB: vector
+      POSTGRES_USER: vector
+      POSTGRES_PASSWORD: vector
+    ports:
+      - "55433:5432"
+    volumes:
+      - vector_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vector -d vector"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    image: reachdefence/vector-engagement-lab:0.1.0
+    environment:
+      DATABASE_URL: postgres://vector:vector@database:5432/vector
+    init: true
+    labels:
+      com.reachdefence.product: vector-engagement-lab
+      com.reachdefence.component: catalog-migration
+      com.reachdefence.version: 0.1.0
+    command: ["sh", "-c", "npm run db:migrate && npm run db:seed"]
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: "no"
+
   vector:
+    image: reachdefence/vector-engagement-lab:0.1.0
     build:
       context: .
+      target: runtime
+      args:
+        DATABASE_URL: postgres://vector:vector@database:5432/vector
+    environment:
+      DATABASE_URL: postgres://vector:vector@database:5432/vector
+      PORT: "4317"
+    init: true
+    labels:
+      com.reachdefence.product: vector-engagement-lab
+      com.reachdefence.component: web-application
+      com.reachdefence.version: 0.1.0
     ports:
       - "4317:4317"
     volumes:
       - vector_wrangler:/app/.wrangler
+    depends_on:
+      database:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:4317/api/catalog').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
-        ]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4317/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      start_period: 20s
       interval: 10s
-      timeout: 3s
-      retries: 6
+      timeout: 4s
+      retries: 12
 
 volumes:
+  vector_postgres:
   vector_wrangler:

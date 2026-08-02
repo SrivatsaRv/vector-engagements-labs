@@ -1,7 +1,9 @@
-import type { ScenarioDefinition } from "@/lib/scenarios";
-import { getProfile, type Scenario } from "@/lib/simulation";
-import { findPlatform, findWeapon } from "@/lib/capability-data";
-import { getCatalogObject } from "@/lib/object-catalog";
+import type { ScenarioDefinition } from "./scenarios.ts";
+import type { Scenario } from "./simulation.ts";
+import { findPlatform, findWeapon } from "./capability-data.ts";
+import { getCatalogObject } from "./object-catalog.ts";
+import { ENGINE_VERSION } from "./engine/version.ts";
+import { findWeaponSimulationModel } from "./simulation-models.ts";
 
 export type ValidationState = "pass" | "warning" | "error";
 export type ValidationItem = {
@@ -15,9 +17,9 @@ export function validateScenario(
   definition: ScenarioDefinition,
   scenario: Scenario,
 ): ValidationItem[] {
-  const profile = getProfile(scenario);
   const platform = findPlatform(scenario.bluePlatformId);
   const weapon = findWeapon(scenario.blueSystemId);
+  const simulationModel = findWeaponSimulationModel(scenario.blueSystemId);
   const launchObject = getCatalogObject(scenario.bluePlatformId);
   const guidedSystem = getCatalogObject(scenario.blueSystemId);
   const loadoutLinked =
@@ -28,8 +30,12 @@ export function validateScenario(
             platform.compatibleWeaponIds.includes(weapon.id),
         )
       : Boolean(scenario.bluePlatformId && scenario.blueSystemId);
+  const loadoutSourceLinked =
+    scenario.bluePlatformId === "su-30mki" &&
+    scenario.blueSystemId === "astra-mk1";
   const targetAltitude = scenario.altitude + scenario.targetDelta;
-  const profileFits = scenario.range <= profile.maxRange * 1000;
+  const cruiseAltitudeValid =
+    scenario.domain !== "G2G" || scenario.cruiseAltitude >= 30;
   const targetStateFits =
     definition.targetMotion === "fixed"
       ? scenario.targetSpeed === 0 &&
@@ -49,23 +55,25 @@ export function validateScenario(
       state: scenario.objective.trim() ? "pass" : "error",
     },
     {
-      id: "study-boundary",
-      label: profileFits
-        ? "Starting distance is inside this model's study boundary"
-        : "Starting distance exceeds this model's study boundary",
-      detail: `${scenario.range / 1000} km selected · ${profile.maxRange} km study limit for ${profile.name}. This is a model limit, not a published weapon range.`,
-      state: profileFits ? "pass" : "error",
+      id: "flight-model",
+      label: simulationModel
+        ? "Selected weapon has a flight-model coefficient set"
+        : "Selected weapon has no flight-model coefficient set",
+      detail: simulationModel
+        ? `${simulationModel.id}@${simulationModel.version} · ${simulationModel.valueState.toLowerCase().replaceAll("_", " ")}. This confirms model availability, not real-world performance.`
+        : `No deterministic 3DOF coefficient set is registered for ${scenario.blueSystemId}.`,
+      state: simulationModel ? "pass" : "error",
     },
     {
       id: "loadout",
       label: loadoutLinked
         ? scenario.domain === "A2A"
-          ? "Selected weapon is source-linked to the launch platform"
+          ? "Selected weapon is assigned to the launch platform"
           : "Launch object and guided system are assigned"
         : "Selected weapon is not linked to this platform",
       detail: loadoutLinked
         ? scenario.domain === "A2A"
-          ? `${weapon!.designation} is available for ${platform!.designation}; quantity ${scenario.blueWeaponQuantity}.`
+          ? `${weapon!.designation} / ${platform!.designation} · quantity ${scenario.blueWeaponQuantity} · ${loadoutSourceLinked ? "source-backed catalog link" : "scenario catalog assignment; exact variant integration remains unverified"}`
           : `${launchObject.designation} / ${guidedSystem.designation} · scenario catalog assignment`
         : `Choose a weapon with a cataloged compatibility record for ${platform?.designation ?? launchObject.designation}.`,
       state: loadoutLinked ? "pass" : "error",
@@ -84,22 +92,25 @@ export function validateScenario(
     {
       id: "flight-state",
       label:
-        scenario.altitude >= 0 && targetAltitude >= 0
+        scenario.altitude >= 0 && targetAltitude >= 0 && cruiseAltitudeValid
           ? "Starting flight state is internally consistent"
-          : "An altitude falls below the local reference surface",
-      detail: `Blue ${scenario.altitude} m at ${scenario.launcherSpeed} m/s · Red ${targetAltitude} m at ${scenario.targetSpeed} m/s · ${scenario.aspect}° crossing angle`,
-      state: scenario.altitude >= 0 && targetAltitude >= 0 ? "pass" : "error",
+          : "An altitude is invalid for this scenario",
+      detail: `${scenario.domain === "G2G" ? `Launcher elevation ${scenario.altitude} m · commanded cruise altitude ${scenario.cruiseAltitude} m · objective elevation ${targetAltitude} m` : `Blue ${scenario.altitude} m at ${scenario.launcherSpeed} m/s · Red ${targetAltitude} m at ${scenario.targetSpeed} m/s · ${scenario.aspect}° crossing angle`}`,
+      state:
+        scenario.altitude >= 0 && targetAltitude >= 0 && cruiseAltitudeValid
+          ? "pass"
+          : "error",
     },
     {
       id: "information-path",
       label:
         scenario.domain === "A2A"
-          ? "Blue Team has a defined source for the opposing track"
+          ? "Both teams have declared air-picture sources"
           : "Scenario conditions are defined",
       detail:
         scenario.domain === "A2A"
-          ? `${scenario.blueTrackSource.replaceAll("_", " ").toLowerCase()} · radar ${scenario.blueRadarMode.toLowerCase()} · data link ${scenario.blueDatalink ? "available" : "unavailable"} · Blue ${scenario.blueDecision.replaceAll("_", " ").toLowerCase()} · Red ${scenario.redDecision.replaceAll("_", " ").toLowerCase()}`
-          : `Target motion ${definition.targetMotion} · environmental-loss input ${scenario.wind}`,
+          ? `IAF ${scenario.blueTrackSource.replaceAll("_", " ").toLowerCase()} · PAF ${scenario.redTrackSource.replaceAll("_", " ").toLowerCase()} · Blue ${scenario.blueDecision.replaceAll("_", " ").toLowerCase()} · Red ${scenario.redDecision.replaceAll("_", " ").toLowerCase()}`
+          : `Target motion ${definition.targetMotion} · east–west wind ${scenario.wind} m/s`,
       state: "pass",
     },
     {
@@ -108,13 +119,13 @@ export function validateScenario(
       detail:
         definition.preparedEvent.physicsEffect === "guidance-hold"
           ? "When applied, Blue guidance holds the last line-of-sight command for eight model seconds and the IAF RASP track ages."
-          : "When applied, the environmental-loss input increases by eight points from the selected model time.",
+          : "When applied, the eastward wind component increases by 8 m/s from the selected model time.",
       state: "pass",
     },
     {
       id: "provenance",
       label: "Sources, assumptions, and versions will be frozen with the run",
-      detail: `${definition.id}@${definition.version} · browser-point-mass-v0.4 · ${weapon?.model.version ?? "generic-public-study-v0.4"}`,
+      detail: `${definition.id}@${definition.version} · ${ENGINE_VERSION} · ${simulationModel?.id ?? "model unavailable"}@${simulationModel?.version ?? "unknown"}`,
       state: "pass",
     },
   ];

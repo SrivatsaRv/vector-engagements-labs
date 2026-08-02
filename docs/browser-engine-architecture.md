@@ -1,39 +1,32 @@
 # Browser simulation engine boundary
 
-Status: foundation contract, not yet the default workbench runtime.
+Status: active workbench runtime.
 
-VECTOR is moving from a fixed engagement calculator to a scenario-driven engine. The boundary is deliberately small:
+1. Construct emits one immutable scenario package.
+2. The compiler resolves catalog objects and versioned coefficients.
+3. The engine creates state for any number of declared entities.
+4. Carried weapons remain inventory (`STOWED`) and are omitted from observable frames.
+5. A launch event activates a weapon and copies the launcher position, velocity, and heading into its initial world state.
+6. The engine advances all active entities at a fixed model step and emits immutable sampled frames plus diagnostics.
+7. Map, 3D, telemetry, RASP, explanation, comparison, and reporting consume those same frames.
 
-1. The builder emits one immutable scenario package.
-2. The engine spawns every entity declared in that package.
-3. The engine advances entity state at a fixed model step.
-4. The engine emits immutable sampled frames and diagnostics.
-5. The 3D view, future MapLibre view, telemetry, replay, explanation, and report all consume the same frames.
+## State ownership
 
-No engine loop assumes a pair or a fixed number of entities. An entity declares identity, affiliation, kind, lifecycle, initial state, behavior, optional weapon or sensor behavior, and provenance. Stowed weapons remain entities and can be activated by scenario events.
+- PostGIS owns published template versions, object identity, source assertions, model versions, installation geometry, and saved runs.
+- The Construct state owns one editable draft and increments its local revision when an authoring input changes.
+- Conduct owns runtime-only state: playback time, speed, selected surface, active RASP perspective, layer visibility, and prepared-condition state. These controls do not mutate the authored scenario.
+- A completed result is valid only for the draft revision that produced it. Editing an authoring input invalidates Results and Save; playback, view switching, and fault activation do not.
+- The report owns no simulation logic. It renders the exact saved frames and provenance read from PostGIS.
 
-## First physics foundation
+## Geographic presentation
 
-`lib/engine/core.ts` currently provides the isolated first implementation:
+The MapLibre surface has two independent choices:
 
-- deterministic 50 ms fixed-step integration;
-- local Cartesian east/north/up coordinates;
-- standard-atmosphere density and speed of sound;
-- air-relative velocity using an explicit three-axis wind vector;
-- thrust, propellant depletion, aerodynamic drag, and gravity;
-- proportional-navigation acceleration with a maneuver-authority limit;
-- direct and simplified loft guidance;
-- moving target behavior;
-- guidance-hold and wind-shift event contracts;
-- closest approach, termination, and non-finite-state diagnostics.
+- basemap: minimal or satellite;
+- extent: engagement (default, fit to recorded trajectories) or region (India/Pakistan public-reference station context).
 
-The current workbench still calls the legacy adapter until scenario compilation, presentation, report, and regression tests are migrated together. This prevents the UI from presenting a mixed run assembled from two engines.
+Map, 3D, and telemetry share model time. Tactical markers are keyed by affiliation, object kind, and lifecycle; a guided weapon is absent before launch.
 
-## Runtime direction
+`lib/engine/contracts.ts` defines the boundary; `compiler.ts` resolves the scenario; `core.ts` integrates it. No loop assumes two, four, or another fixed entity count.
 
-The reference implementation remains TypeScript so it can be inspected and tested easily. The same scenario/frame contracts are intended to cross a Web Worker boundary. Performance-critical integration may later move to Rust/WASM without changing the builder or presentation contracts. A server may persist or batch runs, but a network service is not required to conduct a scenario.
-
-## Truth labels
-
-RDDF identity and public specifications do not automatically become physics coefficients. Every engine parameter carries a value state: sourced, model assumption, user provided, or unknown. Public maximum-range figures are metadata and study-boundary context; they are not runtime termination equations.
-
+The current inspected TypeScript implementation is the golden reference. Rust/WASM is authorized as a performance path, but it must pass frame/result parity fixtures before becoming default. A Web Worker boundary will keep batches away from interaction rendering. Rust/WASM will not change scenario or frame schemas.

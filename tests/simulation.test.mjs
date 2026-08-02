@@ -3,12 +3,12 @@ import test from "node:test";
 import {
   DEFAULT_SCENARIO,
   buildRaspTrack,
-  explainResult,
   getFrameAt,
   simulate,
   standardAtmosphere,
 } from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
+import { canConduct, validateScenario } from "../lib/scenario-validation.ts";
 
 test("standard atmosphere produces credible sea-level reference values", () => {
   const atmosphere = standardAtmosphere(0, 0);
@@ -49,31 +49,223 @@ test("RASP separates model truth from degraded sensor-derived tracks", () => {
     "IAF",
   );
   assert.equal(nominal.status, "TRACKING");
-  assert.equal(degraded.status, "COASTING");
+  assert.equal(degraded.status, "NO_TRACK");
+  assert.equal(degraded.visible, false);
   assert.ok(degraded.confidence < nominal.confidence);
   assert.ok(degraded.uncertaintyMeters > nominal.uncertaintyMeters);
   assert.notDeepEqual(degraded.position, degraded.truthPosition);
 });
 
-test("distance-exhausted explanation distinguishes start boundary from flown path", () => {
+test("RASP source controls have explicit availability behavior for both sides", () => {
   const result = simulate(DEFAULT_SCENARIO);
-  assert.equal(result.outcome, "Modeled distance exhausted");
-  assert.match(explainResult(DEFAULT_SCENARIO, result), /start was inside/i);
-  assert.doesNotMatch(
-    explainResult(DEFAULT_SCENARIO, result),
-    /starting distance is beyond/i,
+  const farFrame = getFrameAt(result, 10);
+  const nearFrame = result.frames.find((item) => item.range <= 17000) ?? result.frames.at(-1);
+
+  for (const perspective of ["IAF", "PAF"]) {
+    const sourceKey = perspective === "IAF" ? "blueTrackSource" : "redTrackSource";
+    const radarKey = perspective === "IAF" ? "blueRadarMode" : "redRadarMode";
+    const linkKey = perspective === "IAF" ? "blueDatalink" : "redDatalink";
+    const jammerKey = perspective === "IAF" ? "redJammer" : "blueJammer";
+
+    const radarTrack = buildRaspTrack(
+      { ...DEFAULT_SCENARIO, [sourceKey]: "ONBOARD_RADAR", [radarKey]: "ACTIVE" },
+      farFrame,
+      perspective,
+    );
+    const silentRadar = buildRaspTrack(
+      { ...DEFAULT_SCENARIO, [sourceKey]: "ONBOARD_RADAR", [radarKey]: "SILENT" },
+      farFrame,
+      perspective,
+    );
+    assert.equal(radarTrack.visible, true);
+    assert.equal(silentRadar.status, "NO_TRACK");
+
+    for (const source of ["DATALINK", "AIRBORNE_EARLY_WARNING"]) {
+      assert.equal(
+        buildRaspTrack(
+          { ...DEFAULT_SCENARIO, [sourceKey]: source, [linkKey]: true },
+          farFrame,
+          perspective,
+        ).visible,
+        true,
+      );
+      assert.equal(
+        buildRaspTrack(
+          { ...DEFAULT_SCENARIO, [sourceKey]: source, [linkKey]: false },
+          farFrame,
+          perspective,
+        ).status,
+        "NO_TRACK",
+      );
+    }
+
+    assert.equal(
+      buildRaspTrack(
+        { ...DEFAULT_SCENARIO, [sourceKey]: "VISUAL" },
+        farFrame,
+        perspective,
+      ).status,
+      "NO_TRACK",
+    );
+    assert.equal(
+      buildRaspTrack(
+        { ...DEFAULT_SCENARIO, [sourceKey]: "VISUAL" },
+        nearFrame,
+        perspective,
+      ).visible,
+      true,
+    );
+
+    const jammed = buildRaspTrack(
+      { ...DEFAULT_SCENARIO, [sourceKey]: "ONBOARD_RADAR", [jammerKey]: true },
+      farFrame,
+      perspective,
+    );
+    assert.ok(jammed.confidence < radarTrack.confidence);
+    assert.ok(jammed.uncertaintyMeters > radarTrack.uncertaintyMeters);
+  }
+});
+
+test("team decisions change declared platform motion and guidance support", () => {
+  const support = simulate({ ...DEFAULT_SCENARIO, blueDecision: "SUPPORT_WEAPON" });
+  const crank = simulate({ ...DEFAULT_SCENARIO, blueDecision: "CRANK" });
+  const defend = simulate({ ...DEFAULT_SCENARIO, blueDecision: "DEFEND" });
+  const disengage = simulate({ ...DEFAULT_SCENARIO, blueDecision: "DISENGAGE" });
+  const bluePlatform = (result) =>
+    result.frames.at(-1).entities.find((item) => item.id === "blue-platform-1");
+
+  assert.equal(bluePlatform(support).commandedG, 0);
+  assert.ok(bluePlatform(crank).commandedG > 0);
+  assert.ok(bluePlatform(defend).commandedG > bluePlatform(crank).commandedG);
+  assert.ok(bluePlatform(disengage).commandedG > 0);
+  assert.notDeepEqual(bluePlatform(crank).position, bluePlatform(support).position);
+  assert.notEqual(disengage.closestApproach, support.closestApproach);
+});
+
+test("every Red Team decision produces its declared maneuver demand", () => {
+  const runs = Object.fromEntries(
+    ["PRESS", "CRANK", "DEFEND", "DISENGAGE"].map((decision) => [
+      decision,
+      simulate({ ...DEFAULT_SCENARIO, redDecision: decision }),
+    ]),
   );
+  const targetAt = (decision) =>
+    runs[decision].frames
+      .at(-1)
+      .entities.find((entity) => entity.id === "red-object-1");
+
+  assert.ok(targetAt("DEFEND").commandedG > targetAt("CRANK").commandedG);
+  assert.ok(targetAt("CRANK").commandedG > targetAt("DISENGAGE").commandedG);
+  assert.ok(targetAt("DISENGAGE").commandedG > targetAt("PRESS").commandedG);
+  assert.notDeepEqual(targetAt("PRESS").position, targetAt("DEFEND").position);
+  assert.notEqual(runs.PRESS.closestApproach, runs.DEFEND.closestApproach);
+});
+
+test("runtime does not terminate on the legacy profile-distance allowance", () => {
+  const result = simulate({ ...DEFAULT_SCENARIO, range: 90000 });
+  assert.doesNotMatch(result.reason, /distance allowance|study boundary/i);
   assert.ok(result.timeOfFlight > 0);
-  assert.ok(result.closestApproach < DEFAULT_SCENARIO.range);
 });
 
 test("every configured library baseline completes its stated mission profile", () => {
   for (const definition of SCENARIO_LIBRARY) {
+    const checks = validateScenario(definition, definition.scenario);
+    assert.equal(
+      canConduct(checks),
+      true,
+      `${definition.id} has blocking setup checks: ${checks
+        .filter((item) => item.state === "error")
+        .map((item) => item.label)
+        .join(", ")}`,
+    );
     const result = simulate(definition.scenario);
     assert.equal(
       result.successful,
       true,
       `${definition.id} baseline ended as ${result.outcome}: ${result.reason}`,
     );
+    assert.equal(result.termination, "threshold_reached");
+    assert.ok(result.closestApproach <= 180);
+    assert.ok(result.frames.length > 1);
+    assert.equal(result.engineRun.diagnostics.nonFiniteStateCount, 0);
+    assert.ok(result.engineRun.diagnostics.minimumMassMarginKg >= -1e-8);
+    assert.equal(
+      result.entityManifest.length,
+      definition.domain === "A2A" ? 4 : 3,
+    );
+    for (let index = 1; index < result.frames.length; index += 1) {
+      assert.ok(result.frames[index].t > result.frames[index - 1].t);
+    }
+    for (const frame of result.frames) {
+      assert.ok(Number.isFinite(frame.range));
+      assert.ok(Number.isFinite(frame.closureRate));
+      assert.ok(Number.isFinite(frame.specificEnergy));
+      for (const entity of frame.entities) {
+        assert.ok(entity.position.z >= 0);
+        assert.ok(entity.massKg >= 0);
+        assert.ok(entity.fuelKg >= -1e-8);
+        assert.ok(Number.isFinite(entity.speedMps));
+      }
+    }
   }
+});
+
+test("surface-strike runs honor the declared cruise altitude", () => {
+  const definition = SCENARIO_LIBRARY.find(
+    (item) => item.id === "g2g-defended-route",
+  );
+  assert.ok(definition);
+  const direct = simulate(definition.scenario);
+  const lofted = simulate({ ...definition.scenario, guidance: "loft" });
+  const weaponAltitudes = (result) =>
+    result.frames
+      .flatMap((frame) => frame.entities)
+      .filter((entity) => entity.id === "blue-weapon-1")
+      .map((entity) => entity.position.z);
+  const directAltitudes = weaponAltitudes(direct);
+  const loftedAltitudes = weaponAltitudes(lofted);
+
+  assert.ok(Math.max(...directAltitudes) >= definition.scenario.cruiseAltitude - 80);
+  assert.ok(Math.max(...loftedAltitudes) > Math.max(...directAltitudes) + 200);
+  assert.ok(directAltitudes.at(-1) < definition.scenario.cruiseAltitude);
+});
+
+test("surface-strike validation blocks a zero cruise altitude", () => {
+  const definition = SCENARIO_LIBRARY.find(
+    (item) => item.id === "g2g-defended-route",
+  );
+  assert.ok(definition);
+  const checks = validateScenario(definition, {
+    ...definition.scenario,
+    cruiseAltitude: 0,
+  });
+  const flightState = checks.find((item) => item.id === "flight-state");
+  assert.equal(flightState?.state, "error");
+  assert.equal(canConduct(checks), false);
+});
+
+test("prepared guidance interruption changes a run without corrupting state", () => {
+  const baseline = simulate(DEFAULT_SCENARIO);
+  const interrupted = simulate({
+    ...DEFAULT_SCENARIO,
+    guidanceInterruptionAt: 8,
+    guidanceInterruptionDuration: 12,
+  });
+  assert.notEqual(interrupted.closestApproach, baseline.closestApproach);
+  assert.equal(interrupted.engineRun.diagnostics.nonFiniteStateCount, 0);
+});
+
+test("extreme declared conditions remain finite and deterministic", () => {
+  const scenario = {
+    ...DEFAULT_SCENARIO,
+    wind: 60,
+    temperatureOffset: 25,
+    targetG: 9,
+    seed: 999,
+  };
+  const first = simulate(scenario);
+  const second = simulate(scenario);
+  assert.deepEqual(first, second);
+  assert.equal(first.engineRun.diagnostics.nonFiniteStateCount, 0);
+  assert.ok(first.frames.every((frame) => Number.isFinite(frame.range)));
 });

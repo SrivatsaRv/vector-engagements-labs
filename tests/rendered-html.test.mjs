@@ -56,17 +56,46 @@ test("server-renders the scenario library and configured workbench", async () =>
   assert.match(workbench, /Run baseline/);
   assert.match(
     workbench,
-    /This is a model limit, not a published weapon range/,
+    /This confirms model availability, not real-world performance/,
   );
 });
 
-test("keeps data facts, model assumptions, RASP, and Cloudflare persistence explicit", async () => {
-  const [capabilityData, simulation, api, report, makefile] = await Promise.all(
+test("server-renders model transparency and tactical-symbol references", async () => {
+  const [mathResponse, symbolsResponse] = await Promise.all([
+    render("/math"),
+    render("/symbols"),
+  ]);
+  assert.equal(mathResponse.status, 200);
+  assert.equal(symbolsResponse.status, 200);
+  const [math, symbols] = await Promise.all([
+    mathResponse.text(),
+    symbolsResponse.text(),
+  ]);
+  assert.match(math, /Math behind VECTOR/);
+  assert.match(math, /Proportional-navigation demand/);
+  assert.match(math, /Run termination/);
+  assert.match(math, /How a displayed result is traced/);
+  assert.match(math, /SHA-256 of canonical JSON/);
+  assert.match(math, /NASA Glenn/);
+  assert.match(symbols, /The symbols used on the map, in 3D, and in reports/);
+});
+
+test("keeps data facts, model assumptions, RASP, map scope, and persistence explicit", async () => {
+  const [capabilityData, simulation, map, api, report, migration, provenanceMigration, makefile] = await Promise.all(
     [
       readFile(new URL("../lib/capability-data.ts", import.meta.url), "utf8"),
       readFile(new URL("../lib/simulation.ts", import.meta.url), "utf8"),
+      readFile(new URL("../components/EngagementMap.tsx", import.meta.url), "utf8"),
       readFile(new URL("../app/api/runs/route.ts", import.meta.url), "utf8"),
       readFile(new URL("../lib/report-export.ts", import.meta.url), "utf8"),
+      readFile(
+        new URL("../db/migrations/002_saved_run_integrity.sql", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../db/migrations/003_scenario_package_provenance.sql", import.meta.url),
+        "utf8",
+      ),
       readFile(new URL("../Makefile", import.meta.url), "utf8"),
     ],
   );
@@ -74,9 +103,21 @@ test("keeps data facts, model assumptions, RASP, and Cloudflare persistence expl
   assert.match(capabilityData, /MODEL_ASSUMPTION/);
   assert.match(capabilityData, /Astra Mk-I public-study profile/);
   assert.match(capabilityData, /F-16C Block 52/);
+  assert.match(capabilityData, /mbda-mica-2022/);
+  assert.match(capabilityData, /rafael-spice-2024/);
+  assert.match(capabilityData, /pib-akash-2014/);
+  assert.match(capabilityData, /brahmos-block1-2011/);
   assert.match(simulation, /buildRaspTrack/);
   assert.match(simulation, /standardAtmosphere/);
-  assert.match(api, /savedRunSnapshots/);
+  assert.match(map, /MapScope = "ENGAGEMENT" \| "REGION"/);
+  assert.match(map, /map\.fitBounds/);
+  assert.match(api, /saved_run_snapshots/);
+  assert.match(api, /completed run report with recorded frames is required/);
+  assert.match(migration, /saved_run_report_required/);
+  assert.match(migration, /saved_run_scenario_fk/);
+  assert.match(provenanceMigration, /scenario_content_hash/);
+  assert.match(provenanceMigration, /compiled_scenario/);
+  assert.match(provenanceMigration, /frame_hash/);
   assert.match(report, /vector\.engagement-report\.v2/);
   assert.match(report, /normalizedWeaponSpeedPercent/);
   assert.match(makefile, /npm run typecheck/);

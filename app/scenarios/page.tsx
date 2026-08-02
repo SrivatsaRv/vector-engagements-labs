@@ -43,10 +43,10 @@ export default function ScenariosPage() {
       <section className="library-policy">
         <strong>Map context</strong>
         <p>
-          This cut uses a local coordinate frame rather than geographic
-          positions. A regional basemap can later provide orientation, but it
-          remains a presentation layer and will not change the flight
-          calculation.
+          Every run keeps its physics in a local coordinate frame. The map can
+          fit the recorded engagement or show the 12 public-reference IAF and
+          PAF station points in regional context; changing map extent or
+          basemap never changes the calculation.
         </p>
       </section>
     </main>

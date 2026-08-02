@@ -20,7 +20,8 @@ import {
   reportExportFilename,
   type ReportData,
 } from "@/lib/report-export";
-import { getProfile, simulate, standardAtmosphere } from "@/lib/simulation";
+import { simulate, standardAtmosphere } from "@/lib/simulation";
+import { ENGINE_VERSION } from "@/lib/engine/version";
 
 type ActionState = "idle" | "preparing" | "done" | "error";
 type PrintState = "idle" | "preparing" | "printing";
@@ -52,8 +53,13 @@ const fallback: ReportData = {
     },
   ],
   createdAt: "2026-08-02T10:00:00.000Z",
-  engine: "browser-point-mass-v0.4",
-  profileVersion: "public-study-v0.4",
+  engine: ENGINE_VERSION,
+  profileVersion: "public-study-v0.5",
+  packageProvenance: {
+    schemaVersion: "vector.scenario.v1",
+    contentHash: "example",
+    draftRevision: 0,
+  },
   libraryScenario: {
     id: DEFAULT_SCENARIO_DEFINITION.id,
     version: DEFAULT_SCENARIO_DEFINITION.version,
@@ -72,14 +78,14 @@ export default function ReportPage() {
   const [data, setData] = useState<ReportData>(fallback);
   const [loadState, setLoadState] = useState<
     "example" | "loading" | "saved" | "error"
-  >(sampleMode ? "example" : "loading");
+  >(sampleMode ? "example" : runId ? "loading" : "error");
   const [exportState, setExportState] = useState<ActionState>("idle");
   const [printState, setPrintState] = useState<PrintState>("idle");
 
   useEffect(() => {
-    if (sampleMode) return;
+    if (sampleMode || !runId) return;
     const controller = new AbortController();
-    const query = runId ? `?id=${encodeURIComponent(runId)}` : "";
+    const query = `?id=${encodeURIComponent(runId)}`;
     fetch(`/api/runs${query}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("run unavailable");
@@ -214,6 +220,12 @@ export default function ReportPage() {
           </button>
         </div>
       </header>
+      {loadState === "loading" && (
+        <section className="report-load-error" aria-live="polite">
+          <strong>Preparing saved report</strong>
+          <p>Loading the frozen scenario package, engine frames, and source record.</p>
+        </section>
+      )}
       {loadState === "error" && (
         <section className="report-load-error" role="alert">
           <strong>Saved run unavailable</strong>
@@ -226,7 +238,7 @@ export default function ReportPage() {
           </Link>
         </section>
       )}
-      {loadState !== "error" && (
+      {(loadState === "saved" || loadState === "example") && (
         <article className="report-sheet">
           <header>
             <div className="report-brand">
@@ -241,7 +253,7 @@ export default function ReportPage() {
                 {loadState === "example"
                   ? "Example result"
                   : loadState === "saved"
-                    ? "Saved D1 run"
+                    ? "Saved PostGIS run"
                     : loadState === "loading"
                       ? "Loading saved run"
                       : "Saved run unavailable"}{" "}
@@ -328,9 +340,9 @@ export default function ReportPage() {
             <div>
               <span>Starting conditions</span>
               <strong>
-                {scenario.range / 1000} km · Blue {scenario.altitude} m · Red{" "}
-                {scenario.altitude + scenario.targetDelta} m · {scenario.aspect}
-                °
+                {scenario.domain === "G2G"
+                  ? `${scenario.range / 1000} km · launcher ${scenario.altitude} m · cruise ${scenario.cruiseAltitude} m · objective ${scenario.altitude + scenario.targetDelta} m`
+                  : `${scenario.range / 1000} km · Blue ${scenario.altitude} m · Red ${scenario.altitude + scenario.targetDelta} m · ${scenario.aspect}°`}
               </strong>
             </div>
           </section>
@@ -363,17 +375,23 @@ export default function ReportPage() {
                   <dd>{libraryScenario.domain}</dd>
                   <dt>Map setting</dt>
                   <dd>{libraryScenario.theatre}</dd>
-                  <dt>Weapon study model</dt>
-                  <dd>{getProfile(scenario).name}</dd>
+                  <dt>Flight model</dt>
+                  <dd>{data.profileVersion}</dd>
                   <dt>Weapon path</dt>
                   <dd>{scenario.guidance}</dd>
                   <dt>Starting distance</dt>
                   <dd>{scenario.range / 1000} km</dd>
-                  <dt>Blue altitude / speed</dt>
+                  <dt>{scenario.domain === "G2G" ? "Launcher elevation / speed" : "Blue altitude / speed"}</dt>
                   <dd>
                     {scenario.altitude} m / {scenario.launcherSpeed} m/s
                   </dd>
-                  <dt>Red altitude / speed</dt>
+                  {scenario.domain === "G2G" && (
+                    <>
+                      <dt>Commanded cruise altitude</dt>
+                      <dd>{scenario.cruiseAltitude} m</dd>
+                    </>
+                  )}
+                  <dt>{scenario.domain === "G2G" ? "Objective elevation / speed" : "Red altitude / speed"}</dt>
                   <dd>
                     {scenario.altitude + scenario.targetDelta} m /{" "}
                     {scenario.targetSpeed} m/s
@@ -400,6 +418,12 @@ export default function ReportPage() {
                       {scenario.blueRadarMode.toLowerCase()} /{" "}
                       {scenario.blueDatalink ? "available" : "unavailable"}
                     </dd>
+                    <dt>PAF track source</dt>
+                    <dd>
+                      {scenario.redTrackSource
+                        .replaceAll("_", " ")
+                        .toLowerCase()}
+                    </dd>
                     <dt>PAF radar / data link</dt>
                     <dd>
                       {scenario.redRadarMode.toLowerCase()} /{" "}
@@ -425,15 +449,15 @@ export default function ReportPage() {
                   <dl>
                     <dt>Objective state</dt>
                     <dd>{scenario.targetSpeed === 0 ? "fixed" : "moving"}</dd>
-                    <dt>Environmental-loss input</dt>
-                    <dd>{scenario.wind}</dd>
+                    <dt>East–west wind</dt>
+                    <dd>{scenario.wind} m/s</dd>
                     <dt>Guidance interruption</dt>
                     <dd>
                       {scenario.guidanceInterruptionAt == null
                         ? "not applied"
                         : `applied at ${scenario.guidanceInterruptionAt.toFixed(1)} s`}
                     </dd>
-                    <dt>Loss increase</dt>
+                    <dt>Wind shift</dt>
                     <dd>
                       {scenario.lossIncreaseAt == null
                         ? "not applied"
@@ -458,8 +482,7 @@ export default function ReportPage() {
               </ReportSection>
               <ReportSection title="Next controlled comparison">
                 <p>
-                  Change one input—starting distance, flight path, environmental
-                  loss
+                  Change one input—starting distance, flight path, wind
                   {scenario.domain === "A2A"
                     ? ", target maneuver, sensor state, or tactical decision"
                     : ""}
@@ -498,6 +521,16 @@ export default function ReportPage() {
                   </dd>
                   <dt>Engine</dt>
                   <dd>{data.engine}</dd>
+                  <dt>Scenario package</dt>
+                  <dd>
+                    {data.packageProvenance
+                      ? `${data.packageProvenance.schemaVersion} · ${data.packageProvenance.contentHash.slice(0, 12)} · draft ${data.packageProvenance.draftRevision}`
+                      : "Legacy snapshot"}
+                  </dd>
+                  <dt>Telemetry hash</dt>
+                  <dd>
+                    {data.packageProvenance?.frameHash?.slice(0, 16) ?? "Not recorded"}
+                  </dd>
                   <dt>Weapon model</dt>
                   <dd>{data.profileVersion}</dd>
                   <dt>Model scope</dt>
@@ -505,7 +538,7 @@ export default function ReportPage() {
                   <dt>Random seed</dt>
                   <dd>{scenario.seed}</dd>
                   <dt>Catalog state</dt>
-                  <dd>D1 structured source catalog</dd>
+                  <dd>PostgreSQL / PostGIS source catalog</dd>
                 </dl>
                 <div className="report-sources">
                   {[...new Set(reportSourceIds)]

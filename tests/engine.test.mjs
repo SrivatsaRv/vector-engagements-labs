@@ -87,6 +87,7 @@ function testScenario() {
           launchMassKg: 180,
           dryMassKg: 110,
           thrustNewtons: 28000,
+          thrustTaperSpeedMps: 1000,
           referenceAreaM2: 0.06,
           dragCoefficient: 0.28,
           navigationConstant: 3.5,
@@ -134,3 +135,42 @@ test("engine entity count is supplied by the scenario, not fixed in code", () =>
   assert.equal(run.frames[0].entities.length, 4);
 });
 
+test("stowed weapons become observable only when their launch event occurs", () => {
+  const scenario = testScenario();
+  const weapon = scenario.entities.find((entity) => entity.id === "weapon-blue");
+  weapon.weapon.launchTimeSeconds = 2;
+  const run = runEngine(scenario);
+  const beforeLaunch = run.frames.find((frame) => frame.t < 2);
+  const launchFrame = run.frames.find((frame) => frame.t >= 2);
+  assert.ok(beforeLaunch);
+  assert.ok(launchFrame);
+  assert.equal(
+    beforeLaunch.entities.some((entity) => entity.id === "weapon-blue"),
+    false,
+  );
+  const launchedWeapon = launchFrame.entities.find(
+    (entity) => entity.id === "weapon-blue",
+  );
+  const launchPlatform = launchFrame.entities.find(
+    (entity) => entity.id === "aircraft-blue",
+  );
+  assert.ok(launchedWeapon);
+  assert.ok(launchPlatform);
+  assert.ok(
+    Math.abs(launchedWeapon.position.x - launchPlatform.position.x) < 100,
+    "launch position should inherit the platform state",
+  );
+});
+
+test("an unlaunched carried weapon remains inventory, not a world entity", () => {
+  const scenario = testScenario();
+  const weapon = scenario.entities.find((entity) => entity.id === "weapon-blue");
+  weapon.weapon.launchTimeSeconds = null;
+  const run = runEngine(scenario);
+  assert.ok(
+    run.frames.every(
+      (frame) => !frame.entities.some((entity) => entity.id === "weapon-blue"),
+    ),
+  );
+  assert.equal(run.scenario.entities.length, 3);
+});

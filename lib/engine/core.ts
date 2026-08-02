@@ -32,6 +32,7 @@ type RuntimeState = {
   thrustNewtons: number;
   phase: string;
   lastGuidanceAcceleration: Vec3;
+  lastGuidanceUpdateSeconds: number;
 };
 
 const G0 = 9.80665;
@@ -51,6 +52,7 @@ function initialState(definition: EngineEntityDefinition): RuntimeState {
     thrustNewtons: 0,
     phase: definition.lifecycle === "STOWED" ? "Stowed" : "Initial state",
     lastGuidanceAcceleration: { x: 0, y: 0, z: 0 },
+    lastGuidanceUpdateSeconds: Number.NEGATIVE_INFINITY,
   };
 }
 
@@ -163,7 +165,13 @@ function updateWeapon(
   const drag =
     dynamicPressure * weapon.dragCoefficient * weapon.referenceAreaM2;
   const burning = sinceLaunch >= 0 && sinceLaunch < weapon.burnSeconds;
-  const thrust = burning ? weapon.thrustNewtons : 0;
+  const taperStart = weapon.thrustTaperSpeedMps * 0.9;
+  const taperEnd = weapon.thrustTaperSpeedMps * 1.08;
+  const thrustFactor = Math.max(
+    0,
+    Math.min(1, (taperEnd - airspeed) / Math.max(1, taperEnd - taperStart)),
+  );
+  const thrust = burning ? weapon.thrustNewtons * thrustFactor : 0;
   const propellantKg = Math.max(0, weapon.launchMassKg - weapon.dryMassKg);
   const massFlowKgS =
     weapon.burnSeconds > 0 ? propellantKg / weapon.burnSeconds : 0;
@@ -178,7 +186,37 @@ function updateWeapon(
     weapon.navigationConstant * closingRate,
   );
   let loftAcceleration: Vec3 = { x: 0, y: 0, z: 0 };
-  if (weapon.guidance === "loft") {
+  if (scenario.domain === "G2G") {
+    // Surface-strike altitude is an absolute height in the local model frame.
+    // Blend from the declared cruise altitude to the objective elevation inside
+    // terminal range so both direct and lofted paths finish at the objective.
+    const terminalBlend = Math.max(
+      0,
+      Math.min(1, separation / Math.max(1, weapon.seekerActivationRangeM)),
+    );
+    const commandedCruiseAltitude = Math.max(
+      target.position.z + 30,
+      weapon.commandedCruiseAltitudeM,
+    );
+    const loftApex =
+      weapon.guidance === "loft"
+        ? Math.max(
+            commandedCruiseAltitude,
+            target.position.z + Math.min(9000, Math.max(800, separation * 0.06)),
+          )
+        : commandedCruiseAltitude;
+    const desiredAltitude =
+      target.position.z + (loftApex - target.position.z) * terminalBlend;
+    const altitudeError = desiredAltitude - state.position.z;
+    loftAcceleration = {
+      x: 0,
+      y: 0,
+      z: Math.max(
+        -22,
+        Math.min(22, altitudeError * 0.018 - state.velocity.z * 0.32),
+      ),
+    };
+  } else if (weapon.guidance === "loft") {
     const desiredHeight = Math.min(9000, Math.max(800, separation * 0.06));
     const altitudeError = target.position.z + desiredHeight - state.position.z;
     loftAcceleration = {
@@ -188,16 +226,38 @@ function updateWeapon(
     };
   }
   const maximumAcceleration = weapon.maximumCommandG * G0;
-  const unclampedGuidance = add(nominalGuidance, loftAcceleration);
-  const guidanceAcceleration = guidanceHeld(
+  // The commanded normal acceleration includes gravity compensation. Without
+  // it a level-flight command would be interpreted as zero lift and a surface
+  // launch would immediately fall into the reference plane.
+  const gravityCompensation: Vec3 = { x: 0, y: 0, z: G0 };
+  const unclampedGuidance = add(
+    add(nominalGuidance, loftAcceleration),
+    gravityCompensation,
+  );
+  const terminalGuidance = separation <= weapon.seekerActivationRangeM;
+  const updateMultiplier =
+    state.definition.behavior.decision === "CRANK"
+      ? 1.5
+      : state.definition.behavior.decision === "DEFEND"
+        ? 3
+        : state.definition.behavior.decision === "DISENGAGE"
+          ? Number.POSITIVE_INFINITY
+          : 1;
+  const guidanceUpdateDue =
+    terminalGuidance ||
+    time - state.lastGuidanceUpdateSeconds >=
+      weapon.datalinkUpdateSeconds * updateMultiplier;
+  const holdGuidance = guidanceHeld(
     scenario,
     state.definition.id,
     time,
-  )
+  );
+  const guidanceAcceleration = holdGuidance || !guidanceUpdateDue
     ? state.lastGuidanceAcceleration
     : clampMagnitude(unclampedGuidance, maximumAcceleration);
-  if (!guidanceHeld(scenario, state.definition.id, time)) {
+  if (!holdGuidance && guidanceUpdateDue) {
     state.lastGuidanceAcceleration = guidanceAcceleration;
+    state.lastGuidanceUpdateSeconds = time;
   }
 
   const thrustAcceleration = scale(direction, thrust / state.massKg);
@@ -220,7 +280,7 @@ function updateWeapon(
   state.thrustNewtons = thrust;
   state.phase = burning
     ? "Powered flight"
-    : separation <= weapon.seekerActivationRangeM
+    : terminalGuidance
       ? "Terminal guidance"
       : "Midcourse guidance";
 }
@@ -284,6 +344,20 @@ function buildEnvelopes(scenario: EngineScenario): CoverageEnvelope[] {
         kind: "TRACKING" as const,
         radiusM: sensor.trackingRadiusM,
         label: `${entity.designation} tracking study volume`,
+      },
+      {
+        ...shared,
+        id: `${entity.id}-engagement`,
+        kind: "ENGAGEMENT" as const,
+        radiusM: sensor.engagementRadiusM,
+        label: `${entity.designation} engagement study envelope`,
+      },
+      {
+        ...shared,
+        id: `${entity.id}-minimum`,
+        kind: "MINIMUM_RANGE" as const,
+        radiusM: sensor.minimumRangeM,
+        label: `${entity.designation} minimum-range limitation`,
       },
     ];
   });
@@ -373,7 +447,12 @@ export function runEngine(scenario: EngineScenario): EngineRun {
     if (integratedSteps % sampleEvery === 1 || integratedSteps === 1) {
       frames.push({
         t: Number(time.toFixed(6)),
-        entities: [...states.values()].map((state) => toFrame(state, scenario)),
+        // Carried inventory is part of the scenario package, not yet a world
+        // track. It enters the observable frame only when its launch event
+        // activates it and gives it inherited launcher state.
+        entities: [...states.values()]
+          .filter((state) => state.lifecycle !== "STOWED")
+          .map((state) => toFrame(state, scenario)),
         primaryWeaponId: primaryWeapon.definition.id,
         primaryTargetId: primaryTarget.definition.id,
         separationM,

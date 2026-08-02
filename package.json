@@ -12,7 +12,11 @@
     "test": "npm run build && node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/migrate-db.mjs",
+    "db:seed": "tsx scripts/seed-db.ts",
+    "db:verify": "node scripts/verify-db.mjs",
+    "app:verify": "node scripts/verify-app.mjs"
   },
   "dependencies": {
     "@types/three": "^0.185.3",
@@ -21,6 +25,7 @@
     "maplibre-gl": "^6.1.0",
     "milsymbol": "^3.0.4",
     "next": "^16.2.12",
+    "postgres": "^3.4.9",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "three": "^0.185.1"
@@ -43,6 +48,7 @@
     "eslint-config-next": "16.2.6",
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",
+    "tsx": "^4.23.4",
     "typescript": "5.9.3",
     "vinext": "0.0.50",
     "vite": "8.0.13",

@@ -1,63 +1,57 @@
-import { asc } from "drizzle-orm";
-import { ensureCatalogDb } from "@/db/bootstrap";
-import { getDb } from "@/db";
-import {
-  platformVariants,
-  platformWeaponCompatibility,
-  sourceAssertions,
-  sources,
-  subsystems,
-  weapons,
-} from "@/db/schema";
+import { CATALOG_SCHEMA_VERSION } from "@/db/bootstrap";
+import { withDatabase } from "@/db";
 
 export async function GET() {
   try {
-    await ensureCatalogDb();
-    const db = getDb();
-    const [
-      platformRows,
-      weaponRows,
-      subsystemRows,
-      sourceRows,
-      compatibilityRows,
-      assertionRows,
-    ] = await Promise.all([
-      db
-        .select()
-        .from(platformVariants)
-        .orderBy(
-          asc(platformVariants.service),
-          asc(platformVariants.displayName),
-        ),
-      db
-        .select()
-        .from(weapons)
-        .orderBy(asc(weapons.category), asc(weapons.displayName)),
-      db
-        .select()
-        .from(subsystems)
-        .orderBy(asc(subsystems.kind), asc(subsystems.designation)),
-      db
-        .select()
-        .from(sources)
-        .orderBy(asc(sources.publisher), asc(sources.title)),
-      db.select().from(platformWeaponCompatibility),
-      db.select().from(sourceAssertions),
-    ]);
+    const catalog = await withDatabase(async (sql) => {
+      const [
+        platforms,
+        weapons,
+        subsystems,
+        sources,
+        compatibility,
+        assertions,
+        simulationModels,
+        installations,
+        scenarioTemplates,
+      ] = await Promise.all([
+        sql`SELECT * FROM platform_variants ORDER BY service, display_name`,
+        sql`SELECT * FROM weapons ORDER BY category, display_name`,
+        sql`SELECT * FROM subsystems ORDER BY kind, designation`,
+        sql`SELECT * FROM sources ORDER BY publisher, title`,
+        sql`SELECT * FROM platform_weapon_compatibility ORDER BY platform_id, weapon_id`,
+        sql`SELECT * FROM source_assertions ORDER BY entity_type, entity_id, field_path`,
+        sql`SELECT * FROM simulation_models ORDER BY weapon_id, version`,
+        sql`SELECT id, service, name, installation_type,
+              ST_X(location) AS longitude, ST_Y(location) AS latitude,
+              public_reference, source_id
+            FROM installations ORDER BY service, name`,
+        sql`SELECT id, version, domain, title, status, package,
+              schema_version, content_hash, engine_version
+            FROM scenario_templates WHERE status = 'VALIDATED'
+            ORDER BY domain, title`,
+      ]);
+      return {
+        platforms,
+        weapons,
+        subsystems,
+        sources,
+        compatibility,
+        assertions,
+        simulationModels,
+        installations,
+        scenarioTemplates,
+      };
+    });
     return Response.json({
-      schema: "vector.capability-catalog.v1",
-      state: "D1",
-      platforms: platformRows,
-      weapons: weaponRows,
-      subsystems: subsystemRows,
-      sources: sourceRows,
-      compatibility: compatibilityRows,
-      assertions: assertionRows,
+      schema: CATALOG_SCHEMA_VERSION,
+      state: "POSTGIS",
+      ...catalog,
     });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Catalog unavailable" },
-      { status: 500 },
+      { status: 503 },
     );
   }
 }

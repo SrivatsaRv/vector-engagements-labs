@@ -1,163 +1,168 @@
 import {
+  boolean,
+  customType,
+  doublePrecision,
+  index,
   integer,
+  jsonb,
+  pgTable,
   primaryKey,
-  real,
-  sqliteTable,
   text,
-} from "drizzle-orm/sqlite-core";
+  timestamp,
+} from "drizzle-orm/pg-core";
 
-export const sources = sqliteTable("sources", {
+const geometryPoint = customType<{ data: string }>({
+  dataType() {
+    return "geometry(Point,4326)";
+  },
+});
+
+export const sources = pgTable("sources", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
   publisher: text("publisher").notNull(),
   url: text("url").notNull(),
-  publishedAt: text("published_at"),
-  sourceClass: text("source_class", {
-    enum: ["OFFICIAL", "MANUFACTURER", "SECONDARY", "USER"],
-  }).notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  sourceClass: text("source_class").notNull(),
   notes: text("notes"),
 });
 
-export const platformVariants = sqliteTable("platform_variants", {
+export const subsystems = pgTable("subsystems", {
   id: text("id").primaryKey(),
-  service: text("service", { enum: ["IAF", "PAF"] }).notNull(),
+  kind: text("kind").notNull(),
+  designation: text("designation").notNull(),
+  manufacturer: text("manufacturer"),
+  description: text("description").notNull(),
+  sourceIds: jsonb("source_ids").$type<string[]>().notNull(),
+  dataStatus: text("data_status").notNull(),
+});
+
+export const platformVariants = pgTable("platform_variants", {
+  id: text("id").primaryKey(),
+  service: text("service").notNull(),
   country: text("country").notNull(),
   family: text("family").notNull(),
   variant: text("variant").notNull(),
   displayName: text("display_name").notNull(),
   role: text("role").notNull(),
   crew: integer("crew"),
-  emptyMassKg: real("empty_mass_kg"),
-  internalFuelKg: real("internal_fuel_kg"),
-  maxTakeoffMassKg: real("max_takeoff_mass_kg"),
-  maxPublishedSpeedMach: real("max_published_speed_mach"),
-  maxPublishedG: real("max_published_g"),
-  engineId: text("engine_id"),
+  engineIds: jsonb("engine_ids").$type<string[]>().notNull(),
   radarId: text("radar_id"),
   ewId: text("ew_id"),
   datalinkId: text("datalink_id"),
-  sourceId: text("source_id").references(() => sources.id),
-  dataStatus: text("data_status", {
-    enum: ["SOURCED", "PARTIAL", "UNSOURCED"],
-  }).notNull(),
+  rwrId: text("rwr_id"),
+  countermeasureId: text("countermeasure_id"),
+  domains: jsonb("domains").$type<string[]>().notNull(),
+  defaultLoadout: jsonb("default_loadout").notNull(),
+  sourceIds: jsonb("source_ids").$type<string[]>().notNull(),
+  dataStatus: text("data_status").notNull(),
 });
 
-export const subsystems = sqliteTable("subsystems", {
-  id: text("id").primaryKey(),
-  kind: text("kind", {
-    enum: ["ENGINE", "RADAR", "EW", "DATALINK", "RWR", "COUNTERMEASURE"],
-  }).notNull(),
-  designation: text("designation").notNull(),
-  manufacturer: text("manufacturer"),
-  description: text("description").notNull(),
-  sourceId: text("source_id").references(() => sources.id),
-  dataStatus: text("data_status", {
-    enum: ["SOURCED", "PARTIAL", "UNSOURCED"],
-  }).notNull(),
-});
-
-export const weapons = sqliteTable("weapons", {
+export const weapons = pgTable("weapons", {
   id: text("id").primaryKey(),
   country: text("country").notNull(),
   family: text("family").notNull(),
   variant: text("variant").notNull(),
   displayName: text("display_name").notNull(),
-  category: text("category", {
-    enum: [
-      "AAM_BVR",
-      "AAM_WVR",
-      "ANTI_RADIATION",
-      "AIR_TO_SURFACE",
-      "SAM",
-      "SURFACE_STRIKE",
-    ],
-  }).notNull(),
+  category: text("category").notNull(),
+  domains: jsonb("domains").$type<string[]>().notNull(),
   seekerType: text("seeker_type"),
-  guidanceStages: text("guidance_stages", { mode: "json" }).$type<string[]>(),
-  launchSupport: text("launch_support", {
-    enum: ["NONE", "OPTIONAL", "REQUIRED", "UNKNOWN"],
-  }).notNull(),
-  motorType: text("motor_type"),
-  publishedRangeKm: real("published_range_km"),
+  guidanceStages: jsonb("guidance_stages").$type<string[]>().notNull(),
+  launchSupport: text("launch_support").notNull(),
+  publishedRangeKm: doublePrecision("published_range_km"),
   rangeCondition: text("range_condition"),
-  publishedSpeedMach: real("published_speed_mach"),
-  modelProfileId: text("model_profile_id").notNull(),
-  modelVersion: text("model_version").notNull(),
-  modelStudyLimitKm: real("model_study_limit_km").notNull(),
-  modelPoweredFlightSeconds: real("model_powered_flight_seconds").notNull(),
-  modelMaxSpeedMps: real("model_max_speed_mps").notNull(),
-  modelTurnG: real("model_turn_g").notNull(),
-  modelPostBurnLossMps2: real("model_post_burn_loss_mps2").notNull(),
-  modelRationale: text("model_rationale").notNull(),
-  sourceId: text("source_id").references(() => sources.id),
-  dataStatus: text("data_status", {
-    enum: ["SOURCED", "PARTIAL", "UNSOURCED"],
-  }).notNull(),
+  publishedSpeedMach: doublePrecision("published_speed_mach"),
+  sourceIds: jsonb("source_ids").$type<string[]>().notNull(),
+  dataStatus: text("data_status").notNull(),
 });
 
-export const platformStations = sqliteTable("platform_stations", {
+export const simulationModels = pgTable("simulation_models", {
   id: text("id").primaryKey(),
-  platformId: text("platform_id")
-    .notNull()
-    .references(() => platformVariants.id),
-  label: text("label").notNull(),
-  stationGroup: text("station_group").notNull(),
-  maxQuantity: integer("max_quantity").notNull().default(1),
-  dataStatus: text("data_status", {
-    enum: ["SOURCED", "PARTIAL", "UNSOURCED"],
-  }).notNull(),
+  weaponId: text("weapon_id").notNull().references(() => weapons.id),
+  version: text("version").notNull(),
+  domains: jsonb("domains").$type<string[]>().notNull(),
+  propulsionKind: text("propulsion_kind").notNull(),
+  launchMassKg: doublePrecision("launch_mass_kg").notNull(),
+  dryMassKg: doublePrecision("dry_mass_kg").notNull(),
+  poweredFlightSeconds: doublePrecision("powered_flight_seconds").notNull(),
+  thrustNewtons: doublePrecision("thrust_newtons").notNull(),
+  thrustTaperSpeedMps: doublePrecision("thrust_taper_speed_mps").notNull(),
+  referenceAreaM2: doublePrecision("reference_area_m2").notNull(),
+  dragCoefficient: doublePrecision("drag_coefficient").notNull(),
+  navigationConstant: doublePrecision("navigation_constant").notNull(),
+  maximumCommandG: doublePrecision("maximum_command_g").notNull(),
+  seekerActivationRangeM: doublePrecision("seeker_activation_range_m").notNull(),
+  datalinkUpdateSeconds: doublePrecision("datalink_update_seconds").notNull(),
+  valueState: text("value_state").notNull(),
+  rationale: text("rationale").notNull(),
 });
 
-export const platformWeaponCompatibility = sqliteTable(
+export const platformWeaponCompatibility = pgTable(
   "platform_weapon_compatibility",
   {
-    platformId: text("platform_id")
-      .notNull()
-      .references(() => platformVariants.id),
-    weaponId: text("weapon_id")
-      .notNull()
-      .references(() => weapons.id),
+    platformId: text("platform_id").notNull().references(() => platformVariants.id),
+    weaponId: text("weapon_id").notNull().references(() => weapons.id),
     stationGroup: text("station_group").notNull(),
-    sourceId: text("source_id").references(() => sources.id),
-    status: text("status", {
-      enum: ["CONFIRMED", "CLAIMED", "UNVERIFIED"],
-    }).notNull(),
+    sourceIds: jsonb("source_ids").$type<string[]>().notNull(),
+    status: text("status").notNull(),
   },
-  (table) => [
-    primaryKey({
-      columns: [table.platformId, table.weaponId, table.stationGroup],
-    }),
-  ],
+  (table) => [primaryKey({ columns: [table.platformId, table.weaponId, table.stationGroup] })],
 );
 
-export const sourceAssertions = sqliteTable("source_assertions", {
+export const sourceAssertions = pgTable("source_assertions", {
   id: text("id").primaryKey(),
-  entityType: text("entity_type", {
-    enum: ["PLATFORM", "SUBSYSTEM", "WEAPON", "COMPATIBILITY"],
-  }).notNull(),
+  entityType: text("entity_type").notNull(),
   entityId: text("entity_id").notNull(),
   fieldPath: text("field_path").notNull(),
   valueText: text("value_text").notNull(),
   unit: text("unit"),
   conditionText: text("condition_text"),
-  sourceId: text("source_id")
-    .notNull()
-    .references(() => sources.id),
-  confidence: real("confidence").notNull(),
-  reviewState: text("review_state", {
-    enum: ["ACCEPTED", "CONTRADICTED", "UNREVIEWED"],
-  }).notNull(),
+  sourceId: text("source_id").notNull().references(() => sources.id),
+  confidence: doublePrecision("confidence").notNull(),
+  reviewState: text("review_state").notNull(),
 });
 
-export const savedRunSnapshots = sqliteTable("saved_run_snapshots", {
+export const installations = pgTable(
+  "installations",
+  {
+    id: text("id").primaryKey(),
+    service: text("service").notNull(),
+    name: text("name").notNull(),
+    installationType: text("installation_type").notNull(),
+    location: geometryPoint("location").notNull(),
+    publicReference: boolean("public_reference").notNull().default(true),
+    sourceId: text("source_id").notNull().references(() => sources.id),
+  },
+  (table) => [index("installations_location_gix").using("gist", table.location)],
+);
+
+export const scenarioTemplates = pgTable("scenario_templates", {
+  id: text("id").notNull(),
+  version: text("version").notNull(),
+  domain: text("domain").notNull(),
+  title: text("title").notNull(),
+  status: text("status").notNull(),
+  package: jsonb("package").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  contentHash: text("content_hash").notNull(),
+  engineVersion: text("engine_version").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.id, table.version] })]);
+
+export const savedRunSnapshots = pgTable("saved_run_snapshots", {
   id: text("id").primaryKey(),
   scenarioId: text("scenario_id").notNull(),
   scenarioVersion: text("scenario_version").notNull(),
   engineVersion: text("engine_version").notNull(),
-  blueForce: text("blue_force", { mode: "json" }).notNull(),
-  redForce: text("red_force", { mode: "json" }).notNull(),
-  initialState: text("initial_state", { mode: "json" }).notNull(),
-  environment: text("environment", { mode: "json" }).notNull(),
-  modelAssumptions: text("model_assumptions", { mode: "json" }).notNull(),
-  createdAt: text("created_at").notNull(),
+  scenarioSchemaVersion: text("scenario_schema_version").notNull(),
+  scenarioContentHash: text("scenario_content_hash").notNull(),
+  compiledScenario: jsonb("compiled_scenario").notNull(),
+  frameHash: text("frame_hash").notNull(),
+  draftRevision: integer("draft_revision").notNull(),
+  blueForce: jsonb("blue_force").notNull(),
+  redForce: jsonb("red_force").notNull(),
+  initialState: jsonb("initial_state").notNull(),
+  environment: jsonb("environment").notNull(),
+  modelAssumptions: jsonb("model_assumptions").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

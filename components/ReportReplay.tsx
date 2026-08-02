@@ -7,10 +7,10 @@ import { PrintTrajectory } from "@/components/PrintTrajectory";
 import {
   buildRaspTrack,
   getFrameAt,
-  getProfile,
   type Scenario,
   type SimulationResult,
 } from "@/lib/simulation";
+import { findWeaponSimulationModel } from "@/lib/simulation-models";
 
 export function ReportReplay({
   scenario,
@@ -32,7 +32,10 @@ export function ReportReplay({
     () => buildRaspTrack(scenario, frame, "PAF"),
     [frame, scenario],
   );
-  const profile = getProfile(scenario);
+  const model = findWeaponSimulationModel(scenario.blueSystemId);
+  const primaryWeapon = result.entityManifest.find(
+    (entity) => entity.id === result.engineRun.primaryWeaponId,
+  );
   const airCombat = scenario.domain === "A2A";
 
   useEffect(() => {
@@ -71,7 +74,8 @@ export function ReportReplay({
         </div>
         <p>
           Drag to orbit. Standardized markers show the exact run recorded in
-          this report without requiring asset artwork.
+          this report without requiring asset artwork. Print/PDF replaces the
+          live view with a static vector projection from the same saved frames.
         </p>
       </header>
       <div className="report-replay-stage">
@@ -208,8 +212,8 @@ export function ReportReplay({
                 <span>Flight configuration</span>
                 <strong>{scenario.guidance} path</strong>
                 <dl>
-                  <dt>Environmental loss</dt>
-                  <dd>{scenario.wind}</dd>
+                  <dt>East–west wind</dt>
+                  <dd>{scenario.wind} m/s</dd>
                   <dt>Model seed</dt>
                   <dd>{scenario.seed}</dd>
                 </dl>
@@ -218,15 +222,22 @@ export function ReportReplay({
           )}
           <article>
             <i className="profile-short" />
-            <span>Weapon study model</span>
-            <strong>{profile.name}</strong>
+            <span>Flight model</span>
+            <strong>
+              {primaryWeapon?.designation ?? scenario.blueSystemId} · v
+              {model?.version ?? "unknown"}
+            </strong>
             <dl>
-              <dt>Study limit</dt>
-              <dd>{profile.maxRange} km</dd>
               <dt>Powered flight</dt>
-              <dd>{profile.burn} s</dd>
-              <dt>Status</dt>
-              <dd>Assumption</dd>
+              <dd>{model?.poweredFlightSeconds ?? "—"} s</dd>
+              <dt>Launch / dry mass</dt>
+              <dd>
+                {model
+                  ? `${model.launchMassKg} / ${model.dryMassKg} kg`
+                  : "Unavailable"}
+              </dd>
+              <dt>Coefficient state</dt>
+              <dd>{model?.valueState.toLowerCase().replaceAll("_", " ") ?? "unknown"}</dd>
             </dl>
           </article>
         </div>

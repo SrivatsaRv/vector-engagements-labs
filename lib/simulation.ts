@@ -1,7 +1,31 @@
-export type EngagementDomain = "A2A" | "A2G" | "G2A" | "G2G";
-export type ProfileId = "short" | "medium" | "sustained";
-export type Guidance = "direct" | "loft";
-export type Maneuver = "steady" | "break" | "weave";
+import { compileScenario } from "./engine/compiler.ts";
+import { runEngine } from "./engine/core.ts";
+import {
+  standardAtmosphere,
+} from "./engine/atmosphere.ts";
+import type {
+  CoverageEnvelope,
+  EngineEntityDefinition,
+  EngineEntityFrame,
+  EngineRun,
+} from "./engine/contracts.ts";
+import type {
+  EngagementDomain,
+  Guidance,
+  Maneuver,
+  ProfileId,
+  Vec3,
+} from "./engine/primitives.ts";
+
+export { standardAtmosphere } from "./engine/atmosphere.ts";
+export type { AtmosphereState } from "./engine/atmosphere.ts";
+export type {
+  EngagementDomain,
+  Guidance,
+  Maneuver,
+  ProfileId,
+  Vec3,
+} from "./engine/primitives.ts";
 export type RadarMode = "ACTIVE" | "SILENT";
 export type TrackSource =
   | "ONBOARD_RADAR"
@@ -14,7 +38,6 @@ export type TacticalDecision =
   | "CRANK"
   | "DEFEND"
   | "DISENGAGE";
-export type Vec3 = { x: number; y: number; z: number };
 
 export type Scenario = {
   domain: EngagementDomain;
@@ -41,6 +64,7 @@ export type Scenario = {
   profile: ProfileId;
   guidance: Guidance;
   altitude: number;
+  cruiseAltitude: number;
   targetDelta: number;
   range: number;
   aspect: number;
@@ -68,13 +92,15 @@ export type Frame = {
   losRate: number;
   airDensity: number;
   mach: number;
-};
-
-export type AtmosphereState = {
-  temperatureK: number;
-  pressureKpa: number;
-  densityKgM3: number;
-  speedOfSoundMps: number;
+  entities: EngineEntityFrame[];
+  closureRate: number;
+  specificEnergy: number;
+  massKg: number;
+  fuelKg: number;
+  commandedG: number;
+  availableG: number;
+  thrustNewtons: number;
+  dragNewtons: number;
 };
 
 export type RaspTrack = {
@@ -89,14 +115,16 @@ export type RaspTrack = {
   uncertaintyMeters: number;
   position: Vec3;
   truthPosition: Vec3;
-  status: "TRACKING" | "DEGRADED" | "COASTING";
+  observedEntityId: string;
+  visible: boolean;
+  status: "TRACKING" | "DEGRADED" | "COASTING" | "NO_TRACK";
 };
 
 export type TerminationCode =
   | "threshold_reached"
   | "energy_depleted"
-  | "profile_range_limit"
-  | "time_limit";
+  | "time_limit"
+  | "invalid_scenario";
 
 export type SimulationResult = {
   frames: Frame[];
@@ -113,6 +141,9 @@ export type SimulationResult = {
   endSpeed: number;
   peakDemand: number;
   reason: string;
+  engineRun: EngineRun;
+  entityManifest: EngineEntityDefinition[];
+  envelopes: CoverageEnvelope[];
 };
 
 export type VehicleProfile = {
@@ -312,6 +343,7 @@ export const DEFAULT_SCENARIO: Scenario = {
   profile: "medium",
   guidance: "loft",
   altitude: 8500,
+  cruiseAltitude: 8500,
   targetDelta: 1500,
   range: 52000,
   aspect: 145,
@@ -327,31 +359,6 @@ export const DEFAULT_SCENARIO: Scenario = {
   lossIncreaseAmount: 8,
   seed: 42,
 };
-
-export function standardAtmosphere(
-  altitudeMeters: number,
-  temperatureOffsetC = 0,
-): AtmosphereState {
-  const altitude = Math.max(0, Math.min(25000, altitudeMeters));
-  let temperatureC: number;
-  let pressureKpa: number;
-  if (altitude <= 11000) {
-    temperatureC = 15.04 - 0.00649 * altitude;
-    pressureKpa = 101.29 * Math.pow((temperatureC + 273.1) / 288.08, 5.256);
-  } else {
-    temperatureC = -56.46;
-    pressureKpa = 22.65 * Math.exp(1.73 - 0.000157 * altitude);
-  }
-  temperatureC += temperatureOffsetC;
-  const temperatureK = temperatureC + 273.15;
-  const densityKgM3 = pressureKpa / (0.2869 * temperatureK);
-  return {
-    temperatureK,
-    pressureKpa,
-    densityKgM3,
-    speedOfSoundMps: Math.sqrt(1.4 * 287.05 * temperatureK),
-  };
-}
 
 function resolveProfile(input: Scenario, profileId: ProfileId): VehicleProfile {
   if (input.domain !== "A2A") return PROFILE_CATALOGS[input.domain][profileId];
@@ -397,256 +404,131 @@ function resolveProfile(input: Scenario, profileId: ProfileId): VehicleProfile {
   return profiles[input.blueSystemId] ?? PROFILE_CATALOGS.A2A[profileId];
 }
 
-function rotateToward(current: number, target: number, maximum: number) {
-  let delta = Math.atan2(
-    Math.sin(target - current),
-    Math.cos(target - current),
-  );
-  delta = Math.max(-maximum, Math.min(maximum, delta));
-  return current + delta;
-}
-
-function angularDifference(current: number, previous: number) {
-  return Math.atan2(Math.sin(current - previous), Math.cos(current - previous));
-}
-
 export function simulate(
   input: Scenario,
   profileId: ProfileId = input.profile,
 ): SimulationResult {
   const profile = resolveProfile(input, profileId);
-  const dt = 0.1;
-  const gravity = 9.81;
-  const frames: Frame[] = [];
-  const fixedObjective = input.domain === "A2G" || input.domain === "G2G";
-  const maxTime = input.domain === "G2G" ? 180 : 120;
-  let ix = 0;
-  let iy = 0;
-  let iz = input.altitude;
-  let interceptorHeading = 0;
-  let interceptorSpeed = Math.max(0, input.launcherSpeed);
-  let travelledDistance = 0;
-  let tx = input.range;
-  let ty = 0;
-  const tz = input.altitude + input.targetDelta;
-  let targetHeading = ((180 - input.aspect) * Math.PI) / 180;
-  const targetSpeed = fixedObjective ? 0 : input.targetSpeed;
-  let previousLosAngle = Math.atan2(ty - iy, tx - ix);
-  let guidanceHeading = previousLosAngle;
-  let lastGuidanceUpdate = -Infinity;
-  let peakDemand = 0;
-  let closestApproach = Number.POSITIVE_INFINITY;
-  let termination: TerminationCode = "time_limit";
-  const redDecisionFactor =
-    input.redDecision === "DEFEND"
-      ? 1
-      : input.redDecision === "CRANK"
-        ? 0.65
-        : input.redDecision === "DISENGAGE"
-          ? 0.55
-          : 0.2;
-  const guidanceUpdateInterval =
-    input.domain !== "A2A" || input.blueDecision === "SUPPORT_WEAPON"
-      ? dt
-      : input.blueDecision === "PRESS"
-        ? 0.25
-        : input.blueDecision === "CRANK"
-          ? 0.5
-          : input.blueDecision === "DEFEND"
-            ? 1.5
-            : 4;
-
-  for (let time = 0; time <= maxTime; time += dt) {
-    if (
-      !fixedObjective &&
-      input.maneuver !== "steady" &&
-      input.targetG > 0 &&
-      time > 5
-    ) {
-      const direction = input.maneuver === "break" ? 1 : Math.sin(time * 0.55);
-      targetHeading +=
-        direction *
-        ((input.targetG * redDecisionFactor * gravity) /
-          Math.max(targetSpeed, 1)) *
-        dt *
-        0.18;
-    }
-    tx += Math.cos(targetHeading) * targetSpeed * dt;
-    ty += Math.sin(targetHeading) * targetSpeed * dt;
-
-    const dx = tx - ix;
-    const dy = ty - iy;
-    const dz = tz - iz;
-    const range = Math.hypot(dx, dy, dz);
-    closestApproach = Math.min(closestApproach, range);
-    const lineOfSightHeading = Math.atan2(dy, dx);
-    const losRate =
-      Math.abs(angularDifference(lineOfSightHeading, previousLosAngle)) / dt;
-    previousLosAngle = lineOfSightHeading;
-    const guidanceInterrupted =
-      input.guidanceInterruptionAt !== null &&
-      time >= input.guidanceInterruptionAt &&
-      time < input.guidanceInterruptionAt + input.guidanceInterruptionDuration;
-    if (
-      !guidanceInterrupted &&
-      time - lastGuidanceUpdate >= guidanceUpdateInterval
-    ) {
-      guidanceHeading = lineOfSightHeading;
-      lastGuidanceUpdate = time;
-    }
-    const desiredHeading = guidanceHeading;
-    const availableG = Math.max(
-      3,
-      profile.turnG *
-        (0.45 + 0.55 * Math.min(interceptorSpeed / profile.maxSpeed, 1)),
+  const engineScenario = compileScenario(
+    {
+      id: `configured-${input.domain.toLowerCase()}`,
+      version: "0.5.0",
+      domain: input.domain,
+      name: input.name,
+      bluePlatformId: input.bluePlatformId,
+      blueSystemId: input.blueSystemId,
+      redObjectId: input.redObjectId,
+      redSystemId: input.redSystemId,
+      profile: profileId,
+      guidance: input.guidance,
+      altitude: input.altitude,
+      cruiseAltitude: input.cruiseAltitude,
+      targetDelta: input.targetDelta,
+      range: input.range,
+      aspect: input.aspect,
+      launcherSpeed: input.launcherSpeed,
+      targetSpeed: input.targetSpeed,
+      maneuver: input.maneuver,
+      targetG: input.targetG,
+      blueFuelPercent: input.blueFuelPercent,
+      redFuelPercent: input.redFuelPercent,
+      blueDecision: input.blueDecision,
+      redDecision: input.redDecision,
+      windEastMps: input.wind,
+      windNorthMps: 0,
+      temperatureOffset: input.temperatureOffset,
+      guidanceInterruptionAt: input.guidanceInterruptionAt,
+      guidanceInterruptionDuration: input.guidanceInterruptionDuration,
+      windShiftAt: input.lossIncreaseAt,
+      windShiftEastMps: input.lossIncreaseAmount,
+      windShiftNorthMps: 0,
+      seed: input.seed,
+    },
+    profile,
+  );
+  const engineRun = runEngine(engineScenario);
+  const frames: Frame[] = engineRun.frames.map((engineFrame) => {
+    const weapon = engineFrame.entities.find(
+      (entity) => entity.id === engineRun.primaryWeaponId,
+    )!;
+    const target = engineFrame.entities.find(
+      (entity) => entity.id === engineRun.primaryTargetId,
+    )!;
+    const atmosphere = standardAtmosphere(
+      weapon.position.z,
+      input.temperatureOffset,
     );
-    const previousHeading = interceptorHeading;
-    interceptorHeading = rotateToward(
-      interceptorHeading,
-      desiredHeading,
-      (availableG * gravity * dt) / Math.max(interceptorSpeed, 100),
-    );
-    peakDemand = Math.max(
-      peakDemand,
-      ((Math.abs(interceptorHeading - previousHeading) / dt) *
-        interceptorSpeed) /
-        gravity,
-    );
-
-    const atmosphere = standardAtmosphere(iz, input.temperatureOffset);
-    if (time < profile.burn) {
-      interceptorSpeed = Math.min(
-        profile.maxSpeed,
-        interceptorSpeed +
-          ((profile.maxSpeed - input.launcherSpeed) / profile.burn) * dt,
-      );
-    } else {
-      const baseLoss =
-        profileId === "sustained" ? 3.8 : profileId === "medium" ? 6.2 : 8.5;
-      const injectedLoss =
-        input.lossIncreaseAt !== null && time >= input.lossIncreaseAt
-          ? input.lossIncreaseAmount
-          : 0;
-      const densityRatio = atmosphere.densityKgM3 / 1.225;
-      const loadoutFactor =
-        1 + Math.max(0, input.blueWeaponQuantity - 1) * 0.015;
-      interceptorSpeed = Math.max(
+    return {
+      t: engineFrame.t,
+      interceptor: weapon.position,
+      target: target.position,
+      speed: weapon.speedMps,
+      range: engineFrame.separationM,
+      energy: Math.max(
         0,
-        interceptorSpeed -
-          baseLoss * densityRatio * loadoutFactor * dt -
-          (input.wind + injectedLoss) * 0.025,
-      );
-    }
-
-    const progress = Math.max(
-      0,
-      Math.min(1, 1 - Math.hypot(dx, dy) / Math.max(input.range, 1)),
-    );
-    const loft =
-      input.guidance === "loft"
-        ? Math.sin(progress * Math.PI) * Math.min(7000, input.range * 0.08)
-        : 0;
-    const desiredAltitude =
-      input.altitude + (tz - input.altitude) * progress + loft;
-    iz += Math.max(-140, Math.min(140, (desiredAltitude - iz) * 0.35)) * dt;
-    ix += Math.cos(interceptorHeading) * interceptorSpeed * dt;
-    iy += Math.sin(interceptorHeading) * interceptorSpeed * dt;
-    travelledDistance += interceptorSpeed * dt;
-
-    const energy = Math.max(
-      0,
-      Math.min(
-        100,
-        ((interceptorSpeed - 150) / Math.max(profile.maxSpeed - 150, 1)) * 100,
+        Math.min(100, (weapon.speedMps / Math.max(1, profile.maxSpeed)) * 100),
       ),
-    );
-    const phase =
-      time < profile.burn
-        ? "Powered flight"
-        : progress < 0.72
-          ? "Midcourse"
-          : "Terminal";
-    if (Math.round(time * 10) % 5 === 0) {
-      frames.push({
-        t: time,
-        interceptor: { x: ix, y: iy, z: iz },
-        target: { x: tx, y: ty, z: tz },
-        speed: interceptorSpeed,
-        range,
-        energy,
-        phase,
-        losRate,
-        airDensity: atmosphere.densityKgM3,
-        mach: interceptorSpeed / atmosphere.speedOfSoundMps,
-      });
-    }
-
-    if (range < 180) {
-      termination = "threshold_reached";
-      break;
-    }
-    if (travelledDistance > profile.maxRange * 1000 * 1.08) {
-      termination = "profile_range_limit";
-      break;
-    }
-    if (time > profile.burn && energy < 2 && range > 1500) {
-      termination = "energy_depleted";
-      break;
-    }
-  }
-
-  const successful = termination === "threshold_reached";
+      phase: weapon.phase,
+      losRate: engineFrame.lineOfSightRateRadS,
+      airDensity: atmosphere.densityKgM3,
+      mach: weapon.mach,
+      entities: engineFrame.entities,
+      closureRate: engineFrame.closureRateMps,
+      specificEnergy: weapon.specificEnergyJkg,
+      massKg: weapon.massKg,
+      fuelKg: weapon.fuelKg,
+      commandedG: weapon.commandedG,
+      availableG: weapon.availableG,
+      thrustNewtons: weapon.thrustNewtons,
+      dragNewtons: weapon.dragNewtons,
+    };
+  });
+  const successful = engineRun.termination === "threshold_reached";
+  const fixedObjective = input.domain === "A2G" || input.domain === "G2G";
   const outcome = successful
     ? fixedObjective
       ? "Objective reached"
       : "Intercept"
-    : termination === "energy_depleted"
+    : engineRun.termination === "energy_depleted"
       ? "Energy depleted"
-      : termination === "profile_range_limit"
-        ? "Modeled distance exhausted"
-        : "Time limit reached";
-  const reason =
-    termination === "threshold_reached"
-      ? fixedObjective
-        ? "The modeled vehicle reached the fixed-objective completion threshold."
-        : "The modeled interceptor reached the airborne-target completion threshold."
-      : termination === "energy_depleted"
-        ? "Modeled speed fell below the continuation threshold after powered flight."
-        : termination === "profile_range_limit"
-          ? `The weapon traveled the selected study model's ${profile.maxRange} km path-distance allowance without reaching the completion threshold.`
-          : `The run did not reach the completion threshold within ${maxTime} model seconds.`;
+      : "Time limit reached";
+  const reason = successful
+    ? fixedObjective
+      ? "The guided vehicle reached the configured objective-completion distance."
+      : "The guided vehicle reached the configured intercept-completion distance."
+    : engineRun.termination === "energy_depleted"
+      ? "The vehicle reached the reference surface or fell below the continuation-speed condition after powered flight."
+      : engineRun.termination === "invalid_scenario"
+        ? "The scenario did not contain an active guided vehicle and a valid assigned objective."
+        : `The run reached ${engineScenario.durationSeconds} model seconds before the completion distance.`;
   const last = frames.at(-1);
-
   return {
     frames,
     outcome,
     successful,
-    termination,
-    closestApproach: successful
-      ? Math.min(closestApproach, 180)
-      : closestApproach,
+    termination: engineRun.termination,
+    closestApproach: engineRun.closestApproachM,
     timeOfFlight: last?.t ?? 0,
     endSpeed: last?.speed ?? 0,
-    peakDemand,
+    peakDemand: engineRun.peakCommandG,
     reason,
+    engineRun,
+    entityManifest: engineRun.scenario.entities,
+    envelopes: engineRun.envelopes,
   };
 }
 
 export function explainResult(scenario: Scenario, result: SimulationResult) {
-  const profile = resolveProfile(scenario, scenario.profile);
+  const weapon = result.entityManifest.find(
+    (entity) => entity.id === result.engineRun.primaryWeaponId,
+  );
   if (result.termination === "threshold_reached") {
-    return `${profile.name} covered the ${scenario.range / 1000} km starting distance and reached the model's 180 m completion threshold in ${result.timeOfFlight.toFixed(1)} seconds.`;
-  }
-  if (result.termination === "profile_range_limit") {
-    if (scenario.range > profile.maxRange * 1000) {
-      return `The ${scenario.range / 1000} km starting distance exceeds this study model's ${profile.maxRange} km setup boundary. Reduce the distance before treating the comparison as in scope.`;
-    }
-    return `The start was inside the ${profile.maxRange} km setup boundary, but the curved pursuit path used the model's distance allowance before reaching the 180 m completion threshold. Closest separation was ${Math.round(result.closestApproach)} m. Change one input—distance, crossing angle, target maneuver, or path—and run again.`;
+    return `The simulated ${weapon?.designation ?? "guided vehicle"} reached the configured 180 m completion threshold from a ${scenario.range / 1000} km start in ${result.timeOfFlight.toFixed(1)} seconds.`;
   }
   if (result.termination === "energy_depleted") {
-    return `After ${profile.burn} seconds of powered flight, modeled speed fell below the continuation threshold with ${Math.round(result.closestApproach / 1000)} km still separating the vehicle and objective.`;
+    return `After ${weapon?.weapon?.burnSeconds ?? 0} seconds of powered flight, modeled speed fell below the continuation threshold with ${Math.round(result.closestApproach / 1000)} km still separating the vehicle and objective.`;
   }
-  return `The run reached its model-time limit before the 180 m completion threshold. Review distance, flight path, and environmental-loss assumptions.`;
+  return `The run reached its model-time limit before the 180 m completion threshold. Review distance, flight path, and wind assumptions.`;
 }
 
 export function buildRaspTrack(
@@ -661,7 +543,12 @@ export function buildRaspTrack(
     : scenario.redTrackSource;
   const datalink = isBlue ? scenario.blueDatalink : scenario.redDatalink;
   const opposingJammer = isBlue ? scenario.redJammer : scenario.blueJammer;
-  const truthPosition = isBlue ? frame.target : frame.interceptor;
+  // Each national RASP presents its estimate of the opposing aircraft track.
+  // Guided weapons remain separate lifecycle entities and can be added later as
+  // missile-warning tracks without replacing the aircraft picture.
+  const observedEntityId = isBlue ? "red-object-1" : "blue-platform-1";
+  const observedEntity = frame.entities.find((entity) => entity.id === observedEntityId);
+  const truthPosition = observedEntity?.position ?? (isBlue ? frame.target : frame.interceptor);
   const rangeKm = frame.range / 1000;
   const sourceBase: Record<TrackSource, number> = {
     ONBOARD_RADAR: 82,
@@ -669,14 +556,15 @@ export function buildRaspTrack(
     AIRBORNE_EARLY_WARNING: 90,
     VISUAL: 72,
   };
+  const sourceAvailable =
+    observedEntity !== undefined &&
+    (trackSource === "ONBOARD_RADAR"
+      ? radarMode === "ACTIVE" && rangeKm <= 120
+      : trackSource === "DATALINK" || trackSource === "AIRBORNE_EARLY_WARNING"
+        ? datalink
+        : rangeKm <= 18);
   let confidence = sourceBase[trackSource];
-  if (trackSource === "ONBOARD_RADAR" && radarMode === "SILENT")
-    confidence -= 52;
-  if (
-    (trackSource === "DATALINK" || trackSource === "AIRBORNE_EARLY_WARNING") &&
-    !datalink
-  )
-    confidence -= 48;
+  if (!sourceAvailable) confidence = 0;
   confidence -= Math.max(0, rangeKm - 25) * 0.32;
   if (opposingJammer) confidence -= 17;
   const interrupted =
@@ -685,9 +573,11 @@ export function buildRaspTrack(
     frame.t <
       scenario.guidanceInterruptionAt + scenario.guidanceInterruptionDuration;
   if (interrupted && isBlue) confidence -= 34;
-  confidence = Math.round(Math.max(5, Math.min(98, confidence)));
+  confidence = Math.round(Math.max(0, Math.min(98, confidence)));
   const uncertaintyMeters = Math.round(
-    120 + Math.pow(100 - confidence, 1.55) * 11,
+    sourceAvailable
+      ? 120 + Math.pow(100 - confidence, 1.55) * 11
+      : 25000,
   );
   const phase = scenario.seed * 0.37 + frame.t * 0.13 + (isBlue ? 0 : 1.9);
   const position = {
@@ -695,14 +585,17 @@ export function buildRaspTrack(
     y: truthPosition.y + Math.sin(phase) * uncertaintyMeters * 0.46,
     z: truthPosition.z + Math.sin(phase * 0.7) * uncertaintyMeters * 0.18,
   };
-  const status =
-    confidence < 30 ? "COASTING" : confidence < 60 ? "DEGRADED" : "TRACKING";
+  const status = !sourceAvailable
+    ? "NO_TRACK"
+    : confidence < 30
+      ? "COASTING"
+      : confidence < 60
+        ? "DEGRADED"
+        : "TRACKING";
   return {
     perspective,
     trackId: isBlue ? "R-021" : "B-014",
-    classification: isBlue
-      ? "Fighter-sized airborne track"
-      : "Fighter / weapon-support track",
+    classification: "Fighter-sized airborne track",
     identification:
       confidence >= 70 ? "HOSTILE" : confidence >= 45 ? "SUSPECT" : "UNKNOWN",
     source:
@@ -714,17 +607,23 @@ export function buildRaspTrack(
             ? "Tactical data link"
             : "Visual observation",
     lastUpdateSeconds:
-      interrupted && isBlue
+      !sourceAvailable
+        ? frame.t
+        : interrupted && isBlue
         ? Math.max(0, frame.t - (scenario.guidanceInterruptionAt ?? 0))
         : 0.1,
     ageSeconds:
-      interrupted && isBlue
+      !sourceAvailable
+        ? frame.t
+        : interrupted && isBlue
         ? Math.max(0, frame.t - (scenario.guidanceInterruptionAt ?? 0))
         : 0.1,
     confidence,
     uncertaintyMeters,
     position,
     truthPosition,
+    observedEntityId,
+    visible: sourceAvailable,
     status,
   };
 }

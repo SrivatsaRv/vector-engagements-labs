@@ -4,7 +4,7 @@ import {
   type Scenario,
 } from "./simulation.ts";
 
-export type { EngagementDomain } from "@/lib/simulation";
+export type { EngagementDomain } from "./simulation.ts";
 export type ScenarioComplexity = "Foundation" | "Intermediate" | "Advanced";
 export type FocusOption = {
   title: string;
@@ -102,16 +102,16 @@ const fixedFocus: FocusOption[] = [
   {
     title: "Range margin",
     description:
-      "Check whether the selected study model covers the starting distance with margin.",
+      "Check whether the selected flight model can complete the run from the chosen starting distance.",
     objective:
       "Check whether the selected flight model covers the starting distance with margin.",
   },
   {
-    title: "Environmental loss",
+    title: "Wind sensitivity",
     description:
-      "Measure how the loss assumption changes flight time and terminal speed.",
+      "Measure how an east–west wind changes flight time and terminal speed.",
     objective:
-      "Measure how the environmental-loss assumption changes flight time and terminal speed.",
+      "Measure how an east–west wind changes flight time and terminal speed.",
   },
 ];
 const trackEvent: PreparedEvent = {
@@ -122,9 +122,9 @@ const trackEvent: PreparedEvent = {
   physicsEffect: "guidance-hold",
 };
 const navigationEvent: PreparedEvent = {
-  title: "Environmental-loss increase",
+  title: "Wind shift",
   description:
-    "From the selected model time onward, the environmental-loss index increases by eight points.",
+    "From the selected model time onward, the eastward wind component increases by 8 m/s.",
   duration: 0,
   physicsEffect: "loss-increase",
 };
@@ -177,7 +177,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     runVariants: movingRuns,
     presetRationale: {
       profile:
-        "The 52 km start is inside VECTOR's 65 km Astra study boundary. That boundary is a teaching assumption, not a published universal engagement range.",
+        "The 52 km baseline is regression-tested against VECTOR's current Astra coefficient set. It is a reproducible model setup, not a published engagement-range claim.",
       geometry:
         "A 145° crossing angle and 1,500 m altitude difference create a crossing intercept rather than a head-on pass or tail chase.",
       conditions:
@@ -193,6 +193,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       redObjectId: "f-16c-block52-paf",
       redSystemId: "aim-120c5",
       guidance: "direct",
+      range: 52000,
     }),
   },
   {
@@ -376,7 +377,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       guidance: "loft",
       altitude: 80,
       targetDelta: 7920,
-      range: 48000,
+      range: 35000,
       aspect: 135,
       launcherSpeed: 0,
       targetSpeed: 245,
@@ -421,10 +422,10 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       blueSystemId: "s-200",
       redObjectId: "jf-17",
       profile: "sustained",
-      guidance: "loft",
+      guidance: "direct",
       altitude: 100,
       targetDelta: 11900,
-      range: 85000,
+      range: 60000,
       aspect: 155,
       launcherSpeed: 0,
       targetSpeed: 305,
@@ -471,6 +472,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       profile: "sustained",
       guidance: "direct",
       altitude: 50,
+      cruiseAltitude: 250,
       targetDelta: 0,
       range: 105000,
       aspect: 180,
@@ -486,7 +488,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     domain: "G2G",
     title: "BrahMos route to a fixed command site",
     summary:
-      "Compare repeatable route and environmental-loss variants to a user-positioned fixed command site.",
+      "Compare repeatable route and wind variants to a user-positioned fixed command site.",
     blue: "BrahMos mobile launcher",
     red: "Fixed command-and-control site",
     targetProfile: "User-positioned command site",
@@ -507,19 +509,20 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       geometry:
         "The launcher and objective are fixed at the reference surface; the baseline direct path is the completion case.",
       conditions:
-        "Environmental loss is set to 22 for this sensitivity run. Defence interaction is not part of the physics.",
+        "The eastward wind component is set to 22 m/s for this sensitivity run. Defence interaction is not part of the physics.",
     },
     scenario: scenario({
       domain: "G2G",
       name: "BrahMos flight path: fixed command site",
       objective:
-        "Measure how flight path and environmental loss change time and terminal speed at a fixed command site.",
+        "Measure how flight path and east–west wind change time and terminal speed at a fixed command site.",
       bluePlatformId: "brahmos-mal",
       blueSystemId: "brahmos-block-i",
       redObjectId: "command-site",
       profile: "sustained",
       guidance: "direct",
       altitude: 50,
+      cruiseAltitude: 500,
       targetDelta: 0,
       range: 118000,
       aspect: 180,

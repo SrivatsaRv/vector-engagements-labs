@@ -28,7 +28,9 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { ObjectPicker } from "@/components/ObjectPicker";
+import { EngagementMap, type MapInstallation } from "@/components/EngagementMap";
 import { SimulationScene } from "@/components/SimulationScene";
+import { TacticalSymbol } from "@/components/TacticalSymbol";
 import { TelemetryChart } from "@/components/TelemetryChart";
 import {
   canConduct,
@@ -53,10 +55,22 @@ import {
   type ScenarioDefinition,
 } from "@/lib/scenarios";
 import {
+  findWeaponSimulationModel,
+  registerDatabaseSimulationModels,
+} from "@/lib/simulation-models";
+import { ENGINE_VERSION } from "@/lib/engine/version";
+import type { ReportData } from "@/lib/report-export";
+import { sha256Hex } from "@/lib/canonical-json";
+import {
+  isScenarioDefinition,
+  isStoredScenarioPackage,
+  SCENARIO_PACKAGE_SCHEMA_VERSION,
+  type StoredScenarioPackage,
+} from "@/lib/scenario-package";
+import {
   buildRaspTrack,
   explainResult,
   getFrameAt,
-  getProfile,
   simulate,
   standardAtmosphere,
   type ProfileId,
@@ -67,6 +81,7 @@ import {
 
 type Workspace = "configure" | "run" | "results";
 type ViewMode = "TRUTH" | "IAF_RASP" | "PAF_RASP";
+type PlaybackSurface = "MAP" | "THREE_D";
 type EventItem = {
   id: number;
   time: number;
@@ -102,17 +117,18 @@ function RedirectToScenarios() {
 }
 
 function LabWorkbench({
-  definition,
+  definition: initialDefinition,
   startStep,
 }: {
   definition: ScenarioDefinition;
   startStep: number;
 }) {
   const router = useRouter();
+  const [definition, setDefinition] = useState(initialDefinition);
   const [scenario, setScenario] = useState<Scenario>(() => ({
-    ...definition.scenario,
+    ...initialDefinition.scenario,
   }));
-  const [result, setResult] = useState(() => simulate(definition.scenario));
+  const [result, setResult] = useState(() => simulate(initialDefinition.scenario));
   const [workspace, setWorkspace] = useState<Workspace>("configure");
   const [buildStep, setBuildStep] = useState(startStep);
   const [hasRun, setHasRun] = useState(false);
@@ -139,20 +155,29 @@ function LabWorkbench({
     },
   ]);
   const [conditionArmed, setConditionArmed] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [savedRunId, setSavedRunId] = useState<string | null>(null);
+  const [draftRevision, setDraftRevision] = useState(0);
+  const [runDraftRevision, setRunDraftRevision] = useState<number | null>(null);
+  const [templateIdentity, setTemplateIdentity] = useState<{
+    schemaVersion: string;
+    contentHash: string;
+    engineVersion: string;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
-  const [catalogState, setCatalogState] = useState<"loading" | "D1" | "error">(
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [catalogState, setCatalogState] = useState<"loading" | "POSTGIS" | "error">(
     "loading",
   );
+  const [catalogInstallations, setCatalogInstallations] = useState<MapInstallation[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("TRUTH");
+  const [playbackSurface, setPlaybackSurface] =
+    useState<PlaybackSurface>("MAP");
   const validations = useMemo(
     () => validateScenario(definition, scenario),
     [definition, scenario],
   );
-  const bluePlatform = getCatalogObject(scenario.bluePlatformId);
   const blueSystem = getCatalogObject(scenario.blueSystemId);
   const redObject = getCatalogObject(scenario.redObjectId);
-  const redSystem = getCatalogObject(scenario.redSystemId);
 
   useEffect(() => {
     let active = true;
@@ -161,9 +186,49 @@ function LabWorkbench({
         if (!response.ok) throw new Error("catalog");
         return response.json();
       })
-      .then((data: unknown) => {
-        const payload = data as { state?: string };
-        if (active) setCatalogState(payload.state === "D1" ? "D1" : "error");
+      .then(async (data: unknown) => {
+        const payload = data as {
+          state?: string;
+          installations?: MapInstallation[];
+          simulationModels?: Parameters<typeof registerDatabaseSimulationModels>[0];
+          scenarioTemplates?: StoredScenarioPackage[];
+        };
+        if (active) {
+          const template = payload.scenarioTemplates?.find(
+            (item) =>
+              item.id === initialDefinition.id &&
+              item.version === initialDefinition.version &&
+              item.status === "VALIDATED",
+          );
+          if (
+            payload.state !== "POSTGIS" ||
+            !template ||
+            !isStoredScenarioPackage(template) ||
+            template.schema_version !== SCENARIO_PACKAGE_SCHEMA_VERSION ||
+            template.engine_version !== ENGINE_VERSION ||
+            !isScenarioDefinition(template.package) ||
+            !payload.simulationModels?.length
+          ) {
+            throw new Error("catalog package incomplete");
+          }
+          const computedHash = await sha256Hex(template.package);
+          if (computedHash !== template.content_hash) {
+            throw new Error("scenario package hash mismatch");
+          }
+          registerDatabaseSimulationModels(payload.simulationModels);
+          setDefinition(template.package);
+          setScenario({ ...template.package.scenario });
+          setResult(simulate(template.package.scenario));
+          setDraftRevision(0);
+          setRunDraftRevision(null);
+          setTemplateIdentity({
+            schemaVersion: template.schema_version,
+            contentHash: template.content_hash,
+            engineVersion: template.engine_version,
+          });
+          setCatalogState("POSTGIS");
+          setCatalogInstallations(payload.installations ?? []);
+        }
       })
       .catch(() => {
         if (active) setCatalogState("error");
@@ -171,9 +236,30 @@ function LabWorkbench({
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialDefinition.id, initialDefinition.version]);
+
+  const setConfiguredScenario = useCallback<
+    React.Dispatch<React.SetStateAction<Scenario>>
+  >((action) => {
+    setScenario((current) =>
+      typeof action === "function" ? action(current) : action,
+    );
+    setDraftRevision((value) => value + 1);
+    if (hasRun) {
+      setHasRun(false);
+      setPlaying(false);
+      setSavedRunId(null);
+      setRunDraftRevision(null);
+      setWorkspace("configure");
+      setSaveError("Configuration changed. Conduct a new run before saving or reporting.");
+    }
+  }, [hasRun]);
 
   const run = useCallback(() => {
+    if (catalogState !== "POSTGIS") {
+      setSaveError("Wait for the PostGIS scenario package before conducting the run.");
+      return;
+    }
     const checks = validateScenario(definition, scenario);
     if (!canConduct(checks)) {
       setWorkspace("configure");
@@ -187,6 +273,9 @@ function LabWorkbench({
     setWorkspace("run");
     setComparison(null);
     setHasRun(true);
+    setRunDraftRevision(draftRevision);
+    setSavedRunId(null);
+    setSaveError(null);
     setEvents((items) => [
       ...items,
       {
@@ -194,10 +283,10 @@ function LabWorkbench({
         time: 0,
         type: "run",
         title: "Baseline run started",
-        detail: `${getProfile(scenario).name} · ${scenario.guidance} path · ${scenario.range / 1000} km`,
+        detail: `${getCatalogObject(scenario.blueSystemId).designation} · ${findWeaponSimulationModel(scenario.blueSystemId)?.id ?? "model unavailable"}@${findWeaponSimulationModel(scenario.blueSystemId)?.version ?? "unknown"} · ${scenario.guidance} path · ${scenario.range / 1000} km`,
       },
     ]);
-  }, [definition, scenario]);
+  }, [catalogState, definition, draftRevision, scenario]);
 
   useEffect(() => {
     if (!playing) return;
@@ -273,6 +362,8 @@ function LabWorkbench({
     setResult(simulate(changed));
     setConditionArmed(false);
     setComparison(null);
+    setSavedRunId(null);
+    setSaveError(null);
     setEvents((items) => [
       ...items,
       {
@@ -324,13 +415,23 @@ function LabWorkbench({
       },
     ]);
   };
-  const buildReport = () => ({
+  const buildReport = (): ReportData => ({
     scenario,
     result,
     events,
     createdAt: new Date().toISOString(),
-    engine: "browser-point-mass-v0.4",
-    profileVersion: getProfile(scenario).name,
+    engine: ENGINE_VERSION,
+    packageProvenance: templateIdentity
+      ? {
+          schemaVersion: templateIdentity.schemaVersion,
+          contentHash: templateIdentity.contentHash,
+          draftRevision: runDraftRevision ?? draftRevision,
+        }
+      : undefined,
+    profileVersion: (() => {
+      const model = findWeaponSimulationModel(scenario.blueSystemId);
+      return model ? `${model.id}@${model.version}` : "model-unavailable";
+    })(),
     libraryScenario: {
       id: definition.id,
       version: definition.version,
@@ -339,18 +440,26 @@ function LabWorkbench({
       scope: definition.scope,
       targetProfile: redObject.designation,
       theatre: definition.theatre,
-      blue: `${bluePlatform.designation} / ${blueSystem.designation}`,
-      red:
-        scenario.domain === "A2A"
-          ? `${redObject.designation} / ${redSystem.designation}`
-          : redObject.designation,
-      environment: definition.environment,
     },
   });
   const saveReport = async () => {
+    if (!hasRun) {
+      setSaveError("Conduct a run before saving a report.");
+      return null;
+    }
+    if (!templateIdentity || runDraftRevision !== draftRevision) {
+      setSaveError("The saved template and completed run are out of sync. Conduct the run again.");
+      return null;
+    }
+    if (savedRunId) return savedRunId;
     setSaving(true);
+    setSaveError(null);
     try {
       const report = buildReport();
+      const frameHash = await sha256Hex(report.result.frames);
+      report.packageProvenance = report.packageProvenance
+        ? { ...report.packageProvenance, frameHash }
+        : undefined;
       const response = await fetch("/api/runs", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -358,6 +467,11 @@ function LabWorkbench({
           scenarioId: definition.id,
           scenarioVersion: definition.version,
           engineVersion: report.engine,
+          scenarioSchemaVersion: templateIdentity.schemaVersion,
+          scenarioContentHash: templateIdentity.contentHash,
+          compiledScenario: result.engineRun.scenario,
+          frameHash,
+          draftRevision: runDraftRevision,
           blueForce: {
             platformId: scenario.bluePlatformId,
             weaponId: scenario.blueSystemId,
@@ -378,28 +492,28 @@ function LabWorkbench({
           },
           modelAssumptions: {
             report,
-            weaponModel: findWeapon(scenario.blueSystemId)?.model ?? {
-              id: `${scenario.blueSystemId}-public-study`,
-              version: "generic-public-study-v0.4",
-              rationale:
-                "A scenario-specific teaching curve from the VECTOR public-study profile library.",
-            },
+            weaponModel:
+              findWeaponSimulationModel(scenario.blueSystemId) ??
+              result.engineRun.scenario.entities.find(
+                (entity) => entity.id === result.engineRun.primaryWeaponId,
+              )?.provenance,
           },
         }),
       });
       if (!response.ok) throw new Error("save");
       const data = (await response.json()) as { id: string };
-      setSaved(true);
+      setSavedRunId(data.id);
       return data.id;
     } catch {
-      setSaved(false);
+      setSaveError("The run could not be saved. Check the catalog connection and try again.");
       return null;
     } finally {
       setSaving(false);
     }
   };
   const openReport = async () => {
-    const id = await saveReport();
+    if (!hasRun) return;
+    const id = savedRunId ?? (await saveReport());
     if (id) router.push(`/report?run=${id}`);
   };
 
@@ -421,41 +535,37 @@ function LabWorkbench({
             className={workspace === "configure" ? "active" : ""}
             onClick={() => setWorkspace("configure")}
           >
-            Configure
+            Construct
           </button>
           <button className={workspace === "run" ? "active" : ""} onClick={run}>
-            Run
+            Simulate &amp; observe
           </button>
           <button
             disabled={!hasRun}
             className={workspace === "results" ? "active" : ""}
             onClick={() => setWorkspace("results")}
           >
-            Results
+            Explain &amp; report
           </button>
         </nav>
         <div className="lab-actions">
           <span className={`catalog-state ${catalogState}`}>
             <Database size={14} />
-            {catalogState === "D1"
-              ? "Source catalog connected"
+            {catalogState === "POSTGIS"
+              ? "PostGIS catalog connected"
               : catalogState === "loading"
                 ? "Connecting catalog"
                 : "Catalog unavailable"}
           </span>
           <button
             disabled={saving || !hasRun}
-            onClick={() => void saveReport()}
+            onClick={() =>
+              savedRunId ? router.push(`/report?run=${savedRunId}`) : void saveReport()
+            }
           >
-            <Save size={14} />
-            {saving ? "Saving" : saved ? "Saved" : "Save run"}
+            {savedRunId ? <FileText size={14} /> : <Save size={14} />}
+            {saving ? "Saving run…" : savedRunId ? "View report" : "Save run"}
           </button>
-          {hasRun && (
-            <button onClick={() => void openReport()}>
-              <FileText size={14} />
-              Report
-            </button>
-          )}
         </div>
       </header>
       <div className="lab-notice">
@@ -470,7 +580,7 @@ function LabWorkbench({
         <ConfigureWorkspace
           definition={definition}
           scenario={scenario}
-          setScenario={setScenario}
+          setScenario={setConfiguredScenario}
           advanced={advanced}
           setAdvanced={setAdvanced}
           step={buildStep}
@@ -484,6 +594,10 @@ function LabWorkbench({
           scenario={scenario}
           result={result}
           events={events}
+          saving={saving}
+          savedRunId={savedRunId}
+          saveError={saveError}
+          saveReport={saveReport}
           openReport={openReport}
         />
       )}
@@ -569,6 +683,20 @@ function LabWorkbench({
                   )}
                 </div>
               )}
+              <div className="picture-switch surface-switch" aria-label="Playback surface">
+                <button
+                  className={playbackSurface === "MAP" ? "active" : ""}
+                  onClick={() => setPlaybackSurface("MAP")}
+                >
+                  Map
+                </button>
+                <button
+                  className={playbackSurface === "THREE_D" ? "active" : ""}
+                  onClick={() => setPlaybackSurface("THREE_D")}
+                >
+                  3D
+                </button>
+              </div>
               <div className="live-metrics">
                 <Metric label="Time" value={`${time.toFixed(1)} s`} />
                 <Metric
@@ -582,27 +710,37 @@ function LabWorkbench({
                 <Metric label="Mach" value={frame.mach.toFixed(2)} />
               </div>
             </div>
-            <div className="scene-wrap">
-              <SimulationScene
-                result={result}
-                time={time}
-                profile={scenario.profile}
-                layers={layers}
-                raspTrack={raspTrack}
-              />
+            <div
+              className={`scene-wrap ${playbackSurface === "MAP" ? "map-surface" : "three-d-surface"}`}
+            >
+              {playbackSurface === "MAP" ? (
+                <EngagementMap
+                  result={result}
+                  time={time}
+                  installations={catalogInstallations}
+                  raspTrack={raspTrack}
+                />
+              ) : (
+                <SimulationScene
+                  result={result}
+                  time={time}
+                  profile={scenario.profile}
+                  layers={layers}
+                  raspTrack={raspTrack}
+                />
+              )}
               <div className="symbol-key">
-                <span>
-                  <i className="friendly-symbol" />
-                  Blue · {bluePlatform.designation}
-                </span>
-                <span>
-                  <i className="track-symbol" />
-                  Red · {redObject.designation}
-                </span>
-                <span>
-                  <i className="interceptor-symbol" />
-                  {blueSystem.designation}
-                </span>
+                {frame.entities.map((entity) => (
+                  <span key={entity.id}>
+                    <TacticalSymbol
+                      kind={entity.kind}
+                      affiliation={entity.affiliation}
+                      lifecycle={entity.lifecycle}
+                      size={22}
+                    />
+                    {entity.designation} · {entity.lifecycle.toLowerCase()}
+                  </span>
+                ))}
                 {raspTrack && (
                   <span>
                     <i className="uncertainty-symbol" />
@@ -614,7 +752,7 @@ function LabWorkbench({
                 {viewMode === "TRUTH"
                   ? "Computed model state"
                   : "What this side can observe; uncertainty is deliberately visible"}{" "}
-                · drag to orbit · scroll to zoom
+                · {playbackSurface === "MAP" ? "pan or zoom the geographic surface" : "drag to orbit · scroll to zoom"}
               </div>
             </div>
             <Playback
@@ -628,15 +766,8 @@ function LabWorkbench({
             />
             <div className="telemetry">
               <div className="telemetry-title">
-                <strong>Flight telemetry</strong>
-                <span>
-                  <i className="speed-line" />
-                  Speed
-                </span>
-                <span>
-                  <i className="energy-line" />
-                  Normalized weapon speed
-                </span>
+                <strong>Synchronized run telemetry</strong>
+                <span>Computed at {time.toFixed(1)} model seconds</span>
               </div>
               <TelemetryChart result={result} time={time} />
             </div>
@@ -727,7 +858,7 @@ function ConfigureWorkspace({
 }) {
   const update = <K extends keyof Scenario>(key: K, value: Scenario[K]) =>
     setScenario((current) => ({ ...current, [key]: value }));
-  const selectedProfile = getProfile(scenario);
+  const simulationModel = findWeaponSimulationModel(scenario.blueSystemId);
   const fixed = definition.targetMotion === "fixed";
   const launchPlatforms = getLaunchPlatforms(scenario.domain);
   const guidedSystems = getGuidedSystems(scenario.domain);
@@ -811,7 +942,7 @@ function ConfigureWorkspace({
         ? "Which fixed-objective conditions apply?"
         : "What can each side see, and what will each side do?",
       fixed
-        ? "A fixed objective cannot maneuver. Adjust environmental loss or prepare a condition change."
+        ? "A fixed objective cannot maneuver. Adjust the wind or prepare a condition change."
         : "Set the Red aircraft maneuver, radar and data-link state, electronic warfare, and the next tactical decision.",
     ],
     [
@@ -824,7 +955,7 @@ function ConfigureWorkspace({
   return (
     <section className="build-workspace">
       <aside className="build-steps">
-        <span>Configure experiment</span>
+        <span>Construct experiment</span>
         {CONFIGURE_STEPS.map((label, index) => (
           <button
             className={index === step ? "active" : ""}
@@ -974,13 +1105,13 @@ function ConfigureWorkspace({
             <article className="profile-explanation">
               <strong>Simulation assumption · {blueSystem.designation}</strong>
               <p>
-                {findWeapon(scenario.blueSystemId)?.model.rationale ??
-                  "This mission set uses a scenario-specific teaching curve from the VECTOR public-study profile library. It is not a published system envelope."}
+                {simulationModel?.rationale ??
+                  "No flight-model coefficient set is available for this selection."}
               </p>
               <span>
-                Study boundary {selectedProfile.maxRange} km · modeled powered
-                flight {selectedProfile.burn} s · modeled maximum speed{" "}
-                {selectedProfile.maxSpeed} m/s
+                {simulationModel
+                  ? `${simulationModel.id}@${simulationModel.version} · powered flight ${simulationModel.poweredFlightSeconds} s · launch/dry mass ${simulationModel.launchMassKg}/${simulationModel.dryMassKg} kg · ${simulationModel.valueState.toLowerCase().replaceAll("_", " ")}`
+                  : "Model unavailable"}
               </span>
             </article>
             {scenario.domain === "A2A" || scenario.domain === "A2G" ? (
@@ -1057,6 +1188,17 @@ function ConfigureWorkspace({
                 unit="m"
                 onChange={(value) => update("altitude", value)}
               />
+              {scenario.domain === "G2G" && (
+                <Range
+                  label="Commanded cruise altitude"
+                  value={scenario.cruiseAltitude}
+                  min={30}
+                  max={15000}
+                  step={10}
+                  unit="m"
+                  onChange={(value) => update("cruiseAltitude", value)}
+                />
+              )}
               <Range
                 label={
                   fixed
@@ -1214,6 +1356,22 @@ function ConfigureWorkspace({
                     )
                   }
                 />
+                <ChoiceButtons
+                  label="PAF source for the Blue track"
+                  value={scenario.redTrackSource}
+                  options={[
+                    ["ONBOARD_RADAR", "Onboard radar"],
+                    ["DATALINK", "Data link"],
+                    ["AIRBORNE_EARLY_WARNING", "Airborne early warning"],
+                    ["VISUAL", "Visual contact"],
+                  ]}
+                  onChange={(value) =>
+                    update(
+                      "redTrackSource",
+                      value as Scenario["redTrackSource"],
+                    )
+                  }
+                />
                 <div className="information-grid">
                   <BinaryChoice
                     label="IAF radar"
@@ -1306,14 +1464,20 @@ function ConfigureWorkspace({
               </div>
             )}
             <Range
-              label="Wind / unmodeled loss input"
+              label="East–west wind component"
               value={scenario.wind}
-              min={0}
+              min={-40}
               max={40}
               step={1}
-              unit="index"
+              unit="m/s"
               onChange={(value) => update("wind", value)}
             />
+            <p className="field-help">
+              Positive values blow east; negative values blow west. The engine
+              subtracts this vector from ground velocity to calculate
+              air-relative drag. This is a physical wind input, not a generic
+              performance-loss slider.
+            </p>
             <article className="prepared-event">
               <TriangleAlert size={17} />
               <div>
@@ -1368,7 +1532,7 @@ function ConfigureWorkspace({
                 <p>
                   {scenario.domain === "A2A"
                     ? `Blue ${scenario.blueDecision.replaceAll("_", " ").toLowerCase()} · Red ${scenario.redDecision.replaceAll("_", " ").toLowerCase()} · IAF track from ${scenario.blueTrackSource.replaceAll("_", " ").toLowerCase()}`
-                    : `${definition.targetMotion === "fixed" ? "Fixed objective" : `Red ${scenario.maneuver}`} · environmental-loss input ${scenario.wind}`}{" "}
+                    : `${definition.targetMotion === "fixed" ? "Fixed objective" : `Red ${scenario.maneuver}`} · east–west wind ${scenario.wind} m/s`}{" "}
                   · {definition.preparedEvent.title} available
                 </p>
                 <button onClick={() => setStep(3)}>Edit conditions</button>
@@ -1423,8 +1587,12 @@ function ConfigureWorkspace({
             {redObject.designation}
             {scenario.domain === "A2A" ? ` / ${redSystem.designation}` : ""}
           </dd>
-          <dt>Weapon study model</dt>
-          <dd>{selectedProfile.name}</dd>
+          <dt>Flight model</dt>
+          <dd>
+            {simulationModel
+              ? `${simulationModel.id}@${simulationModel.version}`
+              : "Unavailable"}
+          </dd>
           <dt>Starting distance</dt>
           <dd>{scenario.range / 1000} km</dd>
           <dt>Environment</dt>
@@ -1484,11 +1652,19 @@ function ResultsWorkspace({
   scenario,
   result,
   events,
+  saving,
+  savedRunId,
+  saveError,
+  saveReport,
   openReport,
 }: {
   scenario: Scenario;
   result: SimulationResult;
   events: EventItem[];
+  saving: boolean;
+  savedRunId: string | null;
+  saveError: string | null;
+  saveReport: () => Promise<string | null>;
   openReport: () => Promise<void>;
 }) {
   const bluePlatform = getCatalogObject(scenario.bluePlatformId);
@@ -1498,7 +1674,7 @@ function ResultsWorkspace({
   return (
     <section className="debrief-workspace">
       <header>
-        <span>Results</span>
+        <span>Explain and report</span>
         <h1>{scenario.name}</h1>
         <p>
           Read the outcome against the selected forces, starting conditions, and
@@ -1567,10 +1743,20 @@ function ResultsWorkspace({
         <article className="debrief-notes">
           <h2>Experiment notes</h2>
           <textarea defaultValue="Record the variable you changed, the result it produced, and the next controlled comparison." />
-          <button onClick={() => void openReport()}>
-            <FileText size={15} />
-            Save and open full report
+          {saveError && <p className="save-error" role="alert">{saveError}</p>}
+          <button
+            disabled={saving}
+            aria-busy={saving}
+            onClick={() => void (savedRunId ? openReport() : saveReport())}
+          >
+            {savedRunId ? <FileText size={15} /> : <Save size={15} />}
+            {saving ? "Saving run…" : savedRunId ? "View full report" : "Save run"}
           </button>
+          <small>
+            {savedRunId
+              ? "Saved. The report is now a reproducible snapshot of this run."
+              : "Saving freezes the scenario, model versions, telemetry, and sources before reporting."}
+          </small>
         </article>
       </div>
     </section>
@@ -2004,8 +2190,9 @@ function RaspPanel({ track }: { track: RaspTrack }) {
         <dd>±{track.uncertaintyMeters} m</dd>
       </dl>
       <p>
-        This is the side&apos;s estimated air picture, not model truth. The
-        amber ring shows positional uncertainty.
+        {track.visible
+          ? "This is the side’s estimated air picture, not model truth. The amber ring shows positional uncertainty."
+          : "No usable track is available from the selected source in the current geometry. Model Truth remains unchanged."}
       </p>
     </section>
   );

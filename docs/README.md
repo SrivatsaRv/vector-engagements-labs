@@ -1,77 +1,50 @@
-# VECTOR Engagement Lab
+# VECTOR product and engineering contract
 
-VECTOR is a local-first browser simulation workbench for defence and aviation enthusiasts. It combines a versioned scenario library, named public-reference objects, source-aware loadouts, a deterministic browser physics model, Real Air Situation Picture views, repeatable experiment tools, and durable reports.
+## One journey
 
-## Product flow
+| Product stage | Includes |
+| --- | --- |
+| Enter | Choose a template, blank scenario, weapon-led study, or Red-vs-Blue study |
+| Construct | Engagement type, entities, placement, loadouts, environment, assumptions |
+| Simulate | Deterministic detailed run; uncertainty batches follow the same package contract |
+| Observe | Synchronized map/3D playback, event timeline, air picture, and telemetry |
+| Explain | Outcome, causes, value state, confidence, and influential variables |
+| Compare | Controlled Variant A/Variant B comparison |
+| Report | Save, replay, print/PDF, JSON/telemetry export, and research citations |
 
-The experience has one continuous enthusiast journey:
+The current navigation is being converged on these terms. Brief, Forces, Flight, Conditions, and Review are Construct sections. Advanced repeatability tools remain enthusiast features and are not described as an Instructor Station.
 
-1. `/` explains what VECTOR does and embeds a live model preview.
-2. `/scenarios` presents eight configured templates across A2A, A2G, G2A, and G2G.
-3. `/workbench?scenario={id}` opens the selected template at Review, ready to run unchanged or edit.
-4. The workbench progresses through **Configure → Run → Results**.
-5. Configuration uses **Brief → Forces → Flight → Conditions → Review**.
-6. A saved run opens `/report?run={id}` with interpretation, replay, provenance, sources, print/PDF, and JSON export.
+## Working vertical slice
 
-`/lab?scenario={id}` is retained as a backward-compatible route alias. `/lab` without a scenario redirects to the library; it is not a second landing page.
+- Eight versioned A2A, A2G, G2A, and G2G templates, with regression-tested successful baselines.
+- Scenario-driven engine contracts with no fixed entity count.
+- Explicit carried → launched → active → terminated weapon lifecycle.
+- Deterministic fixed-step browser physics, atmosphere, wind vector, changing mass, thrust, drag, gravity, proportional-navigation demand, and termination diagnostics.
+- Tactical symbols by affiliation and object kind; carried inventory is not rendered as a world track.
+- MapLibre minimal/satellite views backed by PostGIS public-reference installations.
+- Engagement-scale map fitting for readable trajectories plus an explicit regional station-context extent.
+- Three.js playback with exact recorded tracks, ground projections, altitude curtains, altitude stems, and synchronized model time.
+- Small-multiple telemetry from the same engine frames.
+- Model Truth, IAF RASP, and PAF RASP separation.
+- Run snapshots saved to Postgres and a dedicated PDF-like report route with explicit print and JSON behavior.
+- A hosted `/math` page that publishes equations, value states, limitations, and the package/hash/model/frame reproducibility chain.
 
-## Implemented capability
+## Data authority
 
-- Eight configured scenario templates stored in `lib/scenarios.ts`.
-- Every template baseline is regression-tested to complete its stated mission profile; comparison variants may still fail when the changed inputs make completion impossible.
-- Named Blue and Red objects with domain and affiliation filters in `lib/object-catalog.ts`.
-- Source-aware A2A platform, subsystem, weapon, compatibility, and study-model records in `lib/capability-data.ts`.
-- Su-30MKI/Astra Mk-I versus PAF F-16C Block 52/AIM-120C-5 as the detailed first A2A slice.
-- Explicit aircraft variant, weapon, quantity, fuel, radar, data-link, jammer, track source, maneuver, and decision inputs.
-- Separate Model Truth, IAF RASP, and PAF RASP views. Air-picture uncertainty is derived from configured sensor and information state and never presented as truth.
-- Deterministic point-mass simulation with direct/lofted paths, target motion, an educational standard atmosphere, Mach, line-of-sight rate, prepared condition effects, and reproducible telemetry.
-- Advanced enthusiast tools inside the run: repeatable variants, condition injection, observation markers, reset, replay, and results.
-- D1-backed catalog bootstrap and saved-run snapshots through `/api/catalog` and `/api/runs`.
-- Report output that leads with what was tested, who was involved, starting conditions, outcome, interpretation, and next comparison.
-- Interactive Three.js result on screen and a deterministic SVG trajectory projection in print/PDF.
-- Versioned, indented JSON export with inputs, result, telemetry, provenance, sources, and limitations.
+PostgreSQL/PostGIS is the runtime authority. Schema creation is migration-only; API requests never create tables or seed data as a side effect. `scripts/seed-db.ts` loads deterministic development fixtures. Public facts, source assertions, and simulation coefficients are separate tables and retain separate value states.
 
-## Data and truth boundaries
+## Acceptance rules
 
-Public facts and simulation assumptions are separate records. A published conditional maximum figure is never treated as a universal engagement range. Each named weapon uses a visibly labeled VECTOR public-study curve until a stronger public validation basis exists.
-
-RASP is a synthetic sensor-derived view generated from the run state. It models track confidence, age, uncertainty, identification, degradation, and coasting for interface and research purposes; it is not live tracking or a verified radar model.
-
-Non-A2A templates use named catalog objects but currently retain generic public-study physics profiles. Their UI and reports no longer inherit A2A platform or weapon data through fallback lookups.
-
-The current visualization uses a local Cartesian coordinate frame. A scenario-driven engine foundation is now isolated behind the contract documented in `docs/browser-engine-architecture.md`; it is not yet the default workbench runtime. Regional basemaps and authored geographic replay remain separate presentation contracts in this baseline.
-
-## UI acceptance rules
-
-- Primary action visible at 1366×768, 1440×900, and 1920×1080.
-- No horizontal scrolling at those desktop breakpoints.
-- Configure keeps steps, authoring surface, and summary together.
-- Run keeps the left experiment rail, 3D canvas, and right detail rail together.
-- Results on load are explicitly labeled example, saved run, or loading; a missing saved run never silently substitutes example data.
-- Controls show affiliation or view scope before effect.
-- Editable inputs and calculated outputs use different component treatments.
-- Custom object pickers have keyboard, hover, active, disabled, and focus states.
-- React playback updates are capped at 30 Hz; Three.js renders independently.
-
-## Visual semantics
-
-- Blue: friendly/Blue Team affiliation.
-- Red: opposing/Red Team affiliation.
-- Green: ready, sourced, passed, or successful state.
-- Amber: assumption, caution, uncertainty, or prepared condition.
-- Grey: reference geometry or inactive context.
-
-VECTOR uses this limited affiliation convention consistently but does not claim complete APP-06 or MIL-STD-2525 implementation.
-
-## Cloudflare architecture
-
-- UI and API routes: Cloudflare Worker-compatible vinext build.
-- Structured catalog and saved-run metadata: Cloudflare D1.
-- Future large telemetry or generated artifacts: R2, referenced by D1.
-- Future account/session state: Workers authentication layer plus D1; Durable Objects only where live multi-user session coordination is required.
-
-The current development target is local Cloudflare runtime parity. No external deployment is required to use or verify this cut.
+- Primary actions remain visible at 1366×768, 1440×900, and 1920×1080.
+- No critical control requires horizontal scrolling.
+- Results never appear as unlabeled examples.
+- A report cannot exist without either an explicit saved run ID or `sample=1`.
+- Saving is permitted only after a completed run has recorded frames. The API,
+  database check constraint, and report route enforce that lifecycle together.
+- Controls expose affiliation/view scope before effect.
+- Inputs and computed outputs have distinct treatments.
+- Expensive batches will run in browser Workers; map and playback interactions remain immediate.
 
 ## Verification
 
-Run `make ci-local`. It runs lint, production build, and rendered-route tests before a commit.
+`make ci-local` is the commit gate. `make integration-local` additionally verifies the live PostGIS catalog and the Save → View Report API contract, including rejected incomplete saves and missing-run reads. Docker Compose uses explicit image versions and health-gated migration/application startup.
