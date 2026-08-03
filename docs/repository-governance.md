@@ -20,9 +20,9 @@ Repository administrators retain emergency recovery authority but should not use
 
 ## Continuous integration
 
-`ci.yml` verifies source generation, Rust/WASM integrity, Rust tests, lint, type safety, production build, behavioral tests, PostGIS/API/report integration, supported responsive breakpoints, and an engine performance guard. Actions are pinned to immutable commit SHAs.
+`ci.yml` verifies source generation, Rust/WASM integrity, Rust tests, lint, type safety, production build, behavioral tests, PostGIS/API/report integration, supported responsive breakpoints, and an engine performance guard. Rust sources carry a deterministic source digest; the embedded module carries its own byte digest and required-export check; CI also compiles the module afresh on its runner. This avoids incorrectly requiring different compiler platforms to emit byte-identical WASM. Actions are pinned to immutable commit SHAs.
 
-`codeql.yml` performs JavaScript and TypeScript security analysis on changes to `main`, pull requests, and a weekly schedule. `dependency-review.yml` rejects vulnerable or incompatible new dependencies in pull requests. Dependabot groups routine npm and Cargo updates and separately reviews Actions updates.
+`codeql.yml` performs JavaScript and TypeScript security analysis on changes to `main`, pull requests, and a weekly schedule. `dependency-review.yml` rejects vulnerable or incompatible new dependencies in pull requests. Dependabot permits one open maintenance pull request per ecosystem, groups routine npm, Cargo, and Actions updates, and excludes major versions so they require an intentional maintainer proposal.
 
 The commit gate rejects high-severity production dependency advisories. The current remaining npm audit findings are development-only advisories inherited through `drizzle-kit` and the locally proven Cloudflare Vite/Wrangler adapter. They are not shipped in the Worker runtime dependency surface and remain tracked for upstream removal. The latest Cloudflare adapter was evaluated and rejected because its alpha Miniflare dependency crashed during the responsive integration suite; using `--force` would also incorrectly downgrade the migration tool. Production dependencies currently audit cleanly.
 
