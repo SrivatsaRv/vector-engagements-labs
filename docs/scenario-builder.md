@@ -33,6 +33,8 @@ Construct produces a versioned scenario package. Compilation produces an immutab
 
 The current builder edits every input used by the eight validated templates. The next builder expansion adds arbitrary entity collections, direct map placement, route authoring, supporting sensor nodes, and imported package editing. Those capabilities must extend the same scenario contract; they must not introduce a second simulation-state format.
 
+The internal `vector.scenario-draft.v1` state contract now provides the safe authoring foundation: an actually empty draft, stable entity and waypoint IDs, draft revisions, geographic position, heading, speed, routes, loadouts, target/launch references, dependency-safe deletion, duplication, and blocking validation. It remains unexposed until the blank-scenario surface can compile and run the authored package end to end; VECTOR does not ship a builder button that terminates in an incomplete workflow.
+
 ## Full builder UX specification
 
 The builder is one persistent desktop workspace, not a page-per-field wizard. The left rail owns the five Construct sections, the center owns the geographic placement surface and form for the selected object, and the right rail owns the selected entity, validation state, and compiled-summary preview. At 1366×768 all three remain visible; drawers may extend a rail but may not replace the map.
