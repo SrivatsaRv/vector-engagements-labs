@@ -46,6 +46,12 @@ test("Worker database adapter consumes the generated Hyperdrive binding", async 
     "2026-05-22",
     "Compatibility date must match the pinned Wrangler/workerd support boundary",
   );
+  assert.match(viteConfig, /process\.env\.npm_lifecycle_event === "deploy"/);
+  assert.match(
+    viteConfig,
+    /isVinextDeploy \? \{\} : \{ compatibility_flags: \["nodejs_compat"\] \}/,
+    "local builds need nodejs_compat while vinext deploy must not duplicate it",
+  );
   assert.match(databaseAdapter, /runtime\.HYPERDRIVE\?\.connectionString/);
 });
 
