@@ -3,21 +3,31 @@ import "./globals.css";
 import { BrowserTelemetry } from "@/components/BrowserTelemetry";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.SITE_URL || "http://localhost:4317"),
-  title: "Vector Engagement Labs",
+  metadataBase: new URL(process.env.SITE_URL || "https://labs.reachdefence.com"),
+  title: "Vector Engagement Labs by Reach Defence",
   description:
-    "A browser-based engagement experiment lab with visible public-model assumptions.",
+    "Explore browser-based engagement experiments with visible assumptions, synchronized simulation views, comparisons, and reproducible reports.",
   openGraph: {
-    title: "Vector Engagement Labs",
+    type: "website",
+    url: "https://labs.reachdefence.com",
+    siteName: "Vector Engagement Labs by Reach Defence",
+    title: "Vector Engagement Labs by Reach Defence",
     description:
-      "Construct, simulate, observe, explain, compare, and report a browser-based engagement experiment.",
-    images: ["/og.png"],
+      "Explore browser-based engagement experiments with visible assumptions, synchronized simulation views, comparisons, and reproducible reports.",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Vector Engagement Labs by Reach Defence",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vector Engagement Labs",
+    title: "Vector Engagement Labs by Reach Defence",
     description:
-      "Construct, simulate, observe, explain, compare, and report a browser-based engagement experiment.",
+      "Explore browser-based engagement experiments with visible assumptions, synchronized simulation views, comparisons, and reproducible reports.",
     images: ["/og.png"],
   },
   icons: {

@@ -6,6 +6,10 @@ Vector Engagement Labs is built by
 
 This directory is the maintained engineering and product contract for the application and the reusable simulation engine. A behavior is not complete when code exists but its contract, limits, verification, and operational consequences are undocumented.
 
+## Public identity
+
+The canonical public title is **Vector Engagement Labs by Reach Defence**. Social previews use `public/og.png` at 1200×630 and describe the product as a browser-based engagement experiment lab with visible assumptions, synchronized simulation views, comparisons, and reproducible reports. Public metadata must resolve against `https://labs.reachdefence.com` in production.
+
 ## Documentation map
 
 - [`engineering-principles.md`](engineering-principles.md): open-source boundary, SOLID design, twelve-factor alignment, and release evidence.
