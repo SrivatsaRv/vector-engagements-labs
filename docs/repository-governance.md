@@ -34,7 +34,10 @@ Cloudflare delivery is deliberately manual and protected by the GitHub `producti
 
 - `CLOUDFLARE_API_TOKEN` with least-privilege Worker deployment access;
 - `CLOUDFLARE_ACCOUNT_ID`;
-- `CLOUDFLARE_HYPERDRIVE_ID` for the production PostgreSQL/PostGIS origin.
+- `DATABASE_ORIGIN_URL` as a protected environment secret for migrations and
+  direct origin verification only.
+- `CLOUDFLARE_HYPERDRIVE_ID` as a non-secret production environment variable
+  for the PostgreSQL/PostGIS binding.
 
 No Cloudflare secret is stored in the repository. R2 is optional and should be introduced only with an explicit `ARTIFACTS` binding and object-custody contract.
 
