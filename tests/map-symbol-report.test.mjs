@@ -11,6 +11,11 @@ import {
   localToLngLat,
 } from "../lib/map-layer-contracts.ts";
 import { tacticalSymbolMarkup } from "../lib/tactical-symbol-markup.ts";
+import {
+  TACTICAL_SYMBOL_LIBRARY,
+  TACTICAL_SYMBOL_ROLES,
+} from "../lib/tactical-symbol-library.ts";
+import { OBJECT_CATALOG } from "../lib/object-catalog.ts";
 import { buildReportExport } from "../lib/report-export.ts";
 import { getScenarioDefinition } from "../lib/scenarios.ts";
 import { getFrameAt, simulate } from "../lib/simulation.ts";
@@ -96,12 +101,48 @@ test("every tactical kind has stable affiliation and lifecycle markup", () => {
         assert.match(markup, new RegExp(`data-kind="${kind}"`));
         assert.match(markup, new RegExp(`tactical-symbol-${affiliation.toLowerCase()}`));
         assert.match(markup, new RegExp(`tactical-symbol-${lifecycle.toLowerCase()}`));
-        assert.match(markup, /tactical-glyph/);
+        assert.match(markup, /tactical-silhouette/);
         outputs.add(markup);
       }
     }
   }
   assert.equal(outputs.size, kinds.length * affiliations.length * lifecycles.length);
+});
+
+test("approved tactical roles render distinct, attributed silhouettes", () => {
+  const outputs = new Set();
+  for (const role of TACTICAL_SYMBOL_ROLES) {
+    const definition = TACTICAL_SYMBOL_LIBRARY[role];
+    const kind = role === "GUIDED_MISSILE"
+      ? "GUIDED_WEAPON"
+      : role === "RADAR"
+        ? "RADAR"
+        : role === "SAM_SYSTEM"
+          ? "AIR_DEFENCE_SYSTEM"
+          : role === "SURFACE_LAUNCHER"
+            ? "SURFACE_LAUNCHER"
+            : role === "AIR_BASE"
+              ? "BASE"
+              : role === "FIXED_OBJECTIVE"
+                ? "FIXED_OBJECTIVE"
+                : "AIRCRAFT";
+    const markup = tacticalSymbolMarkup(kind, "BLUE", "ACTIVE", role);
+    assert.match(markup, new RegExp(`data-symbol-role="${role}"`));
+    assert.match(markup, /tactical-heading-layer/);
+    assert.ok(definition.author.length > 0);
+    outputs.add(markup);
+  }
+  assert.equal(outputs.size, TACTICAL_SYMBOL_ROLES.length);
+});
+
+test("every catalog object declares a supported tactical role", () => {
+  assert.ok(OBJECT_CATALOG.length > 0);
+  for (const object of OBJECT_CATALOG) {
+    assert.ok(
+      TACTICAL_SYMBOL_LIBRARY[object.symbolRole],
+      `${object.id} must map to an approved tactical role`,
+    );
+  }
 });
 
 test("report export binds the exact run configuration, frames and source state", () => {

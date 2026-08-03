@@ -21,6 +21,7 @@ performance-local:
 	npm run performance:verify
 
 ci-local:
+	npm run symbols:verify
 	npm run lint
 	npm run typecheck
 	npm test

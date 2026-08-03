@@ -18,14 +18,15 @@
     "db:verify": "node scripts/verify-db.mjs",
     "app:verify": "node scripts/verify-app.mjs",
     "observability:verify": "node scripts/verify-observability.mjs",
-    "performance:verify": "tsx scripts/benchmark-engine.ts"
+    "performance:verify": "tsx scripts/benchmark-engine.ts",
+    "symbols:generate": "node scripts/generate-tactical-icons.mjs",
+    "symbols:verify": "node scripts/generate-tactical-icons.mjs --check"
   },
   "dependencies": {
     "@types/three": "^0.185.3",
     "drizzle-orm": "0.45.2",
     "lucide-react": "^1.28.0",
     "maplibre-gl": "^6.1.0",
-    "milsymbol": "^3.0.4",
     "next": "^16.2.12",
     "postgres": "^3.4.9",
     "react": "19.2.6",
@@ -39,6 +40,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
     "@cloudflare/workers-types": "^4.20260702.1",
+    "@iconify-json/game-icons": "^1.2.4",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",

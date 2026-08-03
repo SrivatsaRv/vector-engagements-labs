@@ -833,6 +833,7 @@ function LabWorkbench({
                   <span key={entity.id}>
                     <TacticalSymbol
                       kind={entity.kind}
+                      symbolRole={entity.symbolRole}
                       affiliation={entity.affiliation}
                       lifecycle={entity.lifecycle}
                       size={22}

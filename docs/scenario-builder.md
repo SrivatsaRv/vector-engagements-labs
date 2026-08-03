@@ -23,7 +23,7 @@ A runnable scenario declares a PostGIS-backed `study_area_id` and a weather pres
 
 The engine uses local east-north-up coordinates for numerical stability. The presentation layer projects those coordinates from the selected study-area anchor. This makes the simulation portable without letting the map decide where a run occurred.
 
-The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-east mountains, the Arabian Sea, and coastal Gujarat. Their boundaries are educational visualization contexts, not operational engagement boxes.
+The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-east mountains, the Arabian Sea, and coastal Gujarat. Their boundaries are educational visualization contexts, not operational engagement boxes. Selecting a study area is a preset choice. The first complete builder does not ask the operator to draw a study-area polygon.
 
 ## Scenario artifact
 
@@ -78,3 +78,27 @@ A field change after a run increments the draft revision, invalidates Save and R
 - Preserve stable entity IDs across draft edits, save/reload and report replay.
 - Keep map placement, numeric inspectors, compiled preview and saved package round-trip equivalent.
 - Permit keyboard operation and provide closed, hover, active, loading, disabled and error states for every control.
+
+## Operator input versus governed behavior
+
+The operator chooses a preset study area and weather preset, selects catalog
+objects for Blue, Red, or neutral forces, places world entities, sets altitude,
+heading, and speed, authors routes and waypoints, assigns targets, and declares
+launch relationships.
+
+The system governs:
+
+- stable entity, route, and waypoint identities;
+- study-area bounds and coordinate conversion;
+- object-class and engagement-family compatibility;
+- allowed loadouts and model availability;
+- affiliation ownership and target-reference integrity;
+- stowed-to-launched weapon lifecycle;
+- dependency-safe removal and duplication;
+- canonical package compilation, version, and content hash;
+- blocking validation before simulation.
+
+An authored area of interest is not a substitute for the study-area preset. If
+a later workflow needs a smaller AOI, it is a separate optional geometry inside
+the selected study area and must not silently change the weather, terrain
+reference, or map anchor.

@@ -77,9 +77,12 @@ test("server-renders model transparency and tactical-symbol references", async (
   assert.match(math, /How a displayed result is traced/);
   assert.match(math, /SHA-256 of canonical JSON/);
   assert.match(math, /NASA Glenn/);
-  assert.match(symbols, /The exact visual subset used in playback and reports/);
+  assert.match(symbols, /Recognisable tactical objects, not generic dots/);
   assert.match(symbols, /Tacview-style analysis subset/);
   assert.match(symbols, /not a NATO symbol set/);
+  assert.match(symbols, /Fighter aircraft/);
+  assert.match(symbols, /Airborne early warning/);
+  assert.match(symbols, /CC BY 3.0/);
 });
 
 test("basemap proxy rejects invalid tile coordinates without contacting an upstream", async () => {

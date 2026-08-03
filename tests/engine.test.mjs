@@ -38,6 +38,7 @@ function testScenario() {
         callsign: "BLUE 1",
         affiliation: "BLUE",
         kind: "AIRCRAFT",
+        symbolRole: "FIGHTER",
         initial: {
           position: { x: 0, y: 0, z: 8000 },
           velocity: { x: 250, y: 0, z: 0 },
@@ -54,6 +55,7 @@ function testScenario() {
         callsign: "RED 1",
         affiliation: "RED",
         kind: "AIRCRAFT",
+        symbolRole: "FIGHTER",
         initial: {
           position: { x: 10000, y: 1500, z: 8500 },
           velocity: { x: -220, y: 0, z: 0 },
@@ -70,6 +72,7 @@ function testScenario() {
         callsign: "BLUE WEAPON 1",
         affiliation: "BLUE",
         kind: "GUIDED_WEAPON",
+        symbolRole: "GUIDED_MISSILE",
         lifecycle: "STOWED",
         initial: {
           position: { x: 0, y: 0, z: 8000 },
@@ -117,6 +120,11 @@ test("generic engine updates every spawned entity deterministically", () => {
   assert.deepEqual(first, second);
   assert.ok(first.frames.length > 10);
   assert.equal(first.frames[0].entities.length, 3);
+  assert.equal(
+    first.frames[0].entities.find((entity) => entity.id === "aircraft-blue")
+      .symbolRole,
+    "FIGHTER",
+  );
   assert.equal(first.diagnostics.nonFiniteStateCount, 0);
   const firstWeapon = first.frames[0].entities.find((item) => item.id === "weapon-blue");
   const lastWeapon = first.frames.at(-1).entities.find((item) => item.id === "weapon-blue");
@@ -134,6 +142,7 @@ test("engine entity count is supplied by the scenario, not fixed in code", () =>
     callsign: "OBSERVER",
     affiliation: "NEUTRAL",
     kind: "BASE",
+    symbolRole: "AIR_BASE",
     initial: {
       position: { x: 1000, y: 1000, z: 0 },
       velocity: { x: 0, y: 0, z: 0 },

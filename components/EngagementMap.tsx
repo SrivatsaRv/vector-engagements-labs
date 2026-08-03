@@ -119,7 +119,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           const element = document.createElement("div");
           element.className = "map-tactical-marker map-installation-marker";
           const affiliation = installation.service === "IAF" ? "BLUE" : "RED";
-          element.innerHTML = `${tacticalSymbolMarkup("BASE", affiliation, "ACTIVE")}<span></span>`;
+          element.innerHTML = `${tacticalSymbolMarkup("BASE", affiliation, "ACTIVE", "AIR_BASE")}<span></span>`;
           const label = element.querySelector("span");
           if (label) label.textContent = installation.name;
           element.title = `${installation.service} public-reference station · ${installation.name}`;
@@ -340,7 +340,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
         if (!marker) {
           const element = document.createElement("div");
           element.className = "map-tactical-marker";
-          element.innerHTML = `${tacticalSymbolMarkup(entity.kind, entity.affiliation, entity.lifecycle)}<span></span>`;
+          element.innerHTML = `${tacticalSymbolMarkup(entity.kind, entity.affiliation, entity.lifecycle, entity.symbolRole)}<span></span>`;
           const label = element.querySelector("span");
           if (label) label.textContent = entity.callsign || entity.designation;
           element.title = `${entity.designation} · ${entity.lifecycle.toLowerCase()}`;

@@ -14,6 +14,21 @@ export type EntityKind =
   | "BASE"
   | "FIXED_OBJECTIVE";
 
+export type TacticalSymbolRole =
+  | "FIGHTER"
+  | "BOMBER"
+  | "TRANSPORT"
+  | "AEW_C"
+  | "TANKER"
+  | "HELICOPTER"
+  | "UAV"
+  | "GUIDED_MISSILE"
+  | "RADAR"
+  | "SAM_SYSTEM"
+  | "SURFACE_LAUNCHER"
+  | "AIR_BASE"
+  | "FIXED_OBJECTIVE";
+
 export type Affiliation = "BLUE" | "RED" | "NEUTRAL";
 export type EntityLifecycle =
   | "STOWED"
@@ -35,6 +50,7 @@ export type EngineEntityDefinition = {
   callsign: string;
   affiliation: Affiliation;
   kind: EntityKind;
+  symbolRole: TacticalSymbolRole;
   lifecycle: EntityLifecycle;
   route?: Vec3[];
   initial: {
@@ -136,6 +152,7 @@ export type EngineEntityFrame = {
   callsign: string;
   affiliation: Affiliation;
   kind: EntityKind;
+  symbolRole: TacticalSymbolRole;
   lifecycle: EntityLifecycle;
   position: Vec3;
   velocity: Vec3;

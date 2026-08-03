@@ -256,6 +256,7 @@ export function compileScenario(
       callsign: blueIsAircraft ? "BLUE 1" : "BLUE SITE 1",
       affiliation: "BLUE",
       kind: kindMap[blueObject.kind],
+      symbolRole: blueObject.symbolRole,
       lifecycle: "ACTIVE",
       route: [
         { x: 0, y: 0, z: input.altitude },
@@ -290,6 +291,7 @@ export function compileScenario(
       callsign: movingTarget ? "RED 1" : "OBJECTIVE 1",
       affiliation: "RED",
       kind: kindMap[redObject.kind],
+      symbolRole: redObject.symbolRole,
       lifecycle: "ACTIVE",
       route: [
         {
@@ -335,6 +337,7 @@ export function compileScenario(
       callsign: "BLUE WEAPON 1",
       affiliation: "BLUE",
       kind: "GUIDED_WEAPON",
+      symbolRole: blueSystem.symbolRole,
       lifecycle: "STOWED",
       initial: {
         position: { ...bluePlatform.initial.position },
@@ -397,6 +400,7 @@ export function compileScenario(
           callsign: "RED WEAPON 1",
           affiliation: "RED",
           kind: "GUIDED_WEAPON",
+          symbolRole: redSystem.symbolRole,
           lifecycle: "STOWED",
           initial: {
             position: { ...redTarget.initial.position },

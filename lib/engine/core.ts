@@ -344,6 +344,7 @@ function toFrame(
     callsign: state.definition.callsign,
     affiliation: state.definition.affiliation,
     kind: state.definition.kind,
+    symbolRole: state.definition.symbolRole,
     lifecycle: state.lifecycle,
     position: { ...state.position },
     velocity: { ...state.velocity },

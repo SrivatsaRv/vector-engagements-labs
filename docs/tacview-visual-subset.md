@@ -1,22 +1,40 @@
 # VECTOR analysis-display visual subset
 
-Status: mandatory product contract, version 0.2.
+Status: mandatory product contract, version 0.3.
 
 VECTOR implements a deliberately small Tacview-style analysis-display subset. “Tacview-style” means synchronized, time-addressable tracks with recognisable object silhouettes, altitude cues, sensor volumes, event markers, labels, and telemetry. It does **not** claim Tacview file compatibility, NATO APP-6 compliance, MIL-STD-2525 compliance, or reproduction of Tacview artwork.
 
 The display consumes a [`vector.record.v1`](vector-simulation-record.md) recording. It does not read mutable builder state and it does not own physics. An ACMI exporter is an interoperability adapter, not the internal record format.
 
+## Silhouette source and attribution
+
+VECTOR uses a curated subset of [Game Icons](https://game-icons.net/) under
+CC BY 3.0. The build-time generator reads `@iconify-json/game-icons`, verifies
+the approved icon names, and emits only the selected SVG bodies. The browser
+does not download the full collection. The source icon and author remain in
+the symbol registry and on the hosted symbol reference page.
+
+The library supplies the inner silhouette. VECTOR supplies affiliation frame,
+color, lifecycle, heading, label, altitude stem, trail, sensor coverage, and
+engagement envelope. These meanings are governed by scenario and engine state.
+
 ## Entity marks
 
 | Entity kind | Map and 3D mark | Appears when |
 | --- | --- | --- |
-| Aircraft | top-view aircraft silhouette plus affiliation frame | active in the world |
+| Fighter | jet-fighter silhouette plus affiliation frame | active in the world |
+| Bomber | flying-wing silhouette | active in the world |
+| Transport | transport-aircraft silhouette | active in the world |
+| AEW&C | transport silhouette with a radome mark | active and contributing to the scenario |
+| Tanker | transport silhouette with refuelling-boom mark | active and contributing to the scenario |
+| Helicopter | rotary-wing silhouette | active in the world |
+| UAV | uncrewed-aircraft silhouette | active in the world |
 | Guided weapon | directional missile/dart silhouette | its launch lifecycle begins |
 | Radar | antenna and radiating-arc glyph | declared as a scenario entity |
 | Air-defence system | launcher and radar combination glyph | declared as a scenario entity |
 | Surface launcher | launcher-vehicle glyph | declared as a scenario entity |
-| Installation | affiliation-framed runway glyph and station label | public-reference station layer is enabled |
-| Fixed objective | reticle and objective box | declared as a scenario entity |
+| Installation | affiliation-framed control-tower silhouette and station label | public-reference station layer is enabled |
+| Fixed objective | objective-flag silhouette | declared as a scenario entity |
 
 Blue uses blue and a round frame; Red uses red and a diamond frame; neutral or unknown uses grey and a square frame. The inner silhouette communicates object kind. A label always carries callsign or designation, so color is never the only identity channel.
 
@@ -29,6 +47,10 @@ Blue uses blue and a round frame; Red uses red and a diamond frame; neutral or u
 - **Terminated** remains in replay history with reduced opacity and a termination mark.
 
 A weapon therefore does not appear beside its aircraft before launch. At launch it becomes a new world entity at the launch platform’s recorded position and inherits the launch platform’s velocity.
+
+The catalog owns `symbolRole`; the compiler copies it to the immutable engine
+scenario; every engine frame preserves it. Map, 3D, legend, and report render
+that same value. A known catalog object may not fall back to a generic dot.
 
 ## Geometry and time layers
 

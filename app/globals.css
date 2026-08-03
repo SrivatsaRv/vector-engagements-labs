@@ -5063,8 +5063,10 @@ button:disabled,
 }
 /* Tactical symbols share one visual contract across reference, map, 3D and print. */
 .tactical-symbol { color: #26313a; overflow: visible; }
-.tactical-frame, .tactical-glyph { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tactical-frame, .tactical-glyph, .tactical-role-detail { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tactical-glyph-fill { fill: currentColor; }
+.tactical-silhouette { color: currentColor; }
+.tactical-role-detail { stroke-width: 1.5; }
 .tactical-symbol-blue { color: #2f6fb5; }
 .tactical-symbol-red { color: #a94f45; }
 .tactical-symbol-neutral { color: #606b73; }
@@ -5084,11 +5086,16 @@ button:disabled,
 .symbol-affiliation-row { display: flex; align-items: center; gap: 13px; min-height: 66px; margin-bottom: 18px; }
 .symbol-card > strong { display: block; font-size: 16px; }
 .symbol-card p { margin: 7px 0 0; color: #64717c; font-size: 13px; line-height: 1.5; }
+.symbol-card small { display: block; margin-top: 12px; color: #7b858d; font-size: 9px; letter-spacing: .055em; text-transform: uppercase; }
+.symbol-section header > p { max-width: 760px; margin: -13px 0 25px; color: #65717b; font-size: 13px; line-height: 1.55; }
 .symbol-state-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid #d6dadd; background: #fff; }
 .symbol-state-grid article { display: grid; justify-items: center; gap: 5px; padding: 24px 10px; border-right: 1px solid #e0e3e5; text-align: center; }
 .symbol-state-grid article:last-child { border-right: 0; }
 .symbol-state-grid strong { font-size: 13px; }
 .symbol-state-grid span { color: #68747e; font-size: 11px; }
+.symbol-license-note { margin-top: 36px; padding: 20px 22px; border: 1px solid #d6dadd; border-left: 3px solid #2f6fb5; background: #fff; }
+.symbol-license-note strong { font-size: 13px; }
+.symbol-license-note p { max-width: 860px; margin: 7px 0 0; color: #65717b; font-size: 12px; line-height: 1.55; }
 @media (max-width: 900px) { .symbol-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .symbol-state-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .symbol-grid, .symbol-state-grid { grid-template-columns: 1fr; } .symbol-state-grid article { border-right: 0; border-bottom: 1px solid #e0e3e5; } }
 .engagement-map-shell { position: relative; width: 100%; height: 100%; min-height: 420px; overflow: hidden; background: #eef1f2; }
@@ -5118,8 +5125,8 @@ button:disabled,
 .map-status.error { inset: auto 12px 48px auto; max-width: 320px; padding: 12px 14px; border: 1px solid #d8beba; background: rgba(255,255,255,.96); text-align: left; }
 .map-tactical-marker { width: 42px; height: 42px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.22)); cursor: pointer; }
 .map-tactical-marker svg { width: 100%; height: 100%; }
-.map-tactical-marker svg[data-kind="AIRCRAFT"] .tactical-glyph,
-.map-tactical-marker svg[data-kind="GUIDED_WEAPON"] .tactical-glyph {
+.map-tactical-marker svg[data-kind="AIRCRAFT"] .tactical-heading-layer,
+.map-tactical-marker svg[data-kind="GUIDED_WEAPON"] .tactical-heading-layer {
   transform: rotate(var(--entity-heading, 0deg));
   transform-origin: 24px 24px;
   transition: transform 80ms linear;
