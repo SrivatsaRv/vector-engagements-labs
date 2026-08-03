@@ -145,7 +145,7 @@ export default function MathPage() {
       <ProductHeader current="math" />
       <section className="math-hero">
         <span>MODEL TRANSPARENCY · {ENGINE_VERSION}</span>
-        <h1>Math behind VECTOR</h1>
+        <h1>Math behind Vector Engagement Labs</h1>
         <p>
           Every displayed result should be traceable to an input, an equation,
           a coefficient state, and the exact frames saved with the run.

@@ -252,8 +252,8 @@ export default function ReportPage() {
             <div className="report-brand">
               <span>V</span>
               <div>
-                <strong>VECTOR</strong>
-                <small>Engagement Lab</small>
+                <strong>Vector</strong>
+                <small>Engagement Labs</small>
               </div>
             </div>
             <div className="report-id">
@@ -370,7 +370,7 @@ export default function ReportPage() {
             <div>
               <span>Read this as</span>
               <strong>
-                A sensitivity result—not verified system performance.
+                A sensitivity result, not verified system performance.
               </strong>
             </div>
           </section>
@@ -500,11 +500,11 @@ export default function ReportPage() {
               </ReportSection>
               <ReportSection title="Next controlled comparison">
                 <p>
-                  Change one input—starting distance, flight path, wind
+                  Change one input: starting distance, flight path, wind
                   {scenario.domain === "A2A"
                     ? ", target maneuver, sensor state, or tactical decision"
                     : ""}
-                  —then repeat the run. Preserve all other inputs so the
+                  then repeat the run. Preserve all other inputs so the
                   difference remains interpretable.
                 </p>
                 <div className="recommendation">
@@ -593,7 +593,7 @@ export default function ReportPage() {
             </p>
           </section>
           <footer>
-            <span>VECTOR Engagement Lab</span>
+            <span>Vector Engagement Labs</span>
             <span>Public data mode · Reproducible record</span>
           </footer>
         </article>

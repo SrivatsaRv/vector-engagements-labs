@@ -1,0 +1,11 @@
+* @SrivatsaRv
+
+/engine-rust/ @SrivatsaRv
+/lib/engine/ @SrivatsaRv
+/lib/simulation.ts @SrivatsaRv
+/lib/scenarios.ts @SrivatsaRv
+/db/ @SrivatsaRv
+/drizzle/ @SrivatsaRv
+/.github/ @SrivatsaRv
+/SECURITY.md @SrivatsaRv
+/GOVERNANCE.md @SrivatsaRv

@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 
 export function ProductHeader({ current }: { current?: "scenarios" | "math" | "symbols" }) {
   return <header className="landing-nav product-header">
-    <Link href="/" className="brand"><span>V</span><div><strong>VECTOR</strong><small>Engagement Lab</small></div></Link>
+    <Link href="/" className="brand"><span>V</span><div><strong>Vector</strong><small>Engagement Labs</small></div></Link>
     <nav aria-label="Product navigation">
       <Link className={current === "scenarios" ? "active" : ""} href="/scenarios">Scenarios</Link>
       <Link href="/#how">How it works</Link>

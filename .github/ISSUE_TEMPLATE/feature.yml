@@ -1,0 +1,29 @@
+name: Feature proposal
+description: Propose a scoped capability or model improvement
+title: "[Proposal]: "
+labels: ["type: enhancement", "status: triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the user, research, or engineering problem without prescribing implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Observable outcome
+      description: What should a user or engine consumer be able to do or verify?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sources and prior art
+      description: Link authoritative technical sources and state license constraints.
+  - type: textarea
+    id: contracts
+    attributes:
+      label: Contracts and tests affected
+      description: Scenario, engine, recording, RASP, persistence, UI, report, deployment, or other.

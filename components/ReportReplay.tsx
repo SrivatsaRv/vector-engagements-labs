@@ -229,7 +229,7 @@ export function ReportReplay({
             </strong>
             <dl>
               <dt>Powered flight</dt>
-              <dd>{model?.poweredFlightSeconds ?? "—"} s</dd>
+              <dd>{model?.poweredFlightSeconds ?? "Not available"} s</dd>
               <dt>Launch / dry mass</dt>
               <dd>
                 {model

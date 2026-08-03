@@ -65,7 +65,7 @@ try {
   const mathPage = await fetch(`${baseUrl}/math`);
   assert.equal(mathPage.status, 200);
   const mathHtml = await mathPage.text();
-  assert.match(mathHtml, /Math behind VECTOR/);
+  assert.match(mathHtml, /Math behind Vector Engagement Labs/);
   assert.match(mathHtml, /How a displayed result is traced/);
   const frames = [{ t: 0 }];
   const frameHash = createHash("sha256")

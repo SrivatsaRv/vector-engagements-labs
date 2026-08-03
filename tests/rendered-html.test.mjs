@@ -26,12 +26,12 @@ async function render(path = "/") {
   );
 }
 
-test("server-renders the VECTOR landing page", async () => {
+test("server-renders the Vector Engagement Labs landing page", async () => {
   const response = await render("/");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
-  assert.match(html, /VECTOR/);
+  assert.match(html, /Vector Engagement Labs/);
   assert.match(html, /Understand the engagement/);
   assert.match(html, /Choose a scenario/);
   assert.match(html, /Live model/);
@@ -71,7 +71,7 @@ test("server-renders model transparency and tactical-symbol references", async (
     mathResponse.text(),
     symbolsResponse.text(),
   ]);
-  assert.match(math, /Math behind VECTOR/);
+  assert.match(math, /Math behind Vector Engagement Labs/);
   assert.match(math, /Proportional-navigation demand/);
   assert.match(math, /Run termination/);
   assert.match(math, /How a displayed result is traced/);

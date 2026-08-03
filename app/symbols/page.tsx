@@ -6,7 +6,7 @@ export default function SymbolsPage() {
     <main className="symbols-page">
       <ProductHeader current="symbols" />
       <section className="symbols-hero">
-        <span>VECTOR ANALYSIS DISPLAY · VERSION 0.3</span>
+        <span>VECTOR ENGAGEMENT LABS ANALYSIS DISPLAY · VERSION 0.3</span>
         <h1>Recognisable tactical objects, not generic dots.</h1>
         <p>
           This is a Tacview-style analysis subset, not a NATO symbol set and not

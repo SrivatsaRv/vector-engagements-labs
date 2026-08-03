@@ -22,6 +22,7 @@ performance-local:
 	npm run performance:verify
 
 ci-local:
+	npm run audit:production
 	npm run symbols:verify
 	npm run engine:rust:verify
 	npm run engine:rust:test

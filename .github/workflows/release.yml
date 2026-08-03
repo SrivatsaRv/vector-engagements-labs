@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+      - name: Verify tag matches package version
+        run: test "${GITHUB_REF_NAME}" = "v$(node -p 'require(\"./package.json\").version')"
+      - name: Install and verify
+        run: npm ci && make ci-local
+      - name: Build release archive
+        run: |
+          tar -czf "vector-engagement-labs-${GITHUB_REF_NAME}.tar.gz" \
+            dist docs engine-rust lib/engine README.md LICENSE NOTICE CHANGELOG.md
+          shasum -a 256 "vector-engagement-labs-${GITHUB_REF_NAME}.tar.gz" > SHA256SUMS
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "vector-engagement-labs-${GITHUB_REF_NAME}.tar.gz" SHA256SUMS \
+            --verify-tag --generate-notes --title "Vector Engagement Labs ${GITHUB_REF_NAME}"

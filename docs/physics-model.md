@@ -1,6 +1,6 @@
 # Physics and information-model status
 
-VECTOR currently uses a deterministic three-dimensional point-mass reference engine intended for inspectable sensitivity research—not verified prediction of named-system performance.
+Vector currently uses a deterministic three-dimensional point-mass reference engine intended for inspectable sensitivity research, not verified prediction of named-system performance.
 
 ## Integrated model
 

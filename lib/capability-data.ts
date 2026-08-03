@@ -215,7 +215,7 @@ export const SOURCES: SourceRecord[] = [
   },
   {
     id: "nasa-standard-atmosphere",
-    title: "Earth atmosphere model — metric units",
+    title: "Earth atmosphere model: metric units",
     publisher: "NASA Glenn Research Center",
     url: "https://www.grc.nasa.gov/www/k-12/VirtualAero/BottleRocket/airplane/atmosmet508.html",
     sourceClass: "OFFICIAL",

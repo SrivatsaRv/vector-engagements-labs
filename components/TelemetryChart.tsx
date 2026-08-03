@@ -62,7 +62,7 @@ function MetricPanel({
           <span key={item.id}>
             <i className={`telemetry-dot ${item.affiliation.toLowerCase()}`} />
             {item.label}
-            <strong>{Number.isFinite(item.current) ? item.current.toFixed(item.current >= 100 ? 0 : 1) : "—"}</strong>
+            <strong>{Number.isFinite(item.current) ? item.current.toFixed(item.current >= 100 ? 0 : 1) : "N/A"}</strong>
           </span>
         ))}
       </div>

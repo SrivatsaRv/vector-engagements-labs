@@ -134,7 +134,7 @@ function RedirectToScenarios() {
   }, [router]);
   return (
     <main className="route-transition" aria-busy="true">
-      <span>VECTOR</span>
+      <span>Vector Engagement Labs</span>
       <strong>Opening the scenario library…</strong>
     </main>
   );
@@ -1923,7 +1923,7 @@ function ConfigureWorkspace({
           <span>
             {step === 4
               ? canConduct(validations)
-                ? "Setup checks passed — ready to run"
+                ? "Setup checks passed. Ready to run"
                 : "Resolve failed checks before running"
               : "Changes apply to this experiment only"}
           </span>

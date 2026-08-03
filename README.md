@@ -1,6 +1,14 @@
-# VECTOR Engagement Lab
+# Vector Engagement Labs
 
-VECTOR is a local-first browser workbench for public-data engagement experiments. A normalized PostgreSQL/PostGIS catalog resolves versioned scenario packages; deterministic physics, map/3D playback, telemetry, comparison, and reporting execute from one browser-engine frame contract.
+[![Continuous Integration](https://github.com/SrivatsaRv/vector-engagements-labs/actions/workflows/ci.yml/badge.svg)](https://github.com/SrivatsaRv/vector-engagements-labs/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/SrivatsaRv/vector-engagements-labs/actions/workflows/codeql.yml/badge.svg)](https://github.com/SrivatsaRv/vector-engagements-labs/actions/workflows/codeql.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
+> **Project status: pre-alpha research software.** Contracts and results may change before `v1.0.0`. The software is for transparent educational simulation and is not verified system performance or operational decision support.
+
+Vector Engagement Labs is a local-first browser workbench for public-data engagement experiments. A normalized PostgreSQL/PostGIS catalog resolves versioned scenario packages; deterministic physics, map/3D playback, telemetry, comparison, and reporting execute from one browser-engine frame contract.
+
+The long-term deliverable is a rigorously tested open-source simulation library with a browser workbench as its reference application. See [`docs/README.md`](docs/README.md), [`docs/engineering-principles.md`](docs/engineering-principles.md), and [`CONTRIBUTING.md`](CONTRIBUTING.md). Source code is licensed under Apache-2.0; bundled third-party artwork retains its own attribution and license in [`NOTICE`](NOTICE).
 
 ## Run the complete local stack
 
@@ -15,11 +23,11 @@ Open [http://localhost:4317](http://localhost:4317). Grafana is available at [ht
 
 Useful routes:
 
-- `/` — product entry and scenario quick start
-- `/scenarios` — eight versioned templates
-- `/workbench?scenario=a2a-crossing-intercept` — Construct, Simulate, Observe, Explain, Compare, Report
-- `/math` — published equations, model limits, and reproducibility contract
-- `/symbols` — tactical symbol and lifecycle reference
+- `/`: product entry and scenario quick start
+- `/scenarios`: eight versioned templates
+- `/workbench?scenario=a2a-crossing-intercept`: Construct, Simulate, Observe, Explain, Compare, Report
+- `/math`: published equations, model limits, and reproducibility contract
+- `/symbols`: tactical symbol and lifecycle reference
 
 For host-side development, start the database and seed it first:
 

@@ -1,8 +1,9 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
-import { sites } from "./build/sites-vite-plugin";
 
 const LOCAL_HYPERDRIVE_ID = "00000000-0000-4000-8000-000000000000";
+const hyperdriveId =
+  process.env.CLOUDFLARE_HYPERDRIVE_ID ?? LOCAL_HYPERDRIVE_ID;
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -13,7 +14,7 @@ const localBindingConfig = {
   hyperdrive: [
     {
       binding: "HYPERDRIVE",
-      id: LOCAL_HYPERDRIVE_ID,
+      id: hyperdriveId,
       localConnectionString:
         process.env.DATABASE_URL ??
         "postgres://vector:vector@127.0.0.1:55433/vector",
@@ -51,7 +52,6 @@ export default defineConfig(async () => {
       : undefined,
     plugins: [
       vinext(),
-      sites(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: localBindingConfig,

@@ -1,4 +1,24 @@
-# VECTOR product and engineering contract
+# Vector Engagement Labs documentation
+
+This directory is the maintained engineering and product contract for the application and the reusable simulation engine. A behavior is not complete when code exists but its contract, limits, verification, and operational consequences are undocumented.
+
+## Documentation map
+
+- [`engineering-principles.md`](engineering-principles.md): open-source boundary, SOLID design, twelve-factor alignment, and release evidence.
+- [`browser-engine-architecture.md`](browser-engine-architecture.md): scenario compilation, runtime ownership, entity lifecycle, and frame consumers.
+- [`engine-backends.md`](engine-backends.md): TypeScript and Rust/WASM interface, provenance, parity, and backend selection.
+- [`physics-model.md`](physics-model.md): equations, atmosphere, guidance, termination, numerical limits, and declared assumptions.
+- [`scenario-builder.md`](scenario-builder.md): authoring journey, state ownership, map controls, and validation.
+- [`vector-simulation-record.md`](vector-simulation-record.md): portable replay and debriefing record.
+- [`catalog-and-sources.md`](catalog-and-sources.md): PostGIS ontology, source assertions, versions, and installation geometry.
+- [`rasp-state-machine.md`](rasp-state-machine.md): observer-picture dependencies, state transitions, scope, and regression matrix.
+- [`tacview-visual-subset.md`](tacview-visual-subset.md): supported analysis-display subset and explicit exclusions.
+- [`responsive-ui.md`](responsive-ui.md): supported viewports and fit-to-task behavior.
+- [`regression-matrix.md`](regression-matrix.md): release proof across engine, maps, symbols, reports, persistence, and UI.
+- [`observability.md`](observability.md): metrics, traces, logs, dashboards, and business signals.
+- [`cloudflare-architecture.md`](cloudflare-architecture.md): Workers, Hyperdrive, optional R2, deployment gates, and local parity.
+- [`product-language.md`](product-language.md): canonical workflow and human-readable military terminology.
+- [`repository-governance.md`](repository-governance.md): protected branches, CI/CD, releases, tags, ownership, and repository status.
 
 ## One journey
 
