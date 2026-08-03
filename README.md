@@ -4,6 +4,9 @@
 [![CodeQL](https://github.com/SrivatsaRv/vector-engagements-labs/actions/workflows/codeql.yml/badge.svg)](https://github.com/SrivatsaRv/vector-engagements-labs/actions/workflows/codeql.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
+Built by [Reach Defence](https://reachdefence.com) and created and maintained
+by [Srivatsa RV](https://github.com/SrivatsaRv).
+
 > **Project status: pre-alpha research software.** Contracts and results may change before `v1.0.0`. The software is for transparent educational simulation and is not verified system performance or operational decision support.
 
 Vector Engagement Labs is a local-first browser workbench for public-data engagement experiments. A normalized PostgreSQL/PostGIS catalog resolves versioned scenario packages; deterministic physics, map/3D playback, telemetry, comparison, and reporting execute from one browser-engine frame contract.
@@ -63,3 +66,9 @@ make observability-local
 The first command runs lint, type checks, production build, route checks, and deterministic engine tests. The second applies migrations/seeds and validates PostGIS SRID, row coverage, scenario count, and model foreign keys. The third proves Prometheus ingestion, Tempo traces, Grafana provisioning, and bounded browser business telemetry.
 
 See [`docs/`](docs/README.md) for product language, catalog contracts, engine mathematics, deployment mapping, and current limitations.
+
+## Project stewardship
+
+Vector Engagement Labs is an open-source Reach Defence research project led by
+Srivatsa RV. Project information and related defence technology research are
+available at [reachdefence.com](https://reachdefence.com).

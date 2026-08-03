@@ -9,18 +9,24 @@ The repository is public, Apache-2.0 licensed, and currently **pre-alpha researc
 All contributor work enters through a pull request. The `main` branch requires:
 
 - an up-to-date branch;
-- at least one approving review;
-- CODEOWNER review for protected contracts;
 - resolution of review conversations;
 - passing Quality, Integration, Performance, CodeQL, and Dependency Review checks;
 - linear history;
 - no force pushes and no branch deletion.
 
-Repository administrators retain emergency recovery authority but should not use it to bypass ordinary review. Security fixes follow `SECURITY.md`.
+GitHub does not permit an author to approve their own pull request. During the
+solo-maintainer phase, the required approving-review count is therefore zero.
+The maintainer can merge an authored pull request only after every required
+check passes and every review conversation is resolved. `CODEOWNERS` still
+routes sensitive changes for review, and external contributors cannot merge
+their own work. When a second trusted maintainer is onboarded, the repository
+will restore one required approval and required CODEOWNER review.
+
+Repository administrators retain emergency recovery authority but should not use it to bypass ordinary checks. Security fixes follow `SECURITY.md`.
 
 ## Continuous integration
 
-`ci.yml` verifies source generation, Rust/WASM integrity, Rust tests, lint, type safety, production build, behavioral tests, PostGIS/API/report integration, supported responsive breakpoints, and an engine performance guard. Rust sources carry a deterministic source digest; the embedded module carries its own byte digest and required-export check; CI also compiles the module afresh on its runner. This avoids incorrectly requiring different compiler platforms to emit byte-identical WASM. Actions are pinned to immutable commit SHAs.
+`ci.yml` verifies source generation, Rust/WASM integrity, Rust tests, lint, type safety, production build, behavioral tests, PostGIS/API/report integration, supported responsive breakpoints, and an engine performance guard. A failed Compose startup emits bounded service status and logs before evidence upload, so a container health failure is diagnosable from the check itself. Rust sources carry a deterministic source digest; the embedded module carries its own byte digest and required-export check; CI also compiles the module afresh on its runner. This avoids incorrectly requiring different compiler platforms to emit byte-identical WASM. Actions are pinned to immutable commit SHAs.
 
 `codeql.yml` performs JavaScript and TypeScript security analysis on changes to `main`, pull requests, and a weekly schedule. `dependency-review.yml` rejects vulnerable or incompatible new dependencies in pull requests. Dependabot permits one open maintenance pull request per ecosystem, groups routine npm, Cargo, and Actions updates, and excludes major versions so they require an intentional maintainer proposal.
 
@@ -30,11 +36,15 @@ The commit gate rejects high-severity production dependency advisories. The curr
 
 Pushing a semantic tag creates a GitHub release only when the tag exactly matches `package.json`, the commit gate passes, and the release archive receives a SHA-256 manifest.
 
-Cloudflare delivery is deliberately manual and protected by the GitHub `production` environment. It deploys an explicit commit or tag only after CI and requires three repository secrets:
+Cloudflare delivery is deliberately manual and protected by the GitHub `production` environment. It deploys an explicit commit SHA only after CI and requires two protected secrets and two non-secret environment variables:
 
 - `CLOUDFLARE_API_TOKEN` with least-privilege Worker deployment access;
-- `CLOUDFLARE_ACCOUNT_ID`;
-- `CLOUDFLARE_HYPERDRIVE_ID` for the production PostgreSQL/PostGIS origin.
+- `DATABASE_ORIGIN_URL` as a protected environment secret for migrations and
+  direct origin verification only.
+- `CLOUDFLARE_ACCOUNT_ID` as a non-secret production environment variable;
+- `CLOUDFLARE_HYPERDRIVE_ID` as a non-secret production environment variable
+  for the PostgreSQL/PostGIS binding.
+- `VECTOR_PRODUCTION_HOST` as the non-secret production custom domain.
 
 No Cloudflare secret is stored in the repository. R2 is optional and should be introduced only with an explicit `ARTIFACTS` binding and object-custody contract.
 
@@ -49,4 +59,8 @@ No Cloudflare secret is stored in the repository. R2 is optional and should be i
 
 ## Ownership and contributor safety
 
-`CODEOWNERS` assigns default ownership and explicitly protects engine, database, workflow, governance, and security surfaces. Contributors cannot merge directly to `main`, dismiss reviews, bypass checks, or force-push protected history.
+`CODEOWNERS` assigns default ownership across engine, database, workflow,
+governance, and security surfaces. Contributors cannot merge directly to
+`main`, bypass checks, or force-push protected history. The solo maintainer may
+merge their own pull request after all mandatory checks and conversations pass;
+GitHub self-approval is neither possible nor treated as evidence.

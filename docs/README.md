@@ -1,5 +1,9 @@
 # Vector Engagement Labs documentation
 
+Vector Engagement Labs is built by
+[Reach Defence](https://reachdefence.com) and maintained by
+[Srivatsa RV](https://github.com/SrivatsaRv).
+
 This directory is the maintained engineering and product contract for the application and the reusable simulation engine. A behavior is not complete when code exists but its contract, limits, verification, and operational consequences are undocumented.
 
 ## Documentation map
