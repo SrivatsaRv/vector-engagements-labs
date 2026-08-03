@@ -14,7 +14,7 @@ This matrix is the minimum proof required before a feature milestone is committe
 | Reports | Exact configuration, result, frame count, environment, source state and provenance hashes | Save → load → report lifecycle; missing/incomplete run rejection |
 | Database | Canonical scenario identity, content hash, schema version and spatial context | Migrations, seed counts and PostGIS catalog verification |
 | Observability | Telemetry allowlist and metric definitions | Prometheus targets/queries, Tempo trace, Loki/Grafana data sources and both provisioned dashboards |
-| Responsive layout | CSS ownership for builder scroll/footer and six telemetry panels | Headless system-Chrome checks at 1366×768, 1440×900 and 1920×1080; non-zero authoring and Observe canvases, no horizontal overflow or action overlap, readable maneuver cards and distinct Blue/Red RASP ownership |
+| Responsive layout | CSS ownership for builder scroll/footer, fluid task-width tokens and six telemetry panels | Headless system-Chrome checks at 390×844, 430×932, 1280×720, 1366×768, 1440×900, 1536×864, 1920×1080, 2560×1440 and 3840×2160; phone stacking, QHD/4K proportional expansion, non-zero authoring and Observe canvases, no horizontal overflow or action overlap, readable maneuver cards and distinct Blue/Red RASP ownership |
 
 ## Commit gates
 
