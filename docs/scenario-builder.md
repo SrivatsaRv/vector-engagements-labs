@@ -23,6 +23,10 @@ A runnable scenario declares a PostGIS-backed `study_area_id` and a weather pres
 
 The engine uses local east-north-up coordinates for numerical stability. The presentation layer projects those coordinates from the selected study-area anchor. This makes the simulation portable without letting the map decide where a run occurred.
 
+Both Construct and Observe use the same MapLibre navigation contract. The map starts flat; supports wheel zoom, drag pan, right-drag rotation, touch zoom/rotation, double-click zoom, and keyboard navigation; disables touch pitch and pitch-with-rotate; and exposes an explicit 0°/52° tilt preview. VECTOR-owned controls provide basemap selection, zoom, reset north/tilt, fit, cursor coordinates, zoom, bearing, and pitch. Standard, minimal, and low-light tactical basemaps are same-origin proxied and the selection persists in browser local storage. During waypoint placement the view is forced flat so a presentation gesture cannot obscure authored geometry. These camera and basemap choices are presentation state and never change simulation inputs.
+
+Replay markers default to the catalog designation, such as `Su-30MKI`, `F-16C Block 52`, or `Astra Mk 1`. Generated engine identifiers such as `BLUE WEAPON 1` remain internal replay identity and are not presented as the operator label.
+
 The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-east mountains, the Arabian Sea, and coastal Gujarat. Their boundaries are educational visualization contexts, not operational engagement boxes. Selecting a study area is a preset choice. The first complete builder does not ask the operator to draw a study-area polygon.
 
 ## Scenario artifact

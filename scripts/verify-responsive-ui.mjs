@@ -103,7 +103,8 @@ try {
         markers: document.querySelectorAll(".authoring-entity-marker").length,
         installationMarkers: document.querySelectorAll(".authoring-installation-marker").length,
         originPickers: document.querySelectorAll(".origin-pickers details").length,
-        navigationVisible: Boolean(document.querySelector(".scenario-authoring-map .maplibregl-ctrl-top-right")),
+        mapControlCount: document.querySelectorAll(".scenario-authoring-map-shell .vector-map-toolbar button").length,
+        cameraTelemetry: document.querySelectorAll(".scenario-authoring-map-shell .vector-map-telemetry span").length,
         stepsVisible: getComputedStyle(document.querySelector(".build-steps")).display !== "none",
         summaryVisible: getComputedStyle(document.querySelector(".builder-summary")).display !== "none",
       };
@@ -116,8 +117,16 @@ try {
     assert.equal(construct.markers, 2, `${viewport.width}: expected two start entities`);
     assert.ok(construct.installationMarkers >= 1, `${viewport.width}: no selectable bases rendered`);
     assert.equal(construct.originPickers, 2, `${viewport.width}: team origin controls missing`);
-    assert.equal(construct.navigationVisible, true, `${viewport.width}: map navigation missing`);
+    assert.equal(construct.mapControlCount, 6, `${viewport.width}: VECTOR map controls missing`);
+    assert.equal(construct.cameraTelemetry, 4, `${viewport.width}: map telemetry missing`);
     assert.ok(successfulTiles > 0, `${viewport.width}: basemap returned no successful tiles`);
+    if (viewport.label === "phone") {
+      await page.getByRole("button", { name: "Basemap", exact: true }).click();
+      await page.getByRole("button", { name: /^Tactical/ }).click();
+      await page.waitForFunction(() => localStorage.getItem("vector.map.basemap.v1") === "TACTICAL");
+      await page.getByRole("button", { name: "Basemap", exact: true }).click();
+      await page.getByRole("button", { name: /^Minimal/ }).click();
+    }
     assert.ok(construct.primaryActionHeight >= 38, `${viewport.width}: primary action is undersized`);
     if (viewport.family === "phone") {
       assert.equal(construct.stepsVisible, false, `${viewport.width}: desktop step rail is visible on phone`);

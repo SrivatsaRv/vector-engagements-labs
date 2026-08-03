@@ -91,6 +91,34 @@ test("basemap proxy rejects invalid tile coordinates without contacting an upstr
   assert.deepEqual(await response.json(), { error: "invalid tile coordinate" });
 });
 
+test("basemap proxy rejects an unknown governed map mode", async () => {
+  const response = await render("/api/map-tile?mode=imaginary&z=1&x=0&y=0");
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "invalid tile coordinate" });
+});
+
+test("VECTOR map controls share the MIAR-derived navigation contract", async () => {
+  const [controls, mapContract, engagement, authoring] = await Promise.all([
+    readFile(new URL("../components/VectorMapControls.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/vector-map.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/EngagementMap.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/ScenarioAuthoringMap.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(controls, /Tilt preview/);
+  assert.match(controls, /Reset north and tilt/);
+  assert.match(controls, /BRG/);
+  assert.match(mapContract, /TACTICAL/);
+  assert.match(mapContract, /vector\.map\.basemap\.v1/);
+  for (const surface of [engagement, authoring]) {
+    assert.match(surface, /touchZoomRotate\.enableRotation\(\)/);
+    assert.match(surface, /touchPitch\.disable\(\)/);
+    assert.match(surface, /keyboard\.enable\(\)/);
+    assert.match(surface, /bearingSnap: 0/);
+    assert.match(surface, /ResizeObserver/);
+  }
+  assert.match(engagement, /label\.textContent = entity\.designation/);
+});
+
 test("keeps data facts, model assumptions, RASP, map scope, and persistence explicit", async () => {
   const [capabilityData, simulation, map, api, report, migration, provenanceMigration, spatialMigration, spatialPackageMigration, visualContract, makefile] = await Promise.all(
     [
@@ -174,7 +202,8 @@ test("responsive workspace reserves footer space and keeps six telemetry plots i
   assert.match(css, /\.scenario-authoring-map-shell\s*\{[^}]*height:\s*clamp\(/s);
   assert.match(authoringMap, /draggable:\s*true/);
   assert.match(authoringMap, /maxBounds/);
-  assert.match(authoringMap, /NavigationControl/);
+  assert.match(authoringMap, /VectorMapControls/);
+  assert.match(authoringMap, /AttributionControl/);
   assert.match(authoringMap, /authoring-routes/);
   assert.match(authoringMap, /Waypoint rejected/);
 });

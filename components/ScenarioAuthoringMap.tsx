@@ -13,6 +13,14 @@ import {
 } from "@/lib/scenario-spatial";
 import type { StudyArea } from "@/lib/study-areas";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
+import { VectorMapControls, type MapCameraTelemetry } from "@/components/VectorMapControls";
+import {
+  buildVectorMapStyle,
+  readVectorBasemap,
+  setVectorBasemapVisibility,
+  writeVectorBasemap,
+  type VectorBasemap,
+} from "@/lib/vector-map";
 
 type TeamKey = "blue" | "red";
 
@@ -23,19 +31,6 @@ type Props = {
   redObject: CatalogObject;
   installations: MapInstallation[];
   onChange: (plan: ScenarioSpatialPlan) => void;
-};
-
-const style = {
-  version: 8 as const,
-  sources: {
-    carto: {
-      type: "raster" as const,
-      tiles: ["/api/map-tile?z={z}&x={x}&y={y}"],
-      tileSize: 512,
-      attribution: "© OpenStreetMap contributors © CARTO",
-    },
-  },
-  layers: [{ id: "carto", type: "raster" as const, source: "carto" }],
 };
 
 export function ScenarioAuthoringMap({
@@ -53,6 +48,16 @@ export function ScenarioAuthoringMap({
   const [tool, setTool] = useState<"MOVE" | "WAYPOINT">("MOVE");
   const [ready, setReady] = useState(false);
   const [message, setMessage] = useState("");
+  const [mapError, setMapError] = useState("");
+  const [basemap, setBasemap] = useState<VectorBasemap>("MINIMAL");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [camera, setCamera] = useState<MapCameraTelemetry>({
+    longitude: studyArea.anchor.longitude,
+    latitude: studyArea.anchor.latitude,
+    zoom: 5.3,
+    bearing: 0,
+    pitch: 0,
+  });
   const selectedRef = useRef(selected);
   const toolRef = useRef(tool);
   const onChangeRef = useRef(onChange);
@@ -73,6 +78,18 @@ export function ScenarioAuthoringMap({
   const planRef = useRef(plan);
 
   useEffect(() => {
+    queueMicrotask(() => setBasemap(readVectorBasemap()));
+  }, []);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map) setVectorBasemapVisibility(map, basemap);
+    writeVectorBasemap(basemap);
+  }, [basemap]);
+  useEffect(() => {
+    if (tool === "WAYPOINT") mapRef.current?.easeTo({ pitch: 0, duration: 140 });
+  }, [tool]);
+
+  useEffect(() => {
     selectedRef.current = selected;
   }, [selected]);
   useEffect(() => {
@@ -89,29 +106,63 @@ export function ScenarioAuthoringMap({
   useEffect(() => {
     if (!mount.current) return;
     let disposed = false;
+    let resizeObserver: ResizeObserver | null = null;
     const currentMarkers = markers.current;
     setReady(false);
+    setMapError("");
     import("maplibre-gl").then((maplibregl) => {
       if (disposed || !mount.current) return;
       const map = new maplibregl.Map({
         container: mount.current,
-        style,
+        style: buildVectorMapStyle("MINIMAL"),
         center: [studyArea.anchor.longitude, studyArea.anchor.latitude],
         zoom: 6.2,
-        pitch: 18,
+        pitch: 0,
         bearing: 0,
         dragRotate: true,
-        touchPitch: true,
+        touchZoomRotate: true,
+        touchPitch: false,
+        pitchWithRotate: false,
+        maxPitch: 60,
+        bearingSnap: 0,
         maxBounds: [
           [studyArea.bounds[0][0] - 1, studyArea.bounds[0][1] - 1],
           [studyArea.bounds[1][0] + 1, studyArea.bounds[1][1] + 1],
         ],
       });
-      map.addControl(
-        new maplibregl.NavigationControl({ showCompass: true }),
-        "top-right",
-      );
+      map.touchZoomRotate.enable();
+      map.touchZoomRotate.enableRotation();
+      map.dragRotate.enable();
+      map.touchPitch.disable();
+      map.keyboard.enable();
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
+      resizeObserver = new ResizeObserver(() => map.resize());
+      resizeObserver.observe(mount.current);
+      const updateCamera = () => {
+        const center = map.getCenter();
+        setCamera((current) => ({
+          ...current,
+          longitude: center.lng,
+          latitude: center.lat,
+          zoom: map.getZoom(),
+          bearing: map.getBearing(),
+          pitch: Math.max(0, Math.min(58, map.getPitch())),
+        }));
+      };
+      map.on("move", updateCamera);
+      map.on("zoom", updateCamera);
+      map.on("rotate", updateCamera);
+      map.on("mousemove", (event) => setCamera((current) => ({
+        ...current,
+        longitude: event.lngLat.lng,
+        latitude: event.lngLat.lat,
+      })));
+      map.on("error", (event) => {
+        if (!map.isStyleLoaded()) setMapError(event.error?.message ?? "Basemap could not be loaded");
+      });
       map.on("load", () => {
+        map.resize();
+        setVectorBasemapVisibility(map, readVectorBasemap());
         const [[west, south], [east, north]] = studyArea.bounds;
         map.addSource("authoring-area", {
           type: "geojson",
@@ -197,6 +248,7 @@ export function ScenarioAuthoringMap({
     });
     return () => {
       disposed = true;
+      resizeObserver?.disconnect();
       for (const marker of currentMarkers.values()) marker.remove();
       currentMarkers.clear();
       mapRef.current?.remove();
@@ -481,7 +533,26 @@ export function ScenarioAuthoringMap({
       </header>
       <div className="scenario-authoring-map-shell">
         <div ref={mount} className="scenario-authoring-map" aria-label="Scenario placement map" />
-        {!ready && <div className="authoring-map-status">Loading placement surface…</div>}
+        <VectorMapControls
+          basemap={basemap}
+          camera={camera}
+          paletteOpen={paletteOpen}
+          onPaletteToggle={() => setPaletteOpen((current) => !current)}
+          onBasemap={(value) => { setBasemap(value); setPaletteOpen(false); }}
+          onZoomIn={() => mapRef.current?.zoomIn({ duration: 120 })}
+          onZoomOut={() => mapRef.current?.zoomOut({ duration: 120 })}
+          onTilt={() => {
+            if (tool === "WAYPOINT") {
+              setMessage("Tilt is disabled while placing waypoints so route geometry remains unambiguous.");
+              return;
+            }
+            mapRef.current?.easeTo({ pitch: camera.pitch > 5 ? 0 : 52, duration: 220 });
+          }}
+          onReset={() => mapRef.current?.easeTo({ bearing: 0, pitch: 0, duration: 220 })}
+          onFit={() => mapRef.current?.fitBounds(studyArea.bounds, { padding: 42, duration: 220, pitch: 0 })}
+          fitLabel="Fit study area"
+        />
+        {!ready && <div className={`authoring-map-status${mapError ? " error" : ""}`}>{mapError || "Loading placement surface…"}</div>}
         <div className="authoring-map-scope">Preset boundary · {studyArea.shortName}</div>
       </div>
       <div className="authoring-inspector">

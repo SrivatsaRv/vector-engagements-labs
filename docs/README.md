@@ -29,7 +29,7 @@ The release proof across engine, map, symbols, reports, persistence, observabili
 - Explicit carried → launched → active → terminated weapon lifecycle.
 - Deterministic fixed-step browser physics, atmosphere, wind vector, changing mass, thrust, drag, gravity, proportional-navigation demand, and termination diagnostics.
 - Tactical symbols by affiliation and object kind; carried inventory is not rendered as a world track.
-- MapLibre minimal basemap backed by PostGIS public-reference installations, with study-area boundaries, declared routes, recorded tracks, launches, and model-assumption coverage envelopes.
+- Shared MapLibre standard, minimal, and low-light tactical basemaps with VECTOR controls, camera telemetry, PostGIS public-reference installations, study-area boundaries, declared routes, recorded tracks, launches, and model-assumption coverage envelopes.
 - Engagement-scale map fitting for readable trajectories plus an explicit regional station-context extent.
 - Three.js playback with exact recorded tracks, ground projections, altitude curtains, altitude stems, and synchronized model time.
 - Small-multiple telemetry from the same engine frames.

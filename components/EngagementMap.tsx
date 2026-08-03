@@ -2,6 +2,7 @@
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
+import { VectorMapControls, type MapCameraTelemetry } from "@/components/VectorMapControls";
 import type { RaspTrack, SimulationResult } from "@/lib/simulation";
 import { getFrameAt } from "@/lib/simulation";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
@@ -17,6 +18,13 @@ import {
   localToLngLat,
   type MapInstallationRecord,
 } from "@/lib/map-layer-contracts";
+import {
+  buildVectorMapStyle,
+  readVectorBasemap,
+  setVectorBasemapVisibility,
+  writeVectorBasemap,
+  type VectorBasemap,
+} from "@/lib/vector-map";
 
 export type MapInstallation = MapInstallationRecord;
 
@@ -28,18 +36,6 @@ type Props = {
 };
 type MapScope = "ENGAGEMENT" | "REGION";
 
-const minimalStyle = {
-  version: 8 as const,
-  sources: {
-    carto: {
-      type: "raster" as const,
-      tiles: ["/api/map-tile?z={z}&x={x}&y={y}"],
-      tileSize: 512,
-      attribution: "© OpenStreetMap contributors © CARTO",
-    },
-  },
-  layers: [{ id: "carto", type: "raster" as const, source: "carto" }],
-};
 export function EngagementMap({ result, time, installations, raspTrack }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
@@ -49,13 +45,33 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
     "loading",
   );
   const [mapError, setMapError] = useState("");
+  const [basemap, setBasemap] = useState<VectorBasemap>("MINIMAL");
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [camera, setCamera] = useState<MapCameraTelemetry>({
+    longitude: 0,
+    latitude: 0,
+    zoom: 5.3,
+    bearing: 0,
+    pitch: 0,
+  });
   const spatial = result.engineRun.scenario.environment.studyArea;
   const origin = spatial.anchor;
+
+  useEffect(() => {
+    queueMicrotask(() => setBasemap(readVectorBasemap()));
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map) setVectorBasemapVisibility(map, basemap);
+    writeVectorBasemap(basemap);
+  }, [basemap]);
 
   useEffect(() => {
     if (!mount.current) return;
     const mapStartedAt = performance.now();
     let disposed = false;
+    let resizeObserver: ResizeObserver | null = null;
     setMapStatus("loading");
     setMapError("");
     const currentMarkers = markers.current;
@@ -63,16 +79,44 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
       if (disposed || !mount.current) return;
       const map = new maplibregl.Map({
         container: mount.current,
-        style: minimalStyle,
+        style: buildVectorMapStyle("MINIMAL"),
         center: [origin.longitude, origin.latitude],
         zoom: 5.3,
-        pitch: 34,
+        pitch: 0,
         bearing: 0,
         attributionControl: false,
         dragRotate: true,
-        touchPitch: true,
+        touchZoomRotate: true,
+        touchPitch: false,
+        pitchWithRotate: false,
+        maxPitch: 60,
+        bearingSnap: 0,
       });
-      map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
+      map.touchZoomRotate.enable();
+      map.touchZoomRotate.enableRotation();
+      map.dragRotate.enable();
+      map.touchPitch.disable();
+      map.keyboard.enable();
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
+      resizeObserver = new ResizeObserver(() => map.resize());
+      resizeObserver.observe(mount.current);
+      const updateCamera = () => {
+        const center = map.getCenter();
+        setCamera((current) => ({
+          ...current,
+          longitude: center.lng,
+          latitude: center.lat,
+          zoom: map.getZoom(),
+          bearing: map.getBearing(),
+          pitch: Math.max(0, Math.min(58, map.getPitch())),
+        }));
+      };
+      map.on("move", updateCamera);
+      map.on("zoom", updateCamera);
+      map.on("rotate", updateCamera);
+      map.on("mousemove", (event) => {
+        setCamera((current) => ({ ...current, longitude: event.lngLat.lng, latitude: event.lngLat.lat }));
+      });
       map.on("error", (event) => {
         if (disposed) return;
         // A single remote tile can fail while the map and static regional
@@ -84,6 +128,9 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
         }
       });
       map.on("load", () => {
+        map.resize();
+        const activeBasemap = readVectorBasemap();
+        setVectorBasemapVisibility(map, activeBasemap);
         const [[west, south], [east, north]] = spatial.bounds;
         map.addSource("study-area", {
           type: "geojson",
@@ -268,7 +315,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
         setMapStatus("ready");
         emitBrowserTelemetry({
           type: "map_loaded",
-          basemap: "MINIMAL",
+          basemap: activeBasemap,
           durationMs: performance.now() - mapStartedAt,
         });
       });
@@ -279,12 +326,13 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
       setMapError(error instanceof Error ? error.message : "Map renderer could not be loaded");
       emitBrowserTelemetry({
         type: "map_failed",
-        basemap: "MINIMAL",
+        basemap: readVectorBasemap(),
         durationMs: performance.now() - mapStartedAt,
       });
     });
     return () => {
       disposed = true;
+      resizeObserver?.disconnect();
       for (const marker of currentMarkers.values()) marker.remove();
       currentMarkers.clear();
       mapRef.current?.remove();
@@ -296,7 +344,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
     const map = mapRef.current;
     if (!map || mapStatus !== "ready") return;
     if (mapScope === "REGION") {
-      map.fitBounds(spatial.bounds, { padding: 46, duration: 250, pitch: 18 });
+      map.fitBounds(spatial.bounds, { padding: 46, duration: 220, pitch: 0 });
       return;
     }
     const coordinates = result.frames.flatMap((frame) =>
@@ -312,7 +360,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
         [Math.min(...longitudes), Math.min(...latitudes)],
         [Math.max(...longitudes), Math.max(...latitudes)],
       ],
-      { padding: 86, duration: 250, maxZoom: 9.4, pitch: 26 },
+      { padding: 86, duration: 220, maxZoom: 9.4, pitch: 0 },
     );
   }, [mapScope, mapStatus, origin, result, spatial.bounds]);
 
@@ -342,7 +390,11 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           element.className = "map-tactical-marker";
           element.innerHTML = `${tacticalSymbolMarkup(entity.kind, entity.affiliation, entity.lifecycle, entity.symbolRole)}<span></span>`;
           const label = element.querySelector("span");
-          if (label) label.textContent = entity.callsign || entity.designation;
+          // Generated engine callsigns preserve replay identity but are not
+          // useful operator labels. Default map presentation names the actual
+          // catalog object; a later presentation setting may deliberately
+          // switch to a declared scenario callsign.
+          if (label) label.textContent = entity.designation;
           element.title = `${entity.designation} · ${entity.lifecycle.toLowerCase()}`;
           const createdMarker = new maplibregl.Marker({ element, anchor: "center" });
           createdMarker.setLngLat(localToLngLat(displayPosition, origin)).addTo(map);
@@ -427,6 +479,19 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
         </button>
       </div>
       <div ref={mount} className="engagement-map" aria-label="Geographic engagement map" />
+      <VectorMapControls
+        basemap={basemap}
+        camera={camera}
+        paletteOpen={paletteOpen}
+        onPaletteToggle={() => setPaletteOpen((current) => !current)}
+        onBasemap={(value) => { setBasemap(value); setPaletteOpen(false); }}
+        onZoomIn={() => mapRef.current?.zoomIn({ duration: 120 })}
+        onZoomOut={() => mapRef.current?.zoomOut({ duration: 120 })}
+        onTilt={() => mapRef.current?.easeTo({ pitch: camera.pitch > 5 ? 0 : 52, duration: 220 })}
+        onReset={() => mapRef.current?.easeTo({ bearing: 0, pitch: 0, duration: 220 })}
+        onFit={() => setMapScope((current) => current === "ENGAGEMENT" ? "REGION" : "ENGAGEMENT")}
+        fitLabel={mapScope === "ENGAGEMENT" ? "Fit study area" : "Fit run"}
+      />
       {mapStatus !== "ready" && (
         <div className={`map-status ${mapStatus}`} role={mapStatus === "error" ? "alert" : "status"}>
           <strong>{mapStatus === "error" ? "Basemap unavailable" : "Loading basemap"}</strong>
@@ -440,7 +505,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
         <span><i className="engagement" />Engagement envelope</span>
         <span><i className="launch" />Launch</span>
       </div>
-      <div className="map-data-note">{spatial.name} · public educational area · pan, zoom, rotate, and tilt enabled</div>
+      <div className="map-data-note">{spatial.name} · public educational area · right-drag or touch to rotate · tilt is a context preview</div>
     </div>
   );
 }
