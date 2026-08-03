@@ -46,6 +46,8 @@ GitHub `production` environment owns the deployment credentials:
 - `CLOUDFLARE_ACCOUNT_ID` is a non-secret environment variable.
 - `CLOUDFLARE_HYPERDRIVE_ID` is a non-secret environment variable identifying
   the production Hyperdrive configuration.
+- `VECTOR_PRODUCTION_HOST` is the non-secret custom domain. Production uses
+  `labs.reachdefence.com`.
 
 The deployment gate validates that the Hyperdrive configuration exists, runs
 the forward-only SQL migrations, refreshes the canonical catalog seed, and
@@ -64,6 +66,12 @@ the Hyperdrive configuration, migrations, seed idempotency, and database
 integrity without publishing the application. The `deploy` operation accepts
 only a full 40-character commit SHA, preventing production from following a
 mutable branch name.
+
+The Cloudflare Vite configuration owns the Worker name, compatibility date,
+observability switch, Hyperdrive binding, and custom-domain route. A separate
+`wrangler.jsonc` is intentionally not maintained because two configuration
+sources can silently diverge. The custom-domain route is included only when
+`VECTOR_PRODUCTION_HOST` is present during deployment.
 
 ## Deployment gates
 

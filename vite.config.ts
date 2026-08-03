@@ -4,13 +4,20 @@ import { defineConfig } from "vite";
 const LOCAL_HYPERDRIVE_ID = "00000000-0000-4000-8000-000000000000";
 const hyperdriveId =
   process.env.CLOUDFLARE_HYPERDRIVE_ID ?? LOCAL_HYPERDRIVE_ID;
+const productionHost = process.env.VECTOR_PRODUCTION_HOST;
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
 const localBindingConfig = {
+  name: "vector-engagement-labs",
   main: "./worker/index.ts",
+  compatibility_date: "2026-08-04",
   compatibility_flags: ["nodejs_compat"],
+  observability: { enabled: true },
+  routes: productionHost
+    ? [{ pattern: productionHost, custom_domain: true }]
+    : [],
   hyperdrive: [
     {
       binding: "HYPERDRIVE",

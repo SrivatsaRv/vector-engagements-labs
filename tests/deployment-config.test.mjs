@@ -11,6 +11,7 @@ test("production workflow keeps credentials secret and binding IDs non-secret", 
   assert.match(workflow, /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/);
   assert.match(workflow, /CLOUDFLARE_ACCOUNT_ID: \$\{\{ vars\.CLOUDFLARE_ACCOUNT_ID \}\}/);
   assert.match(workflow, /CLOUDFLARE_HYPERDRIVE_ID: \$\{\{ vars\.CLOUDFLARE_HYPERDRIVE_ID \}\}/);
+  assert.match(workflow, /VECTOR_PRODUCTION_HOST: \$\{\{ vars\.VECTOR_PRODUCTION_HOST \}\}/);
   assert.doesNotMatch(workflow, /secrets\.CLOUDFLARE_(?:ACCOUNT_ID|HYPERDRIVE_ID)/);
 });
 
@@ -32,6 +33,8 @@ test("Worker database adapter consumes the generated Hyperdrive binding", async 
 
   assert.match(viteConfig, /binding: "HYPERDRIVE"/);
   assert.match(viteConfig, /process\.env\.CLOUDFLARE_HYPERDRIVE_ID/);
+  assert.match(viteConfig, /process\.env\.VECTOR_PRODUCTION_HOST/);
+  assert.match(viteConfig, /custom_domain: true/);
   assert.match(databaseAdapter, /runtime\.HYPERDRIVE\?\.connectionString/);
 });
 
@@ -40,6 +43,7 @@ test("public environment example contains placeholders, not production values", 
 
   assert.match(example, /^PROD_DATABASE_ORIGIN_URL=$/m);
   assert.match(example, /^CLOUDFLARE_HYPERDRIVE_ID=$/m);
+  assert.match(example, /^VECTOR_PRODUCTION_HOST=$/m);
   assert.doesNotMatch(example, /a58922f3bf554c36bb758b89950c467d/);
   assert.doesNotMatch(example, /postgres(?:ql)?:\/\/[^\s]+@[^\s]+\.neon\.tech/);
 });

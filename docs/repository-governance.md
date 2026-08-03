@@ -44,6 +44,7 @@ Cloudflare delivery is deliberately manual and protected by the GitHub `producti
 - `CLOUDFLARE_ACCOUNT_ID` as a non-secret production environment variable;
 - `CLOUDFLARE_HYPERDRIVE_ID` as a non-secret production environment variable
   for the PostgreSQL/PostGIS binding.
+- `VECTOR_PRODUCTION_HOST` as the non-secret production custom domain.
 
 No Cloudflare secret is stored in the repository. R2 is optional and should be introduced only with an explicit `ARTIFACTS` binding and object-custody contract.
 
