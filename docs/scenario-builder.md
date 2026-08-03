@@ -31,7 +31,9 @@ Construct produces a versioned scenario package. Compilation produces an immutab
 
 ## Builder expansion boundary
 
-The current builder edits every input used by the eight validated templates. The next builder expansion adds arbitrary entity collections, direct map placement, route authoring, supporting sensor nodes, and imported package editing. Those capabilities must extend the same scenario contract; they must not introduce a second simulation-state format.
+The configured-template builder edits every input used by the eight validated templates. Its **Place & flight** surface now performs direct geographic start placement, heading, altitude and speed editing, and Blue/Red route and waypoint authoring inside a selected preset study area. Map gestures and numeric fields update one spatial plan; compilation converts it to local east-north-up engine state. Authored routes remain declared intent beside the computed engine track; the current engine does not silently force an aircraft to follow a drawn route.
+
+The next expansion adds database-backed arbitrary entity collections, supporting sensor nodes, target/launch relationship authoring, and the complete blank-scenario path. Those capabilities must extend the same scenario contract; they must not introduce a second simulation-state format.
 
 The internal `vector.scenario-draft.v1` state contract now provides the safe authoring foundation: an actually empty draft, stable entity and waypoint IDs, draft revisions, geographic position, heading, speed, routes, loadouts, target/launch references, dependency-safe deletion, duplication, and blocking validation. It remains unexposed until the blank-scenario surface can compile and run the authored package end to end; VECTOR does not ship a builder button that terminates in an incomplete workflow.
 
@@ -102,3 +104,12 @@ An authored area of interest is not a substitute for the study-area preset. If
 a later workflow needs a smaller AOI, it is a separate optional geometry inside
 the selected study area and must not silently change the weather, terrain
 reference, or map anchor.
+
+### Current configured-template behavior
+
+- The selected study area and weather are explicitly labelled preconfigured.
+- `Change context` exposes the six governed regional presets and their available weather states; the operator does not draw the regional boundary.
+- Blue and Red start markers and waypoints are draggable.
+- The selected entity inspector edits altitude above sea level, true heading, speed, and route state.
+- Drag and numeric edits synchronize starting distance, altitude difference, aspect, and platform speeds before compilation.
+- Validation blocks non-finite state, negative speed or altitude, invalid headings, mismatched route origins, and any start or waypoint outside the preset boundary.

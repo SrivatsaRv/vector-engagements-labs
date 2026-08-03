@@ -9,6 +9,7 @@ This matrix is the minimum proof required before a feature milestone is committe
 | RASP | 128 source-state rows, both perspectives, dependency isolation, truth invariance, interruption boundaries | RASP display and run event inspection |
 | Decisions | 5 Blue × 4 Red combinations, finite deterministic frames, declared effects | Recorded scenario/report decision fields |
 | Tactical map | Coordinate conversion, closed coverage polygons, installations, routes, launches, tracks, vectors, ownership and value state | Same-origin tile response and browser MapLibre initialization |
+| Map authoring | Map/scalar state equivalence, heading/speed compilation, route retention, route-origin integrity, preset-boundary rejection | Two draggable starts, draggable waypoints, navigation controls, compact preconfigured context, no browser error overlay |
 | Symbols | 7 entity kinds × 3 affiliations × 5 lifecycle states | Map and 3D use the same symbol contract |
 | Reports | Exact configuration, result, frame count, environment, source state and provenance hashes | Save → load → report lifecycle; missing/incomplete run rejection |
 | Database | Canonical scenario identity, content hash, schema version and spatial context | Migrations, seed counts and PostGIS catalog verification |

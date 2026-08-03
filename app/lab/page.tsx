@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { ObjectPicker } from "@/components/ObjectPicker";
 import { EngagementMap, type MapInstallation } from "@/components/EngagementMap";
+import { ScenarioAuthoringMap } from "@/components/ScenarioAuthoringMap";
 import { SimulationScene } from "@/components/SimulationScene";
 import { TacticalSymbol } from "@/components/TacticalSymbol";
 import { TelemetryChart } from "@/components/TelemetryChart";
@@ -62,6 +63,13 @@ import { ENGINE_VERSION } from "@/lib/engine/version";
 import type { ReportData } from "@/lib/report-export";
 import { emitBrowserTelemetry } from "@/lib/observability/client";
 import type { StudyArea } from "@/lib/study-areas";
+import {
+  spatialAspectDeg,
+  spatialHorizontalSeparationM,
+  withSpatialAspectDeg,
+  withSpatialRangeM,
+  type ScenarioSpatialPlan,
+} from "@/lib/scenario-spatial";
 import { sha256Hex } from "@/lib/canonical-json";
 import {
   isScenarioDefinition,
@@ -100,6 +108,11 @@ const CONFIGURE_STEPS = [
   "Sensors & decisions",
   "Validate",
 ];
+
+function formatDistanceKm(distanceM: number) {
+  const kilometers = distanceM / 1000;
+  return Number.isInteger(kilometers) ? `${kilometers}` : kilometers.toFixed(1);
+}
 
 export default function LabPage() {
   const searchParams = useSearchParams();
@@ -363,7 +376,7 @@ function LabWorkbench({
         time: 0,
         type: "run",
         title: "Baseline run started",
-        detail: `${getCatalogObject(scenario.blueSystemId).designation} · ${findWeaponSimulationModel(scenario.blueSystemId)?.id ?? "model unavailable"}@${findWeaponSimulationModel(scenario.blueSystemId)?.version ?? "unknown"} · ${scenario.guidance} path · ${scenario.range / 1000} km`,
+        detail: `${getCatalogObject(scenario.blueSystemId).designation} · ${findWeaponSimulationModel(scenario.blueSystemId)?.id ?? "model unavailable"}@${findWeaponSimulationModel(scenario.blueSystemId)?.version ?? "unknown"} · ${scenario.guidance} path · ${formatDistanceKm(scenario.range)} km`,
       },
     ]);
   }, [catalogState, definition, draftRevision, scenario]);
@@ -958,8 +971,7 @@ function ConfigureWorkspace({
   studyAreas: StudyArea[];
   run: () => void;
 }) {
-  const update = <K extends keyof Scenario>(key: K, value: Scenario[K]) =>
-    setScenario((current) => ({ ...current, [key]: value }));
+  const [contextExpanded, setContextExpanded] = useState(false);
   const simulationModel = findWeaponSimulationModel(scenario.blueSystemId);
   const fixed = definition.targetMotion === "fixed";
   const launchPlatforms = getLaunchPlatforms(scenario.domain);
@@ -994,6 +1006,47 @@ function ConfigureWorkspace({
   const selectedWeather = selectedStudyArea?.weatherPresets.find(
     (preset) => preset.id === scenario.weatherPresetId,
   );
+  const update = <K extends keyof Scenario>(key: K, value: Scenario[K]) =>
+    setScenario((current) => ({ ...current, [key]: value }));
+  const applySpatialPlan = (plan: ScenarioSpatialPlan) => {
+    if (!selectedStudyArea) return;
+    setScenario((current) => ({
+      ...current,
+      spatialPlan: plan,
+      range: spatialHorizontalSeparationM(plan, selectedStudyArea),
+      altitude: plan.blue.position.altitudeM,
+      targetDelta:
+        plan.red.position.altitudeM - plan.blue.position.altitudeM,
+      aspect: spatialAspectDeg(plan, selectedStudyArea),
+      launcherSpeed: plan.blue.speedMps,
+      targetSpeed: plan.red.speedMps,
+    }));
+  };
+  const updateSpatialAltitude = (team: "blue" | "red", altitudeM: number) => {
+    const plan = scenario.spatialPlan;
+    if (!plan) return;
+    applySpatialPlan({
+      ...plan,
+      [team]: {
+        ...plan[team],
+        position: { ...plan[team].position, altitudeM },
+        route: plan[team].route.map((point, index) =>
+          index === 0 ? { ...point, altitudeM } : point,
+        ),
+      },
+    });
+  };
+  const updateSpatialSpeed = (team: "blue" | "red", speedMps: number) => {
+    const plan = scenario.spatialPlan;
+    if (!plan) {
+      update(team === "blue" ? "launcherSpeed" : "targetSpeed", speedMps);
+      return;
+    }
+    applySpatialPlan({
+      ...plan,
+      [team]: { ...plan[team], speedMps },
+    });
+  };
   const selectStudyArea = (area: StudyArea) => {
     const preset = area.weatherPresets.find(
       (candidate) => candidate.id === area.defaultWeatherPresetId,
@@ -1007,6 +1060,7 @@ function ConfigureWorkspace({
       windNorth: preset.windNorthMps,
       visibilityKm: preset.visibilityKm,
       humidityPercent: preset.humidityPercent,
+      spatialPlan: undefined,
     }));
   };
   const selectWeather = (preset: StudyArea["weatherPresets"][number]) => {
@@ -1257,7 +1311,7 @@ function ConfigureWorkspace({
                   max={450}
                   step={5}
                   unit="m/s"
-                  onChange={(value) => update("launcherSpeed", value)}
+                  onChange={(value) => updateSpatialSpeed("blue", value)}
                 />
                 {!fixed && (
                   <Range
@@ -1267,7 +1321,7 @@ function ConfigureWorkspace({
                     max={450}
                     step={5}
                     unit="m/s"
-                    onChange={(value) => update("targetSpeed", value)}
+                    onChange={(value) => updateSpatialSpeed("red", value)}
                   />
                 )}
                 <Range
@@ -1307,45 +1361,76 @@ function ConfigureWorkspace({
             <div className="placement-section">
               <header>
                 <span>STUDY AREA</span>
-                <strong>Choose the geographic and atmospheric context.</strong>
+                <strong>Geographic and atmospheric context.</strong>
                 <p>
-                  The selected area sets the map anchor, terrain elevation, and
-                  available weather presets. It does not create an operational
-                  route or claim a real engagement location.
+                  A governed regional preset sets the map anchor, boundary,
+                  terrain reference, and weather. It is not an operator-drawn
+                  engagement area.
                 </p>
               </header>
-              <div className="study-area-grid">
-                {studyAreas.map((area) => (
+              {selectedStudyArea && selectedWeather && (
+                <div className="study-context-summary">
+                  <div>
+                    <span>Preconfigured context</span>
+                    <strong>{selectedStudyArea.shortName} · {selectedWeather.label}</strong>
+                    <small>
+                      {selectedStudyArea.terrainClass.toLowerCase().replaceAll("_", " ")} · {selectedStudyArea.surfaceElevationM} m reference terrain · ISA {selectedWeather.temperatureOffsetC >= 0 ? "+" : ""}{selectedWeather.temperatureOffsetC} °C · wind {selectedWeather.windEastMps} E / {selectedWeather.windNorthMps} N m/s
+                    </small>
+                  </div>
                   <button
-                    key={area.id}
-                    className={scenario.studyAreaId === area.id ? "active" : ""}
-                    onClick={() => selectStudyArea(area)}
+                    type="button"
+                    aria-expanded={contextExpanded}
+                    onClick={() => setContextExpanded((current) => !current)}
                   >
-                    <strong>{area.shortName}</strong>
-                    <small>{area.terrainClass.toLowerCase().replaceAll("_", " ")} · {area.surfaceElevationM} m reference terrain</small>
-                    <span>{area.description}</span>
+                    {contextExpanded ? "Keep selected context" : "Change context"}
                   </button>
-                ))}
-              </div>
-              {selectedStudyArea && (
-                <div className="weather-preset-grid">
-                  <span>Weather preset for {selectedStudyArea.shortName}</span>
-                  {selectedStudyArea.weatherPresets.map((preset) => (
-                    <button
-                      key={preset.id}
-                      className={scenario.weatherPresetId === preset.id ? "active" : ""}
-                      onClick={() => selectWeather(preset)}
-                    >
-                      <strong>{preset.label}</strong>
-                      <small>{preset.description}</small>
-                      <em>
-                        ISA {preset.temperatureOffsetC >= 0 ? "+" : ""}{preset.temperatureOffsetC} °C · wind {preset.windEastMps} E / {preset.windNorthMps} N m/s · visibility {preset.visibilityKm} km
-                      </em>
-                    </button>
-                  ))}
+                </div>
+              )}
+              {contextExpanded && (
+                <div className="study-context-editor">
+                  <div className="study-area-grid">
+                    {studyAreas.map((area) => (
+                      <button
+                        key={area.id}
+                        className={scenario.studyAreaId === area.id ? "active" : ""}
+                        onClick={() => selectStudyArea(area)}
+                      >
+                        <strong>{area.shortName}</strong>
+                        <small>{area.terrainClass.toLowerCase().replaceAll("_", " ")} · {area.surfaceElevationM} m reference terrain</small>
+                        <span>{area.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {selectedStudyArea && (
+                    <div className="weather-preset-grid">
+                      <span>Weather preset for {selectedStudyArea.shortName}</span>
+                      {selectedStudyArea.weatherPresets.map((preset) => (
+                        <button
+                          key={preset.id}
+                          className={scenario.weatherPresetId === preset.id ? "active" : ""}
+                          onClick={() => selectWeather(preset)}
+                        >
+                          <strong>{preset.label}</strong>
+                          <small>{preset.description}</small>
+                          <em>
+                            ISA {preset.temperatureOffsetC >= 0 ? "+" : ""}{preset.temperatureOffsetC} °C · wind {preset.windEastMps} E / {preset.windNorthMps} N m/s · visibility {preset.visibilityKm} km
+                          </em>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
+            {selectedStudyArea && (
+              <ScenarioAuthoringMap
+                scenario={scenario}
+                studyArea={selectedStudyArea}
+                blueObject={bluePlatform}
+                redObject={redObject}
+                onChange={applySpatialPlan}
+              />
+            )}
             <div className="compact-controls">
               <Range
                 label="Starting distance"
@@ -1353,7 +1438,20 @@ function ConfigureWorkspace({
                 min={5}
                 max={170}
                 unit="km"
-                onChange={(value) => update("range", value * 1000)}
+                onChange={(value) => {
+                  const rangeM = value * 1000;
+                  if (scenario.spatialPlan && selectedStudyArea) {
+                    applySpatialPlan(
+                      withSpatialRangeM(
+                        scenario.spatialPlan,
+                        selectedStudyArea,
+                        rangeM,
+                      ),
+                    );
+                  } else {
+                    update("range", rangeM);
+                  }
+                }}
               />
               <Range
                 label={fixed ? "Launch elevation" : "Launch altitude"}
@@ -1362,7 +1460,11 @@ function ConfigureWorkspace({
                 max={15000}
                 step={10}
                 unit="m"
-                onChange={(value) => update("altitude", value)}
+                onChange={(value) =>
+                  scenario.spatialPlan
+                    ? updateSpatialAltitude("blue", value)
+                    : update("altitude", value)
+                }
               />
               {scenario.domain === "G2G" && (
                 <Range
@@ -1386,7 +1488,14 @@ function ConfigureWorkspace({
                 max={12000}
                 step={10}
                 unit="m"
-                onChange={(value) => update("targetDelta", value)}
+                onChange={(value) =>
+                  scenario.spatialPlan
+                    ? updateSpatialAltitude(
+                        "red",
+                        scenario.spatialPlan.blue.position.altitudeM + value,
+                      )
+                    : update("targetDelta", value)
+                }
               />
             </div>
             <div className="geometry-choice">
@@ -1428,7 +1537,19 @@ function ConfigureWorkspace({
                     max={180}
                     step={5}
                     unit="°"
-                    onChange={(value) => update("aspect", value)}
+                    onChange={(value) => {
+                      if (scenario.spatialPlan && selectedStudyArea) {
+                        applySpatialPlan(
+                          withSpatialAspectDeg(
+                            scenario.spatialPlan,
+                            selectedStudyArea,
+                            value,
+                          ),
+                        );
+                      } else {
+                        update("aspect", value);
+                      }
+                    }}
                   />
                 )}
                 <Range
@@ -1731,7 +1852,7 @@ function ConfigureWorkspace({
               <div>
                 <span>Place &amp; flight</span>
                 <strong>
-                  {scenario.range / 1000} km · {scenario.guidance} path
+                  {formatDistanceKm(scenario.range)} km · {scenario.guidance} path
                 </strong>
                 <p>
                   {selectedStudyArea?.shortName ?? "Study area unavailable"} · {selectedWeather?.label ?? "weather not selected"} · {" "}
@@ -1813,7 +1934,7 @@ function ConfigureWorkspace({
               : "Unavailable"}
           </dd>
           <dt>Starting distance</dt>
-          <dd>{scenario.range / 1000} km</dd>
+          <dd>{formatDistanceKm(scenario.range)} km</dd>
           <dt>Environment</dt>
           <dd>
             {selectedStudyArea?.shortName ?? definition.environment} · {selectedWeather?.label ?? "weather preset unavailable"}
@@ -1919,7 +2040,7 @@ function ResultsWorkspace({
         <article>
           <span>Starting conditions</span>
           <strong>
-            {scenario.range / 1000} km · Blue {scenario.altitude} m · Red{" "}
+            {formatDistanceKm(scenario.range)} km · Blue {scenario.altitude} m · Red{" "}
             {scenario.altitude + scenario.targetDelta} m · {scenario.aspect}°
           </strong>
         </article>

@@ -156,7 +156,13 @@ test("keeps data facts, model assumptions, RASP, map scope, and persistence expl
 });
 
 test("responsive workspace reserves footer space and keeps six telemetry plots inside the task surface", async () => {
-  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const [css, authoringMap] = await Promise.all([
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(
+      new URL("../components/ScenarioAuthoringMap.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
   assert.match(css, /\.builder\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\) auto/s);
   assert.match(css, /\.builder-scroll\s*\{[^}]*overflow:\s*auto/s);
   assert.match(css, /\.builder > footer\.builder-actions,[^{]*\{[^}]*position:\s*static/s);
@@ -165,4 +171,10 @@ test("responsive workspace reserves footer space and keeps six telemetry plots i
     /grid-template-rows:\s*58px minmax\(220px, 1fr\) 44px clamp\(190px, 23vh, 248px\)/,
   );
   assert.match(css, /\.telemetry-multiples\s*\{[^}]*grid-template-columns:\s*repeat\(3,/s);
+  assert.match(css, /\.scenario-authoring-map-shell\s*\{[^}]*height:\s*clamp\(/s);
+  assert.match(authoringMap, /draggable:\s*true/);
+  assert.match(authoringMap, /maxBounds/);
+  assert.match(authoringMap, /NavigationControl/);
+  assert.match(authoringMap, /authoring-routes/);
+  assert.match(authoringMap, /Waypoint rejected/);
 });

@@ -10,6 +10,12 @@ import {
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { canConduct, validateScenario } from "../lib/scenario-validation.ts";
 import { getStudyArea, getWeatherPreset } from "../lib/study-areas.ts";
+import {
+  createDefaultSpatialPlan,
+  spatialAspectDeg,
+  spatialHorizontalSeparationM,
+  withSpatialRangeM,
+} from "../lib/scenario-spatial.ts";
 
 test("standard atmosphere produces credible sea-level reference values", () => {
   const atmosphere = standardAtmosphere(0, 0);
@@ -40,6 +46,108 @@ test("both horizontal wind components reach the compiled physics environment", (
   });
   const changed = simulate({ ...scenario, windNorth: 13 });
   assert.notDeepEqual(changed.frames, result.frames);
+});
+
+test("map-authored start positions, headings, speeds and routes compile into engine state", () => {
+  const area = getStudyArea(DEFAULT_SCENARIO.studyAreaId);
+  const plan = createDefaultSpatialPlan({
+    studyArea: area,
+    rangeM: DEFAULT_SCENARIO.range,
+    blueAltitudeM: DEFAULT_SCENARIO.altitude,
+    redAltitudeM: DEFAULT_SCENARIO.altitude + DEFAULT_SCENARIO.targetDelta,
+    blueSpeedMps: DEFAULT_SCENARIO.launcherSpeed,
+    redSpeedMps: DEFAULT_SCENARIO.targetSpeed,
+    crossingAngleDeg: DEFAULT_SCENARIO.aspect,
+  });
+  assert.ok(
+    Math.abs(spatialHorizontalSeparationM(plan, area) - DEFAULT_SCENARIO.range) <
+      1,
+  );
+  assert.ok(Math.abs(spatialAspectDeg(plan, area) - DEFAULT_SCENARIO.aspect) < 0.01);
+
+  const result = simulate({ ...DEFAULT_SCENARIO, spatialPlan: plan });
+  const scenario = result.engineRun.scenario;
+  const blue = scenario.entities.find((entity) => entity.id === "blue-platform-1");
+  const red = scenario.entities.find((entity) => entity.id === "red-object-1");
+  assert.equal(blue.route.length, plan.blue.route.length);
+  assert.equal(red.route.length, plan.red.route.length);
+  assert.equal(Math.round(blue.initial.position.z), DEFAULT_SCENARIO.altitude);
+  assert.equal(
+    Math.round(red.initial.position.z),
+    DEFAULT_SCENARIO.altitude + DEFAULT_SCENARIO.targetDelta,
+  );
+  assert.equal(Math.round(Math.hypot(blue.initial.velocity.x, blue.initial.velocity.y)), DEFAULT_SCENARIO.launcherSpeed);
+  assert.equal(Math.round(Math.hypot(red.initial.velocity.x, red.initial.velocity.y)), DEFAULT_SCENARIO.targetSpeed);
+  assert.ok(Math.abs(blue.initial.velocity.y) < 1e-9);
+  assert.ok(red.initial.velocity.y > 0);
+});
+
+test("numeric distance edits and map placement share one spatial plan", () => {
+  const area = getStudyArea(DEFAULT_SCENARIO.studyAreaId);
+  const initial = createDefaultSpatialPlan({
+    studyArea: area,
+    rangeM: 52000,
+    blueAltitudeM: 8500,
+    redAltitudeM: 10000,
+    blueSpeedMps: 270,
+    redSpeedMps: 250,
+    crossingAngleDeg: 145,
+  });
+  const changed = withSpatialRangeM(initial, area, 38000);
+  assert.ok(Math.abs(spatialHorizontalSeparationM(changed, area) - 38000) < 1);
+  assert.deepEqual(changed.blue, initial.blue);
+  assert.notDeepEqual(changed.red.position, initial.red.position);
+});
+
+test("validation blocks authored points outside the preset study area", () => {
+  const definition = SCENARIO_LIBRARY.find(
+    (item) => item.id === "a2a-crossing-intercept",
+  );
+  const area = getStudyArea(definition.scenario.studyAreaId);
+  const plan = createDefaultSpatialPlan({
+    studyArea: area,
+    rangeM: definition.scenario.range,
+    blueAltitudeM: definition.scenario.altitude,
+    redAltitudeM: definition.scenario.altitude + definition.scenario.targetDelta,
+    blueSpeedMps: definition.scenario.launcherSpeed,
+    redSpeedMps: definition.scenario.targetSpeed,
+    crossingAngleDeg: definition.scenario.aspect,
+  });
+  plan.red.position.longitude = area.bounds[1][0] + 2;
+  const checks = validateScenario(definition, {
+    ...definition.scenario,
+    spatialPlan: plan,
+  });
+  assert.equal(
+    checks.find((item) => item.id === "authored-placement")?.state,
+    "error",
+  );
+  assert.equal(canConduct(checks), false);
+});
+
+test("validation blocks malformed authored headings, speeds and route origins", () => {
+  const definition = SCENARIO_LIBRARY.find(
+    (item) => item.id === "a2a-crossing-intercept",
+  );
+  const area = getStudyArea(definition.scenario.studyAreaId);
+  const plan = createDefaultSpatialPlan({
+    studyArea: area,
+    rangeM: definition.scenario.range,
+    blueAltitudeM: definition.scenario.altitude,
+    redAltitudeM: definition.scenario.altitude + definition.scenario.targetDelta,
+    blueSpeedMps: definition.scenario.launcherSpeed,
+    redSpeedMps: definition.scenario.targetSpeed,
+    crossingAngleDeg: definition.scenario.aspect,
+  });
+  plan.blue.headingDeg = 360;
+  plan.red.speedMps = -1;
+  plan.blue.route[0] = { ...plan.blue.route[0], latitude: plan.blue.route[0].latitude + 0.01 };
+  const checks = validateScenario(definition, {
+    ...definition.scenario,
+    spatialPlan: plan,
+  });
+  assert.equal(checks.find((item) => item.id === "authored-placement")?.state, "error");
+  assert.equal(canConduct(checks), false);
 });
 
 test("visual acquisition obeys the declared visibility limit", () => {

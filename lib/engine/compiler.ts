@@ -45,6 +45,14 @@ export type ScenarioCompilerInput = {
   windShiftEastMps: number;
   windShiftNorthMps: number;
   seed: number;
+  placement?: {
+    blueStart: Vec3;
+    redStart: Vec3;
+    blueHeadingRad: number;
+    redHeadingRad: number;
+    blueRoute: Vec3[];
+    redRoute: Vec3[];
+  };
 };
 
 export type CompilerProfile = {
@@ -185,6 +193,18 @@ export function compileScenario(
   const studyArea = getStudyArea(input.studyAreaId);
   const weatherPreset = getWeatherPreset(studyArea, input.weatherPresetId);
   const targetHeadingRad = ((180 - input.aspect) * Math.PI) / 180;
+  const blueStart = input.placement?.blueStart ?? {
+    x: 0,
+    y: 0,
+    z: input.altitude,
+  };
+  const redStart = input.placement?.redStart ?? {
+    x: input.range,
+    y: 0,
+    z: Math.max(0, input.altitude + input.targetDelta),
+  };
+  const blueHeadingRad = input.placement?.blueHeadingRad ?? 0;
+  const redHeadingRad = input.placement?.redHeadingRad ?? targetHeadingRad;
   const movingTarget = input.domain === "A2A" || input.domain === "G2A";
   const blueIsAircraft = blueObject.kind === "AIRCRAFT";
   const blueAircraft = blueIsAircraft
@@ -258,18 +278,28 @@ export function compileScenario(
       kind: kindMap[blueObject.kind],
       symbolRole: blueObject.symbolRole,
       lifecycle: "ACTIVE",
-      route: [
-        { x: 0, y: 0, z: input.altitude },
-        {
-          x: (blueIsAircraft ? input.launcherSpeed : 0) * 140,
-          y: 0,
-          z: input.altitude,
-        },
-      ],
+      route: input.placement?.blueRoute.length
+        ? input.placement.blueRoute.map((point) => ({ ...point }))
+        : [
+            blueStart,
+            {
+              x:
+                blueStart.x +
+                Math.cos(blueHeadingRad) *
+                  (blueIsAircraft ? input.launcherSpeed : 0) *
+                  140,
+              y:
+                blueStart.y +
+                Math.sin(blueHeadingRad) *
+                  (blueIsAircraft ? input.launcherSpeed : 0) *
+                  140,
+              z: blueStart.z,
+            },
+          ],
       initial: {
-        position: { x: 0, y: 0, z: input.altitude },
-        velocity: velocity(blueIsAircraft ? input.launcherSpeed : 0, 0),
-        headingRad: 0,
+        position: { ...blueStart },
+        velocity: velocity(blueIsAircraft ? input.launcherSpeed : 0, blueHeadingRad),
+        headingRad: blueHeadingRad,
         massKg: blueAircraft ? blueAircraft.emptyMassKg + blueFuelKg : 12000,
         fuelKg: blueFuelKg,
       },
@@ -293,29 +323,28 @@ export function compileScenario(
       kind: kindMap[redObject.kind],
       symbolRole: redObject.symbolRole,
       lifecycle: "ACTIVE",
-      route: [
-        {
-          x: input.range,
-          y: 0,
-          z: Math.max(0, input.altitude + input.targetDelta),
-        },
-        {
-          x:
-            input.range +
-            Math.cos(targetHeadingRad) * (movingTarget ? input.targetSpeed : 0) * 140,
-          y:
-            Math.sin(targetHeadingRad) * (movingTarget ? input.targetSpeed : 0) * 140,
-          z: Math.max(0, input.altitude + input.targetDelta),
-        },
-      ],
+      route: input.placement?.redRoute.length
+        ? input.placement.redRoute.map((point) => ({ ...point }))
+        : [
+            redStart,
+            {
+              x:
+                redStart.x +
+                Math.cos(redHeadingRad) *
+                  (movingTarget ? input.targetSpeed : 0) *
+                  140,
+              y:
+                redStart.y +
+                Math.sin(redHeadingRad) *
+                  (movingTarget ? input.targetSpeed : 0) *
+                  140,
+              z: redStart.z,
+            },
+          ],
       initial: {
-        position: {
-          x: input.range,
-          y: 0,
-          z: Math.max(0, input.altitude + input.targetDelta),
-        },
-        velocity: velocity(movingTarget ? input.targetSpeed : 0, targetHeadingRad),
-        headingRad: targetHeadingRad,
+        position: { ...redStart },
+        velocity: velocity(movingTarget ? input.targetSpeed : 0, redHeadingRad),
+        headingRad: redHeadingRad,
         massKg: redAircraft ? redAircraft.emptyMassKg + redFuelKg : 10000,
         fuelKg: redFuelKg,
       },

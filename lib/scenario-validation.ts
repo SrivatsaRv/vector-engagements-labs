@@ -5,6 +5,7 @@ import { getCatalogObject } from "./object-catalog.ts";
 import { ENGINE_VERSION } from "./engine/version.ts";
 import { findWeaponSimulationModel } from "./simulation-models.ts";
 import { STUDY_AREAS } from "./study-areas.ts";
+import { isPointInsideStudyArea } from "./scenario-spatial.ts";
 
 export type ValidationState = "pass" | "warning" | "error";
 export type ValidationItem = {
@@ -47,6 +48,40 @@ export function validateScenario(
         scenario.maneuver === "steady" &&
         scenario.targetG === 0
       : scenario.targetSpeed > 0;
+  const authoredPoints = scenario.spatialPlan
+    ? [
+        scenario.spatialPlan.blue.position,
+        scenario.spatialPlan.red.position,
+        ...scenario.spatialPlan.blue.route,
+        ...scenario.spatialPlan.red.route,
+      ]
+    : [];
+  const spatialEntities = scenario.spatialPlan
+    ? [scenario.spatialPlan.blue, scenario.spatialPlan.red]
+    : [];
+  const spatialPlanValid = Boolean(
+    studyArea &&
+      authoredPoints.every(
+        (point) =>
+          Number.isFinite(point.longitude) &&
+          Number.isFinite(point.latitude) &&
+          Number.isFinite(point.altitudeM) &&
+          point.altitudeM >= 0 &&
+          isPointInsideStudyArea(point, studyArea),
+      ) &&
+      spatialEntities.every(
+        (entity) =>
+          Number.isFinite(entity.headingDeg) &&
+          entity.headingDeg >= 0 &&
+          entity.headingDeg < 360 &&
+          Number.isFinite(entity.speedMps) &&
+          entity.speedMps >= 0 &&
+          entity.route.length >= 1 &&
+          Math.abs(entity.route[0].longitude - entity.position.longitude) < 1e-9 &&
+          Math.abs(entity.route[0].latitude - entity.position.latitude) < 1e-9 &&
+          Math.abs(entity.route[0].altitudeM - entity.position.altitudeM) < 1e-6,
+      ),
+  );
 
   return [
     {
@@ -80,6 +115,18 @@ export function validateScenario(
         ? `${simulationModel.id}@${simulationModel.version} · ${simulationModel.valueState.toLowerCase().replaceAll("_", " ")}. This confirms model availability, not real-world performance.`
         : `No deterministic 3DOF coefficient set is registered for ${scenario.blueSystemId}.`,
       state: simulationModel ? "pass" : "error",
+    },
+    {
+      id: "authored-placement",
+      label: scenario.spatialPlan
+        ? spatialPlanValid
+          ? "Authored positions and routes are inside the selected study area"
+          : "Authored placement or route state is invalid"
+        : "Template geometry will be compiled from the starting conditions",
+      detail: scenario.spatialPlan
+        ? `${scenario.spatialPlan.blue.route.length - 1} Blue waypoints · ${scenario.spatialPlan.red.route.length - 1} Red waypoints · headings, speeds, route origins, and preset boundary checked`
+        : "Open Place & flight to create explicit geographic start positions and declared routes.",
+      state: scenario.spatialPlan ? (spatialPlanValid ? "pass" : "error") : "pass",
     },
     {
       id: "loadout",

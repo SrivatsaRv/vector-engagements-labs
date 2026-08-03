@@ -16,6 +16,9 @@ import type {
   ProfileId,
   Vec3,
 } from "./engine/primitives.ts";
+import type { ScenarioSpatialPlan } from "./scenario-spatial.ts";
+import { geographicToLocal } from "./scenario-spatial.ts";
+import { getStudyArea } from "./study-areas.ts";
 
 export { standardAtmosphere } from "./engine/atmosphere.ts";
 export type { AtmosphereState } from "./engine/atmosphere.ts";
@@ -154,6 +157,7 @@ export type Scenario = {
   visibilityKm: number;
   humidityPercent: number;
   temperatureOffset: number;
+  spatialPlan?: ScenarioSpatialPlan;
   guidanceInterruptionAt: number | null;
   guidanceInterruptionDuration: number;
   lossIncreaseAt: number | null;
@@ -497,6 +501,29 @@ export function simulate(
   profileId: ProfileId = input.profile,
 ): SimulationResult {
   const profile = resolveProfile(input, profileId);
+  const studyArea = getStudyArea(input.studyAreaId);
+  const placement = input.spatialPlan
+    ? {
+        blueStart: geographicToLocal(
+          input.spatialPlan.blue.position,
+          studyArea.anchor,
+        ),
+        redStart: geographicToLocal(
+          input.spatialPlan.red.position,
+          studyArea.anchor,
+        ),
+        blueHeadingRad:
+          ((90 - input.spatialPlan.blue.headingDeg) * Math.PI) / 180,
+        redHeadingRad:
+          ((90 - input.spatialPlan.red.headingDeg) * Math.PI) / 180,
+        blueRoute: input.spatialPlan.blue.route.map((point) =>
+          geographicToLocal(point, studyArea.anchor),
+        ),
+        redRoute: input.spatialPlan.red.route.map((point) =>
+          geographicToLocal(point, studyArea.anchor),
+        ),
+      }
+    : undefined;
   const engineScenario = compileScenario(
     {
       id: `configured-${input.domain.toLowerCase()}`,
@@ -533,6 +560,7 @@ export function simulate(
       windShiftEastMps: input.lossIncreaseAmount,
       windShiftNorthMps: 0,
       seed: input.seed,
+      placement,
     },
     profile,
   );
