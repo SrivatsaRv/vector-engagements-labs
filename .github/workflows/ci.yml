@@ -61,7 +61,7 @@ jobs:
         run: make integration-local
       - name: Upload responsive evidence on failure
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: responsive-failure-evidence
           path: outputs/responsive
@@ -87,7 +87,7 @@ jobs:
           VECTOR_MAX_ENGINE_P95_MS: "200"
         run: make performance-local | tee performance.json
       - name: Upload benchmark evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: engine-performance
           path: performance.json
