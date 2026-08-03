@@ -53,7 +53,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
-    "@cloudflare/workers-types": "4.20260702.1",
+    "@cloudflare/workers-types": "5.20260731.1",
     "@iconify-json/game-icons": "^1.2.4",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
