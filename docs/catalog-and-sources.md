@@ -8,7 +8,7 @@ The runtime catalog lives in PostgreSQL/PostGIS and separates:
 4. `weapons` — identity, category, public guidance description, and conditional published facts.
 5. `simulation_models` — versioned coefficients and explicit value state; never presented as published specifications.
 6. `platform_weapon_compatibility` — explicit source-bearing loadout relationships.
-7. `installations` — public-reference WGS84 point geometry with a GiST index.
+7. `installations` — public-reference WGS84 point geometry with a GiST index, optional ICAO code, elevation, and runway note.
 8. `scenario_templates` — immutable ID/version packages with lifecycle status.
 9. `saved_run_snapshots` — frozen scenario, engine version, forces, environment, and report payload. A composite template-version foreign key and JSON report constraint prevent orphaned or output-free snapshots.
 
@@ -16,7 +16,9 @@ The TypeScript arrays are idempotent local seed fixtures and deterministic test 
 
 ## Fixed development fixture
 
-This slice deliberately remains **3 platforms, 8 weapons, 8 model sets, 12 public-reference installations, and 8 scenario templates**. Source enrichment updates the existing rows; it does not expand the inventory. The database verifier fails if those counts drift.
+This slice deliberately remains **3 platforms, 8 weapons, 8 model sets, 21 public-reference installations, and 8 scenario templates**. The installation catalog contains six IAF context points and all 15 PAF points present in SHIELD's `apps/backend/data/paf_orbat.json` seed. PAF coordinates are ingest-authored public-reference data, identified by `shield-paf-orbat-2026-05-19`; they are not RDDF-derived and do not represent current force disposition. The database verifier fails if the catalog count, ICAO coverage, SRID, provenance, or the Nur Khan coordinate regression drifts.
+
+PostGIS is canonical for installation geometry. Map markers, study-area origin selectors, and future KML/GeoJSON exports derive from `installations.location`; VECTOR does not maintain an independent hand-edited KML truth file. Coordinate order is longitude, latitude in EPSG:4326.
 
 The eight existing weapon identities now include public-source records for Astra Mk-I, AIM-120C-5, MICA IR, Kh-31P, SPICE 2000, Akash, the historical S-200 reference case, and BRAHMOS Block-I. Public identity, guidance class, or conditional manufacturer figures do not turn VECTOR's thrust, drag, mass, seeker, or terminal-behavior coefficients into sourced facts. Those remain separately labeled `MODEL_ASSUMPTION`.
 

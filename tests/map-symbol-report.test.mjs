@@ -16,6 +16,7 @@ import {
   TACTICAL_SYMBOL_ROLES,
 } from "../lib/tactical-symbol-library.ts";
 import { OBJECT_CATALOG } from "../lib/object-catalog.ts";
+import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import { buildReportExport } from "../lib/report-export.ts";
 import { getScenarioDefinition } from "../lib/scenarios.ts";
 import { getFrameAt, simulate } from "../lib/simulation.ts";
@@ -27,6 +28,22 @@ test("geographic conversion and coverage rings remain finite and closed", () => 
   assert.equal(ring.length, 65);
   assert.deepEqual(ring[0], ring.at(-1));
   assert.ok(ring.flat().every(Number.isFinite));
+});
+
+test("SHIELD PAF installation seed retains all validated point identities", () => {
+  const paf = PUBLIC_INSTALLATIONS.filter((item) => item.service === "PAF");
+  assert.equal(paf.length, 15);
+  assert.deepEqual(
+    paf.map((item) => item.icaoCode).sort(),
+    ["OPBW", "OPJA", "OPKC", "OPMI", "OPMR", "OPMS", "OPMU", "OPRN", "OPRQ", "OPRS", "OPSD", "OPSF", "OPSK", "OPPS", "OPSR"].sort(),
+  );
+  assert.ok(paf.every((item) => item.sourceId === "shield-paf-orbat-2026-05-19"));
+  assert.ok(paf.every((item) => Number.isFinite(item.longitude) && Number.isFinite(item.latitude)));
+  const nurKhan = paf.find((item) => item.icaoCode === "OPRN");
+  assert.deepEqual(
+    { latitude: nurKhan?.latitude, longitude: nurKhan?.longitude },
+    { latitude: 33.6167, longitude: 73.0992 },
+  );
 });
 
 test("map contract produces installations, routes, launch, tracks and vectors from one run", () => {

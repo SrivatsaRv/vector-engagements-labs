@@ -36,7 +36,7 @@ npm run dev -- --port 4317
 
 ## Runtime boundaries
 
-- PostgreSQL/PostGIS: sources, objects, compatibility, model coefficients, public-reference installations, template versions, and saved run snapshots.
+- PostgreSQL/PostGIS: sources, objects, compatibility, model coefficients, 21 public-reference installations including all 15 SHIELD-seeded PAF points, template versions, and saved run snapshots.
 - Scenario compiler: resolves builder state and catalog records into one immutable engine package.
 - Browser engine: fixed-step 3DOF/point-mass integration and event lifecycle.
 - Presentation: MapLibre, Three.js, telemetry, RASP, explanation, comparison, and report consume the same sampled frames.

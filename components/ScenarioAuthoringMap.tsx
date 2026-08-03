@@ -280,7 +280,7 @@ export function ScenarioAuthoringMap({
           const element = document.createElement("button");
           element.type = "button";
           element.className = `authoring-installation-marker ${installation.service === "IAF" ? "blue" : "red"}`;
-          element.innerHTML = `${tacticalSymbolMarkup("BASE", installation.service === "IAF" ? "BLUE" : "RED", "ACTIVE", "AIR_BASE")}<span>${installation.name}</span>`;
+          element.innerHTML = `${tacticalSymbolMarkup("BASE", installation.service === "IAF" ? "BLUE" : "RED", "ACTIVE", "AIR_BASE")}<span>${installation.name}${installation.icao_code ? ` · ${installation.icao_code}` : ""}</span>`;
           element.title = `Use ${installation.name} as ${installation.service === "IAF" ? "Blue" : "Red"} origin`;
           element.addEventListener("click", (event) => {
             event.stopPropagation();
@@ -522,7 +522,7 @@ export function ScenarioAuthoringMap({
                 <div>
                   {options.length ? options.map((installation) => (
                     <button key={installation.id} onClick={() => selectOrigin(team, installation)} type="button">
-                      {installation.name}
+                      {installation.name}{installation.icao_code ? ` · ${installation.icao_code}` : ""}
                     </button>
                   )) : <span>No {service} base in this study area. Drag the start marker instead.</span>}
                 </div>

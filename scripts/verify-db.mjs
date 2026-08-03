@@ -19,7 +19,7 @@ try {
     platforms: 3,
     weapons: 8,
     models: 8,
-    installations: 12,
+    installations: 21,
     study_areas: 6,
     scenarios: 8,
   });
@@ -30,6 +30,16 @@ try {
     FROM installations LIMIT 1`;
   assert.equal(geospatial.srid, 4326);
   assert.equal(geospatial.valid, true);
+
+  const pafInstallations = await sql`SELECT id, name, icao_code,
+      ST_Y(location) AS latitude, ST_X(location) AS longitude, source_id
+    FROM installations WHERE service='PAF' ORDER BY icao_code`;
+  assert.equal(pafInstallations.length, 15);
+  assert.ok(pafInstallations.every((item) => /^OP[A-Z]{2}$/.test(item.icao_code)));
+  assert.ok(pafInstallations.every((item) => item.source_id === 'shield-paf-orbat-2026-05-19'));
+  const nurKhan = pafInstallations.find((item) => item.icao_code === 'OPRN');
+  assert.equal(Number(nurKhan?.latitude), 33.6167);
+  assert.equal(Number(nurKhan?.longitude), 73.0992);
 
   const [studyArea] = await sql`SELECT
     ST_SRID(anchor)::int AS anchor_srid,

@@ -6,6 +6,9 @@ export type MapInstallationRecord = {
   id: string;
   service: "IAF" | "PAF";
   name: string;
+  icao_code?: string | null;
+  elevation_ft?: number | null;
+  runway_info?: string | null;
   installation_type: string;
   longitude: number;
   latitude: number;

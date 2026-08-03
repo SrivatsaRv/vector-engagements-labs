@@ -25,7 +25,7 @@ export async function GET(request: Request) {
         sql`SELECT * FROM platform_weapon_compatibility ORDER BY platform_id, weapon_id`,
         sql`SELECT * FROM source_assertions ORDER BY entity_type, entity_id, field_path`,
         sql`SELECT * FROM simulation_models ORDER BY weapon_id, version`,
-        sql`SELECT id, service, name, installation_type,
+        sql`SELECT id, service, name, icao_code, elevation_ft, runway_info, installation_type,
               ST_X(location) AS longitude, ST_Y(location) AS latitude,
               public_reference, source_id
             FROM installations ORDER BY service, name`,

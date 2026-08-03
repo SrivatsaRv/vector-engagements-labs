@@ -21,7 +21,7 @@ try {
     for (const source of [
       ...SOURCES,
       { id: "iaf-stations-wikipedia", title: "List of Indian Air Force stations", publisher: "Wikipedia contributors", url: "https://en.wikipedia.org/wiki/List_of_Indian_Air_Force_stations", sourceClass: "SECONDARY" as const, note: "Public-reference coordinates; individual entries require source review." },
-      { id: "paf-bases-wikipedia", title: "List of Pakistan Air Force bases", publisher: "Wikipedia contributors", url: "https://en.wikipedia.org/wiki/List_of_Pakistan_Air_Force_bases", sourceClass: "SECONDARY" as const, note: "Public-reference coordinates; individual entries require source review." },
+      { id: "shield-paf-orbat-2026-05-19", title: "SHIELD Pakistan Air Force ORBAT seed", publisher: "Reach Defence SHIELD", url: "urn:shield:data:paf_orbat.json", sourceClass: "USER" as const, note: "Operator-supplied, public-reference PAF installation coordinates and attributes compiled from the source-intelligence statement embedded in paf_orbat.json; validated 2026-05-19." },
     ]) {
       await tx`INSERT INTO sources (id,title,publisher,url,published_at,source_class,notes)
         VALUES (${source.id},${source.title},${source.publisher},${source.url},${"publishedAt" in source ? source.publishedAt ?? null : null},${source.sourceClass},${source.note})
@@ -76,10 +76,12 @@ try {
         ON CONFLICT (id) DO UPDATE SET weapon_id=EXCLUDED.weapon_id,version=EXCLUDED.version,domains=EXCLUDED.domains,propulsion_kind=EXCLUDED.propulsion_kind,launch_mass_kg=EXCLUDED.launch_mass_kg,dry_mass_kg=EXCLUDED.dry_mass_kg,powered_flight_seconds=EXCLUDED.powered_flight_seconds,thrust_newtons=EXCLUDED.thrust_newtons,thrust_taper_speed_mps=EXCLUDED.thrust_taper_speed_mps,reference_area_m2=EXCLUDED.reference_area_m2,drag_coefficient=EXCLUDED.drag_coefficient,navigation_constant=EXCLUDED.navigation_constant,maximum_command_g=EXCLUDED.maximum_command_g,seeker_activation_range_m=EXCLUDED.seeker_activation_range_m,datalink_update_seconds=EXCLUDED.datalink_update_seconds,value_state=EXCLUDED.value_state,rationale=EXCLUDED.rationale`;
     }
     for (const item of PUBLIC_INSTALLATIONS) {
-      await tx`INSERT INTO installations (id,service,name,installation_type,location,public_reference,source_id)
-        VALUES (${item.id},${item.service},${item.name},${item.type},ST_SetSRID(ST_MakePoint(${item.longitude},${item.latitude}),4326),true,${item.sourceId})
-        ON CONFLICT (id) DO UPDATE SET service=EXCLUDED.service,name=EXCLUDED.name,installation_type=EXCLUDED.installation_type,location=EXCLUDED.location,public_reference=EXCLUDED.public_reference,source_id=EXCLUDED.source_id`;
+      await tx`INSERT INTO installations (id,service,name,icao_code,elevation_ft,runway_info,installation_type,location,public_reference,source_id)
+        VALUES (${item.id},${item.service},${item.name},${item.icaoCode ?? null},${item.elevationFt ?? null},${item.runwayInfo ?? null},${item.type},ST_SetSRID(ST_MakePoint(${item.longitude},${item.latitude}),4326),true,${item.sourceId})
+        ON CONFLICT (id) DO UPDATE SET service=EXCLUDED.service,name=EXCLUDED.name,icao_code=EXCLUDED.icao_code,elevation_ft=EXCLUDED.elevation_ft,runway_info=EXCLUDED.runway_info,installation_type=EXCLUDED.installation_type,location=EXCLUDED.location,public_reference=EXCLUDED.public_reference,source_id=EXCLUDED.source_id`;
     }
+    const pafInstallationIds = PUBLIC_INSTALLATIONS.filter((item) => item.service === "PAF").map((item) => item.id);
+    await tx`DELETE FROM installations WHERE service='PAF' AND id NOT IN ${tx(pafInstallationIds)}`;
     for (const area of STUDY_AREAS) {
       const [[west, south], [east, north]] = area.bounds;
       await tx`INSERT INTO study_areas

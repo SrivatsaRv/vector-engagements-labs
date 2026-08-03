@@ -168,8 +168,10 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           const affiliation = installation.service === "IAF" ? "BLUE" : "RED";
           element.innerHTML = `${tacticalSymbolMarkup("BASE", affiliation, "ACTIVE", "AIR_BASE")}<span></span>`;
           const label = element.querySelector("span");
-          if (label) label.textContent = installation.name;
-          element.title = `${installation.service} public-reference station · ${installation.name}`;
+          if (label) label.textContent = installation.icao_code
+            ? `${installation.name} · ${installation.icao_code}`
+            : installation.name;
+          element.title = `${installation.service} public-reference station · ${installation.name}${installation.icao_code ? ` · ${installation.icao_code}` : ""}`;
           const marker = new maplibregl.Marker({ element, anchor: "center" })
             .setLngLat([installation.longitude, installation.latitude])
             .addTo(map);
