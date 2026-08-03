@@ -6,15 +6,19 @@ import type { RaspTrack, SimulationResult } from "@/lib/simulation";
 import { getFrameAt } from "@/lib/simulation";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
 import { emitBrowserTelemetry } from "@/lib/observability/client";
+import {
+  buildCoverageFeatures,
+  buildDeclaredRouteFeatures,
+  buildDirectionVectorFeatures,
+  buildInstallationFeatures,
+  buildLaunchFeatures,
+  buildTrackFeatures,
+  circlePolygon,
+  localToLngLat,
+  type MapInstallationRecord,
+} from "@/lib/map-layer-contracts";
 
-export type MapInstallation = {
-  id: string;
-  service: "IAF" | "PAF";
-  name: string;
-  installation_type: string;
-  longitude: number;
-  latitude: number;
-};
+export type MapInstallation = MapInstallationRecord;
 
 type Props = {
   result: SimulationResult;
@@ -36,27 +40,6 @@ const minimalStyle = {
   },
   layers: [{ id: "carto", type: "raster" as const, source: "carto" }],
 };
-type MapOrigin = { longitude: number; latitude: number };
-
-function localToLngLat(position: { x: number; y: number }, origin: MapOrigin) {
-  const latitude = origin.latitude + position.y / 111320;
-  const longitude =
-    origin.longitude +
-    position.x / (111320 * Math.cos((origin.latitude * Math.PI) / 180));
-  return [longitude, latitude] as [number, number];
-}
-
-function circlePolygon(center: [number, number], radiusM: number) {
-  const [longitude, latitude] = center;
-  const points = Array.from({ length: 65 }, (_, index) => {
-    const angle = (index / 64) * Math.PI * 2;
-    const north = Math.sin(angle) * radiusM;
-    const east = Math.cos(angle) * radiusM;
-    return localToLngLat({ x: east, y: north }, { longitude, latitude });
-  });
-  return [points];
-}
-
 export function EngagementMap({ result, time, installations, raspTrack }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
@@ -129,11 +112,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           type: "geojson",
           data: {
             type: "FeatureCollection",
-            features: installations.map((item) => ({
-              type: "Feature" as const,
-              properties: { name: item.name, service: item.service },
-              geometry: { type: "Point" as const, coordinates: [item.longitude, item.latitude] },
-            })),
+            features: buildInstallationFeatures(installations),
           },
         });
         for (const installation of installations) {
@@ -214,16 +193,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           type: "geojson",
           data: {
             type: "FeatureCollection",
-            features: result.engineRun.scenario.entities
-              .filter((entity) => entity.route && entity.route.length > 1)
-              .map((entity) => ({
-                type: "Feature" as const,
-                properties: { affiliation: entity.affiliation, kind: entity.kind },
-                geometry: {
-                  type: "LineString" as const,
-                  coordinates: entity.route!.map((point) => localToLngLat(point, origin)),
-                },
-              })),
+            features: buildDeclaredRouteFeatures(result, origin),
           },
         });
         map.addLayer({
@@ -264,38 +234,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
             "line-width": 2,
           },
         });
-        const launchFeatures = result.engineRun.scenario.entities
-          .filter(
-            (entity) =>
-              Boolean(entity.weapon) && entity.weapon!.launchTimeSeconds !== null,
-          )
-          .map((entity) => {
-            const launchTime = entity.weapon?.launchTimeSeconds ?? 0;
-            const frame = result.frames.reduce((closest, candidate) =>
-              Math.abs(candidate.t - launchTime) < Math.abs(closest.t - launchTime)
-                ? candidate
-                : closest,
-            );
-            const launched = frame.entities.find((candidate) => candidate.id === entity.id);
-            const platform = frame.entities.find(
-              (candidate) => candidate.id === entity.weapon?.launchPlatformId,
-            );
-            return {
-              type: "Feature" as const,
-              properties: {
-                label: `${entity.designation} launch`,
-                affiliation: entity.affiliation,
-                modelTime: launchTime,
-              },
-              geometry: {
-                type: "Point" as const,
-                coordinates: localToLngLat(
-                  launched?.position ?? platform?.position ?? entity.initial.position,
-                  origin,
-                ),
-              },
-            };
-          });
+        const launchFeatures = buildLaunchFeatures(result, origin);
         map.addSource("launch-events", {
           type: "geojson",
           data: { type: "FeatureCollection", features: launchFeatures },
@@ -443,77 +382,23 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
       const source = map.getSource("entity-tracks") as import("maplibre-gl").GeoJSONSource | undefined;
       source?.setData({
         type: "FeatureCollection",
-        features: frame.entities
-          .filter((entity) => raspTrack?.observedEntityId !== entity.id)
-          .map((entity) => ({
-          type: "Feature" as const,
-          properties: { affiliation: entity.affiliation, kind: entity.kind },
-          geometry: {
-            type: "LineString" as const,
-            coordinates: result.frames
-              .filter((sample) => sample.t <= time)
-              .map((sample) => sample.entities.find((item) => item.id === entity.id))
-              .filter((item) => item && item.lifecycle !== "STOWED")
-              .map((item) => localToLngLat(item!.position, origin)),
-          },
-        })),
+        features: buildTrackFeatures(
+          result,
+          frame,
+          time,
+          origin,
+          raspTrack?.observedEntityId,
+        ),
       });
       const vectors = map.getSource("direction-vectors") as import("maplibre-gl").GeoJSONSource | undefined;
       vectors?.setData({
         type: "FeatureCollection",
-        features: frame.entities
-          .filter((entity) => entity.lifecycle !== "STOWED")
-          .map((entity) => {
-            const lengthSeconds = entity.kind === "GUIDED_WEAPON" ? 5 : 12;
-            return {
-              type: "Feature" as const,
-              properties: { affiliation: entity.affiliation, kind: entity.kind },
-              geometry: {
-                type: "LineString" as const,
-                coordinates: [
-                  localToLngLat(entity.position, origin),
-                  localToLngLat(
-                    {
-                      x: entity.position.x + entity.velocity.x * lengthSeconds,
-                      y: entity.position.y + entity.velocity.y * lengthSeconds,
-                    },
-                    origin,
-                  ),
-                ],
-              },
-            };
-          }),
+        features: buildDirectionVectorFeatures(frame, origin),
       });
       const coverage = map.getSource("coverage-envelopes") as import("maplibre-gl").GeoJSONSource | undefined;
       coverage?.setData({
         type: "FeatureCollection",
-        features: result.envelopes
-          .filter((envelope) => envelope.radiusM > 0)
-          .flatMap((envelope) => {
-            const owner = frame.entities.find(
-              (entity) => entity.id === envelope.entityId,
-            );
-            if (!owner || owner.lifecycle === "STOWED") return [];
-            return [{
-              type: "Feature" as const,
-              properties: {
-                id: envelope.id,
-                kind: envelope.kind,
-                affiliation: envelope.affiliation,
-                label: envelope.label,
-                minimumAltitudeM: envelope.minimumAltitudeM,
-                maximumAltitudeM: envelope.maximumAltitudeM,
-                valueState: envelope.valueState,
-              },
-              geometry: {
-                type: "Polygon" as const,
-                coordinates: circlePolygon(
-                  localToLngLat(owner.position, origin),
-                  envelope.radiusM,
-                ),
-              },
-            }];
-          }),
+        features: buildCoverageFeatures(result, frame, origin),
       });
       const launchFilter: import("maplibre-gl").FilterSpecification = [
         "<=",

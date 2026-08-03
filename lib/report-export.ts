@@ -1,7 +1,7 @@
-import type { Scenario, SimulationResult } from "@/lib/simulation";
-import { findPlatform, findWeapon, getSource } from "@/lib/capability-data";
-import { getCatalogObject } from "@/lib/object-catalog";
-import { findWeaponSimulationModel } from "@/lib/simulation-models";
+import type { Scenario, SimulationResult } from "./simulation.ts";
+import { findPlatform, findWeapon, getSource } from "./capability-data.ts";
+import { getCatalogObject } from "./object-catalog.ts";
+import { findWeaponSimulationModel } from "./simulation-models.ts";
 
 export type ReportLibraryScenario = {
   id: string;

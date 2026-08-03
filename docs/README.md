@@ -20,6 +20,8 @@ The portable replay and debriefing artifact is specified in [`vector-simulation-
 
 The air-picture source dependencies, effect scope, transitions, and automated regression matrix are specified in [`rasp-state-machine.md`](rasp-state-machine.md).
 
+The release proof across engine, map, symbols, reports, persistence, observability, and responsive breakpoints is specified in [`regression-matrix.md`](regression-matrix.md).
+
 ## Working vertical slice
 
 - Eight versioned A2A, A2G, G2A, and G2G templates, with regression-tested successful baselines.

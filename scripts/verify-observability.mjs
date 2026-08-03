@@ -43,6 +43,10 @@ for (const event of [
     modelSeconds: 110.3,
     entityCount: 4,
   },
+  { type: "map_loaded", basemap: "MINIMAL", durationMs: 84 },
+  { type: "report_saved", domain: "A2A" },
+  { type: "browser_long_task", durationMs: 72 },
+  { type: "browser_navigation", durationMs: 135 },
 ]) {
   const response = await fetch(`${vectorUrl}/api/telemetry`, {
     method: "POST",
@@ -77,6 +81,14 @@ const active = await query("sum(vector_scenario_runs_active)");
 assert.equal(Number(active.data.result[0]?.value[1] ?? 0), 0);
 const unmatched = await query("clamp_min((sum(increase(vector_scenario_runs_started_total[15m])) or vector(0)) - (sum(increase(vector_scenario_runs_completed_total[15m])) or vector(0)) - (sum(increase(vector_scenario_runs_failed_total[15m])) or vector(0)), 0)");
 assert.equal(Number(unmatched.data.result[0]?.value[1] ?? 0), 0);
+const mapLoads = await query('sum(vector_map_loads_total{outcome="loaded"})');
+assert.ok(Number(mapLoads.data.result[0]?.value[1]) >= 1);
+const reports = await query('sum(vector_reports_total{outcome="saved"})');
+assert.ok(Number(reports.data.result[0]?.value[1]) >= 1);
+const longTasks = await query("sum(vector_browser_long_task_duration_seconds_count)");
+assert.ok(Number(longTasks.data.result[0]?.value[1]) >= 1);
+const navigations = await query("sum(vector_browser_navigation_duration_seconds_count)");
+assert.ok(Number(navigations.data.result[0]?.value[1]) >= 1);
 
 const dashboards = await fetch(`${grafanaUrl}/api/search?type=dash-db`, {
   headers: { authorization: grafanaAuthorization },
@@ -94,6 +106,15 @@ const operationPanelTitles = new Set(
 assert.ok(operationPanelTitles.has("Runs missing a completion event · 15m"));
 assert.ok(operationPanelTitles.has("Browser runs slower than 250 ms · 1h"));
 assert.ok(operationPanelTitles.has("Mean declared entities per run"));
+
+const browserDashboard = await fetch(`${grafanaUrl}/api/dashboards/uid/vector-browser-performance`, {
+  headers: { authorization: grafanaAuthorization },
+}).then((response) => response.json());
+const browserPanelTitles = new Set(
+  browserDashboard.dashboard.panels.map((panel) => panel.title),
+);
+assert.ok(browserPanelTitles.has("Browser responsiveness"));
+assert.ok(browserPanelTitles.has("Map and telemetry outcomes"));
 
 const datasources = await fetch(`${grafanaUrl}/api/datasources`, {
   headers: { authorization: grafanaAuthorization },
