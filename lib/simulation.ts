@@ -32,12 +32,87 @@ export type TrackSource =
   | "DATALINK"
   | "AIRBORNE_EARLY_WARNING"
   | "VISUAL";
+export type RaspAvailabilityReason =
+  | "AVAILABLE"
+  | "NO_OBSERVED_ENTITY"
+  | "RADAR_SILENT"
+  | "RADAR_OUT_OF_RANGE"
+  | "DATALINK_UNAVAILABLE"
+  | "BEYOND_VISUAL_RANGE";
 export type TacticalDecision =
   | "PRESS"
   | "SUPPORT_WEAPON"
   | "CRANK"
   | "DEFEND"
   | "DISENGAGE";
+
+export const RASP_SOURCE_CONTRACTS: Record<
+  TrackSource,
+  {
+    label: string;
+    requirement: string;
+    pictureEffect: string;
+    physicsEffect: string;
+    limitation?: string;
+  }
+> = {
+  ONBOARD_RADAR: {
+    label: "Onboard radar",
+    requirement: "The observing aircraft radar must be active and the opposing aircraft must be within the 120 km educational sensor boundary.",
+    pictureEffect: "Creates or removes the opposing-aircraft track and changes its quality and uncertainty.",
+    physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
+  },
+  DATALINK: {
+    label: "Data link",
+    requirement: "The observing side's tactical data link must be available.",
+    pictureEffect: "Injects an off-board opposing-aircraft track into that side's RASP.",
+    physicsEffect: "RASP only. The separate Blue Team decision controls weapon-update cadence.",
+  },
+  AIRBORNE_EARLY_WARNING: {
+    label: "Airborne early warning",
+    requirement: "The observing side's tactical data link must be available.",
+    pictureEffect: "Injects a higher-quality off-board opposing-aircraft track into that side's RASP.",
+    physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
+    limitation: "No AEW aircraft or sensor-volume entity is spawned yet; this is a declared external track source.",
+  },
+  VISUAL: {
+    label: "Visual contact",
+    requirement: "The opposing aircraft must be inside the selected weather preset's visibility distance, capped at 18 km.",
+    pictureEffect: "Creates a short-range visual track without requiring radar or data link.",
+    physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
+  },
+};
+
+export const TACTICAL_DECISION_CONTRACTS: Record<
+  TacticalDecision,
+  { label: string; blueEffect: string; redEffect: string }
+> = {
+  PRESS: {
+    label: "Continue toward target",
+    blueEffect: "Blue holds its initial course and gives the weapon the most frequent modeled updates.",
+    redEffect: "Red holds a low maneuver demand while continuing its initial flight path.",
+  },
+  SUPPORT_WEAPON: {
+    label: "Support the weapon",
+    blueEffect: "Blue holds its initial course and maintains the baseline weapon-update cadence.",
+    redEffect: "Not offered to Red in this scenario configuration.",
+  },
+  CRANK: {
+    label: "Turn while supporting",
+    blueEffect: "Blue commands a 2.5 g turn and reduces the modeled weapon-update cadence.",
+    redEffect: "Red commands 70% of the selected target maneuver demand.",
+  },
+  DEFEND: {
+    label: "Defend",
+    blueEffect: "Blue commands a 5 g turn and substantially reduces the modeled weapon-update cadence.",
+    redEffect: "Red commands the full selected target maneuver demand.",
+  },
+  DISENGAGE: {
+    label: "Disengage",
+    blueEffect: "Blue turns away at the declared model demand and stops modeled mid-course updates.",
+    redEffect: "Red commands 55% of the selected target maneuver demand while turning away.",
+  },
+};
 
 export type Scenario = {
   domain: EngagementDomain;
@@ -123,6 +198,9 @@ export type RaspTrack = {
   observedEntityId: string;
   visible: boolean;
   status: "TRACKING" | "DEGRADED" | "COASTING" | "NO_TRACK";
+  availabilityReason: RaspAvailabilityReason;
+  effectScope: "AIR_PICTURE_ONLY" | "AIR_PICTURE_AND_GUIDANCE_EVENT";
+  stateExplanation: string;
 };
 
 export type TerminationCode =
@@ -543,17 +621,77 @@ export function explainResult(scenario: Scenario, result: SimulationResult) {
   return `The run reached its model-time limit before the 180 m completion threshold. Review distance, flight path, and wind assumptions.`;
 }
 
+export function evaluateRaspSourceAvailability(
+  scenario: Scenario,
+  frame: Frame,
+  perspective: "IAF" | "PAF",
+): { available: boolean; reason: RaspAvailabilityReason; explanation: string } {
+  const isBlue = perspective === "IAF";
+  const radarMode = isBlue ? scenario.blueRadarMode : scenario.redRadarMode;
+  const trackSource = isBlue ? scenario.blueTrackSource : scenario.redTrackSource;
+  const datalink = isBlue ? scenario.blueDatalink : scenario.redDatalink;
+  const observedEntityId = isBlue ? "red-object-1" : "blue-platform-1";
+  const observedEntity = frame.entities.find((entity) => entity.id === observedEntityId);
+  if (!observedEntity) {
+    return {
+      available: false,
+      reason: "NO_OBSERVED_ENTITY",
+      explanation: "The opposing aircraft is not present in this engine frame.",
+    };
+  }
+  const rangeKm = frame.range / 1000;
+  if (trackSource === "ONBOARD_RADAR") {
+    if (radarMode !== "ACTIVE") {
+      return {
+        available: false,
+        reason: "RADAR_SILENT",
+        explanation: "The selected onboard radar is silent.",
+      };
+    }
+    if (rangeKm > 120) {
+      return {
+        available: false,
+        reason: "RADAR_OUT_OF_RANGE",
+        explanation: "The opposing aircraft is outside the current 120 km educational radar boundary.",
+      };
+    }
+  }
+  if (
+    (trackSource === "DATALINK" || trackSource === "AIRBORNE_EARLY_WARNING") &&
+    !datalink
+  ) {
+    return {
+      available: false,
+      reason: "DATALINK_UNAVAILABLE",
+      explanation: "The selected off-board track cannot enter the air picture because the tactical data link is unavailable.",
+    };
+  }
+  if (
+    trackSource === "VISUAL" &&
+    rangeKm > Math.min(18, scenario.visibilityKm)
+  ) {
+    return {
+      available: false,
+      reason: "BEYOND_VISUAL_RANGE",
+      explanation: `The opposing aircraft is beyond the ${Math.min(18, scenario.visibilityKm).toFixed(0)} km visual-acquisition boundary for this run.`,
+    };
+  }
+  return {
+    available: true,
+    reason: "AVAILABLE",
+    explanation: RASP_SOURCE_CONTRACTS[trackSource].pictureEffect,
+  };
+}
+
 export function buildRaspTrack(
   scenario: Scenario,
   frame: Frame,
   perspective: "IAF" | "PAF",
 ): RaspTrack {
   const isBlue = perspective === "IAF";
-  const radarMode = isBlue ? scenario.blueRadarMode : scenario.redRadarMode;
   const trackSource = isBlue
     ? scenario.blueTrackSource
     : scenario.redTrackSource;
-  const datalink = isBlue ? scenario.blueDatalink : scenario.redDatalink;
   const opposingJammer = isBlue ? scenario.redJammer : scenario.blueJammer;
   // Each national RASP presents its estimate of the opposing aircraft track.
   // Guided weapons remain separate lifecycle entities and can be added later as
@@ -568,13 +706,12 @@ export function buildRaspTrack(
     AIRBORNE_EARLY_WARNING: 90,
     VISUAL: 72,
   };
-  const sourceAvailable =
-    observedEntity !== undefined &&
-    (trackSource === "ONBOARD_RADAR"
-      ? radarMode === "ACTIVE" && rangeKm <= 120
-      : trackSource === "DATALINK" || trackSource === "AIRBORNE_EARLY_WARNING"
-        ? datalink
-      : rangeKm <= Math.min(18, scenario.visibilityKm));
+  const availability = evaluateRaspSourceAvailability(
+    scenario,
+    frame,
+    perspective,
+  );
+  const sourceAvailable = availability.available;
   let confidence = sourceBase[trackSource];
   if (!sourceAvailable) confidence = 0;
   confidence -= Math.max(0, rangeKm - 25) * 0.32;
@@ -637,6 +774,14 @@ export function buildRaspTrack(
     observedEntityId,
     visible: sourceAvailable,
     status,
+    availabilityReason: availability.reason,
+    effectScope:
+      interrupted && isBlue
+        ? "AIR_PICTURE_AND_GUIDANCE_EVENT"
+        : "AIR_PICTURE_ONLY",
+    stateExplanation: opposingJammer && sourceAvailable
+      ? `${availability.explanation} Opposing jamming reduces the VECTOR track-quality index by 17 points.`
+      : availability.explanation,
   };
 }
 

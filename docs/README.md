@@ -18,6 +18,8 @@ The mandatory analysis-display contract is documented in [`tacview-visual-subset
 
 The portable replay and debriefing artifact is specified in [`vector-simulation-record.md`](vector-simulation-record.md). It is the browser-oriented VECTOR equivalent of an ACMI recording and is deliberately independent of the TypeScript or Rust/WASM engine backend.
 
+The air-picture source dependencies, effect scope, transitions, and automated regression matrix are specified in [`rasp-state-machine.md`](rasp-state-machine.md).
+
 ## Working vertical slice
 
 - Eight versioned A2A, A2G, G2A, and G2G templates, with regression-tested successful baselines.

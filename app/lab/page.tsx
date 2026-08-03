@@ -70,6 +70,8 @@ import {
   type StoredScenarioPackage,
 } from "@/lib/scenario-package";
 import {
+  RASP_SOURCE_CONTRACTS,
+  TACTICAL_DECISION_CONTRACTS,
   buildRaspTrack,
   explainResult,
   getFrameAt,
@@ -1627,11 +1629,41 @@ function ConfigureWorkspace({
                   />
                 </div>
                 <p className="model-effect-note">
-                  Current model effect: the Blue decision changes mid-course
-                  guidance-update cadence; the Red decision changes how much of
-                  the selected turn demand is commanded. Radar, data link, and
-                  jammer controls change the two RASP views.
+                  Scope: source, radar, data-link, and jammer controls change the
+                  two air-picture views. Team decisions change the simulated
+                  aircraft and weapon behavior.
                 </p>
+                <div className="rasp-effect-grid" aria-label="Current control effects">
+                  {([
+                    ["IAF view of Red", scenario.blueTrackSource, scenario.blueRadarMode, scenario.blueDatalink, scenario.redJammer],
+                    ["PAF view of Blue", scenario.redTrackSource, scenario.redRadarMode, scenario.redDatalink, scenario.blueJammer],
+                  ] as const).map(([title, source, radarMode, datalink, opposingJammer]) => {
+                    const contract = RASP_SOURCE_CONTRACTS[source];
+                    const unavailable =
+                      (source === "ONBOARD_RADAR" && radarMode === "SILENT") ||
+                      ((source === "DATALINK" || source === "AIRBORNE_EARLY_WARNING") && !datalink);
+                    return (
+                      <article key={title} className={unavailable ? "unavailable" : "available"}>
+                        <span>{title}</span>
+                        <strong>{contract.label} · {unavailable ? "unavailable at start" : "available at start"}</strong>
+                        <p>{contract.requirement}</p>
+                        <p><b>Run display:</b> select this RASP above the map or 3D view to see the estimated marker, track state, age, and uncertainty.</p>
+                        {opposingJammer && <em>Opposing jammer reduces the displayed track-quality index.</em>}
+                        {contract.limitation && <em>{contract.limitation}</em>}
+                      </article>
+                    );
+                  })}
+                </div>
+                <div className="decision-effect-grid" aria-label="Selected decision effects">
+                  <article>
+                    <span>Blue Team engine effect</span>
+                    <p>{TACTICAL_DECISION_CONTRACTS[scenario.blueDecision].blueEffect}</p>
+                  </article>
+                  <article>
+                    <span>Red Team engine effect</span>
+                    <p>{TACTICAL_DECISION_CONTRACTS[scenario.redDecision].redEffect}</p>
+                  </article>
+                </div>
               </div>
             )}
             <Range
@@ -2363,11 +2395,19 @@ function RaspPanel({ track }: { track: RaspTrack }) {
         <dd>{track.ageSeconds.toFixed(1)} s</dd>
         <dt>Position uncertainty</dt>
         <dd>±{track.uncertaintyMeters} m</dd>
+        <dt>State reason</dt>
+        <dd>{track.availabilityReason.replaceAll("_", " ").toLowerCase()}</dd>
+        <dt>Effect scope</dt>
+        <dd>
+          {track.effectScope === "AIR_PICTURE_ONLY"
+            ? "Air picture only"
+            : "Air picture and guidance event"}
+        </dd>
       </dl>
       <p>
-        {track.visible
-          ? "This is the side’s estimated air picture, not model truth. The amber ring shows positional uncertainty."
-          : "No usable track is available from the selected source in the current geometry. Model Truth remains unchanged."}
+        {track.stateExplanation} {track.visible
+          ? "The amber ring shows positional uncertainty; Model Truth remains separate."
+          : "Model Truth remains unchanged."}
       </p>
     </section>
   );

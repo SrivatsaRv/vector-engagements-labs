@@ -3,6 +3,7 @@ import { ArrowRight, BookOpen, Calculator, CircleAlert } from "lucide-react";
 import { ProductHeader } from "@/components/ProductHeader";
 import { ENGINE_VERSION } from "@/lib/engine/version";
 import { SCENARIO_PACKAGE_SCHEMA_VERSION } from "@/lib/scenario-package";
+import { RASP_SOURCE_CONTRACTS } from "@/lib/simulation";
 
 const equations = [
   {
@@ -132,6 +133,12 @@ const visualLayers = [
   ["Telemetry", "Recorded value or formula fallback", "The label identifies the entity, unit, value state and current model time"],
 ];
 
+const raspSourceRows = Object.values(RASP_SOURCE_CONTRACTS).map((source) => [
+  source.label,
+  source.requirement,
+  `${source.pictureEffect} ${source.physicsEffect}${source.limitation ? ` ${source.limitation}` : ""}`,
+]);
+
 export default function MathPage() {
   return (
     <main className="math-page">
@@ -182,6 +189,22 @@ export default function MathPage() {
             )}
           </article>
         ))}
+      </section>
+      <section className="math-layer-contract" aria-labelledby="rasp-contract-title">
+        <header>
+          <span>AIR-PICTURE STATE CONTRACT</span>
+          <h2 id="rasp-contract-title">What each RASP source actually does</h2>
+          <p>These are observer-picture inputs, not interchangeable sensor physics. The selected source must satisfy its dependency before VECTOR displays an opposing-aircraft track.</p>
+        </header>
+        <div role="table" aria-label="RASP source state matrix">
+          {raspSourceRows.map(([source, requirement, effect]) => (
+            <article role="row" key={source}>
+              <strong role="cell">{source}</strong>
+              <span role="cell">{requirement}</span>
+              <p role="cell">{effect}</p>
+            </article>
+          ))}
+        </div>
       </section>
       <section className="math-layer-contract" aria-labelledby="layer-contract-title">
         <header>
