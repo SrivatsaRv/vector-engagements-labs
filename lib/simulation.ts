@@ -1,10 +1,11 @@
 import { compileScenario } from "./engine/compiler.ts";
-import { runEngine } from "./engine/core.ts";
+import { runEngineBackend } from "./engine/backend.ts";
 import {
   standardAtmosphere,
 } from "./engine/atmosphere.ts";
 import type {
   CoverageEnvelope,
+  EngineBackendId,
   EngineEntityDefinition,
   EngineEntityFrame,
   EngineRun,
@@ -118,6 +119,7 @@ export const TACTICAL_DECISION_CONTRACTS: Record<
 };
 
 export type Scenario = {
+  engineBackend: EngineBackendId;
   domain: EngagementDomain;
   name: string;
   objective: string;
@@ -405,6 +407,7 @@ export const getProfile = (
 ) => resolveProfile(scenario, id);
 
 export const DEFAULT_SCENARIO: Scenario = {
+  engineBackend: "rust-wasm",
   domain: "A2A",
   name: "Crossing-air-target intercept",
   objective:
@@ -564,7 +567,7 @@ export function simulate(
     },
     profile,
   );
-  const engineRun = runEngine(engineScenario);
+  const engineRun = runEngineBackend(engineScenario, input.engineBackend);
   const frames: Frame[] = engineRun.frames.map((engineFrame) => {
     const weapon = engineFrame.entities.find(
       (entity) => entity.id === engineRun.primaryWeaponId,

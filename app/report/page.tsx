@@ -27,9 +27,14 @@ import { getStudyArea, getWeatherPreset } from "@/lib/study-areas";
 type ActionState = "idle" | "preparing" | "done" | "error";
 type PrintState = "idle" | "preparing" | "printing";
 
+const fallbackScenario = {
+  ...DEFAULT_SCENARIO_DEFINITION.scenario,
+  engineBackend: "typescript" as const,
+};
+
 const fallback: ReportData = {
-  scenario: DEFAULT_SCENARIO_DEFINITION.scenario,
-  result: simulate(DEFAULT_SCENARIO_DEFINITION.scenario),
+  scenario: fallbackScenario,
+  result: simulate(fallbackScenario),
   events: [
     {
       id: 1,
@@ -452,7 +457,7 @@ export default function ReportPage() {
                   <dl>
                     <dt>Objective state</dt>
                     <dd>{scenario.targetSpeed === 0 ? "fixed" : "moving"}</dd>
-                    <dt>East–west wind</dt>
+                    <dt>Eastward wind velocity</dt>
                     <dd>{scenario.wind} m/s</dd>
                     <dt>Guidance interruption</dt>
                     <dd>
@@ -534,6 +539,12 @@ export default function ReportPage() {
                   </dd>
                   <dt>Engine</dt>
                   <dd>{data.engine}</dd>
+                  <dt>Execution backend</dt>
+                  <dd>
+                    {result.engineRun.diagnostics.backend === "rust-wasm"
+                      ? "Rust / WebAssembly"
+                      : "TypeScript reference"}
+                  </dd>
                   <dt>Scenario package</dt>
                   <dd>
                     {data.packageProvenance

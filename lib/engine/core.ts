@@ -431,6 +431,7 @@ export function runEngine(scenario: EngineScenario): EngineRun {
       closestApproachM: Number.POSITIVE_INFINITY,
       peakCommandG: 0,
       diagnostics: {
+        backend: "typescript",
         fixedStepSeconds: scenario.fixedStepSeconds,
         integratedSteps: 0,
         nonFiniteStateCount: 0,
@@ -532,6 +533,7 @@ export function runEngine(scenario: EngineScenario): EngineRun {
     closestApproachM,
     peakCommandG,
     diagnostics: {
+      backend: "typescript",
       fixedStepSeconds: scenario.fixedStepSeconds,
       integratedSteps,
       nonFiniteStateCount,

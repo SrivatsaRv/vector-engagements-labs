@@ -30,6 +30,7 @@ export type TacticalSymbolRole =
   | "FIXED_OBJECTIVE";
 
 export type Affiliation = "BLUE" | "RED" | "NEUTRAL";
+export type EngineBackendId = "typescript" | "rust-wasm";
 export type EntityLifecycle =
   | "STOWED"
   | "ACTIVE"
@@ -206,6 +207,7 @@ export type EngineRun = {
   closestApproachM: number;
   peakCommandG: number;
   diagnostics: {
+    backend: EngineBackendId;
     fixedStepSeconds: number;
     integratedSteps: number;
     nonFiniteStateCount: number;

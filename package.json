@@ -20,7 +20,11 @@
     "observability:verify": "node scripts/verify-observability.mjs",
     "performance:verify": "tsx scripts/benchmark-engine.ts",
     "symbols:generate": "node scripts/generate-tactical-icons.mjs",
-    "symbols:verify": "node scripts/generate-tactical-icons.mjs --check"
+    "symbols:verify": "node scripts/generate-tactical-icons.mjs --check",
+    "engine:rust:build": "node scripts/build-rust-engine.mjs",
+    "engine:rust:verify": "node scripts/build-rust-engine.mjs --check",
+    "engine:rust:test": "cargo test --manifest-path engine-rust/Cargo.toml",
+    "ui:responsive:verify": "node scripts/verify-responsive-ui.mjs"
   },
   "dependencies": {
     "@types/three": "^0.185.3",
@@ -50,6 +54,7 @@
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.6",
+    "playwright-core": "1.62.1",
     "react-server-dom-webpack": "19.2.6",
     "tailwindcss": "4.2.1",
     "tsx": "^4.23.4",

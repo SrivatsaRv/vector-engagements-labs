@@ -13,6 +13,7 @@ compose-up:
 integration-local: compose-up
 	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector npm run db:verify
 	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector VECTOR_URL=http://127.0.0.1:4317 npm run app:verify
+	VECTOR_URL=http://127.0.0.1:4317 npm run ui:responsive:verify
 
 observability-local: compose-up
 	npm run observability:verify
@@ -22,6 +23,8 @@ performance-local:
 
 ci-local:
 	npm run symbols:verify
+	npm run engine:rust:verify
+	npm run engine:rust:test
 	npm run lint
 	npm run typecheck
 	npm test

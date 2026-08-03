@@ -1,0 +1,104 @@
+import type {
+  EngineBackendId,
+  EngineRun,
+  EngineScenario,
+} from "./contracts.ts";
+import { runEngine } from "./core.ts";
+import {
+  VECTOR_ENGINE_WASM_BASE64,
+  VECTOR_ENGINE_WASM_BYTES,
+  VECTOR_ENGINE_WASM_SHA256,
+} from "./generated/vector-engine-wasm.ts";
+
+type RustEngineExports = WebAssembly.Exports & {
+  memory: WebAssembly.Memory;
+  vector_input_reserve: (length: number) => number;
+  vector_run_json: () => number;
+  vector_output_ptr: () => number;
+  vector_output_len: () => number;
+};
+
+let rustEngine: RustEngineExports | null = null;
+
+function decodeBase64(value: string) {
+  const decoded = globalThis.atob(value);
+  const bytes = new Uint8Array(decoded.length);
+  for (let index = 0; index < decoded.length; index += 1) {
+    bytes[index] = decoded.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function getRustEngine() {
+  if (rustEngine) return rustEngine;
+  const bytes = decodeBase64(VECTOR_ENGINE_WASM_BASE64);
+  if (bytes.byteLength !== VECTOR_ENGINE_WASM_BYTES) {
+    throw new Error("The embedded VECTOR Rust/WASM module failed its length check.");
+  }
+  const instance = new WebAssembly.Instance(new WebAssembly.Module(bytes), {});
+  const exports = instance.exports as RustEngineExports;
+  if (
+    !(exports.memory instanceof WebAssembly.Memory) ||
+    typeof exports.vector_input_reserve !== "function" ||
+    typeof exports.vector_run_json !== "function" ||
+    typeof exports.vector_output_ptr !== "function" ||
+    typeof exports.vector_output_len !== "function"
+  ) {
+    throw new Error("The VECTOR Rust/WASM module does not expose the required engine ABI.");
+  }
+  rustEngine = exports;
+  return exports;
+}
+
+export function runRustWasmEngine(scenario: EngineScenario): EngineRun {
+  const engine = getRustEngine();
+  const input = new TextEncoder().encode(JSON.stringify(scenario));
+  const inputPointer = engine.vector_input_reserve(input.byteLength);
+  new Uint8Array(engine.memory.buffer, inputPointer, input.byteLength).set(input);
+  const succeeded = engine.vector_run_json() === 1;
+  const outputPointer = engine.vector_output_ptr();
+  const outputLength = engine.vector_output_len();
+  const output = new TextDecoder().decode(
+    new Uint8Array(engine.memory.buffer, outputPointer, outputLength),
+  );
+  if (!succeeded) {
+    throw new Error(`VECTOR Rust/WASM engine rejected the scenario: ${output}`);
+  }
+  const run = JSON.parse(output) as EngineRun;
+  if (run.diagnostics.backend !== "rust-wasm") {
+    throw new Error("The VECTOR Rust/WASM engine returned invalid provenance.");
+  }
+  return run;
+}
+
+export function runEngineBackend(
+  scenario: EngineScenario,
+  backend: EngineBackendId,
+): EngineRun {
+  if (backend === "rust-wasm") return runRustWasmEngine(scenario);
+  if (backend === "typescript") return runEngine(scenario);
+  const exhaustive: never = backend;
+  throw new Error(`Unknown VECTOR engine backend: ${exhaustive}`);
+}
+
+export const ENGINE_BACKENDS: Array<{
+  id: EngineBackendId;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: "rust-wasm",
+    label: "Rust / WebAssembly",
+    description: "Compiled 3DOF engine running locally inside the browser.",
+  },
+  {
+    id: "typescript",
+    label: "TypeScript reference",
+    description: "Reference implementation retained for parity verification.",
+  },
+];
+
+export const RUST_WASM_ENGINE_ARTIFACT = {
+  sha256: VECTOR_ENGINE_WASM_SHA256,
+  bytes: VECTOR_ENGINE_WASM_BYTES,
+} as const;

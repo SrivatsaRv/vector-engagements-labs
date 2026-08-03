@@ -3,6 +3,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogObject } from "@/lib/object-catalog";
+import type { MapInstallation } from "@/components/EngagementMap";
 import type { Scenario } from "@/lib/simulation";
 import {
   createDefaultSpatialPlan,
@@ -20,6 +21,7 @@ type Props = {
   studyArea: StudyArea;
   blueObject: CatalogObject;
   redObject: CatalogObject;
+  installations: MapInstallation[];
   onChange: (plan: ScenarioSpatialPlan) => void;
 };
 
@@ -41,6 +43,7 @@ export function ScenarioAuthoringMap({
   studyArea,
   blueObject,
   redObject,
+  installations,
   onChange,
 }: Props) {
   const mount = useRef<HTMLDivElement>(null);
@@ -207,6 +210,54 @@ export function ScenarioAuthoringMap({
     import("maplibre-gl").then((maplibregl) => {
       const activeKeys = new Set<string>();
       const objects = { blue: blueObject, red: redObject };
+      for (const installation of installations) {
+        if (
+          !isPointInsideStudyArea(
+            {
+              longitude: installation.longitude,
+              latitude: installation.latitude,
+              altitudeM: 0,
+            },
+            studyArea,
+          )
+        ) continue;
+        const key = `installation:${installation.id}`;
+        activeKeys.add(key);
+        let installationMarker = markers.current.get(key);
+        if (!installationMarker) {
+          const element = document.createElement("button");
+          element.type = "button";
+          element.className = `authoring-installation-marker ${installation.service === "IAF" ? "blue" : "red"}`;
+          element.innerHTML = `${tacticalSymbolMarkup("BASE", installation.service === "IAF" ? "BLUE" : "RED", "ACTIVE", "AIR_BASE")}<span>${installation.name}</span>`;
+          element.title = `Use ${installation.name} as ${installation.service === "IAF" ? "Blue" : "Red"} origin`;
+          element.addEventListener("click", (event) => {
+            event.stopPropagation();
+            const team: TeamKey = installation.service === "IAF" ? "blue" : "red";
+            const current = planRef.current;
+            const point = {
+              longitude: installation.longitude,
+              latitude: installation.latitude,
+              altitudeM: current[team].position.altitudeM,
+            };
+            setSelected(team);
+            onChangeRef.current({
+              ...current,
+              [team]: {
+                ...current[team],
+                position: point,
+                route: current[team].route.map((routePoint, index) =>
+                  index === 0 ? point : routePoint,
+                ),
+              },
+            });
+            setMessage(`${installation.name} selected as the ${team === "blue" ? "Blue" : "Red"} origin.`);
+          });
+          installationMarker = new maplibregl.Marker({ element, anchor: "center" })
+            .setLngLat([installation.longitude, installation.latitude])
+            .addTo(map);
+          markers.current.set(key, installationMarker);
+        }
+      }
       for (const team of ["blue", "red"] as const) {
         const entity = plan[team];
         const object = objects[team];
@@ -358,7 +409,7 @@ export function ScenarioAuthoringMap({
         ),
       });
     });
-  }, [blueObject, plan, ready, redObject, selected, studyArea]);
+  }, [blueObject, installations, plan, ready, redObject, selected, studyArea]);
 
   const updateEntity = (
     team: TeamKey,
@@ -366,6 +417,36 @@ export function ScenarioAuthoringMap({
   ) => onChange({ ...plan, [team]: { ...plan[team], ...patch } });
   const selectedEntity = plan[selected];
   const selectedObject = selected === "blue" ? blueObject : redObject;
+  const availableOrigins = installations.filter((installation) =>
+    isPointInsideStudyArea(
+      {
+        longitude: installation.longitude,
+        latitude: installation.latitude,
+        altitudeM: 0,
+      },
+      studyArea,
+    ),
+  );
+  const selectOrigin = (team: TeamKey, installation: MapInstallation) => {
+    const entity = plan[team];
+    const position = {
+      longitude: installation.longitude,
+      latitude: installation.latitude,
+      altitudeM: entity.position.altitudeM,
+    };
+    setSelected(team);
+    onChange({
+      ...plan,
+      [team]: {
+        ...entity,
+        position,
+        route: entity.route.map((point, index) =>
+          index === 0 ? position : point,
+        ),
+      },
+    });
+    setMessage(`${installation.name} selected as the ${team === "blue" ? "Blue" : "Red"} origin.`);
+  };
 
   return (
     <section className="scenario-authoring-surface">
@@ -374,14 +455,28 @@ export function ScenarioAuthoringMap({
           <span>MAP AUTHORING</span>
           <strong>Place the selected forces inside {studyArea.shortName}.</strong>
           <p>
-            Drag start positions. Add and drag planned waypoints. The engine uses
-            the authored start position, altitude, heading, and speed; routes are
-            retained as declared intent and shown beside the computed track.
+            Choose a public-reference base or drag either aircraft to its start
+            position. Altitude, heading, speed, and any planned route compile
+            into the same scenario state.
           </p>
         </div>
-        <div className="authoring-tools" aria-label="Map authoring tool">
-          <button className={tool === "MOVE" ? "active" : ""} onClick={() => setTool("MOVE")}>Select and drag</button>
-          <button className={tool === "WAYPOINT" ? "active" : ""} onClick={() => setTool("WAYPOINT")}>Add waypoint</button>
+        <div className="origin-pickers" aria-label="Team origin selection">
+          {(["blue", "red"] as const).map((team) => {
+            const service = team === "blue" ? "IAF" : "PAF";
+            const options = availableOrigins.filter((item) => item.service === service);
+            return (
+              <details className={team} key={team}>
+                <summary>{team === "blue" ? "Blue" : "Red"} origin</summary>
+                <div>
+                  {options.length ? options.map((installation) => (
+                    <button key={installation.id} onClick={() => selectOrigin(team, installation)} type="button">
+                      {installation.name}
+                    </button>
+                  )) : <span>No {service} base in this study area. Drag the start marker instead.</span>}
+                </div>
+              </details>
+            );
+          })}
         </div>
       </header>
       <div className="scenario-authoring-map-shell">
@@ -408,6 +503,15 @@ export function ScenarioAuthoringMap({
                 selectedEntity.route.length === 2 ? " waypoint" : " waypoints"
               }
             </strong>
+            <button
+              className={tool === "WAYPOINT" ? "active" : ""}
+              onClick={() => setTool(tool === "WAYPOINT" ? "MOVE" : "WAYPOINT")}
+              type="button"
+            >
+              {tool === "WAYPOINT"
+                ? `Click map for ${selected === "blue" ? "Blue" : "Red"} waypoint`
+                : `Add ${selected === "blue" ? "Blue" : "Red"} waypoint`}
+            </button>
             <button disabled={selectedEntity.route.length <= 1} onClick={() => updateEntity(selected, { route: [selectedEntity.position] })}>Clear route</button>
           </div>
         </div>

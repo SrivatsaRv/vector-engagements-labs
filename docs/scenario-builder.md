@@ -4,7 +4,7 @@ VECTOR uses one product journey everywhere:
 
 1. **Enter** chooses a validated template, a blank scenario, an imported scenario package, or a Red-versus-Blue study.
 2. **Construct** defines the question, selects forces and loadouts, places them in a study area, declares flight state, sensors, decisions, environment, and model assumptions, then validates the package.
-3. **Simulate** compiles the scenario package into engine entities and runs a deterministic fixed-step model.
+3. **Simulate** compiles the scenario package into engine entities and runs a deterministic fixed-step model through the selected Rust/WASM or TypeScript-reference backend.
 4. **Observe** replays the engine frames on the synchronized map, 3D surface, timeline, RASP, and telemetry views.
 5. **Explain** presents the termination cause, geometry, information state, and contributing variables.
 6. **Compare** holds the scenario package constant while changing declared variables in a variant.
@@ -98,6 +98,7 @@ The system governs:
 - stowed-to-launched weapon lifecycle;
 - dependency-safe removal and duplication;
 - canonical package compilation, version, and content hash;
+- explicit engine-backend selection and fail-closed dispatch;
 - blocking validation before simulation.
 
 An authored area of interest is not a substitute for the study-area preset. If
@@ -109,7 +110,9 @@ reference, or map anchor.
 
 - The selected study area and weather are explicitly labelled preconfigured.
 - `Change context` exposes the six governed regional presets and their available weather states; the operator does not draw the regional boundary.
+- Blue and Red each have an affiliation-scoped origin picker populated from public-reference installations inside the selected study area. Choosing an origin moves that team's aircraft to the installation; manual drag remains available when no catalog origin is appropriate.
 - Blue and Red start markers and waypoints are draggable.
+- Waypoint creation is scoped to the currently selected team and lives in that team's route inspector. The map never offers an unowned generic waypoint action.
 - The selected entity inspector edits altitude above sea level, true heading, speed, and route state.
 - Drag and numeric edits synchronize starting distance, altitude difference, aspect, and platform speeds before compilation.
 - Validation blocks non-finite state, negative speed or altitude, invalid headings, mismatched route origins, and any start or waypoint outside the preset boundary.

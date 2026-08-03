@@ -18,7 +18,10 @@ export function LandingMiniSim() {
   const definition =
     SCENARIO_LIBRARY.find((item) => item.domain === domain) ??
     SCENARIO_LIBRARY[0];
-  const result = useMemo(() => simulate(definition.scenario), [definition]);
+  const result = useMemo(
+    () => simulate({ ...definition.scenario, engineBackend: "typescript" }),
+    [definition],
+  );
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(true);
   const frame = getFrameAt(result, time);
