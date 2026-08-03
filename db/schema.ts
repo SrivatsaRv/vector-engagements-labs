@@ -17,6 +17,12 @@ const geometryPoint = customType<{ data: string }>({
   },
 });
 
+const geometryPolygon = customType<{ data: string }>({
+  dataType() {
+    return "geometry(Polygon,4326)";
+  },
+});
+
 export const sources = pgTable("sources", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
@@ -136,6 +142,27 @@ export const installations = pgTable(
   (table) => [index("installations_location_gix").using("gist", table.location)],
 );
 
+export const studyAreas = pgTable(
+  "study_areas",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    shortName: text("short_name").notNull(),
+    description: text("description").notNull(),
+    terrainClass: text("terrain_class").notNull(),
+    surfaceElevationM: doublePrecision("surface_elevation_m").notNull(),
+    anchor: geometryPoint("anchor").notNull(),
+    boundary: geometryPolygon("boundary").notNull(),
+    environmentPresets: jsonb("environment_presets").notNull(),
+    defaultEnvironmentPresetId: text("default_environment_preset_id").notNull(),
+    sourceClass: text("source_class").notNull(),
+  },
+  (table) => [
+    index("study_areas_anchor_gix").using("gist", table.anchor),
+    index("study_areas_boundary_gix").using("gist", table.boundary),
+  ],
+);
+
 export const scenarioTemplates = pgTable("scenario_templates", {
   id: text("id").notNull(),
   version: text("version").notNull(),
@@ -146,6 +173,7 @@ export const scenarioTemplates = pgTable("scenario_templates", {
   schemaVersion: text("schema_version").notNull(),
   contentHash: text("content_hash").notNull(),
   engineVersion: text("engine_version").notNull(),
+  studyAreaId: text("study_area_id").references(() => studyAreas.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [primaryKey({ columns: [table.id, table.version] })]);
 
@@ -164,5 +192,7 @@ export const savedRunSnapshots = pgTable("saved_run_snapshots", {
   initialState: jsonb("initial_state").notNull(),
   environment: jsonb("environment").notNull(),
   modelAssumptions: jsonb("model_assumptions").notNull(),
+  studyAreaId: text("study_area_id").references(() => studyAreas.id),
+  spatialContext: jsonb("spatial_context"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

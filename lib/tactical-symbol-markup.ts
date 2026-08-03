@@ -8,8 +8,8 @@ const frame = (affiliation: Affiliation) =>
       : '<circle cx="24" cy="24" r="22" class="tactical-frame"/>';
 
 const glyph: Record<EntityKind, string> = {
-  AIRCRAFT: '<path d="m24 9 3.2 10.2 11.3 5.2v3.2l-11-2.1-1.1 7.6 4.3 3v2.4L24 36l-6.7 2.5v-2.4l4.3-3-1.1-7.6-11 2.1v-3.2l11.3-5.2Z" class="tactical-glyph tactical-glyph-fill"/>',
-  GUIDED_WEAPON: '<path d="M13 29 29.5 12.5l5-1-1 5L17 33l-7 3 3-7Zm11-6 7 7m-12-2-1-7" class="tactical-glyph"/>',
+  AIRCRAFT: '<path d="M24 5 28 18 42 25v4l-14-3-1 9 6 4v3l-9-3-9 3v-3l6-4-1-9-14 3v-4l14-7Z" class="tactical-glyph tactical-glyph-fill"/>',
+  GUIDED_WEAPON: '<path d="M24 6 29 15v18l5 6-8-2-2 6-2-6-8 2 5-6V15Z" class="tactical-glyph tactical-glyph-fill"/>',
   RADAR: '<path d="M15 28a13 13 0 0 1 18-12M12 33a18 18 0 0 1 26-21m-21 9 15-15-3 13ZM24 31v7m-6 0h12" class="tactical-glyph"/>',
   AIR_DEFENCE_SYSTEM: '<path d="M12 34h24v5H12zM16 31l14-14m-9 15 14-14M13 18a13 13 0 0 1 22-6" class="tactical-glyph"/>',
   SURFACE_LAUNCHER: '<path d="M10 34h27v6H10zM15 32l15-15m-8 16 15-15" class="tactical-glyph"/>',
@@ -22,5 +22,5 @@ export function tacticalSymbolMarkup(
   affiliation: Affiliation,
   lifecycle: EntityLifecycle,
 ) {
-  return `<svg viewBox="0 0 48 48" class="tactical-symbol tactical-symbol-${affiliation.toLowerCase()} tactical-symbol-${lifecycle.toLowerCase()}" aria-hidden="true">${frame(affiliation)}${glyph[kind]}</svg>`;
+  return `<svg viewBox="0 0 48 48" data-kind="${kind}" class="tactical-symbol tactical-symbol-${affiliation.toLowerCase()} tactical-symbol-${lifecycle.toLowerCase()}" aria-hidden="true">${frame(affiliation)}${glyph[kind]}</svg>`;
 }

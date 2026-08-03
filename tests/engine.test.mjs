@@ -100,6 +100,17 @@ function testScenario() {
   };
 }
 
+const testAircraftModel = {
+  emptyMassKg: 14000,
+  fuelCapacityKg: 5000,
+  referenceAreaM2: 62,
+  zeroLiftDragCoefficient: 0.025,
+  inducedDragFactor: 0.055,
+  maximumThrustNewtons: 240000,
+  specificFuelConsumptionKgPerNewtonSecond: 0.000022,
+  maximumCommandG: 9,
+};
+
 test("generic engine updates every spawned entity deterministically", () => {
   const first = runEngine(testScenario());
   const second = runEngine(testScenario());
@@ -173,4 +184,44 @@ test("an unlaunched carried weapon remains inventory, not a world entity", () =>
     ),
   );
   assert.equal(run.scenario.entities.length, 3);
+});
+
+test("sensor entities publish separate detection, tracking, engagement, and minimum-range envelopes", () => {
+  const scenario = testScenario();
+  scenario.entities[0].sensor = {
+    detectionRadiusM: 90000,
+    trackingRadiusM: 70000,
+    engagementRadiusM: 45000,
+    minimumRangeM: 2500,
+    minimumAltitudeM: 50,
+    maximumAltitudeM: 18000,
+  };
+  const run = runEngine(scenario);
+  assert.deepEqual(
+    run.envelopes.map((envelope) => envelope.kind),
+    ["DETECTION", "TRACKING", "ENGAGEMENT", "MINIMUM_RANGE"],
+  );
+  assert.deepEqual(
+    run.envelopes.map((envelope) => envelope.radiusM),
+    [90000, 70000, 45000, 2500],
+  );
+});
+
+test("aircraft dynamics consume fuel and expose thrust, drag, mass, and maneuver authority", () => {
+  const scenario = testScenario();
+  const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
+  blue.aircraft = testAircraftModel;
+  blue.behavior.commandedG = 4;
+  blue.behavior.maneuver = "break";
+  const run = runEngine(scenario);
+  const first = run.frames[0].entities.find((entity) => entity.id === "aircraft-blue");
+  const last = run.frames.at(-1).entities.find((entity) => entity.id === "aircraft-blue");
+
+  assert.ok(first && last);
+  assert.ok(last.fuelKg < first.fuelKg, "modeled thrust must consume aircraft fuel");
+  assert.ok(last.massKg < first.massKg, "fuel consumption must reduce aircraft mass");
+  assert.ok(last.dragNewtons > 0, "air-relative drag must be computed");
+  assert.ok(last.thrustNewtons > 0, "available fuel must permit modeled thrust");
+  assert.equal(last.availableG, testAircraftModel.maximumCommandG);
+  assert.ok(last.commandedG > 0 && last.commandedG <= last.availableG);
 });

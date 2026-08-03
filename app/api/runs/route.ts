@@ -18,6 +18,8 @@ type SavedRunRow = {
   red_force: Record<string, unknown>;
   initial_state: Record<string, unknown>;
   environment: Record<string, unknown>;
+  study_area_id: string | null;
+  spatial_context: Record<string, unknown> | null;
   model_assumptions: Record<string, unknown>;
   created_at: string | Date;
 };
@@ -37,6 +39,8 @@ function serializeRun(row: SavedRunRow) {
     redForce: row.red_force,
     initialState: row.initial_state,
     environment: row.environment,
+    studyAreaId: row.study_area_id,
+    spatialContext: row.spatial_context,
     modelAssumptions: row.model_assumptions,
     createdAt:
       row.created_at instanceof Date
@@ -107,7 +111,7 @@ export async function POST(request: Request) {
       );
     }
     const templateRows = await withDatabase((sql) => sql`
-      SELECT schema_version, content_hash, engine_version
+      SELECT schema_version, content_hash, engine_version, study_area_id
       FROM scenario_templates
       WHERE id = ${payload.scenarioId as string}
         AND version = ${payload.scenarioVersion as string}
@@ -115,7 +119,7 @@ export async function POST(request: Request) {
       LIMIT 1
     `);
     const template = templateRows[0] as
-      | { schema_version: string; content_hash: string; engine_version: string }
+      | { schema_version: string; content_hash: string; engine_version: string; study_area_id: string }
       | undefined;
     if (
       !template ||
@@ -144,11 +148,23 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
+    const initialState = (payload.initialState ?? {}) as Record<string, unknown>;
+    if (typeof initialState.studyAreaId !== "string") {
+      return Response.json(
+        { error: "A PostGIS study area is required" },
+        { status: 400 },
+      );
+    }
+    const studyAreaId = initialState.studyAreaId;
+    const compiledEnvironment = (
+      payload.compiledScenario as { environment?: { studyArea?: unknown } }
+    ).environment;
     const rows = await withDatabase((sql) => sql`
       INSERT INTO saved_run_snapshots
         (id,scenario_id,scenario_version,engine_version,scenario_schema_version,
          scenario_content_hash,compiled_scenario,frame_hash,draft_revision,
-         blue_force,red_force,initial_state,environment,model_assumptions)
+         blue_force,red_force,initial_state,environment,model_assumptions,
+         study_area_id,spatial_context)
       VALUES
         (${id},${payload.scenarioId as string},${payload.scenarioVersion as string},${engineVersion},
          ${payload.scenarioSchemaVersion as string},${payload.scenarioContentHash as string},
@@ -156,7 +172,8 @@ export async function POST(request: Request) {
          ${payload.draftRevision as number},
          ${sql.json((payload.blueForce ?? {}) as never)},${sql.json((payload.redForce ?? {}) as never)},
          ${sql.json((payload.initialState ?? {}) as never)},${sql.json((payload.environment ?? {}) as never)},
-         ${sql.json(assumptions as never)})
+         ${sql.json(assumptions as never)},${studyAreaId},
+         ${sql.json((compiledEnvironment?.studyArea ?? {}) as never)})
       RETURNING id, created_at
     `);
     const domain = (payload.scenarioId as string).split("-")[0]?.toUpperCase();

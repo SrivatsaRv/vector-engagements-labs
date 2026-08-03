@@ -55,7 +55,7 @@ try {
     (item) => item.id === "a2a-crossing-intercept" && item.version === "1.0.0",
   );
   assert.ok(template);
-  assert.equal(template.schema_version, "vector.scenario.v1");
+  assert.equal(template.schema_version, "vector.scenario.v2");
   assert.match(template.content_hash, /^[0-9a-f]{64}$/);
   assert.equal(template.engine_version, "browser-point-mass-v0.5");
 
@@ -78,7 +78,13 @@ try {
       engineVersion: "browser-point-mass-v0.5",
       scenarioSchemaVersion: template.schema_version,
       scenarioContentHash: "0".repeat(64),
-      compiledScenario: { id: "configured-a2a", version: "0.5.0" },
+      compiledScenario: {
+        id: "configured-a2a",
+        version: "0.5.0",
+        environment: {
+          studyArea: { id: "north-punjab", name: "North Punjab airspace study area" },
+        },
+      },
       frameHash,
       draftRevision: 0,
       blueForce: {},
@@ -101,13 +107,19 @@ try {
       engineVersion: "browser-point-mass-v0.5",
       scenarioSchemaVersion: template.schema_version,
       scenarioContentHash: template.content_hash,
-      compiledScenario: { id: "configured-a2a", version: "0.5.0" },
+      compiledScenario: {
+        id: "configured-a2a",
+        version: "0.5.0",
+        environment: {
+          studyArea: { id: "north-punjab", name: "North Punjab airspace study area" },
+        },
+      },
       frameHash,
       draftRevision: 0,
       blueForce: { platformId: "su-30mki" },
       redForce: { platformId: "f-16c-block52-paf" },
-      initialState: { seed: 42 },
-      environment: { atmosphere: "NASA_EDUCATIONAL_STANDARD" },
+      initialState: { seed: 42, studyAreaId: "north-punjab", weatherPresetId: "north-punjab-standard" },
+      environment: { atmosphere: "NASA_EDUCATIONAL_STANDARD", studyAreaId: "north-punjab" },
       modelAssumptions: {
         report: {
           createdAt: new Date().toISOString(),
@@ -129,6 +141,8 @@ try {
   assert.equal(loadedPayload.run.engineVersion, "browser-point-mass-v0.5");
   assert.equal(loadedPayload.run.scenarioContentHash, template.content_hash);
   assert.equal(loadedPayload.run.frameHash, frameHash);
+  assert.equal(loadedPayload.run.studyAreaId, "north-punjab");
+  assert.equal(loadedPayload.run.spatialContext.id, "north-punjab");
   assert.ok(loadedPayload.run.modelAssumptions.report);
   assert.equal("scenario_id" in loadedPayload.run, false);
 

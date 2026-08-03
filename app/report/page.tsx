@@ -56,7 +56,7 @@ const fallback: ReportData = {
   engine: ENGINE_VERSION,
   profileVersion: "public-study-v0.5",
   packageProvenance: {
-    schemaVersion: "vector.scenario.v1",
+    schemaVersion: "vector.scenario.v2",
     contentHash: "example",
     draftRevision: 0,
   },

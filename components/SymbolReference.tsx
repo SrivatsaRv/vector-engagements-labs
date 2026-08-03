@@ -35,8 +35,8 @@ export function SymbolReference() {
       </section>
       <section className="symbol-section symbol-state-section">
         <header>
-          <span>AFFILIATION + STATE</span>
-          <h2>Shape remains meaningful without color</h2>
+          <span>AFFILIATION + LIFECYCLE</span>
+          <h2>A carried weapon becomes a world object only at launch</h2>
         </header>
         <div className="symbol-state-grid">
           <article><TacticalSymbol kind="AIRCRAFT" affiliation="BLUE" size={68} /><strong>Blue</strong><span>Circle frame</span></article>

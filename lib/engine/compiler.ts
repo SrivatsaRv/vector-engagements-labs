@@ -8,6 +8,7 @@ import type {
 } from "./primitives.ts";
 import { getCatalogObject } from "../object-catalog.ts";
 import { findWeaponSimulationModel } from "../simulation-models.ts";
+import { getStudyArea, getWeatherPreset } from "../study-areas.ts";
 
 export type ScenarioCompilerInput = {
   id: string;
@@ -18,6 +19,8 @@ export type ScenarioCompilerInput = {
   blueSystemId: string;
   redObjectId: string;
   redSystemId: string;
+  studyAreaId: string;
+  weatherPresetId: string;
   profile: ProfileId;
   guidance: Guidance;
   altitude: number;
@@ -66,6 +69,43 @@ const velocity = (speed: number, headingRad: number): Vec3 => ({
   y: Math.sin(headingRad) * speed,
   z: 0,
 });
+
+function aircraftAssumptions(id: string) {
+  if (id === "su-30mki") {
+    return {
+      emptyMassKg: 18400,
+      fuelCapacityKg: 9400,
+      referenceAreaM2: 62,
+      zeroLiftDragCoefficient: 0.026,
+      inducedDragFactor: 0.085,
+      maximumThrustNewtons: 245000,
+      specificFuelConsumptionKgPerNewtonSecond: 0.000024,
+      maximumCommandG: 9,
+    };
+  }
+  if (id === "mirage-2000h") {
+    return {
+      emptyMassKg: 7600,
+      fuelCapacityKg: 3200,
+      referenceAreaM2: 41,
+      zeroLiftDragCoefficient: 0.024,
+      inducedDragFactor: 0.09,
+      maximumThrustNewtons: 95000,
+      specificFuelConsumptionKgPerNewtonSecond: 0.000026,
+      maximumCommandG: 9,
+    };
+  }
+  return {
+    emptyMassKg: 9000,
+    fuelCapacityKg: 3200,
+    referenceAreaM2: 28,
+    zeroLiftDragCoefficient: 0.025,
+    inducedDragFactor: 0.095,
+    maximumThrustNewtons: 125000,
+    specificFuelConsumptionKgPerNewtonSecond: 0.000025,
+    maximumCommandG: 9,
+  };
+}
 
 function withProvenance(
   input: Omit<EngineEntityDefinition, "provenance">,
@@ -142,9 +182,23 @@ export function compileScenario(
   const redObject = getCatalogObject(input.redObjectId);
   const redSystem =
     input.domain === "A2A" ? getCatalogObject(input.redSystemId) : undefined;
+  const studyArea = getStudyArea(input.studyAreaId);
+  const weatherPreset = getWeatherPreset(studyArea, input.weatherPresetId);
   const targetHeadingRad = ((180 - input.aspect) * Math.PI) / 180;
   const movingTarget = input.domain === "A2A" || input.domain === "G2A";
   const blueIsAircraft = blueObject.kind === "AIRCRAFT";
+  const blueAircraft = blueIsAircraft
+    ? aircraftAssumptions(blueObject.id)
+    : undefined;
+  const redAircraft = movingTarget
+    ? aircraftAssumptions(redObject.id)
+    : undefined;
+  const blueFuelKg = blueAircraft
+    ? blueAircraft.fuelCapacityKg * (input.blueFuelPercent / 100)
+    : 0;
+  const redFuelKg = redAircraft
+    ? redAircraft.fuelCapacityKg * (input.redFuelPercent / 100)
+    : 0;
   const selectedModel = findWeaponSimulationModel(input.blueSystemId);
   const assumptions = selectedModel
     ? {
@@ -203,18 +257,27 @@ export function compileScenario(
       affiliation: "BLUE",
       kind: kindMap[blueObject.kind],
       lifecycle: "ACTIVE",
+      route: [
+        { x: 0, y: 0, z: input.altitude },
+        {
+          x: (blueIsAircraft ? input.launcherSpeed : 0) * 140,
+          y: 0,
+          z: input.altitude,
+        },
+      ],
       initial: {
         position: { x: 0, y: 0, z: input.altitude },
         velocity: velocity(blueIsAircraft ? input.launcherSpeed : 0, 0),
         headingRad: 0,
-        massKg: blueIsAircraft ? 26000 : 12000,
-        fuelKg: blueIsAircraft ? 9400 * (input.blueFuelPercent / 100) : 0,
+        massKg: blueAircraft ? blueAircraft.emptyMassKg + blueFuelKg : 12000,
+        fuelKg: blueFuelKg,
       },
       behavior: {
         maneuver: blueIsAircraft ? bluePlatformManeuver : "steady",
         commandedG: blueIsAircraft ? bluePlatformG : 0,
         decision: input.blueDecision,
       },
+      aircraft: blueAircraft,
     },
     blueObject.id,
   );
@@ -228,6 +291,21 @@ export function compileScenario(
       affiliation: "RED",
       kind: kindMap[redObject.kind],
       lifecycle: "ACTIVE",
+      route: [
+        {
+          x: input.range,
+          y: 0,
+          z: Math.max(0, input.altitude + input.targetDelta),
+        },
+        {
+          x:
+            input.range +
+            Math.cos(targetHeadingRad) * (movingTarget ? input.targetSpeed : 0) * 140,
+          y:
+            Math.sin(targetHeadingRad) * (movingTarget ? input.targetSpeed : 0) * 140,
+          z: Math.max(0, input.altitude + input.targetDelta),
+        },
+      ],
       initial: {
         position: {
           x: input.range,
@@ -236,14 +314,15 @@ export function compileScenario(
         },
         velocity: velocity(movingTarget ? input.targetSpeed : 0, targetHeadingRad),
         headingRad: targetHeadingRad,
-        massKg: movingTarget ? 12500 : 10000,
-        fuelKg: movingTarget ? 3200 * (input.redFuelPercent / 100) : 0,
+        massKg: redAircraft ? redAircraft.emptyMassKg + redFuelKg : 10000,
+        fuelKg: redFuelKg,
       },
       behavior: {
         maneuver: movingTarget ? input.maneuver : "steady",
         commandedG: movingTarget ? input.targetG * redDecisionFactor : 0,
         decision: input.redDecision,
       },
+      aircraft: redAircraft,
     },
     redObject.id,
   );
@@ -358,6 +437,22 @@ export function compileScenario(
     };
   }
 
+  if (redObject.kind === "RADAR") {
+    redTarget.sensor = {
+      detectionRadiusM: Math.max(70000, profile.maxRange * 900),
+      trackingRadiusM: Math.max(45000, profile.maxRange * 650),
+      engagementRadiusM: 0,
+      minimumRangeM: 0,
+      minimumAltitudeM: 50,
+      maximumAltitudeM: 18000,
+    };
+    redTarget.provenance = {
+      ...redTarget.provenance,
+      valueState: "MODEL_ASSUMPTION",
+      modelVersion: "public-radar-envelope-v0.1",
+    };
+  }
+
   return {
     id: input.id,
     version: input.version,
@@ -372,6 +467,15 @@ export function compileScenario(
       temperatureOffsetC: input.temperatureOffset,
       windMps: { x: input.windEastMps, y: input.windNorthMps, z: 0 },
       atmosphere: "NASA_EDUCATIONAL_STANDARD",
+      studyArea: {
+        id: studyArea.id,
+        name: studyArea.name,
+        terrainClass: studyArea.terrainClass,
+        surfaceElevationM: studyArea.surfaceElevationM,
+        anchor: studyArea.anchor,
+        bounds: studyArea.bounds,
+        weatherPresetId: weatherPreset.id,
+      },
     },
     completion: { distanceMeters: 180 },
     events: [

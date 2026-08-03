@@ -46,6 +46,17 @@ const equations = [
     state: "Model assumption",
   },
   {
+    id: "aircraft-forces",
+    name: "Aircraft force and fuel state",
+    output: "Lift demand, induced drag, thrust, fuel and turn rate",
+    formula: "L = nmg · Cᴅ = Cᴅ₀ + kCʟ² · D = qSCᴅ · ṁ_f = TSFC·T · ω = g√(n²−1)/V",
+    meaning:
+      "The selected decision and maneuver set load-factor demand. The engine caps it at the aircraft model limit, resolves parasitic and induced drag, consumes fuel from thrust demand, updates mass, and changes heading at the resulting point-mass turn rate.",
+    state: "Model assumption",
+    source: "https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/drag-equation/",
+    sourceLabel: "NASA Glenn · Drag equation",
+  },
+  {
     id: "guidance",
     name: "Proportional-navigation demand",
     output: "Commanded lateral acceleration",
@@ -89,6 +100,15 @@ const equations = [
     meaning:
       "This is an explicitly declared educational information-quality model. Radar, data-link availability, visual range, jamming and prepared interruptions affect the perceived track; they never move Model Truth.",
     state: "Model assumption",
+  },
+  {
+    id: "coverage",
+    name: "Sensor and engagement envelopes",
+    output: "Detection, tracking, engagement and minimum-range volumes",
+    formula: "inside(r) ⇔ r_min ≤ |p_target − p_sensor| ≤ r_kind and h_min ≤ h ≤ h_max",
+    meaning:
+      "The current envelopes are scenario-declared study volumes that follow the owning entity. They are displayed independently and carry a sourced or assumed value state. They are not yet calculated from a radar equation, terrain, radar cross-section, propagation, or electronic attack.",
+    state: "Scenario/model assumption",
   },
   {
     id: "termination",

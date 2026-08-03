@@ -3196,6 +3196,96 @@ button:disabled,
 .authoring-section {
   max-width: 720px;
 }
+.placement-section {
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.placement-section > header span,
+.weather-preset-grid > span {
+  display: block;
+  color: var(--blue);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+.placement-section > header strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 14px;
+}
+.placement-section > header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.study-area-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 15px;
+}
+.study-area-grid button,
+.weather-preset-grid button {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  padding: 11px;
+  text-align: left;
+}
+.study-area-grid button:hover,
+.weather-preset-grid button:hover {
+  border-color: #9bb4cd;
+  background: #f8fbfe;
+}
+.study-area-grid button.active,
+.weather-preset-grid button.active {
+  border-color: var(--blue);
+  box-shadow: inset 3px 0 0 var(--blue);
+  background: var(--blue-soft);
+}
+.study-area-grid strong,
+.study-area-grid small,
+.study-area-grid span,
+.weather-preset-grid strong,
+.weather-preset-grid small,
+.weather-preset-grid em {
+  display: block;
+}
+.study-area-grid strong,
+.weather-preset-grid strong {
+  font-size: 10px;
+}
+.study-area-grid small,
+.weather-preset-grid small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.4;
+}
+.study-area-grid span {
+  margin-top: 7px;
+  color: #52616d;
+  font-size: 8px;
+  line-height: 1.4;
+}
+.weather-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 14px;
+}
+.weather-preset-grid > span {
+  grid-column: 1 / -1;
+}
+.weather-preset-grid em {
+  margin-top: 7px;
+  color: var(--blue);
+  font-size: 8px;
+  font-style: normal;
+  line-height: 1.35;
+}
 .section-label {
   display: flex;
   align-items: end;
@@ -3830,7 +3920,9 @@ button:disabled,
   .entity-role-grid,
   .geometry-choice,
   .event-choice,
-  .review-inputs {
+  .review-inputs,
+  .study-area-grid,
+  .weather-preset-grid {
     grid-template-columns: 1fr;
   }
   .review-inputs aside {
@@ -4924,6 +5016,14 @@ button:disabled,
 .map-scope-switch button:last-child { border-right: 0; }
 .map-scope-switch button.active { background: #263642; color: #fff; }
 .map-data-note { position: absolute; z-index: 5; right: 12px; bottom: 10px; padding: 7px 9px; border: 1px solid rgba(190,198,204,.9); background: rgba(255,255,255,.9); color: #64717b; font-size: 9px; letter-spacing: .05em; text-transform: uppercase; }
+.map-layer-legend { position: absolute; z-index: 5; left: 12px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 11px; max-width: min(62%, 640px); padding: 8px 10px; border: 1px solid rgba(190,198,204,.9); background: rgba(255,255,255,.94); box-shadow: 0 2px 12px rgba(25,35,43,.06); }
+.map-layer-legend span { display: inline-flex; align-items: center; gap: 5px; color: #4d5a64; font-size: 9px; white-space: nowrap; }
+.map-layer-legend i { width: 16px; height: 0; border-top: 2px solid #2f6fb5; }
+.map-layer-legend i.route { border-top-style: dashed; opacity: .65; }
+.map-layer-legend i.track { border-top-width: 3px; }
+.map-layer-legend i.sensor { width: 12px; height: 12px; border: 1px dashed #5c7f9f; border-radius: 50%; background: rgba(92,127,159,.08); }
+.map-layer-legend i.engagement { width: 12px; height: 12px; border: 1px dashed #a94f45; border-radius: 50%; background: rgba(169,79,69,.08); }
+.map-layer-legend i.launch { width: 8px; height: 8px; border: 2px solid #2f6fb5; border-radius: 50%; background: #fff; }
 .map-status { position: absolute; z-index: 4; inset: 0; display: grid; place-content: center; gap: 6px; background: #eef1f2; color: #56636d; text-align: center; }
 .map-status strong { font-size: 12px; }
 .map-status span { font-size: 10px; }
@@ -4931,7 +5031,15 @@ button:disabled,
 .map-status.error { inset: auto 12px 48px auto; max-width: 320px; padding: 12px 14px; border: 1px solid #d8beba; background: rgba(255,255,255,.96); text-align: left; }
 .map-tactical-marker { width: 42px; height: 42px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.22)); cursor: pointer; }
 .map-tactical-marker svg { width: 100%; height: 100%; }
+.map-tactical-marker svg[data-kind="AIRCRAFT"] .tactical-glyph,
+.map-tactical-marker svg[data-kind="GUIDED_WEAPON"] .tactical-glyph {
+  transform: rotate(var(--entity-heading, 0deg));
+  transform-origin: 24px 24px;
+  transition: transform 80ms linear;
+}
 .map-tactical-marker > span { position: absolute; top: 39px; left: 50%; width: max-content; max-width: 150px; transform: translateX(-50%); padding: 3px 5px; border: 1px solid rgba(203,209,213,.9); background: rgba(255,255,255,.94); color: #27333c; font-size: 8px; font-weight: 750; line-height: 1.2; letter-spacing: .035em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-installation-marker { width: 32px; height: 32px; opacity: .86; }
+.map-installation-marker > span { top: 30px; max-width: 120px; font-size: 7px; font-weight: 680; }
 .map-tactical-marker.is-stowed { width: 30px; height: 30px; opacity: .75; }
 .map-tactical-marker.is-hidden-track { display: none; }
 .map-rasp-uncertainty {

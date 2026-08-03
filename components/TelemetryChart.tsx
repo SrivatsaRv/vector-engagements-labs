@@ -132,10 +132,13 @@ export function TelemetryChart({
         series={entitySeries((entity) => entity.specificEnergyJkg / 1000, (entity) => entity.lifecycle !== "STOWED")}
       />
       <MetricPanel
-        title="Vehicle mass"
+        title="Fuel and propellant remaining"
         unit="kg"
         marker={marker}
-        series={entitySeries((entity) => entity.massKg, (entity) => entity.kind === "GUIDED_WEAPON")}
+        series={entitySeries(
+          (entity) => entity.fuelKg,
+          (entity) => entity.lifecycle !== "STOWED" && entity.fuelKg > 0,
+        )}
       />
       <MetricPanel
         title="Separation and closure"

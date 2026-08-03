@@ -8,6 +8,7 @@ import { WEAPON_SIMULATION_MODELS } from "../lib/simulation-models.ts";
 import { canonicalJson } from "../lib/canonical-json.ts";
 import { ENGINE_VERSION } from "../lib/engine/version.ts";
 import { SCENARIO_PACKAGE_SCHEMA_VERSION } from "../lib/scenario-package.ts";
+import { STUDY_AREAS } from "../lib/study-areas.ts";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
@@ -79,24 +80,41 @@ try {
         VALUES (${item.id},${item.service},${item.name},${item.type},ST_SetSRID(ST_MakePoint(${item.longitude},${item.latitude}),4326),true,${item.sourceId})
         ON CONFLICT (id) DO UPDATE SET service=EXCLUDED.service,name=EXCLUDED.name,installation_type=EXCLUDED.installation_type,location=EXCLUDED.location,public_reference=EXCLUDED.public_reference,source_id=EXCLUDED.source_id`;
     }
+    for (const area of STUDY_AREAS) {
+      const [[west, south], [east, north]] = area.bounds;
+      await tx`INSERT INTO study_areas
+        (id,name,short_name,description,terrain_class,surface_elevation_m,anchor,boundary,environment_presets,default_environment_preset_id,source_class)
+        VALUES (
+          ${area.id},${area.name},${area.shortName},${area.description},${area.terrainClass},${area.surfaceElevationM},
+          ST_SetSRID(ST_MakePoint(${area.anchor.longitude},${area.anchor.latitude}),4326),
+          ST_MakeEnvelope(${west},${south},${east},${north},4326),
+          ${json(area.weatherPresets)},${area.defaultWeatherPresetId},${area.sourceClass}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          name=EXCLUDED.name,short_name=EXCLUDED.short_name,description=EXCLUDED.description,
+          terrain_class=EXCLUDED.terrain_class,surface_elevation_m=EXCLUDED.surface_elevation_m,
+          anchor=EXCLUDED.anchor,boundary=EXCLUDED.boundary,environment_presets=EXCLUDED.environment_presets,
+          default_environment_preset_id=EXCLUDED.default_environment_preset_id,source_class=EXCLUDED.source_class`;
+    }
     for (const item of SCENARIO_LIBRARY) {
       const contentHash = createHash("sha256")
         .update(canonicalJson(item))
         .digest("hex");
       await tx`INSERT INTO scenario_templates
-        (id,version,domain,title,status,package,schema_version,content_hash,engine_version)
-        VALUES (${item.id},${item.version},${item.domain},${item.title},'VALIDATED',${json(item)},${SCENARIO_PACKAGE_SCHEMA_VERSION},${contentHash},${ENGINE_VERSION})
+        (id,version,domain,title,status,package,schema_version,content_hash,engine_version,study_area_id)
+        VALUES (${item.id},${item.version},${item.domain},${item.title},'VALIDATED',${json(item)},${SCENARIO_PACKAGE_SCHEMA_VERSION},${contentHash},${ENGINE_VERSION},${item.scenario.studyAreaId})
         ON CONFLICT (id,version) DO UPDATE SET
           domain=EXCLUDED.domain,title=EXCLUDED.title,status=EXCLUDED.status,
           package=EXCLUDED.package,schema_version=EXCLUDED.schema_version,
-          content_hash=EXCLUDED.content_hash,engine_version=EXCLUDED.engine_version`;
+          content_hash=EXCLUDED.content_hash,engine_version=EXCLUDED.engine_version,
+          study_area_id=EXCLUDED.study_area_id`;
     }
   });
   const weaponCount = new Set([
     ...WEAPONS.map((item) => item.id),
     ...WEAPON_SIMULATION_MODELS.map((item) => item.weaponId),
   ]).size;
-  process.stdout.write(`seeded ${PLATFORMS.length} platforms, ${weaponCount} weapons, ${WEAPON_SIMULATION_MODELS.length} models, ${PUBLIC_INSTALLATIONS.length} installations, ${SCENARIO_LIBRARY.length} scenarios\n`);
+  process.stdout.write(`seeded ${PLATFORMS.length} platforms, ${weaponCount} weapons, ${WEAPON_SIMULATION_MODELS.length} models, ${PUBLIC_INSTALLATIONS.length} installations, ${STUDY_AREAS.length} study areas, ${SCENARIO_LIBRARY.length} scenarios\n`);
 } finally {
   await sql.end();
 }

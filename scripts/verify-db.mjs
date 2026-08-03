@@ -11,6 +11,7 @@ try {
     (SELECT count(*)::int FROM weapons) AS weapons,
     (SELECT count(*)::int FROM simulation_models) AS models,
     (SELECT count(*)::int FROM installations) AS installations,
+    (SELECT count(*)::int FROM study_areas) AS study_areas,
     (SELECT count(*)::int FROM scenario_templates WHERE status='VALIDATED') AS scenarios`;
   // This release intentionally freezes the development catalog. Expanding it
   // is a separate research and source-governance task, not an integration side effect.
@@ -19,6 +20,7 @@ try {
     weapons: 8,
     models: 8,
     installations: 12,
+    study_areas: 6,
     scenarios: 8,
   });
 
@@ -29,6 +31,20 @@ try {
   assert.equal(geospatial.srid, 4326);
   assert.equal(geospatial.valid, true);
 
+  const [studyArea] = await sql`SELECT
+    ST_SRID(anchor)::int AS anchor_srid,
+    ST_IsValid(boundary) AS boundary_valid,
+    ST_Area(boundary::geography) > 0 AS has_area
+    FROM study_areas LIMIT 1`;
+  assert.equal(studyArea.anchor_srid, 4326);
+  assert.equal(studyArea.boundary_valid, true);
+  assert.equal(studyArea.has_area, true);
+
+  const missingStudyAreas = await sql`SELECT id, version
+    FROM scenario_templates
+    WHERE study_area_id IS NULL`;
+  assert.equal(missingStudyAreas.length, 0);
+
   const missingModels = await sql`SELECT sm.weapon_id
     FROM simulation_models sm LEFT JOIN weapons w ON w.id=sm.weapon_id
     WHERE w.id IS NULL`;
@@ -36,7 +52,7 @@ try {
 
   const invalidPackages = await sql`SELECT id, version
     FROM scenario_templates
-    WHERE schema_version <> 'vector.scenario.v1'
+    WHERE schema_version <> 'vector.scenario.v2'
       OR engine_version <> 'browser-point-mass-v0.5'
       OR content_hash !~ '^[0-9a-f]{64}$'
       OR package IS NULL`;

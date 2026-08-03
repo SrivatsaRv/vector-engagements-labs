@@ -77,11 +77,13 @@ test("server-renders model transparency and tactical-symbol references", async (
   assert.match(math, /How a displayed result is traced/);
   assert.match(math, /SHA-256 of canonical JSON/);
   assert.match(math, /NASA Glenn/);
-  assert.match(symbols, /The symbols used on the map, in 3D, and in reports/);
+  assert.match(symbols, /The exact visual subset used in playback and reports/);
+  assert.match(symbols, /Tacview-style analysis subset/);
+  assert.match(symbols, /not a NATO symbol set/);
 });
 
 test("keeps data facts, model assumptions, RASP, map scope, and persistence explicit", async () => {
-  const [capabilityData, simulation, map, api, report, migration, provenanceMigration, makefile] = await Promise.all(
+  const [capabilityData, simulation, map, api, report, migration, provenanceMigration, spatialMigration, spatialPackageMigration, visualContract, makefile] = await Promise.all(
     [
       readFile(new URL("../lib/capability-data.ts", import.meta.url), "utf8"),
       readFile(new URL("../lib/simulation.ts", import.meta.url), "utf8"),
@@ -94,6 +96,18 @@ test("keeps data facts, model assumptions, RASP, map scope, and persistence expl
       ),
       readFile(
         new URL("../db/migrations/003_scenario_package_provenance.sql", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../db/migrations/004_study_areas.sql", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../db/migrations/005_spatial_scenario_package.sql", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../docs/tacview-visual-subset.md", import.meta.url),
         "utf8",
       ),
       readFile(new URL("../Makefile", import.meta.url), "utf8"),
@@ -111,6 +125,10 @@ test("keeps data facts, model assumptions, RASP, map scope, and persistence expl
   assert.match(simulation, /standardAtmosphere/);
   assert.match(map, /MapScope = "ENGAGEMENT" \| "REGION"/);
   assert.match(map, /map\.fitBounds/);
+  assert.match(map, /coverage-envelopes/);
+  assert.match(map, /declared-routes/);
+  assert.match(map, /direction-vectors/);
+  assert.match(map, /launch-events/);
   assert.match(api, /saved_run_snapshots/);
   assert.match(api, /completed run report with recorded frames is required/);
   assert.match(migration, /saved_run_report_required/);
@@ -118,6 +136,11 @@ test("keeps data facts, model assumptions, RASP, map scope, and persistence expl
   assert.match(provenanceMigration, /scenario_content_hash/);
   assert.match(provenanceMigration, /compiled_scenario/);
   assert.match(provenanceMigration, /frame_hash/);
+  assert.match(spatialMigration, /geometry\(Polygon, 4326\)/);
+  assert.match(spatialMigration, /study_area_id/);
+  assert.match(spatialPackageMigration, /vector\.scenario\.v2/);
+  assert.match(visualContract, /Stowed.*inventory/s);
+  assert.match(visualContract, /Detection, tracking, and engagement volumes/);
   assert.match(report, /vector\.engagement-report\.v2/);
   assert.match(report, /normalizedWeaponSpeedPercent/);
   assert.match(makefile, /npm run typecheck/);

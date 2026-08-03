@@ -15,6 +15,7 @@ export async function GET(request: Request) {
         assertions,
         simulationModels,
         installations,
+        studyAreas,
         scenarioTemplates,
       ] = await Promise.all([
         sql`SELECT * FROM platform_variants ORDER BY service, display_name`,
@@ -28,6 +29,13 @@ export async function GET(request: Request) {
               ST_X(location) AS longitude, ST_Y(location) AS latitude,
               public_reference, source_id
             FROM installations ORDER BY service, name`,
+        sql`SELECT id, name, short_name, description, terrain_class,
+              surface_elevation_m,
+              ST_X(anchor) AS anchor_longitude,
+              ST_Y(anchor) AS anchor_latitude,
+              ST_AsGeoJSON(boundary)::json AS boundary,
+              environment_presets, default_environment_preset_id, source_class
+            FROM study_areas ORDER BY name`,
         sql`SELECT id, version, domain, title, status, package,
               schema_version, content_hash, engine_version
             FROM scenario_templates WHERE status = 'VALIDATED'
@@ -42,6 +50,7 @@ export async function GET(request: Request) {
         assertions,
         simulationModels,
         installations,
+        studyAreas,
         scenarioTemplates,
       };
     });

@@ -73,6 +73,10 @@ const routeRequests = await query('sum(vector_http_requests_total{route="/api/te
 assert.ok(Number(routeRequests.data.result[0]?.value[1]) >= 2);
 const databaseOperations = await query("sum(vector_database_operations_total)");
 assert.ok(Number(databaseOperations.data.result[0]?.value[1]) >= 1);
+const active = await query("sum(vector_scenario_runs_active)");
+assert.equal(Number(active.data.result[0]?.value[1] ?? 0), 0);
+const unmatched = await query("clamp_min((sum(increase(vector_scenario_runs_started_total[15m])) or vector(0)) - (sum(increase(vector_scenario_runs_completed_total[15m])) or vector(0)) - (sum(increase(vector_scenario_runs_failed_total[15m])) or vector(0)), 0)");
+assert.equal(Number(unmatched.data.result[0]?.value[1] ?? 0), 0);
 
 const dashboards = await fetch(`${grafanaUrl}/api/search?type=dash-db`, {
   headers: { authorization: grafanaAuthorization },
@@ -80,6 +84,16 @@ const dashboards = await fetch(`${grafanaUrl}/api/search?type=dash-db`, {
 const dashboardUids = new Set(dashboards.map((dashboard) => dashboard.uid));
 assert.ok(dashboardUids.has("vector-operations"));
 assert.ok(dashboardUids.has("vector-browser-performance"));
+
+const operationsDashboard = await fetch(`${grafanaUrl}/api/dashboards/uid/vector-operations`, {
+  headers: { authorization: grafanaAuthorization },
+}).then((response) => response.json());
+const operationPanelTitles = new Set(
+  operationsDashboard.dashboard.panels.map((panel) => panel.title),
+);
+assert.ok(operationPanelTitles.has("Runs missing a completion event · 15m"));
+assert.ok(operationPanelTitles.has("Browser runs slower than 250 ms · 1h"));
+assert.ok(operationPanelTitles.has("Mean declared entities per run"));
 
 const datasources = await fetch(`${grafanaUrl}/api/datasources`, {
   headers: { authorization: grafanaAuthorization },

@@ -47,6 +47,8 @@ export type Scenario = {
   blueSystemId: string;
   redObjectId: string;
   redSystemId: string;
+  studyAreaId: string;
+  weatherPresetId: string;
   blueWeaponQuantity: number;
   redWeaponQuantity: number;
   blueFuelPercent: number;
@@ -326,6 +328,8 @@ export const DEFAULT_SCENARIO: Scenario = {
   blueSystemId: "astra-mk1",
   redObjectId: "f-16c-block52-paf",
   redSystemId: "aim-120c5",
+  studyAreaId: "north-punjab",
+  weatherPresetId: "north-punjab-clear",
   blueWeaponQuantity: 2,
   redWeaponQuantity: 2,
   blueFuelPercent: 70,
@@ -419,6 +423,8 @@ export function simulate(
       blueSystemId: input.blueSystemId,
       redObjectId: input.redObjectId,
       redSystemId: input.redSystemId,
+      studyAreaId: input.studyAreaId,
+      weatherPresetId: input.weatherPresetId,
       profile: profileId,
       guidance: input.guidance,
       altitude: input.altitude,

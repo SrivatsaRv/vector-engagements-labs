@@ -10,6 +10,7 @@ VECTOR currently uses a deterministic three-dimensional point-mass reference eng
 - air-relative velocity with an explicit three-axis wind vector;
 - launch-state inheritance;
 - thrust taper, propellant mass depletion, aerodynamic drag, and gravity;
+- aircraft fuel mass, thrust demand, parasitic drag, induced drag, and load-factor-limited turning;
 - direct and commanded-loft guidance;
 - proportional-navigation acceleration demand with command limits;
 - moving target behavior and decision modifiers;
@@ -18,6 +19,10 @@ VECTOR currently uses a deterministic three-dimensional point-mass reference eng
 - closest approach, completion, energy/time termination, non-finite-state checks, and dry-mass margin diagnostics.
 
 Model coefficients are in versioned `simulation_models` rows. Public source assertions remain separate. Current coefficients are labeled model assumptions unless a field is genuinely source-backed.
+
+Aircraft motion uses the same standard atmosphere and wind field as a launched vehicle. The current aircraft coefficient set resolves dynamic pressure, load-factor lift demand, parasitic and induced drag, available thrust, fuel flow, mass, and the turn-rate limit on every fixed step. It is an educational point-mass model, not a flight-manual or manufacturer engine deck.
+
+Sensor and air-defence envelopes are scenario-declared volumes. Detection, tracking, engagement, and minimum-range rings remain separate, carry their own altitude bounds and value state, and follow their owning entity in playback. The current release does not infer those radii from transmitter power, radar cross-section, terrain, propagation, or electronic attack.
 
 ## Presentation truth
 

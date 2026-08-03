@@ -12,7 +12,9 @@
 | Compare | Controlled Variant A/Variant B comparison |
 | Report | Save, replay, print/PDF, JSON/telemetry export, and research citations |
 
-The current navigation is being converged on these terms. Brief, Forces, Flight, Conditions, and Review are Construct sections. Advanced repeatability tools remain enthusiast features and are not described as an Instructor Station.
+The interface uses these terms. Define, Forces & loadouts, Place & flight, Sensors & decisions, and Validate are Construct sections. Advanced repeatability tools remain enthusiast features and are not described as an Instructor Station. The complete builder contract is in [`scenario-builder.md`](scenario-builder.md).
+
+The mandatory analysis-display contract is documented in [`tacview-visual-subset.md`](tacview-visual-subset.md). It defines the Tacview-style subset precisely and explicitly excludes claims of Tacview file compatibility or NATO symbol compliance.
 
 ## Working vertical slice
 
@@ -21,7 +23,7 @@ The current navigation is being converged on these terms. Brief, Forces, Flight,
 - Explicit carried → launched → active → terminated weapon lifecycle.
 - Deterministic fixed-step browser physics, atmosphere, wind vector, changing mass, thrust, drag, gravity, proportional-navigation demand, and termination diagnostics.
 - Tactical symbols by affiliation and object kind; carried inventory is not rendered as a world track.
-- MapLibre minimal/satellite views backed by PostGIS public-reference installations.
+- MapLibre minimal basemap backed by PostGIS public-reference installations, with study-area boundaries, declared routes, recorded tracks, launches, and model-assumption coverage envelopes.
 - Engagement-scale map fitting for readable trajectories plus an explicit regional station-context extent.
 - Three.js playback with exact recorded tracks, ground projections, altitude curtains, altitude stems, and synchronized model time.
 - Small-multiple telemetry from the same engine frames.
@@ -47,4 +49,4 @@ PostgreSQL/PostGIS is the runtime authority. Schema creation is migration-only; 
 
 ## Verification
 
-`make ci-local` is the commit gate. `make integration-local` additionally verifies the live PostGIS catalog and the Save → View Report API contract, including rejected incomplete saves and missing-run reads. `make observability-local` verifies Prometheus metrics, Tempo traces, and provisioned Grafana dashboards. Docker Compose uses explicit image versions and health-gated migration/application startup. See [`observability.md`](observability.md) for the metric and dashboard contract.
+`make ci-local` is the commit gate. `make integration-local` additionally verifies the live PostGIS catalog and the Save → View Report API contract, including rejected incomplete saves and missing-run reads. `make observability-local` verifies Prometheus metrics, Tempo traces, and provisioned Grafana dashboards. `make performance-local` runs the deterministic engine benchmark and p95 regression guard. Docker Compose uses explicit image versions and health-gated migration/application startup. See [`observability.md`](observability.md) for the metric and dashboard contract.

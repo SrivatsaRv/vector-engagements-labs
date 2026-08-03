@@ -61,6 +61,7 @@ import {
 import { ENGINE_VERSION } from "@/lib/engine/version";
 import type { ReportData } from "@/lib/report-export";
 import { emitBrowserTelemetry } from "@/lib/observability/client";
+import type { StudyArea } from "@/lib/study-areas";
 import { sha256Hex } from "@/lib/canonical-json";
 import {
   isScenarioDefinition,
@@ -90,7 +91,13 @@ type EventItem = {
   title: string;
   detail: string;
 };
-const CONFIGURE_STEPS = ["Brief", "Forces", "Flight", "Conditions", "Review"];
+const CONFIGURE_STEPS = [
+  "Define",
+  "Forces & loadouts",
+  "Place & flight",
+  "Sensors & decisions",
+  "Validate",
+];
 
 export default function LabPage() {
   const searchParams = useSearchParams();
@@ -170,6 +177,7 @@ function LabWorkbench({
     "loading",
   );
   const [catalogInstallations, setCatalogInstallations] = useState<MapInstallation[]>([]);
+  const [catalogStudyAreas, setCatalogStudyAreas] = useState<StudyArea[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("TRUTH");
   const [playbackSurface, setPlaybackSurface] =
     useState<PlaybackSurface>("MAP");
@@ -193,6 +201,20 @@ function LabWorkbench({
           installations?: MapInstallation[];
           simulationModels?: Parameters<typeof registerDatabaseSimulationModels>[0];
           scenarioTemplates?: StoredScenarioPackage[];
+          studyAreas?: Array<{
+            id: StudyArea["id"];
+            name: string;
+            short_name: string;
+            description: string;
+            terrain_class: StudyArea["terrainClass"];
+            surface_elevation_m: number;
+            anchor_longitude: number;
+            anchor_latitude: number;
+            boundary: { coordinates: number[][][] };
+            environment_presets: StudyArea["weatherPresets"];
+            default_environment_preset_id: string;
+            source_class: StudyArea["sourceClass"];
+          }>;
         };
         if (active) {
           const template = payload.scenarioTemplates?.find(
@@ -208,7 +230,8 @@ function LabWorkbench({
             template.schema_version !== SCENARIO_PACKAGE_SCHEMA_VERSION ||
             template.engine_version !== ENGINE_VERSION ||
             !isScenarioDefinition(template.package) ||
-            !payload.simulationModels?.length
+            !payload.simulationModels?.length ||
+            !payload.studyAreas?.length
           ) {
             throw new Error("catalog package incomplete");
           }
@@ -229,6 +252,27 @@ function LabWorkbench({
           });
           setCatalogState("POSTGIS");
           setCatalogInstallations(payload.installations ?? []);
+          setCatalogStudyAreas(
+            payload.studyAreas.map((area) => ({
+              id: area.id,
+              name: area.name,
+              shortName: area.short_name,
+              description: area.description,
+              terrainClass: area.terrain_class,
+              surfaceElevationM: area.surface_elevation_m,
+              anchor: {
+                longitude: Number(area.anchor_longitude),
+                latitude: Number(area.anchor_latitude),
+              },
+              bounds: [
+                area.boundary.coordinates[0][0] as [number, number],
+                area.boundary.coordinates[0][2] as [number, number],
+              ],
+              weatherPresets: area.environment_presets,
+              defaultWeatherPresetId: area.default_environment_preset_id,
+              sourceClass: area.source_class,
+            })),
+          );
         }
       })
       .catch(() => {
@@ -523,6 +567,8 @@ function LabWorkbench({
             wind: scenario.wind,
             temperatureOffset: scenario.temperatureOffset,
             atmosphere: "NASA educational standard atmosphere",
+            studyAreaId: scenario.studyAreaId,
+            weatherPresetId: scenario.weatherPresetId,
           },
           modelAssumptions: {
             report,
@@ -620,6 +666,7 @@ function LabWorkbench({
           step={buildStep}
           setStep={setBuildStep}
           validations={validations}
+          studyAreas={catalogStudyAreas}
           run={run}
         />
       )}
@@ -878,6 +925,7 @@ function ConfigureWorkspace({
   step,
   setStep,
   validations,
+  studyAreas,
   run,
 }: {
   definition: ScenarioDefinition;
@@ -888,6 +936,7 @@ function ConfigureWorkspace({
   step: number;
   setStep: (value: number) => void;
   validations: ValidationItem[];
+  studyAreas: StudyArea[];
   run: () => void;
 }) {
   const update = <K extends keyof Scenario>(key: K, value: Scenario[K]) =>
@@ -921,6 +970,31 @@ function ConfigureWorkspace({
     scenario.altitude,
     scenario.temperatureOffset,
   );
+  const selectedStudyArea =
+    studyAreas.find((area) => area.id === scenario.studyAreaId) ?? studyAreas[0];
+  const selectedWeather = selectedStudyArea?.weatherPresets.find(
+    (preset) => preset.id === scenario.weatherPresetId,
+  );
+  const selectStudyArea = (area: StudyArea) => {
+    const preset = area.weatherPresets.find(
+      (candidate) => candidate.id === area.defaultWeatherPresetId,
+    ) ?? area.weatherPresets[0];
+    setScenario((current) => ({
+      ...current,
+      studyAreaId: area.id,
+      weatherPresetId: preset.id,
+      temperatureOffset: preset.temperatureOffsetC,
+      wind: preset.windEastMps,
+    }));
+  };
+  const selectWeather = (preset: StudyArea["weatherPresets"][number]) => {
+    setScenario((current) => ({
+      ...current,
+      weatherPresetId: preset.id,
+      temperatureOffset: preset.temperatureOffsetC,
+      wind: preset.windEastMps,
+    }));
+  };
   const selectSystem = (id: string) => {
     const object = getCatalogObject(id);
     setScenario((current) => ({
@@ -956,22 +1030,22 @@ function ConfigureWorkspace({
   };
   const headings = [
     [
-      "Brief",
+      "Define",
       "What is this run comparing?",
       "This library template is already configured. Edit the run name or purpose only when you want a different comparison.",
     ],
     [
-      "Forces",
+      "Forces & loadouts",
       "Who is fighting, and what is each side carrying?",
       "Review the aircraft variant, fitted systems, selected weapon, quantity, fuel state, and source coverage for both teams.",
     ],
     [
-      "Flight",
+      "Place & flight",
       "Where and how does the fight begin?",
       "Set distance, altitude, speed, crossing angle, and the weapon flight path. Derived atmosphere and geometry update from these inputs.",
     ],
     [
-      "Conditions",
+      "Sensors & decisions",
       fixed
         ? "Which fixed-objective conditions apply?"
         : "What can each side see, and what will each side do?",
@@ -980,7 +1054,7 @@ function ConfigureWorkspace({
         : "Set the Red aircraft maneuver, radar and data-link state, electronic warfare, and the next tactical decision.",
     ],
     [
-      "Review",
+      "Validate",
       "Review the configured experiment.",
       "The template is ready when its setup checks pass. These checks test completeness and consistency; they do not certify real-world performance.",
     ],
@@ -1204,6 +1278,48 @@ function ConfigureWorkspace({
         )}
         {step === 2 && (
           <section className="authoring-section">
+            <div className="placement-section">
+              <header>
+                <span>STUDY AREA</span>
+                <strong>Choose the geographic and atmospheric context.</strong>
+                <p>
+                  The selected area sets the map anchor, terrain elevation, and
+                  available weather presets. It does not create an operational
+                  route or claim a real engagement location.
+                </p>
+              </header>
+              <div className="study-area-grid">
+                {studyAreas.map((area) => (
+                  <button
+                    key={area.id}
+                    className={scenario.studyAreaId === area.id ? "active" : ""}
+                    onClick={() => selectStudyArea(area)}
+                  >
+                    <strong>{area.shortName}</strong>
+                    <small>{area.terrainClass.toLowerCase().replaceAll("_", " ")} · {area.surfaceElevationM} m reference terrain</small>
+                    <span>{area.description}</span>
+                  </button>
+                ))}
+              </div>
+              {selectedStudyArea && (
+                <div className="weather-preset-grid">
+                  <span>Weather preset for {selectedStudyArea.shortName}</span>
+                  {selectedStudyArea.weatherPresets.map((preset) => (
+                    <button
+                      key={preset.id}
+                      className={scenario.weatherPresetId === preset.id ? "active" : ""}
+                      onClick={() => selectWeather(preset)}
+                    >
+                      <strong>{preset.label}</strong>
+                      <small>{preset.description}</small>
+                      <em>
+                        ISA {preset.temperatureOffsetC >= 0 ? "+" : ""}{preset.temperatureOffsetC} °C · wind {preset.windEastMps} E / {preset.windNorthMps} N m/s · visibility {preset.visibilityKm} km
+                      </em>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="compact-controls">
               <Range
                 label="Starting distance"
@@ -1530,10 +1646,10 @@ function ConfigureWorkspace({
                 <span>Run purpose</span>
                 <strong>{scenario.name}</strong>
                 <p>{scenario.objective}</p>
-                <button onClick={() => setStep(0)}>Edit brief</button>
+                <button onClick={() => setStep(0)}>Edit definition</button>
               </div>
               <div>
-                <span>Forces</span>
+                <span>Forces &amp; loadouts</span>
                 <strong>
                   Blue · {bluePlatform.designation} / {blueSystem.designation}
                 </strong>
@@ -1546,18 +1662,19 @@ function ConfigureWorkspace({
                 <button onClick={() => setStep(1)}>Edit forces</button>
               </div>
               <div>
-                <span>Flight</span>
+                <span>Place &amp; flight</span>
                 <strong>
                   {scenario.range / 1000} km · {scenario.guidance} path
                 </strong>
                 <p>
+                  {selectedStudyArea?.shortName ?? "Study area unavailable"} · {selectedWeather?.label ?? "weather not selected"} · {" "}
                   {scenario.altitude} m launch elevation
                   {fixed ? "" : ` · ${scenario.aspect}° aspect`}
                 </p>
                 <button onClick={() => setStep(2)}>Edit flight</button>
               </div>
               <div>
-                <span>Conditions</span>
+                <span>Sensors &amp; decisions</span>
                 <strong>
                   {fixed
                     ? "Fixed objective"
@@ -1630,7 +1747,9 @@ function ConfigureWorkspace({
           <dt>Starting distance</dt>
           <dd>{scenario.range / 1000} km</dd>
           <dt>Environment</dt>
-          <dd>{definition.environment}</dd>
+          <dd>
+            {selectedStudyArea?.shortName ?? definition.environment} · {selectedWeather?.label ?? "weather preset unavailable"}
+          </dd>
         </dl>
         <section className="preset-basis">
           <strong>Why these starting values?</strong>

@@ -20,16 +20,21 @@ export type BrowserTelemetryEvent =
   | { type: "browser_long_task"; durationMs: number }
   | { type: "browser_navigation"; durationMs: number };
 
+let telemetryQueue = Promise.resolve();
+
 export function emitBrowserTelemetry(event: BrowserTelemetryEvent) {
   const payload = JSON.stringify(event);
-  if (typeof navigator !== "undefined" && navigator.sendBeacon) {
-    navigator.sendBeacon("/api/telemetry", new Blob([payload], { type: "application/json" }));
-    return;
-  }
-  void fetch("/api/telemetry", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: payload,
-    keepalive: true,
-  });
+  // Preserve start → completion ordering. A pair of independent sendBeacon
+  // calls can be observed in reverse order, leaving an active-run gauge stale.
+  telemetryQueue = telemetryQueue
+    .catch(() => undefined)
+    .then(async () => {
+      await fetch("/api/telemetry", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: payload,
+        keepalive: true,
+      });
+    })
+    .catch(() => undefined);
 }

@@ -83,10 +83,16 @@ function guidanceHeld(
   );
 }
 
-function updateKinematicEntity(state: RuntimeState, time: number, dt: number) {
+function updateKinematicEntity(
+  state: RuntimeState,
+  scenario: EngineScenario,
+  time: number,
+  dt: number,
+) {
   if (state.lifecycle !== "ACTIVE" && state.lifecycle !== "TRACKING") return;
   const { behavior, kind } = state.definition;
   if (kind !== "AIRCRAFT") return;
+  const model = state.definition.aircraft;
   const speed = Math.max(1, magnitude(state.velocity));
   let turnDemand = 0;
   if (behavior.maneuver !== "steady" && time >= 5) {
@@ -95,17 +101,54 @@ function updateKinematicEntity(state: RuntimeState, time: number, dt: number) {
         ? behavior.commandedG
         : behavior.commandedG * Math.sin(time * 0.55);
   }
-  const turnRate = (turnDemand * G0) / speed;
+  const limitedTurnDemand = model
+    ? Math.max(-model.maximumCommandG, Math.min(model.maximumCommandG, turnDemand))
+    : turnDemand;
+  const atmosphere = standardAtmosphere(
+    state.position.z,
+    scenario.environment.temperatureOffsetC,
+  );
+  const airRelative = subtract(state.velocity, activeWind(scenario, time));
+  const airspeed = Math.max(1, magnitude(airRelative));
+  let longitudinalAcceleration = 0;
+  if (model) {
+    const dynamicPressure = Math.max(1, 0.5 * atmosphere.densityKgM3 * airspeed * airspeed);
+    const loadFactor = Math.sqrt(1 + limitedTurnDemand * limitedTurnDemand);
+    const liftCoefficient =
+      (state.massKg * G0 * loadFactor) /
+      (dynamicPressure * model.referenceAreaM2);
+    const dragCoefficient =
+      model.zeroLiftDragCoefficient +
+      model.inducedDragFactor * liftCoefficient * liftCoefficient;
+    const drag = dynamicPressure * model.referenceAreaM2 * dragCoefficient;
+    const thrustDemand = Math.min(
+      model.maximumThrustNewtons,
+      drag * (limitedTurnDemand === 0 ? 1.02 : 1.18),
+    );
+    const fuelFlow =
+      state.fuelKg > 0
+        ? thrustDemand * model.specificFuelConsumptionKgPerNewtonSecond
+        : 0;
+    const consumed = Math.min(state.fuelKg, fuelFlow * dt);
+    state.fuelKg -= consumed;
+    state.massKg = Math.max(model.emptyMassKg, state.massKg - consumed);
+    state.dragNewtons = drag;
+    state.thrustNewtons = state.fuelKg > 0 ? thrustDemand : 0;
+    longitudinalAcceleration =
+      (state.thrustNewtons - state.dragNewtons) / state.massKg;
+    state.availableG = model.maximumCommandG;
+  }
+  const nextSpeed = Math.max(60, speed + longitudinalAcceleration * dt);
+  const turnRate = (limitedTurnDemand * G0) / nextSpeed;
   state.headingRad += turnRate * dt;
-  const horizontalSpeed = Math.hypot(state.velocity.x, state.velocity.y);
   state.velocity = {
-    x: Math.cos(state.headingRad) * horizontalSpeed,
-    y: Math.sin(state.headingRad) * horizontalSpeed,
+    x: Math.cos(state.headingRad) * nextSpeed,
+    y: Math.sin(state.headingRad) * nextSpeed,
     z: state.velocity.z,
   };
   state.position = add(state.position, scale(state.velocity, dt));
-  state.commandedG = Math.abs(turnDemand);
-  state.phase = turnDemand === 0 ? "Steady flight" : "Commanded maneuver";
+  state.commandedG = Math.abs(limitedTurnDemand);
+  state.phase = limitedTurnDemand === 0 ? "Steady flight" : "Commanded maneuver";
 }
 
 function activateWeapon(
@@ -411,7 +454,7 @@ export function runEngine(scenario: EngineScenario): EngineRun {
   ) {
     for (const state of states.values()) activateWeapon(state, states, time);
     for (const state of states.values())
-      updateKinematicEntity(state, time, scenario.fixedStepSeconds);
+      updateKinematicEntity(state, scenario, time, scenario.fixedStepSeconds);
     for (const state of states.values())
       updateWeapon(state, states, scenario, time, scenario.fixedStepSeconds);
     integratedSteps += 1;

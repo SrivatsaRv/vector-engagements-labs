@@ -4,6 +4,7 @@ import { findPlatform, findWeapon } from "./capability-data.ts";
 import { getCatalogObject } from "./object-catalog.ts";
 import { ENGINE_VERSION } from "./engine/version.ts";
 import { findWeaponSimulationModel } from "./simulation-models.ts";
+import { STUDY_AREAS } from "./study-areas.ts";
 
 export type ValidationState = "pass" | "warning" | "error";
 export type ValidationItem = {
@@ -34,6 +35,10 @@ export function validateScenario(
     scenario.bluePlatformId === "su-30mki" &&
     scenario.blueSystemId === "astra-mk1";
   const targetAltitude = scenario.altitude + scenario.targetDelta;
+  const studyArea = STUDY_AREAS.find((area) => area.id === scenario.studyAreaId);
+  const weatherPreset = studyArea?.weatherPresets.find(
+    (preset) => preset.id === scenario.weatherPresetId,
+  );
   const cruiseAltitudeValid =
     scenario.domain !== "G2G" || scenario.cruiseAltitude >= 30;
   const targetStateFits =
@@ -51,8 +56,20 @@ export function validateScenario(
         : "Run purpose is missing",
       detail: scenario.objective.trim()
         ? scenario.objective
-        : "Add a plain-language purpose in Brief.",
+        : "Add a plain-language purpose in Define.",
       state: scenario.objective.trim() ? "pass" : "error",
+    },
+    {
+      id: "spatial-context",
+      label:
+        studyArea && weatherPreset
+          ? "Study area and weather preset are defined"
+          : "Study area or weather preset is unavailable",
+      detail:
+        studyArea && weatherPreset
+          ? `${studyArea.shortName} · ${studyArea.terrainClass.toLowerCase().replaceAll("_", " ")} · ${studyArea.surfaceElevationM} m reference terrain · ${weatherPreset.label}`
+          : "Choose a PostGIS-backed study area and one of its declared weather presets.",
+      state: studyArea && weatherPreset ? "pass" : "error",
     },
     {
       id: "flight-model",

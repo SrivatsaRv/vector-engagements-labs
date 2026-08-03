@@ -36,6 +36,7 @@ export type EngineEntityDefinition = {
   affiliation: Affiliation;
   kind: EntityKind;
   lifecycle: EntityLifecycle;
+  route?: Vec3[];
   initial: {
     position: Vec3;
     velocity: Vec3;
@@ -74,6 +75,16 @@ export type EngineEntityDefinition = {
     minimumAltitudeM: number;
     maximumAltitudeM: number;
   };
+  aircraft?: {
+    emptyMassKg: number;
+    fuelCapacityKg: number;
+    referenceAreaM2: number;
+    zeroLiftDragCoefficient: number;
+    inducedDragFactor: number;
+    maximumThrustNewtons: number;
+    specificFuelConsumptionKgPerNewtonSecond: number;
+    maximumCommandG: number;
+  };
   provenance: {
     sourceObjectId: string;
     modelVersion: string;
@@ -95,6 +106,15 @@ export type EngineScenario = {
     temperatureOffsetC: number;
     windMps: Vec3;
     atmosphere: "NASA_EDUCATIONAL_STANDARD";
+    studyArea: {
+      id: string;
+      name: string;
+      terrainClass: string;
+      surfaceElevationM: number;
+      anchor: { longitude: number; latitude: number };
+      bounds: [[number, number], [number, number]];
+      weatherPresetId: string;
+    };
   };
   completion: {
     distanceMeters: number;

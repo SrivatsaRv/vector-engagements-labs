@@ -24,7 +24,7 @@ The S-200 template is a historical public-reference case and does not claim curr
 
 ## Template-to-report version chain
 
-1. A template is stored under immutable `(id, version)` identity with `vector.scenario.v1`, engine version, canonical JSON package, and SHA-256 content hash.
+1. A template is stored under immutable `(id, version)` identity with `vector.scenario.v2`, engine version, canonical JSON package, study-area identity, weather-preset identity, and SHA-256 content hash.
 2. `/api/catalog` returns that exact package. The browser recomputes the hash before allowing a run.
 3. Construct edits produce a draft revision derived from the loaded package without mutating the template row.
 4. The compiler resolves the draft into the complete engine scenario: entities, events, environment, model IDs, model versions, and seed.

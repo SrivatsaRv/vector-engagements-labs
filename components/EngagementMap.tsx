@@ -1,11 +1,9 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import type { RaspTrack, SimulationResult } from "@/lib/simulation";
 import { getFrameAt } from "@/lib/simulation";
-import { DEFAULT_MAP_ORIGIN } from "@/lib/installations";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
 import { emitBrowserTelemetry } from "@/lib/observability/client";
 
@@ -24,7 +22,6 @@ type Props = {
   installations: MapInstallation[];
   raspTrack?: RaspTrack;
 };
-type Basemap = "MINIMAL" | "SATELLITE";
 type MapScope = "ENGAGEMENT" | "REGION";
 
 const minimalStyle = {
@@ -42,45 +39,38 @@ const minimalStyle = {
   },
   layers: [{ id: "carto", type: "raster" as const, source: "carto" }],
 };
-const satelliteStyle = {
-  version: 8 as const,
-  sources: {
-    imagery: {
-      type: "raster" as const,
-      tiles: [
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      ],
-      tileSize: 256,
-      attribution: "Esri World Imagery",
-    },
-  },
-  layers: [{ id: "imagery", type: "raster" as const, source: "imagery" }],
-};
-const regionalFallback = {
-  MINIMAL:
-    "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/export?bbox=64,23,84,40&bboxSR=4326&imageSR=4326&size=1600,900&format=png32&f=image",
-  SATELLITE:
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=64,23,84,40&bboxSR=4326&imageSR=4326&size=1600,900&format=png32&f=image",
-} satisfies Record<Basemap, string>;
+type MapOrigin = { longitude: number; latitude: number };
 
-function localToLngLat(position: { x: number; y: number }) {
-  const latitude = DEFAULT_MAP_ORIGIN.latitude + position.y / 111320;
+function localToLngLat(position: { x: number; y: number }, origin: MapOrigin) {
+  const latitude = origin.latitude + position.y / 111320;
   const longitude =
-    DEFAULT_MAP_ORIGIN.longitude +
-    position.x / (111320 * Math.cos((DEFAULT_MAP_ORIGIN.latitude * Math.PI) / 180));
+    origin.longitude +
+    position.x / (111320 * Math.cos((origin.latitude * Math.PI) / 180));
   return [longitude, latitude] as [number, number];
+}
+
+function circlePolygon(center: [number, number], radiusM: number) {
+  const [longitude, latitude] = center;
+  const points = Array.from({ length: 65 }, (_, index) => {
+    const angle = (index / 64) * Math.PI * 2;
+    const north = Math.sin(angle) * radiusM;
+    const east = Math.cos(angle) * radiusM;
+    return localToLngLat({ x: east, y: north }, { longitude, latitude });
+  });
+  return [points];
 }
 
 export function EngagementMap({ result, time, installations, raspTrack }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
   const markers = useRef<Map<string, import("maplibre-gl").Marker>>(new Map());
-  const [basemap, setBasemap] = useState<Basemap>("MINIMAL");
   const [mapScope, setMapScope] = useState<MapScope>("ENGAGEMENT");
   const [mapStatus, setMapStatus] = useState<"loading" | "ready" | "error">(
     "loading",
   );
   const [mapError, setMapError] = useState("");
+  const spatial = result.engineRun.scenario.environment.studyArea;
+  const origin = spatial.anchor;
 
   useEffect(() => {
     if (!mount.current) return;
@@ -93,12 +83,14 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
       if (disposed || !mount.current) return;
       const map = new maplibregl.Map({
         container: mount.current,
-        style: basemap === "MINIMAL" ? minimalStyle : satelliteStyle,
-        center: [DEFAULT_MAP_ORIGIN.longitude, DEFAULT_MAP_ORIGIN.latitude],
+        style: minimalStyle,
+        center: [origin.longitude, origin.latitude],
         zoom: 5.3,
         pitch: 34,
         bearing: 0,
         attributionControl: false,
+        dragRotate: true,
+        touchPitch: true,
       });
       map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
       map.on("error", (event) => {
@@ -112,6 +104,30 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
         }
       });
       map.on("load", () => {
+        const [[west, south], [east, north]] = spatial.bounds;
+        map.addSource("study-area", {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: { name: spatial.name },
+            geometry: {
+              type: "Polygon",
+              coordinates: [[[west, south], [east, south], [east, north], [west, north], [west, south]]],
+            },
+          },
+        });
+        map.addLayer({
+          id: "study-area-fill",
+          type: "fill",
+          source: "study-area",
+          paint: { "fill-color": "#2f6fb5", "fill-opacity": 0.035 },
+        });
+        map.addLayer({
+          id: "study-area-outline",
+          type: "line",
+          source: "study-area",
+          paint: { "line-color": "#6688a8", "line-width": 1, "line-dasharray": [5, 4] },
+        });
         map.addSource("public-installations", {
           type: "geojson",
           data: {
@@ -123,32 +139,105 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
             })),
           },
         });
-        map.addLayer({
-          id: "public-installations",
-          type: "circle",
-          source: "public-installations",
-          paint: {
-            "circle-radius": 4,
-            "circle-color": ["match", ["get", "service"], "IAF", "#2f6fb5", "#a94f45"],
-            "circle-stroke-width": 1.5,
-            "circle-stroke-color": "#ffffff",
+        for (const installation of installations) {
+          const element = document.createElement("div");
+          element.className = "map-tactical-marker map-installation-marker";
+          const affiliation = installation.service === "IAF" ? "BLUE" : "RED";
+          element.innerHTML = `${tacticalSymbolMarkup("BASE", affiliation, "ACTIVE")}<span></span>`;
+          const label = element.querySelector("span");
+          if (label) label.textContent = installation.name;
+          element.title = `${installation.service} public-reference station · ${installation.name}`;
+          const marker = new maplibregl.Marker({ element, anchor: "center" })
+            .setLngLat([installation.longitude, installation.latitude])
+            .addTo(map);
+          currentMarkers.set(`installation:${installation.id}`, marker);
+        }
+        map.addSource("coverage-envelopes", {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: result.envelopes
+              .filter((envelope) => envelope.radiusM > 0)
+              .map((envelope) => {
+                const definition = result.engineRun.scenario.entities.find(
+                  (entity) => entity.id === envelope.entityId,
+                );
+                const center = localToLngLat(
+                  definition?.initial.position ?? { x: 0, y: 0 },
+                  origin,
+                );
+                return {
+                  type: "Feature" as const,
+                  properties: {
+                    id: envelope.id,
+                    kind: envelope.kind,
+                    affiliation: envelope.affiliation,
+                    label: envelope.label,
+                  },
+                  geometry: {
+                    type: "Polygon" as const,
+                    coordinates: circlePolygon(center, envelope.radiusM),
+                  },
+                };
+              }),
           },
         });
         map.addLayer({
-          id: "public-installation-labels",
-          type: "symbol",
-          source: "public-installations",
-          minzoom: 5.5,
-          layout: {
-            "text-field": ["get", "name"],
-            "text-size": 10,
-            "text-offset": [0, 1.1],
-            "text-anchor": "top",
-          },
+          id: "coverage-envelopes-fill",
+          type: "fill",
+          source: "coverage-envelopes",
           paint: {
-            "text-color": basemap === "SATELLITE" ? "#ffffff" : "#3f4a53",
-            "text-halo-color": basemap === "SATELLITE" ? "#1c252c" : "#ffffff",
-            "text-halo-width": 1,
+            "fill-color": [
+              "match", ["get", "kind"],
+              "DETECTION", "#5c7f9f",
+              "TRACKING", "#8e6a35",
+              "ENGAGEMENT", "#a94f45",
+              "#8b8f91",
+            ],
+            "fill-opacity": ["match", ["get", "kind"], "MINIMUM_RANGE", 0.04, 0.075],
+          },
+        });
+        map.addLayer({
+          id: "coverage-envelopes-outline",
+          type: "line",
+          source: "coverage-envelopes",
+          paint: {
+            "line-color": [
+              "match", ["get", "kind"],
+              "DETECTION", "#5c7f9f",
+              "TRACKING", "#8e6a35",
+              "ENGAGEMENT", "#a94f45",
+              "#8b8f91",
+            ],
+            "line-width": 1.25,
+            "line-dasharray": [4, 3],
+          },
+        });
+        map.addSource("declared-routes", {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: result.engineRun.scenario.entities
+              .filter((entity) => entity.route && entity.route.length > 1)
+              .map((entity) => ({
+                type: "Feature" as const,
+                properties: { affiliation: entity.affiliation, kind: entity.kind },
+                geometry: {
+                  type: "LineString" as const,
+                  coordinates: entity.route!.map((point) => localToLngLat(point, origin)),
+                },
+              })),
+          },
+        });
+        map.addLayer({
+          id: "declared-routes",
+          type: "line",
+          source: "declared-routes",
+          paint: {
+            "line-color": ["match", ["get", "affiliation"], "BLUE", "#2f6fb5", "RED", "#a94f45", "#606b73"],
+            "line-width": 1,
+            "line-opacity": 0.42,
+            "line-dasharray": [7, 5],
           },
         });
         map.addSource("entity-tracks", {
@@ -165,10 +254,85 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
             "line-opacity": 0.8,
           },
         });
+        map.addSource("direction-vectors", {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+        map.addLayer({
+          id: "direction-vectors",
+          type: "line",
+          source: "direction-vectors",
+          paint: {
+            "line-color": ["match", ["get", "affiliation"], "BLUE", "#1f5f9e", "RED", "#983f36", "#4f5960"],
+            "line-width": 2,
+          },
+        });
+        const launchFeatures = result.engineRun.scenario.entities
+          .filter(
+            (entity) =>
+              Boolean(entity.weapon) && entity.weapon!.launchTimeSeconds !== null,
+          )
+          .map((entity) => {
+            const launchTime = entity.weapon?.launchTimeSeconds ?? 0;
+            const frame = result.frames.reduce((closest, candidate) =>
+              Math.abs(candidate.t - launchTime) < Math.abs(closest.t - launchTime)
+                ? candidate
+                : closest,
+            );
+            const launched = frame.entities.find((candidate) => candidate.id === entity.id);
+            const platform = frame.entities.find(
+              (candidate) => candidate.id === entity.weapon?.launchPlatformId,
+            );
+            return {
+              type: "Feature" as const,
+              properties: {
+                label: `${entity.designation} launch`,
+                affiliation: entity.affiliation,
+                modelTime: launchTime,
+              },
+              geometry: {
+                type: "Point" as const,
+                coordinates: localToLngLat(
+                  launched?.position ?? platform?.position ?? entity.initial.position,
+                  origin,
+                ),
+              },
+            };
+          });
+        map.addSource("launch-events", {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: launchFeatures },
+        });
+        map.addLayer({
+          id: "launch-events",
+          type: "circle",
+          source: "launch-events",
+          filter: ["<=", ["get", "modelTime"], 0],
+          paint: {
+            "circle-radius": 6,
+            "circle-color": "#ffffff",
+            "circle-stroke-width": 2,
+            "circle-stroke-color": ["match", ["get", "affiliation"], "BLUE", "#2f6fb5", "#a94f45"],
+          },
+        });
+        map.addLayer({
+          id: "launch-event-labels",
+          type: "symbol",
+          source: "launch-events",
+          filter: ["<=", ["get", "modelTime"], 0],
+          minzoom: 6,
+          layout: {
+            "text-field": ["concat", ["get", "label"], " · T+", ["to-string", ["get", "modelTime"]], "s"],
+            "text-size": 10,
+            "text-offset": [0, 1.4],
+            "text-anchor": "top",
+          },
+          paint: { "text-color": "#34424c", "text-halo-color": "#ffffff", "text-halo-width": 1 },
+        });
         setMapStatus("ready");
         emitBrowserTelemetry({
           type: "map_loaded",
-          basemap,
+          basemap: "MINIMAL",
           durationMs: performance.now() - mapStartedAt,
         });
       });
@@ -179,7 +343,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
       setMapError(error instanceof Error ? error.message : "Map renderer could not be loaded");
       emitBrowserTelemetry({
         type: "map_failed",
-        basemap,
+        basemap: "MINIMAL",
         durationMs: performance.now() - mapStartedAt,
       });
     });
@@ -190,25 +354,19 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [basemap, installations]);
+  }, [installations, origin, result, spatial]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || mapStatus !== "ready") return;
     if (mapScope === "REGION") {
-      map.fitBounds(
-        [
-          [66, 25],
-          [79.5, 36],
-        ],
-        { padding: 46, duration: 250, pitch: 18 },
-      );
+      map.fitBounds(spatial.bounds, { padding: 46, duration: 250, pitch: 18 });
       return;
     }
     const coordinates = result.frames.flatMap((frame) =>
       frame.entities
         .filter((entity) => entity.lifecycle !== "STOWED")
-        .map((entity) => localToLngLat(entity.position)),
+        .map((entity) => localToLngLat(entity.position, origin)),
     );
     if (coordinates.length < 2) return;
     const longitudes = coordinates.map(([longitude]) => longitude);
@@ -220,16 +378,20 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
       ],
       { padding: 86, duration: 250, maxZoom: 9.4, pitch: 26 },
     );
-  }, [mapScope, mapStatus, result]);
+  }, [mapScope, mapStatus, origin, result, spatial.bounds]);
 
   useEffect(() => {
     const map = mapRef.current;
     const frame = getFrameAt(result, time);
-    if (!map || !frame || !map.isStyleLoaded()) return;
+    if (!map || !frame || mapStatus !== "ready") return;
     import("maplibre-gl").then((maplibregl) => {
       const visibleEntityIds = new Set(frame.entities.map((entity) => entity.id));
       for (const [id, marker] of markers.current.entries()) {
-        if (id === "rasp-uncertainty" || visibleEntityIds.has(id)) continue;
+        if (
+          id === "rasp-uncertainty" ||
+          id.startsWith("installation:") ||
+          visibleEntityIds.has(id)
+        ) continue;
         marker.remove();
         markers.current.delete(id);
       }
@@ -247,11 +409,15 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           if (label) label.textContent = entity.callsign || entity.designation;
           element.title = `${entity.designation} · ${entity.lifecycle.toLowerCase()}`;
           const createdMarker = new maplibregl.Marker({ element, anchor: "center" });
-          createdMarker.setLngLat(localToLngLat(displayPosition)).addTo(map);
+          createdMarker.setLngLat(localToLngLat(displayPosition, origin)).addTo(map);
           markers.current.set(entity.id, createdMarker);
           marker = createdMarker;
         }
-        marker.setLngLat(localToLngLat(displayPosition));
+        marker.setLngLat(localToLngLat(displayPosition, origin));
+        marker.getElement().style.setProperty(
+          "--entity-heading",
+          `${90 - (entity.headingRad * 180) / Math.PI}deg`,
+        );
         marker.getElement().classList.toggle("is-stowed", entity.lifecycle === "STOWED");
         marker.getElement().classList.toggle(
           "is-hidden-track",
@@ -264,11 +430,11 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           const element = document.createElement("div");
           element.className = "map-rasp-uncertainty";
           uncertainty = new maplibregl.Marker({ element, anchor: "center" })
-            .setLngLat(localToLngLat(raspTrack.position))
+            .setLngLat(localToLngLat(raspTrack.position, origin))
             .addTo(map);
           markers.current.set("rasp-uncertainty", uncertainty);
         }
-        uncertainty.setLngLat(localToLngLat(raspTrack.position));
+        uncertainty.setLngLat(localToLngLat(raspTrack.position, origin));
         uncertainty.getElement().style.setProperty(
           "--track-uncertainty",
           `${Math.max(18, Math.min(82, raspTrack.uncertaintyMeters / 55))}px`,
@@ -291,42 +457,93 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
               .filter((sample) => sample.t <= time)
               .map((sample) => sample.entities.find((item) => item.id === entity.id))
               .filter((item) => item && item.lifecycle !== "STOWED")
-              .map((item) => localToLngLat(item!.position)),
+              .map((item) => localToLngLat(item!.position, origin)),
           },
         })),
       });
+      const vectors = map.getSource("direction-vectors") as import("maplibre-gl").GeoJSONSource | undefined;
+      vectors?.setData({
+        type: "FeatureCollection",
+        features: frame.entities
+          .filter((entity) => entity.lifecycle !== "STOWED")
+          .map((entity) => {
+            const lengthSeconds = entity.kind === "GUIDED_WEAPON" ? 5 : 12;
+            return {
+              type: "Feature" as const,
+              properties: { affiliation: entity.affiliation, kind: entity.kind },
+              geometry: {
+                type: "LineString" as const,
+                coordinates: [
+                  localToLngLat(entity.position, origin),
+                  localToLngLat(
+                    {
+                      x: entity.position.x + entity.velocity.x * lengthSeconds,
+                      y: entity.position.y + entity.velocity.y * lengthSeconds,
+                    },
+                    origin,
+                  ),
+                ],
+              },
+            };
+          }),
+      });
+      const coverage = map.getSource("coverage-envelopes") as import("maplibre-gl").GeoJSONSource | undefined;
+      coverage?.setData({
+        type: "FeatureCollection",
+        features: result.envelopes
+          .filter((envelope) => envelope.radiusM > 0)
+          .flatMap((envelope) => {
+            const owner = frame.entities.find(
+              (entity) => entity.id === envelope.entityId,
+            );
+            if (!owner || owner.lifecycle === "STOWED") return [];
+            return [{
+              type: "Feature" as const,
+              properties: {
+                id: envelope.id,
+                kind: envelope.kind,
+                affiliation: envelope.affiliation,
+                label: envelope.label,
+                minimumAltitudeM: envelope.minimumAltitudeM,
+                maximumAltitudeM: envelope.maximumAltitudeM,
+                valueState: envelope.valueState,
+              },
+              geometry: {
+                type: "Polygon" as const,
+                coordinates: circlePolygon(
+                  localToLngLat(owner.position, origin),
+                  envelope.radiusM,
+                ),
+              },
+            }];
+          }),
+      });
+      const launchFilter: import("maplibre-gl").FilterSpecification = [
+        "<=",
+        ["get", "modelTime"],
+        time,
+      ];
+      map.setFilter("launch-events", launchFilter);
+      map.setFilter("launch-event-labels", launchFilter);
     });
-  }, [result, time, basemap, raspTrack]);
+  }, [mapStatus, origin, result, time, raspTrack]);
 
   return (
     <div className="engagement-map-shell">
-      <div className="map-basemap-switch" aria-label="Basemap">
-        <button className={basemap === "MINIMAL" ? "active" : ""} onClick={() => setBasemap("MINIMAL")}>Minimal</button>
-        <button className={basemap === "SATELLITE" ? "active" : ""} onClick={() => setBasemap("SATELLITE")}>Satellite</button>
-      </div>
       <div className="map-scope-switch" aria-label="Map extent">
         <button
           className={mapScope === "ENGAGEMENT" ? "active" : ""}
           onClick={() => setMapScope("ENGAGEMENT")}
         >
-          Engagement
+          Fit run
         </button>
         <button
           className={mapScope === "REGION" ? "active" : ""}
           onClick={() => setMapScope("REGION")}
         >
-          Region
+          Study area
         </button>
       </div>
-      <Image
-        className="map-static-fallback"
-        src={regionalFallback[basemap]}
-        alt=""
-        aria-hidden="true"
-        fill
-        sizes="100vw"
-        unoptimized
-      />
       <div ref={mount} className="engagement-map" aria-label="Geographic engagement map" />
       {mapStatus !== "ready" && (
         <div className={`map-status ${mapStatus}`} role={mapStatus === "error" ? "alert" : "status"}>
@@ -334,7 +551,14 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           <span>{mapStatus === "error" ? mapError : "Preparing geographic context and overlays."}</span>
         </div>
       )}
-      <div className="map-data-note">Public-reference installations · local scenario projection · not an operational map</div>
+      <div className="map-layer-legend" aria-label="Map layer legend">
+        <span><i className="route" />Declared route</span>
+        <span><i className="track" />Recorded trajectory</span>
+        <span><i className="sensor" />Sensor coverage</span>
+        <span><i className="engagement" />Engagement envelope</span>
+        <span><i className="launch" />Launch</span>
+      </div>
+      <div className="map-data-note">{spatial.name} · public educational area · pan, zoom, rotate, and tilt enabled</div>
     </div>
   );
 }

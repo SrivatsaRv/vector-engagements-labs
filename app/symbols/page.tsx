@@ -6,12 +6,13 @@ export default function SymbolsPage() {
     <main className="symbols-page">
       <ProductHeader current="symbols" />
       <section className="symbols-hero">
-        <span>VECTOR TACTICAL LANGUAGE · VERSION 0.1</span>
-        <h1>The symbols used on the map, in 3D, and in reports.</h1>
+        <span>VECTOR ANALYSIS DISPLAY · VERSION 0.2</span>
+        <h1>The exact visual subset used in playback and reports.</h1>
         <p>
-          Affiliation is encoded by both color and frame geometry. The inner
-          glyph identifies the simulated object class; the model designation
-          remains text beside the symbol.
+          This is a Tacview-style analysis subset, not a NATO symbol set and not
+          a claim of Tacview compatibility. Silhouette identifies the object,
+          frame and color identify affiliation, and lifecycle determines when
+          the object is allowed to appear in the world.
         </p>
       </section>
       <SymbolReference />

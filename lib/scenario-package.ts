@@ -1,6 +1,6 @@
 import type { ScenarioDefinition } from "./scenarios.ts";
 
-export const SCENARIO_PACKAGE_SCHEMA_VERSION = "vector.scenario.v1";
+export const SCENARIO_PACKAGE_SCHEMA_VERSION = "vector.scenario.v2";
 
 export type StoredScenarioPackage = {
   id: string;
@@ -33,6 +33,8 @@ export function isScenarioDefinition(value: unknown): value is ScenarioDefinitio
       candidate.scenario.domain === candidate.domain &&
       candidate.scenario.name &&
       candidate.scenario.objective &&
+      candidate.scenario.studyAreaId &&
+      candidate.scenario.weatherPresetId &&
       Number.isFinite(candidate.scenario.seed),
   );
 }

@@ -1,4 +1,4 @@
-.PHONY: ci-local db-up db-down compose-up integration-local observability-local
+.PHONY: ci-local db-up db-down compose-up integration-local observability-local performance-local
 
 db-up:
 	docker compose up -d database
@@ -16,6 +16,9 @@ integration-local: compose-up
 
 observability-local: compose-up
 	npm run observability:verify
+
+performance-local:
+	npm run performance:verify
 
 ci-local:
 	npm run lint

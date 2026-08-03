@@ -26,15 +26,15 @@ function Glyph({ kind }: { kind: EntityKind }) {
     case "AIRCRAFT":
       return (
         <path
-          d="m24 9 3.2 10.2 11.3 5.2v3.2l-11-2.1-1.1 7.6 4.3 3v2.4L24 36l-6.7 2.5v-2.4l4.3-3-1.1-7.6-11 2.1v-3.2l11.3-5.2Z"
+          d="M24 5 28 18 42 25v4l-14-3-1 9 6 4v3l-9-3-9 3v-3l6-4-1-9-14 3v-4l14-7Z"
           className="tactical-glyph tactical-glyph-fill"
         />
       );
     case "GUIDED_WEAPON":
       return (
         <path
-          d="M13 29 29.5 12.5l5-1-1 5L17 33l-7 3 3-7Zm11-6 7 7m-12-2-1-7"
-          className="tactical-glyph"
+          d="M24 6 29 15v18l5 6-8-2-2 6-2-6-8 2 5-6V15Z"
+          className="tactical-glyph tactical-glyph-fill"
         />
       );
     case "RADAR":
@@ -102,6 +102,7 @@ export function TacticalSymbol({
       width={size}
       height={size}
       className={classes}
+      data-kind={kind}
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
