@@ -429,6 +429,14 @@ function LabWorkbench({
           ),
     [frame, scenario, viewMode],
   );
+  const guidanceInterruptionRemaining =
+    scenario.guidanceInterruptionAt !== null &&
+    time >= scenario.guidanceInterruptionAt &&
+    time < scenario.guidanceInterruptionAt + scenario.guidanceInterruptionDuration
+      ? scenario.guidanceInterruptionAt +
+        scenario.guidanceInterruptionDuration -
+        time
+      : null;
   const injectCondition = () => {
     const changed =
       definition.preparedEvent.physicsEffect === "guidance-hold"
@@ -749,6 +757,11 @@ function LabWorkbench({
                 <strong>
                   {blueSystem.designation} · {scenario.guidance} path
                 </strong>
+                {guidanceInterruptionRemaining !== null && (
+                  <em className="active-state-notice">
+                    Guidance update hold · {guidanceInterruptionRemaining.toFixed(1)} s remaining
+                  </em>
+                )}
               </div>
               {scenario.domain === "A2A" && (
                 <div className="picture-switch" aria-label="Air picture view">

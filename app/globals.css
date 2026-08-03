@@ -731,6 +731,19 @@ a {
   font-size: 10px;
   margin-top: 3px;
 }
+.sim-topline .active-state-notice {
+  width: max-content;
+  margin-top: 4px;
+  padding: 2px 5px;
+  border: 1px solid #d8a942;
+  background: #fff6df;
+  color: #745616;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
 .live-metrics {
   margin-left: auto;
   height: 100%;
