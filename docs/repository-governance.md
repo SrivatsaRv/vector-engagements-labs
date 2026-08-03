@@ -26,7 +26,7 @@ Repository administrators retain emergency recovery authority but should not use
 
 ## Continuous integration
 
-`ci.yml` verifies source generation, Rust/WASM integrity, Rust tests, lint, type safety, production build, behavioral tests, PostGIS/API/report integration, supported responsive breakpoints, and an engine performance guard. Rust sources carry a deterministic source digest; the embedded module carries its own byte digest and required-export check; CI also compiles the module afresh on its runner. This avoids incorrectly requiring different compiler platforms to emit byte-identical WASM. Actions are pinned to immutable commit SHAs.
+`ci.yml` verifies source generation, Rust/WASM integrity, Rust tests, lint, type safety, production build, behavioral tests, PostGIS/API/report integration, supported responsive breakpoints, and an engine performance guard. A failed Compose startup emits bounded service status and logs before evidence upload, so a container health failure is diagnosable from the check itself. Rust sources carry a deterministic source digest; the embedded module carries its own byte digest and required-export check; CI also compiles the module afresh on its runner. This avoids incorrectly requiring different compiler platforms to emit byte-identical WASM. Actions are pinned to immutable commit SHAs.
 
 `codeql.yml` performs JavaScript and TypeScript security analysis on changes to `main`, pull requests, and a weekly schedule. `dependency-review.yml` rejects vulnerable or incompatible new dependencies in pull requests. Dependabot permits one open maintenance pull request per ecosystem, groups routine npm, Cargo, and Actions updates, and excludes major versions so they require an intentional maintainer proposal.
 

@@ -59,6 +59,11 @@ jobs:
         env:
           VECTOR_CHROME_PATH: /usr/bin/google-chrome
         run: make integration-local
+      - name: Report Compose state on failure
+        if: failure()
+        run: |
+          docker compose ps -a
+          docker compose logs --no-color --tail=250
       - name: Upload responsive evidence on failure
         if: failure()
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4

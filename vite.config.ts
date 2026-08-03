@@ -12,7 +12,9 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const localBindingConfig = {
   name: "vector-engagement-labs",
   main: "./worker/index.ts",
-  compatibility_date: "2026-08-04",
+  // Keep this at or below the newest date supported by the pinned local
+  // Wrangler/workerd runtime. Update it deliberately with that dependency.
+  compatibility_date: "2026-05-22",
   compatibility_flags: ["nodejs_compat"],
   observability: { enabled: true },
   routes: productionHost

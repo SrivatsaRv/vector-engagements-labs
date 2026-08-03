@@ -35,6 +35,17 @@ test("Worker database adapter consumes the generated Hyperdrive binding", async 
   assert.match(viteConfig, /process\.env\.CLOUDFLARE_HYPERDRIVE_ID/);
   assert.match(viteConfig, /process\.env\.VECTOR_PRODUCTION_HOST/);
   assert.match(viteConfig, /custom_domain: true/);
+  const compatibilityDate = viteConfig.match(/compatibility_date: "([0-9-]+)"/)?.[1];
+  assert.ok(compatibilityDate, "Cloudflare compatibility date must be explicit");
+  assert.ok(
+    compatibilityDate <= new Date().toISOString().slice(0, 10),
+    "Cloudflare compatibility date cannot be in the future in UTC",
+  );
+  assert.equal(
+    compatibilityDate,
+    "2026-05-22",
+    "Compatibility date must match the pinned Wrangler/workerd support boundary",
+  );
   assert.match(databaseAdapter, /runtime\.HYPERDRIVE\?\.connectionString/);
 });
 

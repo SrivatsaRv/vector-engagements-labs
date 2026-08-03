@@ -73,6 +73,12 @@ observability switch, Hyperdrive binding, and custom-domain route. A separate
 sources can silently diverge. The custom-domain route is included only when
 `VECTOR_PRODUCTION_HOST` is present during deployment.
 
+The compatibility date is pinned to `2026-05-22`, the newest date accepted by
+the repository's pinned Wrangler/workerd runtime. Dependency upgrades must
+advance and verify this date together; using the calendar date without checking
+the runtime support boundary can make the local Worker fail before health
+checks begin.
+
 ## Deployment gates
 
 - `make ci-local`, integration, responsive, observability, and performance checks pass against the release commit.
