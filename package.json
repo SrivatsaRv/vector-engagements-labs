@@ -52,10 +52,10 @@
     "sharp": "0.35.0"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
+    "@cloudflare/vite-plugin": "1.50.0",
     "@cloudflare/workers-types": "4.20260702.1",
     "@iconify-json/game-icons": "^1.2.4",
-    "@tailwindcss/postcss": "4.2.1",
+    "@tailwindcss/postcss": "4.3.3",
     "@types/node": "22.19.19",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
@@ -66,12 +66,12 @@
     "eslint-config-next": "16.2.12",
     "playwright-core": "1.62.1",
     "react-server-dom-webpack": "19.2.8",
-    "tailwindcss": "4.2.1",
+    "tailwindcss": "4.3.3",
     "tsx": "4.23.5",
     "typescript": "5.9.3",
-    "vinext": "0.0.50",
+    "vinext": "0.2.1",
     "vite": "8.2.0",
-    "wrangler": "4.92.0"
+    "wrangler": "4.118.0"
   },
   "type": "module"
 }
