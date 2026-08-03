@@ -1,4 +1,5 @@
 import postgres, { type Sql } from "postgres";
+import { observeDatabaseOperation } from "@/lib/observability/server";
 
 type RuntimeEnv = Cloudflare.Env & {
   HYPERDRIVE?: Hyperdrive;
@@ -33,7 +34,7 @@ export async function withDatabase<T>(operation: (sql: Sql) => Promise<T>) {
     prepare: true,
   });
   try {
-    return await operation(sql);
+    return await observeDatabaseOperation(() => operation(sql));
   } finally {
     await sql.end();
   }

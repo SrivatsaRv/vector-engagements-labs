@@ -47,4 +47,4 @@ PostgreSQL/PostGIS is the runtime authority. Schema creation is migration-only; 
 
 ## Verification
 
-`make ci-local` is the commit gate. `make integration-local` additionally verifies the live PostGIS catalog and the Save → View Report API contract, including rejected incomplete saves and missing-run reads. Docker Compose uses explicit image versions and health-gated migration/application startup.
+`make ci-local` is the commit gate. `make integration-local` additionally verifies the live PostGIS catalog and the Save → View Report API contract, including rejected incomplete saves and missing-run reads. `make observability-local` verifies Prometheus metrics, Tempo traces, and provisioned Grafana dashboards. Docker Compose uses explicit image versions and health-gated migration/application startup. See [`observability.md`](observability.md) for the metric and dashboard contract.

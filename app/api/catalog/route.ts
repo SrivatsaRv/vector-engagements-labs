@@ -1,8 +1,10 @@
 import { CATALOG_SCHEMA_VERSION } from "@/db/bootstrap";
 import { withDatabase } from "@/db";
+import { withObservedRoute } from "@/lib/observability/server";
 
-export async function GET() {
-  try {
+export async function GET(request: Request) {
+  return withObservedRoute("/api/catalog", request, async () => {
+   try {
     const catalog = await withDatabase(async (sql) => {
       const [
         platforms,
@@ -53,5 +55,6 @@ export async function GET() {
       { error: error instanceof Error ? error.message : "Catalog unavailable" },
       { status: 503 },
     );
-  }
+    }
+  });
 }

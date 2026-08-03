@@ -43,9 +43,14 @@ services:
       target: runtime
       args:
         DATABASE_URL: postgres://vector:vector@database:5432/vector
+        OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+        VECTOR_VERSION: 0.1.0
     environment:
       DATABASE_URL: postgres://vector:vector@database:5432/vector
       PORT: "4317"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      VECTOR_VERSION: 0.1.0
+      VECTOR_ENVIRONMENT: local
     init: true
     labels:
       com.reachdefence.product: vector-engagement-lab
@@ -60,6 +65,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4317/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       start_period: 20s
@@ -67,6 +74,82 @@ services:
       timeout: 4s
       retries: 12
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.131.1
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4318:4318"
+      - "13133:13133"
+    depends_on:
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=24h
+      - --web.enable-lifecycle
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - vector_prometheus:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      vector:
+        condition: service_healthy
+
+  tempo:
+    image: grafana/tempo:2.8.2
+    command: ["-config.file=/etc/tempo.yaml"]
+    user: "0:0"
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+      - vector_tempo:/var/tempo
+    ports:
+      - "3200:3200"
+
+  loki:
+    image: grafana/loki:3.5.3
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./observability/loki.yaml:/etc/loki/local-config.yaml:ro
+      - vector_loki:/loki
+    ports:
+      - "3100:3100"
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    environment:
+      GF_SECURITY_ADMIN_USER: vector
+      GF_SECURITY_ADMIN_PASSWORD: vector
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - vector_grafana:/var/lib/grafana
+    ports:
+      - "4300:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
+
 volumes:
   vector_postgres:
   vector_wrangler:
+  vector_prometheus:
+  vector_tempo:
+  vector_loki:
+  vector_grafana:

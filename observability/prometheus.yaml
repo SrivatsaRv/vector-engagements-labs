@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: vector-web
+    metrics_path: /api/metrics
+    static_configs:
+      - targets: [vector:4317]
+        labels:
+          product: vector
+          environment: local
+  - job_name: vector-otel-collector
+    static_configs:
+      - targets: [otel-collector:9464]
+        labels:
+          product: vector
+          environment: local
+  - job_name: prometheus
+    static_configs:
+      - targets: [prometheus:9090]

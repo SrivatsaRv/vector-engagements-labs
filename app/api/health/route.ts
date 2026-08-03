@@ -1,7 +1,9 @@
 import { withDatabase } from "@/db";
+import { withObservedRoute } from "@/lib/observability/server";
 
-export async function GET() {
-  try {
+export async function GET(request: Request) {
+  return withObservedRoute("/api/health", request, async () => {
+   try {
     const rows = await withDatabase((sql) => sql`
       SELECT current_database() AS database,
         postgis_version() AS postgis,
@@ -17,5 +19,6 @@ export async function GET() {
       { status: "unavailable", error: error instanceof Error ? error.message : "Database unavailable" },
       { status: 503 },
     );
-  }
+    }
+  });
 }

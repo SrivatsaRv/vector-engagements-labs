@@ -11,7 +11,7 @@ docker compose up --build -d
 docker compose ps
 ```
 
-Open [http://localhost:4317](http://localhost:4317). The database is exposed locally on port `55433` for inspection. Images use explicit versions: `reachdefence/vector-engagement-lab:0.1.0`, `node:22.18.0-bookworm-slim`, and digest-pinned `postgis/postgis:16-3.4`.
+Open [http://localhost:4317](http://localhost:4317). Grafana is available at [http://localhost:4300](http://localhost:4300) using `vector` / `vector`. The database is exposed locally on port `55433` for inspection. Every Compose image uses an explicit version or digest.
 
 Useful routes:
 
@@ -49,8 +49,9 @@ npm run dev -- --port 4317
 ```bash
 make ci-local
 make integration-local
+make observability-local
 ```
 
-The first command runs lint, type checks, production build, route checks, and deterministic engine tests. The second applies migrations/seeds and validates PostGIS SRID, row coverage, scenario count, and model foreign keys.
+The first command runs lint, type checks, production build, route checks, and deterministic engine tests. The second applies migrations/seeds and validates PostGIS SRID, row coverage, scenario count, and model foreign keys. The third proves Prometheus ingestion, Tempo traces, Grafana provisioning, and bounded browser business telemetry.
 
 See [`docs/`](docs/README.md) for product language, catalog contracts, engine mathematics, deployment mapping, and current limitations.

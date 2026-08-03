@@ -32,6 +32,14 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    define: {
+      // Worker route modules do not receive Docker environment variables at
+      // request time. Bake the non-secret collector address into the server
+      // bundle so local Compose traces reach the collector reliably.
+      __VECTOR_OTEL_ENDPOINT__: JSON.stringify(
+        process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "",
+      ),
+    },
     optimizeDeps: {
       // MapLibre creates its worker from the package entrypoint. Pre-bundling
       // rewrites that entry to a transient `.vite/deps` worker path which is

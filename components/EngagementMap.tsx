@@ -7,6 +7,7 @@ import type { RaspTrack, SimulationResult } from "@/lib/simulation";
 import { getFrameAt } from "@/lib/simulation";
 import { DEFAULT_MAP_ORIGIN } from "@/lib/installations";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
+import { emitBrowserTelemetry } from "@/lib/observability/client";
 
 export type MapInstallation = {
   id: string;
@@ -83,6 +84,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
 
   useEffect(() => {
     if (!mount.current) return;
+    const mapStartedAt = performance.now();
     let disposed = false;
     setMapStatus("loading");
     setMapError("");
@@ -164,12 +166,22 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           },
         });
         setMapStatus("ready");
+        emitBrowserTelemetry({
+          type: "map_loaded",
+          basemap,
+          durationMs: performance.now() - mapStartedAt,
+        });
       });
       mapRef.current = map;
     }).catch((error: unknown) => {
       if (disposed) return;
       setMapStatus("error");
       setMapError(error instanceof Error ? error.message : "Map renderer could not be loaded");
+      emitBrowserTelemetry({
+        type: "map_failed",
+        basemap,
+        durationMs: performance.now() - mapStartedAt,
+      });
     });
     return () => {
       disposed = true;

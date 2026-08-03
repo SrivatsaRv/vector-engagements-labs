@@ -1,6 +1,8 @@
 import { withDatabase } from "@/db";
 import { sha256Hex } from "@/lib/canonical-json";
 import { ENGINE_VERSION } from "@/lib/engine/version";
+import { incrementCounter } from "@/lib/observability/metrics";
+import { withObservedRoute } from "@/lib/observability/server";
 
 type SavedRunRow = {
   id: string;
@@ -44,6 +46,7 @@ function serializeRun(row: SavedRunRow) {
 }
 
 export async function GET(request: Request) {
+ return withObservedRoute("/api/runs", request, async () => {
   try {
     const id = new URL(request.url).searchParams.get("id");
     if (!id) {
@@ -62,10 +65,12 @@ export async function GET(request: Request) {
       { error: error instanceof Error ? error.message : "Run unavailable" },
       { status: 503 },
     );
-  }
+   }
+ });
 }
 
 export async function POST(request: Request) {
+ return withObservedRoute("/api/runs", request, async () => {
   try {
     const payload = (await request.json()) as Record<string, unknown>;
     if (typeof payload.scenarioId !== "string" || typeof payload.scenarioVersion !== "string") {
@@ -154,11 +159,18 @@ export async function POST(request: Request) {
          ${sql.json(assumptions as never)})
       RETURNING id, created_at
     `);
+    const domain = (payload.scenarioId as string).split("-")[0]?.toUpperCase();
+    incrementCounter("vector_reports_total", {
+      domain: ["A2A", "A2G", "G2A", "G2G"].includes(domain) ? domain : "unknown",
+      outcome: "saved",
+    });
     return Response.json(rows[0], { status: 201 });
   } catch (error) {
+    incrementCounter("vector_reports_total", { domain: "unknown", outcome: "failed" });
     return Response.json(
       { error: error instanceof Error ? error.message : "Run could not be saved" },
       { status: 503 },
     );
-  }
+   }
+ });
 }

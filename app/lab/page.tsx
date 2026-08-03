@@ -60,6 +60,7 @@ import {
 } from "@/lib/simulation-models";
 import { ENGINE_VERSION } from "@/lib/engine/version";
 import type { ReportData } from "@/lib/report-export";
+import { emitBrowserTelemetry } from "@/lib/observability/client";
 import { sha256Hex } from "@/lib/canonical-json";
 import {
   isScenarioDefinition,
@@ -266,7 +267,40 @@ function LabWorkbench({
       setBuildStep(4);
       return;
     }
-    const next = simulate(scenario);
+    const telemetryRunId = crypto.randomUUID();
+    emitBrowserTelemetry({
+      type: "scenario_run_started",
+      runId: telemetryRunId,
+      domain: scenario.domain,
+      engineVersion: ENGINE_VERSION,
+    });
+    const simulationStarted = performance.now();
+    let next: SimulationResult;
+    try {
+      next = simulate(scenario);
+      emitBrowserTelemetry({
+        type: "scenario_run_completed",
+        runId: telemetryRunId,
+        domain: scenario.domain,
+        engineVersion: ENGINE_VERSION,
+        outcome: next.termination,
+        durationMs: performance.now() - simulationStarted,
+        modelSeconds: next.timeOfFlight,
+        entityCount: next.entityManifest.length,
+      });
+    } catch (error) {
+      emitBrowserTelemetry({
+        type: "scenario_run_failed",
+        runId: telemetryRunId,
+        domain: scenario.domain,
+        engineVersion: ENGINE_VERSION,
+        outcome: "invalid_scenario",
+        durationMs: performance.now() - simulationStarted,
+        modelSeconds: 0,
+        entityCount: 0,
+      });
+      throw error;
+    }
     setResult(next);
     setTime(0);
     setPlaying(true);
