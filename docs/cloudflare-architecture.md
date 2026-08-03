@@ -79,6 +79,12 @@ advance and verify this date together; using the calendar date without checking
 the runtime support boundary can make the local Worker fail before health
 checks begin.
 
+Local Cloudflare builds declare `nodejs_compat` through the Vite binding so the
+runtime can load the framework and PostgreSQL adapter. During `vinext deploy`,
+vinext owns the generated copy, so the Vite configuration omits its copy for
+that lifecycle. Cloudflare rejects duplicate compatibility flags before the
+Worker version is created.
+
 ## Deployment gates
 
 - `make ci-local`, integration, responsive, observability, and performance checks pass against the release commit.
