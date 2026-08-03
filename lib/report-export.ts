@@ -143,6 +143,7 @@ export function buildReportExport(
           targetSpeed: { value: data.scenario.targetSpeed, unit: "m/s" },
           targetDemand: { value: data.scenario.targetG, unit: "g" },
           eastWind: { value: data.scenario.wind, unit: "m/s" },
+          northWind: { value: data.scenario.windNorth, unit: "m/s" },
         },
         information: {
           blueRadarMode: data.scenario.blueRadarMode,
@@ -164,6 +165,8 @@ export function buildReportExport(
             value: data.scenario.temperatureOffset,
             unit: "degC",
           },
+          visibility: { value: data.scenario.visibilityKm, unit: "km" },
+          humidity: { value: data.scenario.humidityPercent, unit: "%" },
         },
       },
     },

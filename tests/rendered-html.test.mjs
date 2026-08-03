@@ -82,6 +82,12 @@ test("server-renders model transparency and tactical-symbol references", async (
   assert.match(symbols, /not a NATO symbol set/);
 });
 
+test("basemap proxy rejects invalid tile coordinates without contacting an upstream", async () => {
+  const response = await render("/api/map-tile?z=99&x=0&y=0");
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "invalid tile coordinate" });
+});
+
 test("keeps data facts, model assumptions, RASP, map scope, and persistence explicit", async () => {
   const [capabilityData, simulation, map, api, report, migration, provenanceMigration, spatialMigration, spatialPackageMigration, visualContract, makefile] = await Promise.all(
     [
@@ -144,4 +150,16 @@ test("keeps data facts, model assumptions, RASP, map scope, and persistence expl
   assert.match(report, /vector\.engagement-report\.v2/);
   assert.match(report, /normalizedWeaponSpeedPercent/);
   assert.match(makefile, /npm run typecheck/);
+});
+
+test("responsive workspace reserves footer space and keeps six telemetry plots inside the task surface", async () => {
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(css, /\.builder\s*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\) auto/s);
+  assert.match(css, /\.builder-scroll\s*\{[^}]*overflow:\s*auto/s);
+  assert.match(css, /\.builder > footer\.builder-actions,[^{]*\{[^}]*position:\s*static/s);
+  assert.match(
+    css,
+    /grid-template-rows:\s*58px minmax\(220px, 1fr\) 44px clamp\(190px, 23vh, 248px\)/,
+  );
+  assert.match(css, /\.telemetry-multiples\s*\{[^}]*grid-template-columns:\s*repeat\(3,/s);
 });

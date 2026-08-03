@@ -22,6 +22,7 @@ import {
 } from "@/lib/report-export";
 import { simulate, standardAtmosphere } from "@/lib/simulation";
 import { ENGINE_VERSION } from "@/lib/engine/version";
+import { getStudyArea, getWeatherPreset } from "@/lib/study-areas";
 
 type ActionState = "idle" | "preparing" | "done" | "error";
 type PrintState = "idle" | "preparing" | "printing";
@@ -139,6 +140,8 @@ export default function ReportPage() {
     scenario.altitude,
     scenario.temperatureOffset,
   );
+  const studyArea = getStudyArea(scenario.studyAreaId);
+  const weatherPreset = getWeatherPreset(studyArea, scenario.weatherPresetId);
   const driver =
     scenario.maneuver === "steady"
       ? `${scenario.guidance} trajectory and initial range`
@@ -468,6 +471,10 @@ export default function ReportPage() {
               )}
               <ReportSection title="Atmosphere">
                 <dl>
+                  <dt>Study area</dt>
+                  <dd>{studyArea.shortName}</dd>
+                  <dt>Weather preset</dt>
+                  <dd>{weatherPreset.label}</dd>
                   <dt>Reference</dt>
                   <dd>NASA educational standard atmosphere</dd>
                   <dt>Temperature</dt>
@@ -478,6 +485,12 @@ export default function ReportPage() {
                   <dd>{atmosphere.densityKgM3.toFixed(3)} kg/m³</dd>
                   <dt>Speed of sound</dt>
                   <dd>{Math.round(atmosphere.speedOfSoundMps)} m/s</dd>
+                  <dt>Wind vector</dt>
+                  <dd>{scenario.wind} E / {scenario.windNorth} N m/s</dd>
+                  <dt>Visibility</dt>
+                  <dd>{scenario.visibilityKm} km</dd>
+                  <dt>Relative humidity</dt>
+                  <dd>{scenario.humidityPercent}%</dd>
                 </dl>
               </ReportSection>
               <ReportSection title="Next controlled comparison">

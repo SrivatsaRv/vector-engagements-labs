@@ -564,7 +564,10 @@ function LabWorkbench({
           },
           initialState: scenario,
           environment: {
-            wind: scenario.wind,
+            windEastMps: scenario.wind,
+            windNorthMps: scenario.windNorth,
+            visibilityKm: scenario.visibilityKm,
+            humidityPercent: scenario.humidityPercent,
             temperatureOffset: scenario.temperatureOffset,
             atmosphere: "NASA educational standard atmosphere",
             studyAreaId: scenario.studyAreaId,
@@ -985,6 +988,9 @@ function ConfigureWorkspace({
       weatherPresetId: preset.id,
       temperatureOffset: preset.temperatureOffsetC,
       wind: preset.windEastMps,
+      windNorth: preset.windNorthMps,
+      visibilityKm: preset.visibilityKm,
+      humidityPercent: preset.humidityPercent,
     }));
   };
   const selectWeather = (preset: StudyArea["weatherPresets"][number]) => {
@@ -993,6 +999,9 @@ function ConfigureWorkspace({
       weatherPresetId: preset.id,
       temperatureOffset: preset.temperatureOffsetC,
       wind: preset.windEastMps,
+      windNorth: preset.windNorthMps,
+      visibilityKm: preset.visibilityKm,
+      humidityPercent: preset.humidityPercent,
     }));
   };
   const selectSystem = (id: string) => {
@@ -1078,13 +1087,14 @@ function ConfigureWorkspace({
         ))}
       </aside>
       <div className="builder">
-        <header>
-          <span>
-            Configured template · {step + 1} of 5 · {headings[step][0]}
-          </span>
-          <h1>{headings[step][1]}</h1>
-          <p>{headings[step][2]}</p>
-        </header>
+        <div className="builder-scroll">
+          <header>
+            <span>
+              Configured template · {step + 1} of 5 · {headings[step][0]}
+            </span>
+            <h1>{headings[step][1]}</h1>
+            <p>{headings[step][2]}</p>
+          </header>
         {step === 0 && (
           <>
             <div className="configured-note">
@@ -1418,7 +1428,9 @@ function ConfigureWorkspace({
             )}
             <article className="atmosphere-card">
               <div>
-                <span>Calculated atmosphere at Blue altitude</span>
+                <span>
+                  Calculated atmosphere at Blue altitude · {selectedWeather?.label ?? "custom conditions"}
+                </span>
                 <strong>NASA educational standard atmosphere</strong>
               </div>
               <dl>
@@ -1430,7 +1442,16 @@ function ConfigureWorkspace({
                 <dd>{atmosphere.densityKgM3.toFixed(3)} kg/m³</dd>
                 <dt>Speed of sound</dt>
                 <dd>{Math.round(atmosphere.speedOfSoundMps)} m/s</dd>
+                <dt>Wind vector</dt>
+                <dd>{scenario.wind} E / {scenario.windNorth} N m/s</dd>
+                <dt>Visibility</dt>
+                <dd>{scenario.visibilityKm} km</dd>
+                <dt>Relative humidity</dt>
+                <dd>{scenario.humidityPercent}%</dd>
               </dl>
+              <p>
+                Temperature and both wind components affect the engine. Visibility limits visual-track acquisition. Humidity is recorded for the run but does not yet alter propulsion, drag, radar, or seeker behavior.
+              </p>
             </article>
           </section>
         )}
@@ -1692,6 +1713,7 @@ function ConfigureWorkspace({
             <ValidationList items={validations} />
           </section>
         )}
+        </div>
         <footer className="builder-actions">
           <span>
             {step === 4

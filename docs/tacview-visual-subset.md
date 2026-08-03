@@ -4,6 +4,8 @@ Status: mandatory product contract, version 0.2.
 
 VECTOR implements a deliberately small Tacview-style analysis-display subset. “Tacview-style” means synchronized, time-addressable tracks with recognisable object silhouettes, altitude cues, sensor volumes, event markers, labels, and telemetry. It does **not** claim Tacview file compatibility, NATO APP-6 compliance, MIL-STD-2525 compliance, or reproduction of Tacview artwork.
 
+The display consumes a [`vector.record.v1`](vector-simulation-record.md) recording. It does not read mutable builder state and it does not own physics. An ACMI exporter is an interoperability adapter, not the internal record format.
+
 ## Entity marks
 
 | Entity kind | Map and 3D mark | Appears when |

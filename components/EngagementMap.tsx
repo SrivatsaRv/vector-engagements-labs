@@ -29,10 +29,7 @@ const minimalStyle = {
   sources: {
     carto: {
       type: "raster" as const,
-      tiles: [
-        "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
-        "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png",
-      ],
+      tiles: ["/api/map-tile?z={z}&x={x}&y={y}"],
       tileSize: 512,
       attribution: "© OpenStreetMap contributors © CARTO",
     },

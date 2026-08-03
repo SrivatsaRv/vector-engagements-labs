@@ -75,6 +75,9 @@ export type Scenario = {
   maneuver: Maneuver;
   targetG: number;
   wind: number;
+  windNorth: number;
+  visibilityKm: number;
+  humidityPercent: number;
   temperatureOffset: number;
   guidanceInterruptionAt: number | null;
   guidanceInterruptionDuration: number;
@@ -355,7 +358,10 @@ export const DEFAULT_SCENARIO: Scenario = {
   targetSpeed: 250,
   maneuver: "break",
   targetG: 4,
-  wind: 12,
+  wind: -4,
+  windNorth: 1,
+  visibilityKm: 25,
+  humidityPercent: 35,
   temperatureOffset: 0,
   guidanceInterruptionAt: null,
   guidanceInterruptionDuration: 8,
@@ -441,7 +447,7 @@ export function simulate(
       blueDecision: input.blueDecision,
       redDecision: input.redDecision,
       windEastMps: input.wind,
-      windNorthMps: 0,
+      windNorthMps: input.windNorth,
       temperatureOffset: input.temperatureOffset,
       guidanceInterruptionAt: input.guidanceInterruptionAt,
       guidanceInterruptionDuration: input.guidanceInterruptionDuration,
@@ -568,7 +574,7 @@ export function buildRaspTrack(
       ? radarMode === "ACTIVE" && rangeKm <= 120
       : trackSource === "DATALINK" || trackSource === "AIRBORNE_EARLY_WARNING"
         ? datalink
-        : rangeKm <= 18);
+      : rangeKm <= Math.min(18, scenario.visibilityKm));
   let confidence = sourceBase[trackSource];
   if (!sourceAvailable) confidence = 0;
   confidence -= Math.max(0, rangeKm - 25) * 0.32;

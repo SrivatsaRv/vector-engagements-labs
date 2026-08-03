@@ -11,7 +11,7 @@ const equations = [
     output: "Temperature, pressure, density and speed of sound",
     formula: "T = T₀ − Lh · p = p₀(T/T₀)^(g/RL) · ρ = p/RT · a = √(γRT)",
     meaning:
-      "Altitude changes the air through which every aircraft and guided vehicle moves. The current engine applies a standard-day atmosphere with a user-selected temperature offset.",
+      "Altitude changes the air through which every aircraft and guided vehicle moves. A study area selects a reference terrain and weather preset; the preset supplies the declared temperature offset and wind vector. The area name itself does not alter the equation.",
     state: "Sourced method",
     source: "https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/earth-atmosphere-equation-english/",
     sourceLabel: "NASA Glenn · Earth atmosphere equations",
@@ -22,7 +22,7 @@ const equations = [
     output: "Velocity used by the drag calculation",
     formula: "v_air = v_ground − v_wind",
     meaning:
-      "Wind is a vector, not a generic performance penalty. The current interface exposes the east–west component and records it with the run.",
+      "Wind is a vector, not a generic performance penalty. The selected weather preset supplies east and north components; both are subtracted from ground velocity before drag is calculated.",
     state: "Computed state",
   },
   {
@@ -96,9 +96,9 @@ const equations = [
     id: "rasp",
     name: "RASP track quality",
     output: "Track status, age and positional uncertainty",
-    formula: "Q = clamp(Q_source − Q_range − Q_jam − Q_age) · σ = f(100 − Q)",
+    formula: "Q = clamp(Q₀ − 0.32·max(Rkm−25,0) − 17·jam − 34·hold) · σ = 120 + 11(100−Q)^1.55",
     meaning:
-      "This is an explicitly declared educational information-quality model. Radar, data-link availability, visual range, jamming and prepared interruptions affect the perceived track; they never move Model Truth.",
+      "Q₀ is 82 for onboard radar, 78 for data link, 90 for airborne early warning and 72 for visual observation. This is a VECTOR-authored educational information-quality assumption, not a sourced probability or radar-detection equation. Source availability, selected visibility, range, jamming and interruption state affect the perceived track; they never move Model Truth.",
     state: "Model assumption",
   },
   {
@@ -119,6 +119,17 @@ const equations = [
       "The 180 m value is a scenario completion threshold. It is not a fuse radius, lethal radius or real-world hit-probability claim.",
     state: "Scenario contract",
   },
+];
+
+const visualLayers = [
+  ["Aircraft and launched weapons", "Recorded entity frames", "Position, orientation, lifecycle and affiliation from the immutable engine record"],
+  ["Recorded trajectories", "Recorded entity frames", "Time-ordered positions; the viewer reveals the path only up to current model time"],
+  ["Declared routes", "Scenario package", "Authored waypoints; no physics equation is implied"],
+  ["Installations", "PostGIS catalog snapshot", "EPSG:4326 point geometry and public-reference identity"],
+  ["Sensor coverage", "Compiled entity envelope", "Declared detection or tracking radius, altitude band and value state"],
+  ["Engagement envelope", "Compiled entity envelope", "Declared minimum/maximum range and altitude band; not probability of kill"],
+  ["IAF and PAF RASP", "Observer-picture samples", "Sensor-source availability plus the documented VECTOR information-quality assumption"],
+  ["Telemetry", "Recorded value or formula fallback", "The label identifies the entity, unit, value state and current model time"],
 ];
 
 export default function MathPage() {
@@ -171,6 +182,22 @@ export default function MathPage() {
             )}
           </article>
         ))}
+      </section>
+      <section className="math-layer-contract" aria-labelledby="layer-contract-title">
+        <header>
+          <span>DISPLAY PROVENANCE</span>
+          <h2 id="layer-contract-title">What generates each rendered layer</h2>
+          <p>Not everything on the map is produced by a physics equation. VECTOR distinguishes recorded motion, authored geometry, catalog geography, and model-assumption envelopes.</p>
+        </header>
+        <div role="table" aria-label="Rendered layer provenance">
+          {visualLayers.map(([layer, source, rule]) => (
+            <article role="row" key={layer}>
+              <strong role="cell">{layer}</strong>
+              <span role="cell">{source}</span>
+              <p role="cell">{rule}</p>
+            </article>
+          ))}
+        </div>
       </section>
       <section className="math-version-contract" aria-labelledby="version-contract-title">
         <header>

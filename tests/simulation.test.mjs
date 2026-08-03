@@ -9,6 +9,7 @@ import {
 } from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { canConduct, validateScenario } from "../lib/scenario-validation.ts";
+import { getStudyArea, getWeatherPreset } from "../lib/study-areas.ts";
 
 test("standard atmosphere produces credible sea-level reference values", () => {
   const atmosphere = standardAtmosphere(0, 0);
@@ -16,6 +17,46 @@ test("standard atmosphere produces credible sea-level reference values", () => {
   assert.ok(Math.abs(atmosphere.pressureKpa - 101.325) < 0.2);
   assert.ok(Math.abs(atmosphere.densityKgM3 - 1.225) < 0.01);
   assert.ok(Math.abs(atmosphere.speedOfSoundMps - 340.3) < 0.5);
+});
+
+test("every configured study area carries its selected weather state into the scenario", () => {
+  for (const definition of SCENARIO_LIBRARY) {
+    const area = getStudyArea(definition.scenario.studyAreaId);
+    const preset = getWeatherPreset(area, definition.scenario.weatherPresetId);
+    assert.equal(definition.scenario.windNorth, preset.windNorthMps);
+    assert.equal(definition.scenario.visibilityKm, preset.visibilityKm);
+    assert.equal(definition.scenario.humidityPercent, preset.humidityPercent);
+    assert.equal(definition.scenario.temperatureOffset, preset.temperatureOffsetC);
+  }
+});
+
+test("both horizontal wind components reach the compiled physics environment", () => {
+  const scenario = { ...DEFAULT_SCENARIO, wind: 11, windNorth: -13 };
+  const result = simulate(scenario);
+  assert.deepEqual(result.engineRun.scenario.environment.windMps, {
+    x: 11,
+    y: -13,
+    z: 0,
+  });
+  const changed = simulate({ ...scenario, windNorth: 13 });
+  assert.notDeepEqual(changed.frames, result.frames);
+});
+
+test("visual acquisition obeys the declared visibility limit", () => {
+  const result = simulate(DEFAULT_SCENARIO);
+  const frame = result.frames.find((item) => item.range <= 15000) ?? result.frames.at(-1);
+  const visible = buildRaspTrack(
+    { ...DEFAULT_SCENARIO, blueTrackSource: "VISUAL", visibilityKm: 18 },
+    frame,
+    "IAF",
+  );
+  const obscured = buildRaspTrack(
+    { ...DEFAULT_SCENARIO, blueTrackSource: "VISUAL", visibilityKm: 2 },
+    frame,
+    "IAF",
+  );
+  assert.equal(visible.visible, true);
+  assert.equal(obscured.visible, false);
 });
 
 test("simulation is deterministic and tactical decisions have declared effects", () => {

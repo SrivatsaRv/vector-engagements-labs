@@ -3516,6 +3516,26 @@ button:disabled,
   display: flex;
   gap: 6px;
 }
+.builder-actions {
+  position: sticky;
+  z-index: 8;
+  bottom: 0;
+  width: 100%;
+  min-height: 64px;
+  margin-top: 26px;
+  padding: 12px 0 16px;
+  border-top: 1px solid var(--line);
+  background: rgba(250, 250, 250, 0.98);
+  box-shadow: 0 -10px 22px rgba(34, 45, 54, 0.045);
+}
+.builder-actions > div button {
+  min-width: 94px;
+  margin-left: 0;
+  justify-content: center;
+}
+.builder-actions > div button:last-child {
+  min-width: 154px;
+}
 .builder-actions button.back-action {
   background: #fff;
   color: var(--ink);
@@ -3711,7 +3731,7 @@ button:disabled,
   padding: 10px;
 }
 .simulation-column {
-  grid-template-rows: 58px minmax(240px, 1fr) 44px 145px;
+  grid-template-rows: 58px minmax(220px, 1fr) 44px clamp(190px, 23vh, 248px);
 }
 .playback {
   height: 44px;
@@ -4395,6 +4415,14 @@ button:disabled,
   margin: 4px 0 0;
   font-size: 10px;
   font-weight: 700;
+}
+.atmosphere-card > p {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line2);
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
 }
 .information-setup {
   margin: 24px 0;
@@ -5156,6 +5184,64 @@ button:disabled,
 .math-equations article > p { grid-column: 2; margin: -2px 0 0; color: #53616c; font-size: 13px; line-height: 1.65; }
 .math-equations article > a { grid-column: 2; width: max-content; display: inline-flex; align-items: center; gap: 7px; color: #2f6fb5; font-size: 11px; font-weight: 700; }
 .math-version-contract { margin-top: 24px; margin-bottom: 26px; display: grid; grid-template-columns: minmax(260px, .8fr) minmax(520px, 1.2fr); gap: 38px; padding: 30px; border: 1px solid #cfd5d9; background: #fff; }
+.math-layer-contract { width: min(1120px, calc(100% - clamp(32px, 7vw, 112px))); margin: 26px auto; padding: 30px; border: 1px solid #cfd5d9; background: #fff; }
+.math-layer-contract > header { max-width: 760px; margin-bottom: 22px; }
+.math-layer-contract > header > span { color: #2f6fb5; font-size: 9px; font-weight: 750; letter-spacing: .14em; }
+.math-layer-contract h2 { margin: 9px 0; font-size: clamp(21px, 2vw, 28px); line-height: 1.15; }
+.math-layer-contract header p { margin: 0; color: #596670; font-size: 12px; line-height: 1.55; }
+.math-layer-contract > div { border-top: 1px solid #d6dadd; }
+.math-layer-contract article { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(170px, .7fr) minmax(320px, 1.5fr); gap: 18px; padding: 14px 0; border-bottom: 1px solid #e0e3e5; align-items: start; }
+.math-layer-contract article strong { font-size: 12px; }
+.math-layer-contract article span { color: #2f6fb5; font-size: 10px; font-weight: 700; }
+.math-layer-contract article p { margin: 0; color: #5d6973; font-size: 11px; line-height: 1.5; }
+
+/* The builder footer owns a dedicated row; it never overlays authored inputs. */
+.builder {
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.builder-scroll {
+  min-height: 0;
+  overflow: auto;
+  padding: 38px max(30px, 8%) 26px;
+}
+.builder-scroll > header {
+  max-width: 620px;
+  margin-bottom: 27px;
+}
+.builder-scroll > header span {
+  color: var(--blue);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.builder-scroll > header p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.builder > footer.builder-actions,
+.builder-actions {
+  position: static;
+  inset: auto;
+  width: auto;
+  max-width: none;
+  min-height: 68px;
+  margin: 0;
+  padding: 12px max(30px, 8%);
+  border-top: 1px solid var(--line);
+  background: #fafafa;
+  box-shadow: 0 -8px 18px rgba(34, 45, 54, 0.04);
+}
+@media (max-width: 600px) {
+  .builder { padding: 0; }
+  .builder-scroll { padding: 25px 18px; }
+  .builder > footer.builder-actions { padding: 10px 18px; }
+  .builder > footer.builder-actions > span { display: none; }
+}
 .math-version-contract header > span { color: #2f6fb5; font-size: 9px; font-weight: 750; letter-spacing: .14em; }
 .math-version-contract h2 { margin: 9px 0; font-size: clamp(21px, 2vw, 28px); line-height: 1.15; }
 .math-version-contract header p { margin: 0; color: #63707a; font-size: 12px; line-height: 1.6; }

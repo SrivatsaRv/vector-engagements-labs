@@ -3,6 +3,7 @@ import {
   type EngagementDomain,
   type Scenario,
 } from "./simulation.ts";
+import { getStudyArea, getWeatherPreset } from "./study-areas.ts";
 
 export type { EngagementDomain } from "./simulation.ts";
 export type ScenarioComplexity = "Foundation" | "Intermediate" | "Advanced";
@@ -65,10 +66,20 @@ export const DOMAIN_DETAILS: Record<
   },
 };
 
-const scenario = (patch: Partial<Scenario>): Scenario => ({
-  ...DEFAULT_SCENARIO,
-  ...patch,
-});
+const scenario = (patch: Partial<Scenario>): Scenario => {
+  const configured = { ...DEFAULT_SCENARIO, ...patch };
+  const area = getStudyArea(configured.studyAreaId);
+  const weatherPreset = getWeatherPreset(area, configured.weatherPresetId);
+  return {
+    ...configured,
+    wind: patch.wind ?? weatherPreset.windEastMps,
+    windNorth: patch.windNorth ?? weatherPreset.windNorthMps,
+    visibilityKm: patch.visibilityKm ?? weatherPreset.visibilityKm,
+    humidityPercent: patch.humidityPercent ?? weatherPreset.humidityPercent,
+    temperatureOffset:
+      patch.temperatureOffset ?? weatherPreset.temperatureOffsetC,
+  };
+};
 
 const movingFocus: FocusOption[] = [
   {
@@ -177,7 +188,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     runVariants: movingRuns,
     presetRationale: {
       profile:
-        "The 48 km baseline is regression-tested against VECTOR's current Astra coefficient set. It is a reproducible model setup, not a published engagement-range claim.",
+        "The 46 km baseline is regression-tested against VECTOR's current Astra coefficient set and the selected North Punjab weather preset. It is a reproducible model setup, not a published engagement-range claim.",
       geometry:
         "A 145° crossing angle and 1,500 m altitude difference create a crossing intercept rather than a head-on pass or tail chase.",
       conditions:
@@ -195,7 +206,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       studyAreaId: "north-punjab",
       weatherPresetId: "north-punjab-clear",
       guidance: "direct",
-      range: 48000,
+      range: 46000,
     }),
   },
   {

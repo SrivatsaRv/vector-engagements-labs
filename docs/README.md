@@ -16,6 +16,8 @@ The interface uses these terms. Define, Forces & loadouts, Place & flight, Senso
 
 The mandatory analysis-display contract is documented in [`tacview-visual-subset.md`](tacview-visual-subset.md). It defines the Tacview-style subset precisely and explicitly excludes claims of Tacview file compatibility or NATO symbol compliance.
 
+The portable replay and debriefing artifact is specified in [`vector-simulation-record.md`](vector-simulation-record.md). It is the browser-oriented VECTOR equivalent of an ACMI recording and is deliberately independent of the TypeScript or Rust/WASM engine backend.
+
 ## Working vertical slice
 
 - Eight versioned A2A, A2G, G2A, and G2G templates, with regression-tested successful baselines.
