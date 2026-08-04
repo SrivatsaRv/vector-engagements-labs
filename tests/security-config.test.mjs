@@ -45,6 +45,22 @@ test("release and deployment workflows admit reviewed main history", async () =>
   assert.match(deploy, /merge-base --is-ancestor/);
 });
 
+test("pull-request validation is causal and excludes browser and benchmark jobs", async () => {
+  const [ci, scheduledCodeql] = await Promise.all([
+    read(".github/workflows/ci.yml"),
+    read(".github/workflows/codeql.yml"),
+  ]);
+  assert.match(ci, /needs: quality/);
+  assert.match(ci, /needs: security/);
+  assert.match(ci, /needs: tests/);
+  assert.match(ci, /needs: integration/);
+  assert.match(ci, /make ci-quality/);
+  assert.match(ci, /make ci-tests/);
+  assert.match(ci, /make integration-ci/);
+  assert.doesNotMatch(ci, /ui:responsive|playwright|performance-local|benchmark-engine/);
+  assert.doesNotMatch(scheduledCodeql, /pull_request:|branches: \[main\]/);
+});
+
 test("Cloudflare toolchain is current and no longer dependency-ignored", async () => {
   const manifest = JSON.parse(await read("package.json"));
   const dependabot = await read(".github/dependabot.yml");
