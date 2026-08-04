@@ -53,3 +53,16 @@ The web application, map styles, PostGIS catalog, reports, and observability dep
 ## Required release evidence
 
 No engine release is complete without contract tests, deterministic fixtures, numerical sanity checks, backend parity results, benchmark results, generated API documentation, model-limit documentation, and a changelog entry.
+
+## Rust engineering contract
+
+The Rust core uses typed domain states, explicit `Result` errors, bounded input,
+and a versioned WASM ABI. Production paths do not use `unwrap`, `expect`, or
+`panic`. Unsafe blocks are denied; the narrowly allowed `no_mangle` attributes
+exist only to publish reviewed WASM symbols and contain no unsafe operations.
+
+Every change to the core must pass Rustfmt, strict Clippy, native tests, rustdoc,
+fresh WASM integrity verification, and TypeScript parity fixtures. Release builds
+retain overflow checks. Clone operations in the integration loop must be
+intentional, and performance claims must identify whether they measure native
+Rust, Node-hosted WASM, or an actual browser runtime.

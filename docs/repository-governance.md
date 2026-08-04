@@ -10,7 +10,8 @@ All contributor work enters through a pull request. The `main` branch requires:
 
 - an up-to-date branch;
 - resolution of review conversations;
-- passing Quality, Integration, Performance, CodeQL, and Dependency Review checks;
+- passing the staged Required PR Gate, which depends on quality, supply-chain,
+  security, unit, contract, database, and API checks;
 - linear history;
 - no force pushes and no branch deletion.
 
@@ -26,15 +27,39 @@ Repository administrators retain emergency recovery authority but should not use
 
 ## Continuous integration
 
-`ci.yml` verifies source generation, Rust/WASM integrity, Rust tests, lint, type safety, production build, behavioral tests, PostGIS/API/report integration, supported responsive breakpoints, and an engine performance guard. A failed Compose startup emits bounded service status and logs before evidence upload, so a container health failure is diagnosable from the check itself. Rust sources carry a deterministic source digest; the embedded module carries its own byte digest and required-export check; CI also compiles the module afresh on its runner. This avoids incorrectly requiring different compiler platforms to emit byte-identical WASM. Actions are pinned to immutable commit SHAs.
+`ci.yml` is one causal pull-request pipeline. Stage 1 verifies source generation,
+Rust formatting, lint, and type safety. Stage 1.5 performs the production
+dependency audit, dependency review, and CodeQL analysis. Stage 2 verifies the
+Rust/WASM module, Rust tests and documentation, the production build, and the
+TypeScript contract suite. Stage 3 runs migrations and validates PostGIS, the
+catalog API, saved-run verification, and report replay against the built
+application. Stage 4 emits the single required PR gate only after every prior
+stage succeeds.
 
-`codeql.yml` performs JavaScript and TypeScript security analysis on changes to `main`, pull requests, and a weekly schedule. `dependency-review.yml` rejects vulnerable or incompatible new dependencies in pull requests. Dependabot permits one open maintenance pull request per ecosystem, groups routine npm, Cargo, and Actions updates, and excludes major versions so they require an intentional maintainer proposal.
+Browser/responsive checks and performance benchmarks are deliberately not run
+on GitHub-hosted pull-request runners. They remain explicit maintainer checks
+through `make integration-local` and `make performance-local`, where the
+browser, GPU/software renderer, display dimensions, and machine class are
+controlled and the evidence is interpretable. The scheduled `codeql.yml`
+workflow retains weekly security analysis without creating a second PR run.
 
-The commit gate rejects high-severity production dependency advisories. The current remaining npm audit findings are development-only advisories inherited through `drizzle-kit` and the locally proven Cloudflare Vite/Wrangler adapter. They are not shipped in the Worker runtime dependency surface and remain tracked for upstream removal. The latest Cloudflare adapter was evaluated and rejected because its alpha Miniflare dependency crashed during the responsive integration suite; using `--force` would also incorrectly downgrade the migration tool. Production dependencies currently audit cleanly.
+Rust sources carry a deterministic source digest; the embedded module carries
+its own byte digest and required-export check; CI also compiles the module
+afresh on its runner. This avoids incorrectly requiring different compiler
+platforms to emit byte-identical WASM. Actions are pinned to immutable commit
+SHAs.
+
+Pull requests receive CodeQL and dependency review inside the causal `ci.yml`
+pipeline. `codeql.yml` is reserved for the weekly scheduled scan and explicit
+maintainer dispatches. Dependabot permits one open maintenance pull request per
+ecosystem, groups routine npm, Cargo, and Actions updates, and excludes major
+versions so they require an intentional maintainer proposal.
+
+The commit gate rejects high-severity production dependency advisories. The Cloudflare Vite adapter, Wrangler, and Workers type package are upgraded as one tested compatibility set and are no longer excluded from Dependabot. Remaining npm audit findings are development-only advisories inherited through local migration and Cloudflare tooling; they are not shipped in the Worker runtime dependency surface and remain tracked for upstream removal. Production dependencies currently audit cleanly.
 
 ## Continuous delivery
 
-Pushing a semantic tag creates a GitHub release only when the tag exactly matches `package.json`, the commit gate passes, and the release archive receives a SHA-256 manifest.
+A maintainer dispatches the release workflow from `main` with an existing semantic tag. The workflow verifies that the tag matches `package.json` and resolves to reviewed `main` history, runs the full gate, generates an SPDX SBOM and SHA-256 manifest, attests the archive, and publishes through the protected `release` environment. Tag pushes alone cannot execute release code.
 
 Cloudflare delivery is deliberately manual and protected by the GitHub `production` environment. It deploys an explicit commit SHA only after CI and requires two protected secrets and two non-secret environment variables:
 

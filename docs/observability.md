@@ -5,7 +5,7 @@ Status: Compose-backed and required for the local integrated stack.
 ## Runtime topology
 
 - VECTOR exports OTLP/HTTP traces and error logs to the OpenTelemetry Collector.
-- Prometheus scrapes VECTOR's bounded `/api/metrics` endpoint and the collector exporter.
+- Prometheus scrapes VECTOR's bounded, bearer-protected `/api/metrics` endpoint and the collector exporter.
 - Tempo stores API traces.
 - Loki stores OTLP logs.
 - Grafana provisions Prometheus, Tempo, and Loki plus the `VECTOR Operations` and `VECTOR Browser Performance` dashboards.
@@ -13,7 +13,7 @@ Status: Compose-backed and required for the local integrated stack.
 The local endpoints are:
 
 - VECTOR: `http://localhost:4317`
-- Grafana: `http://localhost:4300` with `vector` / `vector`
+- Grafana: `http://localhost:4300` with `vector` / `vector-local-only` unless overridden
 - Prometheus: `http://localhost:9090`
 - Tempo: `http://localhost:3200`
 - Loki: `http://localhost:3100`
@@ -23,7 +23,13 @@ The local endpoints are:
 
 Metrics use bounded labels. Run IDs, user-entered names, coordinates, and scenario titles are never metric labels. They belong in traces or durable run records.
 
-Core metrics cover HTTP RED, PostgreSQL operations, scenario starts/completions/failures, compute duration, model duration, entity count, reports, map loading, browser long tasks, and navigation duration. Browser telemetry is delivered in a serialized queue so a run start cannot overtake its completion event.
+Core metrics cover HTTP RED, PostgreSQL operations, verified scenario starts/completions/failures, compute duration, model duration, entity count, reports, map loading, browser long tasks, and navigation duration. Anonymous browser telemetry can write only bounded map and performance events. Run and report metrics are emitted by server-owned verification and persistence paths.
+
+Production metrics return 404 unless `METRICS_BEARER_TOKEN` is configured as a Worker secret and presented as a Bearer token. Compose uses a local scrape token and every endpoint is bound to loopback.
+
+Compose runs the application through Wrangler's development proxy. The local
+application service restarts automatically if that proxy exits; deployed
+Cloudflare Workers do not use this development proxy.
 
 The operations dashboard treats “missing completion” as starts minus completions and failures within a 15-minute observation window. That is an ingestion-health signal, not a durable job-orchestrator state. “Slow browser run” means a reported compute duration above 250 ms. The current engine is synchronous and local to the browser; if execution moves to Workers, durable queued/running/stuck state must come from that orchestration store rather than an in-process metric gauge.
 
@@ -32,7 +38,7 @@ The operations dashboard treats “missing completion” as starts minus complet
 `make observability-local` starts the complete Compose topology and proves:
 
 1. every service becomes ready;
-2. browser scenario events are accepted and invalid event types are rejected;
+2. bounded browser performance events are accepted and authoritative event types are rejected;
 3. Prometheus scrapes VECTOR and can query custom business metrics;
 4. Grafana has all three data sources and both dashboards;
 5. Tempo contains at least one VECTOR API trace.

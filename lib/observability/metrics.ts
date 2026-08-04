@@ -42,6 +42,11 @@ const definitions: Record<string, { help: string; type: "counter" | "gauge" | "h
 };
 
 const defaultBuckets = [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
+const MAX_SERIES_PER_METRIC_TYPE = 512;
+
+function admitSeries<T>(map: Map<string, T>, key: string) {
+  return map.has(key) || map.size < MAX_SERIES_PER_METRIC_TYPE;
+}
 
 function normalizedLabels(labels: Labels = {}) {
   return Object.entries(labels)
@@ -73,15 +78,18 @@ function labelText(labels: Array<[string, string]>, extra?: [string, string]) {
 
 export function incrementCounter(name: string, labels: Labels = {}, amount = 1) {
   const key = metricKey(name, labels);
+  if (!admitSeries(registry.counters, key)) return;
   registry.counters.set(key, (registry.counters.get(key) ?? 0) + amount);
 }
 
 export function setGauge(name: string, value: number, labels: Labels = {}) {
-  registry.gauges.set(metricKey(name, labels), value);
+  const key = metricKey(name, labels);
+  if (admitSeries(registry.gauges, key)) registry.gauges.set(key, value);
 }
 
 export function addGauge(name: string, amount: number, labels: Labels = {}) {
   const key = metricKey(name, labels);
+  if (!admitSeries(registry.gauges, key)) return;
   registry.gauges.set(key, Math.max(0, (registry.gauges.get(key) ?? 0) + amount));
 }
 
@@ -93,6 +101,7 @@ export function observeHistogram(
 ) {
   if (!Number.isFinite(value) || value < 0) return;
   const key = metricKey(name, labels);
+  if (!admitSeries(registry.histograms, key)) return;
   const state = registry.histograms.get(key) ?? {
     buckets,
     counts: buckets.map(() => 0),

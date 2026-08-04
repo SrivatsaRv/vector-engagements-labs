@@ -14,13 +14,15 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "predev": "npm run map:assets:prepare",
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
+    "prebuild": "npm run map:assets:prepare",
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "deploy": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext deploy",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs && tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "lint": "eslint . --max-warnings=0 --ignore-pattern dist --ignore-pattern .next --ignore-pattern engine-rust/target --ignore-pattern public/vendor",
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate-db.mjs",
@@ -31,9 +33,13 @@
     "performance:verify": "tsx scripts/benchmark-engine.ts",
     "symbols:generate": "node scripts/generate-tactical-icons.mjs",
     "symbols:verify": "node scripts/generate-tactical-icons.mjs --check",
+    "map:assets:prepare": "node scripts/prepare-maplibre-assets.mjs",
     "engine:rust:build": "node scripts/build-rust-engine.mjs",
     "engine:rust:verify": "node scripts/build-rust-engine.mjs --check",
-    "engine:rust:test": "cargo test --manifest-path engine-rust/Cargo.toml",
+    "engine:rust:fmt": "cargo fmt --manifest-path engine-rust/Cargo.toml -- --check",
+    "engine:rust:clippy": "cargo clippy --manifest-path engine-rust/Cargo.toml --locked --all-targets --all-features -- -D warnings",
+    "engine:rust:test": "cargo test --manifest-path engine-rust/Cargo.toml --locked --all-targets --all-features",
+    "engine:rust:doc": "RUSTDOCFLAGS='-D warnings' cargo doc --manifest-path engine-rust/Cargo.toml --locked --no-deps",
     "ui:responsive:verify": "node scripts/verify-responsive-ui.mjs"
   },
   "dependencies": {
@@ -52,8 +58,8 @@
     "sharp": "0.35.0"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
-    "@cloudflare/workers-types": "4.20260702.1",
+    "@cloudflare/vite-plugin": "1.50.0",
+    "@cloudflare/workers-types": "5.20260804.1",
     "@iconify-json/game-icons": "^1.2.4",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
@@ -71,7 +77,7 @@
     "typescript": "5.9.3",
     "vinext": "0.0.50",
     "vite": "8.2.0",
-    "wrangler": "4.92.0"
+    "wrangler": "4.118.0"
   },
   "type": "module"
 }

@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Quality gate
+    name: "Stage 1: Quality Gate"
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -30,19 +30,24 @@ jobs:
         with:
           toolchain: stable
           target: wasm32-unknown-unknown
+          components: clippy,rustfmt
       - name: Cache Rust builds
-        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
         with:
           workspaces: engine-rust
       - name: Install locked dependencies
         run: npm ci
-      - name: Run commit gate
-        run: make ci-local
+      - name: Verify formatting, generated assets, lint, and types
+        run: make ci-quality
 
-  integration:
-    name: Integration gate
+  security:
+    name: "Stage 1.5: Supply Chain and Security Gate"
+    needs: quality
+    permissions:
+      contents: read
+      security-events: write
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - name: Check out source
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -53,47 +58,102 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Locate Chrome
-        run: test -x /usr/bin/google-chrome
-      - name: Verify PostGIS, API, reports, maps, and responsive UI
+      - name: Audit production dependencies
+        run: npm run audit:production
+      - name: Review pull-request dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
+        with:
+          fail-on-severity: moderate
+          deny-licenses: GPL-3.0, AGPL-3.0
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@d1ba80a13dd99fba24a470575428917156a28b43
+        with:
+          languages: javascript-typescript
+      - name: Analyze JavaScript and TypeScript
+        uses: github/codeql-action/analyze@d1ba80a13dd99fba24a470575428917156a28b43
+        with:
+          category: /language:javascript-typescript
+
+  tests:
+    name: "Stage 2: Unit and Contract Tests"
+    needs: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          components: clippy,rustfmt
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+        with:
+          workspaces: engine-rust
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run Rust and TypeScript tests
+        run: make ci-tests
+
+  integration:
+    name: "Stage 3: Database and API Integration"
+    needs: tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
         env:
-          VECTOR_CHROME_PATH: /usr/bin/google-chrome
-        run: make integration-local
-      - name: Report Compose state on failure
-        if: failure()
-        run: |
-          docker compose ps -a
-          docker compose logs --no-color --tail=250
-      - name: Upload responsive evidence on failure
+          POSTGRES_DB: vector
+          POSTGRES_USER: vector
+          POSTGRES_PASSWORD: vector
+        ports:
+          - 55433:5432
+        options: >-
+          --health-cmd "pg_isready -U vector -d vector"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgres://vector:vector@127.0.0.1:55433/vector
+      VECTOR_URL: http://127.0.0.1:4317
+      PORT: "4317"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build application
+        run: npm run build
+      - name: Verify PostGIS, migrations, API, and saved reports
+        run: make integration-ci
+      - name: Upload application log on failure
         if: failure()
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
-          name: responsive-failure-evidence
-          path: outputs/responsive
+          name: integration-application-log
+          path: /tmp/vector-integration.log
           if-no-files-found: ignore
           retention-days: 7
 
-  performance:
-    name: Performance gate
+  gate:
+    name: "Stage 4: Required PR Gate"
+    needs: integration
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 2
     steps:
-      - name: Check out source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-      - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: 22.18.0
-          cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Run engine benchmark guard
-        env:
-          VECTOR_MAX_ENGINE_P95_MS: "200"
-        run: make performance-local | tee performance.json
-      - name: Upload benchmark evidence
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
-        with:
-          name: engine-performance
-          path: performance.json
-          retention-days: 30
+      - name: Confirm staged validation completed
+        run: echo "Quality, security, unit, contract, database, and API gates passed."

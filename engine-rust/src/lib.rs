@@ -1,5 +1,17 @@
+#![deny(unsafe_code)]
+#![deny(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
+
+mod error;
+mod validation;
+mod wasm_abi;
+
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
+
+pub use error::EngineError;
+pub use validation::{
+    validate_scenario, MAX_ENTITIES, MAX_EVENTS, MAX_INPUT_BYTES, MAX_INTEGRATED_STEPS,
+    MAX_RECORDED_ENTITY_STATES, MAX_ROUTE_POINTS_PER_ENTITY,
+};
 
 const G0: f64 = 9.80665;
 
@@ -67,6 +79,145 @@ impl Vec3 {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum EngagementDomain {
+    #[serde(rename = "A2A")]
+    AirToAir,
+    #[serde(rename = "A2G")]
+    AirToGround,
+    #[serde(rename = "G2A")]
+    GroundToAir,
+    #[serde(rename = "G2G")]
+    GroundToGround,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum Affiliation {
+    #[serde(rename = "BLUE")]
+    Blue,
+    #[serde(rename = "RED")]
+    Red,
+    #[serde(rename = "NEUTRAL")]
+    Neutral,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum EntityKind {
+    #[serde(rename = "AIRCRAFT")]
+    Aircraft,
+    #[serde(rename = "GUIDED_WEAPON")]
+    GuidedWeapon,
+    #[serde(rename = "AIR_DEFENCE_SYSTEM")]
+    AirDefenceSystem,
+    #[serde(rename = "RADAR")]
+    Radar,
+    #[serde(rename = "SURFACE_LAUNCHER")]
+    SurfaceLauncher,
+    #[serde(rename = "BASE")]
+    Base,
+    #[serde(rename = "FIXED_OBJECTIVE")]
+    FixedObjective,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum EntityLifecycle {
+    #[serde(rename = "STOWED")]
+    Stowed,
+    #[serde(rename = "ACTIVE")]
+    Active,
+    #[serde(rename = "TRACKING")]
+    Tracking,
+    #[serde(rename = "ENGAGING")]
+    Engaging,
+    #[serde(rename = "TERMINATED")]
+    Terminated,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Maneuver {
+    Steady,
+    Break,
+    Weave,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TacticalDecision {
+    #[serde(rename = "PRESS")]
+    Press,
+    #[serde(rename = "SUPPORT_WEAPON")]
+    SupportWeapon,
+    #[serde(rename = "CRANK")]
+    Crank,
+    #[serde(rename = "DEFEND")]
+    Defend,
+    #[serde(rename = "DISENGAGE")]
+    Disengage,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Guidance {
+    Direct,
+    Loft,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum ModelValueState {
+    #[serde(rename = "SOURCED")]
+    Sourced,
+    #[serde(rename = "MODEL_ASSUMPTION")]
+    ModelAssumption,
+    #[serde(rename = "USER_PROVIDED")]
+    UserProvided,
+    #[serde(rename = "UNKNOWN")]
+    Unknown,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum AtmosphereModel {
+    #[serde(rename = "NASA_EDUCATIONAL_STANDARD")]
+    NasaEducationalStandard,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum EngineEventType {
+    #[serde(rename = "GUIDANCE_HOLD")]
+    GuidanceHold,
+    #[serde(rename = "WIND_SHIFT")]
+    WindShift,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub enum CoverageKind {
+    #[serde(rename = "DETECTION")]
+    Detection,
+    #[serde(rename = "TRACKING")]
+    Tracking,
+    #[serde(rename = "ENGAGEMENT")]
+    Engagement,
+    #[serde(rename = "MINIMUM_RANGE")]
+    MinimumRange,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub enum EngineBackend {
+    #[serde(rename = "rust-wasm")]
+    RustWasm,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub enum Termination {
+    #[serde(rename = "threshold_reached")]
+    ThresholdReached,
+    #[serde(rename = "energy_depleted")]
+    EnergyDepleted,
+    #[serde(rename = "time_limit")]
+    TimeLimit,
+    #[serde(rename = "invalid_scenario")]
+    InvalidScenario,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InitialState {
@@ -80,9 +231,9 @@ pub struct InitialState {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Behavior {
-    pub maneuver: String,
+    pub maneuver: Maneuver,
     pub commanded_g: f64,
-    pub decision: String,
+    pub decision: TacticalDecision,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -90,7 +241,7 @@ pub struct Behavior {
 pub struct WeaponModel {
     pub launch_platform_id: String,
     pub target_entity_id: String,
-    pub guidance: String,
+    pub guidance: Guidance,
     pub launch_time_seconds: Option<f64>,
     pub burn_seconds: f64,
     pub launch_mass_kg: f64,
@@ -135,7 +286,7 @@ pub struct AircraftModel {
 pub struct Provenance {
     pub source_object_id: String,
     pub model_version: String,
-    pub value_state: String,
+    pub value_state: ModelValueState,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -145,10 +296,10 @@ pub struct EntityDefinition {
     pub rddf_id: String,
     pub designation: String,
     pub callsign: String,
-    pub affiliation: String,
-    pub kind: String,
+    pub affiliation: Affiliation,
+    pub kind: EntityKind,
     pub symbol_role: String,
-    pub lifecycle: String,
+    pub lifecycle: EntityLifecycle,
     #[serde(default)]
     pub route: Vec<Vec3>,
     pub initial: InitialState,
@@ -184,7 +335,7 @@ pub struct Environment {
     pub gravity_mps2: f64,
     pub temperature_offset_c: f64,
     pub wind_mps: Vec3,
-    pub atmosphere: String,
+    pub atmosphere: AtmosphereModel,
     pub study_area: StudyArea,
 }
 
@@ -199,7 +350,7 @@ pub struct Completion {
 pub struct EngineEvent {
     pub id: String,
     #[serde(rename = "type")]
-    pub event_type: String,
+    pub event_type: EngineEventType,
     pub start_seconds: f64,
     pub duration_seconds: f64,
     pub entity_id: Option<String>,
@@ -211,7 +362,7 @@ pub struct EngineEvent {
 pub struct EngineScenario {
     pub id: String,
     pub version: String,
-    pub domain: String,
+    pub domain: EngagementDomain,
     pub name: String,
     pub seed: u64,
     pub duration_seconds: f64,
@@ -229,10 +380,10 @@ pub struct EntityFrame {
     pub rddf_id: String,
     pub designation: String,
     pub callsign: String,
-    pub affiliation: String,
-    pub kind: String,
+    pub affiliation: Affiliation,
+    pub kind: EntityKind,
     pub symbol_role: String,
-    pub lifecycle: String,
+    pub lifecycle: EntityLifecycle,
     pub position: Vec3,
     pub velocity: Vec3,
     pub speed_mps: f64,
@@ -246,7 +397,7 @@ pub struct EntityFrame {
     pub commanded_g: f64,
     pub available_g: f64,
     pub phase: String,
-    pub value_state: String,
+    pub value_state: ModelValueState,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -266,19 +417,19 @@ pub struct EngineFrame {
 pub struct CoverageEnvelope {
     pub id: String,
     pub entity_id: String,
-    pub affiliation: String,
-    pub kind: String,
+    pub affiliation: Affiliation,
+    pub kind: CoverageKind,
     pub radius_m: f64,
     pub minimum_altitude_m: f64,
     pub maximum_altitude_m: f64,
-    pub value_state: String,
+    pub value_state: ModelValueState,
     pub label: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Diagnostics {
-    pub backend: String,
+    pub backend: EngineBackend,
     pub fixed_step_seconds: f64,
     pub integrated_steps: u64,
     pub non_finite_state_count: u64,
@@ -293,7 +444,7 @@ pub struct EngineRun {
     pub envelopes: Vec<CoverageEnvelope>,
     pub primary_weapon_id: String,
     pub primary_target_id: String,
-    pub termination: String,
+    pub termination: Termination,
     pub closest_approach_m: f64,
     pub peak_command_g: f64,
     pub diagnostics: Diagnostics,
@@ -302,7 +453,7 @@ pub struct EngineRun {
 #[derive(Clone)]
 struct RuntimeState {
     definition: EntityDefinition,
-    lifecycle: String,
+    lifecycle: EntityLifecycle,
     position: Vec3,
     velocity: Vec3,
     mass_kg: f64,
@@ -321,7 +472,7 @@ impl RuntimeState {
     fn new(definition: &EntityDefinition) -> Self {
         Self {
             definition: definition.clone(),
-            lifecycle: definition.lifecycle.clone(),
+            lifecycle: definition.lifecycle,
             position: definition.initial.position,
             velocity: definition.initial.velocity,
             mass_kg: definition.initial.mass_kg,
@@ -335,7 +486,7 @@ impl RuntimeState {
                 .unwrap_or(9.0),
             drag_newtons: 0.0,
             thrust_newtons: 0.0,
-            phase: if definition.lifecycle == "STOWED" {
+            phase: if definition.lifecycle == EntityLifecycle::Stowed {
                 "Stowed"
             } else {
                 "Initial state"
@@ -368,7 +519,7 @@ fn active_wind(scenario: &EngineScenario, time: f64) -> Vec3 {
         .events
         .iter()
         .fold(scenario.environment.wind_mps, |wind, event| {
-            if event.event_type == "WIND_SHIFT"
+            if event.event_type == EngineEventType::WindShift
                 && time >= event.start_seconds
                 && time < event.start_seconds + event.duration_seconds
             {
@@ -384,7 +535,7 @@ fn active_wind(scenario: &EngineScenario, time: f64) -> Vec3 {
 
 fn guidance_held(scenario: &EngineScenario, entity_id: &str, time: f64) -> bool {
     scenario.events.iter().any(|event| {
-        event.event_type == "GUIDANCE_HOLD"
+        event.event_type == EngineEventType::GuidanceHold
             && event
                 .entity_id
                 .as_deref()
@@ -396,17 +547,17 @@ fn guidance_held(scenario: &EngineScenario, entity_id: &str, time: f64) -> bool 
 }
 
 fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f64, dt: f64) {
-    if state.lifecycle != "ACTIVE" && state.lifecycle != "TRACKING" {
+    if state.lifecycle != EntityLifecycle::Active && state.lifecycle != EntityLifecycle::Tracking {
         return;
     }
-    if state.definition.kind != "AIRCRAFT" {
+    if state.definition.kind != EntityKind::Aircraft {
         return;
     }
     let model = state.definition.aircraft.as_ref();
     let speed = state.velocity.magnitude().max(1.0);
     let mut turn_demand = 0.0;
-    if state.definition.behavior.maneuver != "steady" && time >= 5.0 {
-        turn_demand = if state.definition.behavior.maneuver == "break" {
+    if state.definition.behavior.maneuver != Maneuver::Steady && time >= 5.0 {
+        turn_demand = if state.definition.behavior.maneuver == Maneuver::Break {
             state.definition.behavior.commanded_g
         } else {
             state.definition.behavior.commanded_g * (time * 0.55).sin()
@@ -475,7 +626,7 @@ fn activate_weapons(states: &mut [RuntimeState], time: f64) {
         let Some(launch_time) = weapon.launch_time_seconds else {
             continue;
         };
-        if states[index].lifecycle != "STOWED" || time < launch_time {
+        if states[index].lifecycle != EntityLifecycle::Stowed || time < launch_time {
             continue;
         }
         let launcher_id = weapon.launch_platform_id.clone();
@@ -490,7 +641,7 @@ fn activate_weapons(states: &mut [RuntimeState], time: f64) {
             states[index].velocity = velocity;
             states[index].heading_rad = heading;
         }
-        states[index].lifecycle = "ACTIVE".to_string();
+        states[index].lifecycle = EntityLifecycle::Active;
         states[index].phase = "Launched".to_string();
     }
 }
@@ -505,7 +656,7 @@ fn update_weapon(
     let Some(weapon) = states[index].definition.weapon.clone() else {
         return;
     };
-    if states[index].lifecycle != "ACTIVE" {
+    if states[index].lifecycle != EntityLifecycle::Active {
         return;
     }
     let Some(target) = states
@@ -513,12 +664,12 @@ fn update_weapon(
         .find(|state| state.definition.id == weapon.target_entity_id)
         .cloned()
     else {
-        states[index].lifecycle = "TERMINATED".to_string();
+        states[index].lifecycle = EntityLifecycle::Terminated;
         states[index].phase = "Target unavailable".to_string();
         return;
     };
-    if target.lifecycle == "TERMINATED" {
-        states[index].lifecycle = "TERMINATED".to_string();
+    if target.lifecycle == EntityLifecycle::Terminated {
+        states[index].lifecycle = EntityLifecycle::Terminated;
         states[index].phase = "Target unavailable".to_string();
         return;
     }
@@ -563,14 +714,14 @@ fn update_weapon(
     let nominal_guidance = los_rate_vector
         .cross(los)
         .scale(weapon.navigation_constant * closing_rate);
-    let loft = if scenario.domain == "G2G" {
+    let loft = if scenario.domain == EngagementDomain::GroundToGround {
         let terminal_blend =
             (separation / weapon.seeker_activation_range_m.max(1.0)).clamp(0.0, 1.0);
         let commanded = weapon
             .commanded_cruise_altitude_m
             .max(target.position.z + 30.0);
-        let apex = if weapon.guidance == "loft" {
-            commanded.max(target.position.z + (separation * 0.06).max(800.0).min(9000.0))
+        let apex = if weapon.guidance == Guidance::Loft {
+            commanded.max(target.position.z + (separation * 0.06).clamp(800.0, 9000.0))
         } else {
             commanded
         };
@@ -580,8 +731,8 @@ fn update_weapon(
             y: 0.0,
             z: ((desired - state.position.z) * 0.018 - state.velocity.z * 0.32).clamp(-22.0, 22.0),
         }
-    } else if weapon.guidance == "loft" {
-        let desired_height = (separation * 0.06).max(800.0).min(9000.0);
+    } else if weapon.guidance == Guidance::Loft {
+        let desired_height = (separation * 0.06).clamp(800.0, 9000.0);
         Vec3 {
             x: 0.0,
             y: 0.0,
@@ -597,10 +748,10 @@ fn update_weapon(
         z: G0,
     });
     let terminal = separation <= weapon.seeker_activation_range_m;
-    let update_multiplier = match state.definition.behavior.decision.as_str() {
-        "CRANK" => 1.5,
-        "DEFEND" => 3.0,
-        "DISENGAGE" => f64::INFINITY,
+    let update_multiplier = match state.definition.behavior.decision {
+        TacticalDecision::Crank => 1.5,
+        TacticalDecision::Defend => 3.0,
+        TacticalDecision::Disengage => f64::INFINITY,
         _ => 1.0,
     };
     let update_due = terminal
@@ -652,10 +803,10 @@ fn entity_frame(state: &RuntimeState, scenario: &EngineScenario) -> EntityFrame 
         rddf_id: state.definition.rddf_id.clone(),
         designation: state.definition.designation.clone(),
         callsign: state.definition.callsign.clone(),
-        affiliation: state.definition.affiliation.clone(),
-        kind: state.definition.kind.clone(),
+        affiliation: state.definition.affiliation,
+        kind: state.definition.kind,
         symbol_role: state.definition.symbol_role.clone(),
-        lifecycle: state.lifecycle.clone(),
+        lifecycle: state.lifecycle,
         position: state.position,
         velocity: state.velocity,
         speed_mps: speed,
@@ -669,7 +820,7 @@ fn entity_frame(state: &RuntimeState, scenario: &EngineScenario) -> EntityFrame 
         commanded_g: state.commanded_g,
         available_g: state.available_g,
         phase: state.phase.clone(),
-        value_state: state.definition.provenance.value_state.clone(),
+        value_state: state.definition.provenance.value_state,
     }
 }
 
@@ -683,54 +834,73 @@ fn envelopes(scenario: &EngineScenario) -> Vec<CoverageEnvelope> {
             };
             [
                 (
-                    "DETECTION",
+                    CoverageKind::Detection,
                     sensor.detection_radius_m,
                     "detection study volume",
+                    "detection",
                 ),
                 (
-                    "TRACKING",
+                    CoverageKind::Tracking,
                     sensor.tracking_radius_m,
                     "tracking study volume",
+                    "tracking",
                 ),
                 (
-                    "ENGAGEMENT",
+                    CoverageKind::Engagement,
                     sensor.engagement_radius_m,
                     "engagement study envelope",
+                    "engagement",
                 ),
                 (
-                    "MINIMUM_RANGE",
+                    CoverageKind::MinimumRange,
                     sensor.minimum_range_m,
                     "minimum-range limitation",
+                    "minimum",
                 ),
             ]
             .into_iter()
-            .map(|(kind, radius, suffix)| {
-                let suffix_id = if kind == "MINIMUM_RANGE" {
-                    "minimum".to_string()
-                } else {
-                    kind.to_lowercase()
-                };
-                CoverageEnvelope {
-                    id: format!("{}-{suffix_id}", entity.id),
-                    entity_id: entity.id.clone(),
-                    affiliation: entity.affiliation.clone(),
-                    kind: kind.to_string(),
-                    radius_m: radius,
-                    minimum_altitude_m: sensor.minimum_altitude_m,
-                    maximum_altitude_m: sensor.maximum_altitude_m,
-                    value_state: entity.provenance.value_state.clone(),
-                    label: format!("{} {}", entity.designation, suffix),
-                }
+            .map(|(kind, radius, suffix, suffix_id)| CoverageEnvelope {
+                id: format!("{}-{suffix_id}", entity.id),
+                entity_id: entity.id.clone(),
+                affiliation: entity.affiliation,
+                kind,
+                radius_m: radius,
+                minimum_altitude_m: sensor.minimum_altitude_m,
+                maximum_altitude_m: sensor.maximum_altitude_m,
+                value_state: entity.provenance.value_state,
+                label: format!("{} {}", entity.designation, suffix),
             })
             .collect::<Vec<_>>()
         })
         .collect()
 }
 
-pub fn run_engine(scenario: EngineScenario) -> EngineRun {
+fn invalid_run(scenario: EngineScenario) -> EngineRun {
+    EngineRun {
+        frames: Vec::new(),
+        envelopes: envelopes(&scenario),
+        primary_weapon_id: String::new(),
+        primary_target_id: String::new(),
+        termination: Termination::InvalidScenario,
+        closest_approach_m: f64::MAX,
+        peak_command_g: 0.0,
+        diagnostics: Diagnostics {
+            backend: EngineBackend::RustWasm,
+            fixed_step_seconds: scenario.fixed_step_seconds,
+            integrated_steps: 0,
+            non_finite_state_count: 0,
+            minimum_mass_margin_kg: 0.0,
+        },
+        scenario,
+    }
+}
+
+/// Run a validated deterministic scenario and return a replayable engine record.
+pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError> {
+    validate_scenario(&scenario)?;
     let mut states: Vec<RuntimeState> = scenario.entities.iter().map(RuntimeState::new).collect();
     let primary_weapon_index = scenario.entities.iter().position(|entity| {
-        entity.kind == "GUIDED_WEAPON"
+        entity.kind == EntityKind::GuidedWeapon
             && entity
                 .weapon
                 .as_ref()
@@ -748,31 +918,16 @@ pub fn run_engine(scenario: EngineScenario) -> EngineRun {
             .iter()
             .position(|state| state.definition.id == target_id)
     });
-    if primary_weapon_index.is_none() || primary_target_index.is_none() {
-        return EngineRun {
-            scenario: scenario.clone(),
-            frames: Vec::new(),
-            envelopes: envelopes(&scenario),
-            primary_weapon_id: String::new(),
-            primary_target_id: String::new(),
-            termination: "invalid_scenario".to_string(),
-            closest_approach_m: f64::MAX,
-            peak_command_g: 0.0,
-            diagnostics: Diagnostics {
-                backend: "rust-wasm".to_string(),
-                fixed_step_seconds: scenario.fixed_step_seconds,
-                integrated_steps: 0,
-                non_finite_state_count: 0,
-                minimum_mass_margin_kg: 0.0,
-            },
-        };
-    }
-    let weapon_index = primary_weapon_index.unwrap();
-    let target_index = primary_target_index.unwrap();
+    let (Some(weapon_index), Some(target_index)) = (primary_weapon_index, primary_target_index)
+    else {
+        return Err(EngineError::InvalidScenario(
+            "scenario must contain a launched weapon with a valid target".to_string(),
+        ));
+    };
     let weapon_id = states[weapon_index].definition.id.clone();
     let target_id = states[target_index].definition.id.clone();
     let mut frames = Vec::new();
-    let mut termination = "time_limit".to_string();
+    let mut termination = Termination::TimeLimit;
     let mut closest = f64::INFINITY;
     let mut peak_g: f64 = 0.0;
     let mut steps = 0_u64;
@@ -836,7 +991,7 @@ pub fn run_engine(scenario: EngineScenario) -> EngineRun {
                 t: (time * 1_000_000.0).round() / 1_000_000.0,
                 entities: states
                     .iter()
-                    .filter(|state| state.lifecycle != "STOWED")
+                    .filter(|state| state.lifecycle != EntityLifecycle::Stowed)
                     .map(|state| entity_frame(state, &scenario))
                     .collect(),
                 primary_weapon_id: weapon_id.clone(),
@@ -847,23 +1002,27 @@ pub fn run_engine(scenario: EngineScenario) -> EngineRun {
             });
         }
         if separation <= scenario.completion.distance_meters {
-            termination = "threshold_reached".to_string();
+            termination = Termination::ThresholdReached;
             break;
         }
         let speed = states[weapon_index].velocity.magnitude();
-        let weapon = states[weapon_index].definition.weapon.as_ref().unwrap();
+        let Some(weapon) = states[weapon_index].definition.weapon.as_ref() else {
+            return Err(EngineError::InvalidScenario(
+                "primary weapon lost its model during integration".to_string(),
+            ));
+        };
         let since_launch = time - weapon.launch_time_seconds.unwrap_or(0.0);
         if since_launch > weapon.burn_seconds + 2.0 && speed < 80.0 && separation > 1000.0 {
-            termination = "energy_depleted".to_string();
+            termination = Termination::EnergyDepleted;
             break;
         }
         if states[weapon_index].position.z <= 0.0 && time > 1.0 {
-            termination = "energy_depleted".to_string();
+            termination = Termination::EnergyDepleted;
             break;
         }
         time += scenario.fixed_step_seconds;
     }
-    EngineRun {
+    Ok(EngineRun {
         scenario: scenario.clone(),
         frames,
         envelopes: envelopes(&scenario),
@@ -873,7 +1032,7 @@ pub fn run_engine(scenario: EngineScenario) -> EngineRun {
         closest_approach_m: closest,
         peak_command_g: peak_g,
         diagnostics: Diagnostics {
-            backend: "rust-wasm".to_string(),
+            backend: EngineBackend::RustWasm,
             fixed_step_seconds: scenario.fixed_step_seconds,
             integrated_steps: steps,
             non_finite_state_count: non_finite,
@@ -883,62 +1042,27 @@ pub fn run_engine(scenario: EngineScenario) -> EngineRun {
                 0.0
             },
         },
+    })
+}
+
+/// Run a scenario while preserving the legacy invalid-run return contract.
+pub fn run_engine(scenario: EngineScenario) -> EngineRun {
+    let fallback = scenario.clone();
+    try_run_engine(scenario).unwrap_or_else(|_| invalid_run(fallback))
+}
+
+/// Decode, validate, run, and encode one versioned engine scenario.
+pub fn run_json(input: &str) -> Result<String, EngineError> {
+    if input.len() > MAX_INPUT_BYTES {
+        return Err(EngineError::InputTooLarge {
+            requested: input.len(),
+            maximum: MAX_INPUT_BYTES,
+        });
     }
-}
-
-pub fn run_json(input: &str) -> Result<String, String> {
     let scenario: EngineScenario =
-        serde_json::from_str(input).map_err(|error| error.to_string())?;
-    serde_json::to_string(&run_engine(scenario)).map_err(|error| error.to_string())
-}
-
-thread_local! {
-    static INPUT: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
-    static OUTPUT: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
-}
-
-#[no_mangle]
-pub extern "C" fn vector_input_reserve(length: usize) -> *mut u8 {
-    INPUT.with(|cell| {
-        let mut input = cell.borrow_mut();
-        input.clear();
-        input.resize(length, 0);
-        input.as_mut_ptr()
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn vector_run_json() -> u32 {
-    let result = INPUT.with(|input| {
-        let input = input.borrow();
-        std::str::from_utf8(&input)
-            .map_err(|error| error.to_string())
-            .and_then(run_json)
-    });
-    OUTPUT.with(|cell| {
-        let mut output = cell.borrow_mut();
-        output.clear();
-        match result {
-            Ok(value) => {
-                output.extend_from_slice(value.as_bytes());
-                1
-            }
-            Err(error) => {
-                output.extend_from_slice(error.as_bytes());
-                0
-            }
-        }
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn vector_output_ptr() -> *const u8 {
-    OUTPUT.with(|cell| cell.borrow().as_ptr())
-}
-
-#[no_mangle]
-pub extern "C" fn vector_output_len() -> usize {
-    OUTPUT.with(|cell| cell.borrow().len())
+        serde_json::from_str(input).map_err(|error| EngineError::InvalidJson(error.to_string()))?;
+    let run = try_run_engine(scenario)?;
+    serde_json::to_string(&run).map_err(|error| EngineError::Serialization(error.to_string()))
 }
 
 #[cfg(test)]
@@ -949,20 +1073,25 @@ mod tests {
         Provenance {
             source_object_id: "native-test".to_string(),
             model_version: "native-test-v1".to_string(),
-            value_state: "MODEL_ASSUMPTION".to_string(),
+            value_state: ModelValueState::ModelAssumption,
         }
     }
 
-    fn entity(id: &str, affiliation: &str, position: Vec3, velocity: Vec3) -> EntityDefinition {
+    fn entity(
+        id: &str,
+        affiliation: Affiliation,
+        position: Vec3,
+        velocity: Vec3,
+    ) -> EntityDefinition {
         EntityDefinition {
             id: id.to_string(),
             rddf_id: format!("rddf://test/{id}"),
             designation: id.to_string(),
             callsign: id.to_uppercase(),
-            affiliation: affiliation.to_string(),
-            kind: "AIRCRAFT".to_string(),
+            affiliation,
+            kind: EntityKind::Aircraft,
             symbol_role: "FIGHTER".to_string(),
-            lifecycle: "ACTIVE".to_string(),
+            lifecycle: EntityLifecycle::Active,
             route: Vec::new(),
             initial: InitialState {
                 position,
@@ -972,9 +1101,9 @@ mod tests {
                 fuel_kg: 2_000.0,
             },
             behavior: Behavior {
-                maneuver: "steady".to_string(),
+                maneuver: Maneuver::Steady,
                 commanded_g: 0.0,
-                decision: "PRESS".to_string(),
+                decision: TacticalDecision::Press,
             },
             weapon: None,
             sensor: None,
@@ -986,7 +1115,7 @@ mod tests {
     fn scenario() -> EngineScenario {
         let blue = entity(
             "blue-aircraft",
-            "BLUE",
+            Affiliation::Blue,
             Vec3 {
                 x: 0.0,
                 y: 0.0,
@@ -1000,7 +1129,7 @@ mod tests {
         );
         let red = entity(
             "red-aircraft",
-            "RED",
+            Affiliation::Red,
             Vec3 {
                 x: 10_000.0,
                 y: 1_000.0,
@@ -1017,10 +1146,10 @@ mod tests {
             rddf_id: "rddf://test/blue-weapon".to_string(),
             designation: "Test weapon".to_string(),
             callsign: "BLUE WEAPON".to_string(),
-            affiliation: "BLUE".to_string(),
-            kind: "GUIDED_WEAPON".to_string(),
+            affiliation: Affiliation::Blue,
+            kind: EntityKind::GuidedWeapon,
             symbol_role: "GUIDED_MISSILE".to_string(),
-            lifecycle: "STOWED".to_string(),
+            lifecycle: EntityLifecycle::Stowed,
             route: Vec::new(),
             initial: InitialState {
                 position: Vec3 {
@@ -1038,14 +1167,14 @@ mod tests {
                 fuel_kg: 70.0,
             },
             behavior: Behavior {
-                maneuver: "steady".to_string(),
+                maneuver: Maneuver::Steady,
                 commanded_g: 0.0,
-                decision: "SUPPORT_WEAPON".to_string(),
+                decision: TacticalDecision::SupportWeapon,
             },
             weapon: Some(WeaponModel {
                 launch_platform_id: "blue-aircraft".to_string(),
                 target_entity_id: "red-aircraft".to_string(),
-                guidance: "direct".to_string(),
+                guidance: Guidance::Direct,
                 launch_time_seconds: Some(1.0),
                 burn_seconds: 5.0,
                 launch_mass_kg: 180.0,
@@ -1067,7 +1196,7 @@ mod tests {
         EngineScenario {
             id: "native-test".to_string(),
             version: "1.0.0".to_string(),
-            domain: "A2A".to_string(),
+            domain: EngagementDomain::AirToAir,
             name: "Native engine test".to_string(),
             seed: 42,
             duration_seconds: 3.0,
@@ -1077,7 +1206,7 @@ mod tests {
                 gravity_mps2: G0,
                 temperature_offset_c: 0.0,
                 wind_mps: Vec3::default(),
-                atmosphere: "NASA_EDUCATIONAL_STANDARD".to_string(),
+                atmosphere: AtmosphereModel::NasaEducationalStandard,
                 study_area: StudyArea {
                     id: "test-area".to_string(),
                     name: "Test area".to_string(),
@@ -1099,27 +1228,135 @@ mod tests {
     }
 
     #[test]
-    fn deterministic_run_preserves_rust_provenance() {
-        let first = serde_json::to_string(&run_engine(scenario())).unwrap();
-        let second = serde_json::to_string(&run_engine(scenario())).unwrap();
+    fn deterministic_run_preserves_rust_provenance() -> Result<(), Box<dyn std::error::Error>> {
+        let first = serde_json::to_string(&try_run_engine(scenario())?)?;
+        let second = serde_json::to_string(&try_run_engine(scenario())?)?;
         assert_eq!(first, second);
         assert!(first.contains("\"backend\":\"rust-wasm\""));
+        Ok(())
     }
 
     #[test]
-    fn stowed_weapon_appears_only_after_launch() {
-        let run = run_engine(scenario());
-        assert!(!run
-            .frames
-            .first()
-            .unwrap()
+    fn stowed_weapon_appears_only_after_launch() -> Result<(), Box<dyn std::error::Error>> {
+        let run = try_run_engine(scenario())?;
+        let first_frame = run.frames.first().ok_or("run did not produce a frame")?;
+        assert!(!first_frame
             .entities
             .iter()
             .any(|entity| entity.id == "blue-weapon"));
-        assert!(run.frames.iter().any(|frame| frame
-            .entities
+        assert!(run
+            .frames
             .iter()
-            .any(|entity| entity.id == "blue-weapon" && entity.lifecycle == "ACTIVE")));
+            .any(|frame| frame.entities.iter().any(|entity| {
+                entity.id == "blue-weapon" && entity.lifecycle == EntityLifecycle::Active
+            })));
         assert_eq!(run.diagnostics.non_finite_state_count, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn scenario_validation_rejects_duplicate_entity_id() -> Result<(), Box<dyn std::error::Error>> {
+        let mut input = scenario();
+        let duplicate_id = input
+            .entities
+            .first()
+            .ok_or("scenario fixture has no first entity")?
+            .id
+            .clone();
+        input
+            .entities
+            .get_mut(1)
+            .ok_or("scenario fixture has no second entity")?
+            .id = duplicate_id;
+        assert!(matches!(
+            validate_scenario(&input),
+            Err(EngineError::InvalidScenario(message)) if message.contains("duplicate entity id")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn scenario_validation_rejects_missing_weapon_reference(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut input = scenario();
+        input
+            .entities
+            .get_mut(2)
+            .and_then(|entity| entity.weapon.as_mut())
+            .ok_or("scenario fixture has no weapon")?
+            .target_entity_id = "missing-target".to_string();
+        assert!(matches!(
+            validate_scenario(&input),
+            Err(EngineError::InvalidScenario(message)) if message.contains("missing target")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn scenario_validation_rejects_unbounded_integration_work() {
+        let mut input = scenario();
+        input.fixed_step_seconds = 0.000_1;
+        assert!(matches!(
+            validate_scenario(&input),
+            Err(EngineError::InvalidScenario(message)) if message.contains("fixedStepSeconds")
+        ));
+    }
+
+    #[test]
+    fn scenario_json_rejects_unknown_typed_state() -> Result<(), Box<dyn std::error::Error>> {
+        let mut input = serde_json::to_value(scenario())?;
+        input["domain"] = serde_json::Value::String("NAVAL".to_string());
+        let encoded = serde_json::to_string(&input)?;
+        assert!(matches!(
+            run_json(&encoded),
+            Err(EngineError::InvalidJson(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn scenario_json_rejects_oversized_input() {
+        let input = "x".repeat(MAX_INPUT_BYTES + 1);
+        assert!(matches!(
+            run_json(&input),
+            Err(EngineError::InputTooLarge { .. })
+        ));
+    }
+
+    #[test]
+    fn scenario_matrix_remains_finite_across_declared_conditions(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for case in 0..32 {
+            let mut input = scenario();
+            input.environment.temperature_offset_c = f64::from(case % 9) - 4.0;
+            input.environment.wind_mps = Vec3 {
+                x: f64::from(case) - 16.0,
+                y: f64::from(case % 7) - 3.0,
+                z: 0.0,
+            };
+            let target = input
+                .entities
+                .get_mut(1)
+                .ok_or("scenario fixture has no target")?;
+            target.initial.position.x += f64::from(case) * 250.0;
+            target.behavior.maneuver = if case % 2 == 0 {
+                Maneuver::Break
+            } else {
+                Maneuver::Weave
+            };
+            target.behavior.commanded_g = f64::from(case % 8);
+            let run = try_run_engine(input)?;
+            assert!(!run.frames.is_empty());
+            assert_eq!(run.diagnostics.non_finite_state_count, 0);
+            assert!(run.closest_approach_m.is_finite());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn wasm_abi_rejects_oversized_reservation_without_allocating() {
+        assert_eq!(wasm_abi::vector_abi_version(), 1);
+        assert_eq!(wasm_abi::vector_max_input_len(), MAX_INPUT_BYTES);
+        assert!(wasm_abi::vector_input_reserve(MAX_INPUT_BYTES + 1).is_null());
     }
 }

@@ -12,7 +12,7 @@ services:
       POSTGRES_USER: vector
       POSTGRES_PASSWORD: vector
     ports:
-      - "55433:5432"
+      - "127.0.0.1:55433:5432"
     volumes:
       - vector_postgres:/var/lib/postgresql/data
     healthcheck:
@@ -51,13 +51,15 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       VECTOR_VERSION: 0.1.0
       VECTOR_ENVIRONMENT: local
+      METRICS_BEARER_TOKEN: vector-local-metrics
     init: true
+    restart: unless-stopped
     labels:
       com.reachdefence.product: vector-engagement-lab
       com.reachdefence.component: web-application
       com.reachdefence.version: 0.1.0
     ports:
-      - "4317:4317"
+      - "127.0.0.1:4317:4317"
     volumes:
       - vector_wrangler:/app/.wrangler
     depends_on:
@@ -80,8 +82,8 @@ services:
     volumes:
       - ./observability/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
-      - "4318:4318"
-      - "13133:13133"
+      - "127.0.0.1:4318:4318"
+      - "127.0.0.1:13133:13133"
     depends_on:
       tempo:
         condition: service_started
@@ -99,7 +101,7 @@ services:
       - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
       - vector_prometheus:/prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     depends_on:
       vector:
         condition: service_healthy
@@ -112,7 +114,7 @@ services:
       - ./observability/tempo.yaml:/etc/tempo.yaml:ro
       - vector_tempo:/var/tempo
     ports:
-      - "3200:3200"
+      - "127.0.0.1:3200:3200"
 
   loki:
     image: grafana/loki:3.5.3
@@ -121,13 +123,13 @@ services:
       - ./observability/loki.yaml:/etc/loki/local-config.yaml:ro
       - vector_loki:/loki
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
 
   grafana:
     image: grafana/grafana:12.1.1
     environment:
       GF_SECURITY_ADMIN_USER: vector
-      GF_SECURITY_ADMIN_PASSWORD: vector
+      GF_SECURITY_ADMIN_PASSWORD: ${VECTOR_GRAFANA_PASSWORD:-vector-local-only}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
@@ -137,7 +139,7 @@ services:
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - vector_grafana:/var/lib/grafana
     ports:
-      - "4300:3000"
+      - "127.0.0.1:4300:3000"
     depends_on:
       prometheus:
         condition: service_started

@@ -29,13 +29,21 @@ async function connectionString() {
 
 export async function withDatabase<T>(operation: (sql: Sql) => Promise<T>) {
   const sql = postgres(await connectionString(), {
-    max: 5,
+    max: 2,
     fetch_types: false,
     prepare: true,
+    connect_timeout: 5,
+    idle_timeout: 20,
+    max_lifetime: 300,
+    connection: {
+      application_name: "vector-engagement-labs",
+      statement_timeout: 5000,
+      lock_timeout: 2000,
+    },
   });
   try {
     return await observeDatabaseOperation(() => operation(sql));
   } finally {
-    await sql.end();
+    await sql.end({ timeout: 1 });
   }
 }

@@ -1,5 +1,6 @@
 import { withDatabase } from "@/db";
 import { withObservedRoute } from "@/lib/observability/server";
+import { publicApiError } from "@/lib/security/public-api";
 
 export async function GET(request: Request) {
   return withObservedRoute("/api/health", request, async () => {
@@ -13,12 +14,10 @@ export async function GET(request: Request) {
         (SELECT count(*)::int FROM installations) AS installations,
         (SELECT count(*)::int FROM scenario_templates WHERE status='VALIDATED') AS scenarios
     `);
-    return Response.json({ status: "ready", ...rows[0] });
+    if (!rows[0]) throw new Error("readiness query returned no row");
+    return Response.json({ status: "ready" }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
-    return Response.json(
-      { status: "unavailable", error: error instanceof Error ? error.message : "Database unavailable" },
-      { status: 503 },
-    );
+    return publicApiError(error, 503);
     }
   });
 }

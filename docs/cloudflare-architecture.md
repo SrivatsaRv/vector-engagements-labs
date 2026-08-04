@@ -20,6 +20,11 @@ There is no current Cloudflare product named **R1** in the public Cloudflare dev
 5. Keep the Worker stateless. Use Durable Objects only when a later synchronized session needs one ordered coordinator per session.
 6. Send production telemetry to a managed OTLP endpoint. The local Grafana stack remains the development and self-hosted profile.
 
+Public catalog and tile routes use Cloudflare's Cache API and separate Rate
+Limiting bindings. The bindings are cost guards at the edge; database timeouts,
+bounded request bodies, and server-side saved-run reconstruction remain the
+authoritative application controls.
+
 The first deploy requires a Cloudflare account, Wrangler authentication, a Worker name and route, an origin PostgreSQL connection string, a Hyperdrive configuration, runtime secrets, and a production migration job. R2 is optional until durable binary or large JSON artifacts are stored server-side.
 
 ## Binding contract
@@ -30,6 +35,9 @@ The application should accept platform-neutral ports and bind them at the edge:
 - `FRESH_DATABASE`: cache-disabled Hyperdrive access for writes and read-after-write flows;
 - `ARTIFACTS`: optional R2 bucket for immutable records and exports;
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: external telemetry collector;
+- `PUBLIC_API_RATE_LIMITER` and `TILE_RATE_LIMITER`: independent anonymous
+  traffic budgets;
+- `METRICS_BEARER_TOKEN`: secret protecting production Prometheus output;
 - `APP_ENV`, `APP_VERSION`, and `LOG_LEVEL`: non-secret release configuration.
 
 Local Compose supplies equivalent database and telemetry endpoints through environment variables. Code outside the adapter layer must not inspect Cloudflare-specific binding objects.
