@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
 import postgres from "postgres";
-import { createHash } from "node:crypto";
-import { canonicalJson } from "../lib/canonical-json.ts";
 
 const baseUrl = process.env.VECTOR_URL ?? "http://127.0.0.1:4317";
 const connectionString = process.env.DATABASE_URL;
@@ -67,36 +65,16 @@ try {
   const mathHtml = await mathPage.text();
   assert.match(mathHtml, /Math behind Vector Engagement Labs/);
   assert.match(mathHtml, /How a displayed result is traced/);
-  const frames = [{ t: 0 }];
-  const frameHash = createHash("sha256")
-    .update(canonicalJson(frames))
-    .digest("hex");
-
   const stalePackage = await fetch(`${baseUrl}/api/runs`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       scenarioId: "a2a-crossing-intercept",
       scenarioVersion: "1.0.0",
-      engineVersion: "browser-point-mass-v0.5",
       scenarioSchemaVersion: template.schema_version,
       scenarioContentHash: "0".repeat(64),
-      compiledScenario: {
-        id: "configured-a2a",
-        version: "0.5.0",
-        environment: {
-          studyArea: { id: "north-punjab", name: "North Punjab airspace study area" },
-        },
-      },
-      frameHash,
       draftRevision: 0,
-      blueForce: {},
-      redForce: {},
-      initialState: {},
-      environment: {},
-      modelAssumptions: {
-        report: { createdAt: new Date().toISOString(), result: { frames } },
-      },
+      initialState: template.package.scenario,
     }),
   });
   assert.equal(stalePackage.status, 409);
@@ -107,28 +85,10 @@ try {
     body: JSON.stringify({
       scenarioId: "a2a-crossing-intercept",
       scenarioVersion: "1.0.0",
-      engineVersion: "browser-point-mass-v0.5",
       scenarioSchemaVersion: template.schema_version,
       scenarioContentHash: template.content_hash,
-      compiledScenario: {
-        id: "configured-a2a",
-        version: "0.5.0",
-        environment: {
-          studyArea: { id: "north-punjab", name: "North Punjab airspace study area" },
-        },
-      },
-      frameHash,
       draftRevision: 0,
-      blueForce: { platformId: "su-30mki" },
-      redForce: { platformId: "f-16c-block52-paf" },
-      initialState: { seed: 42, studyAreaId: "north-punjab", weatherPresetId: "north-punjab-standard" },
-      environment: { atmosphere: "NASA_EDUCATIONAL_STANDARD", studyAreaId: "north-punjab" },
-      modelAssumptions: {
-        report: {
-          createdAt: new Date().toISOString(),
-          result: { frames },
-        },
-      },
+      initialState: template.package.scenario,
     }),
   });
   assert.equal(saved.status, 201);
@@ -143,13 +103,15 @@ try {
   assert.equal(loadedPayload.run.scenarioId, "a2a-crossing-intercept");
   assert.equal(loadedPayload.run.engineVersion, "browser-point-mass-v0.5");
   assert.equal(loadedPayload.run.scenarioContentHash, template.content_hash);
-  assert.equal(loadedPayload.run.frameHash, frameHash);
+  assert.match(loadedPayload.run.frameHash, /^[0-9a-f]{64}$/);
   assert.equal(loadedPayload.run.studyAreaId, "north-punjab");
   assert.equal(loadedPayload.run.spatialContext.id, "north-punjab");
   assert.ok(loadedPayload.run.modelAssumptions.report);
+  assert.equal(loadedPayload.run.modelAssumptions.verification.source, "server-recomputed");
+  assert.ok(loadedPayload.run.modelAssumptions.report.result.frames.length > 1);
   assert.equal("scenario_id" in loadedPayload.run, false);
 
-  const missing = await fetch(`${baseUrl}/api/runs?id=missing-run`);
+  const missing = await fetch(`${baseUrl}/api/runs?id=${crypto.randomUUID()}`);
   assert.equal(missing.status, 404);
   process.stdout.write("application save/report contract verified\n");
 } finally {

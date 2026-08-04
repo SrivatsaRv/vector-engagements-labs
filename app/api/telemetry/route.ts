@@ -1,53 +1,49 @@
-import {
-  addGauge,
-  incrementCounter,
-  observeHistogram,
-} from "@/lib/observability/metrics";
+import { incrementCounter, observeHistogram } from "@/lib/observability/metrics";
 import { withObservedRoute } from "@/lib/observability/server";
+import { publicApiError, PublicApiError, readBoundedJson } from "@/lib/security/public-api";
+import { enforceRateLimit } from "@/lib/security/runtime";
 
-const domains = new Set(["A2A", "A2G", "G2A", "G2G"]);
-const outcomes = new Set(["intercept", "threshold_reached", "energy_depleted", "time_limit", "invalid_scenario", "unknown"]);
+const MAX_TELEMETRY_BYTES = 2 * 1024;
 
-function bounded(value: unknown, allowed: Set<string>, fallback = "unknown") {
-  return typeof value === "string" && allowed.has(value) ? value : fallback;
+function duration(value: unknown, maximumMs: number) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > maximumMs) {
+    throw new PublicApiError(400, "invalid_duration");
+  }
+  return value;
 }
 
 export async function POST(request: Request) {
   return withObservedRoute("/api/telemetry", request, async () => {
-    const payload = (await request.json()) as Record<string, unknown>;
-    const type = typeof payload.type === "string" ? payload.type : "";
-    const domain = bounded(payload.domain, domains);
-    const engineVersion = typeof payload.engineVersion === "string"
-      ? payload.engineVersion.slice(0, 64)
-      : "unknown";
-    if (type === "scenario_run_started") {
-      incrementCounter("vector_scenario_runs_started_total", { domain, engine_version: engineVersion });
-      addGauge("vector_scenario_runs_active", 1, { domain });
-    } else if (type === "scenario_run_completed" || type === "scenario_run_failed") {
-      const outcome = bounded(payload.outcome, outcomes);
-      incrementCounter(
-        type === "scenario_run_completed"
-          ? "vector_scenario_runs_completed_total"
-          : "vector_scenario_runs_failed_total",
-        { domain, outcome, engine_version: engineVersion },
-      );
-      addGauge("vector_scenario_runs_active", -1, { domain });
-      observeHistogram("vector_scenario_run_duration_seconds", Number(payload.durationMs) / 1000, { domain, outcome });
-      observeHistogram("vector_scenario_model_duration_seconds", Number(payload.modelSeconds), { domain, outcome }, [1, 5, 10, 30, 60, 120, 240, 600]);
-      observeHistogram("vector_scenario_entity_count", Number(payload.entityCount), { domain }, [1, 2, 4, 8, 16, 32, 64, 128, 256]);
-    } else if (type === "report_saved" || type === "report_failed") {
-      incrementCounter("vector_reports_total", { domain, outcome: type === "report_saved" ? "saved" : "failed" });
-    } else if (type === "map_loaded" || type === "map_failed") {
-      const basemap = payload.basemap === "MINIMAL" ? "minimal" : "unknown";
-      incrementCounter("vector_map_loads_total", { basemap, outcome: type === "map_loaded" ? "loaded" : "failed" });
-    } else if (type === "browser_long_task") {
-      observeHistogram("vector_browser_long_task_duration_seconds", Number(payload.durationMs) / 1000, {}, [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5]);
-    } else if (type === "browser_navigation") {
-      observeHistogram("vector_browser_navigation_duration_seconds", Number(payload.durationMs) / 1000);
-    } else {
-      incrementCounter("vector_telemetry_events_rejected_total", { reason: "unsupported_type" });
-      return Response.json({ error: "Unsupported telemetry event" }, { status: 400 });
+    try {
+      await enforceRateLimit(request, "PUBLIC_API_RATE_LIMITER");
+      const raw = await readBoundedJson(request, MAX_TELEMETRY_BYTES);
+      if (!raw || typeof raw !== "object") throw new PublicApiError(400, "invalid_telemetry_event");
+      const payload = raw as Record<string, unknown>;
+      if (payload.type === "map_loaded" || payload.type === "map_failed") {
+        const basemap = payload.basemap === "MINIMAL" ? "minimal" : "unknown";
+        incrementCounter("vector_map_loads_total", {
+          basemap,
+          outcome: payload.type === "map_loaded" ? "loaded" : "failed",
+        });
+      } else if (payload.type === "browser_long_task") {
+        observeHistogram(
+          "vector_browser_long_task_duration_seconds",
+          duration(payload.durationMs, 60_000) / 1000,
+          {},
+          [0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+        );
+      } else if (payload.type === "browser_navigation") {
+        observeHistogram(
+          "vector_browser_navigation_duration_seconds",
+          duration(payload.durationMs, 300_000) / 1000,
+        );
+      } else {
+        incrementCounter("vector_telemetry_events_rejected_total", { reason: "unsupported_type" });
+        throw new PublicApiError(400, "unsupported_telemetry_event");
+      }
+      return new Response(null, { status: 204 });
+    } catch (error) {
+      return publicApiError(error, 503);
     }
-    return new Response(null, { status: 204 });
   });
 }

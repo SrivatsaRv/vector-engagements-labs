@@ -61,8 +61,6 @@ import {
 } from "@/lib/simulation-models";
 import { ENGINE_VERSION } from "@/lib/engine/version";
 import { ENGINE_BACKENDS } from "@/lib/engine/backend";
-import type { ReportData } from "@/lib/report-export";
-import { emitBrowserTelemetry } from "@/lib/observability/client";
 import type { StudyArea } from "@/lib/study-areas";
 import {
   spatialAspectDeg,
@@ -208,7 +206,6 @@ function LabWorkbench({
     [definition, scenario],
   );
   const blueSystem = getCatalogObject(scenario.blueSystemId);
-  const redObject = getCatalogObject(scenario.redObjectId);
 
   useEffect(() => {
     let active = true;
@@ -333,40 +330,10 @@ function LabWorkbench({
       setBuildStep(4);
       return;
     }
-    const telemetryRunId = crypto.randomUUID();
-    emitBrowserTelemetry({
-      type: "scenario_run_started",
-      runId: telemetryRunId,
-      domain: scenario.domain,
-      engineVersion: ENGINE_VERSION,
-    });
-    const simulationStarted = performance.now();
     let next: SimulationResult;
     try {
       next = simulate(scenario);
-      emitBrowserTelemetry({
-        type: "scenario_run_completed",
-        runId: telemetryRunId,
-        domain: scenario.domain,
-        engineVersion: ENGINE_VERSION,
-        outcome: next.termination,
-        durationMs: performance.now() - simulationStarted,
-        modelSeconds: next.timeOfFlight,
-        entityCount: next.entityManifest.length,
-      });
-    } catch (error) {
-      emitBrowserTelemetry({
-        type: "scenario_run_failed",
-        runId: telemetryRunId,
-        domain: scenario.domain,
-        engineVersion: ENGINE_VERSION,
-        outcome: "invalid_scenario",
-        durationMs: performance.now() - simulationStarted,
-        modelSeconds: 0,
-        entityCount: 0,
-      });
-      throw error;
-    }
+    } catch (error) { throw error; }
     setResult(next);
     setTime(0);
     setPlaying(true);
@@ -523,33 +490,6 @@ function LabWorkbench({
       },
     ]);
   };
-  const buildReport = (): ReportData => ({
-    scenario,
-    result,
-    events,
-    createdAt: new Date().toISOString(),
-    engine: ENGINE_VERSION,
-    packageProvenance: templateIdentity
-      ? {
-          schemaVersion: templateIdentity.schemaVersion,
-          contentHash: templateIdentity.contentHash,
-          draftRevision: runDraftRevision ?? draftRevision,
-        }
-      : undefined,
-    profileVersion: (() => {
-      const model = findWeaponSimulationModel(scenario.blueSystemId);
-      return model ? `${model.id}@${model.version}` : "model-unavailable";
-    })(),
-    libraryScenario: {
-      id: definition.id,
-      version: definition.version,
-      domain: definition.domain,
-      title: definition.title,
-      scope: definition.scope,
-      targetProfile: redObject.designation,
-      theatre: definition.theatre,
-    },
-  });
   const saveReport = async () => {
     if (!hasRun) {
       setSaveError("Conduct a run before saving a report.");
@@ -563,54 +503,16 @@ function LabWorkbench({
     setSaving(true);
     setSaveError(null);
     try {
-      const report = buildReport();
-      const frameHash = await sha256Hex(report.result.frames);
-      report.packageProvenance = report.packageProvenance
-        ? { ...report.packageProvenance, frameHash }
-        : undefined;
       const response = await fetch("/api/runs", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           scenarioId: definition.id,
           scenarioVersion: definition.version,
-          engineVersion: report.engine,
           scenarioSchemaVersion: templateIdentity.schemaVersion,
           scenarioContentHash: templateIdentity.contentHash,
-          compiledScenario: result.engineRun.scenario,
-          frameHash,
           draftRevision: runDraftRevision,
-          blueForce: {
-            platformId: scenario.bluePlatformId,
-            weaponId: scenario.blueSystemId,
-            quantity: scenario.blueWeaponQuantity,
-            fuelPercent: scenario.blueFuelPercent,
-          },
-          redForce: {
-            platformId: scenario.redObjectId,
-            weaponId: scenario.redSystemId,
-            quantity: scenario.redWeaponQuantity,
-            fuelPercent: scenario.redFuelPercent,
-          },
           initialState: scenario,
-          environment: {
-            windEastMps: scenario.wind,
-            windNorthMps: scenario.windNorth,
-            visibilityKm: scenario.visibilityKm,
-            humidityPercent: scenario.humidityPercent,
-            temperatureOffset: scenario.temperatureOffset,
-            atmosphere: "NASA educational standard atmosphere",
-            studyAreaId: scenario.studyAreaId,
-            weatherPresetId: scenario.weatherPresetId,
-          },
-          modelAssumptions: {
-            report,
-            weaponModel:
-              findWeaponSimulationModel(scenario.blueSystemId) ??
-              result.engineRun.scenario.entities.find(
-                (entity) => entity.id === result.engineRun.primaryWeaponId,
-              )?.provenance,
-          },
         }),
       });
       if (!response.ok) throw new Error("save");

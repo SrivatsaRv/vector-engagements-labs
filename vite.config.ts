@@ -32,6 +32,26 @@ const localBindingConfig = {
         "postgres://vector:vector@127.0.0.1:55433/vector",
     },
   ],
+  ratelimits: [
+    {
+      name: "PUBLIC_API_RATE_LIMITER",
+      namespace_id: "22001",
+      simple: { limit: 120, period: 60 as const },
+    },
+    {
+      name: "TILE_RATE_LIMITER",
+      namespace_id: "22002",
+      simple: { limit: 600, period: 60 as const },
+    },
+  ],
+  ...(isVinextDeploy
+    ? {}
+    : {
+        vars: {
+          METRICS_BEARER_TOKEN:
+            process.env.METRICS_BEARER_TOKEN ?? "vector-local-metrics",
+        },
+      }),
 };
 
 export default defineConfig(async () => {

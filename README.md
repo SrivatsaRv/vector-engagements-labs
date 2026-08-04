@@ -22,7 +22,7 @@ docker compose up --build -d
 docker compose ps
 ```
 
-Open [http://localhost:4317](http://localhost:4317). Grafana is available at [http://localhost:4300](http://localhost:4300) using `vector` / `vector`. The database is exposed locally on port `55433` for inspection. Every Compose image uses an explicit version or digest.
+Open [http://localhost:4317](http://localhost:4317). Grafana is available at [http://localhost:4300](http://localhost:4300) using `vector` / `vector-local-only` unless `VECTOR_GRAFANA_PASSWORD` is set. The database is exposed on loopback port `55433` for inspection. Every Compose image uses an explicit version or digest.
 
 Useful routes:
 
@@ -49,7 +49,7 @@ npm run dev -- --port 4317
 
 - PostgreSQL/PostGIS: sources, objects, compatibility, model coefficients, 21 public-reference installations including all 15 SHIELD-seeded PAF points, template versions, and saved run snapshots.
 - Scenario compiler: resolves builder state and catalog records into one immutable engine package.
-- Browser engine: fixed-step 3DOF/point-mass integration and event lifecycle.
+- Browser engine: fixed-step 3DOF/point-mass integration and event lifecycle. Saving reruns the bounded scenario on the server so stored telemetry is not caller-authored.
 - Presentation: MapLibre, Three.js, telemetry, RASP, explanation, comparison, and report consume the same sampled frames.
 - Carried weapons are inventory until their launch event. They become visible tracks only when spawned with inherited launcher position and velocity.
 
@@ -63,7 +63,9 @@ make integration-local
 make observability-local
 ```
 
-The first command runs lint, type checks, production build, route checks, and deterministic engine tests. The second applies migrations/seeds and validates PostGIS SRID, row coverage, scenario count, and model foreign keys. The third proves Prometheus ingestion, Tempo traces, Grafana provisioning, and bounded browser business telemetry.
+The first command runs lint, type checks, production build, route checks, and deterministic engine tests. The second applies migrations/seeds and validates PostGIS SRID, row coverage, scenario count, and model foreign keys. The third proves protected Prometheus ingestion, Tempo traces, Grafana provisioning, and bounded browser performance telemetry.
+
+Public API and delivery trust boundaries are documented in [`docs/security-boundaries.md`](docs/security-boundaries.md).
 
 See [`docs/`](docs/README.md) for product language, catalog contracts, engine mathematics, deployment mapping, and current limitations.
 

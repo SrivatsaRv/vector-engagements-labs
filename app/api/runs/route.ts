@@ -1,8 +1,19 @@
 import { withDatabase } from "@/db";
 import { sha256Hex } from "@/lib/canonical-json";
 import { ENGINE_VERSION } from "@/lib/engine/version";
-import { incrementCounter } from "@/lib/observability/metrics";
+import { addGauge, incrementCounter, observeHistogram } from "@/lib/observability/metrics";
 import { withObservedRoute } from "@/lib/observability/server";
+import { isScenarioDefinition } from "@/lib/scenario-package";
+import {
+  publicApiError,
+  PublicApiError,
+  readBoundedJson,
+  shortString,
+} from "@/lib/security/public-api";
+import { buildVerifiedSavedRun } from "@/lib/security/saved-run";
+import { enforceRateLimit } from "@/lib/security/runtime";
+
+const MAX_SAVED_RUN_REQUEST_BYTES = 96 * 1024;
 
 type SavedRunRow = {
   id: string;
@@ -42,152 +53,118 @@ function serializeRun(row: SavedRunRow) {
     studyAreaId: row.study_area_id,
     spatialContext: row.spatial_context,
     modelAssumptions: row.model_assumptions,
-    createdAt:
-      row.created_at instanceof Date
-        ? row.created_at.toISOString()
-        : row.created_at,
+    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
   };
 }
 
 export async function GET(request: Request) {
- return withObservedRoute("/api/runs", request, async () => {
-  try {
-    const id = new URL(request.url).searchParams.get("id");
-    if (!id) {
-      return Response.json(
-        { error: "A saved run id is required" },
-        { status: 400 },
+  return withObservedRoute("/api/runs", request, async () => {
+    try {
+      await enforceRateLimit(request, "PUBLIC_API_RATE_LIMITER");
+      const id = new URL(request.url).searchParams.get("id");
+      if (!id?.match(/^[0-9a-f-]{36}$/i)) throw new PublicApiError(400, "invalid_saved_run_id");
+      const rows = await withDatabase((sql) =>
+        sql`SELECT * FROM saved_run_snapshots WHERE id = ${id} LIMIT 1`,
       );
+      if (!rows[0]) throw new PublicApiError(404, "saved_run_not_found");
+      return Response.json({ run: serializeRun(rows[0] as unknown as SavedRunRow) }, {
+        headers: { "cache-control": "private, no-store" },
+      });
+    } catch (error) {
+      return publicApiError(error, 503);
     }
-    const rows = await withDatabase((sql) =>
-      sql`SELECT * FROM saved_run_snapshots WHERE id = ${id} LIMIT 1`,
-    );
-    if (!rows[0]) return Response.json({ error: "Run not found" }, { status: 404 });
-    return Response.json({ run: serializeRun(rows[0] as unknown as SavedRunRow) });
-  } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Run unavailable" },
-      { status: 503 },
-    );
-   }
- });
+  });
 }
 
 export async function POST(request: Request) {
- return withObservedRoute("/api/runs", request, async () => {
-  try {
-    const payload = (await request.json()) as Record<string, unknown>;
-    if (typeof payload.scenarioId !== "string" || typeof payload.scenarioVersion !== "string") {
-      return Response.json(
-        { error: "scenarioId and scenarioVersion are required" },
-        { status: 400 },
-      );
+  return withObservedRoute("/api/runs", request, async () => {
+    try {
+      await enforceRateLimit(request, "PUBLIC_API_RATE_LIMITER");
+      const raw = await readBoundedJson(request, MAX_SAVED_RUN_REQUEST_BYTES);
+      if (!raw || typeof raw !== "object") throw new PublicApiError(400, "invalid_saved_run");
+      const payload = raw as Record<string, unknown>;
+      const scenarioId = shortString(payload.scenarioId, 120, "scenario_id");
+      const scenarioVersion = shortString(payload.scenarioVersion, 40, "scenario_version");
+      const schemaVersion = shortString(payload.scenarioSchemaVersion, 80, "scenario_schema_version");
+      const contentHash = shortString(payload.scenarioContentHash, 64, "scenario_content_hash");
+      if (!contentHash.match(/^[0-9a-f]{64}$/)) throw new PublicApiError(400, "invalid_scenario_content_hash");
+      if (!Number.isSafeInteger(payload.draftRevision) || (payload.draftRevision as number) < 0) {
+        throw new PublicApiError(400, "invalid_draft_revision");
+      }
+
+      const templateRows = await withDatabase((sql) => sql`
+        SELECT schema_version, content_hash, engine_version, package
+        FROM scenario_templates
+        WHERE id = ${scenarioId}
+          AND version = ${scenarioVersion}
+          AND status = 'VALIDATED'
+        LIMIT 1
+      `);
+      const template = templateRows[0] as
+        | { schema_version: string; content_hash: string; engine_version: string; package: unknown }
+        | undefined;
+      if (
+        !template ||
+        template.schema_version !== schemaVersion ||
+        template.content_hash !== contentHash ||
+        template.engine_version !== ENGINE_VERSION ||
+        !isScenarioDefinition(template.package)
+      ) {
+        throw new PublicApiError(409, "scenario_package_mismatch");
+      }
+
+      const simulationStarted = performance.now();
+      incrementCounter("vector_scenario_runs_started_total", { domain: template.package.domain, engine_version: ENGINE_VERSION });
+      addGauge("vector_scenario_runs_active", 1, { domain: template.package.domain });
+      let verified;
+      try {
+        verified = await buildVerifiedSavedRun(payload.initialState, template.package, {
+          schemaVersion,
+          contentHash,
+          draftRevision: payload.draftRevision as number,
+        });
+        const outcome = verified.result.termination;
+        incrementCounter("vector_scenario_runs_completed_total", { domain: template.package.domain, outcome, engine_version: ENGINE_VERSION });
+        observeHistogram("vector_scenario_run_duration_seconds", (performance.now() - simulationStarted) / 1000, { domain: template.package.domain, outcome });
+        observeHistogram("vector_scenario_model_duration_seconds", verified.result.timeOfFlight, { domain: template.package.domain, outcome }, [1, 5, 10, 30, 60, 120, 240, 600]);
+        observeHistogram("vector_scenario_entity_count", verified.result.entityManifest.length, { domain: template.package.domain }, [1, 2, 4, 8, 16, 32, 64, 128, 256]);
+      } catch (error) {
+        incrementCounter("vector_scenario_runs_failed_total", { domain: template.package.domain, outcome: "invalid_scenario", engine_version: ENGINE_VERSION });
+        throw error;
+      } finally {
+        addGauge("vector_scenario_runs_active", -1, { domain: template.package.domain });
+      }
+      const frameHash = await sha256Hex(verified.result.frames);
+      verified.report.packageProvenance = {
+        ...verified.report.packageProvenance!,
+        frameHash,
+      };
+      const scenario = verified.scenario;
+      const engineRun = verified.result.engineRun;
+      const id = crypto.randomUUID();
+      const rows = await withDatabase((sql) => sql`
+        INSERT INTO saved_run_snapshots
+          (id,scenario_id,scenario_version,engine_version,scenario_schema_version,
+           scenario_content_hash,compiled_scenario,frame_hash,draft_revision,
+           blue_force,red_force,initial_state,environment,model_assumptions,
+           study_area_id,spatial_context)
+        VALUES
+          (${id},${scenarioId},${scenarioVersion},${ENGINE_VERSION},${schemaVersion},${contentHash},
+           ${sql.json(engineRun.scenario as never)},${frameHash},${payload.draftRevision as number},
+           ${sql.json({ platformId: scenario.bluePlatformId, weaponId: scenario.blueSystemId, quantity: scenario.blueWeaponQuantity, fuelPercent: scenario.blueFuelPercent } as never)},
+           ${sql.json({ platformId: scenario.redObjectId, weaponId: scenario.redSystemId, quantity: scenario.redWeaponQuantity, fuelPercent: scenario.redFuelPercent } as never)},
+           ${sql.json(scenario as never)},
+           ${sql.json({ studyAreaId: scenario.studyAreaId, weatherPresetId: scenario.weatherPresetId, windEastMps: scenario.wind, windNorthMps: scenario.windNorth, visibilityKm: scenario.visibilityKm, humidityPercent: scenario.humidityPercent, temperatureOffset: scenario.temperatureOffset } as never)},
+           ${sql.json({ report: verified.report, verification: { source: "server-recomputed", engineVersion: ENGINE_VERSION } } as never)},
+           ${scenario.studyAreaId},
+           ${sql.json((engineRun.scenario.environment.studyArea ?? {}) as never)})
+        RETURNING id, created_at
+      `);
+      incrementCounter("vector_reports_total", { domain: scenario.domain, outcome: "saved" });
+      return Response.json(rows[0], { status: 201, headers: { "cache-control": "no-store" } });
+    } catch (error) {
+      incrementCounter("vector_reports_total", { domain: "unknown", outcome: "failed" });
+      return publicApiError(error, 503);
     }
-    const assumptions = payload.modelAssumptions as
-      | { report?: { result?: { frames?: unknown[] }; createdAt?: string } }
-      | undefined;
-    if (
-      !assumptions?.report ||
-      !Array.isArray(assumptions.report.result?.frames) ||
-      assumptions.report.result.frames.length === 0 ||
-      typeof assumptions.report.createdAt !== "string"
-    ) {
-      return Response.json(
-        { error: "A completed run report with recorded frames is required" },
-        { status: 400 },
-      );
-    }
-    if (
-      typeof payload.scenarioSchemaVersion !== "string" ||
-      typeof payload.scenarioContentHash !== "string" ||
-      typeof payload.frameHash !== "string" ||
-      typeof payload.draftRevision !== "number" ||
-      !payload.compiledScenario ||
-      typeof payload.compiledScenario !== "object"
-    ) {
-      return Response.json(
-        { error: "Versioned scenario package provenance is required" },
-        { status: 400 },
-      );
-    }
-    const templateRows = await withDatabase((sql) => sql`
-      SELECT schema_version, content_hash, engine_version, study_area_id
-      FROM scenario_templates
-      WHERE id = ${payload.scenarioId as string}
-        AND version = ${payload.scenarioVersion as string}
-        AND status = 'VALIDATED'
-      LIMIT 1
-    `);
-    const template = templateRows[0] as
-      | { schema_version: string; content_hash: string; engine_version: string; study_area_id: string }
-      | undefined;
-    if (
-      !template ||
-      template.schema_version !== payload.scenarioSchemaVersion ||
-      template.content_hash !== payload.scenarioContentHash
-    ) {
-      return Response.json(
-        { error: "Scenario package identity does not match the validated template" },
-        { status: 409 },
-      );
-    }
-    const id = crypto.randomUUID();
-    const engineVersion = typeof payload.engineVersion === "string"
-      ? payload.engineVersion
-      : ENGINE_VERSION;
-    if (engineVersion !== template.engine_version || engineVersion !== ENGINE_VERSION) {
-      return Response.json(
-        { error: "Engine version is incompatible with the scenario package" },
-        { status: 409 },
-      );
-    }
-    const serverFrameHash = await sha256Hex(assumptions.report.result?.frames ?? []);
-    if (serverFrameHash !== payload.frameHash) {
-      return Response.json(
-        { error: "Recorded telemetry hash does not match the submitted frames" },
-        { status: 409 },
-      );
-    }
-    const initialState = (payload.initialState ?? {}) as Record<string, unknown>;
-    if (typeof initialState.studyAreaId !== "string") {
-      return Response.json(
-        { error: "A PostGIS study area is required" },
-        { status: 400 },
-      );
-    }
-    const studyAreaId = initialState.studyAreaId;
-    const compiledEnvironment = (
-      payload.compiledScenario as { environment?: { studyArea?: unknown } }
-    ).environment;
-    const rows = await withDatabase((sql) => sql`
-      INSERT INTO saved_run_snapshots
-        (id,scenario_id,scenario_version,engine_version,scenario_schema_version,
-         scenario_content_hash,compiled_scenario,frame_hash,draft_revision,
-         blue_force,red_force,initial_state,environment,model_assumptions,
-         study_area_id,spatial_context)
-      VALUES
-        (${id},${payload.scenarioId as string},${payload.scenarioVersion as string},${engineVersion},
-         ${payload.scenarioSchemaVersion as string},${payload.scenarioContentHash as string},
-         ${sql.json(payload.compiledScenario as never)},${payload.frameHash as string},
-         ${payload.draftRevision as number},
-         ${sql.json((payload.blueForce ?? {}) as never)},${sql.json((payload.redForce ?? {}) as never)},
-         ${sql.json((payload.initialState ?? {}) as never)},${sql.json((payload.environment ?? {}) as never)},
-         ${sql.json(assumptions as never)},${studyAreaId},
-         ${sql.json((compiledEnvironment?.studyArea ?? {}) as never)})
-      RETURNING id, created_at
-    `);
-    const domain = (payload.scenarioId as string).split("-")[0]?.toUpperCase();
-    incrementCounter("vector_reports_total", {
-      domain: ["A2A", "A2G", "G2A", "G2G"].includes(domain) ? domain : "unknown",
-      outcome: "saved",
-    });
-    return Response.json(rows[0], { status: 201 });
-  } catch (error) {
-    incrementCounter("vector_reports_total", { domain: "unknown", outcome: "failed" });
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Run could not be saved" },
-      { status: 503 },
-    );
-   }
- });
+  });
 }

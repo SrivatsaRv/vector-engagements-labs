@@ -25,6 +25,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     name: Deploy production Worker
     environment: production
     runs-on: ubuntu-24.04
@@ -44,6 +45,8 @@ jobs:
             exit 1
           fi
           test "$(git rev-parse HEAD)" = "${REQUESTED_REF}"
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "${REQUESTED_REF}" origin/main
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:

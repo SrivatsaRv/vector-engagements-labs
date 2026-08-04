@@ -27,6 +27,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Socia
 - [`cloudflare-architecture.md`](cloudflare-architecture.md): Workers, Hyperdrive, optional R2, deployment gates, and local parity.
 - [`product-language.md`](product-language.md): canonical workflow and human-readable military terminology.
 - [`repository-governance.md`](repository-governance.md): protected branches, CI/CD, releases, tags, ownership, and repository status.
+- [`security-boundaries.md`](security-boundaries.md): anonymous API admission, saved-run integrity, metrics protection, caching, and delivery trust.
 
 ## One journey
 
@@ -75,8 +76,8 @@ PostgreSQL/PostGIS is the runtime authority. Schema creation is migration-only; 
 - No critical control requires horizontal scrolling.
 - Results never appear as unlabeled examples.
 - A report cannot exist without either an explicit saved run ID or `sample=1`.
-- Saving is permitted only after a completed run has recorded frames. The API,
-  database check constraint, and report route enforce that lifecycle together.
+- Saving is permitted only after a completed browser run. The API validates the
+  bounded scenario and independently recomputes and hashes stored frames.
 - Controls expose affiliation/view scope before effect.
 - Inputs and computed outputs have distinct treatments.
 - Expensive batches will run in browser Workers; map and playback interactions remain immediate.

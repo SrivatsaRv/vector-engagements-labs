@@ -88,13 +88,13 @@ test("server-renders model transparency and tactical-symbol references", async (
 test("basemap proxy rejects invalid tile coordinates without contacting an upstream", async () => {
   const response = await render("/api/map-tile?z=99&x=0&y=0");
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: "invalid tile coordinate" });
+  assert.deepEqual(await response.json(), { error: "invalid_tile_coordinate" });
 });
 
 test("basemap proxy rejects an unknown governed map mode", async () => {
   const response = await render("/api/map-tile?mode=imaginary&z=1&x=0&y=0");
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: "invalid tile coordinate" });
+  assert.deepEqual(await response.json(), { error: "invalid_tile_coordinate" });
 });
 
 test("VECTOR map controls share the MIAR-derived navigation contract", async () => {
@@ -167,7 +167,9 @@ test("keeps data facts, model assumptions, RASP, map scope, and persistence expl
   assert.match(map, /direction-vectors/);
   assert.match(map, /launch-events/);
   assert.match(api, /saved_run_snapshots/);
-  assert.match(api, /completed run report with recorded frames is required/);
+  assert.match(api, /buildVerifiedSavedRun/);
+  assert.match(api, /server-recomputed/);
+  assert.match(api, /MAX_SAVED_RUN_REQUEST_BYTES/);
   assert.match(migration, /saved_run_report_required/);
   assert.match(migration, /saved_run_scenario_fk/);
   assert.match(provenanceMigration, /scenario_content_hash/);

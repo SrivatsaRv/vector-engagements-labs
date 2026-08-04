@@ -5,7 +5,7 @@ const prometheusUrl = process.env.PROMETHEUS_URL ?? "http://127.0.0.1:9090";
 const tempoUrl = process.env.TEMPO_URL ?? "http://127.0.0.1:3200";
 const lokiUrl = process.env.LOKI_URL ?? "http://127.0.0.1:3100";
 const grafanaUrl = process.env.GRAFANA_URL ?? "http://127.0.0.1:4300";
-const grafanaAuthorization = `Basic ${Buffer.from("vector:vector").toString("base64")}`;
+const grafanaAuthorization = `Basic ${Buffer.from(`vector:${process.env.VECTOR_GRAFANA_PASSWORD ?? "vector-local-only"}`).toString("base64")}`;
 
 async function waitFor(url, predicate = (response) => response.ok) {
   let lastError;
@@ -30,21 +30,8 @@ await Promise.all([
   waitFor(`${grafanaUrl}/api/health`),
 ]);
 
-const runId = crypto.randomUUID();
 for (const event of [
-  { type: "scenario_run_started", runId, domain: "A2A", engineVersion: "browser-point-mass-v0.5" },
-  {
-    type: "scenario_run_completed",
-    runId,
-    domain: "A2A",
-    engineVersion: "browser-point-mass-v0.5",
-    outcome: "threshold_reached",
-    durationMs: 18.5,
-    modelSeconds: 110.3,
-    entityCount: 4,
-  },
   { type: "map_loaded", basemap: "MINIMAL", durationMs: 84 },
-  { type: "report_saved", domain: "A2A" },
   { type: "browser_long_task", durationMs: 72 },
   { type: "browser_navigation", durationMs: 135 },
 ]) {
@@ -71,28 +58,23 @@ assert.equal(vectorTarget?.health, "up");
 
 const query = async (expression) =>
   fetch(`${prometheusUrl}/api/v1/query?query=${encodeURIComponent(expression)}`).then((response) => response.json());
-const completed = await query("sum(vector_scenario_runs_completed_total)");
-assert.ok(Number(completed.data.result[0]?.value[1]) >= 1);
 const routeRequests = await query('sum(vector_http_requests_total{route="/api/telemetry"})');
 assert.ok(Number(routeRequests.data.result[0]?.value[1]) >= 2);
 const databaseOperations = await query("sum(vector_database_operations_total)");
 assert.ok(Number(databaseOperations.data.result[0]?.value[1]) >= 1);
-const active = await query("sum(vector_scenario_runs_active)");
-assert.equal(Number(active.data.result[0]?.value[1] ?? 0), 0);
-const unmatched = await query("clamp_min((sum(increase(vector_scenario_runs_started_total[15m])) or vector(0)) - (sum(increase(vector_scenario_runs_completed_total[15m])) or vector(0)) - (sum(increase(vector_scenario_runs_failed_total[15m])) or vector(0)), 0)");
-assert.equal(Number(unmatched.data.result[0]?.value[1] ?? 0), 0);
 const mapLoads = await query('sum(vector_map_loads_total{outcome="loaded"})');
 assert.ok(Number(mapLoads.data.result[0]?.value[1]) >= 1);
-const reports = await query('sum(vector_reports_total{outcome="saved"})');
-assert.ok(Number(reports.data.result[0]?.value[1]) >= 1);
 const longTasks = await query("sum(vector_browser_long_task_duration_seconds_count)");
 assert.ok(Number(longTasks.data.result[0]?.value[1]) >= 1);
 const navigations = await query("sum(vector_browser_navigation_duration_seconds_count)");
 assert.ok(Number(navigations.data.result[0]?.value[1]) >= 1);
 
-const dashboards = await fetch(`${grafanaUrl}/api/search?type=dash-db`, {
+const dashboardsResponse = await fetch(`${grafanaUrl}/api/search?type=dash-db`, {
   headers: { authorization: grafanaAuthorization },
-}).then((response) => response.json());
+});
+assert.equal(dashboardsResponse.status, 200, "Grafana credentials must permit dashboard verification");
+const dashboards = await dashboardsResponse.json();
+assert.ok(Array.isArray(dashboards), "Grafana dashboard search must return an array");
 const dashboardUids = new Set(dashboards.map((dashboard) => dashboard.uid));
 assert.ok(dashboardUids.has("vector-operations"));
 assert.ok(dashboardUids.has("vector-browser-performance"));

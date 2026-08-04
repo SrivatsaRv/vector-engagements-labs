@@ -12,10 +12,6 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
-      # These two packages are upgraded together only after the responsive
-      # integration suite proves the Cloudflare local runtime is compatible.
-      - dependency-name: "@cloudflare/vite-plugin"
-      - dependency-name: "wrangler"
     labels: ["dependencies", "javascript"]
   - package-ecosystem: cargo
     directory: /engine-rust
