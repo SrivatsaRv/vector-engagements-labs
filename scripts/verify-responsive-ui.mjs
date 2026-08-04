@@ -10,8 +10,11 @@ const chromePath =
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const outputDirectory = resolve("outputs/responsive");
 const breakpoints = [
+  { label: "compact-phone", width: 320, height: 568, family: "phone" },
   { label: "phone", width: 390, height: 844, family: "phone" },
   { label: "large-phone", width: 430, height: 932, family: "phone" },
+  { label: "tablet-portrait", width: 768, height: 1024, family: "tablet" },
+  { label: "tablet-landscape", width: 1024, height: 768, family: "tablet" },
   { label: "compact-laptop", width: 1280, height: 720, family: "desktop" },
   { label: "laptop", width: 1366, height: 768, family: "desktop" },
   { label: "workstation", width: 1440, height: 900, family: "desktop" },
@@ -46,8 +49,13 @@ const browser = await chromium.launch({
 });
 
 try {
-  for (const viewport of breakpoints) {
-    const context = await browser.newContext({ viewport });
+  for (const [viewportIndex, viewport] of breakpoints.entries()) {
+    const context = await browser.newContext({
+      viewport,
+      extraHTTPHeaders: {
+        "cf-connecting-ip": `198.18.0.${viewportIndex + 1}`,
+      },
+    });
     const page = await context.newPage();
     const runtimeErrors = [];
     let successfulTiles = 0;
@@ -60,6 +68,38 @@ try {
         successfulTiles += 1;
       }
     });
+
+    await page.goto(vectorUrl, { waitUntil: "networkidle" });
+    await page.waitForFunction(() => Boolean(document.querySelector(".landing-sim canvas")));
+    const landing = await page.evaluate(() => {
+      const rectangle = (selector) => {
+        const element = document.querySelector(selector);
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
+      };
+      const header = rectangle(".product-header");
+      const overline = rectangle(".hero .overline");
+      return {
+        bodyWidth: document.body.scrollWidth,
+        header,
+        overline,
+        title: rectangle(".hero h1"),
+        titleSize: Number.parseFloat(getComputedStyle(document.querySelector(".hero h1")).fontSize),
+        actions: rectangle(".hero-actions"),
+        preview: rectangle(".landing-sim"),
+        previewCanvas: rectangle(".landing-sim canvas"),
+      };
+    });
+    assert.ok(landing.bodyWidth <= viewport.width, `${viewport.width}: landing page overflows horizontally`);
+    assert.ok(landing.preview?.width <= viewport.width, `${viewport.width}: landing preview exceeds viewport`);
+    assert.ok(landing.previewCanvas?.width > 0 && landing.previewCanvas?.height > 0, `${viewport.width}: landing 3D preview collapsed`);
+    if (viewport.family === "phone") {
+      assert.ok((landing.overline?.top ?? 999) - (landing.header?.bottom ?? 0) <= 48, `${viewport.width}: mobile hero begins too far below navigation`);
+      assert.ok(landing.titleSize >= 36 && landing.titleSize <= 48, `${viewport.width}: mobile title scale is outside its contract`);
+      assert.ok((landing.actions?.right ?? 999) <= viewport.width, `${viewport.width}: landing actions exceed viewport`);
+      assert.ok((landing.preview?.height ?? 0) >= 360, `${viewport.width}: mobile model preview is too small`);
+    }
 
     await page.goto(
       `${vectorUrl}/workbench?scenario=a2a-crossing-intercept&start=guided`,
@@ -132,6 +172,8 @@ try {
       assert.equal(construct.stepsVisible, false, `${viewport.width}: desktop step rail is visible on phone`);
       assert.equal(construct.summaryVisible, false, `${viewport.width}: desktop summary rail is visible on phone`);
       assert.ok(construct.titleSize >= 27, `${viewport.width}: phone title is too small`);
+    } else if (viewport.family === "tablet") {
+      assert.equal(construct.stepsVisible, true, `${viewport.width}: tablet lost construct navigation`);
     } else {
       assert.equal(construct.stepsVisible, true, `${viewport.width}: desktop step rail disappeared`);
       assert.equal(construct.summaryVisible, true, `${viewport.width}: desktop summary rail disappeared`);
@@ -230,6 +272,40 @@ try {
     }
     assert.ok(observe.entities >= 2, `${viewport.width}: engine entities not rendered`);
     assert.equal(observe.backend, "rust-wasm", `${viewport.width}: selected browser backend did not run`);
+    await page.getByRole("button", { name: "3D", exact: true }).click();
+    await page.waitForFunction(() => Boolean(document.querySelector(".three-d-surface .simulation-scene canvas")));
+    await page.waitForTimeout(100);
+    const threeDimensional = await page.evaluate(() => {
+      const rectangle = (selector) => {
+        const element = document.querySelector(selector);
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
+      };
+      const simulation = document.querySelector(".simulation-column");
+      return {
+        bodyWidth: document.body.scrollWidth,
+        scrollWidth: simulation?.scrollWidth ?? 0,
+        clientWidth: simulation?.clientWidth ?? 0,
+        scene: rectangle(".three-d-surface"),
+        canvas: rectangle(".three-d-surface canvas"),
+        legend: rectangle(".three-d-surface .symbol-key"),
+        topline: rectangle(".sim-topline"),
+        metrics: rectangle(".live-metrics"),
+        playback: rectangle(".playback"),
+        firstTelemetryPanel: rectangle(".telemetry-panel"),
+      };
+    });
+    assert.ok(threeDimensional.bodyWidth <= viewport.width, `${viewport.width}: 3D replay overflows page`);
+    assert.ok(threeDimensional.scrollWidth <= threeDimensional.clientWidth + 1, `${viewport.width}: 3D replay has internal horizontal overflow`);
+    assert.ok((threeDimensional.scene?.height ?? 0) >= 300, `${viewport.width}: 3D scene collapsed`);
+    assert.ok((threeDimensional.metrics?.bottom ?? 0) <= (threeDimensional.topline?.bottom ?? -1) + 1, `${viewport.width}: live metrics overflow their control row`);
+    assert.ok((threeDimensional.topline?.bottom ?? 99999) <= (threeDimensional.scene?.top ?? 0) + 1, `${viewport.width}: control row overlaps the 3D scene`);
+    assert.ok(Math.abs((threeDimensional.canvas?.width ?? 0) - (threeDimensional.scene?.width ?? 0)) <= 2, `${viewport.width}: 3D canvas width does not follow its container`);
+    assert.ok(Math.abs((threeDimensional.canvas?.height ?? 0) - (threeDimensional.scene?.height ?? 0)) <= 2, `${viewport.width}: 3D canvas height does not follow its container`);
+    assert.ok((threeDimensional.legend?.left ?? -1) >= 0 && (threeDimensional.legend?.right ?? 99999) <= viewport.width, `${viewport.width}: entity legend leaves the viewport`);
+    assert.ok((threeDimensional.playback?.right ?? 99999) <= viewport.width, `${viewport.width}: playback controls leave the viewport`);
+    assert.ok((threeDimensional.firstTelemetryPanel?.right ?? 99999) <= viewport.width, `${viewport.width}: telemetry leaves the viewport`);
     assert.deepEqual(runtimeErrors, [], `${viewport.width}: browser runtime errors: ${runtimeErrors.join(" | ")}`);
     if ([390, 2560, 3840].includes(viewport.width)) {
       await page.screenshot({

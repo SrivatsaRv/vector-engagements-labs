@@ -32,8 +32,8 @@ test("server-renders the Vector Engagement Labs landing page", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /Vector Engagement Labs/);
-  assert.match(html, /Understand the engagement/);
-  assert.match(html, /Choose a scenario/);
+  assert.match(html, /Build the scenario/);
+  assert.match(html, /Pick a scenario/);
   assert.match(html, /Live model/);
   assert.doesNotMatch(html, /Instructor Station|Tony Stark/i);
 });

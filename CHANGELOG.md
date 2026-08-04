@@ -13,6 +13,11 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ### Changed
 
+- Phone and tablet layouts now keep landing content, 3D replay controls,
+  tactical labels, playback, and telemetry within the viewport. The responsive
+  validation suite covers 320-pixel phones through 4K displays.
+- Public landing copy now describes the user task directly: pick a scenario,
+  change it, run it, and review the result.
 - Rust release builds now retain overflow checks and publish explicit compute
   safety limits without changing valid scenario or replay contracts.
 - Authoring and playback maps now package and load MapLibre's module worker

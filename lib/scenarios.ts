@@ -173,7 +173,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     domain: "A2A",
     title: "Su-30MKI / Astra versus F-16C Block 52",
     summary:
-      "Change starting distance, crossing angle, target maneuver, and track quality in a source-backed IAF-versus-PAF setup.",
+      "Put a Su-30MKI and F-16C into a crossing fight. Change the distance, angle, target turn, and radar picture.",
     blue: "Su-30MKI carrying Astra Mk 1",
     red: "PAF F-16C Block 52 carrying AIM-120C-5",
     targetProfile: "PAF F-16C Block 52",
@@ -362,7 +362,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     domain: "G2A",
     title: "Akash versus crossing F-16C Block 52",
     summary:
-      "Examine the selected Akash study layer as an F-16C crosses a defended point.",
+      "Fly an F-16C across an Akash-defended point and see when detection, tracking, and engagement become possible.",
     blue: "Akash air-defence system",
     red: "F-16C Fighting Falcon",
     targetProfile: "F-16C airborne target",
@@ -462,7 +462,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     domain: "G2G",
     title: "BrahMos flight path to a fixed P-18 site",
     summary:
-      "Compare direct and lofted modeled paths from a BrahMos mobile launcher to a user-positioned P-18 site.",
+      "Launch from a mobile platform toward a fixed P-18 site. Compare a direct path with a lofted path.",
     blue: "BrahMos mobile launcher",
     red: "P-18 early-warning radar site",
     targetProfile: "P-18 fixed radar",

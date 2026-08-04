@@ -30,6 +30,6 @@ export function ScenarioLibrary({ compact = false }: { compact?: boolean }) {
         </article>;
       })}
     </div>
-    <div className="semantic-legend"><span><i className="friendly-key"/>Blue Team</span><span><i className="hostile-key"/>Red Team</span><span><i className="validated-key"/>Ready to run</span><span><i className="assumption-key"/>Model limit / caution</span></div>
+    <div className="semantic-legend"><span><i className="friendly-key"/>Blue Team</span><span><i className="hostile-key"/>Red Team</span><span><i className="validated-key"/>Ready to run</span><span><i className="assumption-key"/>Limits shown</span></div>
   </div>;
 }

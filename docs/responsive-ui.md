@@ -8,7 +8,8 @@ page transform or synthetic zoom to make layouts fit.
 
 | Class | Validation viewports | Intended behavior |
 | --- | --- | --- |
-| Phone | 390×844, 430×932 | Single-column Construct and replay; desktop rails are removed; primary actions remain persistent; map, controls and all six telemetry plots remain reachable by vertical scrolling. |
+| Phone | 320×568, 390×844, 430×932 | Single-column Construct and replay; desktop rails are removed; primary actions remain persistent; the 3D/map surface, wrapped playback controls and all six telemetry plots remain reachable by vertical scrolling. |
+| Tablet | 768×1024, 1024×768 | Tablet composition preserves usable authoring context, a full-width simulation surface and touch-sized controls without inheriting either phone crowding or desktop rail widths. |
 | Laptop | 1280×720, 1366×768, 1440×900, 1536×864 | Persistent step rail, task canvas and scenario summary; compact telemetry; no horizontal workflow scrolling. |
 | Full HD | 1920×1080 | Three-panel operational workspace with a bounded reading width and expanded map surface. |
 | QHD / typical 27-inch | 2560×1440 | Wider 1,640-pixel task surface, larger rails, controls, typography, tactical symbols, map and telemetry. |
@@ -26,13 +27,15 @@ rendering sharpness; viewport width and height govern task geometry.
 - MapLibre canvases must have a non-zero task-appropriate height at every class.
 - QHD and 4K expand operational surfaces and control density; they do not merely add empty margins.
 - Phone replay stacks telemetry and makes the simulation column vertically scrollable.
+- The live 3D renderer observes its container, so orientation changes and panel reflow update the WebGL viewport without stretching or clipping.
+- Landing copy, calls to action and live preview remain within the first natural reading sequence on small screens; no fixed hero height creates blank space.
 - Report reading width remains bounded even when operational maps expand.
 
 ## Automated proof
 
 `npm run ui:responsive:verify` launches system Chrome at every viewport above.
-It validates map tiles and canvas size, start/base markers, base-origin mutation,
+It validates the landing hero and live 3D preview, map tiles and canvas size, start/base markers, base-origin mutation,
 action size and placement, rail behavior, typography scaling, RASP ownership,
-telemetry layout, Rust/WASM provenance, entity rendering, page errors, and
+3D container resize behavior, playback and legend containment, telemetry layout, Rust/WASM provenance, entity rendering, page errors, and
 horizontal overflow. Screenshots are written to the ignored
 `outputs/responsive/` directory for visual inspection.
