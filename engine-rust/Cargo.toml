@@ -2,6 +2,13 @@
 name = "vector-engine"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.85"
+description = "Deterministic browser-first 3DOF simulation engine for Vector Engagement Labs"
+repository = "https://github.com/SrivatsaRv/vector-engagements-labs"
+homepage = "https://labs.reachdefence.com"
+license = "Apache-2.0"
+readme = "README.md"
+keywords = ["simulation", "webassembly", "aerospace", "three-dof"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -14,5 +21,6 @@ serde_json = "1.0.149"
 codegen-units = 1
 lto = true
 opt-level = "s"
+overflow-checks = true
 panic = "abort"
 strip = true

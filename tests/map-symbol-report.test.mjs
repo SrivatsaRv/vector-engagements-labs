@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   buildCoverageFeatures,
@@ -20,6 +21,18 @@ import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import { buildReportExport } from "../lib/report-export.ts";
 import { getScenarioDefinition } from "../lib/scenarios.ts";
 import { getFrameAt, simulate } from "../lib/simulation.ts";
+
+test("both MapLibre surfaces use the same-origin module worker prepared at build time", () => {
+  const authoringMap = readFileSync(new URL("../components/ScenarioAuthoringMap.tsx", import.meta.url), "utf8");
+  const engagementMap = readFileSync(new URL("../components/EngagementMap.tsx", import.meta.url), "utf8");
+  const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  const workerPath = "/vendor/maplibre/maplibre-gl-worker.mjs";
+
+  assert.match(authoringMap, new RegExp(`setWorkerUrl\\(\\"${workerPath}`));
+  assert.match(engagementMap, new RegExp(`setWorkerUrl\\(\\"${workerPath}`));
+  assert.equal(packageJson.scripts.prebuild, "npm run map:assets:prepare");
+  assert.equal(packageJson.scripts.predev, "npm run map:assets:prepare");
+});
 
 test("geographic conversion and coverage rings remain finite and closed", () => {
   const origin = { longitude: 74.5, latitude: 31.2 };

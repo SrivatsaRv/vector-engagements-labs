@@ -112,6 +112,7 @@ export function ScenarioAuthoringMap({
     setMapError("");
     import("maplibre-gl").then((maplibregl) => {
       if (disposed || !mount.current) return;
+      maplibregl.setWorkerUrl("/vendor/maplibre/maplibre-gl-worker.mjs");
       const map = new maplibregl.Map({
         container: mount.current,
         style: buildVectorMapStyle("MINIMAL"),

@@ -12,7 +12,9 @@ import {
 
 type RustEngineExports = WebAssembly.Exports & {
   memory: WebAssembly.Memory;
+  vector_abi_version: () => number;
   vector_input_reserve: (length: number) => number;
+  vector_max_input_len: () => number;
   vector_run_json: () => number;
   vector_output_ptr: () => number;
   vector_output_len: () => number;
@@ -39,12 +41,17 @@ function getRustEngine() {
   const exports = instance.exports as RustEngineExports;
   if (
     !(exports.memory instanceof WebAssembly.Memory) ||
+    typeof exports.vector_abi_version !== "function" ||
     typeof exports.vector_input_reserve !== "function" ||
+    typeof exports.vector_max_input_len !== "function" ||
     typeof exports.vector_run_json !== "function" ||
     typeof exports.vector_output_ptr !== "function" ||
     typeof exports.vector_output_len !== "function"
   ) {
     throw new Error("The VECTOR Rust/WASM module does not expose the required engine ABI.");
+  }
+  if (exports.vector_abi_version() !== 1) {
+    throw new Error("The VECTOR Rust/WASM module exposes an unsupported ABI version.");
   }
   rustEngine = exports;
   return exports;
@@ -53,7 +60,16 @@ function getRustEngine() {
 export function runRustWasmEngine(scenario: EngineScenario): EngineRun {
   const engine = getRustEngine();
   const input = new TextEncoder().encode(JSON.stringify(scenario));
+  const maximumInputLength = engine.vector_max_input_len();
+  if (input.byteLength > maximumInputLength) {
+    throw new Error(
+      `The VECTOR Rust/WASM scenario is ${input.byteLength} bytes; the ABI maximum is ${maximumInputLength} bytes.`,
+    );
+  }
   const inputPointer = engine.vector_input_reserve(input.byteLength);
+  if (input.byteLength > 0 && inputPointer === 0) {
+    throw new Error("The VECTOR Rust/WASM engine could not reserve its input buffer.");
+  }
   new Uint8Array(engine.memory.buffer, inputPointer, input.byteLength).set(input);
   const succeeded = engine.vector_run_json() === 1;
   const outputPointer = engine.vector_output_ptr();

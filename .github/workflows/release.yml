@@ -54,6 +54,7 @@ jobs:
         with:
           toolchain: stable
           target: wasm32-unknown-unknown
+          components: clippy,rustfmt
       - name: Install and verify
         run: npm ci && make ci-local
       - name: Build release artifacts

@@ -24,8 +24,11 @@ performance-local:
 ci-local:
 	npm run audit:production
 	npm run symbols:verify
+	npm run engine:rust:fmt
+	npm run engine:rust:clippy
 	npm run engine:rust:verify
 	npm run engine:rust:test
+	npm run engine:rust:doc
 	npm run lint
 	npm run typecheck
 	npm test

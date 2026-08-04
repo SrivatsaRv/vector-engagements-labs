@@ -57,6 +57,7 @@ jobs:
         with:
           toolchain: stable
           target: wasm32-unknown-unknown
+          components: clippy,rustfmt
       - name: Install locked dependencies
         run: npm ci
       - name: Require production bindings

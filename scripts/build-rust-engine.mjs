@@ -48,7 +48,9 @@ function verifyModule(bytes, label) {
   );
   for (const required of [
     "memory",
+    "vector_abi_version",
     "vector_input_reserve",
+    "vector_max_input_len",
     "vector_output_len",
     "vector_output_ptr",
     "vector_run_json",
@@ -62,7 +64,15 @@ function verifyModule(bytes, label) {
 try {
   execFileSync(
     cargo,
-    ["build", "--release", "--target", "wasm32-unknown-unknown", "--manifest-path", manifest],
+    [
+      "build",
+      "--locked",
+      "--release",
+      "--target",
+      "wasm32-unknown-unknown",
+      "--manifest-path",
+      manifest,
+    ],
     { cwd: root, stdio: "inherit" },
   );
 } catch (error) {
