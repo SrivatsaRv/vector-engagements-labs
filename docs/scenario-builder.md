@@ -31,7 +31,13 @@ The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-eas
 
 ## Scenario artifact
 
-Construct produces a versioned scenario package. Compilation produces an immutable engine scenario containing all spawned entities, initial states, events, environment, study-area context, completion rules, and model provenance. Simulation produces ordered engine frames. Saving a report records both artifacts and their hashes so replay never depends on mutable UI state.
+Construct produces a `vector.scenario.v3` package with an intended-use identity
+and immutable compiled model-pack identity/digest. Compilation produces an
+immutable engine scenario containing all spawned entities, initial states,
+events, environment, study-area context, completion rules, model IDs, and the
+same digest. Simulation produces ordered engine frames. Saving a report records
+both artifacts, credibility limitations, and their hashes so replay never
+depends on mutable UI state.
 
 ## Builder expansion boundary
 
@@ -67,6 +73,9 @@ No mode may show results until the compiled package has passed validation and a 
 ### Artifact and state boundaries
 
 - Builder state is an editable draft scenario package.
+- A parameter change against governed model data is a scenario-local patch with
+  old value, new value, SI unit, reason, timestamp, author, evidence, model ID,
+  and pack digest; it never mutates the catalog or pack.
 - Validate canonicalizes the package and records a content hash.
 - Simulate compiles catalog references into an immutable engine scenario.
 - The engine owns lifecycle changes and produces ordered frames and events.

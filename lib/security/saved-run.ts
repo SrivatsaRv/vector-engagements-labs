@@ -7,6 +7,8 @@ import {
 import { findWeaponSimulationModel } from "@/lib/simulation-models";
 import { ENGINE_VERSION } from "@/lib/engine/version";
 import { OBJECT_CATALOG } from "@/lib/object-catalog";
+import { compileModelPack } from "@/lib/model-pack";
+import { createCurrentModelPackSource } from "@/lib/reference-model-pack";
 import { finiteNumber, PublicApiError, shortString } from "./public-api";
 
 const domains = new Set(["A2A", "A2G", "G2A", "G2G"]);
@@ -141,6 +143,17 @@ export async function buildVerifiedSavedRun(
   provenance: { schemaVersion: string; contentHash: string; draftRevision: number },
 ) {
   const scenario = validateSavedScenario(input, template);
+  const modelPackBundle = await compileModelPack(createCurrentModelPackSource());
+  if (
+    template.modelPack.id !== modelPackBundle.pack.id ||
+    template.modelPack.version !== modelPackBundle.pack.version ||
+    template.modelPack.digest !== modelPackBundle.pack.digest ||
+    !modelPackBundle.pack.intendedUses.some(
+      (item) => item.id === template.intendedUse.id && item.version === template.intendedUse.version,
+    )
+  ) {
+    throw new PublicApiError(409, "scenario_model_pack_mismatch");
+  }
   const result = simulate(scenario);
   if (result.frames.length === 0 || result.frames.length > 10_000) {
     throw new PublicApiError(422, "simulation_output_rejected");
@@ -156,7 +169,21 @@ export async function buildVerifiedSavedRun(
     createdAt: new Date().toISOString(),
     engine: ENGINE_VERSION,
     profileVersion: model ? `${model.id}@${model.version}` : "model-unavailable",
-    packageProvenance: provenance,
+    packageProvenance: {
+      ...provenance,
+      intendedUse: template.intendedUse,
+      modelPack: template.modelPack,
+      credibilityManifest: {
+        id: modelPackBundle.credibilityManifest.id,
+        version: modelPackBundle.credibilityManifest.version,
+        approvalState: modelPackBundle.credibilityManifest.approvalState,
+        limitations: modelPackBundle.credibilityManifest.limitations.map((item) => ({
+          id: item.id,
+          severity: item.severity,
+          statement: item.statement,
+        })),
+      },
+    },
     libraryScenario: {
       id: template.id,
       version: template.version,

@@ -47,6 +47,16 @@ try {
   assert.equal(catalog.platforms.length, 3);
   assert.equal(catalog.weapons.length, 8);
   assert.equal(catalog.simulationModels.length, 8);
+  assert.equal(catalog.compiledModelPacks.length, 1);
+  assert.equal(catalog.credibilityManifests.length, 2);
+  assert.equal(catalog.intendedUses.length, 1);
+  assert.match(catalog.compiledModelPacks[0].digest, /^[0-9a-f]{64}$/);
+  assert.equal(catalog.compiledModelPacks[0].payload.unitSystem, "SI");
+  assert.equal(
+    catalog.credibilityManifests.find((item) => item.subject_kind === "MODEL_PACK").subject_digest,
+    catalog.compiledModelPacks[0].digest,
+  );
+  assert.ok(catalog.credibilityManifests.some((item) => item.subject_kind === "ENGINE"));
   assert.equal(catalog.installations.length, 21);
   const pafInstallations = catalog.installations.filter((item) => item.service === "PAF");
   assert.equal(pafInstallations.length, 15);
@@ -56,9 +66,11 @@ try {
     (item) => item.id === "a2a-crossing-intercept" && item.version === "1.0.0",
   );
   assert.ok(template);
-  assert.equal(template.schema_version, "vector.scenario.v2");
+  assert.equal(template.schema_version, "vector.scenario.v3");
   assert.match(template.content_hash, /^[0-9a-f]{64}$/);
   assert.equal(template.engine_version, "browser-point-mass-v0.5");
+  assert.equal(template.intended_use_id, template.package.intendedUse.id);
+  assert.equal(template.model_pack_digest, template.package.modelPack.digest);
 
   const mathPage = await fetch(`${baseUrl}/math`);
   assert.equal(mathPage.status, 200);
@@ -102,11 +114,20 @@ try {
   const loadedPayload = await loaded.json();
   assert.equal(loadedPayload.run.scenarioId, "a2a-crossing-intercept");
   assert.equal(loadedPayload.run.engineVersion, "browser-point-mass-v0.5");
+  assert.deepEqual(loadedPayload.run.intendedUse, template.package.intendedUse);
+  assert.deepEqual(loadedPayload.run.modelPack, template.package.modelPack);
   assert.equal(loadedPayload.run.scenarioContentHash, template.content_hash);
   assert.match(loadedPayload.run.frameHash, /^[0-9a-f]{64}$/);
   assert.equal(loadedPayload.run.studyAreaId, "north-punjab");
   assert.equal(loadedPayload.run.spatialContext.id, "north-punjab");
   assert.ok(loadedPayload.run.modelAssumptions.report);
+  assert.equal(
+    loadedPayload.run.modelAssumptions.report.packageProvenance.modelPack.digest,
+    template.package.modelPack.digest,
+  );
+  assert.ok(
+    loadedPayload.run.modelAssumptions.report.packageProvenance.credibilityManifest.limitations.length > 0,
+  );
   assert.equal(loadedPayload.run.modelAssumptions.verification.source, "server-recomputed");
   assert.ok(loadedPayload.run.modelAssumptions.report.result.frames.length > 1);
   assert.equal("scenario_id" in loadedPayload.run, false);

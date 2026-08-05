@@ -18,7 +18,13 @@ Vector currently uses a deterministic three-dimensional point-mass reference eng
 - guidance-hold and wind-shift events;
 - closest approach, completion, energy/time termination, non-finite-state checks, and dry-mass margin diagnostics.
 
-Model coefficients are in versioned `simulation_models` rows. Public source assertions remain separate. Current coefficients are labeled model assumptions unless a field is genuinely source-backed.
+The current scalar coefficients remain in versioned `simulation_models` rows for
+catalog delivery and are also compiled into the immutable
+`vector.compiled-model-pack.v1` regression fixture. Public source assertions,
+unit-bearing model sources, compiled SI data, and credibility evidence remain
+separate. Every engine entity records the exact model ID, version, value state,
+and pack digest. This foundation does not add flight dynamics or increase the
+fidelity claim.
 
 Aircraft motion uses the same standard atmosphere and wind field as a launched vehicle. The current aircraft coefficient set resolves dynamic pressure, load-factor lift demand, parasitic and induced drag, available thrust, fuel flow, mass, and the turn-rate limit on every fixed step. It is an educational point-mass model, not a flight-manual or manufacturer engine deck.
 

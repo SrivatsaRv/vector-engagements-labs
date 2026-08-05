@@ -1,6 +1,6 @@
 import type { ScenarioDefinition } from "./scenarios.ts";
 
-export const SCENARIO_PACKAGE_SCHEMA_VERSION = "vector.scenario.v2";
+export const SCENARIO_PACKAGE_SCHEMA_VERSION = "vector.scenario.v3";
 
 export type StoredScenarioPackage = {
   id: string;
@@ -12,6 +12,11 @@ export type StoredScenarioPackage = {
   schema_version: string;
   content_hash: string;
   engine_version: string;
+  intended_use_id: string;
+  intended_use_version: string;
+  model_pack_id: string;
+  model_pack_version: string;
+  model_pack_digest: string;
 };
 
 export function isScenarioDefinition(value: unknown): value is ScenarioDefinition {
@@ -20,6 +25,11 @@ export function isScenarioDefinition(value: unknown): value is ScenarioDefinitio
   return Boolean(
     candidate.id &&
       candidate.version &&
+      candidate.intendedUse?.id &&
+      candidate.intendedUse?.version &&
+      candidate.modelPack?.id &&
+      candidate.modelPack?.version &&
+      candidate.modelPack?.digest?.match(/^[0-9a-f]{64}$/) &&
       candidate.domain &&
       candidate.title &&
       candidate.summary &&
@@ -50,6 +60,11 @@ export function isStoredScenarioPackage(
       candidate.status === "VALIDATED" &&
       candidate.schema_version === SCENARIO_PACKAGE_SCHEMA_VERSION &&
       candidate.engine_version &&
+      candidate.intended_use_id === candidate.package?.intendedUse?.id &&
+      candidate.intended_use_version === candidate.package?.intendedUse?.version &&
+      candidate.model_pack_id === candidate.package?.modelPack?.id &&
+      candidate.model_pack_version === candidate.package?.modelPack?.version &&
+      candidate.model_pack_digest === candidate.package?.modelPack?.digest &&
       candidate.content_hash?.match(/^[0-9a-f]{64}$/) &&
       isScenarioDefinition(candidate.package) &&
       candidate.package.id === candidate.id &&

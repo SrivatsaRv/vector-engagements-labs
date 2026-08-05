@@ -33,6 +33,7 @@ performance-local:
 
 ci-quality:
 	npm run symbols:verify
+	npm run models:verify
 	npm run engine:rust:fmt
 	npm run lint
 	npm run typecheck

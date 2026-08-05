@@ -31,6 +31,8 @@
     "app:verify": "node scripts/verify-app.mjs",
     "observability:verify": "node scripts/verify-observability.mjs",
     "performance:verify": "tsx scripts/benchmark-engine.ts",
+    "models:generate": "tsx scripts/generate-model-pack-fixture.ts",
+    "models:verify": "tsx scripts/generate-model-pack-fixture.ts --check",
     "symbols:generate": "node scripts/generate-tactical-icons.mjs",
     "symbols:verify": "node scripts/generate-tactical-icons.mjs --check",
     "map:assets:prepare": "node scripts/prepare-maplibre-assets.mjs",
