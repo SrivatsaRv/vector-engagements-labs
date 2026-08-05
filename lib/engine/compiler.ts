@@ -9,6 +9,9 @@ import type {
 import { getCatalogObject } from "../object-catalog.ts";
 import { findWeaponSimulationModel } from "../simulation-models.ts";
 import { getStudyArea, getWeatherPreset } from "../study-areas.ts";
+import { localFrameToGeographic } from "../geospatial/geodesy.ts";
+import { scenarioOrigin } from "../scenario-spatial.ts";
+import { buildSyntheticEnvironmentManifest } from "../geospatial/synthetic-environment.ts";
 
 export type ScenarioCompilerInput = {
   id: string;
@@ -486,6 +489,23 @@ export function compileScenario(
     };
   }
 
+  const origin = scenarioOrigin(studyArea);
+  const routes = entities.map((entity) => ({
+    entityId: entity.id,
+    points: (entity.route ?? []).map((point) => ({ ...point })),
+  }));
+  const syntheticEnvironment = buildSyntheticEnvironmentManifest({
+    studyArea,
+    weatherPreset,
+    origin,
+    routes,
+    effectiveWeather: {
+      windEastMps: input.windEastMps,
+      windNorthMps: input.windNorthMps,
+      temperatureOffsetC: input.temperatureOffset,
+    },
+  });
+
   return {
     id: input.id,
     version: input.version,
@@ -495,6 +515,15 @@ export function compileScenario(
     durationSeconds: input.domain === "G2G" ? 240 : 140,
     fixedStepSeconds: 0.05,
     entities,
+    geospatial: {
+      schemaVersion: "vector.engine-geospatial.v1",
+      origin,
+      initialPositions: entities.map((entity) => ({
+        entityId: entity.id,
+        position: localFrameToGeographic(entity.initial.position, origin),
+      })),
+      syntheticEnvironment,
+    },
     environment: {
       gravityMps2: 9.80665,
       temperatureOffsetC: input.temperatureOffset,
@@ -505,6 +534,7 @@ export function compileScenario(
         name: studyArea.name,
         terrainClass: studyArea.terrainClass,
         surfaceElevationM: studyArea.surfaceElevationM,
+        surfaceElevationDatum: studyArea.surfaceElevationDatum,
         anchor: studyArea.anchor,
         bounds: studyArea.bounds,
         weatherPresetId: weatherPreset.id,

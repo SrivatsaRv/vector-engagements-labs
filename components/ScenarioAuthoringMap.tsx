@@ -231,6 +231,7 @@ export function ScenarioAuthoringMap({
           longitude: event.lngLat.lng,
           latitude: event.lngLat.lat,
           altitudeM: current[team].position.altitudeM,
+          verticalDatum: "MSL" as const,
         };
         if (!isPointInsideStudyArea(nextPoint, studyArea)) {
           setMessage("Waypoint rejected: keep it inside the selected study area.");
@@ -270,6 +271,7 @@ export function ScenarioAuthoringMap({
               longitude: installation.longitude,
               latitude: installation.latitude,
               altitudeM: 0,
+              verticalDatum: "MSL" as const,
             },
             studyArea,
           )
@@ -291,6 +293,7 @@ export function ScenarioAuthoringMap({
               longitude: installation.longitude,
               latitude: installation.latitude,
               altitudeM: current[team].position.altitudeM,
+              verticalDatum: "MSL" as const,
             };
             setSelected(team);
             onChangeRef.current({
@@ -349,6 +352,7 @@ export function ScenarioAuthoringMap({
               longitude: position.lng,
               latitude: position.lat,
               altitudeM: current[team].position.altitudeM,
+              verticalDatum: "MSL" as const,
             };
             if (!isPointInsideStudyArea(point, studyArea)) {
               marker!.setLngLat([
@@ -407,6 +411,7 @@ export function ScenarioAuthoringMap({
                 altitudeM:
                   currentWaypoint?.altitudeM ??
                   current[team].position.altitudeM,
+                verticalDatum: "MSL" as const,
               };
               if (!isPointInsideStudyArea(point, studyArea)) {
                 if (currentWaypoint) {
@@ -476,6 +481,7 @@ export function ScenarioAuthoringMap({
         longitude: installation.longitude,
         latitude: installation.latitude,
         altitudeM: 0,
+        verticalDatum: "MSL" as const,
       },
       studyArea,
     ),
@@ -486,6 +492,7 @@ export function ScenarioAuthoringMap({
       longitude: installation.longitude,
       latitude: installation.latitude,
       altitudeM: entity.position.altitudeM,
+      verticalDatum: "MSL" as const,
     };
     setSelected(team);
     onChange({

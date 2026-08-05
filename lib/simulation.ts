@@ -10,6 +10,7 @@ import type {
   EngineEntityFrame,
   EngineRun,
 } from "./engine/contracts.ts";
+import type { RecordedGeographicPosition } from "./geospatial/contracts.ts";
 import type {
   EngagementDomain,
   Guidance,
@@ -179,6 +180,7 @@ export type Frame = {
   airDensity: number;
   mach: number;
   entities: EngineEntityFrame[];
+  geographicPositions: RecordedGeographicPosition[];
   closureRate: number;
   specificEnergy: number;
   massKg: number;
@@ -509,21 +511,21 @@ export function simulate(
     ? {
         blueStart: geographicToLocal(
           input.spatialPlan.blue.position,
-          studyArea.anchor,
+          studyArea,
         ),
         redStart: geographicToLocal(
           input.spatialPlan.red.position,
-          studyArea.anchor,
+          studyArea,
         ),
         blueHeadingRad:
           ((90 - input.spatialPlan.blue.headingDeg) * Math.PI) / 180,
         redHeadingRad:
           ((90 - input.spatialPlan.red.headingDeg) * Math.PI) / 180,
         blueRoute: input.spatialPlan.blue.route.map((point) =>
-          geographicToLocal(point, studyArea.anchor),
+          geographicToLocal(point, studyArea),
         ),
         redRoute: input.spatialPlan.red.route.map((point) =>
-          geographicToLocal(point, studyArea.anchor),
+          geographicToLocal(point, studyArea),
         ),
       }
     : undefined;
@@ -594,6 +596,7 @@ export function simulate(
       airDensity: atmosphere.densityKgM3,
       mach: weapon.mach,
       entities: engineFrame.entities,
+      geographicPositions: engineFrame.geographicPositions,
       closureRate: engineFrame.closureRateMps,
       specificEnergy: weapon.specificEnergyJkg,
       massKg: weapon.massKg,

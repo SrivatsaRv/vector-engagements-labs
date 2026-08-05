@@ -17,6 +17,7 @@ import {
   scale,
   subtract,
 } from "./vector.ts";
+import { localFrameToGeographic } from "../geospatial/geodesy.ts";
 
 type RuntimeState = {
   definition: EngineEntityDefinition;
@@ -381,6 +382,7 @@ function buildEnvelopes(scenario: EngineScenario): CoverageEnvelope[] {
         kind: "DETECTION" as const,
         radiusM: sensor.detectionRadiusM,
         label: `${entity.designation} detection study volume`,
+        basis: "DECLARED" as const,
       },
       {
         ...shared,
@@ -388,6 +390,7 @@ function buildEnvelopes(scenario: EngineScenario): CoverageEnvelope[] {
         kind: "TRACKING" as const,
         radiusM: sensor.trackingRadiusM,
         label: `${entity.designation} tracking study volume`,
+        basis: "DECLARED" as const,
       },
       {
         ...shared,
@@ -395,6 +398,7 @@ function buildEnvelopes(scenario: EngineScenario): CoverageEnvelope[] {
         kind: "ENGAGEMENT" as const,
         radiusM: sensor.engagementRadiusM,
         label: `${entity.designation} engagement study envelope`,
+        basis: "DECLARED" as const,
       },
       {
         ...shared,
@@ -402,12 +406,25 @@ function buildEnvelopes(scenario: EngineScenario): CoverageEnvelope[] {
         kind: "MINIMUM_RANGE" as const,
         radiusM: sensor.minimumRangeM,
         label: `${entity.designation} minimum-range limitation`,
+        basis: "DECLARED" as const,
       },
     ];
   });
 }
 
 export function runEngine(scenario: EngineScenario): EngineRun {
+  const legacyStudyArea = scenario.environment.studyArea;
+  const recordingOrigin = scenario.geospatial?.origin ?? {
+    schemaVersion: "vector.scenario-origin.v1" as const,
+    id: `legacy:${legacyStudyArea?.id ?? "unlocated"}:origin`,
+    frame: "ENU" as const,
+    geographic: {
+      longitudeDeg: legacyStudyArea?.anchor.longitude ?? 0,
+      latitudeDeg: legacyStudyArea?.anchor.latitude ?? 0,
+      altitude: { valueM: 0, datum: "ELLIPSOID" as const },
+    },
+    transformVersion: "vector.wgs84-ecef-local.v1" as const,
+  };
   const states = new Map(
     scenario.entities.map((definition) => [definition.id, initialState(definition)]),
   );
@@ -498,6 +515,15 @@ export function runEngine(scenario: EngineScenario): EngineRun {
         entities: [...states.values()]
           .filter((state) => state.lifecycle !== "STOWED")
           .map((state) => toFrame(state, scenario)),
+        geographicPositions: [...states.values()]
+          .filter((state) => state.lifecycle !== "STOWED")
+          .map((state) => ({
+            entityId: state.definition.id,
+            position: localFrameToGeographic(
+              state.position,
+              recordingOrigin,
+            ),
+          })),
         primaryWeaponId: primaryWeapon.definition.id,
         primaryTargetId: primaryTarget.definition.id,
         separationM,

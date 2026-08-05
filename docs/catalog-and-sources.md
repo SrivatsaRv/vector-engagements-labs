@@ -37,3 +37,13 @@ The S-200 template is a historical public-reference case and does not claim curr
 This is semantic versioning plus content-addressed verification, not Git. Template maintainers publish a new row version when authored behavior changes; old saved runs remain bound to their original package and frame hashes.
 
 No missing value may be silently promoted to sourced truth.
+
+## Synthetic-environment identity
+
+Catalog object identity remains separate from the run's synthetic-environment
+identity. Compilation freezes transform, geoid, terrain, weather, atmosphere,
+study-area, route, installation and airspace dataset versions/digests in
+`vector.synthetic-environment.v1`. The current reference terrain and zero-geoid
+fixtures are `MODEL_ASSUMPTION`; they do not upgrade PostGIS installation points
+or public-source assertions. A future production terrain/geoid ingest publishes
+new content identities rather than mutating a saved run.

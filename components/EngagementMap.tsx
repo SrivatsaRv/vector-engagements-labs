@@ -16,6 +16,7 @@ import {
   buildTrackFeatures,
   circlePolygon,
   localToLngLat,
+  recordedLngLat,
   type MapInstallationRecord,
 } from "@/lib/map-layer-contracts";
 import {
@@ -353,7 +354,12 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
     const coordinates = result.frames.flatMap((frame) =>
       frame.entities
         .filter((entity) => entity.lifecycle !== "STOWED")
-        .map((entity) => localToLngLat(entity.position, origin)),
+        .map((entity) => recordedLngLat(
+          frame.geographicPositions,
+          entity.id,
+          entity.position,
+          origin,
+        )),
     );
     if (coordinates.length < 2) return;
     const longitudes = coordinates.map(([longitude]) => longitude);
@@ -387,6 +393,14 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
         const displayPosition = isObservedTrack && raspTrack?.visible
           ? raspTrack.position
           : entity.position;
+        const displayLngLat = isObservedTrack && raspTrack?.visible
+          ? localToLngLat(displayPosition, origin)
+          : recordedLngLat(
+              frame.geographicPositions,
+              entity.id,
+              displayPosition,
+              origin,
+            );
         let marker = markers.current.get(entity.id);
         if (!marker) {
           const element = document.createElement("div");
@@ -400,11 +414,11 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           if (label) label.textContent = entity.designation;
           element.title = `${entity.designation} · ${entity.lifecycle.toLowerCase()}`;
           const createdMarker = new maplibregl.Marker({ element, anchor: "center" });
-          createdMarker.setLngLat(localToLngLat(displayPosition, origin)).addTo(map);
+          createdMarker.setLngLat(displayLngLat).addTo(map);
           markers.current.set(entity.id, createdMarker);
           marker = createdMarker;
         }
-        marker.setLngLat(localToLngLat(displayPosition, origin));
+        marker.setLngLat(displayLngLat);
         marker.getElement().style.setProperty(
           "--entity-heading",
           `${90 - (entity.headingRad * 180) / Math.PI}deg`,

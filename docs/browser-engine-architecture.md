@@ -27,6 +27,15 @@ The MapLibre surface has two independent choices:
 
 Map, 3D, and telemetry share model time. Tactical markers are keyed by affiliation, object kind, and lifecycle; a guided weapon is absent before launch.
 
+The compiled scenario also carries `vector.engine-geospatial.v1`: a stable WGS84
+origin, entity-keyed geographic initial positions, and the frozen
+`vector.synthetic-environment.v1` manifest. Each sampled frame records both the
+authoritative local f64 position and an entity-keyed WGS84 ellipsoid position.
+MapLibre consumes the recorded geographic sample; Three.js consumes the same
+frame's local sample through a camera-relative f32 adapter. Neither renderer can
+write position back to the engine. See
+[`geospatial-environment.md`](geospatial-environment.md).
+
 `lib/engine/contracts.ts` defines the boundary; `compiler.ts` resolves the scenario; `core.ts` integrates it. No loop assumes two, four, or another fixed entity count.
 
 The current inspected TypeScript implementation is the golden reference. Rust/WASM is authorized as a performance path, but it must pass frame/result parity fixtures before becoming default. A Web Worker boundary will keep batches away from interaction rendering. Rust/WASM will not change scenario or frame schemas.

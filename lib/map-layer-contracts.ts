@@ -1,5 +1,7 @@
 import type { EngineEntityFrame } from "./engine/contracts.ts";
 import type { SimulationResult, Vec3 } from "./simulation.ts";
+import type { RecordedGeographicPosition, ScenarioOrigin } from "./geospatial/contracts.ts";
+import { localFrameToGeographic } from "./geospatial/geodesy.ts";
 
 export type MapOrigin = { longitude: number; latitude: number };
 export type MapInstallationRecord = {
@@ -18,11 +20,41 @@ export function localToLngLat(
   position: Pick<Vec3, "x" | "y">,
   origin: MapOrigin,
 ) {
-  const latitude = origin.latitude + position.y / 111320;
-  const longitude =
-    origin.longitude +
-    position.x / (111320 * Math.cos((origin.latitude * Math.PI) / 180));
-  return [longitude, latitude] as [number, number];
+  if (position.x === 0 && position.y === 0) {
+    return [origin.longitude, origin.latitude] as [number, number];
+  }
+  const scenarioOrigin: ScenarioOrigin = {
+    schemaVersion: "vector.scenario-origin.v1",
+    id: "map-adapter-origin",
+    frame: "ENU",
+    geographic: {
+      longitudeDeg: origin.longitude,
+      latitudeDeg: origin.latitude,
+      altitude: { valueM: 0, datum: "ELLIPSOID" },
+    },
+    transformVersion: "vector.wgs84-ecef-local.v1",
+  };
+  const geographic = localFrameToGeographic(
+    {
+      x: position.x,
+      y: position.y,
+      z: (position as Partial<Vec3>).z ?? 0,
+    },
+    scenarioOrigin,
+  );
+  return [geographic.longitudeDeg, geographic.latitudeDeg] as [number, number];
+}
+
+export function recordedLngLat(
+  geographicPositions: RecordedGeographicPosition[] | undefined,
+  entityId: string,
+  fallbackPosition: Pick<Vec3, "x" | "y">,
+  origin: MapOrigin,
+) {
+  const recorded = geographicPositions?.find((item) => item.entityId === entityId);
+  return recorded
+    ? [recorded.position.longitudeDeg, recorded.position.latitudeDeg] as [number, number]
+    : localToLngLat(fallbackPosition, origin);
 }
 
 export function circlePolygon(
@@ -40,6 +72,7 @@ export function circlePolygon(
       { longitude, latitude },
     );
   });
+  points[points.length - 1] = points[0];
   return [points];
 }
 
@@ -110,7 +143,9 @@ export function buildLaunchFeatures(
         },
         geometry: {
           type: "Point" as const,
-          coordinates: localToLngLat(
+          coordinates: recordedLngLat(
+            frame.geographicPositions,
+            launched?.id ?? platform?.id ?? entity.id,
             launched?.position ?? platform?.position ?? entity.initial.position,
             origin,
           ),
@@ -131,9 +166,16 @@ export function buildTrackFeatures(
     .flatMap((entity) => {
       const coordinates = result.frames
         .filter((sample) => sample.t <= time)
-        .map((sample) => sample.entities.find((item) => item.id === entity.id))
-        .filter((item) => item && item.lifecycle !== "STOWED")
-        .map((item) => localToLngLat(item!.position, origin));
+        .flatMap((sample) => {
+          const item = sample.entities.find((candidate) => candidate.id === entity.id);
+          if (!item || item.lifecycle === "STOWED") return [];
+          return [recordedLngLat(
+            sample.geographicPositions,
+            item.id,
+            item.position,
+            origin,
+          )];
+        });
       if (coordinates.length < 2) return [];
       return [{
         type: "Feature" as const,
@@ -148,7 +190,7 @@ export function buildTrackFeatures(
 }
 
 export function buildDirectionVectorFeatures(
-  frame: { entities: EngineEntityFrame[] },
+  frame: { entities: EngineEntityFrame[]; geographicPositions?: RecordedGeographicPosition[] },
   origin: MapOrigin,
 ) {
   return frame.entities
@@ -165,7 +207,7 @@ export function buildDirectionVectorFeatures(
         geometry: {
           type: "LineString" as const,
           coordinates: [
-            localToLngLat(entity.position, origin),
+            recordedLngLat(frame.geographicPositions, entity.id, entity.position, origin),
             localToLngLat(
               {
                 x: entity.position.x + entity.velocity.x * lengthSeconds,
@@ -181,7 +223,7 @@ export function buildDirectionVectorFeatures(
 
 export function buildCoverageFeatures(
   result: SimulationResult,
-  frame: { entities: EngineEntityFrame[] },
+  frame: { entities: EngineEntityFrame[]; geographicPositions?: RecordedGeographicPosition[] },
   origin: MapOrigin,
 ) {
   return result.envelopes.flatMap((envelope) => {
@@ -199,10 +241,14 @@ export function buildCoverageFeatures(
         minimumAltitudeM: envelope.minimumAltitudeM,
         maximumAltitudeM: envelope.maximumAltitudeM,
         valueState: envelope.valueState,
+        basis: envelope.basis,
       },
       geometry: {
         type: "Polygon" as const,
-        coordinates: circlePolygon(localToLngLat(owner.position, origin), envelope.radiusM),
+        coordinates: circlePolygon(
+          recordedLngLat(frame.geographicPositions, owner.id, owner.position, origin),
+          envelope.radiusM,
+        ),
       },
     }];
   });

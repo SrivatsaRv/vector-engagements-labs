@@ -6,9 +6,9 @@ import {
   type ProfileId,
   type RaspTrack,
   type SimulationResult,
-  type Vec3,
 } from "@/lib/simulation";
 import type { EngineEntityFrame } from "@/lib/engine/contracts";
+import { cameraRelativeThreePosition } from "@/lib/geospatial/geodesy";
 
 type Props = {
   result: SimulationResult;
@@ -255,8 +255,10 @@ export function SimulationScene({ result, time, layers, raspTrack }: Props) {
       const current = state.current;
       const frame = getFrameAt(result, time);
       if (!current || !frame) return;
-      const point = (position: Vec3) =>
-        new THREE.Vector3(position.x, position.z, position.y);
+      const point = (position: EngineEntityFrame["position"]) => {
+        const [x, y, z] = cameraRelativeThreePosition(position);
+        return new THREE.Vector3(x, y, z);
+      };
 
       for (const entity of frame.entities.filter((item) => item.lifecycle !== "STOWED")) {
         let symbol = current.symbols.get(entity.id);

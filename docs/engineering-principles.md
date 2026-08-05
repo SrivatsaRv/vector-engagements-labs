@@ -43,6 +43,7 @@ Vector Engagement Labs is being developed as an open-source, browser-first simul
 The reusable simulation library should be publishable independently from the product UI. Its public surface consists of:
 
 - versioned scenario, entity, environment, event, frame, diagnostic, and recording schemas;
+- WGS84/ECEF/local-frame transforms, explicit vertical-datum operations, and bounded synthetic-environment ports that do not depend on a renderer or remote tick service;
 - a deterministic reference engine;
 - the Rust/WASM backend and TypeScript reference backend;
 - conformance fixtures, parity tests, numerical tolerances, and benchmarks;

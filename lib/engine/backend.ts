@@ -9,6 +9,7 @@ import {
   VECTOR_ENGINE_WASM_BYTES,
   VECTOR_ENGINE_WASM_SHA256,
 } from "./generated/vector-engine-wasm.ts";
+import { localFrameToGeographic } from "../geospatial/geodesy.ts";
 
 type RustEngineExports = WebAssembly.Exports & {
   memory: WebAssembly.Memory;
@@ -21,6 +22,42 @@ type RustEngineExports = WebAssembly.Exports & {
 };
 
 let rustEngine: RustEngineExports | null = null;
+
+function withGeospatialRecord(
+  scenario: EngineScenario,
+  run: EngineRun,
+): EngineRun {
+  return {
+    ...run,
+    scenario: {
+      ...run.scenario,
+      geospatial: scenario.geospatial,
+      environment: {
+        ...run.scenario.environment,
+        studyArea: {
+          ...run.scenario.environment.studyArea,
+          surfaceElevationDatum:
+            scenario.environment.studyArea.surfaceElevationDatum,
+        },
+      },
+    },
+    frames: run.frames.map((frame) => ({
+      ...frame,
+      geographicPositions: frame.geographicPositions
+        ?? frame.entities.map((entity) => ({
+          entityId: entity.id,
+          position: localFrameToGeographic(
+            entity.position,
+            scenario.geospatial.origin,
+          ),
+        })),
+    })),
+    envelopes: run.envelopes.map((envelope) => ({
+      ...envelope,
+      basis: envelope.basis ?? "DECLARED",
+    })),
+  };
+}
 
 function decodeBase64(value: string) {
   const decoded = globalThis.atob(value);
@@ -84,7 +121,7 @@ export function runRustWasmEngine(scenario: EngineScenario): EngineRun {
   if (run.diagnostics.backend !== "rust-wasm") {
     throw new Error("The VECTOR Rust/WASM engine returned invalid provenance.");
   }
-  return run;
+  return withGeospatialRecord(scenario, run);
 }
 
 export function runEngineBackend(
@@ -92,7 +129,7 @@ export function runEngineBackend(
   backend: EngineBackendId,
 ): EngineRun {
   if (backend === "rust-wasm") return runRustWasmEngine(scenario);
-  if (backend === "typescript") return runEngine(scenario);
+  if (backend === "typescript") return withGeospatialRecord(scenario, runEngine(scenario));
   const exhaustive: never = backend;
   throw new Error(`Unknown VECTOR engine backend: ${exhaustive}`);
 }
