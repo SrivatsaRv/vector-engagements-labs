@@ -674,7 +674,7 @@ function LabWorkbench({
           </aside>
           <section className="simulation-column">
             <div className="sim-topline">
-              <div>
+              <div className="sim-identity">
                 <span>
                   {viewMode === "TRUTH"
                     ? "Model truth"

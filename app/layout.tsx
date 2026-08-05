@@ -6,14 +6,14 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL || "https://labs.reachdefence.com"),
   title: "Vector Engagement Labs by Reach Defence",
   description:
-    "Explore browser-based engagement experiments with visible assumptions, synchronized simulation views, comparisons, and reproducible reports.",
+    "Build a combat scenario, run it in your browser, replay every move, and compare the result.",
   openGraph: {
     type: "website",
     url: "https://labs.reachdefence.com",
     siteName: "Vector Engagement Labs by Reach Defence",
     title: "Vector Engagement Labs by Reach Defence",
     description:
-      "Explore browser-based engagement experiments with visible assumptions, synchronized simulation views, comparisons, and reproducible reports.",
+      "Build a combat scenario, run it in your browser, replay every move, and compare the result.",
     images: [
       {
         url: "/og.png",
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Vector Engagement Labs by Reach Defence",
     description:
-      "Explore browser-based engagement experiments with visible assumptions, synchronized simulation views, comparisons, and reproducible reports.",
+      "Build a combat scenario, run it in your browser, replay every move, and compare the result.",
     images: ["/og.png"],
   },
   icons: {

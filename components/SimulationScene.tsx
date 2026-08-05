@@ -199,8 +199,13 @@ export function SimulationScene({ result, time, layers, raspTrack }: Props) {
         camera.updateProjectionMatrix();
         renderer.setSize(nextWidth, nextHeight);
       };
+      const resizeObserver = new ResizeObserver(resize);
+      resizeObserver.observe(mount.current);
       window.addEventListener("resize", resize);
-      removeResize = () => window.removeEventListener("resize", resize);
+      removeResize = () => {
+        resizeObserver.disconnect();
+        window.removeEventListener("resize", resize);
+      };
       const render = () => {
         controls.update();
         renderer.render(scene, camera);
