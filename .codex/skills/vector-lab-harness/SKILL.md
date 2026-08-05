@@ -34,7 +34,6 @@ Use this flow:
 5. Run grouped integration and cross-stream tests from the release worktree after every merge.
 
 Never copy files between worktrees, cherry-pick another chat's uncommitted state, or have two chats edit the same branch. If a shared contract is needed early, commit the smallest contract slice, push it, and let the release steward merge it before dependent implementation proceeds. Use `git status`, `git log`, and `git diff` to prove which state is being shared.
-
 ## Context discipline
 
 - Prefer the context-slice script and targeted `rg` searches over dumping `docs/`, `pending-work/`, or whole source trees.
