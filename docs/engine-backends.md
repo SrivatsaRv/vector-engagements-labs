@@ -56,3 +56,24 @@ committed, integrity-checked artifact and does not install a compiler at runtime
 ## Swap boundary
 
 UI components do not import either numerical core. They call `simulate`, which compiles the scenario and dispatches through `runEngineBackend`. Observe, Explain, Compare, Save, and Report consume only the returned `EngineRun`. A later native service, worker pool, or higher-fidelity engine must implement this same boundary instead of branching presentation state.
+
+Interactive workbench calls now use `BrowserSimulationClient`, not the
+synchronous `simulate` compatibility function. The client loads a digest-addressed
+compiled adapter, sends a compact run reference, and receives one transferable
+VSR. Server verification, deterministic fixtures, benchmarks, the landing sample,
+and the hidden SSR pre-run placeholder continue to use `simulate` explicitly.
+Those entry points retain authored backend provenance and never substitute
+TypeScript for a selected Rust run.
+
+The browser protocol is common to both backends, but the numerical adapters are
+at different maturity levels:
+
+| Backend | Worker execution | Model batching | Current ABI |
+| --- | --- | --- | --- |
+| TypeScript | dedicated module Worker | cooperative fixed-step batches | `typescript-batched-v1` |
+| Rust/WASM | dedicated module Worker | one complete run | `rust-json-v1` compatibility ABI |
+
+The Rust JSON ABI remains supported until a typed batch ABI reproduces the full
+parity corpus. Its manifest provenance includes the selected backend, ABI name,
+and committed WASM artifact SHA-256. Loading, execution, record creation, or
+replay fails closed when those identities disagree.

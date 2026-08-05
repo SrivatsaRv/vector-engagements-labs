@@ -61,6 +61,11 @@ import {
 } from "@/lib/simulation-models";
 import { ENGINE_VERSION } from "@/lib/engine/version";
 import { ENGINE_BACKENDS } from "@/lib/engine/backend";
+import {
+  BrowserSimulationCancelledError,
+  BrowserSimulationClient,
+} from "@/lib/runtime/browser-simulation-client";
+import type { BrowserRuntimeState } from "@/lib/runtime/protocol";
 import type { StudyArea } from "@/lib/study-areas";
 import {
   spatialAspectDeg,
@@ -146,6 +151,7 @@ function LabWorkbench({
   startStep: number;
 }) {
   const router = useRouter();
+  const simulationClient = useMemo(() => new BrowserSimulationClient(), []);
   const [definition, setDefinition] = useState(initialDefinition);
   const [scenario, setScenario] = useState<Scenario>(() => ({
     ...initialDefinition.scenario,
@@ -192,6 +198,9 @@ function LabWorkbench({
     engineVersion: string;
   } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [runtimeState, setRuntimeState] =
+    useState<BrowserRuntimeState>("ready");
+  const [runProgress, setRunProgress] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [catalogState, setCatalogState] = useState<"loading" | "POSTGIS" | "error">(
     "loading",
@@ -206,6 +215,13 @@ function LabWorkbench({
     [definition, scenario],
   );
   const blueSystem = getCatalogObject(scenario.blueSystemId);
+  const runtimeBusy =
+    runtimeState === "initialization" ||
+    runtimeState === "running" ||
+    runtimeState === "paused" ||
+    runtimeState === "cancelling";
+
+  useEffect(() => () => simulationClient.terminate(), [simulationClient]);
 
   useEffect(() => {
     let active = true;
@@ -261,7 +277,6 @@ function LabWorkbench({
           registerDatabaseSimulationModels(payload.simulationModels);
           setDefinition(template.package);
           setScenario({ ...template.package.scenario });
-          setResult(simulate(template.package.scenario));
           setDraftRevision(0);
           setRunDraftRevision(null);
           setTemplateIdentity({
@@ -320,7 +335,7 @@ function LabWorkbench({
     }
   }, [hasRun]);
 
-  const run = useCallback(() => {
+  const run = useCallback(async () => {
     if (catalogState !== "POSTGIS") {
       setSaveError("Wait for the PostGIS scenario package before conducting the run.");
       return;
@@ -331,11 +346,27 @@ function LabWorkbench({
       setBuildStep(4);
       return;
     }
-    let next: SimulationResult;
     try {
-      next = simulate(scenario);
-    } catch (error) { throw error; }
-    setResult(next);
+      setRunProgress(0);
+      setRuntimeState("initialization");
+      const completion = await simulationClient.run(scenario, scenario.profile, {
+        onState: setRuntimeState,
+        onProgress: ({ progress }) => setRunProgress(progress),
+      });
+      const next = completion.result;
+      setResult(next);
+    } catch (error) {
+      if (error instanceof BrowserSimulationCancelledError) {
+        setRuntimeState("ready");
+        setSaveError("Browser simulation run cancelled.");
+        return;
+      }
+      setRuntimeState("failed");
+      setSaveError(
+        error instanceof Error ? error.message : "The browser simulation Worker failed.",
+      );
+      return;
+    }
     setTime(0);
     setPlaying(true);
     setWorkspace("run");
@@ -354,7 +385,7 @@ function LabWorkbench({
         detail: `${getCatalogObject(scenario.blueSystemId).designation} · ${findWeaponSimulationModel(scenario.blueSystemId)?.id ?? "model unavailable"}@${findWeaponSimulationModel(scenario.blueSystemId)?.version ?? "unknown"} · ${scenario.guidance} path · ${formatDistanceKm(scenario.range)} km`,
       },
     ]);
-  }, [catalogState, definition, draftRevision, scenario]);
+  }, [catalogState, definition, draftRevision, scenario, simulationClient]);
 
   useEffect(() => {
     if (!playing) return;
@@ -395,7 +426,7 @@ function LabWorkbench({
         event.preventDefault();
         setPlaying((value) => !value);
       }
-      if (event.key === "Enter") run();
+      if (event.key === "Enter") void run();
       if (event.key === "ArrowRight")
         setTime((value) => Math.min(result.timeOfFlight, value + 0.5));
       if (event.key === "ArrowLeft")
@@ -425,7 +456,7 @@ function LabWorkbench({
         scenario.guidanceInterruptionDuration -
         time
       : null;
-  const injectCondition = () => {
+  const injectCondition = async () => {
     const changed =
       definition.preparedEvent.physicsEffect === "guidance-hold"
         ? {
@@ -435,7 +466,23 @@ function LabWorkbench({
           }
         : { ...scenario, lossIncreaseAt: time, lossIncreaseAmount: 8 };
     setScenario(changed);
-    setResult(simulate(changed));
+    try {
+      setRuntimeState("initialization");
+      const completion = await simulationClient.run(changed, changed.profile, {
+        onState: setRuntimeState,
+        onProgress: ({ progress }) => setRunProgress(progress),
+      });
+      setResult(completion.result);
+    } catch (error) {
+      if (error instanceof BrowserSimulationCancelledError) {
+        setRuntimeState("ready");
+        setSaveError("Condition run cancelled.");
+        return;
+      }
+      setRuntimeState("failed");
+      setSaveError(error instanceof Error ? error.message : "Condition run failed.");
+      return;
+    }
     setConditionArmed(false);
     setComparison(null);
     setSavedRunId(null);
@@ -462,22 +509,58 @@ function LabWorkbench({
         detail: "This model time was marked for the Results timeline.",
       },
     ]);
-  const compare = () => {
-    setComparison({
-      short: simulate(scenario, "short"),
-      medium: simulate(scenario, "medium"),
-      sustained: simulate(scenario, "sustained"),
-    });
-    setPlaying(false);
+  const compare = async () => {
+    try {
+      setRuntimeState("initialization");
+      const short = await simulationClient.run(scenario, "short", {
+        onState: setRuntimeState,
+      });
+      const medium = await simulationClient.run(scenario, "medium", {
+        onState: setRuntimeState,
+      });
+      const sustained = await simulationClient.run(scenario, "sustained", {
+        onState: setRuntimeState,
+      });
+      setComparison({
+        short: short.result,
+        medium: medium.result,
+        sustained: sustained.result,
+      });
+      setPlaying(false);
+    } catch (error) {
+      if (error instanceof BrowserSimulationCancelledError) {
+        setRuntimeState("ready");
+        setSaveError("Comparison run cancelled.");
+        return;
+      }
+      setRuntimeState("failed");
+      setSaveError(error instanceof Error ? error.message : "Comparison run failed.");
+    }
   };
-  const resetRun = () => {
+  const resetRun = async () => {
     const baseline = {
       ...scenario,
       guidanceInterruptionAt: null,
       lossIncreaseAt: null,
     };
     setScenario(baseline);
-    setResult(simulate(baseline));
+    try {
+      setRuntimeState("initialization");
+      const completion = await simulationClient.run(baseline, baseline.profile, {
+        onState: setRuntimeState,
+        onProgress: ({ progress }) => setRunProgress(progress),
+      });
+      setResult(completion.result);
+    } catch (error) {
+      if (error instanceof BrowserSimulationCancelledError) {
+        setRuntimeState("ready");
+        setSaveError("Baseline reset cancelled.");
+        return;
+      }
+      setRuntimeState("failed");
+      setSaveError(error instanceof Error ? error.message : "Baseline reset failed.");
+      return;
+    }
     setTime(0);
     setPlaying(false);
     setComparison(null);
@@ -553,7 +636,11 @@ function LabWorkbench({
           >
             Construct
           </button>
-          <button className={workspace === "run" ? "active" : ""} onClick={run}>
+          <button
+            className={workspace === "run" ? "active" : ""}
+            disabled={runtimeBusy}
+            onClick={() => void run()}
+          >
             Simulate &amp; observe
           </button>
           <button
@@ -565,6 +652,17 @@ function LabWorkbench({
           </button>
         </nav>
         <div className="lab-actions">
+          <span className="catalog-state" data-runtime-state={runtimeState}>
+            <Gauge size={14} />
+            {runtimeState === "running"
+              ? `Worker running · ${Math.round(runProgress * 100)}%`
+              : `Worker · ${runtimeState}`}
+          </span>
+          {runtimeBusy && runtimeState !== "initialization" && (
+            <button onClick={() => void simulationClient.cancel()}>
+              <CircleX size={14} /> Cancel run
+            </button>
+          )}
           <span className={`catalog-state ${catalogState}`}>
             <Database size={14} />
             {catalogState === "POSTGIS"

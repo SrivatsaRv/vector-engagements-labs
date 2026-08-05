@@ -41,9 +41,16 @@ The path forward is not to add more maximum-range fields. It is to compile versi
   environment digests, bounded terrain sampling and geometric LOS fixtures.
   Production geoid/DEM ingestion, terrain collision, smooth-Earth horizon and
   terrain-driven sensor state remain incomplete.
-- Rust/WASM currently runs synchronously through a JSON ABI on the calling browser thread. There is no dedicated simulation Worker or transferable frame buffer.
+- Interactive Rust/WASM and TypeScript runs now execute behind
+  `vector.browser-runtime.v1` in a dedicated browser Worker and return a
+  transferable content-addressed VSR. TypeScript advances cooperative fixed-step
+  batches. Rust remains a whole-run JSON compatibility ABI inside the Worker;
+  its typed batch ABI is not implemented yet.
 - Backend ownership is inconsistent across entry points. New scenario state defaults to Rust/WASM, while the landing preview, some lab/report samples, and server-side saved-run verification explicitly select TypeScript. The architecture document also still describes TypeScript as the golden implementation while the backend document calls Rust/WASM the default. This must become one declared execution and verification policy.
-- The documented `vector.record.v1` archive is a design contract. Its columnar frame archive and ACMI adapter are not implemented.
+- `vector.record.v1` now has a verified binary archive, a versioned VECTOR
+  columnar f64 frame member, stable events, recorded RASP pictures, provenance,
+  frozen report data, corruption detection, and replay into current consumers.
+  True Apache Arrow IPC, archive download/import UI, and ACMI remain unimplemented.
 - The configured-template builder works. The complete blank, arbitrary-entity builder is still an internal draft contract rather than a finished product path.
 - Existing scale tests exercise small templates. They do not establish 100-entity performance.
 

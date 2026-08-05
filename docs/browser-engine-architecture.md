@@ -1,6 +1,6 @@
 # Browser simulation engine boundary
 
-Status: active workbench runtime.
+Status: dedicated browser runtime implemented; Rust typed batch ABI pending.
 
 1. Construct emits one immutable scenario package.
 2. The compiler resolves catalog objects and versioned coefficients.
@@ -38,4 +38,48 @@ write position back to the engine. See
 
 `lib/engine/contracts.ts` defines the boundary; `compiler.ts` resolves the scenario; `core.ts` integrates it. No loop assumes two, four, or another fixed entity count.
 
-The current inspected TypeScript implementation is the golden reference. Rust/WASM is authorized as a performance path, but it must pass frame/result parity fixtures before becoming default. A Web Worker boundary will keep batches away from interaction rendering. Rust/WASM will not change scenario or frame schemas.
+TypeScript is the conformance reference; Rust/WASM is the authored default for
+new interactive scenarios because it passes the current eight-scenario parity
+corpus. “Reference” describes independent verification ownership, not silent
+runtime fallback. The dedicated browser Worker keeps execution away from
+interaction rendering, and neither backend changes scenario or frame schemas.
+
+## Dedicated simulation Worker
+
+Interactive workbench execution uses the module Worker in
+`lib/runtime/simulation.worker.ts`. This is a browser Web Worker and is unrelated
+to the Cloudflare application Worker in `worker/index.ts`. Its message contract is
+`vector.browser-runtime.v1` and its observable states are `initialization`,
+`ready`, `running`, `paused`, `cancelling`, `completed`, `failed`, and
+`terminated`.
+
+The TypeScript backend advances an `EngineSession` in bounded `runTicks(count)`
+batches. It yields between batches so pause, cancellation, and bounded progress
+messages can be observed. The default batch is 128 fixed steps and progress is
+limited to at most 20 messages per wall second. Rust/WASM implements the same
+Worker request, result, record, failure, timeout, and provenance protocol, but
+currently executes one whole-run `rust-json-v1` compatibility call. It therefore
+cannot cooperatively pause inside that short WASM call; cancellation or timeout
+that cannot be acknowledged within the client grace period terminates the Worker
+and the next request creates a new instance.
+
+The runtime loads a compiled input once under a SHA-256 digest, then runs it by
+`digest + scenarioRef`. `RuntimeModelPackAdapter` is deliberately the only place
+that treats the current `EngineScenario` as a model pack. It will be replaced by
+the Simulation Data Foundation contract after that work lands; no competing
+entity or model schema is introduced here.
+
+Worker results are a content-addressed VSR transferred as an `ArrayBuffer`.
+Ownership moves Worker → main thread at completion and main thread → Worker after
+verification and decoding. The Worker retains at most two returned buffers, each
+no larger than 64 MiB, and uses a power-of-two capacity so subsequent records can
+reuse storage. No `SharedArrayBuffer` or cross-origin isolation is required.
+
+## Clock ownership
+
+- The Worker session owns fixed-step model time.
+- The playback controls own seek, pause, and 0.5×/1×/2×/4× playback time over a
+  completed record.
+- Map and Three.js own render time through `requestAnimationFrame`.
+- The runtime client owns wall-clock progress, timeout, and responsiveness
+  measurement. Wall time never enters physics or record event ordering.

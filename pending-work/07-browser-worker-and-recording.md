@@ -2,6 +2,10 @@
 
 Priority: P1
 
+Status: core browser runtime and VSR boundary implemented on
+`feat/runtime/browser-worker`; Rust typed batch ABI, Apache Arrow IPC, record
+download/import UI, 100-entity profiling, and long soak remain.
+
 Depends on: stable compiled scenario, model, entity, event, and frame contracts
 
 Blocks: responsive heavy runs, uncertainty batches, scale testing, and ACMI export
@@ -12,7 +16,19 @@ Physics runs in a dedicated browser Worker. The engine emits one deterministic, 
 
 ## Current gap
 
-Rust/WASM and TypeScript are both called synchronously. The Rust ABI serializes the complete scenario to JSON and parses the complete run back to JavaScript. The application holds array-of-object frames. The documented `vector.record.v1` archive, `frames.arrow`, transferable buffers, and event stream do not yet exist.
+Interactive workbench execution now uses a dedicated browser Worker. TypeScript
+uses cooperative fixed-step batches; Rust/WASM is isolated behind the same
+protocol but retains its whole-run JSON compatibility ABI. The implemented VSR
+has a content-addressed archive, transferable/reusable buffer, columnar f64 frame
+member, stable event stream, recorded RASP pictures, sources, limitations, and a
+frozen report. Existing consumers receive a reconstructed `SimulationResult`
+without rerunning physics.
+
+Remaining gaps are a typed Rust batch ABI, true Apache Arrow IPC (the current
+versioned VECTOR columnar codec retains the `frames.arrow` path), direct record
+download/import UI, user annotations merged into the final record, 100-entity
+allocation profiling, browser long-task traces on representative devices, and a
+60-minute memory soak.
 
 ## Runtime boundary
 
@@ -92,6 +108,14 @@ Systems read the previous committed state and write next-state buffers. Parallel
 - Opening a VSR reproduces the entity list, events, map/3D playback, telemetry, RASP views, explanation, and report without executing the engine.
 - Every required archive member has a digest and schema version.
 - A changed scenario or model pack cannot masquerade as the saved run.
+
+Implemented evidence: protocol/state tests, batch-size deterministic identity,
+all eight Rust/TypeScript parity fixtures, digest mutation rejection, exact
+columnar round-trip, VSR deterministic identity, corruption rejection, buffer
+reuse, client timeout/replacement, production build, and real-Chromium
+pause/resume/cancel/main-thread responsiveness, transferable detachment, and
+Worker/VSR backend-parity verification. Synthetic channel-crash coverage proves
+pending work is rejected and a fresh Worker initializes successfully.
 
 ## Tests
 
