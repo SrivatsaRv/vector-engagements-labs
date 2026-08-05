@@ -63,8 +63,10 @@ Every compiled run carries `vector.synthetic-environment.v1`, including:
 
 Manifest digests are SHA-256 over canonical JSON. The synchronous implementation
 exists so browser scenario compilation remains pure; it has a standards-vector
-test. Basemap selection is recorded only as presentation provenance and cannot
-alter simulation.
+test. Dataset consumers can assert content against its identity; malformed
+digests and content mismatches fail closed with dataset/version context. Basemap
+selection is recorded only as presentation provenance and cannot alter
+simulation.
 
 Weather uses a versioned ENU vector-field interface sampled by geographic
 position and model time. Atmosphere uses a separate versioned field interface.
@@ -103,10 +105,11 @@ The current map envelopes are `DECLARED`. The LOS fixture results are
 ## Verification and tolerances
 
 Automated tests cover equator, both poles, the dateline, high altitude,
-study-area edges, known WGS84 distance/bearing, ENU/NED conversion, explicit
+study-area edges, invalid/non-finite input rejection, known WGS84
+distance/bearing, ENU/NED conversion, explicit
 geoid and AGL operations, flat terrain, synthetic ridge, no-data, bounded work,
-datum mismatch, map/Three/record/report equivalence and TypeScript/Rust-WASM
-record parity.
+datum mismatch, dataset/transform digest mismatch, map/Three/record/report
+equivalence and TypeScript/Rust-WASM record parity.
 
 | Check | Tolerance |
 | --- | ---: |

@@ -9,7 +9,11 @@ import {
   geodesicDistanceBearing,
   localFrameToGeographic,
 } from "../lib/geospatial/geodesy.ts";
-import { sha256HexSync, sha256Identity } from "../lib/geospatial/digest.ts";
+import {
+  assertDatasetIdentityContent,
+  sha256HexSync,
+  sha256Identity,
+} from "../lib/geospatial/digest.ts";
 import {
   convertWithGeoid,
   convertWithGroundSurface,
@@ -84,6 +88,44 @@ test("WGS84 geodetic and ECEF round trips cover equator, poles, dateline and hig
       assert.ok(angularDifference(roundTrip.longitudeDeg, fixture.longitudeDeg) < 1e-8);
     }
   }
+});
+
+test("geodesy rejects invalid and non-finite geographic, ECEF and local coordinates", () => {
+  assert.throws(
+    () => geodeticToEcef({
+      longitudeDeg: Number.NaN,
+      latitudeDeg: 0,
+      altitude: { valueM: 0, datum: "ELLIPSOID" },
+    }),
+    /Longitude must be finite/,
+  );
+  assert.throws(
+    () => geodeticToEcef({
+      longitudeDeg: 0,
+      latitudeDeg: 90.0001,
+      altitude: { valueM: 0, datum: "ELLIPSOID" },
+    }),
+    /Latitude must be finite/,
+  );
+  assert.throws(
+    () => geodeticToEcef({
+      longitudeDeg: 0,
+      latitudeDeg: 0,
+      altitude: { valueM: Number.POSITIVE_INFINITY, datum: "ELLIPSOID" },
+    }),
+    /Altitude must be finite/,
+  );
+  assert.throws(
+    () => ecefToGeodetic({ xM: 0, yM: Number.NaN, zM: 0 }),
+    /ECEF coordinates must be finite/,
+  );
+  assert.throws(
+    () => localFrameToGeographic(
+      { x: 0, y: Number.NEGATIVE_INFINITY, z: 0 },
+      origin(0, 0),
+    ),
+    /Local-frame coordinates must be finite/,
+  );
 });
 
 test("scenario-local ENU and NED round trips retain WGS84 state", () => {
@@ -266,6 +308,33 @@ test("compiled runs freeze environment identities and record equivalent map/Thre
   assert.notEqual(
     changedWeather.engineRun.scenario.geospatial.syntheticEnvironment.weather.digest,
     manifest.weather.digest,
+  );
+  assert.doesNotThrow(() => assertDatasetIdentityContent(
+    manifest.coordinateTransform,
+    {
+      ellipsoid: "WGS84",
+      origin: result.engineRun.scenario.geospatial.origin,
+    },
+  ));
+  assert.throws(
+    () => assertDatasetIdentityContent(
+      manifest.coordinateTransform,
+      {
+        ellipsoid: "WGS84",
+        origin: {
+          ...result.engineRun.scenario.geospatial.origin,
+          id: "tampered-origin",
+        },
+      },
+    ),
+    /Dataset digest mismatch/,
+  );
+  assert.throws(
+    () => assertDatasetIdentityContent(
+      { ...manifest.terrain, digest: "not-a-digest" },
+      {},
+    ),
+    /invalid SHA-256 identity/,
   );
 
   const frame = getFrameAt(result, 5);

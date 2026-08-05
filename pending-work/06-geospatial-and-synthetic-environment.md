@@ -106,7 +106,8 @@ Use a measured spike when the product requires global curvature, globe-scale rou
 - A sensor path blocked by a synthetic ridge follows the expected state transition.
 
 Foundation evidence is in `tests/geospatial-environment.test.mjs` and the engine,
-map/report and backend-parity suites. Sensor state does not yet consume the
+map/report and backend-parity suites, including invalid/non-finite coordinates
+and fail-closed dataset/transform digest checks. Sensor state does not yet consume the
 geometric result, so the final sensor-path transition criterion remains open and
 belongs after the canonical sensor contracts land.
 

@@ -91,3 +91,20 @@ export function sha256HexSync(value: unknown) {
 export function sha256Identity(value: unknown): `sha256:${string}` {
   return `sha256:${sha256HexSync(value)}`;
 }
+
+export function assertDatasetIdentityContent(
+  identity: { id: string; version: string; digest: string },
+  content: unknown,
+) {
+  if (!/^sha256:[0-9a-f]{64}$/.test(identity.digest)) {
+    throw new TypeError(
+      `Dataset ${identity.id}@${identity.version} has an invalid SHA-256 identity.`,
+    );
+  }
+  const actual = sha256Identity(content);
+  if (actual !== identity.digest) {
+    throw new Error(
+      `Dataset digest mismatch for ${identity.id}@${identity.version}: expected ${identity.digest}, received ${actual}.`,
+    );
+  }
+}

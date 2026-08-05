@@ -24,6 +24,18 @@ function assertLongitudeLatitude(longitudeDeg: number, latitudeDeg: number) {
   }
 }
 
+function assertEcef(position: EcefPosition) {
+  if (![position.xM, position.yM, position.zM].every(Number.isFinite)) {
+    throw new RangeError("ECEF coordinates must be finite.");
+  }
+}
+
+function assertLocal(position: LocalPosition) {
+  if (![position.x, position.y, position.z].every(Number.isFinite)) {
+    throw new RangeError("Local-frame coordinates must be finite.");
+  }
+}
+
 export function normalizeLongitude(longitudeDeg: number) {
   const normalized = ((longitudeDeg + 180) % 360 + 360) % 360 - 180;
   return normalized === -180 && longitudeDeg > 0 ? 180 : normalized;
@@ -55,9 +67,7 @@ export function geodeticToEcef(
 export function ecefToGeodetic(
   position: EcefPosition,
 ): GeographicPosition<"ELLIPSOID"> {
-  if (![position.xM, position.yM, position.zM].every(Number.isFinite)) {
-    throw new RangeError("ECEF coordinates must be finite.");
-  }
+  assertEcef(position);
   const p = Math.hypot(position.xM, position.yM);
   if (p < 1e-9) {
     return {
@@ -125,6 +135,7 @@ function enuToEcefDelta(position: LocalPosition, origin: ScenarioOrigin): EcefPo
 }
 
 export function ecefToLocal(position: EcefPosition, origin: ScenarioOrigin): LocalPosition {
+  assertEcef(position);
   const originEcef = geodeticToEcef(origin.geographic);
   const enu = ecefDeltaToEnu({
     xM: position.xM - originEcef.xM,
@@ -135,6 +146,7 @@ export function ecefToLocal(position: EcefPosition, origin: ScenarioOrigin): Loc
 }
 
 export function localToEcef(position: LocalPosition, origin: ScenarioOrigin): EcefPosition {
+  assertLocal(position);
   const enu = origin.frame === "ENU"
     ? position
     : { x: position.y, y: position.x, z: -position.z };
