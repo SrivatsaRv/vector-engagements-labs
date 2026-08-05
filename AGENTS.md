@@ -16,6 +16,5 @@ Before handoff:
 - Update the relevant `docs/` or `pending-work/` contract.
 - Run `make ci-local` plus targeted checks appropriate to the change.
 - Record passing and omitted test layers with reasons; report branch, commit, PR target, tests/results, benchmark evidence, migrations, docs and blockers.
-- Report branch, commit, PR target, tests/results, benchmark evidence, migrations, docs and blockers.
 
 Project invariants include deterministic TypeScript/Rust parity, explicit units and datums, provenance-separated facts and assumptions, immutable content-addressed records, migration-only database changes, no database or remote-terrain access in ticks, and browser-heavy work behind Workers.
