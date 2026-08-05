@@ -407,139 +407,193 @@ function buildEnvelopes(scenario: EngineScenario): CoverageEnvelope[] {
   });
 }
 
-export function runEngine(scenario: EngineScenario): EngineRun {
-  const states = new Map(
-    scenario.entities.map((definition) => [definition.id, initialState(definition)]),
-  );
-  const primaryWeapon = states.get(
-    scenario.entities.find(
-      (entity) =>
-        entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds !== null,
-    )?.id ?? "",
-  );
-  const primaryTarget = primaryWeapon?.definition.weapon
-    ? states.get(primaryWeapon.definition.weapon.targetEntityId)
-    : undefined;
-  if (!primaryWeapon || !primaryTarget) {
+export type EngineBatch = {
+  completed: boolean;
+  integratedSteps: number;
+  modelTimeSeconds: number;
+  progress: number;
+};
+
+/**
+ * Fixed-step TypeScript model clock. The session owns model time and advances
+ * only when runTicks is called; wall, render, and playback clocks never enter
+ * the numerical loop.
+ */
+export class EngineSession {
+  private readonly scenario: EngineScenario;
+  private readonly states: Map<string, RuntimeState>;
+  private readonly primaryWeapon?: RuntimeState;
+  private readonly primaryTarget?: RuntimeState;
+  private readonly frames: EngineRun["frames"] = [];
+  private readonly sampleEvery: number;
+  private time = 0;
+  private termination: EngineRun["termination"] = "time_limit";
+  private closestApproachM = Number.POSITIVE_INFINITY;
+  private peakCommandG = 0;
+  private integratedSteps = 0;
+  private nonFiniteStateCount = 0;
+  private minimumMassMarginKg = Number.POSITIVE_INFINITY;
+  private completed = false;
+
+  constructor(scenario: EngineScenario) {
+    this.scenario = scenario;
+    this.states = new Map(
+      scenario.entities.map((definition) => [definition.id, initialState(definition)]),
+    );
+    this.primaryWeapon = this.states.get(
+      scenario.entities.find(
+        (entity) =>
+          entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds !== null,
+      )?.id ?? "",
+    );
+    this.primaryTarget = this.primaryWeapon?.definition.weapon
+      ? this.states.get(this.primaryWeapon.definition.weapon.targetEntityId)
+      : undefined;
+    this.sampleEvery = Math.max(1, Math.round(0.25 / scenario.fixedStepSeconds));
+    if (!this.primaryWeapon || !this.primaryTarget) {
+      this.termination = "invalid_scenario";
+      this.completed = true;
+    }
+  }
+
+  runTicks(maximumTicks: number): EngineBatch {
+    if (!Number.isSafeInteger(maximumTicks) || maximumTicks < 1) {
+      throw new Error("Engine tick batches must contain a positive safe integer.");
+    }
+    let batchSteps = 0;
+    while (!this.completed && batchSteps < maximumTicks) {
+      const primaryWeapon = this.primaryWeapon!;
+      const primaryTarget = this.primaryTarget!;
+      const time = this.time;
+      const scenario = this.scenario;
+      for (const state of this.states.values())
+        activateWeapon(state, this.states, time);
+      for (const state of this.states.values())
+        updateKinematicEntity(state, scenario, time, scenario.fixedStepSeconds);
+      for (const state of this.states.values())
+        updateWeapon(
+          state,
+          this.states,
+          scenario,
+          time,
+          scenario.fixedStepSeconds,
+        );
+      this.integratedSteps += 1;
+      batchSteps += 1;
+
+      const relativePosition = subtract(primaryTarget.position, primaryWeapon.position);
+      const relativeVelocity = subtract(primaryTarget.velocity, primaryWeapon.velocity);
+      const separationM = magnitude(relativePosition);
+      const los = normalize(relativePosition);
+      const closureRateMps = -dot(relativeVelocity, los);
+      const lineOfSightRateRadS =
+        magnitude(cross(relativePosition, relativeVelocity)) /
+        Math.max(1, separationM * separationM);
+      this.closestApproachM = Math.min(this.closestApproachM, separationM);
+      this.peakCommandG = Math.max(this.peakCommandG, primaryWeapon.commandedG);
+      const dryMass = primaryWeapon.definition.weapon?.dryMassKg ?? 0;
+      this.minimumMassMarginKg = Math.min(
+        this.minimumMassMarginKg,
+        primaryWeapon.massKg - dryMass,
+      );
+      for (const state of this.states.values()) {
+        const values = [
+          state.position.x,
+          state.position.y,
+          state.position.z,
+          state.velocity.x,
+          state.velocity.y,
+          state.velocity.z,
+          state.massKg,
+        ];
+        if (values.some((value) => !Number.isFinite(value)))
+          this.nonFiniteStateCount += 1;
+      }
+
+      if (
+        this.integratedSteps % this.sampleEvery === 1 ||
+        this.integratedSteps === 1
+      ) {
+        this.frames.push({
+          t: Number(time.toFixed(6)),
+          // Carried inventory is part of the scenario package, not yet a world
+          // track. It enters the observable frame only when its launch event
+          // activates it and gives it inherited launcher state.
+          entities: [...this.states.values()]
+            .filter((state) => state.lifecycle !== "STOWED")
+            .map((state) => toFrame(state, scenario)),
+          primaryWeaponId: primaryWeapon.definition.id,
+          primaryTargetId: primaryTarget.definition.id,
+          separationM,
+          closureRateMps,
+          lineOfSightRateRadS,
+        });
+      }
+
+      if (separationM <= scenario.completion.distanceMeters) {
+        this.termination = "threshold_reached";
+        this.completed = true;
+      } else {
+        const speed = magnitude(primaryWeapon.velocity);
+        const weapon = primaryWeapon.definition.weapon!;
+        const sinceLaunch = time - (weapon.launchTimeSeconds ?? 0);
+        if (
+          sinceLaunch > weapon.burnSeconds + 2 &&
+          speed < 80 &&
+          separationM > 1000
+        ) {
+          this.termination = "energy_depleted";
+          this.completed = true;
+        } else if (primaryWeapon.position.z <= 0 && time > 1) {
+          this.termination = "energy_depleted";
+          this.completed = true;
+        }
+      }
+      this.time = time + scenario.fixedStepSeconds;
+      if (this.time > scenario.durationSeconds + 1e-9) this.completed = true;
+    }
+
     return {
-      scenario,
-      frames: [],
-      envelopes: buildEnvelopes(scenario),
-      primaryWeaponId: "",
-      primaryTargetId: "",
-      termination: "invalid_scenario",
-      closestApproachM: Number.POSITIVE_INFINITY,
-      peakCommandG: 0,
-      diagnostics: {
-        backend: "typescript",
-        fixedStepSeconds: scenario.fixedStepSeconds,
-        integratedSteps: 0,
-        nonFiniteStateCount: 0,
-        minimumMassMarginKg: 0,
-      },
+      completed: this.completed,
+      integratedSteps: this.integratedSteps,
+      modelTimeSeconds: Math.min(this.time, this.scenario.durationSeconds),
+      progress:
+        this.scenario.durationSeconds > 0
+          ? Math.min(1, this.time / this.scenario.durationSeconds)
+          : 1,
     };
   }
 
-  const frames: EngineRun["frames"] = [];
-  let termination: EngineRun["termination"] = "time_limit";
-  let closestApproachM = Number.POSITIVE_INFINITY;
-  let peakCommandG = 0;
-  let integratedSteps = 0;
-  let nonFiniteStateCount = 0;
-  let minimumMassMarginKg = Number.POSITIVE_INFINITY;
-  const sampleEvery = Math.max(1, Math.round(0.25 / scenario.fixedStepSeconds));
-
-  for (
-    let time = 0;
-    time <= scenario.durationSeconds + 1e-9;
-    time += scenario.fixedStepSeconds
-  ) {
-    for (const state of states.values()) activateWeapon(state, states, time);
-    for (const state of states.values())
-      updateKinematicEntity(state, scenario, time, scenario.fixedStepSeconds);
-    for (const state of states.values())
-      updateWeapon(state, states, scenario, time, scenario.fixedStepSeconds);
-    integratedSteps += 1;
-
-    const relativePosition = subtract(primaryTarget.position, primaryWeapon.position);
-    const relativeVelocity = subtract(primaryTarget.velocity, primaryWeapon.velocity);
-    const separationM = magnitude(relativePosition);
-    const los = normalize(relativePosition);
-    const closureRateMps = -dot(relativeVelocity, los);
-    const lineOfSightRateRadS =
-      magnitude(cross(relativePosition, relativeVelocity)) /
-      Math.max(1, separationM * separationM);
-    closestApproachM = Math.min(closestApproachM, separationM);
-    peakCommandG = Math.max(peakCommandG, primaryWeapon.commandedG);
-    const dryMass = primaryWeapon.definition.weapon?.dryMassKg ?? 0;
-    minimumMassMarginKg = Math.min(
-      minimumMassMarginKg,
-      primaryWeapon.massKg - dryMass,
-    );
-    for (const state of states.values()) {
-      const values = [
-        state.position.x,
-        state.position.y,
-        state.position.z,
-        state.velocity.x,
-        state.velocity.y,
-        state.velocity.z,
-        state.massKg,
-      ];
-      if (values.some((value) => !Number.isFinite(value))) nonFiniteStateCount += 1;
-    }
-
-    if (integratedSteps % sampleEvery === 1 || integratedSteps === 1) {
-      frames.push({
-        t: Number(time.toFixed(6)),
-        // Carried inventory is part of the scenario package, not yet a world
-        // track. It enters the observable frame only when its launch event
-        // activates it and gives it inherited launcher state.
-        entities: [...states.values()]
-          .filter((state) => state.lifecycle !== "STOWED")
-          .map((state) => toFrame(state, scenario)),
-        primaryWeaponId: primaryWeapon.definition.id,
-        primaryTargetId: primaryTarget.definition.id,
-        separationM,
-        closureRateMps,
-        lineOfSightRateRadS,
-      });
-    }
-
-    if (separationM <= scenario.completion.distanceMeters) {
-      termination = "threshold_reached";
-      break;
-    }
-    const speed = magnitude(primaryWeapon.velocity);
-    const weapon = primaryWeapon.definition.weapon!;
-    const sinceLaunch = time - (weapon.launchTimeSeconds ?? 0);
-    if (sinceLaunch > weapon.burnSeconds + 2 && speed < 80 && separationM > 1000) {
-      termination = "energy_depleted";
-      break;
-    }
-    if (primaryWeapon.position.z <= 0 && time > 1) {
-      termination = "energy_depleted";
-      break;
-    }
+  isCompleted() {
+    return this.completed;
   }
 
-  return {
-    scenario,
-    frames,
-    envelopes: buildEnvelopes(scenario),
-    primaryWeaponId: primaryWeapon.definition.id,
-    primaryTargetId: primaryTarget.definition.id,
-    termination,
-    closestApproachM,
-    peakCommandG,
-    diagnostics: {
-      backend: "typescript",
-      fixedStepSeconds: scenario.fixedStepSeconds,
-      integratedSteps,
-      nonFiniteStateCount,
-      minimumMassMarginKg: Number.isFinite(minimumMassMarginKg)
-        ? minimumMassMarginKg
-        : 0,
-    },
-  };
+  result(): EngineRun {
+    if (!this.completed) throw new Error("The engine session is not complete.");
+    return {
+      scenario: this.scenario,
+      frames: this.frames,
+      envelopes: buildEnvelopes(this.scenario),
+      primaryWeaponId: this.primaryWeapon?.definition.id ?? "",
+      primaryTargetId: this.primaryTarget?.definition.id ?? "",
+      termination: this.termination,
+      closestApproachM: this.closestApproachM,
+      peakCommandG: this.peakCommandG,
+      diagnostics: {
+        backend: "typescript",
+        fixedStepSeconds: this.scenario.fixedStepSeconds,
+        integratedSteps: this.integratedSteps,
+        nonFiniteStateCount: this.nonFiniteStateCount,
+        minimumMassMarginKg: Number.isFinite(this.minimumMassMarginKg)
+          ? this.minimumMassMarginKg
+          : 0,
+      },
+    };
+  }
+}
+
+export function runEngine(scenario: EngineScenario): EngineRun {
+  const session = new EngineSession(scenario);
+  while (!session.isCompleted()) session.runTicks(2_048);
+  return session.result();
 }

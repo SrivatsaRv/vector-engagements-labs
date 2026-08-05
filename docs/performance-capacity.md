@@ -88,6 +88,38 @@ Running the complete stack on one machine provides native x86-64 PostgreSQL, loc
 
 The first deployment remains a modular monolith. A distributed control plane is not required for this workload.
 
+## Browser Worker measurement (2026-08-06)
+
+Measured locally on an Apple M3 (arm64, 8 logical cores, 16 GiB), macOS 15.6,
+Node 24.3.0 and headless Chrome. These are development measurements, not an
+x86-64 capacity claim.
+
+The direct Node microbenchmark retained the 8-scenario/200-run workload. After
+the fixed-step session refactor, TypeScript measured 1.413 ms p50 and 2.243 ms
+p95; Rust/WASM through the JSON ABI measured 5.412 ms p50 and 8.104 ms p95. The
+2026-08-05 pre-Worker baseline was 1.617/3.249 ms for TypeScript and 5.495/8.347
+ms for Rust/WASM. Both final samples improve on that baseline and remain far
+below the 75 ms guard, but the difference is small enough to require controlled
+runner history before treating it as an optimization claim. Browser isolation
+and record construction are measured separately.
+
+For the representative A2A scenario (1,564 fixed steps), the production
+TypeScript Worker uses 13 model batches at 128 ticks rather than a call per
+entity or field. Rust uses one Worker-level run and four current WASM JSON export
+calls. The 693,831-byte TypeScript JSON `EngineRun` becomes a 437,294-byte
+columnar frame member. The complete replayable VSR is 843,552 bytes and uses one
+recyclable 1 MiB transferable allocation; it is larger than frames alone because
+it also carries scenario, compiled input, pictures, sources, events, and report.
+
+The production Chromium verification proves both backends execute in the module
+Worker, the main-thread interval continues during execution, TypeScript pause,
+resume, and cancellation are acknowledged, the Rust backend retains explicit
+provenance, sampled Rust/TypeScript frame values match through the Worker/VSR
+boundary within the declared tolerance, ownership transfer detaches the returned
+buffer before reuse, and a returned VSR begins with the expected archive identity. This is
+responsiveness evidence for the current small scenario, not yet the required
+100-entity, long-task, allocation-profile, or 60-minute soak proof.
+
 ## Required performance test matrix
 
 | Test | Purpose |

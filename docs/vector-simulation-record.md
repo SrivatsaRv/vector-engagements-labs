@@ -1,6 +1,6 @@
 # VECTOR Simulation Record
 
-Status: architecture contract, schema name `vector.record.v1`.
+Status: browser implementation available, schema name `vector.record.v1`.
 
 The VECTOR Simulation Record (VSR) is VECTOR's equivalent of an ACMI recording. It is a portable, immutable analysis artifact, not a second simulation engine. A viewer must be able to open one VSR and reproduce the same entity list, event timeline, map/3D playback, telemetry, RASP views, explanation, and report without rerunning physics.
 
@@ -27,6 +27,13 @@ Primary references:
 | `report.json` | frozen report content and analyst notes |
 | `assets/` | optional portable GeoJSON, silhouettes or low-poly models identified by content hash |
 
+The implemented archive is a deterministic binary envelope (`vector.archive.v1`)
+with a bounded member table followed by member payloads. The outer table hashes
+every member, including `manifest.json`; the manifest independently binds every
+required replay member and carries a content digest. Opening verifies bounds,
+duplicate paths, SHA-256, required members, schema versions, backend provenance,
+and frozen report/frame agreement before returning replay data.
+
 Basemap tiles are referenced by provider and style revision, not silently embedded. A portable export may include explicitly licensed terrain or static assets. Missing optional assets must degrade to class silhouettes and a neutral terrain surface without changing telemetry.
 
 ## Frame contract
@@ -42,3 +49,27 @@ The manifest records SHA-256 hashes for the canonical scenario, compiled engine 
 ## Browser and interoperability boundary
 
 VSR is designed for browser production and playback. Frames use a transferable columnar buffer so a Web Worker, TypeScript engine or Rust/WASM engine can produce the same record contract. An ACMI 2.2 exporter can be added as an interoperability adapter; ACMI is not used as VECTOR's internal source of model truth because it does not carry VECTOR's full coefficient, provenance and scenario contracts.
+
+## Implemented replay boundary
+
+`createVectorSimulationRecord` freezes the authored scenario, compiled adapter,
+entity manifest, engine frames, stable lifecycle/input events, both observer
+pictures for A2A runs, provenance, limitations, and report outcome. The
+`openVectorSimulationRecord` path reconstructs the existing `SimulationResult`
+from recorded frames and metadata without calling either physics backend. That
+read model is sufficient for the existing map, Three.js, telemetry, RASP,
+explanation, and report consumers.
+
+`frames.arrow` currently contains the versioned VECTOR columnar codec
+`vector.frames.columnar.v1`: string/lifecycle metadata is encoded once in a
+canonical header and all numerical entity fields are stored as contiguous f64
+columns. The historical path is retained for compatibility, but this first
+implementation is not Apache Arrow IPC. An Arrow IPC adapter and downloadable
+ZIP container remain follow-up interoperability work; changing the frame codec
+requires a new member schema version and fixture migration.
+
+Stable events are ordered by model timestamp, event-class rank, entity ID, and
+detail, then assigned monotonically increasing sequence numbers. Record identity
+is derived from member content digests, so wall-clock creation metadata cannot
+masquerade as simulation identity. Reusable transport capacity is not part of the
+record bytes or content identity.
