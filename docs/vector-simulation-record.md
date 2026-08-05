@@ -18,7 +18,7 @@ Primary references:
 | --- | --- |
 | `manifest.json` | schema version, record ID, title, timestamps, producer, hashes and required viewer features |
 | `scenario.json` | authored scenario package, study area, environment, forces, routes, loadouts and assumptions |
-| `compiled.json` | immutable engine input with resolved catalog and model revisions |
+| `compiled.json` | immutable engine input with resolved catalog IDs, compiled model-pack digest, model indexes, scenario-local patches, and model revisions |
 | `entities.json` | stable entity identities, affiliation, class, labels, lifecycle and presentation references |
 | `frames.arrow` | columnar time-addressed state for every active entity |
 | `events.jsonl` | launches, detections, track changes, guidance phases, terminations and annotations |
@@ -37,7 +37,7 @@ Weapons remain loadout inventory before launch. A launch event creates the weapo
 
 ## Integrity and replay
 
-The manifest records SHA-256 hashes for the canonical scenario, compiled engine input, frames, events, sources and optional assets. Saving a run is complete only after all required hashes and a terminal run state exist. Editing a scenario creates a new draft revision; it cannot mutate a saved VSR.
+The manifest records SHA-256 hashes for the canonical scenario, compiled engine input, compiled model pack, frames, events, sources and optional assets. It also records intended-use and credibility-manifest identities. Saving a run is complete only after all required hashes and a terminal run state exist. Editing a scenario creates a new draft revision; it cannot mutate a saved VSR.
 
 ## Browser and interoperability boundary
 

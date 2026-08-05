@@ -79,6 +79,19 @@ fn label(path: &str, value: &str) -> Result<(), EngineError> {
     Ok(())
 }
 
+fn sha256_digest(path: &str, value: &str) -> Result<(), EngineError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(invalid(format!(
+            "{path} must be a lowercase SHA-256 digest"
+        )));
+    }
+    Ok(())
+}
+
 fn vector(path: &str, value: Vec3) -> Result<(), EngineError> {
     finite(&format!("{path}.x"), value.x)?;
     finite(&format!("{path}.y"), value.y)?;
@@ -96,8 +109,16 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
         &entity.provenance.source_object_id,
     )?;
     identifier(
+        &format!("{root}.provenance.modelId"),
+        &entity.provenance.model_id,
+    )?;
+    identifier(
         &format!("{root}.provenance.modelVersion"),
         &entity.provenance.model_version,
+    )?;
+    sha256_digest(
+        &format!("{root}.provenance.modelPackDigest"),
+        &entity.provenance.model_pack_digest,
     )?;
     vector(&format!("{root}.initial.position"), entity.initial.position)?;
     vector(&format!("{root}.initial.velocity"), entity.initial.velocity)?;
@@ -272,6 +293,52 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         )));
     }
     positive("fixedStepSeconds", scenario.fixed_step_seconds)?;
+    if scenario.model_pack.schema_version != "vector.compiled-model-pack.v1" {
+        return Err(invalid("modelPack.schemaVersion is unsupported"));
+    }
+    identifier("modelPack.id", &scenario.model_pack.id)?;
+    identifier("modelPack.version", &scenario.model_pack.version)?;
+    sha256_digest("modelPack.digest", &scenario.model_pack.digest)?;
+    identifier(
+        "modelPack.intendedUse.id",
+        &scenario.model_pack.intended_use.id,
+    )?;
+    identifier(
+        "modelPack.intendedUse.version",
+        &scenario.model_pack.intended_use.version,
+    )?;
+    for (index, patch) in scenario.model_pack.scenario_patches.iter().enumerate() {
+        let root = format!("modelPack.scenarioPatches[{index}]");
+        if patch.schema_version != "vector.model-patch.v1" {
+            return Err(invalid(format!("{root}.schemaVersion is unsupported")));
+        }
+        identifier(&format!("{root}.id"), &patch.id)?;
+        identifier(&format!("{root}.modelId"), &patch.model_id)?;
+        sha256_digest(&format!("{root}.modelPackDigest"), &patch.model_pack_digest)?;
+        if patch.model_pack_digest != scenario.model_pack.digest {
+            return Err(invalid(format!(
+                "{root}.modelPackDigest does not match modelPack"
+            )));
+        }
+        label(&format!("{root}.fieldPath"), &patch.field_path)?;
+        finite(&format!("{root}.oldValue"), patch.old_value)?;
+        finite(&format!("{root}.newValue"), patch.new_value)?;
+        label(&format!("{root}.unit"), &patch.unit)?;
+        label(&format!("{root}.reason"), &patch.reason)?;
+        label(
+            &format!("{root}.provenance.authorId"),
+            &patch.provenance.author_id,
+        )?;
+        label(
+            &format!("{root}.provenance.authoredAt"),
+            &patch.provenance.authored_at,
+        )?;
+        if patch.provenance.evidence_ref_ids.is_empty() {
+            return Err(invalid(format!(
+                "{root}.provenance.evidenceRefIds must not be empty"
+            )));
+        }
+    }
     if !(MIN_FIXED_STEP_SECONDS..=MAX_FIXED_STEP_SECONDS).contains(&scenario.fixed_step_seconds) {
         return Err(invalid(format!(
             "fixedStepSeconds must be between {MIN_FIXED_STEP_SECONDS} and {MAX_FIXED_STEP_SECONDS}"
@@ -337,6 +404,12 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
     let mut entity_ids = HashSet::with_capacity(scenario.entities.len());
     for (index, entity) in scenario.entities.iter().enumerate() {
         validate_entity(index, entity)?;
+        if entity.provenance.model_pack_digest != scenario.model_pack.digest {
+            return Err(invalid(format!(
+                "entity {} model-pack digest does not match scenario",
+                entity.id
+            )));
+        }
         if !entity_ids.insert(entity.id.as_str()) {
             return Err(invalid(format!("duplicate entity id {}", entity.id)));
         }

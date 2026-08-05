@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
 import postgres from "postgres";
+import {
+  CURRENT_INTENDED_USE_ID,
+  CURRENT_INTENDED_USE_VERSION,
+  CURRENT_MODEL_PACK_DIGEST,
+  CURRENT_MODEL_PACK_ID,
+  CURRENT_MODEL_PACK_VERSION,
+} from "../lib/reference-model-pack.ts";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
@@ -10,6 +17,9 @@ try {
     (SELECT count(*)::int FROM platform_variants) AS platforms,
     (SELECT count(*)::int FROM weapons) AS weapons,
     (SELECT count(*)::int FROM simulation_models) AS models,
+    (SELECT count(*)::int FROM compiled_model_packs) AS compiled_model_packs,
+    (SELECT count(*)::int FROM credibility_manifests) AS credibility_manifests,
+    (SELECT count(*)::int FROM intended_use_contracts) AS intended_uses,
     (SELECT count(*)::int FROM installations) AS installations,
     (SELECT count(*)::int FROM study_areas) AS study_areas,
     (SELECT count(*)::int FROM scenario_templates WHERE status='VALIDATED') AS scenarios`;
@@ -19,6 +29,9 @@ try {
     platforms: 3,
     weapons: 8,
     models: 8,
+    compiled_model_packs: 1,
+    credibility_manifests: 2,
+    intended_uses: 1,
     installations: 21,
     study_areas: 6,
     scenarios: 8,
@@ -62,9 +75,14 @@ try {
 
   const invalidPackages = await sql`SELECT id, version
     FROM scenario_templates
-    WHERE schema_version <> 'vector.scenario.v2'
+    WHERE schema_version <> 'vector.scenario.v3'
       OR engine_version <> 'browser-point-mass-v0.5'
       OR content_hash !~ '^[0-9a-f]{64}$'
+      OR intended_use_id <> ${CURRENT_INTENDED_USE_ID}
+      OR intended_use_version <> ${CURRENT_INTENDED_USE_VERSION}
+      OR model_pack_id <> ${CURRENT_MODEL_PACK_ID}
+      OR model_pack_version <> ${CURRENT_MODEL_PACK_VERSION}
+      OR model_pack_digest <> ${CURRENT_MODEL_PACK_DIGEST}
       OR package IS NULL`;
   assert.equal(invalidPackages.length, 0);
 
@@ -73,6 +91,23 @@ try {
     GROUP BY id, version
     HAVING count(*) <> 1`;
   assert.equal(versionDuplicates.length, 0);
+
+  const [modelPack] = await sql`SELECT p.id, p.version, p.digest,
+      p.payload->>'digest' AS payload_digest,
+      p.payload->>'unitSystem' AS unit_system,
+      m.subject_digest, m.approval_state
+    FROM compiled_model_packs p
+    JOIN credibility_manifests m
+      ON m.id=p.credibility_manifest_id AND m.version=p.credibility_manifest_version`;
+  assert.deepEqual(modelPack, {
+    id: CURRENT_MODEL_PACK_ID,
+    version: CURRENT_MODEL_PACK_VERSION,
+    digest: CURRENT_MODEL_PACK_DIGEST,
+    payload_digest: CURRENT_MODEL_PACK_DIGEST,
+    unit_system: "SI",
+    subject_digest: CURRENT_MODEL_PACK_DIGEST,
+    approval_state: "DRAFT",
+  });
   process.stdout.write(`database verified: ${JSON.stringify(counts)}\n`);
 } finally {
   await sql.end();

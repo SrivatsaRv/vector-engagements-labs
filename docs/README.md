@@ -19,6 +19,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Socia
 - [`scenario-builder.md`](scenario-builder.md): authoring journey, state ownership, map controls, and validation.
 - [`vector-simulation-record.md`](vector-simulation-record.md): portable replay and debriefing record.
 - [`catalog-and-sources.md`](catalog-and-sources.md): PostGIS ontology, source assertions, versions, and installation geometry.
+- [`model-pack-contract.md`](model-pack-contract.md): executable object definitions, intended use, credibility, SI compilation, compatibility, patches, and cross-language consumption.
 - [`rasp-state-machine.md`](rasp-state-machine.md): observer-picture dependencies, state transitions, scope, and regression matrix.
 - [`tacview-visual-subset.md`](tacview-visual-subset.md): supported analysis-display subset and explicit exclusions.
 - [`responsive-ui.md`](responsive-ui.md): supported viewports and fit-to-task behavior.
@@ -72,7 +73,7 @@ The release proof across engine, map, symbols, reports, persistence, observabili
 
 ## Data authority
 
-PostgreSQL/PostGIS is the runtime authority. Schema creation is migration-only; API requests never create tables or seed data as a side effect. `scripts/seed-db.ts` loads deterministic development fixtures. Public facts, source assertions, and simulation coefficients are separate tables and retain separate value states.
+PostgreSQL/PostGIS is the catalog authority. Schema creation is migration-only; API requests never create tables or seed data as a side effect. `scripts/seed-db.ts` loads deterministic development fixtures. Public facts, source assertions, human-readable model sources, immutable compiled model packs, and credibility manifests are separate records. The engine consumes an admitted SI pack and never queries the database during a tick.
 
 ## Acceptance rules
 

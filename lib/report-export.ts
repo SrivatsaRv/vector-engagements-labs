@@ -31,6 +31,14 @@ export type ReportData = {
     contentHash: string;
     draftRevision: number;
     frameHash?: string;
+    intendedUse?: { id: string; version: string };
+    modelPack?: { id: string; version: string; digest: string };
+    credibilityManifest?: {
+      id: string;
+      version: string;
+      approvalState: string;
+      limitations: Array<{ id: string; severity: string; statement: string }>;
+    };
   };
   libraryScenario?: ReportLibraryScenario;
 };
@@ -226,6 +234,9 @@ export function buildReportExport(
       scenarioContentHash: data.packageProvenance?.contentHash ?? "unrecorded",
       draftRevision: data.packageProvenance?.draftRevision ?? 0,
       frameHash: data.packageProvenance?.frameHash ?? "recorded by saved-run envelope",
+      intendedUse: data.packageProvenance?.intendedUse ?? null,
+      modelPack: data.packageProvenance?.modelPack ?? null,
+      credibilityManifest: data.packageProvenance?.credibilityManifest ?? null,
       profileLibrary: data.profileVersion,
       scenarioLibrary: `${library.id}@${library.version}`,
       sourceClass: "public / official-source-first",

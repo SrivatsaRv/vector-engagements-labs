@@ -1,6 +1,8 @@
 # Current state and research findings
 
-Status: research and code audit completed on 2026-08-05.
+Status: research and code audit completed on 2026-08-05. The executable
+model-pack foundation landed afterward; scenario packages are now
+`vector.scenario.v3`. Remaining fidelity findings below still apply.
 
 ## Executive finding
 
@@ -10,7 +12,7 @@ The path forward is not to add more maximum-range fields. It is to compile versi
 
 ## What VECTOR implements today
 
-- A `vector.scenario.v2` scenario package compiled into one immutable `EngineScenario`.
+- A `vector.scenario.v3` scenario package compiled into one immutable `EngineScenario`, with intended-use and compiled model-pack identities.
 - Rust/WASM and TypeScript backends behind the same `EngineScenario -> EngineRun` boundary.
 - Deterministic fixed-step 3D point-mass integration at a declared 50 ms step.
 - Local east, north, up coordinates anchored to a selected study area.

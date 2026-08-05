@@ -10,6 +10,12 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
+import type {
+  CompiledModelPack,
+  CredibilityManifest,
+  IntendedUseContract,
+  ModelPackSource,
+} from "../lib/model-pack.ts";
 
 const geometryPoint = customType<{ data: string }>({
   dataType() {
@@ -103,6 +109,55 @@ export const simulationModels = pgTable("simulation_models", {
   rationale: text("rationale").notNull(),
 });
 
+export const intendedUseContracts = pgTable("intended_use_contracts", {
+  id: text("id").notNull(),
+  version: text("version").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  definition: jsonb("definition").$type<IntendedUseContract>().notNull(),
+  contentHash: text("content_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.id, table.version] })]);
+
+export const modelPackSources = pgTable("model_pack_sources", {
+  id: text("id").notNull(),
+  version: text("version").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  definition: jsonb("definition").$type<ModelPackSource>().notNull(),
+  contentHash: text("content_hash").notNull(),
+  lifecycleStatus: text("lifecycle_status").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.id, table.version] })]);
+
+export const credibilityManifests = pgTable("credibility_manifests", {
+  id: text("id").notNull(),
+  version: text("version").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  subjectKind: text("subject_kind").notNull(),
+  subjectId: text("subject_id").notNull(),
+  subjectDigest: text("subject_digest").notNull(),
+  manifest: jsonb("manifest").$type<CredibilityManifest>().notNull(),
+  contentHash: text("content_hash").notNull(),
+  approvalState: text("approval_state").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.id, table.version] })]);
+
+export const compiledModelPacks = pgTable("compiled_model_packs", {
+  id: text("id").notNull(),
+  version: text("version").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  sourceId: text("source_id").notNull(),
+  sourceVersion: text("source_version").notNull(),
+  sourceHash: text("source_hash").notNull(),
+  digest: text("digest").notNull(),
+  payload: jsonb("payload").$type<CompiledModelPack>().notNull(),
+  credibilityManifestId: text("credibility_manifest_id").notNull(),
+  credibilityManifestVersion: text("credibility_manifest_version").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ columns: [table.id, table.version] }),
+  index("compiled_model_packs_digest_idx").on(table.digest),
+]);
+
 export const platformWeaponCompatibility = pgTable(
   "platform_weapon_compatibility",
   {
@@ -176,6 +231,11 @@ export const scenarioTemplates = pgTable("scenario_templates", {
   schemaVersion: text("schema_version").notNull(),
   contentHash: text("content_hash").notNull(),
   engineVersion: text("engine_version").notNull(),
+  intendedUseId: text("intended_use_id").notNull(),
+  intendedUseVersion: text("intended_use_version").notNull(),
+  modelPackId: text("model_pack_id").notNull(),
+  modelPackVersion: text("model_pack_version").notNull(),
+  modelPackDigest: text("model_pack_digest").notNull(),
   studyAreaId: text("study_area_id").references(() => studyAreas.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [primaryKey({ columns: [table.id, table.version] })]);
@@ -185,6 +245,11 @@ export const savedRunSnapshots = pgTable("saved_run_snapshots", {
   scenarioId: text("scenario_id").notNull(),
   scenarioVersion: text("scenario_version").notNull(),
   engineVersion: text("engine_version").notNull(),
+  intendedUseId: text("intended_use_id").notNull(),
+  intendedUseVersion: text("intended_use_version").notNull(),
+  modelPackId: text("model_pack_id").notNull(),
+  modelPackVersion: text("model_pack_version").notNull(),
+  modelPackDigest: text("model_pack_digest").notNull(),
   scenarioSchemaVersion: text("scenario_schema_version").notNull(),
   scenarioContentHash: text("scenario_content_hash").notNull(),
   compiledScenario: jsonb("compiled_scenario").notNull(),

@@ -13,6 +13,13 @@ Vector Engagement Labs is being developed as an open-source, browser-first simul
 7. **Performance is measurable.** Engine throughput, frame latency, map responsiveness, API latency, failed runs, and incomplete runs have regression thresholds and telemetry.
 8. **Safe evolution.** Schemas are versioned, migrations are forward-only, saved records are immutable, and compatibility changes require fixtures and release notes.
 
+Executable object data follows [`model-pack-contract.md`](model-pack-contract.md).
+Human-readable sources carry units and evidence; compilation resolves references,
+normalizes SI values, and creates an immutable content digest. Catalog identity,
+compiled definitions, scenario instances, and mutable runtime state are separate
+contracts. Neither engine backend parses unit strings or queries a database in a
+tick.
+
 ## SOLID application
 
 - **Single responsibility:** scenario compilation, numerical integration, sensing, recording, rendering, persistence, and reporting remain separate modules.

@@ -27,6 +27,24 @@ Every measured result records the CPU model and architecture, physical and logic
 
 The existing `performance:verify` command is an engine microbenchmark and TypeScript/Rust parity guard. It is not proof of browser rendering performance, multi-user capacity, database latency, or production throughput.
 
+## Model-pack foundation measurement
+
+Measured locally on 2026-08-06 using Node.js v24.3.0 on an Apple M3 with 8
+physical/logical cores, 16 GiB memory, and Darwin 24.6.0 arm64:
+
+- one already-compiled SI pack instantiated and validated 1, 10, 100, and 500
+  object instances in approximately 0.02, 0.08, 0.37, and 1.73 ms during the
+  full CI test run;
+- the regenerated Rust/WASM artifact is 295,175 bytes;
+- the eight-scenario Node harness measured TypeScript p50/p95 at 2.008/4.058 ms
+  and Rust/WASM p50/p95 at 5.424/8.488 ms across 200 runs per backend;
+- both backends remained below the existing 75 ms p95 regression limit.
+
+These are local Node measurements, not browser, x86-64, 100-entity tick, or
+production-capacity claims. Their purpose is to show that a validated pack can
+be loaded once and instantiated repeatedly without source JSON parsing or
+database access.
+
 ## North-star benchmark targets
 
 | Area | Target | Required evidence |
@@ -82,6 +100,7 @@ Running the complete stack on one machine provides native x86-64 PostgreSQL, loc
 - Browser execution is the default and continues when native batch compute is unavailable.
 - Native jobs enter a bounded queue with concurrency limits, per-job time and memory limits, cancellation, and backpressure.
 - The database stores catalog data, scenario packages, hashes, run metadata, and report indexes. It is never part of the model tick.
+- Human-readable unit conversion, evidence resolution, compatibility checks, and model-pack digest verification complete before runtime construction. A validated immutable pack is loaded once and may be instantiated many times without reparsing source JSON.
 - Large immutable simulation records belong in bounded file or object storage. PostgreSQL stores their identity, checksum, and location.
 - Cloudflare may remain the DNS, TLS, cache, and proxy layer for `labs.reachdefence.com`. It is not required to execute physics.
 - The simulation backend is selected through the existing engine boundary, so browser TypeScript, browser Rust/WASM, and native Rust can be compared without changing scenario or frame consumers.

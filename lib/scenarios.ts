@@ -4,6 +4,13 @@ import {
   type Scenario,
 } from "./simulation.ts";
 import { getStudyArea, getWeatherPreset } from "./study-areas.ts";
+import {
+  CURRENT_INTENDED_USE_ID,
+  CURRENT_INTENDED_USE_VERSION,
+  CURRENT_MODEL_PACK_DIGEST,
+  CURRENT_MODEL_PACK_ID,
+  CURRENT_MODEL_PACK_VERSION,
+} from "./reference-model-pack.ts";
 
 export type { EngagementDomain } from "./simulation.ts";
 export type ScenarioComplexity = "Foundation" | "Intermediate" | "Advanced";
@@ -23,6 +30,8 @@ export type RunVariant = { title: string; description: string };
 export type ScenarioDefinition = {
   id: string;
   version: string;
+  intendedUse: { id: typeof CURRENT_INTENDED_USE_ID; version: string };
+  modelPack: { id: string; version: string; digest: string };
   domain: EngagementDomain;
   title: string;
   summary: string;
@@ -41,6 +50,18 @@ export type ScenarioDefinition = {
   presetRationale: { profile: string; geometry: string; conditions: string };
   scenario: Scenario;
 };
+
+const PACKAGE_GOVERNANCE = {
+  intendedUse: {
+    id: CURRENT_INTENDED_USE_ID,
+    version: CURRENT_INTENDED_USE_VERSION,
+  },
+  modelPack: {
+    id: CURRENT_MODEL_PACK_ID,
+    version: CURRENT_MODEL_PACK_VERSION,
+    digest: CURRENT_MODEL_PACK_DIGEST,
+  },
+} as const;
 
 export const DOMAIN_DETAILS: Record<
   EngagementDomain,
@@ -168,6 +189,7 @@ const fixedRuns: [RunVariant, RunVariant, RunVariant] = [
 
 export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
+    ...PACKAGE_GOVERNANCE,
     id: "a2a-crossing-intercept",
     version: "1.0.0",
     domain: "A2A",
@@ -210,6 +232,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     }),
   },
   {
+    ...PACKAGE_GOVERNANCE,
     id: "a2a-defensive-break",
     version: "1.0.0",
     domain: "A2A",
@@ -256,6 +279,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     }),
   },
   {
+    ...PACKAGE_GOVERNANCE,
     id: "a2g-emitter-corridor",
     version: "1.0.0",
     domain: "A2G",
@@ -306,6 +330,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     }),
   },
   {
+    ...PACKAGE_GOVERNANCE,
     id: "a2g-protected-node",
     version: "1.0.0",
     domain: "A2G",
@@ -357,6 +382,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     }),
   },
   {
+    ...PACKAGE_GOVERNANCE,
     id: "g2a-point-defence",
     version: "1.0.0",
     domain: "G2A",
@@ -407,6 +433,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     }),
   },
   {
+    ...PACKAGE_GOVERNANCE,
     id: "g2a-layered-screen",
     version: "1.0.0",
     domain: "G2A",
@@ -457,6 +484,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     }),
   },
   {
+    ...PACKAGE_GOVERNANCE,
     id: "g2g-supersonic-corridor",
     version: "1.0.0",
     domain: "G2G",
@@ -508,6 +536,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     }),
   },
   {
+    ...PACKAGE_GOVERNANCE,
     id: "g2g-defended-route",
     version: "1.0.0",
     domain: "G2G",

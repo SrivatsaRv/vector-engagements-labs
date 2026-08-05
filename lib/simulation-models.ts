@@ -27,6 +27,107 @@ export type WeaponSimulationModel = {
   rationale: string;
 };
 
+export type AircraftSimulationModel = {
+  id: string;
+  aircraftId: string;
+  version: string;
+  domains: EngagementDomain[];
+  emptyMassKg: number;
+  fuelCapacityKg: number;
+  referenceAreaM2: number;
+  zeroLiftDragCoefficient: number;
+  inducedDragFactor: number;
+  maximumThrustNewtons: number;
+  specificFuelConsumptionKgPerNewtonSecond: number;
+  maximumCommandG: number;
+  valueState: SimulationModelValueState;
+  rationale: string;
+};
+
+export const AIRCRAFT_SIMULATION_MODELS: AircraftSimulationModel[] = [
+  {
+    id: "su-30mki-aircraft-study-v05",
+    aircraftId: "su-30mki",
+    version: "0.5.0",
+    domains: ["A2A", "A2G"],
+    emptyMassKg: 18400,
+    fuelCapacityKg: 9400,
+    referenceAreaM2: 62,
+    zeroLiftDragCoefficient: 0.026,
+    inducedDragFactor: 0.085,
+    maximumThrustNewtons: 245000,
+    specificFuelConsumptionKgPerNewtonSecond: 0.000024,
+    maximumCommandG: 9,
+    valueState: "MODEL_ASSUMPTION",
+    rationale: "Regression-continuity point-mass assumptions; not a validated Su-30MKI aerodynamic or propulsion model.",
+  },
+  {
+    id: "mirage-2000h-aircraft-study-v05",
+    aircraftId: "mirage-2000h",
+    version: "0.5.0",
+    domains: ["A2A", "A2G"],
+    emptyMassKg: 7600,
+    fuelCapacityKg: 3200,
+    referenceAreaM2: 41,
+    zeroLiftDragCoefficient: 0.024,
+    inducedDragFactor: 0.09,
+    maximumThrustNewtons: 95000,
+    specificFuelConsumptionKgPerNewtonSecond: 0.000026,
+    maximumCommandG: 9,
+    valueState: "MODEL_ASSUMPTION",
+    rationale: "Regression-continuity point-mass assumptions; not a validated Mirage 2000H aerodynamic or propulsion model.",
+  },
+  {
+    id: "f-16c-block52-aircraft-study-v05",
+    aircraftId: "f-16c-block52-paf",
+    version: "0.5.0",
+    domains: ["A2A", "G2A"],
+    emptyMassKg: 9000,
+    fuelCapacityKg: 3200,
+    referenceAreaM2: 28,
+    zeroLiftDragCoefficient: 0.025,
+    inducedDragFactor: 0.095,
+    maximumThrustNewtons: 125000,
+    specificFuelConsumptionKgPerNewtonSecond: 0.000025,
+    maximumCommandG: 9,
+    valueState: "MODEL_ASSUMPTION",
+    rationale: "Regression-continuity point-mass assumptions; not a validated F-16C Block 52 aerodynamic or propulsion model.",
+  },
+  {
+    id: "jf-17-aircraft-study-v05",
+    aircraftId: "jf-17",
+    version: "0.5.0",
+    domains: ["A2A", "G2A"],
+    emptyMassKg: 9000,
+    fuelCapacityKg: 3200,
+    referenceAreaM2: 28,
+    zeroLiftDragCoefficient: 0.025,
+    inducedDragFactor: 0.095,
+    maximumThrustNewtons: 125000,
+    specificFuelConsumptionKgPerNewtonSecond: 0.000025,
+    maximumCommandG: 9,
+    valueState: "MODEL_ASSUMPTION",
+    rationale: "Regression-continuity generic point-mass assumptions; not a validated JF-17 aerodynamic or propulsion model.",
+  },
+];
+
+export const MODEL_LOADOUT_COMPATIBILITY = [
+  { platformId: "su-30mki", weaponId: "astra-mk1" },
+  { platformId: "su-30mki", weaponId: "kh-31p" },
+  { platformId: "mirage-2000h", weaponId: "mica-ir" },
+  { platformId: "mirage-2000h", weaponId: "spice-2000" },
+  { platformId: "f-16c-block52-paf", weaponId: "aim-120c5" },
+  { platformId: "akash", weaponId: "akash" },
+  { platformId: "s-200", weaponId: "s-200" },
+  { platformId: "brahmos-mal", weaponId: "brahmos-block-i" },
+] as const;
+
+export function isModelLoadoutCompatible(platformId: string, weaponId: string) {
+  return MODEL_LOADOUT_COMPATIBILITY.some(
+    (item) => item.platformId === platformId && item.weaponId === weaponId,
+  );
+}
+
 const model = (value: WeaponSimulationModel) => value;
 
 export const WEAPON_SIMULATION_MODELS: WeaponSimulationModel[] = [
@@ -260,4 +361,8 @@ export function registerDatabaseSimulationModels(rows: DatabaseSimulationModel[]
 export function findWeaponSimulationModel(weaponId: string) {
   return runtimeModels.get(weaponId) ??
     WEAPON_SIMULATION_MODELS.find((item) => item.weaponId === weaponId);
+}
+
+export function findAircraftSimulationModel(aircraftId: string) {
+  return AIRCRAFT_SIMULATION_MODELS.find((item) => item.aircraftId === aircraftId);
 }

@@ -1,5 +1,7 @@
 # Work item 02: Compiled A2A model-pack contract
 
+Status: executable data-contract foundation implemented on 2026-08-06; detailed coefficient tables and flight/weapon dynamics remain later work items.
+
 Priority: P0
 
 Depends on: intended-use and credibility contract
@@ -9,6 +11,13 @@ Blocks: reference aircraft, guided weapon, sensing, and arbitrary-entity builder
 ## Outcome
 
 The object library becomes executable data. Catalog identity, model definition, scenario instance, and runtime state are separate contracts.
+
+Implementation note: `vector.model-pack-source.v1` now compiles to immutable,
+content-addressed `vector.compiled-model-pack.v1` SI arrays shared with Rust.
+Reference resolution, cycles, table shape, units, validity, evidence,
+compatibility, patches, stable scenario identity, and 1/10/100/500-instance
+construction are tested. The current pack only preserves existing v0.5 scalar
+assumptions; it is not an aircraft flight model or guided-weapon fly-out model.
 
 ## Current gap
 

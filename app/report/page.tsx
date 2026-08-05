@@ -62,9 +62,11 @@ const fallback: ReportData = {
   engine: ENGINE_VERSION,
   profileVersion: "public-study-v0.5",
   packageProvenance: {
-    schemaVersion: "vector.scenario.v2",
+    schemaVersion: "vector.scenario.v3",
     contentHash: "example",
     draftRevision: 0,
+    intendedUse: DEFAULT_SCENARIO_DEFINITION.intendedUse,
+    modelPack: DEFAULT_SCENARIO_DEFINITION.modelPack,
   },
   libraryScenario: {
     id: DEFAULT_SCENARIO_DEFINITION.id,
@@ -555,6 +557,23 @@ export default function ReportPage() {
                   <dd>
                     {data.packageProvenance?.frameHash?.slice(0, 16) ?? "Not recorded"}
                   </dd>
+                  <dt>Intended use</dt>
+                  <dd>
+                    {data.packageProvenance?.intendedUse
+                      ? `${data.packageProvenance.intendedUse.id} · ${data.packageProvenance.intendedUse.version}`
+                      : "Not recorded"}
+                  </dd>
+                  <dt>Compiled model pack</dt>
+                  <dd>
+                    {data.packageProvenance?.modelPack
+                      ? `${data.packageProvenance.modelPack.id}@${data.packageProvenance.modelPack.version} · ${data.packageProvenance.modelPack.digest.slice(0, 16)}`
+                      : "Not recorded"}
+                  </dd>
+                  <dt>Credibility state</dt>
+                  <dd>
+                    {data.packageProvenance?.credibilityManifest?.approvalState ??
+                      "No manifest loaded for this example"}
+                  </dd>
                   <dt>Weapon model</dt>
                   <dd>{data.profileVersion}</dd>
                   <dt>Model scope</dt>
@@ -564,6 +583,13 @@ export default function ReportPage() {
                   <dt>Catalog state</dt>
                   <dd>PostgreSQL / PostGIS source catalog</dd>
                 </dl>
+                {data.packageProvenance?.credibilityManifest?.limitations.map(
+                  (limitation) => (
+                    <p key={limitation.id}>
+                      <strong>{limitation.severity}:</strong> {limitation.statement}
+                    </p>
+                  ),
+                )}
                 <div className="report-sources">
                   {[...new Set(reportSourceIds)]
                     .map(getSource)

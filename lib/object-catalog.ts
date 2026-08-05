@@ -42,7 +42,9 @@ export const OBJECT_CATALOG: CatalogObject[] = [
 ];
 
 export function getCatalogObject(id: string) {
-  return OBJECT_CATALOG.find((item) => item.id === id) ?? OBJECT_CATALOG[0];
+  const item = OBJECT_CATALOG.find((candidate) => candidate.id === id);
+  if (!item) throw new Error(`Unknown catalog object: ${id}`);
+  return item;
 }
 
 export function getLaunchPlatforms(domain: EngagementDomain) {

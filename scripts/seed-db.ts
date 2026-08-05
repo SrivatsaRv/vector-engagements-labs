@@ -9,15 +9,77 @@ import { canonicalJson } from "../lib/canonical-json.ts";
 import { ENGINE_VERSION } from "../lib/engine/version.ts";
 import { SCENARIO_PACKAGE_SCHEMA_VERSION } from "../lib/scenario-package.ts";
 import { STUDY_AREAS } from "../lib/study-areas.ts";
+import { compileModelPack } from "../lib/model-pack.ts";
+import { createCurrentModelPackSource } from "../lib/reference-model-pack.ts";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
 const sql = postgres(connectionString, { max: 1 });
 
 const json = (value: unknown) => sql.json(value as never);
+const modelPackSource = createCurrentModelPackSource();
+const modelPackBundle = await compileModelPack(modelPackSource);
+const modelPackSourceHash = createHash("sha256")
+  .update(canonicalJson(modelPackSource))
+  .digest("hex");
+const engineCredibilityManifest = {
+  ...modelPackBundle.credibilityManifest,
+  id: "browser-point-mass-engine-credibility",
+  version: "0.5.0",
+  subject: {
+    kind: "ENGINE" as const,
+    id: ENGINE_VERSION,
+    digest: modelPackSource.credibility.engineDigest,
+  },
+  modelPackDigest: modelPackBundle.pack.digest,
+  contentDigest: "",
+};
+engineCredibilityManifest.contentDigest = createHash("sha256")
+  .update(canonicalJson({ ...engineCredibilityManifest, contentDigest: undefined }))
+  .digest("hex");
 
 try {
   await sql.begin(async (tx) => {
+    for (const intendedUse of modelPackSource.intendedUses) {
+      const contentHash = createHash("sha256")
+        .update(canonicalJson(intendedUse))
+        .digest("hex");
+      await tx`INSERT INTO intended_use_contracts
+        (id,version,schema_version,definition,content_hash)
+        VALUES (${intendedUse.id},${intendedUse.version},${intendedUse.schemaVersion},${json(intendedUse)},${contentHash})
+        ON CONFLICT (id,version) DO UPDATE SET
+          schema_version=EXCLUDED.schema_version,definition=EXCLUDED.definition,content_hash=EXCLUDED.content_hash`;
+    }
+    await tx`INSERT INTO model_pack_sources
+      (id,version,schema_version,definition,content_hash,lifecycle_status)
+      VALUES (${modelPackSource.id},${modelPackSource.version},${modelPackSource.schemaVersion},${json(modelPackSource)},${modelPackSourceHash},'PUBLISHED')
+      ON CONFLICT (id,version) DO NOTHING`;
+    await tx`INSERT INTO credibility_manifests
+      (id,version,schema_version,subject_kind,subject_id,subject_digest,manifest,content_hash,approval_state)
+      VALUES (
+        ${modelPackBundle.credibilityManifest.id},${modelPackBundle.credibilityManifest.version},
+        ${modelPackBundle.credibilityManifest.schemaVersion},'MODEL_PACK',${modelPackBundle.pack.id},
+        ${modelPackBundle.pack.digest},${json(modelPackBundle.credibilityManifest)},
+        ${modelPackBundle.credibilityManifest.contentDigest},${modelPackBundle.credibilityManifest.approvalState}
+      )
+      ON CONFLICT (id,version) DO NOTHING`;
+    await tx`INSERT INTO credibility_manifests
+      (id,version,schema_version,subject_kind,subject_id,subject_digest,manifest,content_hash,approval_state)
+      VALUES (
+        ${engineCredibilityManifest.id},${engineCredibilityManifest.version},
+        ${engineCredibilityManifest.schemaVersion},'ENGINE',${engineCredibilityManifest.subject.id},
+        ${engineCredibilityManifest.subject.digest},${json(engineCredibilityManifest)},
+        ${engineCredibilityManifest.contentDigest},${engineCredibilityManifest.approvalState}
+      )
+      ON CONFLICT (id,version) DO NOTHING`;
+    await tx`INSERT INTO compiled_model_packs
+      (id,version,schema_version,source_id,source_version,source_hash,digest,payload,credibility_manifest_id,credibility_manifest_version)
+      VALUES (
+        ${modelPackBundle.pack.id},${modelPackBundle.pack.version},${modelPackBundle.pack.schemaVersion},
+        ${modelPackSource.id},${modelPackSource.version},${modelPackSourceHash},${modelPackBundle.pack.digest},
+        ${json(modelPackBundle.pack)},${modelPackBundle.credibilityManifest.id},${modelPackBundle.credibilityManifest.version}
+      )
+      ON CONFLICT (id,version) DO NOTHING`;
     for (const source of [
       ...SOURCES,
       { id: "iaf-stations-wikipedia", title: "List of Indian Air Force stations", publisher: "Wikipedia contributors", url: "https://en.wikipedia.org/wiki/List_of_Indian_Air_Force_stations", sourceClass: "SECONDARY" as const, note: "Public-reference coordinates; individual entries require source review." },
@@ -103,20 +165,24 @@ try {
         .update(canonicalJson(item))
         .digest("hex");
       await tx`INSERT INTO scenario_templates
-        (id,version,domain,title,status,package,schema_version,content_hash,engine_version,study_area_id)
-        VALUES (${item.id},${item.version},${item.domain},${item.title},'VALIDATED',${json(item)},${SCENARIO_PACKAGE_SCHEMA_VERSION},${contentHash},${ENGINE_VERSION},${item.scenario.studyAreaId})
+        (id,version,domain,title,status,package,schema_version,content_hash,engine_version,study_area_id,
+         intended_use_id,intended_use_version,model_pack_id,model_pack_version,model_pack_digest)
+        VALUES (${item.id},${item.version},${item.domain},${item.title},'VALIDATED',${json(item)},${SCENARIO_PACKAGE_SCHEMA_VERSION},${contentHash},${ENGINE_VERSION},${item.scenario.studyAreaId},
+          ${item.intendedUse.id},${item.intendedUse.version},${item.modelPack.id},${item.modelPack.version},${item.modelPack.digest})
         ON CONFLICT (id,version) DO UPDATE SET
           domain=EXCLUDED.domain,title=EXCLUDED.title,status=EXCLUDED.status,
           package=EXCLUDED.package,schema_version=EXCLUDED.schema_version,
           content_hash=EXCLUDED.content_hash,engine_version=EXCLUDED.engine_version,
-          study_area_id=EXCLUDED.study_area_id`;
+          study_area_id=EXCLUDED.study_area_id,intended_use_id=EXCLUDED.intended_use_id,
+          intended_use_version=EXCLUDED.intended_use_version,model_pack_id=EXCLUDED.model_pack_id,
+          model_pack_version=EXCLUDED.model_pack_version,model_pack_digest=EXCLUDED.model_pack_digest`;
     }
   });
   const weaponCount = new Set([
     ...WEAPONS.map((item) => item.id),
     ...WEAPON_SIMULATION_MODELS.map((item) => item.weaponId),
   ]).size;
-  process.stdout.write(`seeded ${PLATFORMS.length} platforms, ${weaponCount} weapons, ${WEAPON_SIMULATION_MODELS.length} models, ${PUBLIC_INSTALLATIONS.length} installations, ${STUDY_AREAS.length} study areas, ${SCENARIO_LIBRARY.length} scenarios\n`);
+  process.stdout.write(`seeded ${PLATFORMS.length} platforms, ${weaponCount} weapons, ${WEAPON_SIMULATION_MODELS.length} models, 1 compiled model pack, ${PUBLIC_INSTALLATIONS.length} installations, ${STUDY_AREAS.length} study areas, ${SCENARIO_LIBRARY.length} scenarios\n`);
 } finally {
   await sql.end();
 }

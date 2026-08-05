@@ -29,11 +29,18 @@ test("saved reports are recomputed from admitted scenario inputs", async () => {
   const verified = await buildVerifiedSavedRun(
     DEFAULT_SCENARIO_DEFINITION.scenario,
     DEFAULT_SCENARIO_DEFINITION,
-    { schemaVersion: "vector.scenario.v2", contentHash: "a".repeat(64), draftRevision: 0 },
+    { schemaVersion: "vector.scenario.v3", contentHash: "a".repeat(64), draftRevision: 0 },
   );
   assert.ok(verified.result.frames.length > 1);
   assert.equal(verified.report.result, verified.result);
   assert.equal(verified.report.events[0]?.title, "Verified run started");
+  assert.equal(
+    verified.report.packageProvenance?.modelPack?.digest,
+    DEFAULT_SCENARIO_DEFINITION.modelPack.digest,
+  );
+  assert.ok(
+    verified.report.packageProvenance?.credibilityManifest?.limitations.length,
+  );
 });
 
 test("public metrics are concealed without their bearer secret", async () => {

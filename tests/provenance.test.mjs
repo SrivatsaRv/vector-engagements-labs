@@ -29,11 +29,20 @@ test("stored scenario validation binds database identity to package identity", a
     schema_version: SCENARIO_PACKAGE_SCHEMA_VERSION,
     content_hash: await sha256Hex(definition),
     engine_version: ENGINE_VERSION,
+    intended_use_id: definition.intendedUse.id,
+    intended_use_version: definition.intendedUse.version,
+    model_pack_id: definition.modelPack.id,
+    model_pack_version: definition.modelPack.version,
+    model_pack_digest: definition.modelPack.digest,
   };
   assert.equal(isScenarioDefinition(definition), true);
   assert.equal(isStoredScenarioPackage(valid), true);
   assert.equal(isStoredScenarioPackage({ ...valid, version: "9.9.9" }), false);
   assert.equal(isStoredScenarioPackage({ ...valid, content_hash: "bad" }), false);
+  assert.equal(
+    isStoredScenarioPackage({ ...valid, model_pack_digest: "0".repeat(64) }),
+    false,
+  );
   assert.equal(
     isStoredScenarioPackage({ ...valid, schema_version: "vector.scenario.v0" }),
     false,

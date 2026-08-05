@@ -4,6 +4,7 @@ import type {
   Maneuver,
   Vec3,
 } from "./primitives.ts";
+import type { ScenarioModelPatch } from "../model-pack.ts";
 
 export type EntityKind =
   | "AIRCRAFT"
@@ -104,7 +105,9 @@ export type EngineEntityDefinition = {
   };
   provenance: {
     sourceObjectId: string;
+    modelId: string;
     modelVersion: string;
+    modelPackDigest: string;
     valueState: ModelValueState;
   };
 };
@@ -117,6 +120,14 @@ export type EngineScenario = {
   seed: number;
   durationSeconds: number;
   fixedStepSeconds: number;
+  modelPack: {
+    schemaVersion: "vector.compiled-model-pack.v1";
+    id: string;
+    version: string;
+    digest: string;
+    intendedUse: { id: string; version: string };
+    scenarioPatches: ScenarioModelPatch[];
+  };
   entities: EngineEntityDefinition[];
   environment: {
     gravityMps2: number;
