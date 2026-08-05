@@ -106,7 +106,7 @@ Cloudflare does not run the PostgreSQL container. Hyperdrive supplies the Worker
 
 Compose is intentionally small: one PostGIS service, one one-shot migration/seed service using the same application image, and one web service. The web container serves the built Worker bundle through Wrangler's local Cloudflare runtime; it does not run the HMR development server. Images are explicitly versioned; PostGIS is digest pinned; startup is gated by database health and successful migration.
 
-A Hetzner or similar budget server remains a valid PostgreSQL origin and can also host the complete Compose stack. Server-side native batches are a future compute concern, not a reason to move interactive playback out of the browser.
+An x86-64 server remains a valid PostgreSQL origin and can also host the complete Compose stack plus a bounded native Rust worker pool. Interactive playback and ordinary runs remain browser-first. The workload, machine capability, clock separation, and evidence requirements are defined in [`performance-capacity.md`](performance-capacity.md).
 
 ## Primary references
 
