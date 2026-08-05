@@ -24,6 +24,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Socia
 - [`responsive-ui.md`](responsive-ui.md): supported viewports and fit-to-task behavior.
 - [`regression-matrix.md`](regression-matrix.md): release proof across engine, maps, symbols, reports, persistence, and UI.
 - [`observability.md`](observability.md): metrics, traces, logs, dashboards, and business signals.
+- [`performance-capacity.md`](performance-capacity.md): clock separation, benchmark targets, the 100-user workload, and the x86-64 host capability contract.
 - [`cloudflare-architecture.md`](cloudflare-architecture.md): Workers, Hyperdrive, optional R2, deployment gates, and local parity.
 - [`product-language.md`](product-language.md): canonical workflow and human-readable military terminology.
 - [`repository-governance.md`](repository-governance.md): protected branches, CI/CD, releases, tags, ownership, and repository status.
