@@ -28,6 +28,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Socia
 - [`product-language.md`](product-language.md): canonical workflow and human-readable military terminology.
 - [`repository-governance.md`](repository-governance.md): protected branches, CI/CD, releases, tags, ownership, and repository status.
 - [`security-boundaries.md`](security-boundaries.md): anonymous API admission, saved-run integrity, metrics protection, caching, and delivery trust.
+- [`../pending-work/README.md`](../pending-work/README.md): dependency-ordered A2A research and implementation backlog.
 
 ## One journey
 
