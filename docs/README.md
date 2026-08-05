@@ -23,6 +23,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Socia
 - [`tacview-visual-subset.md`](tacview-visual-subset.md): supported analysis-display subset and explicit exclusions.
 - [`responsive-ui.md`](responsive-ui.md): supported viewports and fit-to-task behavior.
 - [`regression-matrix.md`](regression-matrix.md): release proof across engine, maps, symbols, reports, persistence, and UI.
+- [`testing-strategy.md`](testing-strategy.md): test-layer selection, current runners, frontend strategy, regression policy, and release evidence.
 - [`observability.md`](observability.md): metrics, traces, logs, dashboards, and business signals.
 - [`performance-capacity.md`](performance-capacity.md): clock separation, benchmark targets, the 100-user workload, and the x86-64 host capability contract.
 - [`cloudflare-architecture.md`](cloudflare-architecture.md): Workers, Hyperdrive, optional R2, deployment gates, and local parity.
