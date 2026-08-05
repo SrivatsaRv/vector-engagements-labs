@@ -51,6 +51,10 @@ for (const definition of SCENARIO_LIBRARY) {
     assert.equal(rust.frames.length, typescript.frames.length);
     assert.equal(rust.entityManifest.length, typescript.entityManifest.length);
     assert.deepEqual(
+      rust.engineRun.scenario.geospatial.syntheticEnvironment,
+      typescript.engineRun.scenario.geospatial.syntheticEnvironment,
+    );
+    assert.deepEqual(
       rust.entityManifest.map((entity) => [entity.id, entity.kind, entity.lifecycle]),
       typescript.entityManifest.map((entity) => [entity.id, entity.kind, entity.lifecycle]),
     );
@@ -75,6 +79,33 @@ for (const definition of SCENARIO_LIBRARY) {
         rustFrame.entities.map((entity) => [entity.id, entity.lifecycle, entity.phase]),
         typescriptFrame.entities.map((entity) => [entity.id, entity.lifecycle, entity.phase]),
       );
+      assert.deepEqual(
+        rustFrame.geographicPositions.map((item) => item.entityId),
+        typescriptFrame.geographicPositions.map((item) => item.entityId),
+      );
+      for (let index = 0; index < rustFrame.geographicPositions.length; index += 1) {
+        const rustPosition = rustFrame.geographicPositions[index].position;
+        const typescriptPosition = typescriptFrame.geographicPositions[index].position;
+        close(
+          rustPosition.longitudeDeg,
+          typescriptPosition.longitudeDeg,
+          1e-10,
+          `frame ${frameIndex} longitude`,
+        );
+        close(
+          rustPosition.latitudeDeg,
+          typescriptPosition.latitudeDeg,
+          1e-10,
+          `frame ${frameIndex} latitude`,
+        );
+        close(
+          rustPosition.altitude.valueM,
+          typescriptPosition.altitude.valueM,
+          1e-5,
+          `frame ${frameIndex} ellipsoid altitude`,
+        );
+        assert.equal(rustPosition.altitude.datum, "ELLIPSOID");
+      }
     }
   });
 }

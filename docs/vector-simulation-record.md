@@ -31,7 +31,19 @@ Basemap tiles are referenced by provider and style revision, not silently embedd
 
 ## Frame contract
 
-Each entity sample may carry position, orientation, velocity, TAS, IAS, Mach, ASL, AGL, vertical speed, angle of attack, load factor, roll rate, turn rate, turn radius, fuel, fuel flow, mass, propulsion phase, sensor state and lifecycle state. A value is marked `recorded`, `computed`, `assumed`, or `unknown`. The viewer always prefers recorded values; computed fallback values identify their formula version.
+Each entity sample may carry scenario-local f64 position and an entity-keyed WGS84
+ellipsoid position, orientation, velocity, TAS, IAS, Mach, explicit-datum
+altitudes, vertical speed, angle of attack, load factor, roll rate, turn rate,
+turn radius, fuel, fuel flow, mass, propulsion phase, sensor state and lifecycle
+state. A value is marked `recorded`, `computed`, `assumed`, or `unknown`. The
+viewer always prefers recorded values; computed fallback values identify their
+formula version. Map/3D projection is never persisted as model truth.
+
+The compiled environment freezes `vector.synthetic-environment.v1` identities
+and SHA-256 digests for transform, geoid, terrain, weather, atmosphere, study
+area, routes, installations and airspace. A viewer may degrade missing optional
+presentation assets, but may not silently substitute a physics-affecting
+environment dataset.
 
 Weapons remain loadout inventory before launch. A launch event creates the weapon's first world sample with the launch platform position and inherited velocity. Static objects may omit unchanged samples. The viewer interpolates only properties explicitly declared interpolable.
 

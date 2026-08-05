@@ -36,7 +36,11 @@ The path forward is not to add more maximum-range fields. It is to compile versi
 - A2A behavior is a delayed steady, break, or sinusoidal turn command. It is not a tactical state machine.
 - The RASP formulas create estimated display tracks. They are not yet produced by simulated radar, airborne early-warning, IADS, or datalink entities.
 - Sensor rings are declared study volumes. They are not derived from propagation, target signature, scan geometry, terrain, clutter, electronic attack, or track processing.
-- The geographic conversion uses a local approximation. There is no ECEF transform, explicit vertical datum, terrain sampling, AGL, terrain line of sight, or geoid correction.
+- The versioned geospatial foundation now provides WGS84/ECEF/ENU/NED transforms,
+  explicit ellipsoid/MSL/AGL datum operations, entity-keyed geographic recording,
+  environment digests, bounded terrain sampling and geometric LOS fixtures.
+  Production geoid/DEM ingestion, terrain collision, smooth-Earth horizon and
+  terrain-driven sensor state remain incomplete.
 - Rust/WASM currently runs synchronously through a JSON ABI on the calling browser thread. There is no dedicated simulation Worker or transferable frame buffer.
 - Backend ownership is inconsistent across entry points. New scenario state defaults to Rust/WASM, while the landing preview, some lab/report samples, and server-side saved-run verification explicitly select TypeScript. The architecture document also still describes TypeScript as the golden implementation while the backend document calls Rust/WASM the default. This must become one declared execution and verification policy.
 - The documented `vector.record.v1` archive is a design contract. Its columnar frame archive and ACMI adapter are not implemented.

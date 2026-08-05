@@ -57,6 +57,7 @@ database access.
 | Map interaction | Above 55 visible FPS while panning, zooming, and rotating | Browser trace with representative tracks, labels, and coverage layers |
 | Memory | Bounded trails, labels, sensor contacts, event history, and frame history | Long-run and high-entity memory plateau |
 | Backend parity | Identical deterministic result hash for TypeScript and Rust reference runs | Cross-backend scenario corpus |
+| Geospatial work | Bounded local transform, terrain and LOS sampling with no tick-time network access | Engine benchmark with geographic recording plus enforced sample limits |
 
 Proposed operational targets are a queue-wait p95 below 2 seconds under the nominal workload, no unbounded job, explicit cancellation within one scheduling interval, and less than 1 percent failed runs excluding invalid user input. These remain targets until the production workload is measured.
 
@@ -104,6 +105,7 @@ Running the complete stack on one machine provides native x86-64 PostgreSQL, loc
 - Large immutable simulation records belong in bounded file or object storage. PostgreSQL stores their identity, checksum, and location.
 - Cloudflare may remain the DNS, TLS, cache, and proxy layer for `labs.reachdefence.com`. It is not required to execute physics.
 - The simulation backend is selected through the existing engine boundary, so browser TypeScript, browser Rust/WASM, and native Rust can be compared without changing scenario or frame consumers.
+- Geographic recording is O(active entities) per sampled frame. Terrain and geometric LOS ports enforce explicit sample ceilings; no implementation may perform a remote terrain request during a model tick.
 
 The first deployment remains a modular monolith. A distributed control plane is not required for this workload.
 

@@ -5,6 +5,13 @@ import type {
   Vec3,
 } from "./primitives.ts";
 import type { ScenarioModelPatch } from "../model-pack.ts";
+import type {
+  CoverageBasis,
+  GeographicEntityState,
+  RecordedGeographicPosition,
+  ScenarioOrigin,
+} from "../geospatial/contracts.ts";
+import type { SyntheticEnvironmentManifest } from "../geospatial/synthetic-environment.ts";
 
 export type EntityKind =
   | "AIRCRAFT"
@@ -129,6 +136,12 @@ export type EngineScenario = {
     scenarioPatches: ScenarioModelPatch[];
   };
   entities: EngineEntityDefinition[];
+  geospatial: {
+    schemaVersion: "vector.engine-geospatial.v1";
+    origin: ScenarioOrigin;
+    initialPositions: GeographicEntityState[];
+    syntheticEnvironment: SyntheticEnvironmentManifest;
+  };
   environment: {
     gravityMps2: number;
     temperatureOffsetC: number;
@@ -139,6 +152,7 @@ export type EngineScenario = {
       name: string;
       terrainClass: string;
       surfaceElevationM: number;
+      surfaceElevationDatum: "MSL";
       anchor: { longitude: number; latitude: number };
       bounds: [[number, number], [number, number]];
       weatherPresetId: string;
@@ -192,11 +206,13 @@ export type CoverageEnvelope = {
   maximumAltitudeM: number;
   valueState: ModelValueState;
   label: string;
+  basis: CoverageBasis;
 };
 
 export type EngineFrame = {
   t: number;
   entities: EngineEntityFrame[];
+  geographicPositions: RecordedGeographicPosition[];
   primaryWeaponId: string;
   primaryTargetId: string;
   separationM: number;

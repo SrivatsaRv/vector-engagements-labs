@@ -53,6 +53,7 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
         longitude: finiteNumber(point.longitude, 60, 100, `${name}_longitude`),
         latitude: finiteNumber(point.latitude, 0, 40, `${name}_latitude`),
         altitudeM: finiteNumber(point.altitudeM, -500, 30_000, `${name}_altitude`),
+        verticalDatum: explicitMsl(point.verticalDatum, `${name}_vertical_datum`),
       },
       headingDeg: finiteNumber(placement.headingDeg, 0, 360, `${name}_heading`),
       speedMps: finiteNumber(placement.speedMps, 0, 3_000, `${name}_speed`),
@@ -63,11 +64,23 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
           longitude: finiteNumber(routePoint.longitude, 60, 100, `${name}_route_longitude`),
           latitude: finiteNumber(routePoint.latitude, 0, 40, `${name}_route_latitude`),
           altitudeM: finiteNumber(routePoint.altitudeM, -500, 30_000, `${name}_route_altitude`),
+          verticalDatum: explicitMsl(
+            routePoint.verticalDatum,
+            `${name}_route_vertical_datum`,
+          ),
         };
       }),
     };
   };
   return { blue: side(candidate.blue, "blue"), red: side(candidate.red, "red") };
+}
+
+function explicitMsl(value: unknown, field: string): "MSL" {
+  // vector.scenario.v2 predates the datum field but documented altitude as
+  // ASL/MSL. The compatibility adapter makes that legacy meaning explicit;
+  // any declared non-MSL datum is rejected rather than converted.
+  if (value === undefined || value === "MSL") return "MSL";
+  throw new PublicApiError(400, `invalid_${field}`);
 }
 
 function catalogObject(id: string, domain: Scenario["domain"], field: string) {

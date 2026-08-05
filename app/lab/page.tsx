@@ -279,6 +279,7 @@ function LabWorkbench({
               description: area.description,
               terrainClass: area.terrain_class,
               surfaceElevationM: area.surface_elevation_m,
+              surfaceElevationDatum: "MSL",
               anchor: {
                 longitude: Number(area.anchor_longitude),
                 latitude: Number(area.anchor_latitude),

@@ -205,12 +205,14 @@ export function buildReportExport(
       })),
     },
     telemetry: {
-      coordinateSystem: "local Cartesian educational frame",
+      coordinateSystem: "WGS84 geographic plus scenario-local ENU",
+      scenarioOrigin: data.result.engineRun.scenario.geospatial.origin,
       samples: data.result.frames.map((frame) => ({
         time: Number(frame.t.toFixed(1)),
         phase: frame.phase,
         interceptor: frame.interceptor,
         target: frame.target,
+        geographicPositions: frame.geographicPositions,
         speed: Math.round(frame.speed),
         range: Math.round(frame.range),
         normalizedWeaponSpeedPercent: Math.round(frame.energy),
@@ -251,6 +253,8 @@ export function buildReportExport(
           sourceClass: source!.sourceClass,
         })),
       reviewState: "public-study",
+      syntheticEnvironment:
+        data.result.engineRun.scenario.geospatial.syntheticEnvironment,
     },
     limitations: [
       "Public-data educational approximation.",
