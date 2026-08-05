@@ -21,6 +21,20 @@ Use [references/workstreams.md](references/workstreams.md) to select ownership, 
 
 The release train is `release/x86-runtime`; feature PRs target it, never `main`. The current merge order is data foundation, geospatial environment, browser runtime, then native server foundation. Rebase or merge the current release branch before handoff.
 
+## Worktree integration
+
+Worktrees share Git objects but do not share uncommitted files. A chat's edits become available to another chat only after the owning chat commits them and pushes its feature branch, followed by a merge into `origin/release/x86-runtime`.
+
+Use this flow:
+
+1. Feature chat works only in its assigned worktree and keeps changes scoped.
+2. Feature chat runs focused tests, `make ci-local`, updates docs, commits, and pushes its branch.
+3. Release steward reviews the commit/PR and merges it into `release/x86-runtime`.
+4. Dependent feature chats run `git fetch origin` and rebase or merge `origin/release/x86-runtime` into their own branch after saving/committing local work.
+5. Run grouped integration and cross-stream tests from the release worktree after every merge.
+
+Never copy files between worktrees, cherry-pick another chat's uncommitted state, or have two chats edit the same branch. If a shared contract is needed early, commit the smallest contract slice, push it, and let the release steward merge it before dependent implementation proceeds. Use `git status`, `git log`, and `git diff` to prove which state is being shared.
+
 ## Context discipline
 
 - Prefer the context-slice script and targeted `rg` searches over dumping `docs/`, `pending-work/`, or whole source trees.
@@ -37,8 +51,16 @@ The release train is `release/x86-runtime`; feature PRs target it, never `main`.
 - Do not silently fall back from missing evidence, incompatible model packs, invalid coordinates, or unsupported combinations.
 - Avoid unrelated feature work, UI redesign, high-resolution terrain, classified/operational claims, or production cutover unless explicitly assigned.
 
+## Test-first execution
+
+Treat every executable action item as a contract with a test obligation. Before editing, classify the change using [references/testing.md](references/testing.md), name the smallest meaningful test that should fail before the fix, then implement the change and its tests together.
+
+At minimum, choose the applicable layers: pure unit, schema/contract, Rust unit/integration, TypeScript/Rust parity, database/migration, API integration, frontend component/interaction, browser end-to-end, visual/responsive, security, regression, performance, cancellation/recovery, or observability. A documentation-only change still requires link/format validation when executable references or commands change.
+
+Do not declare an action complete because the code builds. A completed action must have passing tests, a stated reason for any omitted layer, and evidence recorded in the handoff. New behavior without a regression test is incomplete. Fixes must include a test that would have caught the regression.
+
 ## Verification and handoff
 
-Before commit, update relevant documentation and run `make ci-local`. Add targeted database, integration, observability, performance, browser, geospatial, Rust, or parity checks as applicable. Report failures honestly; do not weaken tests or claim a target is measured without evidence.
+Before commit, update relevant documentation and run `make ci-local`. Add targeted database, integration, observability, performance, browser, geospatial, Rust, parity, frontend, and regression checks as applicable. Report failures honestly; do not weaken tests, delete coverage to make a gate pass, or claim a target is measured without evidence.
 
 Every feature handoff includes worktree, branch, commit SHA, PR target/URL, concise diff summary, contracts changed, migrations, tests and results, benchmark evidence where relevant, docs changed, and blockers. Release work also includes grouped integration, deterministic parity, migration, container, observability, load, soak, cancellation, and recovery evidence before promotion.
