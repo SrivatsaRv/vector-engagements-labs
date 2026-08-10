@@ -22,7 +22,7 @@
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run build && node --test tests/*.test.mjs && tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --max-warnings=0 --ignore-pattern dist --ignore-pattern .next --ignore-pattern engine-rust/target --ignore-pattern public/vendor",
+    "lint": "eslint . --max-warnings=0 --ignore-pattern dist --ignore-pattern .next --ignore-pattern engine-rust/target --ignore-pattern public/vendor --ignore-pattern blog",
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate-db.mjs",

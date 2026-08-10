@@ -44,3 +44,6 @@ next-env.d.ts
 /work/
 /engine-rust/target/
 /public/vendor/maplibre/
+
+# local blog experiment (not part of the integrated app/blog surface)
+/blog/
