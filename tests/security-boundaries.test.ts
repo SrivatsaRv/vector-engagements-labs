@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
 import { GET as metricsGet } from "../app/api/metrics/route";
@@ -61,4 +62,27 @@ test("browser telemetry cannot author run outcome or report metrics", async () =
   }));
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { error: "unsupported_telemetry_event" });
+});
+
+test("blog comments keep anonymous persistence bounded by shared API guardrails", async () => {
+  const [route, migration, schema] = await Promise.all([
+    readFile(new URL("../app/api/blog-comments/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/migrations/008_blog_post_comments.sql", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(route, /enforceRateLimit\(request, "PUBLIC_API_RATE_LIMITER"\)/);
+  assert.match(route, /readBoundedJson\(request, MAX_BLOG_COMMENT_REQUEST_BYTES\)/);
+  assert.match(route, /INSERT INTO blog_post_comments/);
+  assert.match(route, /moderation_state = 'published'/);
+  assert.match(route, /displayName: row\.display_name/);
+
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS blog_post_comments/);
+  assert.match(migration, /display_name text/);
+  assert.match(migration, /CHECK \(char_length\(body\) BETWEEN 2 AND 2000\)/);
+  assert.match(migration, /CREATE INDEX IF NOT EXISTS blog_post_comments_slug_created_idx/);
+
+  assert.match(schema, /pgTable\("blog_post_comments"/);
+  assert.match(schema, /displayName: text\("display_name"\)/);
+  assert.match(schema, /moderationState: text\("moderation_state"\)/);
 });
