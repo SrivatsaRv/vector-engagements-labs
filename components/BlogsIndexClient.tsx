@@ -89,6 +89,22 @@ export function BlogsIndexClient({
         <section className={`blogs-results ${viewMode === "grid" ? "grid" : "list"}`}>
           {filtered.map((post) => (
             <article key={post.slug} className="blog-card">
+              {post.thumbnail ? (
+                <div className="blog-card-thumb">
+                  <Link href={`/blogs/posts/${post.slug}`} aria-label={post.title}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      className="blog-card-thumb-image"
+                      src={post.thumbnail}
+                      alt={post.thumbnailAlt ?? post.title}
+                      width={1280}
+                      height={720}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </Link>
+                </div>
+              ) : null}
               <header>
                 <span className="blog-card-category">{post.category}</span>
                 <div className="blog-card-meta">

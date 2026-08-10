@@ -15,6 +15,8 @@ export type BlogPostRecord = {
   readingTimeMinutes: number;
   category: BlogCategory;
   tags: string[];
+  thumbnail?: string;
+  thumbnailAlt?: string;
 };
 
 export const BLOG_POSTS: BlogPostRecord[] = [
@@ -22,9 +24,9 @@ export const BLOG_POSTS: BlogPostRecord[] = [
     slug: "what-engagement-simulators-need-to-model-in-2026",
     title: "What Engagement Simulators Need to Model in 2026",
     summary:
-      "Modern engagement simulation is moving away from isolated platform models and toward one coherent synthetic world that preserves physics, information flow, mission logic and replayable evidence.",
+      "A credible engagement simulator has to preserve physics, information state, mission logic, and a replayable evidence record rather than presenting geometry alone.",
     excerpt:
-      "This long-form note examines why modern engagement simulators need mixed fidelity, side-specific information pictures, mission-level behaviour, bounded browser delivery and a causal event record instead of a persuasive animation.",
+      "Vector Engagement Labs publishes practical notes on what makes a browser-delivered engagement workbench worth trusting: bounded models, observer-picture separation, deterministic replay, explainable operational results, and readable long-form analysis inside the product shell.",
     author: "ReachDefence",
     publishedAt: "2026-08-09",
     updatedAt: "2026-08-09",
@@ -37,6 +39,9 @@ export const BLOG_POSTS: BlogPostRecord[] = [
       "reproducibility",
       "mission modelling",
     ],
+    thumbnail: "/blog/diagrams/causal-simulation-loop.webp",
+    thumbnailAlt:
+      "Causal simulation loop showing world state, observation, bounded decisions, actions, effects, and model-time ordering.",
   },
 ];
 

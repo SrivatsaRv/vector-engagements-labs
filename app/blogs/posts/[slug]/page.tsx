@@ -15,6 +15,10 @@ type PageProps = {
   params: Promise<{ slug: string }>;
 };
 
+function toAbsoluteUrl(path: string) {
+  return new URL(path, "https://labs.reachdefence.com").toString();
+}
+
 function renderInline(tokens: Tokens.Generic[] | undefined, fallback = "") {
   const source = tokens?.map((token) => token.raw).join("") ?? fallback;
   return { __html: marked.parseInline(source) };
@@ -166,6 +170,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params;
   const post = getBlogPost(slug);
   if (!post) return {};
+
+  const image = post.thumbnail ? toAbsoluteUrl(post.thumbnail) : "https://labs.reachdefence.com/og.png";
+
   return {
     title: `${post.title} | Vector Engagement Labs`,
     description: post.summary,
@@ -174,7 +181,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description: post.summary,
       url: `https://labs.reachdefence.com/blogs/posts/${post.slug}`,
       siteName: "Vector Engagement Labs",
-      images: [{ url: "https://labs.reachdefence.com/og.png" }],
+      images: [{ url: image }],
       type: "article",
       publishedTime: `${post.publishedAt}T00:00:00.000Z`,
       modifiedTime: `${post.updatedAt}T00:00:00.000Z`,
@@ -184,7 +191,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       card: "summary_large_image",
       title: `${post.title} | Vector Engagement Labs`,
       description: post.summary,
-      images: ["https://labs.reachdefence.com/og.png"],
+      images: [image],
     },
   };
 }
@@ -194,12 +201,15 @@ export default async function BlogPostPage({ params }: PageProps) {
   const post = getBlogPost(slug);
   if (!post) notFound();
 
+  const image = post.thumbnail ? toAbsoluteUrl(post.thumbnail) : "https://labs.reachdefence.com/og.png";
+  const tokens = marked.lexer(articleMarkdown) as Tokens.Generic[];
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     headline: post.title,
     description: post.summary,
-    image: "https://labs.reachdefence.com/og.png",
+    image,
     datePublished: `${post.publishedAt}T00:00:00.000Z`,
     dateModified: `${post.updatedAt}T00:00:00.000Z`,
     author: {
@@ -214,8 +224,6 @@ export default async function BlogPostPage({ params }: PageProps) {
     },
     url: `https://labs.reachdefence.com/blogs/posts/${post.slug}`,
   };
-
-  const tokens = marked.lexer(articleMarkdown) as Tokens.Generic[];
 
   return (
     <main className="blog-post-page">
@@ -235,6 +243,21 @@ export default async function BlogPostPage({ params }: PageProps) {
           <span className="blog-post-category">{post.category}</span>
           <h1>{post.title}</h1>
           <p>{post.summary}</p>
+
+          {post.thumbnail ? (
+            <figure className="blog-post-cover">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                className="blog-post-cover-image"
+                src={post.thumbnail}
+                alt={post.thumbnailAlt ?? post.title}
+                width={1536}
+                height={1024}
+                loading="eager"
+                decoding="async"
+              />
+            </figure>
+          ) : null}
 
           <dl className="blog-post-meta">
             <div>
