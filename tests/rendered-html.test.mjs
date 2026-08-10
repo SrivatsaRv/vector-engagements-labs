@@ -85,23 +85,29 @@ test("server-renders model transparency and tactical-symbol references", async (
   assert.match(symbols, /CC BY 3.0/);
 });
 
-test("server-renders the engineering blog and preserves the legacy /blogs redirect", async () => {
-  const [blogResponse, removedSlugResponse, legacyResponse] = await Promise.all([
+test("server-renders the blogs index and post routes while preserving legacy /blog redirect", async () => {
+  const [legacyResponse, blogsResponse, postResponse] = await Promise.all([
     render("/blog"),
-    render("/blog/engagement-simulators-2026-revised"),
     render("/blogs"),
+    render("/blogs/posts/what-engagement-simulators-need-to-model-in-2026"),
   ]);
-  assert.equal(blogResponse.status, 200);
-  assert.equal(removedSlugResponse.status, 404);
   assert.equal(legacyResponse.status, 307);
-  assert.equal(legacyResponse.headers.get("location"), "http://localhost/blog");
+  assert.equal(legacyResponse.headers.get("location"), "http://localhost/blogs");
+  assert.equal(blogsResponse.status, 200);
+  assert.equal(postResponse.status, 200);
 
-  const blog = await blogResponse.text();
-  assert.match(blog, /What Engagement Simulators Need to Model in 2026/);
-  assert.match(blog, /Release-facing summary/);
-  assert.match(blog, /One world, several information states/);
-  assert.match(blog, /Choose a scenario/);
-  assert.doesNotMatch(blog, /BlogShareAndComments/);
+  const [blogs, post] = await Promise.all([
+    blogsResponse.text(),
+    postResponse.text(),
+  ]);
+  assert.match(blogs, /Engineering analysis, product notes, and simulation tradecraft/);
+  assert.match(blogs, /List/);
+  assert.match(blogs, /Grid/);
+  assert.match(blogs, /What Engagement Simulators Need to Model in 2026/);
+  assert.match(post, /Written by/);
+  assert.match(post, /Reading time/);
+  assert.match(post, /Comments/);
+  assert.match(post, /Copy link/);
 });
 
 test("basemap proxy rejects invalid tile coordinates without contacting an upstream", async () => {
