@@ -72,6 +72,7 @@ The release proof across engine, map, symbols, reports, persistence, observabili
 - Model Truth, IAF RASP, and PAF RASP separation.
 - Run snapshots saved to Postgres and a dedicated PDF-like report route with explicit print and JSON behavior.
 - A hosted `/math` page that publishes equations, value states, limitations, and the package/hash/model/frame reproducibility chain.
+- A hosted `/blog` surface for engineering notes that explains runtime contracts, assumptions, and release-facing implementation decisions inside the same application shell.
 
 ## Data authority
 
