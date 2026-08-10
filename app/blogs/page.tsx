@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { redirect } from 'next/navigation';
 
-export default function BlogsAliasPage() {
-  redirect("/blog");
+export default function BlogsPage() {
+  redirect('/blog');
 }

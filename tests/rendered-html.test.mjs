@@ -60,33 +60,6 @@ test("server-renders the scenario library and configured workbench", async () =>
   );
 });
 
-test("server-renders the blog index, article, and legacy alias", async () => {
-  const [indexResponse, articleResponse, aliasResponse] = await Promise.all([
-    render("/blog"),
-    render("/blog/engagement-simulators-2026-revised"),
-    render("/blogs"),
-  ]);
-
-  assert.equal(indexResponse.status, 200);
-  assert.equal(articleResponse.status, 200);
-  assert.equal(aliasResponse.status, 307);
-  assert.equal(aliasResponse.headers.get("location"), "http://localhost/blog");
-
-  const [indexHtml, articleHtml] = await Promise.all([
-    indexResponse.text(),
-    articleResponse.text(),
-  ]);
-
-  assert.match(indexHtml, /Engineering blog/);
-  assert.match(indexHtml, /What Engagement Simulators Need to Model in 2026/);
-  assert.match(indexHtml, /Blog/);
-
-  assert.match(articleHtml, /What Engagement Simulators Need to Model in 2026/);
-  assert.match(articleHtml, /Anonymous comments/);
-  assert.match(articleHtml, /Sensing pipeline/);
-  assert.match(articleHtml, /Back to blog index/);
-});
-
 test("server-renders model transparency and tactical-symbol references", async () => {
   const [mathResponse, symbolsResponse] = await Promise.all([
     render("/math"),
@@ -112,24 +85,28 @@ test("server-renders model transparency and tactical-symbol references", async (
   assert.match(symbols, /CC BY 3.0/);
 });
 
-test("server-renders the blog index and keeps legacy /blogs routes as redirects", async () => {
-  const [indexResponse, legacyIndexResponse, legacyPostResponse] = await Promise.all([
+test("server-renders the engineering blog and preserves the legacy /blogs redirect", async () => {
+  const [blogIndexResponse, articleResponse, legacyResponse] = await Promise.all([
     render("/blog"),
+    render("/blog/engagement-simulators-2026-revised"),
     render("/blogs"),
-    render("/blogs/posts/engagement-simulators-2026-revised"),
   ]);
+  assert.equal(blogIndexResponse.status, 200);
+  assert.equal(articleResponse.status, 200);
+  assert.equal(legacyResponse.status, 307);
+  assert.equal(legacyResponse.headers.get("location"), "http://localhost/blog");
 
-  assert.equal(indexResponse.status, 200);
-  assert.equal(legacyIndexResponse.status, 307);
-  assert.equal(legacyIndexResponse.headers.get("location"), "http://localhost/blog");
-  assert.equal(legacyPostResponse.status, 307);
-  assert.equal(legacyPostResponse.headers.get("location"), "http://localhost/blog/engagement-simulators-2026-revised");
-
-  const indexHtml = await indexResponse.text();
-  assert.match(indexHtml, /Engineering blog/);
-  assert.match(indexHtml, /What Engagement Simulators Need to Model in 2026/);
-  assert.match(indexHtml, /Grid/);
-  assert.match(indexHtml, /List/);
+  const [blogIndex, article] = await Promise.all([
+    blogIndexResponse.text(),
+    articleResponse.text(),
+  ]);
+  assert.match(blogIndex, /Engineering Blog/);
+  assert.match(blogIndex, /Simulating Complex Air Battles in 2026/);
+  assert.match(blogIndex, /What Engagement Simulators Need to Model in 2026/);
+  assert.match(article, /What Engagement Simulators Need to Model in 2026/);
+  assert.match(article, /Training simulators and wargames optimise for different kinds of truth/);
+  assert.match(article, /Back to Articles/);
+  assert.match(article, /BlogShareAndComments/);
 });
 
 test("basemap proxy rejects invalid tile coordinates without contacting an upstream", async () => {
