@@ -86,27 +86,22 @@ test("server-renders model transparency and tactical-symbol references", async (
 });
 
 test("server-renders the engineering blog and preserves the legacy /blogs redirect", async () => {
-  const [blogIndexResponse, articleResponse, legacyResponse] = await Promise.all([
+  const [blogResponse, removedSlugResponse, legacyResponse] = await Promise.all([
     render("/blog"),
     render("/blog/engagement-simulators-2026-revised"),
     render("/blogs"),
   ]);
-  assert.equal(blogIndexResponse.status, 200);
-  assert.equal(articleResponse.status, 200);
+  assert.equal(blogResponse.status, 200);
+  assert.equal(removedSlugResponse.status, 404);
   assert.equal(legacyResponse.status, 307);
   assert.equal(legacyResponse.headers.get("location"), "http://localhost/blog");
 
-  const [blogIndex, article] = await Promise.all([
-    blogIndexResponse.text(),
-    articleResponse.text(),
-  ]);
-  assert.match(blogIndex, /Engineering Blog/);
-  assert.match(blogIndex, /Simulating Complex Air Battles in 2026/);
-  assert.match(blogIndex, /What Engagement Simulators Need to Model in 2026/);
-  assert.match(article, /What Engagement Simulators Need to Model in 2026/);
-  assert.match(article, /Training simulators and wargames optimise for different kinds of truth/);
-  assert.match(article, /Back to Articles/);
-  assert.match(article, /BlogShareAndComments/);
+  const blog = await blogResponse.text();
+  assert.match(blog, /What Engagement Simulators Need to Model in 2026/);
+  assert.match(blog, /Release-facing summary/);
+  assert.match(blog, /One world, several information states/);
+  assert.match(blog, /Choose a scenario/);
+  assert.doesNotMatch(blog, /BlogShareAndComments/);
 });
 
 test("basemap proxy rejects invalid tile coordinates without contacting an upstream", async () => {
