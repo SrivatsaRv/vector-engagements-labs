@@ -106,6 +106,8 @@ test("server-renders the blogs index and post routes while preserving legacy /bl
   assert.match(blogs, /What Engagement Simulators Need to Model in 2026/);
   assert.match(post, /Written by/);
   assert.match(post, /Reading time/);
+  assert.match(post, /Training simulators and wargames optimise for different kinds of truth/);
+  assert.match(post, /AI agents are useful when the simulation constrains them/);
   assert.match(post, /Comments/);
   assert.match(post, /Copy link/);
 });
