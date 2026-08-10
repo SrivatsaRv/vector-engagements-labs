@@ -5,51 +5,40 @@ export function MermaidDiagram({ code }: { code: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function renderDiagram() {
-      try {
-        const mermaid = await import('mermaid');
-        mermaid.default.initialize({
-          startOnLoad: false,
-          theme: 'dark',
-          securityLevel: 'loose',
-          fontFamily: 'Inter, system-ui, sans-serif',
-          themeVariables: {
-            darkMode: true,
-            background: '#0B0F17',
-            primaryColor: '#0F172A',
-            primaryTextColor: '#F8FAFC',
-            primaryBorderColor: '#38BDF8',
-            lineColor: '#38BDF8',
-            secondaryColor: '#1E1B4B',
-            tertiaryColor: '#0F172A',
-            nodeBorder: '#00F0FF',
-            clusterBkg: '#090D16',
-            clusterBorder: '#1E293B',
-            titleColor: '#00F0FF',
-            edgeLabelBackground: '#0F172A'
-          }
-        });
-
-        if (!containerRef.current) {
-          return;
+    import('mermaid').then((mermaid) => {
+      mermaid.default.initialize({
+        startOnLoad: false,
+        theme: 'dark',
+        securityLevel: 'loose',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        themeVariables: {
+          darkMode: true,
+          background: '#0B0F17',
+          primaryColor: '#0F172A',
+          primaryTextColor: '#F8FAFC',
+          primaryBorderColor: '#38BDF8',
+          lineColor: '#38BDF8',
+          secondaryColor: '#1E1B4B',
+          tertiaryColor: '#0F172A',
+          nodeBorder: '#00F0FF',
+          clusterBkg: '#090D16',
+          clusterBorder: '#1E293B',
+          titleColor: '#00F0FF',
+          edgeLabelBackground: '#0F172A'
         }
+      });
 
+      if (containerRef.current) {
         const id = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
-        const result = await mermaid.default.render(id, code.trim());
-        if (!cancelled && containerRef.current) {
-          containerRef.current.innerHTML = result.svg;
-        }
-      } catch (error: unknown) {
-        console.error('Mermaid render error:', error);
+        mermaid.default.render(id, code.trim()).then(({ svg }) => {
+          if (containerRef.current) {
+            containerRef.current.innerHTML = svg;
+          }
+        }).catch((err) => {
+          console.error('Mermaid render error:', err);
+        });
       }
-    }
-
-    void renderDiagram();
-    return () => {
-      cancelled = true;
-    };
+    });
   }, [code]);
 
   return (
