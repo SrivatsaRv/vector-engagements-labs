@@ -7,8 +7,23 @@ import type {
   Vec3,
 } from "./primitives.ts";
 import { getCatalogObject } from "../object-catalog.ts";
-import { findWeaponSimulationModel } from "../simulation-models.ts";
+import {
+  findAircraftSimulationModel,
+  findWeaponSimulationModel,
+  isModelLoadoutCompatible,
+} from "../simulation-models.ts";
 import { getStudyArea, getWeatherPreset } from "../study-areas.ts";
+import { COMPILED_MODEL_PACK_SCHEMA_VERSION } from "../model-pack.ts";
+import {
+  CURRENT_INTENDED_USE_ID,
+  CURRENT_INTENDED_USE_VERSION,
+  CURRENT_MODEL_PACK_DIGEST,
+  CURRENT_MODEL_PACK_ID,
+  CURRENT_MODEL_PACK_VERSION,
+} from "../reference-model-pack.ts";
+import { localFrameToGeographic } from "../geospatial/geodesy.ts";
+import { scenarioOrigin } from "../scenario-spatial.ts";
+import { buildSyntheticEnvironmentManifest } from "../geospatial/synthetic-environment.ts";
 
 export type ScenarioCompilerInput = {
   id: string;
@@ -78,46 +93,10 @@ const velocity = (speed: number, headingRad: number): Vec3 => ({
   z: 0,
 });
 
-function aircraftAssumptions(id: string) {
-  if (id === "su-30mki") {
-    return {
-      emptyMassKg: 18400,
-      fuelCapacityKg: 9400,
-      referenceAreaM2: 62,
-      zeroLiftDragCoefficient: 0.026,
-      inducedDragFactor: 0.085,
-      maximumThrustNewtons: 245000,
-      specificFuelConsumptionKgPerNewtonSecond: 0.000024,
-      maximumCommandG: 9,
-    };
-  }
-  if (id === "mirage-2000h") {
-    return {
-      emptyMassKg: 7600,
-      fuelCapacityKg: 3200,
-      referenceAreaM2: 41,
-      zeroLiftDragCoefficient: 0.024,
-      inducedDragFactor: 0.09,
-      maximumThrustNewtons: 95000,
-      specificFuelConsumptionKgPerNewtonSecond: 0.000026,
-      maximumCommandG: 9,
-    };
-  }
-  return {
-    emptyMassKg: 9000,
-    fuelCapacityKg: 3200,
-    referenceAreaM2: 28,
-    zeroLiftDragCoefficient: 0.025,
-    inducedDragFactor: 0.095,
-    maximumThrustNewtons: 125000,
-    specificFuelConsumptionKgPerNewtonSecond: 0.000025,
-    maximumCommandG: 9,
-  };
-}
-
 function withProvenance(
   input: Omit<EngineEntityDefinition, "provenance">,
   sourceObjectId: string,
+  modelId: string,
   valueState: EngineEntityDefinition["provenance"]["valueState"] = "SOURCED",
   modelVersion = "vector-entity-state-v0.5",
 ): EngineEntityDefinition {
@@ -125,59 +104,11 @@ function withProvenance(
     ...input,
     provenance: {
       sourceObjectId,
+      modelId,
       modelVersion,
+      modelPackDigest: CURRENT_MODEL_PACK_DIGEST,
       valueState,
     },
-  };
-}
-
-function fallbackWeaponAssumptions(domain: EngagementDomain, profile: CompilerProfile) {
-  const launchMassKg =
-    domain === "A2A"
-      ? 170
-      : domain === "G2A"
-        ? 520
-        : domain === "A2G"
-          ? 640
-          : 2500;
-  const burnSeconds =
-    domain === "G2G"
-      ? 160
-      : domain === "G2A" && profile.maxRange >= 120
-        ? 65
-        : domain === "G2A"
-          ? profile.burn * 1.5
-          : profile.burn;
-  const dryMassKg = launchMassKg * (domain === "G2G" ? 0.76 : 0.58);
-  const baselineThrust = launchMassKg * Math.max(
-    18,
-    profile.maxSpeed / Math.max(4, profile.burn),
-  );
-  const thrustNewtons =
-    domain === "G2G"
-      ? 65000
-      : domain === "G2A" && profile.maxRange >= 120
-        ? 35000
-        : baselineThrust;
-  return {
-    launchMassKg,
-    dryMassKg,
-    burnSeconds,
-    thrustNewtons,
-    thrustTaperSpeedMps: profile.maxSpeed,
-    referenceAreaM2:
-      domain === "A2A"
-        ? 0.055
-        : domain === "G2A"
-          ? 0.11
-          : domain === "A2G"
-            ? 0.16
-            : 0.42,
-    dragCoefficient: domain === "G2G" ? 0.31 : 0.28,
-    navigationConstant: domain === "G2G" ? 2.5 : 3.5,
-    maximumCommandG: profile.turnG,
-    seekerActivationRangeM: Math.min(18000, profile.maxRange * 220),
-    datalinkUpdateSeconds: 0.2,
   };
 }
 
@@ -190,6 +121,12 @@ export function compileScenario(
   const redObject = getCatalogObject(input.redObjectId);
   const redSystem =
     input.domain === "A2A" ? getCatalogObject(input.redSystemId) : undefined;
+  if (!isModelLoadoutCompatible(blueObject.id, blueSystem.id)) {
+    throw new Error(`Incompatible loadout: ${blueSystem.id} on ${blueObject.id}`);
+  }
+  if (redSystem && !isModelLoadoutCompatible(redObject.id, redSystem.id)) {
+    throw new Error(`Incompatible loadout: ${redSystem.id} on ${redObject.id}`);
+  }
   const studyArea = getStudyArea(input.studyAreaId);
   const weatherPreset = getWeatherPreset(studyArea, input.weatherPresetId);
   const targetHeadingRad = ((180 - input.aspect) * Math.PI) / 180;
@@ -207,11 +144,43 @@ export function compileScenario(
   const redHeadingRad = input.placement?.redHeadingRad ?? targetHeadingRad;
   const movingTarget = input.domain === "A2A" || input.domain === "G2A";
   const blueIsAircraft = blueObject.kind === "AIRCRAFT";
-  const blueAircraft = blueIsAircraft
-    ? aircraftAssumptions(blueObject.id)
+  const blueAircraftModel = blueIsAircraft
+    ? findAircraftSimulationModel(blueObject.id)
     : undefined;
-  const redAircraft = movingTarget
-    ? aircraftAssumptions(redObject.id)
+  if (blueIsAircraft && !blueAircraftModel) {
+    throw new Error(`Missing aircraft model for ${blueObject.id}`);
+  }
+  const redAircraftModel = redObject.kind === "AIRCRAFT"
+    ? findAircraftSimulationModel(redObject.id)
+    : undefined;
+  if (movingTarget && !redAircraftModel) {
+    throw new Error(`Missing aircraft model for moving target ${redObject.id}`);
+  }
+  const blueAircraft = blueAircraftModel
+    ? {
+        emptyMassKg: blueAircraftModel.emptyMassKg,
+        fuelCapacityKg: blueAircraftModel.fuelCapacityKg,
+        referenceAreaM2: blueAircraftModel.referenceAreaM2,
+        zeroLiftDragCoefficient: blueAircraftModel.zeroLiftDragCoefficient,
+        inducedDragFactor: blueAircraftModel.inducedDragFactor,
+        maximumThrustNewtons: blueAircraftModel.maximumThrustNewtons,
+        specificFuelConsumptionKgPerNewtonSecond:
+          blueAircraftModel.specificFuelConsumptionKgPerNewtonSecond,
+        maximumCommandG: blueAircraftModel.maximumCommandG,
+      }
+    : undefined;
+  const redAircraft = redAircraftModel
+    ? {
+        emptyMassKg: redAircraftModel.emptyMassKg,
+        fuelCapacityKg: redAircraftModel.fuelCapacityKg,
+        referenceAreaM2: redAircraftModel.referenceAreaM2,
+        zeroLiftDragCoefficient: redAircraftModel.zeroLiftDragCoefficient,
+        inducedDragFactor: redAircraftModel.inducedDragFactor,
+        maximumThrustNewtons: redAircraftModel.maximumThrustNewtons,
+        specificFuelConsumptionKgPerNewtonSecond:
+          redAircraftModel.specificFuelConsumptionKgPerNewtonSecond,
+        maximumCommandG: redAircraftModel.maximumCommandG,
+      }
     : undefined;
   const blueFuelKg = blueAircraft
     ? blueAircraft.fuelCapacityKg * (input.blueFuelPercent / 100)
@@ -220,21 +189,23 @@ export function compileScenario(
     ? redAircraft.fuelCapacityKg * (input.redFuelPercent / 100)
     : 0;
   const selectedModel = findWeaponSimulationModel(input.blueSystemId);
-  const assumptions = selectedModel
-    ? {
-        launchMassKg: selectedModel.launchMassKg,
-        dryMassKg: selectedModel.dryMassKg,
-        burnSeconds: selectedModel.poweredFlightSeconds,
-        thrustNewtons: selectedModel.thrustNewtons,
-        thrustTaperSpeedMps: selectedModel.thrustTaperSpeedMps,
-        referenceAreaM2: selectedModel.referenceAreaM2,
-        dragCoefficient: selectedModel.dragCoefficient,
-        navigationConstant: selectedModel.navigationConstant,
-        maximumCommandG: selectedModel.maximumCommandG,
-        seekerActivationRangeM: selectedModel.seekerActivationRangeM,
-        datalinkUpdateSeconds: selectedModel.datalinkUpdateSeconds,
-      }
-    : fallbackWeaponAssumptions(input.domain, profile);
+  if (!selectedModel) throw new Error(`Missing weapon model for ${input.blueSystemId}`);
+  if (!selectedModel.domains.includes(input.domain)) {
+    throw new Error(`Weapon model ${selectedModel.id} does not support ${input.domain}`);
+  }
+  const assumptions = {
+    launchMassKg: selectedModel.launchMassKg,
+    dryMassKg: selectedModel.dryMassKg,
+    burnSeconds: selectedModel.poweredFlightSeconds,
+    thrustNewtons: selectedModel.thrustNewtons,
+    thrustTaperSpeedMps: selectedModel.thrustTaperSpeedMps,
+    referenceAreaM2: selectedModel.referenceAreaM2,
+    dragCoefficient: selectedModel.dragCoefficient,
+    navigationConstant: selectedModel.navigationConstant,
+    maximumCommandG: selectedModel.maximumCommandG,
+    seekerActivationRangeM: selectedModel.seekerActivationRangeM,
+    datalinkUpdateSeconds: selectedModel.datalinkUpdateSeconds,
+  };
   const blueDecisionFactor =
     input.blueDecision === "PRESS"
       ? 1.05
@@ -311,6 +282,9 @@ export function compileScenario(
       aircraft: blueAircraft,
     },
     blueObject.id,
+    blueAircraftModel?.id ?? `${blueObject.id}-static-study-v1`,
+    blueAircraftModel?.valueState ?? "MODEL_ASSUMPTION",
+    blueAircraftModel?.version ?? "static-object-v1.0.0",
   );
 
   const redTarget = withProvenance(
@@ -356,6 +330,9 @@ export function compileScenario(
       aircraft: redAircraft,
     },
     redObject.id,
+    redAircraftModel?.id ?? `${redObject.id}-static-study-v1`,
+    redAircraftModel?.valueState ?? "MODEL_ASSUMPTION",
+    redAircraftModel?.version ?? "static-object-v1.0.0",
   );
 
   const blueWeapon = withProvenance(
@@ -393,8 +370,9 @@ export function compileScenario(
       },
     },
     blueSystem.id,
-    selectedModel?.valueState ?? "MODEL_ASSUMPTION",
-    selectedModel?.version ?? "generic-public-study-v0.5",
+    selectedModel.id,
+    selectedModel.valueState,
+    selectedModel.version,
   );
 
   const entities: EngineEntityDefinition[] = [
@@ -405,21 +383,23 @@ export function compileScenario(
 
   if (redSystem) {
     const redModel = findWeaponSimulationModel(redSystem.id);
-    const redAssumptions = redModel
-      ? {
-          launchMassKg: redModel.launchMassKg,
-          dryMassKg: redModel.dryMassKg,
-          burnSeconds: redModel.poweredFlightSeconds,
-          thrustNewtons: redModel.thrustNewtons,
-          thrustTaperSpeedMps: redModel.thrustTaperSpeedMps,
-          referenceAreaM2: redModel.referenceAreaM2,
-          dragCoefficient: redModel.dragCoefficient,
-          navigationConstant: redModel.navigationConstant,
-          maximumCommandG: redModel.maximumCommandG,
-          seekerActivationRangeM: redModel.seekerActivationRangeM,
-          datalinkUpdateSeconds: redModel.datalinkUpdateSeconds,
-        }
-      : fallbackWeaponAssumptions(input.domain, profile);
+    if (!redModel) throw new Error(`Missing weapon model for ${redSystem.id}`);
+    if (!redModel.domains.includes(input.domain)) {
+      throw new Error(`Weapon model ${redModel.id} does not support ${input.domain}`);
+    }
+    const redAssumptions = {
+      launchMassKg: redModel.launchMassKg,
+      dryMassKg: redModel.dryMassKg,
+      burnSeconds: redModel.poweredFlightSeconds,
+      thrustNewtons: redModel.thrustNewtons,
+      thrustTaperSpeedMps: redModel.thrustTaperSpeedMps,
+      referenceAreaM2: redModel.referenceAreaM2,
+      dragCoefficient: redModel.dragCoefficient,
+      navigationConstant: redModel.navigationConstant,
+      maximumCommandG: redModel.maximumCommandG,
+      seekerActivationRangeM: redModel.seekerActivationRangeM,
+      datalinkUpdateSeconds: redModel.datalinkUpdateSeconds,
+    };
     entities.push(
       withProvenance(
         {
@@ -453,8 +433,9 @@ export function compileScenario(
           },
         },
         redSystem.id,
-        redModel?.valueState ?? "MODEL_ASSUMPTION",
-        redModel?.version ?? "generic-public-study-v0.5",
+        redModel.id,
+        redModel.valueState,
+        redModel.version,
       ),
     );
   }
@@ -486,6 +467,23 @@ export function compileScenario(
     };
   }
 
+  const origin = scenarioOrigin(studyArea);
+  const routes = entities.map((entity) => ({
+    entityId: entity.id,
+    points: (entity.route ?? []).map((point) => ({ ...point })),
+  }));
+  const syntheticEnvironment = buildSyntheticEnvironmentManifest({
+    studyArea,
+    weatherPreset,
+    origin,
+    routes,
+    effectiveWeather: {
+      windEastMps: input.windEastMps,
+      windNorthMps: input.windNorthMps,
+      temperatureOffsetC: input.temperatureOffset,
+    },
+  });
+
   return {
     id: input.id,
     version: input.version,
@@ -494,7 +492,27 @@ export function compileScenario(
     seed: input.seed,
     durationSeconds: input.domain === "G2G" ? 240 : 140,
     fixedStepSeconds: 0.05,
+    modelPack: {
+      schemaVersion: COMPILED_MODEL_PACK_SCHEMA_VERSION,
+      id: CURRENT_MODEL_PACK_ID,
+      version: CURRENT_MODEL_PACK_VERSION,
+      digest: CURRENT_MODEL_PACK_DIGEST,
+      intendedUse: {
+        id: CURRENT_INTENDED_USE_ID,
+        version: CURRENT_INTENDED_USE_VERSION,
+      },
+      scenarioPatches: [],
+    },
     entities,
+    geospatial: {
+      schemaVersion: "vector.engine-geospatial.v1",
+      origin,
+      initialPositions: entities.map((entity) => ({
+        entityId: entity.id,
+        position: localFrameToGeographic(entity.initial.position, origin),
+      })),
+      syntheticEnvironment,
+    },
     environment: {
       gravityMps2: 9.80665,
       temperatureOffsetC: input.temperatureOffset,
@@ -505,6 +523,7 @@ export function compileScenario(
         name: studyArea.name,
         terrainClass: studyArea.terrainClass,
         surfaceElevationM: studyArea.surfaceElevationM,
+        surfaceElevationDatum: studyArea.surfaceElevationDatum,
         anchor: studyArea.anchor,
         bounds: studyArea.bounds,
         weatherPresetId: weatherPreset.id,

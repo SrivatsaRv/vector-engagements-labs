@@ -20,6 +20,11 @@ type SavedRunRow = {
   scenario_id: string;
   scenario_version: string;
   engine_version: string;
+  intended_use_id: string;
+  intended_use_version: string;
+  model_pack_id: string;
+  model_pack_version: string;
+  model_pack_digest: string;
   scenario_schema_version: string;
   scenario_content_hash: string;
   compiled_scenario: Record<string, unknown>;
@@ -41,6 +46,8 @@ function serializeRun(row: SavedRunRow) {
     scenarioId: row.scenario_id,
     scenarioVersion: row.scenario_version,
     engineVersion: row.engine_version,
+    intendedUse: { id: row.intended_use_id, version: row.intended_use_version },
+    modelPack: { id: row.model_pack_id, version: row.model_pack_version, digest: row.model_pack_digest },
     scenarioSchemaVersion: row.scenario_schema_version,
     scenarioContentHash: row.scenario_content_hash,
     compiledScenario: row.compiled_scenario,
@@ -93,7 +100,9 @@ export async function POST(request: Request) {
       }
 
       const templateRows = await withDatabase((sql) => sql`
-        SELECT schema_version, content_hash, engine_version, package
+        SELECT schema_version, content_hash, engine_version, package,
+               intended_use_id, intended_use_version,
+               model_pack_id, model_pack_version, model_pack_digest
         FROM scenario_templates
         WHERE id = ${scenarioId}
           AND version = ${scenarioVersion}
@@ -101,7 +110,17 @@ export async function POST(request: Request) {
         LIMIT 1
       `);
       const template = templateRows[0] as
-        | { schema_version: string; content_hash: string; engine_version: string; package: unknown }
+        | {
+            schema_version: string;
+            content_hash: string;
+            engine_version: string;
+            package: unknown;
+            intended_use_id: string;
+            intended_use_version: string;
+            model_pack_id: string;
+            model_pack_version: string;
+            model_pack_digest: string;
+          }
         | undefined;
       if (
         !template ||
@@ -112,27 +131,37 @@ export async function POST(request: Request) {
       ) {
         throw new PublicApiError(409, "scenario_package_mismatch");
       }
+      if (
+        template.intended_use_id !== template.package.intendedUse.id ||
+        template.intended_use_version !== template.package.intendedUse.version ||
+        template.model_pack_id !== template.package.modelPack.id ||
+        template.model_pack_version !== template.package.modelPack.version ||
+        template.model_pack_digest !== template.package.modelPack.digest
+      ) {
+        throw new PublicApiError(409, "scenario_model_governance_mismatch");
+      }
+      const templatePackage = template.package;
 
       const simulationStarted = performance.now();
-      incrementCounter("vector_scenario_runs_started_total", { domain: template.package.domain, engine_version: ENGINE_VERSION });
-      addGauge("vector_scenario_runs_active", 1, { domain: template.package.domain });
+      incrementCounter("vector_scenario_runs_started_total", { domain: templatePackage.domain, engine_version: ENGINE_VERSION });
+      addGauge("vector_scenario_runs_active", 1, { domain: templatePackage.domain });
       let verified;
       try {
-        verified = await buildVerifiedSavedRun(payload.initialState, template.package, {
+        verified = await buildVerifiedSavedRun(payload.initialState, templatePackage, {
           schemaVersion,
           contentHash,
           draftRevision: payload.draftRevision as number,
         });
         const outcome = verified.result.termination;
-        incrementCounter("vector_scenario_runs_completed_total", { domain: template.package.domain, outcome, engine_version: ENGINE_VERSION });
-        observeHistogram("vector_scenario_run_duration_seconds", (performance.now() - simulationStarted) / 1000, { domain: template.package.domain, outcome });
-        observeHistogram("vector_scenario_model_duration_seconds", verified.result.timeOfFlight, { domain: template.package.domain, outcome }, [1, 5, 10, 30, 60, 120, 240, 600]);
-        observeHistogram("vector_scenario_entity_count", verified.result.entityManifest.length, { domain: template.package.domain }, [1, 2, 4, 8, 16, 32, 64, 128, 256]);
+        incrementCounter("vector_scenario_runs_completed_total", { domain: templatePackage.domain, outcome, engine_version: ENGINE_VERSION });
+        observeHistogram("vector_scenario_run_duration_seconds", (performance.now() - simulationStarted) / 1000, { domain: templatePackage.domain, outcome });
+        observeHistogram("vector_scenario_model_duration_seconds", verified.result.timeOfFlight, { domain: templatePackage.domain, outcome }, [1, 5, 10, 30, 60, 120, 240, 600]);
+        observeHistogram("vector_scenario_entity_count", verified.result.entityManifest.length, { domain: templatePackage.domain }, [1, 2, 4, 8, 16, 32, 64, 128, 256]);
       } catch (error) {
-        incrementCounter("vector_scenario_runs_failed_total", { domain: template.package.domain, outcome: "invalid_scenario", engine_version: ENGINE_VERSION });
+        incrementCounter("vector_scenario_runs_failed_total", { domain: templatePackage.domain, outcome: "invalid_scenario", engine_version: ENGINE_VERSION });
         throw error;
       } finally {
-        addGauge("vector_scenario_runs_active", -1, { domain: template.package.domain });
+        addGauge("vector_scenario_runs_active", -1, { domain: templatePackage.domain });
       }
       const frameHash = await sha256Hex(verified.result.frames);
       verified.report.packageProvenance = {
@@ -145,11 +174,14 @@ export async function POST(request: Request) {
       const rows = await withDatabase((sql) => sql`
         INSERT INTO saved_run_snapshots
           (id,scenario_id,scenario_version,engine_version,scenario_schema_version,
+           intended_use_id,intended_use_version,model_pack_id,model_pack_version,model_pack_digest,
            scenario_content_hash,compiled_scenario,frame_hash,draft_revision,
            blue_force,red_force,initial_state,environment,model_assumptions,
            study_area_id,spatial_context)
         VALUES
-          (${id},${scenarioId},${scenarioVersion},${ENGINE_VERSION},${schemaVersion},${contentHash},
+          (${id},${scenarioId},${scenarioVersion},${ENGINE_VERSION},${schemaVersion},
+           ${templatePackage.intendedUse.id},${templatePackage.intendedUse.version},
+           ${templatePackage.modelPack.id},${templatePackage.modelPack.version},${templatePackage.modelPack.digest},${contentHash},
            ${sql.json(engineRun.scenario as never)},${frameHash},${payload.draftRevision as number},
            ${sql.json({ platformId: scenario.bluePlatformId, weaponId: scenario.blueSystemId, quantity: scenario.blueWeaponQuantity, fuelPercent: scenario.blueFuelPercent } as never)},
            ${sql.json({ platformId: scenario.redObjectId, weaponId: scenario.redSystemId, quantity: scenario.redWeaponQuantity, fuelPercent: scenario.redFuelPercent } as never)},

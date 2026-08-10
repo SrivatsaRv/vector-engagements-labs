@@ -31,7 +31,14 @@ Compose runs the application through Wrangler's development proxy. The local
 application service restarts automatically if that proxy exits; deployed
 Cloudflare Workers do not use this development proxy.
 
-The operations dashboard treats “missing completion” as starts minus completions and failures within a 15-minute observation window. That is an ingestion-health signal, not a durable job-orchestrator state. “Slow browser run” means a reported compute duration above 250 ms. The current engine is synchronous and local to the browser; if execution moves to Workers, durable queued/running/stuck state must come from that orchestration store rather than an in-process metric gauge.
+The operations dashboard treats “missing completion” as starts minus completions and failures within a 15-minute observation window. That is an ingestion-health signal, not a durable job-orchestrator state. “Slow browser run” means a reported compute duration above 250 ms. Interactive execution now uses an in-browser Worker with explicit ephemeral states. Those states and bounded progress are UI/runtime diagnostics, not durable orchestration state; a future batch queue must publish durable queued/running/stuck state from its own store.
+
+Worker progress is capped at 20 messages per wall second by default. Run IDs,
+scenario names, model-pack digests, and record IDs are not metric labels. Worker
+crash, timeout, cancellation latency, compute duration, model duration, backend,
+entity-count bucket, record bytes, and boundary-call count are the intended
+bounded telemetry dimensions. Telemetry export remains non-blocking and cannot
+change model time or completion.
 
 ## Verification
 

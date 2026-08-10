@@ -1,5 +1,7 @@
 # Work item 01: Intended use and credibility contract
 
+Status: executable foundation implemented on 2026-08-06; current engine and model-pack approval remains `DRAFT` pending representative physics validation.
+
 Priority: P0
 
 Depends on: current-state audit
@@ -27,6 +29,12 @@ Model fidelity is relative to intended use. A point-mass model can be appropriat
 | Debrief and comparison | What changed between two controlled runs? | Immutable scenario, record, events, metrics, and version identity | Causal claims from uncontrolled multi-variable changes |
 
 ## Deliverables
+
+Implementation note: the versioned contracts, persistence, deterministic
+fixture, report-carried limitations, and evidence-to-digest invalidation rule
+are implemented in `lib/model-pack.ts`, `docs/model-pack-contract.md`, and
+`db/migrations/007_model_pack_foundation.sql`. Formal or named-system approval
+is deliberately not claimed.
 
 1. A versioned `CredibilityManifest` schema for each engine and compiled model pack.
 2. An intended-use identifier attached to every scenario package and saved run.

@@ -19,6 +19,14 @@ count, event count, route length, integration work, and retained entity states
 before the numerical loop begins. These are compute-safety limits, not fixed
 assumptions about the number of actors in a scenario.
 
+Rust also consumes `vector.compiled-model-pack.v1` through the shared generated
+fixture. Admission verifies the canonical digest, SI unit system, table shapes,
+finite ordered axes, component indexes, mass constraints, loadout indexes, and
+compatibility indexes. Scenario admission requires the same pack digest on the
+scenario binding and every entity provenance record. Pack validation and
+runtime construction occur before integration; the numerical loop has no
+database access or unit parsing.
+
 ## TypeScript reference
 
 The TypeScript engine is retained as an independently executable reference implementation. It uses the same coordinate frames, atmosphere, entity lifecycle, aircraft state update, proportional-navigation guidance, coverage-envelope generation, termination rules, and sampling cadence.
@@ -42,8 +50,30 @@ committed, integrity-checked artifact and does not install a compiler at runtime
 - `npm run engine:rust:test` runs native Rust tests.
 - `npm run engine:rust:doc` builds rustdoc with warnings denied.
 - `tests/engine-backends.test.mjs` runs all eight calibrated scenarios through both implementations and compares termination, frame count, entity lifecycle, sampled telemetry, closest approach, time of flight, speed, demand, and finite-state diagnostics.
+- `tests/model-pack.test.mjs` plus Rust `model_pack` tests verify the shared compiled object-data contract and committed digest fixture.
 - `npm run performance:verify` measures cold initialization and warm-run p50/p95 for both backends.
 
 ## Swap boundary
 
 UI components do not import either numerical core. They call `simulate`, which compiles the scenario and dispatches through `runEngineBackend`. Observe, Explain, Compare, Save, and Report consume only the returned `EngineRun`. A later native service, worker pool, or higher-fidelity engine must implement this same boundary instead of branching presentation state.
+
+Interactive workbench calls now use `BrowserSimulationClient`, not the
+synchronous `simulate` compatibility function. The client loads a digest-addressed
+compiled adapter, sends a compact run reference, and receives one transferable
+VSR. Server verification, deterministic fixtures, benchmarks, the landing sample,
+and the hidden SSR pre-run placeholder continue to use `simulate` explicitly.
+Those entry points retain authored backend provenance and never substitute
+TypeScript for a selected Rust run.
+
+The browser protocol is common to both backends, but the numerical adapters are
+at different maturity levels:
+
+| Backend | Worker execution | Model batching | Current ABI |
+| --- | --- | --- | --- |
+| TypeScript | dedicated module Worker | cooperative fixed-step batches | `typescript-batched-v1` |
+| Rust/WASM | dedicated module Worker | one complete run | `rust-json-v1` compatibility ABI |
+
+The Rust JSON ABI remains supported until a typed batch ABI reproduces the full
+parity corpus. Its manifest provenance includes the selected backend, ABI name,
+and committed WASM artifact SHA-256. Loading, execution, record creation, or
+replay fails closed when those identities disagree.

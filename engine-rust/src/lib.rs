@@ -2,12 +2,14 @@
 #![deny(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
 mod error;
+mod model_pack;
 mod validation;
 mod wasm_abi;
 
 use serde::{Deserialize, Serialize};
 
 pub use error::EngineError;
+pub use model_pack::{validate_model_pack_json, CompiledModelPack};
 pub use validation::{
     validate_scenario, MAX_ENTITIES, MAX_EVENTS, MAX_INPUT_BYTES, MAX_INTEGRATED_STEPS,
     MAX_RECORDED_ENTITY_STATES, MAX_ROUTE_POINTS_PER_ENTITY,
@@ -285,8 +287,51 @@ pub struct AircraftModel {
 #[serde(rename_all = "camelCase")]
 pub struct Provenance {
     pub source_object_id: String,
+    pub model_id: String,
     pub model_version: String,
+    pub model_pack_digest: String,
     pub value_state: ModelValueState,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IntendedUseRef {
+    pub id: String,
+    pub version: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PatchProvenance {
+    pub author_id: String,
+    pub authored_at: String,
+    pub evidence_ref_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioModelPatch {
+    pub schema_version: String,
+    pub id: String,
+    pub model_pack_digest: String,
+    pub model_id: String,
+    pub field_path: String,
+    pub old_value: f64,
+    pub new_value: f64,
+    pub unit: String,
+    pub reason: String,
+    pub provenance: PatchProvenance,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelPackBinding {
+    pub schema_version: String,
+    pub id: String,
+    pub version: String,
+    pub digest: String,
+    pub intended_use: IntendedUseRef,
+    pub scenario_patches: Vec<ScenarioModelPatch>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -367,6 +412,7 @@ pub struct EngineScenario {
     pub seed: u64,
     pub duration_seconds: f64,
     pub fixed_step_seconds: f64,
+    pub model_pack: ModelPackBinding,
     pub entities: Vec<EntityDefinition>,
     pub environment: Environment,
     pub completion: Completion,
@@ -1072,7 +1118,10 @@ mod tests {
     fn provenance() -> Provenance {
         Provenance {
             source_object_id: "native-test".to_string(),
+            model_id: "native-test-model".to_string(),
             model_version: "native-test-v1".to_string(),
+            model_pack_digest: "181379ad76df8cdbf08666788bf1aace54b05651ce1d2e852487d651c6fb0e1d"
+                .to_string(),
             value_state: ModelValueState::ModelAssumption,
         }
     }
@@ -1201,6 +1250,18 @@ mod tests {
             seed: 42,
             duration_seconds: 3.0,
             fixed_step_seconds: 0.05,
+            model_pack: ModelPackBinding {
+                schema_version: "vector.compiled-model-pack.v1".to_string(),
+                id: "native-test-pack".to_string(),
+                version: "1.0.0".to_string(),
+                digest: "181379ad76df8cdbf08666788bf1aace54b05651ce1d2e852487d651c6fb0e1d"
+                    .to_string(),
+                intended_use: IntendedUseRef {
+                    id: "vector.intended-use.geometry-teaching".to_string(),
+                    version: "1.0.0".to_string(),
+                },
+                scenario_patches: Vec::new(),
+            },
             entities: vec![blue, red, weapon],
             environment: Environment {
                 gravity_mps2: G0,

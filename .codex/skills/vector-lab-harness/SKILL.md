@@ -1,0 +1,66 @@
+---
+name: vector-lab-harness
+description: Project-level operating harness for Vector Engagement Labs. Use when implementing, reviewing, planning, testing, or coordinating work in this repository, especially simulation engine, model data, geospatial, browser runtime, release-train, database, observability, or documentation tasks. Routes work to the correct stream, loads only relevant docs and pending-work context, and enforces branch, contract, verification, and handoff rules.
+---
+
+# Vector Lab Harness
+
+Use this skill as the repository's low-token steering layer. Treat tracked code and documentation as authoritative; do not reconstruct project history from conversation summaries.
+
+## Start every task
+
+1. Confirm the current worktree and branch with `git status --short --branch`.
+2. Run `scripts/context-slice.sh <stream>` from the repository root. Choose `data`, `geo`, `browser`, `release`, `server`, `ui`, `security`, or `general`.
+3. Read only the listed contract documents and directly relevant source files. Read full files when changing their contract; otherwise use headings and targeted searches first.
+4. Inspect existing tests before changing behavior. Preserve unrelated user changes.
+5. State a short execution plan, then implement rather than stopping at analysis.
+
+## Stream routing
+
+Use [references/workstreams.md](references/workstreams.md) to select ownership, branch, worktree, dependencies, and non-goals. Never create a competing schema or duplicate a contract owned by another stream.
+
+The release train is `release/x86-runtime`; feature PRs target it, never `main`. The current merge order is data foundation, geospatial environment, browser runtime, then native server foundation. Rebase or merge the current release branch before handoff.
+
+## Worktree integration
+
+Worktrees share Git objects but do not share uncommitted files. A chat's edits become available to another chat only after the owning chat commits them and pushes its feature branch, followed by a merge into `origin/release/x86-runtime`.
+
+Use this flow:
+
+1. Feature chat works only in its assigned worktree and keeps changes scoped.
+2. Feature chat runs focused tests, `make ci-local`, updates docs, commits, and pushes its branch.
+3. Release steward reviews the commit/PR and merges it into `release/x86-runtime`.
+4. Dependent feature chats run `git fetch origin` and rebase or merge `origin/release/x86-runtime` into their own branch after saving/committing local work.
+5. Run grouped integration and cross-stream tests from the release worktree after every merge.
+
+Never copy files between worktrees, cherry-pick another chat's uncommitted state, or have two chats edit the same branch. If a shared contract is needed early, commit the smallest contract slice, push it, and let the release steward merge it before dependent implementation proceeds. Use `git status`, `git log`, and `git diff` to prove which state is being shared.
+
+## Context discipline
+
+- Prefer the context-slice script and targeted `rg` searches over dumping `docs/`, `pending-work/`, or whole source trees.
+- Load detailed references only when the task enters that area: [references/contracts.md](references/contracts.md) contains invariants that must not be violated.
+- Do not repeat project background in code comments or task updates when a concise link to the governing document is enough.
+- Record new decisions in the owning `docs/` file or pending-work item so future agents do not need this conversation.
+
+## Engineering rules
+
+- Keep one versioned simulation contract across TypeScript, Rust/WASM, records, playback, reports, and persistence.
+- Keep physics truth, observer estimates, map/render state, UI state, and durable records owned by separate layers.
+- Use deterministic fixed-step behavior, stable IDs, explicit units/datums, bounded inputs, immutable saved artifacts, and forward-only migrations.
+- Keep database access out of simulation ticks and keep the browser UI responsive by using Workers for expensive batches.
+- Do not silently fall back from missing evidence, incompatible model packs, invalid coordinates, or unsupported combinations.
+- Avoid unrelated feature work, UI redesign, high-resolution terrain, classified/operational claims, or production cutover unless explicitly assigned.
+
+## Test-first execution
+
+Treat every executable action item as a contract with a test obligation. Before editing, classify the change using [references/testing.md](references/testing.md), name the smallest meaningful test that should fail before the fix, then implement the change and its tests together.
+
+At minimum, choose the applicable layers: pure unit, schema/contract, Rust unit/integration, TypeScript/Rust parity, database/migration, API integration, frontend component/interaction, browser end-to-end, visual/responsive, security, regression, performance, cancellation/recovery, or observability. A documentation-only change still requires link/format validation when executable references or commands change.
+
+Do not declare an action complete because the code builds. A completed action must have passing tests, a stated reason for any omitted layer, and evidence recorded in the handoff. New behavior without a regression test is incomplete. Fixes must include a test that would have caught the regression.
+
+## Verification and handoff
+
+Before commit, update relevant documentation and run `make ci-local`. Add targeted database, integration, observability, performance, browser, geospatial, Rust, parity, frontend, and regression checks as applicable. Report failures honestly; do not weaken tests, delete coverage to make a gate pass, or claim a target is measured without evidence.
+
+Every feature handoff includes worktree, branch, commit SHA, PR target/URL, concise diff summary, contracts changed, migrations, tests and results, benchmark evidence where relevant, docs changed, and blockers. Release work also includes grouped integration, deterministic parity, migration, container, observability, load, soak, cancellation, and recovery evidence before promotion.

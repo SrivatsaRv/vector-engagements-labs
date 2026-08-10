@@ -31,6 +31,14 @@ export type ReportData = {
     contentHash: string;
     draftRevision: number;
     frameHash?: string;
+    intendedUse?: { id: string; version: string };
+    modelPack?: { id: string; version: string; digest: string };
+    credibilityManifest?: {
+      id: string;
+      version: string;
+      approvalState: string;
+      limitations: Array<{ id: string; severity: string; statement: string }>;
+    };
   };
   libraryScenario?: ReportLibraryScenario;
 };
@@ -197,12 +205,14 @@ export function buildReportExport(
       })),
     },
     telemetry: {
-      coordinateSystem: "local Cartesian educational frame",
+      coordinateSystem: "WGS84 geographic plus scenario-local ENU",
+      scenarioOrigin: data.result.engineRun.scenario.geospatial.origin,
       samples: data.result.frames.map((frame) => ({
         time: Number(frame.t.toFixed(1)),
         phase: frame.phase,
         interceptor: frame.interceptor,
         target: frame.target,
+        geographicPositions: frame.geographicPositions,
         speed: Math.round(frame.speed),
         range: Math.round(frame.range),
         normalizedWeaponSpeedPercent: Math.round(frame.energy),
@@ -226,6 +236,9 @@ export function buildReportExport(
       scenarioContentHash: data.packageProvenance?.contentHash ?? "unrecorded",
       draftRevision: data.packageProvenance?.draftRevision ?? 0,
       frameHash: data.packageProvenance?.frameHash ?? "recorded by saved-run envelope",
+      intendedUse: data.packageProvenance?.intendedUse ?? null,
+      modelPack: data.packageProvenance?.modelPack ?? null,
+      credibilityManifest: data.packageProvenance?.credibilityManifest ?? null,
       profileLibrary: data.profileVersion,
       scenarioLibrary: `${library.id}@${library.version}`,
       sourceClass: "public / official-source-first",
@@ -240,6 +253,8 @@ export function buildReportExport(
           sourceClass: source!.sourceClass,
         })),
       reviewState: "public-study",
+      syntheticEnvironment:
+        data.result.engineRun.scenario.geospatial.syntheticEnvironment,
     },
     limitations: [
       "Public-data educational approximation.",

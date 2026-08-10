@@ -1,8 +1,14 @@
 import { performance } from "node:perf_hooks";
+import { arch, cpus, platform, release, totalmem } from "node:os";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
-import { simulate } from "../lib/simulation.ts";
+import { prepareSimulation, simulate } from "../lib/simulation.ts";
 import type { EngineBackendId } from "../lib/engine/contracts.ts";
 import { RUST_WASM_ENGINE_ARTIFACT } from "../lib/engine/backend.ts";
+import {
+  createVectorSimulationRecord,
+  encodeColumnarFrames,
+  serializeVectorRecord,
+} from "../lib/record/vector-record.ts";
 
 const warmupRounds = 2;
 const measuredRounds = Number(process.env.VECTOR_BENCHMARK_ROUNDS ?? 25);
@@ -67,11 +73,46 @@ const summary = (backend: EngineBackendId) => {
 };
 
 const backendResults = backends.map(summary);
+const transportEvidence = [];
+for (const backend of backends) {
+  const scenario = { ...SCENARIO_LIBRARY[0].scenario, engineBackend: backend };
+  const prepared = prepareSimulation(scenario);
+  const representative = simulate(scenario);
+  const record = await createVectorSimulationRecord(
+    prepared,
+    representative,
+    "2026-08-06T00:00:00.000Z",
+  );
+  const serialized = serializeVectorRecord(record);
+  transportEvidence.push({
+    backend,
+    integratedSteps: representative.engineRun.diagnostics.integratedSteps,
+    workerModelBatchesAt128Ticks:
+      backend === "typescript"
+        ? Math.ceil(representative.engineRun.diagnostics.integratedSteps / 128)
+        : 1,
+    wasmExportCallsPerRun: backend === "rust-wasm" ? 4 : 0,
+    jsonScenarioBytes: Buffer.byteLength(JSON.stringify(prepared.engineScenario)),
+    jsonEngineRunBytes: Buffer.byteLength(JSON.stringify(representative.engineRun)),
+    columnarFrameBytes: encodeColumnarFrames(representative.engineRun.frames).byteLength,
+    vectorRecordBytes: serialized.byteLength,
+    reusableTransferCapacityBytes: serialized.buffer.byteLength,
+  });
+}
 const result = {
   engine: "browser-point-mass-v0.5",
+  environment: {
+    runtime: process.version,
+    platform: `${platform()} ${release()}`,
+    architecture: arch(),
+    cpu: cpus()[0]?.model ?? "unknown",
+    logicalCores: cpus().length,
+    memoryBytes: totalmem(),
+  },
   scenarios: SCENARIO_LIBRARY.length,
   rustWasmBytes: RUST_WASM_ENGINE_ARTIFACT.bytes,
   backends: backendResults,
+  transportEvidence,
   regressionLimitP95Ms: maximumP95Ms,
 };
 

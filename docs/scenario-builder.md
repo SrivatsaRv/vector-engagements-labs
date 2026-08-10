@@ -21,7 +21,13 @@ A runnable scenario declares a PostGIS-backed `study_area_id` and a weather pres
 - public-educational environment presets;
 - an explicit data-state label.
 
-The engine uses local east-north-up coordinates for numerical stability. The presentation layer projects those coordinates from the selected study-area anchor. This makes the simulation portable without letting the map decide where a run occurred.
+Configured authoring positions carry WGS84 longitude/latitude and an explicit
+MSL altitude. Compilation performs the declared geoid operation, converts to
+ECEF, then to the study area's stable local ENU frame. The record retains both
+local and WGS84 ellipsoid positions. The presentation layer projects recorded
+state; the map does not decide where a run occurred. The current deterministic
+zero-undulation geoid is an educational versioned fixture, not a regional geoid
+accuracy claim.
 
 Both Construct and Observe use the same MapLibre navigation contract. The map starts flat; supports wheel zoom, drag pan, right-drag rotation, touch zoom/rotation, double-click zoom, and keyboard navigation; disables touch pitch and pitch-with-rotate; and exposes an explicit 0°/52° tilt preview. VECTOR-owned controls provide basemap selection, zoom, reset north/tilt, fit, cursor coordinates, zoom, bearing, and pitch. Standard, minimal, and low-light tactical basemaps are same-origin proxied and the selection persists in browser local storage. During waypoint placement the view is forced flat so a presentation gesture cannot obscure authored geometry. These camera and basemap choices are presentation state and never change simulation inputs.
 
@@ -31,7 +37,13 @@ The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-eas
 
 ## Scenario artifact
 
-Construct produces a versioned scenario package. Compilation produces an immutable engine scenario containing all spawned entities, initial states, events, environment, study-area context, completion rules, and model provenance. Simulation produces ordered engine frames. Saving a report records both artifacts and their hashes so replay never depends on mutable UI state.
+Construct produces a `vector.scenario.v3` package with an intended-use identity
+and immutable compiled model-pack identity/digest. Compilation produces an
+immutable engine scenario containing all spawned entities, initial states,
+events, environment, study-area context, completion rules, model IDs, and the
+same digest. Simulation produces ordered engine frames. Saving a report records
+both artifacts, credibility limitations, and their hashes so replay never
+depends on mutable UI state.
 
 ## Builder expansion boundary
 
@@ -67,6 +79,9 @@ No mode may show results until the compiled package has passed validation and a 
 ### Artifact and state boundaries
 
 - Builder state is an editable draft scenario package.
+- A parameter change against governed model data is a scenario-local patch with
+  old value, new value, SI unit, reason, timestamp, author, evidence, model ID,
+  and pack digest; it never mutates the catalog or pack.
 - Validate canonicalizes the package and records a content hash.
 - Simulate compiles catalog references into an immutable engine scenario.
 - The engine owns lifecycle changes and produces ordered frames and events.
@@ -117,6 +132,6 @@ reference, or map anchor.
 - Blue and Red each have an affiliation-scoped origin picker populated from public-reference installations inside the selected study area. Choosing an origin moves that team's aircraft to the installation; manual drag remains available when no catalog origin is appropriate.
 - Blue and Red start markers and waypoints are draggable.
 - Waypoint creation is scoped to the currently selected team and lives in that team's route inspector. The map never offers an unowned generic waypoint action.
-- The selected entity inspector edits altitude above sea level, true heading, speed, and route state.
+- The selected entity inspector edits explicit MSL altitude, true heading, speed, and route state.
 - Drag and numeric edits synchronize starting distance, altitude difference, aspect, and platform speeds before compilation.
 - Validation blocks non-finite state, negative speed or altitude, invalid headings, mismatched route origins, and any start or waypoint outside the preset boundary.

@@ -187,7 +187,7 @@ test("report export binds the exact run configuration, frames and source state",
       engine: "browser-point-mass-v0.5",
       profileVersion: "public-study-v0.5",
       packageProvenance: {
-        schemaVersion: "vector.scenario.v2",
+        schemaVersion: "vector.scenario.v3",
         contentHash: "a".repeat(64),
         draftRevision: 0,
         frameHash: "b".repeat(64),

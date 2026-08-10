@@ -1,9 +1,19 @@
 import type { StudyArea } from "./study-areas.ts";
+import type { ScenarioOrigin } from "./geospatial/contracts.ts";
+import {
+  geographicToLocalFrame,
+  localFrameToGeographic,
+} from "./geospatial/geodesy.ts";
+import {
+  SYNTHETIC_ZERO_GEOID,
+  convertWithGeoid,
+} from "./geospatial/vertical-datums.ts";
 
 export type ScenarioSpatialPoint = {
   longitude: number;
   latitude: number;
   altitudeM: number;
+  verticalDatum: "MSL";
 };
 
 export type ScenarioSpatialEntity = {
@@ -22,28 +32,59 @@ export function normalizeHeading(headingDeg: number) {
   return ((headingDeg % 360) + 360) % 360;
 }
 
+export function scenarioOrigin(area: StudyArea): ScenarioOrigin {
+  return {
+    schemaVersion: "vector.scenario-origin.v1",
+    id: `study-area:${area.id}:origin:v1`,
+    frame: "ENU",
+    geographic: {
+      longitudeDeg: area.anchor.longitude,
+      latitudeDeg: area.anchor.latitude,
+      altitude: { valueM: 0, datum: "ELLIPSOID" },
+    },
+    transformVersion: "vector.wgs84-ecef-local.v1",
+  };
+}
+
 export function geographicToLocal(
   point: ScenarioSpatialPoint,
-  origin: StudyArea["anchor"],
+  area: StudyArea,
 ) {
-  const latitudeRad = (origin.latitude * Math.PI) / 180;
-  return {
-    x: (point.longitude - origin.longitude) * 111320 * Math.cos(latitudeRad),
-    y: (point.latitude - origin.latitude) * 111320,
-    z: point.altitudeM,
-  };
+  if (point.verticalDatum !== "MSL") {
+    throw new TypeError("Configured scenario authoring requires an explicit MSL altitude.");
+  }
+  const ellipsoid = convertWithGeoid(
+    {
+      longitudeDeg: point.longitude,
+      latitudeDeg: point.latitude,
+      altitude: { valueM: point.altitudeM, datum: "MSL" },
+    },
+    "ELLIPSOID",
+    {
+      schemaVersion: "vector.geoid-conversion.v1",
+      model: SYNTHETIC_ZERO_GEOID,
+    },
+  );
+  return geographicToLocalFrame(
+    ellipsoid,
+    scenarioOrigin(area),
+  );
 }
 
 export function localToGeographic(
   point: { x: number; y: number; z: number },
-  origin: StudyArea["anchor"],
+  area: StudyArea,
 ): ScenarioSpatialPoint {
-  const latitudeRad = (origin.latitude * Math.PI) / 180;
+  const ellipsoid = localFrameToGeographic(point, scenarioOrigin(area));
+  const msl = convertWithGeoid(ellipsoid, "MSL", {
+    schemaVersion: "vector.geoid-conversion.v1",
+    model: SYNTHETIC_ZERO_GEOID,
+  });
   return {
-    longitude:
-      origin.longitude + point.x / (111320 * Math.cos(latitudeRad)),
-    latitude: origin.latitude + point.y / 111320,
-    altitudeM: point.z,
+    longitude: msl.longitudeDeg,
+    latitude: msl.latitudeDeg,
+    altitudeM: msl.altitude.valueM,
+    verticalDatum: "MSL",
   };
 }
 
@@ -58,8 +99,8 @@ export function createDefaultSpatialPlan(input: {
 }): ScenarioSpatialPlan {
   const blueLocal = { x: -input.rangeM / 2, y: 0, z: input.blueAltitudeM };
   const redLocal = { x: input.rangeM / 2, y: 0, z: input.redAltitudeM };
-  const blue = localToGeographic(blueLocal, input.studyArea.anchor);
-  const red = localToGeographic(redLocal, input.studyArea.anchor);
+  const blue = localToGeographic(blueLocal, input.studyArea);
+  const red = localToGeographic(redLocal, input.studyArea);
   return {
     blue: {
       position: blue,
@@ -69,7 +110,7 @@ export function createDefaultSpatialPlan(input: {
         blue,
         localToGeographic(
           { x: blueLocal.x + input.blueSpeedMps * 120, y: 0, z: blueLocal.z },
-          input.studyArea.anchor,
+          input.studyArea,
         ),
       ],
     },
@@ -92,7 +133,7 @@ export function createDefaultSpatialPlan(input: {
                 120,
             z: redLocal.z,
           },
-          input.studyArea.anchor,
+          input.studyArea,
         ),
       ],
     },
@@ -100,8 +141,8 @@ export function createDefaultSpatialPlan(input: {
 }
 
 export function spatialSeparationM(plan: ScenarioSpatialPlan, area: StudyArea) {
-  const blue = geographicToLocal(plan.blue.position, area.anchor);
-  const red = geographicToLocal(plan.red.position, area.anchor);
+  const blue = geographicToLocal(plan.blue.position, area);
+  const red = geographicToLocal(plan.red.position, area);
   return Math.hypot(red.x - blue.x, red.y - blue.y, red.z - blue.z);
 }
 
@@ -109,14 +150,14 @@ export function spatialHorizontalSeparationM(
   plan: ScenarioSpatialPlan,
   area: StudyArea,
 ) {
-  const blue = geographicToLocal(plan.blue.position, area.anchor);
-  const red = geographicToLocal(plan.red.position, area.anchor);
+  const blue = geographicToLocal(plan.blue.position, area);
+  const red = geographicToLocal(plan.red.position, area);
   return Math.hypot(red.x - blue.x, red.y - blue.y);
 }
 
 export function spatialAspectDeg(plan: ScenarioSpatialPlan, area: StudyArea) {
-  const blue = geographicToLocal(plan.blue.position, area.anchor);
-  const red = geographicToLocal(plan.red.position, area.anchor);
+  const blue = geographicToLocal(plan.blue.position, area);
+  const red = geographicToLocal(plan.red.position, area);
   const lineToBlue = { x: blue.x - red.x, y: blue.y - red.y };
   const headingRad = ((90 - plan.red.headingDeg) * Math.PI) / 180;
   const velocity = { x: Math.cos(headingRad), y: Math.sin(headingRad) };
@@ -136,8 +177,8 @@ export function withSpatialRangeM(
   area: StudyArea,
   rangeM: number,
 ): ScenarioSpatialPlan {
-  const blue = geographicToLocal(plan.blue.position, area.anchor);
-  const red = geographicToLocal(plan.red.position, area.anchor);
+  const blue = geographicToLocal(plan.blue.position, area);
+  const red = geographicToLocal(plan.red.position, area);
   const current = Math.hypot(red.x - blue.x, red.y - blue.y);
   const direction = current > 1
     ? { x: (red.x - blue.x) / current, y: (red.y - blue.y) / current }
@@ -148,7 +189,7 @@ export function withSpatialRangeM(
       y: blue.y + direction.y * rangeM,
       z: red.z,
     },
-    area.anchor,
+    area,
   );
   return {
     ...plan,
@@ -167,8 +208,8 @@ export function withSpatialAspectDeg(
   area: StudyArea,
   aspectDeg: number,
 ): ScenarioSpatialPlan {
-  const blue = geographicToLocal(plan.blue.position, area.anchor);
-  const red = geographicToLocal(plan.red.position, area.anchor);
+  const blue = geographicToLocal(plan.blue.position, area);
+  const red = geographicToLocal(plan.red.position, area);
   const lineBearing = normalizeHeading(
     (Math.atan2(blue.x - red.x, blue.y - red.y) * 180) / Math.PI,
   );

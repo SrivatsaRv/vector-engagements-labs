@@ -12,6 +12,21 @@ server-generated report. Request bodies are capped at 96 KiB, route plans at 64
 waypoints per side, and physics inputs at documented finite study limits.
 Database connections, locks, and statements have explicit timeouts.
 
+The Cloudflare application Worker that validates APIs and saved runs is not the
+browser simulation Web Worker. Interactive physics has no database or network
+capability in its protocol: it receives a validated digest-addressed compiled
+adapter and returns a content-addressed record. Browser Worker input is
+structured-cloned, bounded by the engine admission limits, and verified by
+digest before caching. Output record members are length-checked and SHA-256
+verified before replay.
+
+Transferable `ArrayBuffer` ownership is exclusive. Completed buffers move to the
+main thread, are verified and decoded, then may be transferred back for reuse;
+detached buffers are never read after transfer. The pool retains at most two
+buffers of at most 64 MiB. `SharedArrayBuffer`, cross-origin isolation, network
+fetches from the simulation Worker, and executable record assets are not part of
+this boundary.
+
 ## Browser telemetry and metrics
 
 Anonymous telemetry accepts only bounded browser-performance and map-load

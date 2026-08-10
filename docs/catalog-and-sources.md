@@ -6,11 +6,15 @@ The runtime catalog lives in PostgreSQL/PostGIS and separates:
 2. `source_assertions`: field-level value, condition, confidence, and review state.
 3. `platform_variants` and `subsystems`: named objects and linked equipment.
 4. `weapons`: identity, category, public guidance description, and conditional published facts.
-5. `simulation_models`: versioned coefficients and explicit value state; never presented as published specifications.
+5. `simulation_models`: legacy v0.5 scalar coefficient rows retained for configured-template delivery and regression continuity.
 6. `platform_weapon_compatibility`: explicit source-bearing loadout relationships.
 7. `installations`: public-reference WGS84 point geometry with a GiST index, optional ICAO code, elevation, and runway note.
 8. `scenario_templates`: immutable ID/version packages with lifecycle status.
 9. `saved_run_snapshots`: frozen scenario, engine version, forces, environment, and report payload. A composite template-version foreign key and JSON report constraint prevent orphaned or output-free snapshots.
+10. `intended_use_contracts`: immutable question, supported interpretation, required capability, and explicit non-use contracts.
+11. `model_pack_sources`: human-readable, unit-bearing executable object sources.
+12. `compiled_model_packs`: immutable SI-normalized arrays identified by SHA-256 digest.
+13. `credibility_manifests`: engine or model-pack evidence, validity, uncertainty, limitations, and approval state.
 
 The TypeScript arrays are idempotent local seed fixtures and deterministic test fallbacks. `/api/catalog` reads the database; the client validates that the selected template/version and coefficient set exist before Conduct. Runtime requests never bootstrap schema or authoritative records.
 
@@ -26,7 +30,7 @@ The S-200 template is a historical public-reference case and does not claim curr
 
 ## Template-to-report version chain
 
-1. A template is stored under immutable `(id, version)` identity with `vector.scenario.v2`, engine version, canonical JSON package, study-area identity, weather-preset identity, and SHA-256 content hash.
+1. A template is stored under immutable `(id, version)` identity with `vector.scenario.v3`, intended-use identity, compiled model-pack identity/digest, engine version, canonical JSON package, study-area identity, weather-preset identity, and SHA-256 content hash.
 2. `/api/catalog` returns that exact package. The browser recomputes the hash before allowing a run.
 3. Construct edits produce a draft revision derived from the loaded package without mutating the template row.
 4. The compiler resolves the draft into the complete engine scenario: entities, events, environment, model IDs, model versions, and seed.
@@ -37,3 +41,13 @@ The S-200 template is a historical public-reference case and does not claim curr
 This is semantic versioning plus content-addressed verification, not Git. Template maintainers publish a new row version when authored behavior changes; old saved runs remain bound to their original package and frame hashes.
 
 No missing value may be silently promoted to sourced truth.
+
+## Synthetic-environment identity
+
+Catalog object identity remains separate from the run's synthetic-environment
+identity. Compilation freezes transform, geoid, terrain, weather, atmosphere,
+study-area, route, installation and airspace dataset versions/digests in
+`vector.synthetic-environment.v1`. The current reference terrain and zero-geoid
+fixtures are `MODEL_ASSUMPTION`; they do not upgrade PostGIS installation points
+or public-source assertions. A future production terrain/geoid ingest publishes
+new content identities rather than mutating a saved run.

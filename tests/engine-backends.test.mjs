@@ -34,10 +34,26 @@ for (const definition of SCENARIO_LIBRARY) {
 
     assert.equal(typescript.engineRun.diagnostics.backend, "typescript");
     assert.equal(rust.engineRun.diagnostics.backend, "rust-wasm");
+    assert.match(rust.engineRun.scenario.modelPack.digest, /^[0-9a-f]{64}$/);
+    assert.equal(
+      rust.engineRun.scenario.modelPack.digest,
+      typescript.engineRun.scenario.modelPack.digest,
+    );
+    assert.ok(
+      rust.engineRun.scenario.entities.every(
+        (entity) =>
+          entity.provenance.modelId &&
+          entity.provenance.modelPackDigest === rust.engineRun.scenario.modelPack.digest,
+      ),
+    );
     assert.equal(rust.termination, typescript.termination);
     assert.equal(rust.outcome, typescript.outcome);
     assert.equal(rust.frames.length, typescript.frames.length);
     assert.equal(rust.entityManifest.length, typescript.entityManifest.length);
+    assert.deepEqual(
+      rust.engineRun.scenario.geospatial.syntheticEnvironment,
+      typescript.engineRun.scenario.geospatial.syntheticEnvironment,
+    );
     assert.deepEqual(
       rust.entityManifest.map((entity) => [entity.id, entity.kind, entity.lifecycle]),
       typescript.entityManifest.map((entity) => [entity.id, entity.kind, entity.lifecycle]),
@@ -63,6 +79,33 @@ for (const definition of SCENARIO_LIBRARY) {
         rustFrame.entities.map((entity) => [entity.id, entity.lifecycle, entity.phase]),
         typescriptFrame.entities.map((entity) => [entity.id, entity.lifecycle, entity.phase]),
       );
+      assert.deepEqual(
+        rustFrame.geographicPositions.map((item) => item.entityId),
+        typescriptFrame.geographicPositions.map((item) => item.entityId),
+      );
+      for (let index = 0; index < rustFrame.geographicPositions.length; index += 1) {
+        const rustPosition = rustFrame.geographicPositions[index].position;
+        const typescriptPosition = typescriptFrame.geographicPositions[index].position;
+        close(
+          rustPosition.longitudeDeg,
+          typescriptPosition.longitudeDeg,
+          1e-10,
+          `frame ${frameIndex} longitude`,
+        );
+        close(
+          rustPosition.latitudeDeg,
+          typescriptPosition.latitudeDeg,
+          1e-10,
+          `frame ${frameIndex} latitude`,
+        );
+        close(
+          rustPosition.altitude.valueM,
+          typescriptPosition.altitude.valueM,
+          1e-5,
+          `frame ${frameIndex} ellipsoid altitude`,
+        );
+        assert.equal(rustPosition.altitude.datum, "ELLIPSOID");
+      }
     }
   });
 }
@@ -112,5 +155,54 @@ test("explicit backend selection never silently falls through", () => {
   assert.throws(
     () => runEngineBackend(compiled, "other"),
     /Unknown VECTOR engine backend/,
+  );
+});
+
+test("scenario compilation fails closed for unknown objects and incompatible loadouts", () => {
+  const definition = SCENARIO_LIBRARY[0];
+  const profile = getProfile(definition.scenario);
+  const base = {
+    id: definition.id,
+    version: definition.version,
+    domain: definition.scenario.domain,
+    name: definition.scenario.name,
+    bluePlatformId: definition.scenario.bluePlatformId,
+    blueSystemId: definition.scenario.blueSystemId,
+    redObjectId: definition.scenario.redObjectId,
+    redSystemId: definition.scenario.redSystemId,
+    studyAreaId: definition.scenario.studyAreaId,
+    weatherPresetId: definition.scenario.weatherPresetId,
+    profile: definition.scenario.profile,
+    guidance: definition.scenario.guidance,
+    altitude: definition.scenario.altitude,
+    cruiseAltitude: definition.scenario.cruiseAltitude,
+    targetDelta: definition.scenario.targetDelta,
+    range: definition.scenario.range,
+    aspect: definition.scenario.aspect,
+    launcherSpeed: definition.scenario.launcherSpeed,
+    targetSpeed: definition.scenario.targetSpeed,
+    maneuver: definition.scenario.maneuver,
+    targetG: definition.scenario.targetG,
+    blueFuelPercent: definition.scenario.blueFuelPercent,
+    redFuelPercent: definition.scenario.redFuelPercent,
+    blueDecision: definition.scenario.blueDecision,
+    redDecision: definition.scenario.redDecision,
+    windEastMps: definition.scenario.wind,
+    windNorthMps: definition.scenario.windNorth,
+    temperatureOffset: definition.scenario.temperatureOffset,
+    guidanceInterruptionAt: null,
+    guidanceInterruptionDuration: 8,
+    windShiftAt: null,
+    windShiftEastMps: 0,
+    windShiftNorthMps: 0,
+    seed: definition.scenario.seed,
+  };
+  assert.throws(
+    () => compileScenario({ ...base, bluePlatformId: "unknown-platform" }, profile),
+    /Unknown catalog object/,
+  );
+  assert.throws(
+    () => compileScenario({ ...base, blueSystemId: "aim-120c5" }, profile),
+    /Incompatible loadout/,
   );
 });

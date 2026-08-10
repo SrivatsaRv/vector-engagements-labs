@@ -9,7 +9,9 @@ import type {
   EngineEntityDefinition,
   EngineEntityFrame,
   EngineRun,
+  EngineScenario,
 } from "./engine/contracts.ts";
+import type { RecordedGeographicPosition } from "./geospatial/contracts.ts";
 import type {
   EngagementDomain,
   Guidance,
@@ -179,6 +181,7 @@ export type Frame = {
   airDensity: number;
   mach: number;
   entities: EngineEntityFrame[];
+  geographicPositions: RecordedGeographicPosition[];
   closureRate: number;
   specificEnergy: number;
   massKg: number;
@@ -245,6 +248,13 @@ export type VehicleProfile = {
   maxRange: number;
   turnG: number;
   color: number;
+};
+
+export type PreparedSimulation = {
+  scenario: Scenario;
+  profileId: ProfileId;
+  profile: VehicleProfile;
+  engineScenario: EngineScenario;
 };
 
 const profile = (value: VehicleProfile) => value;
@@ -499,31 +509,31 @@ function resolveProfile(input: Scenario, profileId: ProfileId): VehicleProfile {
   return profiles[input.blueSystemId] ?? PROFILE_CATALOGS.A2A[profileId];
 }
 
-export function simulate(
+export function prepareSimulation(
   input: Scenario,
   profileId: ProfileId = input.profile,
-): SimulationResult {
+): PreparedSimulation {
   const profile = resolveProfile(input, profileId);
   const studyArea = getStudyArea(input.studyAreaId);
   const placement = input.spatialPlan
     ? {
         blueStart: geographicToLocal(
           input.spatialPlan.blue.position,
-          studyArea.anchor,
+          studyArea,
         ),
         redStart: geographicToLocal(
           input.spatialPlan.red.position,
-          studyArea.anchor,
+          studyArea,
         ),
         blueHeadingRad:
           ((90 - input.spatialPlan.blue.headingDeg) * Math.PI) / 180,
         redHeadingRad:
           ((90 - input.spatialPlan.red.headingDeg) * Math.PI) / 180,
         blueRoute: input.spatialPlan.blue.route.map((point) =>
-          geographicToLocal(point, studyArea.anchor),
+          geographicToLocal(point, studyArea),
         ),
         redRoute: input.spatialPlan.red.route.map((point) =>
-          geographicToLocal(point, studyArea.anchor),
+          geographicToLocal(point, studyArea),
         ),
       }
     : undefined;
@@ -567,7 +577,14 @@ export function simulate(
     },
     profile,
   );
-  const engineRun = runEngineBackend(engineScenario, input.engineBackend);
+  return { scenario: input, profileId, profile, engineScenario };
+}
+
+export function buildSimulationResult(
+  prepared: PreparedSimulation,
+  engineRun: EngineRun,
+): SimulationResult {
+  const { scenario: input, profile, engineScenario } = prepared;
   const frames: Frame[] = engineRun.frames.map((engineFrame) => {
     const weapon = engineFrame.entities.find(
       (entity) => entity.id === engineRun.primaryWeaponId,
@@ -594,6 +611,7 @@ export function simulate(
       airDensity: atmosphere.densityKgM3,
       mach: weapon.mach,
       entities: engineFrame.entities,
+      geographicPositions: engineFrame.geographicPositions,
       closureRate: engineFrame.closureRateMps,
       specificEnergy: weapon.specificEnergyJkg,
       massKg: weapon.massKg,
@@ -637,6 +655,18 @@ export function simulate(
     entityManifest: engineRun.scenario.entities,
     envelopes: engineRun.envelopes,
   };
+}
+
+export function simulate(
+  input: Scenario,
+  profileId: ProfileId = input.profile,
+): SimulationResult {
+  const prepared = prepareSimulation(input, profileId);
+  const engineRun = runEngineBackend(
+    prepared.engineScenario,
+    prepared.scenario.engineBackend,
+  );
+  return buildSimulationResult(prepared, engineRun);
 }
 
 export function explainResult(scenario: Scenario, result: SimulationResult) {

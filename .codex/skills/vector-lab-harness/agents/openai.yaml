@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vector Lab Harness"
+  short_description: "Steer Vector Lab work with focused context"
+  default_prompt: "Use $vector-lab-harness to route this Vector Engagement Labs task, load only the required project context, and follow its release and verification rules."

@@ -25,6 +25,7 @@ export type StudyArea = {
   description: string;
   terrainClass: "PLAINS" | "DESERT" | "HIGH_MOUNTAIN" | "MOUNTAIN" | "MARITIME" | "COASTAL";
   surfaceElevationM: number;
+  surfaceElevationDatum: "MSL";
   anchor: { longitude: number; latitude: number };
   bounds: [[number, number], [number, number]];
   weatherPresets: WeatherPreset[];
@@ -61,6 +62,7 @@ export const STUDY_AREAS: StudyArea[] = [
     description: "Low-elevation plains used for repeatable air-intercept studies.",
     terrainClass: "PLAINS",
     surfaceElevationM: 260,
+    surfaceElevationDatum: "MSL",
     anchor: { longitude: 74.2, latitude: 31.8 },
     bounds: [[72.6, 30.5], [76.4, 33.4]],
     weatherPresets: [
@@ -77,6 +79,7 @@ export const STUDY_AREAS: StudyArea[] = [
     description: "Hot, dry desert conditions for air and surface-launch studies.",
     terrainClass: "DESERT",
     surfaceElevationM: 230,
+    surfaceElevationDatum: "MSL",
     anchor: { longitude: 72.8, latitude: 27.1 },
     bounds: [[69.7, 24.8], [75.4, 29.8]],
     weatherPresets: [
@@ -93,6 +96,7 @@ export const STUDY_AREAS: StudyArea[] = [
     description: "High terrain and cold, thin air for altitude-sensitive studies.",
     terrainClass: "HIGH_MOUNTAIN",
     surfaceElevationM: 3300,
+    surfaceElevationDatum: "MSL",
     anchor: { longitude: 77.3, latitude: 34.1 },
     bounds: [[75.5, 32.5], [79.6, 35.9]],
     weatherPresets: [
@@ -109,6 +113,7 @@ export const STUDY_AREAS: StudyArea[] = [
     description: "Mountain and valley context with humid conditions and variable wind.",
     terrainClass: "MOUNTAIN",
     surfaceElevationM: 1450,
+    surfaceElevationDatum: "MSL",
     anchor: { longitude: 92.3, latitude: 27.1 },
     bounds: [[89.8, 25.2], [95.2, 29.4]],
     weatherPresets: [
@@ -125,6 +130,7 @@ export const STUDY_AREAS: StudyArea[] = [
     description: "Maritime airspace for over-water intercept and strike studies.",
     terrainClass: "MARITIME",
     surfaceElevationM: 0,
+    surfaceElevationDatum: "MSL",
     anchor: { longitude: 68.3, latitude: 20.8 },
     bounds: [[63.5, 17.0], [73.2, 24.6]],
     weatherPresets: [
@@ -141,6 +147,7 @@ export const STUDY_AREAS: StudyArea[] = [
     description: "Low coastal terrain for surface-strike and air-defence studies.",
     terrainClass: "COASTAL",
     surfaceElevationM: 40,
+    surfaceElevationDatum: "MSL",
     anchor: { longitude: 69.8, latitude: 23.1 },
     bounds: [[67.3, 20.4], [73.2, 25.2]],
     weatherPresets: [

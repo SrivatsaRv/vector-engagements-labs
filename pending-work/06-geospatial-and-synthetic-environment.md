@@ -2,6 +2,9 @@
 
 Priority: P1
 
+Status: foundation implemented on `feat/runtime/geospatial-environment`; production
+geoid/DEM ingestion and sensor integration remain follow-on work.
+
 Depends on: stable entity and sensor state contracts
 
 Blocks: terrain-aware flight, line of sight, computed coverage, and long-range geographic playback
@@ -12,7 +15,14 @@ Every entity has an authoritative geographic position, an explicit altitude refe
 
 ## Current gap
 
-VECTOR uses a study-area anchor and local east, north, up coordinates, then converts to longitude and latitude using a meters-per-degree approximation. This is adequate for a short local visualization. It does not provide ECEF, an explicit ellipsoid/geoid contract, terrain elevation, AGL, terrain collision, terrain line of sight, Earth curvature, or reproducible synthetic-environment data.
+The historical baseline used a study-area anchor and meters-per-degree
+approximation. The implemented foundation now provides WGS84
+geodetic/ECEF/ENU/NED f64 transforms; explicit ellipsoid, MSL and AGL types and
+operations; stable versioned origins; entity-keyed geographic frame recording;
+shared MapLibre/Three adapters; content-addressed environment manifests;
+versioned weather/atmosphere ports; bounded terrain and straight geometric LOS
+interfaces; and deterministic flat, ridge and no-data fixtures. Earth-curvature
+LOS, real geoid grids, production terrain and terrain collision remain gaps.
 
 ## Coordinate contract
 
@@ -94,6 +104,12 @@ Use a measured spike when the product requires global curvature, globe-scale rou
 - Terrain sampling is local, cached, bounded, and performed away from the main UI thread.
 - Coverage labels state whether they are declared, geometric, or sensor-computed.
 - A sensor path blocked by a synthetic ridge follows the expected state transition.
+
+Foundation evidence is in `tests/geospatial-environment.test.mjs` and the engine,
+map/report and backend-parity suites, including invalid/non-finite coordinates
+and fail-closed dataset/transform digest checks. Sensor state does not yet consume the
+geometric result, so the final sensor-path transition criterion remains open and
+belongs after the canonical sensor contracts land.
 
 ## Tests
 

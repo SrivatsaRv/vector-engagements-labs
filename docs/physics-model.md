@@ -5,7 +5,7 @@ Vector currently uses a deterministic three-dimensional point-mass reference eng
 ## Integrated model
 
 - fixed 50 ms integration step and sampled immutable frames;
-- local east/north/up coordinates;
+- WGS84/ECEF-derived local east/north/up coordinates with an immutable scenario origin;
 - educational standard atmosphere, density, speed of sound, and Mach;
 - air-relative velocity with an explicit three-axis wind vector;
 - launch-state inheritance;
@@ -18,11 +18,23 @@ Vector currently uses a deterministic three-dimensional point-mass reference eng
 - guidance-hold and wind-shift events;
 - closest approach, completion, energy/time termination, non-finite-state checks, and dry-mass margin diagnostics.
 
-Model coefficients are in versioned `simulation_models` rows. Public source assertions remain separate. Current coefficients are labeled model assumptions unless a field is genuinely source-backed.
+The current scalar coefficients remain in versioned `simulation_models` rows for
+catalog delivery and are also compiled into the immutable
+`vector.compiled-model-pack.v1` regression fixture. Public source assertions,
+unit-bearing model sources, compiled SI data, and credibility evidence remain
+separate. Every engine entity records the exact model ID, version, value state,
+and pack digest. This foundation does not add flight dynamics or increase the
+fidelity claim.
 
 Aircraft motion uses the same standard atmosphere and wind field as a launched vehicle. The current aircraft coefficient set resolves dynamic pressure, load-factor lift demand, parasitic and induced drag, available thrust, fuel flow, mass, and the turn-rate limit on every fixed step. It is an educational point-mass model, not a flight-manual or manufacturer engine deck.
 
-Sensor and air-defence envelopes are scenario-declared volumes. Detection, tracking, engagement, and minimum-range rings remain separate, carry their own altitude bounds and value state, and follow their owning entity in playback. The current release does not infer those radii from transmitter power, radar cross-section, terrain, propagation, or electronic attack.
+Sensor and air-defence envelopes are scenario-declared volumes and are explicitly
+labeled `DECLARED`. Detection, tracking, engagement, and minimum-range rings
+remain separate, carry their own altitude bounds and value state, and follow
+their owning entity in playback. A bounded geometric terrain-LOS port and
+synthetic fixtures now exist, but the current engine does not feed LOS into
+sensor state or infer radii from transmitter power, radar cross-section,
+terrain, propagation, or electronic attack.
 
 ## Presentation truth
 
@@ -32,7 +44,7 @@ Model Truth remains separate from IAF and PAF RASP estimates. IAF RASP estimates
 
 ## Still outside the fidelity claim
 
-Validated aircraft coefficient tables and engine maps; full 6DOF attitude/control; detailed seeker/autopilot/fuze/warhead behavior; terrain masking; waveform-level EW and countermeasures; probability of kill; operational routes or current force disposition.
+Validated aircraft coefficient tables and engine maps; full 6DOF attitude/control; detailed seeker/autopilot/fuze/warhead behavior; production terrain ingestion or terrain-aware sensor state; waveform-level EW and countermeasures; probability of kill; operational routes or current force disposition.
 
 ## Rust/WASM gate
 

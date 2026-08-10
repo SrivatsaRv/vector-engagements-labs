@@ -7,6 +7,8 @@ import {
 import { findWeaponSimulationModel } from "@/lib/simulation-models";
 import { ENGINE_VERSION } from "@/lib/engine/version";
 import { OBJECT_CATALOG } from "@/lib/object-catalog";
+import { compileModelPack } from "@/lib/model-pack";
+import { createCurrentModelPackSource } from "@/lib/reference-model-pack";
 import { finiteNumber, PublicApiError, shortString } from "./public-api";
 
 const domains = new Set(["A2A", "A2G", "G2A", "G2G"]);
@@ -51,6 +53,7 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
         longitude: finiteNumber(point.longitude, 60, 100, `${name}_longitude`),
         latitude: finiteNumber(point.latitude, 0, 40, `${name}_latitude`),
         altitudeM: finiteNumber(point.altitudeM, -500, 30_000, `${name}_altitude`),
+        verticalDatum: explicitMsl(point.verticalDatum, `${name}_vertical_datum`),
       },
       headingDeg: finiteNumber(placement.headingDeg, 0, 360, `${name}_heading`),
       speedMps: finiteNumber(placement.speedMps, 0, 3_000, `${name}_speed`),
@@ -61,11 +64,23 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
           longitude: finiteNumber(routePoint.longitude, 60, 100, `${name}_route_longitude`),
           latitude: finiteNumber(routePoint.latitude, 0, 40, `${name}_route_latitude`),
           altitudeM: finiteNumber(routePoint.altitudeM, -500, 30_000, `${name}_route_altitude`),
+          verticalDatum: explicitMsl(
+            routePoint.verticalDatum,
+            `${name}_route_vertical_datum`,
+          ),
         };
       }),
     };
   };
   return { blue: side(candidate.blue, "blue"), red: side(candidate.red, "red") };
+}
+
+function explicitMsl(value: unknown, field: string): "MSL" {
+  // vector.scenario.v2 predates the datum field but documented altitude as
+  // ASL/MSL. The compatibility adapter makes that legacy meaning explicit;
+  // any declared non-MSL datum is rejected rather than converted.
+  if (value === undefined || value === "MSL") return "MSL";
+  throw new PublicApiError(400, `invalid_${field}`);
 }
 
 function catalogObject(id: string, domain: Scenario["domain"], field: string) {
@@ -141,6 +156,17 @@ export async function buildVerifiedSavedRun(
   provenance: { schemaVersion: string; contentHash: string; draftRevision: number },
 ) {
   const scenario = validateSavedScenario(input, template);
+  const modelPackBundle = await compileModelPack(createCurrentModelPackSource());
+  if (
+    template.modelPack.id !== modelPackBundle.pack.id ||
+    template.modelPack.version !== modelPackBundle.pack.version ||
+    template.modelPack.digest !== modelPackBundle.pack.digest ||
+    !modelPackBundle.pack.intendedUses.some(
+      (item) => item.id === template.intendedUse.id && item.version === template.intendedUse.version,
+    )
+  ) {
+    throw new PublicApiError(409, "scenario_model_pack_mismatch");
+  }
   const result = simulate(scenario);
   if (result.frames.length === 0 || result.frames.length > 10_000) {
     throw new PublicApiError(422, "simulation_output_rejected");
@@ -156,7 +182,21 @@ export async function buildVerifiedSavedRun(
     createdAt: new Date().toISOString(),
     engine: ENGINE_VERSION,
     profileVersion: model ? `${model.id}@${model.version}` : "model-unavailable",
-    packageProvenance: provenance,
+    packageProvenance: {
+      ...provenance,
+      intendedUse: template.intendedUse,
+      modelPack: template.modelPack,
+      credibilityManifest: {
+        id: modelPackBundle.credibilityManifest.id,
+        version: modelPackBundle.credibilityManifest.version,
+        approvalState: modelPackBundle.credibilityManifest.approvalState,
+        limitations: modelPackBundle.credibilityManifest.limitations.map((item) => ({
+          id: item.id,
+          severity: item.severity,
+          statement: item.statement,
+        })),
+      },
+    },
     libraryScenario: {
       id: template.id,
       version: template.version,

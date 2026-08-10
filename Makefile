@@ -1,4 +1,4 @@
-.PHONY: ci-local ci-quality ci-tests db-up db-down compose-up integration-ci integration-local observability-local performance-local
+.PHONY: ci-local ci-quality ci-tests db-up db-down compose-up integration-ci integration-local observability-local performance-local worker-local
 
 db-up:
 	docker compose up -d database
@@ -31,8 +31,14 @@ observability-local: compose-up
 performance-local:
 	npm run performance:verify
 
+worker-local:
+	npm run build
+	npm run runtime:verify
+	npm run worker:verify
+
 ci-quality:
 	npm run symbols:verify
+	npm run models:verify
 	npm run engine:rust:fmt
 	npm run lint
 	npm run typecheck
