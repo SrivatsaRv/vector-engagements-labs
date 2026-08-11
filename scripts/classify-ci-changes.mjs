@@ -56,6 +56,7 @@ const CONTAINER_OR_RUNTIME = [
   /^(?:Dockerfile|compose\.ya?ml|\.dockerignore)$/,
   /^observability\//,
   /^(?:package|package-lock)\.json$/,
+  /^scripts\/(?:build-runtime-bundles|node-postgres-adapter|start-production|verify-container-image)\.mjs$/,
   /^(?:vite\.config\.ts|worker\/)/,
 ];
 

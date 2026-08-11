@@ -55,14 +55,55 @@ test("governed study areas are migration data and local Compose keeps migration 
     assert.match(migration, new RegExp(`'${id}'`));
   }
   assert.match(migration, /ON CONFLICT \(id\) DO UPDATE SET/);
-  assert.match(compose, /migrate:[\s\S]*command: \["npm", "run", "db:migrate"\]/);
-  assert.match(compose, /seed:[\s\S]*command: \["npm", "run", "db:seed"\]/);
-  assert.match(compose, /VECTOR_IMAGE_TAG:-0\.1\.0-dev/);
+  assert.match(compose, /migrate:[\s\S]*command: \["node", "dist\/admin\/migrate-db\.mjs"\]/);
+  assert.match(compose, /seed:[\s\S]*command: \["node", "dist\/admin\/seed-db\.mjs"\]/);
+  assert.equal((compose.match(/\$\{VECTOR_IMAGE:-vector-engagement-lab:0\.1\.0-dev\}/g) ?? []).length, 3);
   assert.doesNotMatch(compose, /:latest(?:\s|$)/m);
   assert.match(makefile, /npm run db:governed-data:verify\n\tnpm run db:seed/);
   assert.match(packageJson, /"db:governed-data:verify"/);
   assert.match(dockerignore, /^engine-rust\/target$/m);
+  assert.match(dockerignore, /^blog$/m);
   assert.match(dockerignore, /^outputs$/m);
+});
+
+test("Compose and release delivery admit one immutable production image", async () => {
+  const [dockerfile, compose, release, packageJson, runtimeBuilder] = await Promise.all([
+    read("Dockerfile"),
+    read("compose.yaml"),
+    read(".github/workflows/release.yml"),
+    read("package.json"),
+    read("scripts/build-runtime-bundles.mjs"),
+  ]);
+
+  assert.match(dockerfile, /FROM node:22\.18\.0-bookworm-slim@sha256:[0-9a-f]{64} AS base/);
+  assert.match(dockerfile, /FROM dependencies AS build/);
+  assert.match(dockerfile, /FROM base AS runtime/);
+  assert.doesNotMatch(dockerfile, /ARG (?:DATABASE_URL|OTEL_EXPORTER_OTLP_ENDPOINT)/);
+  assert.match(dockerfile, /org\.opencontainers\.image\.revision/);
+  assert.match(dockerfile, /USER node/);
+  assert.match(dockerfile, /CMD \["node", "dist\/runtime\/start-production\.mjs"\]/);
+  assert.doesNotMatch(dockerfile, /wrangler dev|npm ci --omit=dev/);
+
+  assert.match(compose, /VECTOR_RUNTIME: node/);
+  assert.doesNotMatch(compose, /VECTOR_IMAGE_(?:REPOSITORY|TAG)/);
+  assert.doesNotMatch(compose, /(?:DATABASE_URL|OTEL_EXPORTER_OTLP_ENDPOINT):[\s\S]{0,80}build:/);
+  assert.doesNotMatch(compose, /vector_wrangler/);
+
+  assert.match(release, /image=ghcr\.io\/\$\{GITHUB_REPOSITORY,,\}/);
+  assert.match(release, /platforms: linux\/amd64,linux\/arm64/g);
+  assert.match(release, /packages: write/);
+  assert.match(release, /flavor: latest=false/);
+  assert.match(release, /type=semver,pattern=\{\{version\}\}/);
+  assert.match(release, /type=raw,value=sha-\$\{\{ needs\.verify\.outputs\.sha \}\}/);
+  assert.doesNotMatch(release, /pattern=\{\{(?:major|minor)\}\}/);
+  assert.match(release, /VECTOR_IMAGE: \$\{\{ needs\.verify\.outputs\.image \}\}@\$\{\{ steps\.image\.outputs\.digest \}\}/);
+  assert.match(release, /Attest published image/);
+
+  for (const line of release.matchAll(/uses: [^\n]+@([^\s]+)/g)) {
+    assert.match(line[1], /^[0-9a-f]{40}$/, `release action must be SHA-pinned: ${line[0]}`);
+  }
+  assert.match(packageJson, /build-runtime-bundles\.mjs/);
+  assert.match(runtimeBuilder, /dist\/server\/node-postgres\.mjs/);
 });
 
 test("the Place and flight workspace exposes all governed choices and blocks an incomplete catalog", async () => {

@@ -78,6 +78,14 @@ test("container changes build the image and exercise integration", () => {
     "integration",
     "container",
   ]);
+  assert.deepEqual(selected(["scripts/start-production.mjs"]), [
+    "policy",
+    "quality",
+    "security_js",
+    "web_tests",
+    "integration",
+    "container",
+  ]);
 });
 
 test("workflow changes fail closed through every available gate", () => {

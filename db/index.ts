@@ -1,4 +1,4 @@
-import postgres, { type Sql } from "postgres";
+import workerPostgres, { type Sql } from "postgres";
 import { observeDatabaseOperation } from "@/lib/observability/server";
 
 type RuntimeEnv = Cloudflare.Env & {
@@ -6,12 +6,27 @@ type RuntimeEnv = Cloudflare.Env & {
   DATABASE_URL?: string;
 };
 
-async function connectionString() {
-  // Vinext inlines server-only process.env values during the production build.
-  // Docker supplies DATABASE_URL as a build argument; Workers fall through to
-  // the Hyperdrive binding below when that value is absent.
-  const nodeDatabaseUrl = process.env.DATABASE_URL;
-  if (nodeDatabaseUrl) return nodeDatabaseUrl;
+type PostgresFactory = typeof workerPostgres;
+
+async function databaseRuntime(): Promise<{
+  connectionString: string;
+  postgres: PostgresFactory;
+}> {
+  if (process.env.VECTOR_RUNTIME === "node") {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error("DATABASE_URL is required by the Node runtime.");
+    }
+    // Vinext resolves the static import above for workerd. Docker places this
+    // Node-specific adapter beside the server bundle, keeping credentials as
+    // runtime configuration rather than build inputs.
+    const nodeAdapter = "./node-postgres.mjs";
+    const { default: postgres } = await import(/* @vite-ignore */ nodeAdapter) as {
+      default: PostgresFactory;
+    };
+    return { connectionString, postgres };
+  }
+
   // Keep the Workers-only module out of the Node production bundle. A literal
   // dynamic import is still statically followed by Vinext and makes Docker's
   // Node loader attempt to resolve the `cloudflare:` protocol at startup.
@@ -24,11 +39,12 @@ async function connectionString() {
       "PostgreSQL is unavailable. Configure the HYPERDRIVE binding or DATABASE_URL.",
     );
   }
-  return value;
+  return { connectionString: value, postgres: workerPostgres };
 }
 
 export async function withDatabase<T>(operation: (sql: Sql) => Promise<T>) {
-  const sql = postgres(await connectionString(), {
+  const runtime = await databaseRuntime();
+  const sql = runtime.postgres(runtime.connectionString, {
     max: 2,
     fetch_types: false,
     prepare: true,

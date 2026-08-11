@@ -32,6 +32,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-
 - [`cloudflare-architecture.md`](cloudflare-architecture.md): Workers, Hyperdrive, optional R2, deployment gates, and local parity.
 - [`product-language.md`](product-language.md): canonical workflow and human-readable military terminology.
 - [`repository-governance.md`](repository-governance.md): protected branches, CI/CD, releases, tags, ownership, and repository status.
+- [`container-release.md`](container-release.md): authoritative Compose topology, immutable GHCR images, promotion, rollback, backup, and restore.
 - [`blog-publishing.md`](blog-publishing.md): markdown frontmatter, thumbnail assets, canonical metadata, and ops publishing flow.
 - [`security-boundaries.md`](security-boundaries.md): anonymous API admission, saved-run integrity, metrics protection, caching, and delivery trust.
 - [`../AGENTS.md`](../AGENTS.md) and [`../.codex/skills/vector-lab-harness/SKILL.md`](../.codex/skills/vector-lab-harness/SKILL.md): project-level agent routing, focused context loading, release-train ownership, and verification/handoff rules.

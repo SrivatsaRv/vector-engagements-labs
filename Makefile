@@ -1,4 +1,4 @@
-.PHONY: ci-local ci-quality ci-tests db-up db-down compose-build compose-up integration-ci integration-local observability-local performance-local reference-aircraft-local worker-local
+.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local reference-aircraft-local worker-local
 
 db-up: compose-build
 	docker compose up -d database
@@ -8,11 +8,25 @@ db-up: compose-build
 db-down:
 	docker compose down
 
-compose-build:
-	docker compose build vector
+compose-config:
+	docker compose config --quiet
 
-compose-up: compose-build
+compose-build: compose-config
+	VECTOR_SOURCE_REVISION="$$(git rev-parse HEAD)" docker compose build vector
+
+container-verify: compose-build
+	VECTOR_IMAGE="$${VECTOR_IMAGE:-vector-engagement-lab:0.1.0-dev}" npm run container:verify
+
+compose-up: container-verify
 	docker compose up -d
+
+compose-pull: compose-config
+	@test -n "$${VECTOR_IMAGE:-}" || (echo "VECTOR_IMAGE must be an immutable tag or digest" >&2; exit 1)
+	@case "$$VECTOR_IMAGE" in *:latest) echo "latest is not an admitted image tag" >&2; exit 1;; esac
+	docker compose pull migrate seed vector
+
+compose-up-candidate: compose-pull
+	docker compose up -d --no-build
 
 integration-local: compose-up
 	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector npm run db:verify

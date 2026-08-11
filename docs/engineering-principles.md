@@ -33,15 +33,15 @@ tick.
 | Factor | Repository rule |
 | --- | --- |
 | Codebase | One tracked repository, with deploys derived from immutable commits. |
-| Dependencies | Node, Rust, browser, and container dependencies are declared and versioned. |
-| Config | Runtime configuration is supplied through environment variables or platform bindings. Secrets never enter source control. |
+| Dependencies | Node, Rust, browser, and container dependencies are declared and versioned; the production image contains built runtime artifacts rather than development tooling. |
+| Config | Runtime configuration is supplied through environment variables or platform bindings. Database and telemetry configuration are not Docker build arguments. Secrets never enter source control or image layers. |
 | Backing services | PostgreSQL/PostGIS, object storage, and telemetry endpoints are attached resources behind adapters. |
-| Build, release, run | Build artifacts are created once; deployment configuration selects a release; runtime does not migrate or seed implicitly. |
+| Build, release, run | One multi-architecture image is created once, identified by digest, and promoted without rebuilding. Runtime does not migrate or seed implicitly. |
 | Processes | Web/API processes are stateless. Durable scenario packages and runs live in backing services or user-downloaded records. |
 | Port binding | The local application exports HTTP on the configured port, currently 4317. |
 | Concurrency | Browser Workers scale local batches; stateless edge handlers scale independently; coordinated sessions require an explicit state service. |
 | Disposability | Startup and shutdown are bounded, migrations are one-shot jobs, and interrupted runs never become completed records. |
-| Dev/prod parity | Compose and Cloudflare use the same scenario, engine, API, and migration contracts even when their service adapters differ. |
+| Dev/prod parity | Compose is the authoritative service topology. Its Node/Postgres and Cloudflare/Hyperdrive adapters implement the same scenario, engine, API, and migration contracts. |
 | Logs | Services emit structured event streams and OpenTelemetry signals rather than writing private local log files as authority. |
 | Admin processes | Migration, seed, verification, benchmark, and export commands are explicit one-off tasks. |
 
