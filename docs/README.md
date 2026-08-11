@@ -34,7 +34,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-
 - [`blog-publishing.md`](blog-publishing.md): markdown frontmatter, thumbnail assets, canonical metadata, and ops publishing flow.
 - [`security-boundaries.md`](security-boundaries.md): anonymous API admission, saved-run integrity, metrics protection, caching, and delivery trust.
 - [`../AGENTS.md`](../AGENTS.md) and [`../.codex/skills/vector-lab-harness/SKILL.md`](../.codex/skills/vector-lab-harness/SKILL.md): project-level agent routing, focused context loading, release-train ownership, and verification/handoff rules.
-- [`../pending-work/README.md`](../pending-work/README.md): dependency-ordered A2A research and implementation backlog.
+- [Causal simulation runtime epic #47](https://github.com/SrivatsaRv/vector-engagements-labs/issues/47): dependency order, executable scope, status, and acceptance links. GitHub Issues are the work authority; this directory remains the durable product and engineering contract.
 
 ## One journey
 
@@ -57,6 +57,12 @@ The portable replay and debriefing artifact is specified in [`vector-simulation-
 The air-picture source dependencies, effect scope, transitions, and automated regression matrix are specified in [`rasp-state-machine.md`](rasp-state-machine.md).
 
 The release proof across engine, map, symbols, reports, persistence, observability, and responsive breakpoints is specified in [`regression-matrix.md`](regression-matrix.md).
+
+## Simulation-object objective
+
+Every object visible in the shared 3D world must move and change state as a causal result of its versioned model pack, authored initial conditions, environment, side-owned information, configured mission/behavior, and bounded commands interpreted by its dynamics component. The renderer replays canonical achieved state; it never invents movement. Behavior labels, events, timelines, and reports explain that movement rather than substitute for it.
+
+The contract is cross-domain. A2A is the first proving domain because it stresses continuous dynamics, sensing, pursuit/defence, weapon support, and replay, but named platforms are data fixtures rather than engine or renderer branches.
 
 ## Working vertical slice
 

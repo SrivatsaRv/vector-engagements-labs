@@ -1,6 +1,6 @@
 ---
 name: vector-lab-harness
-description: Project-level operating harness for Vector Engagement Labs. Use when implementing, reviewing, planning, testing, or coordinating work in this repository, especially simulation engine, model data, geospatial, browser runtime, release-train, database, observability, or documentation tasks. Routes work to the correct stream, loads only relevant docs and pending-work context, and enforces branch, contract, verification, and handoff rules.
+description: Project-level operating harness for Vector Engagement Labs. Use when implementing, reviewing, planning, testing, or coordinating work in this repository, especially simulation physics, model data, sensing, mission behavior, 3D playback, geospatial, browser runtime, release-train, database, observability, or documentation tasks. Routes work to the owning GitHub issue and maintained docs, and enforces branch, contract, verification, and handoff rules.
 ---
 
 # Vector Lab Harness
@@ -10,8 +10,8 @@ Use this skill as the repository's low-token steering layer. Treat tracked code 
 ## Start every task
 
 1. Confirm the current worktree and branch with `git status --short --branch`.
-2. Run `scripts/context-slice.sh <stream>` from the repository root. Choose `data`, `geo`, `browser`, `release`, `server`, `ui`, `security`, or `general`.
-3. Read only the listed contract documents and directly relevant source files. Read full files when changing their contract; otherwise use headings and targeted searches first.
+2. Run `scripts/context-slice.sh <stream>` from the repository root. Choose `data`, `physics`, `information`, `geo`, `browser`, `behavior`, `visualization`, `release`, `server`, `ui`, `security`, or `general`.
+3. Read the listed owning GitHub issue and only the listed contract documents and directly relevant source files. Read full files when changing their contract; otherwise use headings and targeted searches first.
 4. Inspect existing tests before changing behavior. Preserve unrelated user changes.
 5. State a short execution plan, then implement rather than stopping at analysis.
 
@@ -19,7 +19,7 @@ Use this skill as the repository's low-token steering layer. Treat tracked code 
 
 Use [references/workstreams.md](references/workstreams.md) to select ownership, branch, worktree, dependencies, and non-goals. Never create a competing schema or duplicate a contract owned by another stream.
 
-The release train is `release/x86-runtime`; feature PRs target it, never `main`. The current merge order is data foundation, geospatial environment, browser runtime, then native server foundation. Rebase or merge the current release branch before handoff.
+GitHub epic [#47](https://github.com/SrivatsaRv/vector-engagements-labs/issues/47) owns causal order. Feature PRs target the protected integration branch declared by their issue; use `origin/main` when no active release train is declared. Rebase or merge the current integration branch before handoff.
 
 ## Worktree integration
 
@@ -29,17 +29,17 @@ Use this flow:
 
 1. Feature chat works only in its assigned worktree and keeps changes scoped.
 2. Feature chat runs focused tests, `make ci-local`, updates docs, commits, and pushes its branch.
-3. Release steward reviews the commit/PR and merges it into `release/x86-runtime`.
-4. Dependent feature chats run `git fetch origin` and rebase or merge `origin/release/x86-runtime` into their own branch after saving/committing local work.
-5. Run grouped integration and cross-stream tests from the release worktree after every merge.
+3. The steward reviews the commit/PR and merges it into the declared integration branch.
+4. Dependent feature work runs `git fetch origin` and rebases or merges the declared integration branch after saving/committing local work.
+5. Run grouped integration and cross-stream tests from the integration worktree after every merge.
 
 Never copy files between worktrees, cherry-pick another chat's uncommitted state, or have two chats edit the same branch. If a shared contract is needed early, commit the smallest contract slice, push it, and let the release steward merge it before dependent implementation proceeds. Use `git status`, `git log`, and `git diff` to prove which state is being shared.
 ## Context discipline
 
-- Prefer the context-slice script and targeted `rg` searches over dumping `docs/`, `pending-work/`, or whole source trees.
+- Prefer the context-slice script, the owning GitHub issue, and targeted `rg` searches over dumping `docs/` or whole source trees.
 - Load detailed references only when the task enters that area: [references/contracts.md](references/contracts.md) contains invariants that must not be violated.
 - Do not repeat project background in code comments or task updates when a concise link to the governing document is enough.
-- Record new decisions in the owning `docs/` file or pending-work item so future agents do not need this conversation.
+- Record durable contract decisions in the owning `docs/` file and executable scope/status in the owning GitHub issue so future agents do not need this conversation.
 
 ## Engineering rules
 
