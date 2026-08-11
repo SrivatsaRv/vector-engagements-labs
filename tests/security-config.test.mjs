@@ -33,7 +33,7 @@ test("local Worker image includes a trusted TLS root store", async () => {
   assert.match(dockerfile, /ca-certificates/);
 });
 
-test("release and deployment workflows admit reviewed main history", async () => {
+test("release and deployment workflows admit reviewed, CI-green main history", async () => {
   const release = await read(".github/workflows/release.yml");
   const deploy = await read(".github/workflows/deploy-cloudflare.yml");
   assert.match(release, /workflow_dispatch:/);
@@ -41,21 +41,26 @@ test("release and deployment workflows admit reviewed main history", async () =>
   assert.match(release, /merge-base --is-ancestor/);
   assert.match(release, /Generate SBOM/);
   assert.match(release, /Attest release archive/);
+  assert.match(release, /make integration-ci/);
+  assert.match(release, /Stage 4: Required PR Gate/);
   assert.match(deploy, /github\.ref == 'refs\/heads\/main'/);
   assert.match(deploy, /merge-base --is-ancestor/);
+  assert.match(deploy, /Stage 4: Required PR Gate/);
+  assert.doesNotMatch(deploy, /npm run db:seed/);
 });
 
-test("pull-request validation is causal and excludes browser and benchmark jobs", async () => {
+test("pull-request validation is change-aware with one stable required gate", async () => {
   const [ci, scheduledCodeql] = await Promise.all([
     read(".github/workflows/ci.yml"),
     read(".github/workflows/codeql.yml"),
   ]);
-  assert.match(ci, /needs: quality/);
-  assert.match(ci, /needs: security/);
-  assert.match(ci, /needs: tests/);
-  assert.match(ci, /needs: integration/);
-  assert.match(ci, /make ci-quality/);
-  assert.match(ci, /make ci-tests/);
+  assert.match(ci, /classify:/);
+  assert.match(ci, /classify-ci-changes\.mjs/);
+  assert.match(ci, /name: "Stage 4: Required PR Gate"/);
+  assert.match(ci, /if: always\(\)/);
+  assert.match(ci, /needs:\s*\n\s*- classify/);
+  assert.match(ci, /npm run audit:production/);
+  assert.match(ci, /cargo audit/);
   assert.match(ci, /make integration-ci/);
   assert.doesNotMatch(ci, /ui:responsive|playwright|performance-local|benchmark-engine/);
   assert.doesNotMatch(scheduledCodeql, /pull_request:|branches: \[main\]/);

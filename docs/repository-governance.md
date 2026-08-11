@@ -10,8 +10,9 @@ All contributor work enters through a pull request. The `main` branch requires:
 
 - an up-to-date branch;
 - resolution of review conversations;
-- passing the staged Required PR Gate, which depends on quality, supply-chain,
-  security, unit, contract, database, and API checks;
+- passing the staged Required PR Gate, which always verifies repository policy
+  and requires every quality, security, test, integration, or container gate
+  selected from the changed contracts;
 - linear history;
 - no force pushes and no branch deletion.
 
@@ -27,14 +28,26 @@ Repository administrators retain emergency recovery authority but should not use
 
 ## Continuous integration
 
-`ci.yml` is one causal pull-request pipeline. Stage 1 verifies source generation,
-Rust formatting, lint, and type safety. Stage 1.5 performs the production
-dependency audit, dependency review, and CodeQL analysis. Stage 2 verifies the
-Rust/WASM module, Rust tests and documentation, the production build, and the
-TypeScript contract suite. Stage 3 runs migrations and validates PostGIS, the
-catalog API, saved-run verification, and report replay against the built
-application. Stage 4 emits the single required PR gate only after every prior
-stage succeeds.
+`ci.yml` is one change-aware pull-request and `main` pipeline. Stage 0 computes
+the changed files from immutable base and head revisions with the tracked
+classifier and always runs repository-policy regression tests. Independent
+quality, JavaScript supply-chain/CodeQL, web-contract, Rust/WASM/parity,
+RustSec, PostGIS/API, and container-rebuild jobs then run in parallel only when
+their owned paths or an unclassified path changed. Workflow and Dependabot
+changes deliberately fail closed through every gate. Stage 4 retains the one
+stable branch-protection context and fails unless every selected job passed;
+jobs skipped by the classifier are not treated as missing evidence.
+
+Documentation, project-skill, and governance-only changes run the classifier,
+policy suite, and final gate without rebuilding the application, Rust engine,
+container, or PostGIS. Blog content and thumbnails build and test the rendered
+web product but do not invoke Rust or PostGIS. Frontend code adds lint,
+typecheck, CodeQL, and web contracts. Rust and shared engine contracts add
+Rust/WASM/parity checks; Cargo manifest changes also run the pinned RustSec
+audit. Database, migration, and API changes add PostGIS integration. Container,
+Compose, runtime-binding, dependency, and workflow changes add an image rebuild
+and the integration gates. Unknown paths run everything until ownership is
+declared in `scripts/classify-ci-changes.mjs`.
 
 Browser/responsive checks and performance benchmarks are deliberately not run
 on GitHub-hosted pull-request runners. They remain explicit maintainer checks
@@ -55,13 +68,38 @@ maintainer dispatches. Dependabot permits one open maintenance pull request per
 ecosystem, groups routine npm, Cargo, and Actions updates, and excludes major
 versions so they require an intentional maintainer proposal.
 
-The commit gate rejects high-severity production dependency advisories. The Cloudflare Vite adapter, Wrangler, and Workers type package are upgraded as one tested compatibility set and are no longer excluded from Dependabot. Remaining npm audit findings are development-only advisories inherited through local migration and Cloudflare tooling; they are not shipped in the Worker runtime dependency surface and remain tracked for upstream removal. Production dependencies currently audit cleanly.
+The commit gate rejects high-severity production dependency advisories. Cargo
+manifest changes and releases also audit `engine-rust/Cargo.lock` with the
+pinned `cargo-audit` version and current RustSec advisory database. The
+Cloudflare Vite adapter, Wrangler, and Workers type package are upgraded as one
+tested compatibility set and are no longer excluded from Dependabot. Remaining
+npm audit findings are development-only advisories inherited through local
+migration and Cloudflare tooling; they are not shipped in the Worker runtime
+dependency surface and remain tracked for upstream removal. Production
+dependencies currently audit cleanly.
 
 ## Continuous delivery
 
-A maintainer dispatches the release workflow from `main` with an existing semantic tag. The workflow verifies that the tag matches `package.json` and resolves to reviewed `main` history, runs the full gate, generates an SPDX SBOM and SHA-256 manifest, attests the archive, and publishes through the protected `release` environment. Tag pushes alone cannot execute release code.
+A maintainer dispatches the release workflow from `main` with an existing
+semantic tag. The workflow verifies that the tag matches `package.json`,
+resolves to reviewed `main` history, and already has a successful Required PR
+Gate on that exact commit. It then reruns quality, unit, parity, production
+dependency, RustSec, PostGIS migration, and application integration checks,
+generates an SPDX SBOM and SHA-256 manifest, attests the archive, and publishes
+through the protected `release` environment. Tag pushes alone cannot execute
+release code. The `release` environment accepts protected branches and requires
+an explicit maintainer approval before publication.
 
-Cloudflare delivery is deliberately manual and protected by the GitHub `production` environment. It deploys an explicit commit SHA only after CI and requires two protected secrets and two non-secret environment variables:
+Cloudflare delivery is deliberately manual and protected by the GitHub
+`production` environment. Both verification and deployment require a full
+40-character commit SHA from `main` with a successful Required PR Gate before
+any production credential is exposed. Verification checks source, Hyperdrive,
+and the production catalog read-only. Deployment alone applies forward-only
+migrations, deploys the admitted revision, and verifies production health. It
+never seeds production implicitly. The environment accepts protected branches
+and requires an explicit maintainer approval before credentials are released.
+The workflow requires two protected secrets and three non-secret environment
+variables:
 
 - `CLOUDFLARE_API_TOKEN` with least-privilege Worker deployment access;
 - `DATABASE_ORIGIN_URL` as a protected environment secret for migrations and

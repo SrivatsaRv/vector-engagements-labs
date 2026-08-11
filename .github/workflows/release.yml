@@ -10,13 +10,32 @@ on:
 
 permissions:
   contents: read
+  checks: read
 
 jobs:
   verify:
     if: github.ref == 'refs/heads/main'
     name: Verify reviewed release revision
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
+        env:
+          POSTGRES_DB: vector
+          POSTGRES_USER: vector
+          POSTGRES_PASSWORD: vector
+        ports:
+          - 55433:5432
+        options: >-
+          --health-cmd "pg_isready -U vector -d vector"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgres://vector:vector@127.0.0.1:55433/vector
+      VECTOR_URL: http://127.0.0.1:4317
+      PORT: "4317"
     outputs:
       sha: ${{ steps.admission.outputs.sha }}
       tag: ${{ steps.admission.outputs.tag }}
@@ -28,6 +47,7 @@ jobs:
       - name: Admit a reviewed semantic-version tag
         id: admission
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           test "${GITHUB_REF}" = "refs/heads/main"
@@ -36,6 +56,8 @@ jobs:
           RELEASE_SHA="$(git rev-list -n 1 "refs/tags/${RELEASE_TAG}")"
           test -n "${RELEASE_SHA}"
           git merge-base --is-ancestor "${RELEASE_SHA}" origin/main
+          gate_count="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_SHA}/check-runs?per_page=100" --jq '[.check_runs[] | select(.name == "Stage 4: Required PR Gate" and .conclusion == "success")] | length')"
+          test "${gate_count}" -ge 1
           test "${RELEASE_TAG}" = "v$(git show "${RELEASE_SHA}:package.json" | node -e 'let x="";process.stdin.on("data",d=>x+=d).on("end",()=>process.stdout.write(JSON.parse(x).version))')"
           echo "sha=${RELEASE_SHA}" >> "${GITHUB_OUTPUT}"
           echo "tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
@@ -57,11 +79,19 @@ jobs:
           components: clippy,rustfmt
       - name: Install and verify
         run: npm ci && make ci-local
+      - name: Audit locked Rust dependencies
+        run: |
+          cargo install cargo-audit --locked --version 0.22.2
+          cargo audit --file engine-rust/Cargo.lock
+      - name: Verify PostGIS migrations and application integration
+        run: |
+          npm run build
+          make integration-ci
       - name: Build release artifacts
         env:
           RELEASE_TAG: ${{ steps.admission.outputs.tag }}
         run: |
-          tar -czf "vector-engagement-labs-${RELEASE_TAG}.tar.gz" dist docs engine-rust lib/engine README.md LICENSE NOTICE CHANGELOG.md
+          tar -czf "vector-engagement-labs-${RELEASE_TAG}.tar.gz" dist docs engine-rust/src engine-rust/Cargo.toml engine-rust/Cargo.lock engine-rust/README.md lib/engine README.md LICENSE NOTICE CHANGELOG.md
           shasum -a 256 "vector-engagement-labs-${RELEASE_TAG}.tar.gz" > SHA256SUMS
       - name: Generate SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610

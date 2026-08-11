@@ -19,6 +19,15 @@ Use the smallest complete set for a change. State why any applicable layer was o
 
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and production-audit checks. `make integration-local` covers the live PostGIS and API path; `make observability-local` covers telemetry; `make performance-local` covers the engine benchmark; responsive verification covers documented breakpoints. These remain separate because they have different environment and runtime costs.
 
+GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
+automated gate from changed paths. Repository-policy tests always run, and an
+unknown path fails closed through every CI job. Documentation and agent-harness
+changes do not consume application, Rust, container, or PostGIS runners. Web,
+simulation, database/API, dependency, workflow, and infrastructure paths each
+add their owning gates. The single Required PR Gate is always emitted and
+verifies that every selected job passed; workflow-level path exclusions are not
+used because they can strand a required check.
+
 ## Framework decision
 
 Keep Node's built-in test runner and Cargo for the existing domain and engine suites. Add `@playwright/test` as the browser end-to-end and visual runner; `playwright-core` alone is not a test framework. Add Vitest plus Testing Library only when component tests require mocking, coverage and watch mode that the built-in runner cannot provide efficiently. Introduce each dependency with a real suite, CI/local command, documentation and maintenance rationale. Do not add multiple overlapping frontend runners.

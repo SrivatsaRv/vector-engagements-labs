@@ -15,14 +15,24 @@ test("production workflow keeps credentials secret and binding IDs non-secret", 
   assert.doesNotMatch(workflow, /secrets\.CLOUDFLARE_(?:ACCOUNT_ID|HYPERDRIVE_ID)/);
 });
 
-test("production publish requires an immutable commit and Hyperdrive verification", async () => {
+test("production operations admit one immutable reviewed commit and never seed production", async () => {
   const workflow = await read(".github/workflows/deploy-cloudflare.yml");
+  const verifyJob = workflow.match(/\n  verify:\n([\s\S]*?)\n  migrate:/)?.[1];
+  const migrateJob = workflow.match(/\n  migrate:\n([\s\S]*?)\n  deploy:/)?.[1];
 
-  assert.match(workflow, /inputs\.operation == 'deploy'/);
+  assert.ok(verifyJob, "verify job must exist");
+  assert.ok(migrateJob, "migrate job must exist");
   assert.match(workflow, /\^\[0-9a-f\]\{40\}\$/);
+  assert.match(workflow, /Stage 4: Required PR Gate/);
+  assert.match(workflow, /check-runs/);
+  assert.doesNotMatch(workflow, /ref: \$\{\{ inputs\.ref \}\}/);
   assert.match(workflow, /wrangler hyperdrive get/);
   assert.match(workflow, /npm run db:migrate/);
   assert.match(workflow, /npm run db:verify/);
+  assert.doesNotMatch(workflow, /npm run db:seed/);
+  assert.doesNotMatch(verifyJob, /npm run db:migrate|npm run db:seed/);
+  assert.match(migrateJob, /if: inputs\.operation == 'deploy'/);
+  assert.match(workflow, /Verify deployed health/);
 });
 
 test("Worker database adapter consumes the generated Hyperdrive binding", async () => {
