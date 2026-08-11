@@ -36,6 +36,19 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-
 - [`../AGENTS.md`](../AGENTS.md) and [`../.codex/skills/vector-lab-harness/SKILL.md`](../.codex/skills/vector-lab-harness/SKILL.md): project-level agent routing, focused context loading, release-train ownership, and verification/handoff rules.
 - [Causal simulation runtime epic #47](https://github.com/SrivatsaRv/vector-engagements-labs/issues/47): dependency order, executable scope, status, and acceptance links. GitHub Issues are the work authority; this directory remains the durable product and engineering contract.
 
+## Engineering personas
+
+The project harness is the shared operating protocol. Four authoritative skills divide engineering responsibility without creating competing contracts:
+
+| Explicit invocation | Authority |
+| --- | --- |
+| `$vector-staff-engineer` | Architecture, shared contracts, causal delivery order, and cross-stream integration |
+| `$vector-simulation-systems-engineer` | Dynamics, behavior, guidance, weapons, sensing, tracking, datalinks, EW, and causal simulation validity |
+| `$vector-3d-frontend-engineer` | Scenario UX, canonical 2D/3D observation, playback, interaction, telemetry, responsive presentation, and frontend performance |
+| `$vector-verification-performance-engineer` | Independent validation, regression, parity, browser and visual testing, performance, security, recovery, and release readiness |
+
+Invoke a persona with the `$skill-name` shown above. Each persona follows `$vector-lab-harness`, the owning GitHub issue, and the maintained contracts in this directory. The Staff Architect owns the integrated outcome; specialist authority and independent verification remain explicit.
+
 ## One journey
 
 | Product stage | Includes |

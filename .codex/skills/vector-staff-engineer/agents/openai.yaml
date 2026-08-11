@@ -1,0 +1,4 @@
+interface:
+  display_name: "VECTOR Staff Software Engineer & Architect"
+  short_description: "Own architecture and cross-system delivery"
+  default_prompt: "Use $vector-staff-engineer to turn this outcome into a coherent architecture and delivery slice."

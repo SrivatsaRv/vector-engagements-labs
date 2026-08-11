@@ -1,0 +1,4 @@
+interface:
+  display_name: "VECTOR Verification, Performance & Release Engineer"
+  short_description: "Prove performance and release readiness"
+  default_prompt: "Use $vector-verification-performance-engineer to independently verify performance and release readiness."
