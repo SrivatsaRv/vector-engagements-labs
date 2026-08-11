@@ -19,6 +19,12 @@ Use the smallest complete set for a change. State why any applicable layer was o
 
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and production-audit checks. `make integration-local` builds and starts the authoritative Compose topology, verifies governed migration data before fixture admission, covers the live PostGIS/API path, and runs automated responsive interaction checks. `make observability-local` covers telemetry; `make performance-local` covers the engine benchmark. These remain separate because they have different environment and runtime costs.
 
+Database integration additionally runs `db:credibility:verify`, which confirms
+the live immutable triggers reject same-version mutation and malformed compiled
+pack insertion under rolled-back transactions. API tests assert that admitted
+credibility, limitations, persisted run provenance, and the Validate surface
+all carry the same pack digest.
+
 GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
 automated gate from changed paths. Repository-policy tests always run, and an
 unknown path fails closed through every CI job. Documentation and agent-harness

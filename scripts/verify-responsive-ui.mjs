@@ -242,6 +242,10 @@ try {
     }
     const runButton = page.getByRole("button", { name: "Run baseline", exact: true });
     await runButton.waitFor();
+    const credibilityText = await page.locator(".credibility-admission").innerText();
+    assert.match(credibilityText, /DRAFT/);
+    assert.match(credibilityText, /BLOCKING:/);
+    assert.match(credibilityText, /vector-scalar-study-models@0\.6\.0/);
     assert.equal(await runButton.isEnabled(), true, `${viewport.width}: calibrated template is not runnable`);
     await runButton.click();
     await page.locator('.session-layout[data-engine-backend="rust-wasm"]').waitFor();

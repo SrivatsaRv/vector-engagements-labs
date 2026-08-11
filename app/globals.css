@@ -3494,6 +3494,19 @@ button:disabled,
   padding: 15px;
   min-height: 140px;
 }
+.review-inputs > .credibility-admission {
+  grid-column: 1 / -1;
+  border: 1px solid #d8aa64;
+  background: #fff8ec;
+  padding: 15px;
+}
+.review-inputs > .credibility-admission.admitted {
+  border-color: #9bbba2;
+  background: #f2f7f3;
+}
+.credibility-admission strong { color: #6c4b19; }
+.credibility-admission.admitted strong { color: var(--green); }
+.credibility-admission p + p { margin-top: 7px; }
 .review-inputs strong {
   display: block;
   font-size: 12px;
@@ -4023,6 +4036,9 @@ button:disabled,
     grid-template-columns: 1fr;
   }
   .review-inputs aside {
+    grid-column: 1;
+  }
+  .review-inputs > .credibility-admission {
     grid-column: 1;
   }
   .report-output-scope {

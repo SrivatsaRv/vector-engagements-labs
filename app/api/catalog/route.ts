@@ -3,6 +3,7 @@ import { withDatabase } from "@/db";
 import { withObservedRoute } from "@/lib/observability/server";
 import { publicApiError } from "@/lib/security/public-api";
 import { enforceRateLimit } from "@/lib/security/runtime";
+import { admitCatalogCredibility } from "@/lib/catalog-admission";
 
 const CATALOG_TTL_MS = 5 * 60 * 1000;
 let catalogCache: { expiresAt: number; value: Record<string, unknown> } | undefined;
@@ -26,7 +27,13 @@ async function loadCatalog() {
       sql`SELECT id, version, schema_version, digest, payload, credibility_manifest_id, credibility_manifest_version FROM compiled_model_packs ORDER BY id, version`,
       sql`SELECT id, version, schema_version, subject_kind, subject_id, subject_digest, manifest, content_hash, approval_state FROM credibility_manifests ORDER BY id, version`,
     ]);
-    return { platforms, weapons, subsystems, sources, compatibility, assertions, simulationModels, installations, studyAreas, scenarioTemplates, intendedUses, compiledModelPacks, credibilityManifests };
+    const credibilityAdmissions = admitCatalogCredibility({
+      scenarioTemplates,
+      intendedUses,
+      compiledModelPacks,
+      credibilityManifests,
+    });
+    return { platforms, weapons, subsystems, sources, compatibility, assertions, simulationModels, installations, studyAreas, scenarioTemplates, intendedUses, compiledModelPacks, credibilityManifests, credibilityAdmissions };
   }).then((value) => {
     catalogCache = { expiresAt: Date.now() + CATALOG_TTL_MS, value };
     return value;

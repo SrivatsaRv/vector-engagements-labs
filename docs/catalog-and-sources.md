@@ -16,6 +16,13 @@ The runtime catalog lives in PostgreSQL/PostGIS and separates:
 12. `compiled_model_packs`: immutable SI-normalized arrays identified by SHA-256 digest.
 13. `credibility_manifests`: engine or model-pack evidence, validity, uncertainty, limitations, and approval state.
 
+The four governed evidence tables—intended uses, model-pack sources, compiled
+model packs, and credibility manifests—are immutable by `(id, version)` after
+insert. PostgreSQL validates payload identity on admission and rejects update or
+delete; changes publish a new version. The catalog API then binds every
+validated scenario template to its exact SI pack and manifest before returning
+an admitted response.
+
 The TypeScript arrays are idempotent local seed fixtures and deterministic test fallbacks. `/api/catalog` reads the database; the client validates that the selected template/version and coefficient set exist before Conduct. Runtime requests never bootstrap schema or authoritative records.
 
 ## Fixed development fixture

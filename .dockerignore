@@ -2,6 +2,8 @@
 .wrangler
 .vinext
 dist
+engine-rust/target
 node_modules
+outputs
 npm-debug.log
 *.tsbuildinfo
