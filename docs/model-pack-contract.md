@@ -38,7 +38,7 @@ The source of truth is [`lib/model-pack.ts`](../lib/model-pack.ts). Rust consume
 the same compiled JSON contract in
 [`engine-rust/src/model_pack.rs`](../engine-rust/src/model_pack.rs). The committed
 cross-language fixture is
-[`fixtures/model-packs/vector-scalar-study-v0.5.compiled.json`](../fixtures/model-packs/vector-scalar-study-v0.5.compiled.json).
+[`fixtures/model-packs/vector-scalar-study-v0.6.compiled.json`](../fixtures/model-packs/vector-scalar-study-v0.6.compiled.json).
 
 ## Source definition
 
@@ -194,8 +194,8 @@ deployments continue to apply the forward-only numbered migrations in
 
 ```text
 id:      vector-scalar-study-models
-version: 0.5.0
-digest:  181379ad76df8cdbf08666788bf1aace54b05651ce1d2e852487d651c6fb0e1d
+version: 0.6.0
+digest:  f3ea60f5476b812d85ebd13ca6aa1d65a751fbca38fcad98ff458abf368efc42
 state:   DRAFT
 ```
 

@@ -17,7 +17,7 @@ Use the smallest complete set for a change. State why any applicable layer was o
 
 ## Existing baseline
 
-`make ci-local` runs quality, Rust, TypeScript, contract, parity and production-audit checks. `make integration-local` covers the live PostGIS and API path; `make observability-local` covers telemetry; `make performance-local` covers the engine benchmark; responsive verification covers documented breakpoints. These remain separate because they have different environment and runtime costs.
+`make ci-local` runs quality, Rust, TypeScript, contract, parity and production-audit checks. `make integration-local` builds and starts the authoritative Compose topology, verifies governed migration data before fixture admission, covers the live PostGIS/API path, and runs automated responsive interaction checks. `make observability-local` covers telemetry; `make performance-local` covers the engine benchmark. These remain separate because they have different environment and runtime costs.
 
 GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
 automated gate from changed paths. Repository-policy tests always run, and an

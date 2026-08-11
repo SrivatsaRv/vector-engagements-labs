@@ -96,7 +96,7 @@ The contract is cross-domain. A2A is the first proving domain because it stresse
 
 ## Data authority
 
-PostgreSQL/PostGIS is the catalog authority. Schema creation is migration-only; API requests never create tables or seed data as a side effect. `scripts/seed-db.ts` loads deterministic development fixtures. Public facts, source assertions, human-readable model sources, immutable compiled model packs, and credibility manifests are separate records. The engine consumes an admitted SI pack and never queries the database during a tick.
+PostgreSQL/PostGIS is the catalog authority. Schema creation and governed runtime catalog data are migration-only; API requests never create tables or seed data as a side effect. `scripts/seed-db.ts` loads deterministic development fixtures in a separate Compose one-shot service. Public facts, source assertions, human-readable model sources, immutable compiled model packs, and credibility manifests are separate records. The engine consumes an admitted SI pack and never queries the database during a tick.
 
 ## Acceptance rules
 

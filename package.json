@@ -26,6 +26,7 @@
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate-db.mjs",
+    "db:governed-data:verify": "tsx scripts/verify-governed-catalog-data.ts",
     "db:seed": "tsx scripts/seed-db.ts",
     "db:verify": "node scripts/verify-db.mjs",
     "app:verify": "node scripts/verify-app.mjs",

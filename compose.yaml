@@ -22,34 +22,51 @@ services:
       retries: 20
 
   migrate:
-    image: reachdefence/vector-engagement-lab:0.1.0
+    image: ${VECTOR_IMAGE_REPOSITORY:-reachdefence/vector-engagement-lab}:${VECTOR_IMAGE_TAG:-0.1.0-dev}
     environment:
       DATABASE_URL: postgres://vector:vector@database:5432/vector
     init: true
     labels:
       com.reachdefence.product: vector-engagement-lab
       com.reachdefence.component: catalog-migration
-      com.reachdefence.version: 0.1.0
-    command: ["sh", "-c", "npm run db:migrate && npm run db:seed"]
+      com.reachdefence.version: ${VECTOR_VERSION:-0.1.0-dev}
+    command: ["npm", "run", "db:migrate"]
     depends_on:
       database:
         condition: service_healthy
     restart: "no"
 
+  seed:
+    image: ${VECTOR_IMAGE_REPOSITORY:-reachdefence/vector-engagement-lab}:${VECTOR_IMAGE_TAG:-0.1.0-dev}
+    environment:
+      DATABASE_URL: postgres://vector:vector@database:5432/vector
+    init: true
+    labels:
+      com.reachdefence.product: vector-engagement-lab
+      com.reachdefence.component: local-catalog-seed
+      com.reachdefence.version: ${VECTOR_VERSION:-0.1.0-dev}
+    command: ["npm", "run", "db:seed"]
+    depends_on:
+      database:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
   vector:
-    image: reachdefence/vector-engagement-lab:0.1.0
+    image: ${VECTOR_IMAGE_REPOSITORY:-reachdefence/vector-engagement-lab}:${VECTOR_IMAGE_TAG:-0.1.0-dev}
     build:
       context: .
       target: runtime
       args:
         DATABASE_URL: postgres://vector:vector@database:5432/vector
         OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-        VECTOR_VERSION: 0.1.0
+        VECTOR_VERSION: ${VECTOR_VERSION:-0.1.0-dev}
     environment:
       DATABASE_URL: postgres://vector:vector@database:5432/vector
       PORT: "4317"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      VECTOR_VERSION: 0.1.0
+      VECTOR_VERSION: ${VECTOR_VERSION:-0.1.0-dev}
       VECTOR_ENVIRONMENT: local
       METRICS_BEARER_TOKEN: vector-local-metrics
     init: true
@@ -57,7 +74,7 @@ services:
     labels:
       com.reachdefence.product: vector-engagement-lab
       com.reachdefence.component: web-application
-      com.reachdefence.version: 0.1.0
+      com.reachdefence.version: ${VECTOR_VERSION:-0.1.0-dev}
     ports:
       - "127.0.0.1:4317:4317"
     volumes:
@@ -66,6 +83,8 @@ services:
       database:
         condition: service_healthy
       migrate:
+        condition: service_completed_successfully
+      seed:
         condition: service_completed_successfully
       otel-collector:
         condition: service_started

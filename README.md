@@ -15,14 +15,18 @@ The long-term deliverable is a rigorously tested open-source simulation library 
 
 ## Run the complete local stack
 
-Docker Compose starts the pinned PostGIS database, applies checksum-tracked migrations, loads idempotent fixtures, and serves the built Worker bundle through the local Cloudflare runtime on port 4317.
+Docker Compose is the authoritative local service topology. It builds one
+explicitly tagged application image, starts the pinned PostGIS database, applies
+checksum-tracked schema and governed-catalog migrations, loads idempotent local
+fixtures in a separate one-shot service, and serves that same image through the
+local Cloudflare runtime on port 4317.
 
 ```bash
-docker compose up --build -d
+make compose-up
 docker compose ps
 ```
 
-Open [http://localhost:4317](http://localhost:4317). Grafana is available at [http://localhost:4300](http://localhost:4300) using `vector` / `vector-local-only` unless `VECTOR_GRAFANA_PASSWORD` is set. The database is exposed on loopback port `55433` for inspection. Every Compose image uses an explicit version or digest.
+Open [http://localhost:4317](http://localhost:4317). Grafana is available at [http://localhost:4300](http://localhost:4300) using `vector` / `vector-local-only` unless `VECTOR_GRAFANA_PASSWORD` is set. The database is exposed on loopback port `55433` for inspection. Every Compose image uses an explicit version or digest; `latest` is not an admitted tag. `VECTOR_IMAGE_REPOSITORY`, `VECTOR_IMAGE_TAG`, and `VECTOR_VERSION` may be overridden together for an immutable candidate image.
 
 Useful routes:
 
@@ -32,7 +36,8 @@ Useful routes:
 - `/math`: published equations, model limits, and reproducibility contract
 - `/symbols`: tactical symbol and lifecycle reference
 
-For host-side development, start the database and seed it first:
+For host-side development, build the same application image and start the
+database, migration, and local fixture services first:
 
 ```bash
 make db-up
@@ -53,7 +58,7 @@ npm run dev -- --port 4317
 - Presentation: MapLibre, Three.js, telemetry, RASP, explanation, comparison, and report consume the same sampled frames.
 - Carried weapons are inventory until their launch event. They become visible tracks only when spawned with inherited launcher position and velocity.
 
-`lib/capability-data.ts`, `lib/installations.ts`, `lib/scenarios.ts`, and `lib/simulation-models.ts` are deterministic seed/test fixtures. Runtime catalog reads come from `/api/catalog`; saved snapshots use `/api/runs`.
+`lib/capability-data.ts`, `lib/installations.ts`, `lib/scenarios.ts`, and `lib/simulation-models.ts` are deterministic local seed/test fixtures. The six governed public-educational study areas are additionally installed by a forward-only data migration so production never depends on running the development seed. Runtime catalog reads come from `/api/catalog`; saved snapshots use `/api/runs`.
 
 ## Verification
 

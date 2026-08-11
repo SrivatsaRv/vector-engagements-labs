@@ -701,6 +701,7 @@ function LabWorkbench({
           setStep={setBuildStep}
           validations={validations}
           studyAreas={catalogStudyAreas}
+          catalogState={catalogState}
           installations={catalogInstallations}
           run={run}
         />
@@ -970,6 +971,7 @@ function ConfigureWorkspace({
   setStep,
   validations,
   studyAreas,
+  catalogState,
   installations,
   run,
 }: {
@@ -982,10 +984,11 @@ function ConfigureWorkspace({
   setStep: (value: number) => void;
   validations: ValidationItem[];
   studyAreas: StudyArea[];
+  catalogState: "loading" | "POSTGIS" | "error";
   installations: MapInstallation[];
   run: () => void;
 }) {
-  const [contextExpanded, setContextExpanded] = useState(false);
+  const [contextExpanded, setContextExpanded] = useState(true);
   const simulationModel = findWeaponSimulationModel(scenario.blueSystemId);
   const fixed = definition.targetMotion === "fixed";
   const launchPlatforms = getLaunchPlatforms(scenario.domain);
@@ -1396,8 +1399,22 @@ function ConfigureWorkspace({
                     aria-expanded={contextExpanded}
                     onClick={() => setContextExpanded((current) => !current)}
                   >
-                    {contextExpanded ? "Keep selected context" : "Change context"}
+                    {contextExpanded ? "Hide context choices" : "Show context choices"}
                   </button>
+                </div>
+              )}
+              {studyAreas.length === 0 && (
+                <div className="study-context-unavailable" role="status">
+                  <strong>
+                    {catalogState === "loading"
+                      ? "Loading governed study areas…"
+                      : "Governed study areas are unavailable."}
+                  </strong>
+                  <span>
+                    {catalogState === "loading"
+                      ? "North Punjab, Ladakh, and the remaining regional presets will appear after PostGIS admission completes."
+                      : "Simulation is blocked because the PostGIS catalog did not provide the governed place and weather contract. Check the catalog service, migrations, and local Compose stack."}
+                  </span>
                 </div>
               )}
               {contextExpanded && (

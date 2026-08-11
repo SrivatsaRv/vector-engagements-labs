@@ -1,14 +1,18 @@
-.PHONY: ci-local ci-quality ci-tests db-up db-down compose-up integration-ci integration-local observability-local performance-local worker-local
+.PHONY: ci-local ci-quality ci-tests db-up db-down compose-build compose-up integration-ci integration-local observability-local performance-local worker-local
 
-db-up:
+db-up: compose-build
 	docker compose up -d database
 	docker compose run --rm migrate
+	docker compose run --rm seed
 
 db-down:
 	docker compose down
 
-compose-up:
-	docker compose up --build -d
+compose-build:
+	docker compose build vector
+
+compose-up: compose-build
+	docker compose up -d
 
 integration-local: compose-up
 	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector npm run db:verify
@@ -17,6 +21,7 @@ integration-local: compose-up
 
 integration-ci:
 	npm run db:migrate
+	npm run db:governed-data:verify
 	npm run db:seed
 	npm run db:verify
 	@set -eu; \

@@ -3,6 +3,12 @@
 Status: versioned foundation implemented. This is an educational synthetic
 environment, not an operational-precision terrain installation.
 
+The six public-educational study-area records are governed catalog data. A
+forward-only migration upserts their EPSG:4326 anchors/bounds and versioned
+weather assumptions, and `db:governed-data:verify` proves the database matches
+the maintained TypeScript contract before fixture seeding. Runtime requests do
+not create or repair these rows.
+
 ## Coordinate authority
 
 VECTOR uses the WGS84 ellipsoid (`EPSG:7030`) and the transform contract

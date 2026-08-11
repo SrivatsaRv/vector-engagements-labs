@@ -15,12 +15,12 @@ import {
 } from "./model-pack.ts";
 
 export const CURRENT_MODEL_PACK_ID = "vector-scalar-study-models";
-export const CURRENT_MODEL_PACK_VERSION = "0.5.0";
-export const CURRENT_MODEL_PACK_DIGEST = "181379ad76df8cdbf08666788bf1aace54b05651ce1d2e852487d651c6fb0e1d";
+export const CURRENT_MODEL_PACK_VERSION = "0.6.0";
+export const CURRENT_MODEL_PACK_DIGEST = "f3ea60f5476b812d85ebd13ca6aa1d65a751fbca38fcad98ff458abf368efc42";
 export const CURRENT_INTENDED_USE_ID = "vector.intended-use.geometry-teaching";
 export const CURRENT_INTENDED_USE_VERSION = "1.0.0";
 export const CURRENT_CREDIBILITY_MANIFEST_ID = "vector-scalar-study-credibility";
-export const CURRENT_CREDIBILITY_MANIFEST_VERSION = "1.0.0";
+export const CURRENT_CREDIBILITY_MANIFEST_VERSION = "1.1.0";
 
 const ASSUMPTION_EVIDENCE_ID = "current-scalar-model-assumptions";
 const CONTRACT_EVIDENCE_ID = "model-pack-contract-tests";

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { compileModelPack } from "../lib/model-pack.ts";
 import { createCurrentModelPackSource } from "../lib/reference-model-pack.ts";
 
-const outputPath = resolve("fixtures/model-packs/vector-scalar-study-v0.5.compiled.json");
+const outputPath = resolve("fixtures/model-packs/vector-scalar-study-v0.6.compiled.json");
 const bundle = await compileModelPack(createCurrentModelPackSource());
 const output = `${JSON.stringify(bundle, null, 2)}\n`;
 
