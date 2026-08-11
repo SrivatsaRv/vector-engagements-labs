@@ -9,26 +9,46 @@ export type BlogPostRecord = {
   title: string;
   summary: string;
   excerpt: string;
+  description: string;
   author: string;
   publishedAt: string;
   updatedAt: string;
+  pubDate: string;
+  updatedDate: string;
   readingTimeMinutes: number;
+  readingTime: string;
   category: BlogCategory;
   tags: string[];
 };
 
+export type BlogPostSummary = {
+  slug: string;
+  title: string;
+  description: string;
+  pubDate: string;
+  updatedDate: string;
+  author: string;
+  tags: string[];
+  readingTime: string;
+};
+
 export const BLOG_POSTS: BlogPostRecord[] = [
   {
-    slug: "what-engagement-simulators-need-to-model-in-2026",
+    slug: "engagement-simulators-2026-revised",
     title: "What Engagement Simulators Need to Model in 2026",
     summary:
       "Modern engagement simulation is moving away from isolated platform models and toward one coherent synthetic world that preserves physics, information flow, mission logic and replayable evidence.",
     excerpt:
       "This long-form note examines why modern engagement simulators need mixed fidelity, side-specific information pictures, mission-level behaviour, bounded browser delivery and a causal event record instead of a persuasive animation.",
+    description:
+      "A practical design note on world state, sensor truth, mission behaviour, mixed fidelity physics, browser execution, and explainable replay.",
     author: "ReachDefence",
     publishedAt: "2026-08-09",
-    updatedAt: "2026-08-09",
+    updatedAt: "2026-08-11",
+    pubDate: "2026-08-09",
+    updatedDate: "2026-08-11",
     readingTimeMinutes: 18,
+    readingTime: "18 min read",
     category: "Product Notes",
     tags: [
       "simulation architecture",
