@@ -57,6 +57,7 @@ try {
   assert.ok(catalog.compiledModelPacks.length >= 1);
   assert.ok(catalog.credibilityManifests.length >= 2);
   assert.equal(catalog.intendedUses.length, 1);
+  assert.equal(catalog.credibilityAdmissions.length, 1);
   const currentPack = catalog.compiledModelPacks.find(
     (item) => item.id === CURRENT_MODEL_PACK_ID && item.version === CURRENT_MODEL_PACK_VERSION,
   );
@@ -72,6 +73,16 @@ try {
     currentPack.digest,
   );
   assert.ok(catalog.credibilityManifests.some((item) => item.subject_kind === "ENGINE"));
+  assert.equal(catalog.credibilityAdmissions[0].state, "ADMITTED_WITH_LIMITATIONS");
+  assert.equal(
+    catalog.credibilityAdmissions[0].modelPack.digest,
+    CURRENT_MODEL_PACK_DIGEST,
+  );
+  assert.ok(
+    catalog.credibilityAdmissions[0].credibilityManifest.limitations.some(
+      (item) => item.severity === "BLOCKING",
+    ),
+  );
   assert.equal(catalog.installations.length, 21);
   assert.deepEqual(
     catalog.studyAreas.map((item) => item.id).sort(),

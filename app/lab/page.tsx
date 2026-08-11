@@ -67,6 +67,7 @@ import {
 } from "@/lib/runtime/browser-simulation-client";
 import type { BrowserRuntimeState } from "@/lib/runtime/protocol";
 import type { StudyArea } from "@/lib/study-areas";
+import type { CatalogCredibilityAdmission } from "@/lib/catalog-admission";
 import {
   spatialAspectDeg,
   spatialHorizontalSeparationM,
@@ -207,6 +208,8 @@ function LabWorkbench({
   );
   const [catalogInstallations, setCatalogInstallations] = useState<MapInstallation[]>([]);
   const [catalogStudyAreas, setCatalogStudyAreas] = useState<StudyArea[]>([]);
+  const [catalogCredibility, setCatalogCredibility] =
+    useState<CatalogCredibilityAdmission | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("TRUTH");
   const [playbackSurface, setPlaybackSurface] =
     useState<PlaybackSurface>("MAP");
@@ -236,6 +239,7 @@ function LabWorkbench({
           installations?: MapInstallation[];
           simulationModels?: Parameters<typeof registerDatabaseSimulationModels>[0];
           scenarioTemplates?: StoredScenarioPackage[];
+          credibilityAdmissions?: CatalogCredibilityAdmission[];
           studyAreas?: Array<{
             id: StudyArea["id"];
             name: string;
@@ -258,6 +262,13 @@ function LabWorkbench({
               item.version === initialDefinition.version &&
               item.status === "VALIDATED",
           );
+          const credibility = payload.credibilityAdmissions?.find(
+            (item) =>
+              item.modelPack.id === template?.model_pack_id &&
+              item.modelPack.version === template?.model_pack_version &&
+              item.modelPack.digest === template?.model_pack_digest &&
+              item.scenarioTemplateIds.includes(initialDefinition.id),
+          );
           if (
             payload.state !== "POSTGIS" ||
             !template ||
@@ -266,7 +277,8 @@ function LabWorkbench({
             template.engine_version !== ENGINE_VERSION ||
             !isScenarioDefinition(template.package) ||
             !payload.simulationModels?.length ||
-            !payload.studyAreas?.length
+            !payload.studyAreas?.length ||
+            !credibility
           ) {
             throw new Error("catalog package incomplete");
           }
@@ -285,6 +297,7 @@ function LabWorkbench({
             engineVersion: template.engine_version,
           });
           setCatalogState("POSTGIS");
+          setCatalogCredibility(credibility);
           setCatalogInstallations(payload.installations ?? []);
           setCatalogStudyAreas(
             payload.studyAreas.map((area) => ({
@@ -311,7 +324,10 @@ function LabWorkbench({
         }
       })
       .catch(() => {
-        if (active) setCatalogState("error");
+        if (active) {
+          setCatalogState("error");
+          setCatalogCredibility(null);
+        }
       });
     return () => {
       active = false;
@@ -702,6 +718,7 @@ function LabWorkbench({
           validations={validations}
           studyAreas={catalogStudyAreas}
           catalogState={catalogState}
+          credibility={catalogCredibility}
           installations={catalogInstallations}
           run={run}
         />
@@ -972,6 +989,7 @@ function ConfigureWorkspace({
   validations,
   studyAreas,
   catalogState,
+  credibility,
   installations,
   run,
 }: {
@@ -985,6 +1003,7 @@ function ConfigureWorkspace({
   validations: ValidationItem[];
   studyAreas: StudyArea[];
   catalogState: "loading" | "POSTGIS" | "error";
+  credibility: CatalogCredibilityAdmission | null;
   installations: MapInstallation[];
   run: () => void;
 }) {
@@ -1932,6 +1951,28 @@ function ConfigureWorkspace({
                 </p>
                 <button onClick={() => setStep(3)}>Edit conditions</button>
               </div>
+              <article className={`credibility-admission ${credibility?.state === "ADMITTED" ? "admitted" : "limited"}`}>
+                <span>MODEL CREDIBILITY</span>
+                <strong>
+                  {credibility
+                    ? `${credibility.credibilityManifest.approvalState} · ${credibility.state.replaceAll("_", " ").toLowerCase()}`
+                    : "Catalog credibility not admitted"}
+                </strong>
+                {credibility ? (
+                  <>
+                    <p>
+                      Intended use {credibility.intendedUse.id}@{credibility.intendedUse.version} · pack {credibility.modelPack.id}@{credibility.modelPack.version} · {credibility.modelPack.digest.slice(0, 16)}
+                    </p>
+                    {credibility.credibilityManifest.limitations.map((limitation) => (
+                      <p key={limitation.id}>
+                        <b>{limitation.severity}:</b> {limitation.statement}
+                      </p>
+                    ))}
+                  </>
+                ) : (
+                  <p>Simulation remains blocked until the intended-use, model-pack, and credibility-manifest chain is complete.</p>
+                )}
+              </article>
             </div>
             <ValidationList items={validations} />
           </section>
@@ -1996,6 +2037,12 @@ function ConfigureWorkspace({
           <dt>Environment</dt>
           <dd>
             {selectedStudyArea?.shortName ?? definition.environment} · {selectedWeather?.label ?? "weather preset unavailable"}
+          </dd>
+          <dt>Credibility</dt>
+          <dd>
+            {credibility
+              ? `${credibility.credibilityManifest.approvalState} · pack ${credibility.modelPack.version}`
+              : "Not admitted"}
           </dd>
         </dl>
         <section className="preset-basis">

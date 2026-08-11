@@ -36,11 +36,12 @@ test("production operations admit one immutable reviewed commit and never seed p
 });
 
 test("governed study areas are migration data and local Compose keeps migration and fixture seeding separate", async () => {
-  const [migration, compose, makefile, packageJson] = await Promise.all([
+  const [migration, compose, makefile, packageJson, dockerignore] = await Promise.all([
     read("db/migrations/009_governed_study_area_catalog.sql"),
     read("compose.yaml"),
     read("Makefile"),
     read("package.json"),
+    read(".dockerignore"),
   ]);
 
   for (const id of [
@@ -60,6 +61,8 @@ test("governed study areas are migration data and local Compose keeps migration 
   assert.doesNotMatch(compose, /:latest(?:\s|$)/m);
   assert.match(makefile, /npm run db:governed-data:verify\n\tnpm run db:seed/);
   assert.match(packageJson, /"db:governed-data:verify"/);
+  assert.match(dockerignore, /^engine-rust\/target$/m);
+  assert.match(dockerignore, /^outputs$/m);
 });
 
 test("the Place and flight workspace exposes all governed choices and blocks an incomplete catalog", async () => {
@@ -70,6 +73,23 @@ test("the Place and flight workspace exposes all governed choices and blocks an 
   assert.match(workspace, /Simulation is blocked because the PostGIS catalog/);
   assert.match(workspace, /studyAreas\.map\(\(area\) =>/);
   assert.match(workspace, /catalogState !== "POSTGIS"/);
+});
+
+test("catalog credibility is admitted as one immutable database/API/UI chain", async () => {
+  const [migration, api, workspace, makefile] = await Promise.all([
+    read("db/migrations/010_immutable_credibility_catalog.sql"),
+    read("app/api/catalog/route.ts"),
+    read("app/lab/page.tsx"),
+    read("Makefile"),
+  ]);
+
+  assert.match(migration, /reject_governed_catalog_mutation/);
+  assert.match(migration, /validate_governed_catalog_insert/);
+  assert.match(migration, /compiled model-pack payload is not an identity-consistent SI artifact/);
+  assert.match(api, /admitCatalogCredibility/);
+  assert.match(workspace, /MODEL CREDIBILITY/);
+  assert.match(workspace, /Catalog credibility not admitted/);
+  assert.match(makefile, /npm run db:credibility:verify/);
 });
 
 test("Worker database adapter consumes the generated Hyperdrive binding", async () => {

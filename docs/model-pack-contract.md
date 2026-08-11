@@ -184,6 +184,23 @@ one current source/pack, a model-pack manifest, an engine manifest, and binds al
 eight scenario fixtures to them. `scripts/verify-db.mjs` verifies row counts,
 digest equality, SI state, manifest binding, and scenario-package binding.
 
+Migration
+[`db/migrations/010_immutable_credibility_catalog.sql`](../db/migrations/010_immutable_credibility_catalog.sql)
+turns those identities into an enforced database boundary. New rows must carry
+payload ID/version/schema/digest fields matching their relational identity;
+compiled packs must be SI and reference their exact credibility manifest.
+Intended uses, source packs, compiled packs, and credibility manifests reject
+update/delete operations. A correction or approval transition therefore
+publishes a new version instead of rewriting evidence already referenced by a
+scenario or saved run.
+
+`/api/catalog` admits validated templates only when their intended use,
+compiled pack, digest, credibility subject, content identity, approval state,
+and explicit limitations form one complete chain. Missing or inconsistent
+evidence fails the catalog request closed. The Construct/Validate surface shows
+the admitted manifest state and blocking limitations before Simulate; saved
+reports retain the same identity.
+
 The PostgreSQL Drizzle baseline is in `drizzle/`. The prior SQLite-shaped
 history was inconsistent with the PostgreSQL Drizzle configuration and is
 preserved, unchanged, in `drizzle-legacy-sqlite/` for auditability. Operational
@@ -228,6 +245,10 @@ contract migration and regression-continuity fixture, not a fidelity upgrade.
 - `tests/scenario-draft.test.mjs` covers stable IDs, draft revisions, and patch
   preservation.
 - `tests/engine-backends.test.mjs` checks model-pack and entity-provenance parity.
+- `tests/catalog-admission.test.mjs` rejects missing packs, digest or approval
+  mismatch, and unapproved packs without explicit limitations.
+- `db:credibility:verify` proves immutable-update and malformed-insert rejection
+  against live PostGIS without retaining test mutations.
 - Rust native tests consume the same fixture and reject digest/index tampering.
 - migration, seed, and live catalog behavior are checked by `db:verify` and
   `app:verify`.

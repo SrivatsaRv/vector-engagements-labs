@@ -47,8 +47,7 @@ try {
       await tx`INSERT INTO intended_use_contracts
         (id,version,schema_version,definition,content_hash)
         VALUES (${intendedUse.id},${intendedUse.version},${intendedUse.schemaVersion},${json(intendedUse)},${contentHash})
-        ON CONFLICT (id,version) DO UPDATE SET
-          schema_version=EXCLUDED.schema_version,definition=EXCLUDED.definition,content_hash=EXCLUDED.content_hash`;
+        ON CONFLICT (id,version) DO NOTHING`;
     }
     await tx`INSERT INTO model_pack_sources
       (id,version,schema_version,definition,content_hash,lifecycle_status)

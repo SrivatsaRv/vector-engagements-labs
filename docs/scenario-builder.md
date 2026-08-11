@@ -76,6 +76,12 @@ No mode may show results until the compiled package has passed validation and a 
 4. **Sensors & decisions** assigns detection/track/engagement volumes, emission state, data links, target assignment, doctrine, maneuvers, prepared faults and launch conditions. Every control names its owner and affected view.
 5. **Validate** separates blocking errors, model warnings and source gaps. It shows the exact entity count, stowed inventory, launch events, area/weather identity, coefficient sets, engine version, duration limit, and package hash before enabling Simulate.
 
+Validate also shows the database-admitted intended-use, compiled model-pack
+version/digest, credibility approval state, and every blocking limitation. If
+that evidence chain is absent or internally inconsistent, catalog admission
+fails and Simulate remains unavailable; the UI never reconstructs credibility
+from static labels.
+
 ### Artifact and state boundaries
 
 - Builder state is an editable draft scenario package.
