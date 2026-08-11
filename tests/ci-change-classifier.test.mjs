@@ -47,6 +47,13 @@ test("Rust implementation changes receive parity tests without dependency audit"
   ]);
 });
 
+test("public aircraft evidence changes receive web and Rust parity gates", () => {
+  assert.deepEqual(
+    selected(["fixtures/public-reference/nasa-nesc-2015-f16-case11.json"]),
+    ["policy", "web_tests", "rust_tests"],
+  );
+});
+
 test("Cargo manifest changes add the Rust dependency audit", () => {
   assert.deepEqual(selected(["engine-rust/Cargo.lock"]), [
     "policy",

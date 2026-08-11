@@ -35,6 +35,7 @@
     "performance:verify": "tsx scripts/benchmark-engine.ts",
     "models:generate": "tsx scripts/generate-model-pack-fixture.ts",
     "models:verify": "tsx scripts/generate-model-pack-fixture.ts --check",
+    "reference-aircraft:verify": "node --import tsx scripts/verify-public-aircraft-reference.mjs",
     "worker:verify": "tsx scripts/verify-browser-worker.ts",
     "runtime:verify": "node --import tsx --test tests/browser-runtime.test.mjs tests/vector-record.test.mjs tests/engine-backends.test.mjs",
     "symbols:generate": "node scripts/generate-tactical-icons.mjs",

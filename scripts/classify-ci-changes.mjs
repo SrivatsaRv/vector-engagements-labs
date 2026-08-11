@@ -34,9 +34,11 @@ const JAVASCRIPT_SECURITY = [
 
 const RUST_CONTRACT = [
   /^engine-rust\//,
+  /^fixtures\/public-reference\//,
   /^lib\/engine\//,
+  /^lib\/validation\/public-aircraft-reference\.ts$/,
   /^lib\/(?:model-pack|reference-model-pack|simulation-models)\.ts$/,
-  /^scripts\/(?:build-rust-engine|generate-model-pack-fixture)\.mjs$/,
+  /^scripts\/(?:build-rust-engine|generate-model-pack-fixture|verify-public-aircraft-reference)\.mjs$/,
 ];
 
 const RUST_MANIFEST = [/^engine-rust\/(?:Cargo\.toml|Cargo\.lock)$/];

@@ -5,6 +5,7 @@ This matrix is the minimum proof required before a feature milestone is committe
 | Surface | Automated proof | Live-stack proof |
 | --- | --- | --- |
 | Engine and lifecycle | Determinism, arbitrary entity count, stowed/launch/active lifecycle, finite state, fuel/mass/force telemetry, eight-scenario TypeScript/Rust-WASM parity, embedded-WASM integrity, fail-closed backend selection | Cold initialization and warm-run p50/p95 for both browser backends |
+| Public aircraft reference | Content-bound NASA NESC Case 11 fixture; position, speed, altitude, attitude, rates, forces, moments, Mach, pressure, energy and trim residual within declared tolerances; malformed/bounded input rejection; 1×10⁻⁹ TypeScript/Rust-WASM parity | `/math` reports the admitted case, measured errors, pass state and named-aircraft limitation |
 | Environment | Study-area preset propagation, east/north wind physics, visual-range boundary, standard atmosphere | Saved run preserves area and weather |
 | RASP | 128 source-state rows, both perspectives, dependency isolation, truth invariance, interruption boundaries | RASP display and run event inspection |
 | Decisions | 5 Blue × 4 Red combinations, finite deterministic frames, declared effects | Recorded scenario/report decision fields |

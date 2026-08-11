@@ -5396,6 +5396,22 @@ button:disabled,
 .math-warning { max-width: 760px; margin-top: 24px; padding: 14px 16px; display: grid; grid-template-columns: 20px 1fr; gap: 10px; border: 1px solid #d8cfb8; border-left: 3px solid #b77c27; background: #fffaf0; }
 .math-warning svg { color: #a66d1d; margin-top: 2px; }
 .math-warning p { margin: 0; color: #5b5548; font-size: 12px; line-height: 1.55; }
+.math-reference-contract { width: min(1120px, calc(100% - clamp(32px, 7vw, 112px))); margin: 26px auto; border: 1px solid #cfd5d9; background: #fff; }
+.math-reference-contract > header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 30px; align-items: start; padding: 30px; border-bottom: 1px solid #dce0e3; }
+.math-reference-contract > header span { color: #2f6fb5; font-size: 9px; font-weight: 750; letter-spacing: .14em; }
+.math-reference-contract h2 { margin: 9px 0; font-size: clamp(22px, 2.2vw, 30px); line-height: 1.15; }
+.math-reference-contract header p { max-width: 760px; margin: 0; color: #596670; font-size: 12px; line-height: 1.6; }
+.math-reference-contract > header > strong { display: inline-flex; align-items: center; gap: 7px; padding: 8px 11px; border: 1px solid #7aaa88; background: #edf7ef; color: #24613a; font-size: 10px; letter-spacing: .1em; }
+.math-reference-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.math-reference-metrics article { padding: 20px 22px; border-right: 1px solid #dce0e3; }
+.math-reference-metrics article:last-child { border-right: 0; }
+.math-reference-metrics span { display: block; color: #66727b; font-size: 9px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.math-reference-metrics strong { display: block; margin-top: 8px; font-size: 22px; font-variant-numeric: tabular-nums; }
+.math-reference-metrics p { margin: 5px 0 0; color: #6a747c; font-size: 10px; line-height: 1.4; }
+.math-reference-contract footer { display: grid; grid-template-columns: 1fr 1fr auto; gap: 24px; align-items: start; padding: 22px 30px; border-top: 1px solid #dce0e3; background: #f7f8f8; }
+.math-reference-contract footer strong { font-size: 11px; }
+.math-reference-contract footer p { margin: 5px 0 0; color: #65717a; font-size: 10px; line-height: 1.5; }
+.math-reference-contract footer a { display: inline-flex; align-items: center; gap: 7px; color: #225f9c; font-size: 10px; font-weight: 700; white-space: nowrap; }
 .math-index { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-bottom: 1px solid #d6dadd; }
 .math-index a { min-width: 0; min-height: 78px; padding: 16px 14px; display: flex; flex-direction: column; gap: 7px; border-right: 1px solid #e0e3e5; color: inherit; background: #fff; }
 .math-index a:nth-child(5n) { border-right: 0; }
@@ -5940,6 +5956,12 @@ button:disabled,
 
 /* Phone and narrow tablet: complete single-column authoring and replay. */
 @media (max-width: 760px) {
+  .math-reference-contract > header { grid-template-columns: 1fr; gap: 16px; padding: 22px; }
+  .math-reference-contract > header > strong { justify-self: start; }
+  .math-reference-metrics { grid-template-columns: 1fr 1fr; }
+  .math-reference-metrics article:nth-child(2) { border-right: 0; }
+  .math-reference-metrics article:nth-child(-n+2) { border-bottom: 1px solid #dce0e3; }
+  .math-reference-contract footer { grid-template-columns: 1fr; padding: 20px 22px; }
   :root {
     --vector-task-max: 100%;
     --vector-task-gutter: 16px;
