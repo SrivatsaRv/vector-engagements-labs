@@ -1,19 +1,29 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { marked, type Tokens } from "marked";
-import articleMarkdown from "@/content/blog/what-engagement-simulators-need-to-model-in-2026.md?raw";
 import { BlogEditorialDiagram } from "@/components/BlogEditorialDiagram";
 import { BlogShareAndComments } from "@/components/BlogShareAndComments";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { ProductHeader } from "@/components/ProductHeader";
-import { formatBlogDate, getBlogPost } from "@/lib/blog";
+import { formatBlogDate } from "@/lib/blog";
+import {
+  blogAbsoluteUrl,
+  blogCanonicalUrl,
+  BLOG_POSTS,
+  getBlogPost,
+} from "@/lib/blog.server";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
+
+function absoluteAssetUrl(path: string) {
+  return new URL(path, process.env.SITE_URL || "https://labs.reachdefence.com").toString();
+}
 
 function renderInline(tokens: Tokens.Generic[] | undefined, fallback = "") {
   const source = tokens?.map((token) => token.raw).join("") ?? fallback;
@@ -162,19 +172,37 @@ function renderMarkdown(tokens: Tokens.Generic[]): ReactNode[] {
   });
 }
 
+export function generateStaticParams() {
+  return BLOG_POSTS.map((post) => ({ slug: post.slug }));
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const post = getBlogPost(slug);
   if (!post) return {};
+
+  const image = post.thumbnail ? absoluteAssetUrl(post.thumbnail) : "https://labs.reachdefence.com/og.png";
+
   return {
     title: `${post.title} | Vector Engagement Labs`,
     description: post.summary,
+    keywords: post.tags,
+    alternates: {
+      canonical: blogCanonicalUrl(post.slug),
+    },
     openGraph: {
       title: `${post.title} | Vector Engagement Labs`,
       description: post.summary,
-      url: `https://labs.reachdefence.com/blogs/posts/${post.slug}`,
+      url: blogAbsoluteUrl(post.slug),
       siteName: "Vector Engagement Labs",
-      images: [{ url: "https://labs.reachdefence.com/og.png" }],
+      images: [
+        {
+          url: image,
+          width: 1200,
+          height: 630,
+          alt: post.thumbnailAlt ?? post.title,
+        },
+      ],
       type: "article",
       publishedTime: `${post.publishedAt}T00:00:00.000Z`,
       modifiedTime: `${post.updatedAt}T00:00:00.000Z`,
@@ -184,7 +212,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       card: "summary_large_image",
       title: `${post.title} | Vector Engagement Labs`,
       description: post.summary,
-      images: ["https://labs.reachdefence.com/og.png"],
+      images: [image],
     },
   };
 }
@@ -194,12 +222,15 @@ export default async function BlogPostPage({ params }: PageProps) {
   const post = getBlogPost(slug);
   if (!post) notFound();
 
+  const image = post.thumbnail ? absoluteAssetUrl(post.thumbnail) : "https://labs.reachdefence.com/og.png";
+  const tokens = marked.lexer(post.markdown) as Tokens.Generic[];
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     headline: post.title,
     description: post.summary,
-    image: "https://labs.reachdefence.com/og.png",
+    image,
     datePublished: `${post.publishedAt}T00:00:00.000Z`,
     dateModified: `${post.updatedAt}T00:00:00.000Z`,
     author: {
@@ -212,10 +243,8 @@ export default async function BlogPostPage({ params }: PageProps) {
       name: "Vector Engagement Labs",
       url: "https://labs.reachdefence.com",
     },
-    url: `https://labs.reachdefence.com/blogs/posts/${post.slug}`,
+    url: blogAbsoluteUrl(post.slug),
   };
-
-  const tokens = marked.lexer(articleMarkdown) as Tokens.Generic[];
 
   return (
     <main className="blog-post-page">
@@ -235,6 +264,18 @@ export default async function BlogPostPage({ params }: PageProps) {
           <span className="blog-post-category">{post.category}</span>
           <h1>{post.title}</h1>
           <p>{post.summary}</p>
+
+          <figure className="blog-post-cover">
+            <Image
+              src={post.thumbnail ?? "/og.png"}
+              alt={post.thumbnailAlt ?? post.title}
+              width={1200}
+              height={630}
+              className="blog-post-cover-image"
+              sizes="(max-width: 900px) 100vw, 820px"
+              priority
+            />
+          </figure>
 
           <dl className="blog-post-meta">
             <div>

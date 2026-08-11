@@ -8,7 +8,7 @@ This directory is the maintained engineering and product contract for the applic
 
 ## Public identity
 
-The canonical public title is **Vector Engagement Labs by Reach Defence**. Social previews use `public/og.png` at 1200×630 and describe the product as a browser-based engagement experiment lab with visible assumptions, synchronized simulation views, comparisons, and reproducible reports. Public metadata must resolve against `https://labs.reachdefence.com` in production.
+The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-level social previews use `public/og.png` at 1200×630 and describe the product as a browser-based engagement experiment lab with visible assumptions, synchronized simulation views, comparisons, and reproducible reports. Blog posts can override that with per-post thumbnails declared in markdown frontmatter. Public metadata must resolve against `https://labs.reachdefence.com` in production.
 
 ## Documentation map
 
@@ -31,6 +31,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Socia
 - [`cloudflare-architecture.md`](cloudflare-architecture.md): Workers, Hyperdrive, optional R2, deployment gates, and local parity.
 - [`product-language.md`](product-language.md): canonical workflow and human-readable military terminology.
 - [`repository-governance.md`](repository-governance.md): protected branches, CI/CD, releases, tags, ownership, and repository status.
+- [`blog-publishing.md`](blog-publishing.md): markdown frontmatter, thumbnail assets, canonical metadata, and ops publishing flow.
 - [`security-boundaries.md`](security-boundaries.md): anonymous API admission, saved-run integrity, metrics protection, caching, and delivery trust.
 - [`../AGENTS.md`](../AGENTS.md) and [`../.codex/skills/vector-lab-harness/SKILL.md`](../.codex/skills/vector-lab-harness/SKILL.md): project-level agent routing, focused context loading, release-train ownership, and verification/handoff rules.
 - [`../pending-work/README.md`](../pending-work/README.md): dependency-ordered A2A research and implementation backlog.

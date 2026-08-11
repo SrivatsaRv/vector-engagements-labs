@@ -1,6 +1,6 @@
 import { withDatabase } from "@/db";
 import { withObservedRoute } from "@/lib/observability/server";
-import { BLOG_POSTS, isBlogSlug } from "@/lib/blog";
+import { BLOG_POSTS, isBlogSlug } from "@/lib/blog.server";
 import {
   publicApiError,
   PublicApiError,

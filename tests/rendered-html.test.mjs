@@ -104,8 +104,14 @@ test("server-renders the blogs index and post routes while preserving legacy /bl
   assert.match(blogs, /List/);
   assert.match(blogs, /Grid/);
   assert.match(blogs, /What Engagement Simulators Need to Model in 2026/);
+  assert.match(blogs, /blog-card-thumb/);
   assert.match(post, /Written by/);
   assert.match(post, /Reading time/);
+  assert.match(post, /blog-post-cover/);
+  assert.match(
+    post,
+    /<meta property="og:image" content="https:\/\/labs\.reachdefence\.com\/blog\/diagrams\/causal-simulation-loop\.webp"/,
+  );
   assert.match(post, /Training simulators and wargames optimise for different kinds of truth/);
   assert.match(post, /AI agents are useful when the simulation constrains them/);
   assert.match(post, /Causal simulation loop/);
