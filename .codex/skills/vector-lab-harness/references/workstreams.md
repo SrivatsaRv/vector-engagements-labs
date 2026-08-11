@@ -1,15 +1,19 @@
 # Workstream routing
 
-| Stream | Branch | Worktree | Owns | Read first | Depends on |
+| Stream | Owning issues | Owns | Read first | Depends on |
 |---|---|---|---|---|---|
-| data | `feat/runtime/object-model-packs` | `/Users/one2n/.codex/worktrees/0ba8/vector-lab` | intended-use, credibility, entity/model-pack schemas, catalog compatibility, Drizzle migrations | `docs/catalog-and-sources.md`, `docs/engine-backends.md`, `pending-work/01-intended-use-and-credibility.md`, `pending-work/02-a2a-model-pack-contract.md` | current release branch |
-| geo | `feat/runtime/geospatial-environment` | `/Users/one2n/.codex/worktrees/0fad/vector-lab` | WGS84/ECEF/local frames, datums, synthetic environment, weather/terrain/LOS interfaces | `docs/physics-model.md`, `docs/vector-simulation-record.md`, `pending-work/06-geospatial-and-synthetic-environment.md` | stable entity/sensor contracts |
-| browser | `feat/runtime/browser-worker` | `/Users/one2n/.codex/worktrees/37aa/vector-lab` | dedicated simulation Worker, fixed-step boundary, transferable buffers, VECTOR Simulation Record | `docs/browser-engine-architecture.md`, `docs/engine-backends.md`, `docs/vector-simulation-record.md`, `pending-work/07-browser-worker-and-recording.md` | compiled scenario/model contracts |
-| release | `release/x86-runtime` | `/Users/one2n/vector-lab-worktrees/release-x86-runtime` | integration, x86 image/tag policy, release gates, grouped validation | `docs/repository-governance.md`, `docs/cloudflare-architecture.md`, `docs/performance-capacity.md` | merged feature PRs |
-| server | `feat/platform/x86-runtime` | create only when assigned | native Rust worker, bounded queue, PostGIS/observability/backup topology, 100-user load harness | `docs/performance-capacity.md`, `docs/observability.md`, `pending-work/10-analysis-products-and-release-gate.md` | browser engine interface |
-| ui | feature branch assigned per task | current task worktree | scenario builder, maps, playback, reports, responsive behavior | `docs/scenario-builder.md`, `docs/responsive-ui.md`, `docs/tacview-visual-subset.md` | versioned domain contracts |
-| security | feature branch assigned per task | current task worktree | API admission, saved-run integrity, metrics, caching, delivery trust | `docs/security-boundaries.md`, `docs/repository-governance.md`, `docs/observability.md` | affected service contract |
+| data | #31, #27 | intended use, credibility, model-pack schemas, catalog compatibility, migrations | `docs/catalog-and-sources.md`, `docs/model-pack-contract.md`, `docs/engine-backends.md` | current integration branch |
+| physics | #33, #28 | object dynamics, guidance, control, weapon fly-out, numerical validation and parity | `docs/physics-model.md`, `docs/model-pack-contract.md`, `docs/engine-backends.md` | executable model-pack and geospatial primitives |
+| information | #26 | observations, sensors, tracks, datalinks, uncertainty and side-owned state | `docs/rasp-state-machine.md`, `docs/physics-model.md`, `docs/vector-simulation-record.md` | stable object and weapon state |
+| geo | #29 | frames, datums, synthetic environment, weather/terrain/LOS interfaces | `docs/geospatial-environment.md`, `docs/physics-model.md`, `docs/vector-simulation-record.md` | stable entity/sensor contracts |
+| browser | #34 | simulation Worker, fixed-step boundary, transferable buffers and VSR | `docs/browser-engine-architecture.md`, `docs/engine-backends.md`, `docs/vector-simulation-record.md` | compiled scenario/model contracts |
+| behavior | #38 | missions, tasks, pursuit/defence policies and bounded control commands | `docs/scenario-builder.md`, `docs/rasp-state-machine.md`, `docs/physics-model.md` | side-owned information and dynamics contracts |
+| visualization | #41 | canonical 2D/3D/timeline/replay presentation and causal acceptance | `docs/tacview-visual-subset.md`, `docs/vector-simulation-record.md`, `docs/responsive-ui.md` | dynamics, information and behavior runtime |
+| release | #47, #39, #32 | integration, image/tag policy, release gates and grouped validation | `docs/repository-governance.md`, `docs/cloudflare-architecture.md`, `docs/performance-capacity.md` | merged feature PRs |
+| server | #25, #32 | bounded queue, PostGIS/observability/backup topology and scale harness | `docs/performance-capacity.md`, `docs/observability.md` | browser engine interface |
+| ui | #40, #41 | scenario workspace, maps, playback, reports and responsive behavior | `docs/scenario-builder.md`, `docs/responsive-ui.md`, `docs/tacview-visual-subset.md` | versioned domain contracts |
+| security | #31, #32 | API admission, saved-run integrity, metrics, caching and delivery trust | `docs/security-boundaries.md`, `docs/repository-governance.md`, `docs/observability.md` | affected service contract |
 
-For `general`, read `docs/README.md`, `docs/engineering-principles.md`, `pending-work/README.md`, then route to a narrower stream before editing.
+For `general`, read `docs/README.md`, `docs/engineering-principles.md`, and epic #47, then route to a narrower stream before editing.
 
-All feature branches start from `origin/release/x86-runtime` and open PRs against that branch. Do not modify another stream's worktree.
+Create a dedicated branch/worktree from the protected integration branch declared by the owning issue. Use `origin/main` when no active release train is declared. Do not modify another stream's worktree.

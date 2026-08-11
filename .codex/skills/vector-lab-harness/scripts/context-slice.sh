@@ -6,19 +6,26 @@ root="$(git rev-parse --show-toplevel)"
 cd "$root"
 
 case "$stream" in
-  data) docs=(docs/README.md docs/engineering-principles.md docs/catalog-and-sources.md docs/engine-backends.md docs/scenario-builder.md pending-work/00-current-state-and-research.md pending-work/01-intended-use-and-credibility.md pending-work/02-a2a-model-pack-contract.md); paths=(lib/object-catalog.ts lib/simulation-models.ts lib/scenario-package.ts lib/scenario-draft.ts lib/engine/contracts.ts lib/engine/compiler.ts db/schema.ts db/migrations engine-rust/src tests);;
-  geo) docs=(docs/README.md docs/engineering-principles.md docs/physics-model.md docs/vector-simulation-record.md docs/scenario-builder.md docs/catalog-and-sources.md pending-work/06-geospatial-and-synthetic-environment.md); paths=(lib/scenario-spatial.ts lib/study-areas.ts lib/vector-map.ts lib/map-layer-contracts.ts lib/engine engine-rust/src components tests);;
-  browser) docs=(docs/README.md docs/engineering-principles.md docs/browser-engine-architecture.md docs/engine-backends.md docs/vector-simulation-record.md docs/performance-capacity.md docs/observability.md pending-work/07-browser-worker-and-recording.md); paths=(lib/engine lib/simulation.ts engine-rust/src scripts/benchmark-engine.ts components tests);;
-  release) docs=(docs/README.md docs/repository-governance.md docs/cloudflare-architecture.md docs/performance-capacity.md docs/observability.md docs/security-boundaries.md pending-work/10-analysis-products-and-release-gate.md); paths=(.github Makefile Dockerfile* docker-compose*.yml scripts tests);;
-  server) docs=(docs/README.md docs/engineering-principles.md docs/cloudflare-architecture.md docs/performance-capacity.md docs/observability.md pending-work/08-multi-entity-scale.md pending-work/10-analysis-products-and-release-gate.md); paths=(engine-rust db observability scripts tests);;
-  ui) docs=(docs/README.md docs/scenario-builder.md docs/responsive-ui.md docs/tacview-visual-subset.md docs/vector-simulation-record.md); paths=(app components lib tests);;
-  security) docs=(docs/README.md docs/security-boundaries.md docs/repository-governance.md docs/observability.md); paths=(app/api lib/security worker .github tests);;
-  general) docs=(docs/README.md docs/engineering-principles.md pending-work/README.md); paths=(app components lib db engine-rust worker tests);;
+  data) issues=(31 27); docs=(docs/README.md docs/engineering-principles.md docs/catalog-and-sources.md docs/model-pack-contract.md docs/engine-backends.md docs/scenario-builder.md); paths=(lib/object-catalog.ts lib/simulation-models.ts lib/scenario-package.ts lib/scenario-draft.ts lib/engine/contracts.ts lib/engine/compiler.ts db/schema.ts db/migrations engine-rust/src tests);;
+  physics) issues=(33 28); docs=(docs/README.md docs/engineering-principles.md docs/model-pack-contract.md docs/physics-model.md docs/engine-backends.md docs/vector-simulation-record.md); paths=(lib/engine lib/simulation.ts engine-rust/src tests);;
+  information) issues=(26); docs=(docs/README.md docs/rasp-state-machine.md docs/physics-model.md docs/scenario-builder.md docs/vector-simulation-record.md); paths=(lib/engine lib/simulation.ts components tests);;
+  geo) issues=(29); docs=(docs/README.md docs/engineering-principles.md docs/physics-model.md docs/geospatial-environment.md docs/vector-simulation-record.md docs/scenario-builder.md docs/catalog-and-sources.md); paths=(lib/scenario-spatial.ts lib/study-areas.ts lib/vector-map.ts lib/map-layer-contracts.ts lib/engine engine-rust/src components tests);;
+  browser) issues=(34); docs=(docs/README.md docs/engineering-principles.md docs/browser-engine-architecture.md docs/engine-backends.md docs/vector-simulation-record.md docs/performance-capacity.md docs/observability.md); paths=(lib/engine lib/simulation.ts engine-rust/src scripts/benchmark-engine.ts components tests);;
+  behavior) issues=(38); docs=(docs/README.md docs/scenario-builder.md docs/rasp-state-machine.md docs/physics-model.md docs/vector-simulation-record.md); paths=(lib/engine lib/scenario-package.ts lib/scenario-draft.ts components tests);;
+  visualization) issues=(41); docs=(docs/README.md docs/scenario-builder.md docs/responsive-ui.md docs/tacview-visual-subset.md docs/vector-simulation-record.md docs/regression-matrix.md); paths=(app components lib tests);;
+  release) issues=(47 39 32); docs=(docs/README.md docs/repository-governance.md docs/cloudflare-architecture.md docs/performance-capacity.md docs/observability.md docs/security-boundaries.md); paths=(.github Makefile Dockerfile* docker-compose*.yml scripts tests);;
+  server) issues=(25 32); docs=(docs/README.md docs/engineering-principles.md docs/cloudflare-architecture.md docs/performance-capacity.md docs/observability.md); paths=(engine-rust db observability scripts tests);;
+  ui) issues=(40 41); docs=(docs/README.md docs/scenario-builder.md docs/responsive-ui.md docs/tacview-visual-subset.md docs/vector-simulation-record.md); paths=(app components lib tests);;
+  security) issues=(31 32); docs=(docs/README.md docs/security-boundaries.md docs/repository-governance.md docs/observability.md); paths=(app/api lib/security worker .github tests);;
+  general) issues=(47); docs=(docs/README.md docs/engineering-principles.md); paths=(app components lib db engine-rust worker tests);;
   *) echo "unknown stream: $stream" >&2; exit 2;;
 esac
 
 echo "STREAM: $stream"
 git status --short --branch
+echo
+echo "OWNING GITHUB ISSUES:"
+printf '  https://github.com/SrivatsaRv/vector-engagements-labs/issues/%s\n' "${issues[@]}"
 echo
 echo "READ THESE FILES FIRST:"
 printf '  %s\n' "${docs[@]}"
