@@ -8,7 +8,7 @@ This directory is the maintained engineering and product contract for the applic
 
 ## Public identity
 
-The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-level social previews use `public/og.png` at 1200×630 and describe the product as a browser-based engagement experiment lab with visible assumptions, synchronized simulation views, comparisons, and reproducible reports. Blog posts can override that with per-post thumbnails declared in the blog registry and consumed by the article route. Public metadata must resolve against `https://labs.reachdefence.com` in production.
+The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-level social previews use `public/og.png` at 1200×630 and describe the product as a browser-based engagement experiment lab with visible assumptions, synchronized simulation views, comparisons, and reproducible reports. Blog posts can override that with per-post thumbnails declared in markdown frontmatter. Public metadata must resolve against `https://labs.reachdefence.com` in production.
 
 ## Documentation map
 

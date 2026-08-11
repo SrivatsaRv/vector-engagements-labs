@@ -1,3 +1,20 @@
+---
+title: What Engagement Simulators Need to Model in 2026
+summary: Modern engagement simulation is moving away from isolated platform models and toward one coherent synthetic world that preserves physics, information flow, mission logic, and replayable evidence.
+author: ReachDefence
+publishedAt: 2026-08-09
+updatedAt: 2026-08-11
+category: Product Notes
+tags:
+  - simulation architecture
+  - browser runtime
+  - evidence
+  - reproducibility
+  - mission modelling
+thumbnail: /blog/diagrams/causal-simulation-loop.webp
+thumbnailAlt: Causal simulation loop showing world state, observation, bounded decisions, actions, effects, and model-time ordering.
+---
+
 # What Engagement Simulators Need to Model in 2026
 
 Military simulation is going through an awkward transition.

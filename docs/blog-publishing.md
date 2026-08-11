@@ -1,37 +1,60 @@
-# Blog publishing flow
+# Blog publishing contract
 
-Vector Engagement Labs blog content is published as a small content registry plus
-Markdown body files.
+The blog is content-driven. Ops can publish by adding one markdown file under
+`content/blog/` and, optionally, a thumbnail asset under `public/blog/thumbnails/`
+or another existing public path.
 
-## Authoring model
+## Source of truth
 
-- Add or update the blog record in `lib/blog.ts`.
-- Keep the article body in `content/blog/*.md` so the route can render the same
-  text in the app shell and in tests.
-- Set `thumbnail` and `thumbnailAlt` on the blog record when the post needs a
-  custom preview image.
-- Keep public image assets under `public/blog/diagrams/` or a similarly
-  versioned subdirectory.
+- File name becomes the slug.
+- Markdown frontmatter defines the post metadata.
+- Markdown body defines the rendered article.
+- The blog index, article page, Open Graph metadata, Twitter metadata, and
+  JSON-LD all read from the same post record.
 
-## Route behavior
+## Frontmatter fields
 
-- `/blog` remains a legacy redirect.
-- `/blogs` is the browsable index with search, category filters, and list/grid
-  views.
-- `/blogs/posts/[slug]` renders the long-form article, cover image, editorial
-  diagrams, Mermaid diagrams, share links, and persisted anonymous comments.
+Required:
 
-## Publishing steps
+- `title`
+- `summary`
+- `author`
+- `publishedAt`
+- `category`
 
-1. Update the blog record and article body.
-2. Add or update the thumbnail asset.
-3. Run the blog rendering and release checks.
-4. Commit and push through the release branch.
-5. Deploy the merged `main` SHA through the deployment workflow.
+Optional:
 
-## Operational notes
+- `updatedAt`
+- `excerpt`
+- `readingTimeMinutes`
+- `tags`
+- `thumbnail`
+- `thumbnailAlt`
 
-- Anonymous comments are persisted through the blog comments API.
-- The article page should not depend on runtime-only local state for content.
-- Thumbnails are part of the public metadata contract and should always be
-  treated as versioned assets.
+`thumbnail` should point to a public asset path such as
+`/blog/thumbnails/<slug>.webp`. If it is omitted, the site falls back to the
+global blog image.
+
+## SEO behavior
+
+- The post page sets a canonical URL for `/blogs/posts/<slug>`.
+- Open Graph and Twitter metadata use the post thumbnail when provided.
+- JSON-LD `BlogPosting` output uses the same image and canonical URL.
+- The blog index remains crawlable because it is server-rendered from the
+  content manifest.
+
+## Handoff workflow
+
+1. Add or edit the markdown file.
+2. Update the frontmatter.
+3. Add or replace the thumbnail asset if the post needs one.
+4. Run `make ci-local`.
+5. Run `npm run blog:visual:verify` when the article includes editorial diagrams
+   or visual assets that changed.
+
+## Notes
+
+- Comments remain persisted through the blog comments API and are independent
+  of article content.
+- The blog does not require a code change for a new post as long as the file
+  is valid and the asset path exists.

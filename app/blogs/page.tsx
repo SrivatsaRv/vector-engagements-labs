@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { ProductHeader } from "@/components/ProductHeader";
 import { BlogsIndexClient } from "@/components/BlogsIndexClient";
-import { BLOG_CATEGORIES, BLOG_POSTS } from "@/lib/blog";
+import { BLOG_CATEGORIES } from "@/lib/blog";
+import { BLOG_POSTS } from "@/lib/blog.server";
 
 export const metadata: Metadata = {
   title: "Engineering Blogs | Vector Engagement Labs",
