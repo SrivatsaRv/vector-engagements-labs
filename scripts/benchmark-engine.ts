@@ -3,7 +3,14 @@ import { arch, cpus, platform, release, totalmem } from "node:os";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { prepareSimulation, simulate } from "../lib/simulation.ts";
 import type { EngineBackendId } from "../lib/engine/contracts.ts";
-import { RUST_WASM_ENGINE_ARTIFACT } from "../lib/engine/backend.ts";
+import {
+  RUST_WASM_ENGINE_ARTIFACT,
+  runRustWasmPublicAircraftReference,
+} from "../lib/engine/backend.ts";
+import {
+  publicAircraftReferenceInput,
+  runPublicAircraftReference,
+} from "../lib/validation/public-aircraft-reference.ts";
 import {
   createVectorSimulationRecord,
   encodeColumnarFrames,
@@ -73,6 +80,24 @@ const summary = (backend: EngineBackendId) => {
 };
 
 const backendResults = backends.map(summary);
+const referenceInput = publicAircraftReferenceInput();
+const referenceBenchmarks = [
+  { backend: "typescript", run: () => runPublicAircraftReference(referenceInput) },
+  { backend: "rust-wasm", run: () => runRustWasmPublicAircraftReference(referenceInput) },
+].map(({ backend, run }) => {
+  const durations = Array.from({ length: 200 }, () => {
+    const started = performance.now();
+    run();
+    return performance.now() - started;
+  }).sort((a, b) => a - b);
+  return {
+    backend,
+    runs: durations.length,
+    p50Ms: Number(durations[Math.ceil(durations.length * 0.5) - 1].toFixed(3)),
+    p95Ms: Number(durations[Math.ceil(durations.length * 0.95) - 1].toFixed(3)),
+    maxMs: Number(durations.at(-1)!.toFixed(3)),
+  };
+});
 const transportEvidence = [];
 for (const backend of backends) {
   const scenario = { ...SCENARIO_LIBRARY[0].scenario, engineBackend: backend };
@@ -112,6 +137,7 @@ const result = {
   scenarios: SCENARIO_LIBRARY.length,
   rustWasmBytes: RUST_WASM_ENGINE_ARTIFACT.bytes,
   backends: backendResults,
+  publicAircraftReference: referenceBenchmarks,
   transportEvidence,
   regressionLimitP95Ms: maximumP95Ms,
 };

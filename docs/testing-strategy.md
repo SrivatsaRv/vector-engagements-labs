@@ -25,6 +25,13 @@ pack insertion under rolled-back transactions. API tests assert that admitted
 credibility, limitations, persisted run provenance, and the Validate surface
 all carry the same pack digest.
 
+Aircraft-model verification additionally runs `reference-aircraft:verify`.
+The gate checks immutable NASA source identities, deterministic trim
+propagation, every declared external time-history tolerance, malformed and
+unbounded input rejection, energy invariance, step-size convergence at common
+checkpoints, and 1×10⁻⁹ TypeScript/Rust-WASM parity. A deliberately perturbed
+trajectory must fail the gate.
+
 GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
 automated gate from changed paths. Repository-policy tests always run, and an
 unknown path fails closed through every CI job. Documentation and agent-harness

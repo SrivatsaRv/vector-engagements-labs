@@ -3,6 +3,7 @@
 
 mod error;
 mod model_pack;
+mod public_aircraft_reference;
 mod validation;
 mod wasm_abi;
 
@@ -10,6 +11,10 @@ use serde::{Deserialize, Serialize};
 
 pub use error::EngineError;
 pub use model_pack::{validate_model_pack_json, CompiledModelPack};
+pub use public_aircraft_reference::{
+    run_public_aircraft_reference, run_public_aircraft_reference_json,
+    PublicAircraftReferenceInput, PublicAircraftReferenceRun,
+};
 pub use validation::{
     validate_scenario, MAX_ENTITIES, MAX_EVENTS, MAX_INPUT_BYTES, MAX_INTEGRATED_STEPS,
     MAX_RECORDED_ENTITY_STATES, MAX_ROUTE_POINTS_PER_ENTITY,

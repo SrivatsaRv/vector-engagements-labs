@@ -119,6 +119,9 @@ try {
   const mathHtml = await mathPage.text();
   assert.match(mathHtml, /Math behind Vector Engagement Labs/);
   assert.match(mathHtml, /How a displayed result is traced/);
+  assert.match(mathHtml, /Subsonic trim flyout reproduced within tolerance/);
+  assert.match(mathHtml, /maximum position error/);
+  assert.match(mathHtml, /without changing the operational scenario models/);
   const stalePackage = await fetch(`${baseUrl}/api/runs`, {
     method: "POST",
     headers: { "content-type": "application/json" },

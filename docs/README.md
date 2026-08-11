@@ -16,6 +16,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-
 - [`browser-engine-architecture.md`](browser-engine-architecture.md): scenario compilation, runtime ownership, entity lifecycle, and frame consumers.
 - [`engine-backends.md`](engine-backends.md): TypeScript and Rust/WASM interface, provenance, parity, and backend selection.
 - [`physics-model.md`](physics-model.md): equations, atmosphere, guidance, termination, numerical limits, and declared assumptions.
+- [`public-aircraft-reference.md`](public-aircraft-reference.md): NASA NESC aircraft check-case evidence, SI-normalized trim propagation, tolerances, parity, measurements, and limits.
 - [`scenario-builder.md`](scenario-builder.md): authoring journey, state ownership, map controls, and validation.
 - [`vector-simulation-record.md`](vector-simulation-record.md): portable replay and debriefing record.
 - [`catalog-and-sources.md`](catalog-and-sources.md): PostGIS ontology, source assertions, versions, and installation geometry.
@@ -92,6 +93,7 @@ The contract is cross-domain. A2A is the first proving domain because it stresse
 - Model Truth, IAF RASP, and PAF RASP separation.
 - Run snapshots saved to Postgres and a dedicated PDF-like report route with explicit print and JSON behavior.
 - A hosted `/math` page that publishes equations, value states, limitations, and the package/hash/model/frame reproducibility chain.
+- A public-reference verification panel that reports NASA NESC Case 11 trajectory errors and the TypeScript/Rust-WASM parity gate without relabeling it as operational F-16 or Su-30MKI performance.
 - A hosted `/blogs` section with searchable engineering notes and per-post discussion that explains runtime contracts, assumptions, and release-facing implementation decisions inside the same application shell.
 
 ## Data authority

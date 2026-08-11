@@ -45,6 +45,16 @@ production-capacity claims. Their purpose is to show that a validated pack can
 be loaded once and instantiated repeatedly without source JSON parsing or
 database access.
 
+## Public-aircraft reference measurement
+
+Measured locally on 2026-08-12 using Node.js v24.3.0 on an Apple M5 arm64 with
+10 logical cores and 16 GiB memory. Across 200 runs of the four-checkpoint NASA
+NESC Case 11 trim oracle, TypeScript measured 0.004/0.010 ms p50/p95 and
+Rust/WASM measured 0.019/0.023 ms p50/p95. The full eight-scenario regression
+workload remained below the existing 75 ms p95 limit. These measurements cover
+only the reference propagation and comparison boundary; they are not an x86-64
+capacity or full nonlinear DAVE-ML performance claim.
+
 ## North-star benchmark targets
 
 | Area | Target | Required evidence |

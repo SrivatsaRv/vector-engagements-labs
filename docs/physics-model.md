@@ -26,6 +26,14 @@ separate. Every engine entity records the exact model ID, version, value state,
 and pack digest. This foundation does not add flight dynamics or increase the
 fidelity claim.
 
+An isolated public-aircraft verification runner now admits NASA NESC 2015
+Atmospheric Case 11 with content hashes and SI-normalized checkpoints. It
+reproduces the published subsonic trim flyout in TypeScript and Rust/WASM within
+declared position, velocity, attitude, angular-rate, force, moment, Mach,
+dynamic-pressure, energy and trim-residual tolerances. This is a validation of
+the trim-propagation and evidence pipeline, not an upgrade to the operational
+scenario flight model. See [`public-aircraft-reference.md`](public-aircraft-reference.md).
+
 Aircraft motion uses the same standard atmosphere and wind field as a launched vehicle. The current aircraft coefficient set resolves dynamic pressure, load-factor lift demand, parasitic and induced drag, available thrust, fuel flow, mass, and the turn-rate limit on every fixed step. It is an educational point-mass model, not a flight-manual or manufacturer engine deck.
 
 Sensor and air-defence envelopes are scenario-declared volumes and are explicitly
@@ -44,7 +52,7 @@ Model Truth remains separate from IAF and PAF RASP estimates. IAF RASP estimates
 
 ## Still outside the fidelity claim
 
-Validated aircraft coefficient tables and engine maps; full 6DOF attitude/control; detailed seeker/autopilot/fuze/warhead behavior; production terrain ingestion or terrain-aware sensor state; waveform-level EW and countermeasures; probability of kill; operational routes or current force disposition.
+Complete nonlinear aircraft coefficient-table and engine-map execution; maneuvering 6DOF attitude/control transients; detailed seeker/autopilot/fuze/warhead behavior; production terrain ingestion or terrain-aware sensor state; waveform-level EW and countermeasures; probability of kill; operational routes or current force disposition.
 
 ## Rust/WASM gate
 

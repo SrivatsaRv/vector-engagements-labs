@@ -26,6 +26,9 @@ TypeScript reference engine and returns the same replayable run contract.
 - `error.rs` owns stable engine errors.
 - `wasm_abi.rs` owns the bounded, versioned browser ABI and linear-memory
   buffers.
+- `public_aircraft_reference.rs` owns the isolated NASA NESC trim-propagation
+  oracle and versioned output used for external-history and cross-backend
+  verification. It does not modify the operational scenario engine.
 
 The physics loop remains intentionally colocated while its equations and state
 transitions are still evolving together. It should be split by behavior only

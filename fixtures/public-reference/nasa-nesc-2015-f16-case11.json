@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "vector.public-aircraft-reference.v1",
+  "id": "nasa-nesc-2015-f16-case11-sim04",
+  "title": "NASA NESC 2015 atmospheric case 11 — F-16 subsonic trim flyout",
+  "referenceModel": {
+    "name": "NASA NESC F-16 DAVE-ML verification model",
+    "modelPackageUrl": "https://nescacademy.nasa.gov/workshop/FlightSim/2015/models/F16_package.zip",
+    "modelPackageSha256": "20c60f615ae8e87d81c9d98b54fff45a2832840201499cbcfe3f45a60ef3e5b2",
+    "caseUrl": "https://nescacademy.nasa.gov/flightsim/2015/atmospheric/acc11",
+    "trajectoryUrl": "https://nescacademy.nasa.gov/workshop/FlightSim/2015/atmos_scn_11/Atmos_11_sim_04.csv",
+    "trajectorySha256": "c6b8c1210c31fa440d271297ad219b5ad89264f4bb8a25f636c14f53d9b04a07",
+    "retrievedAt": "2026-08-12",
+    "sourceImplementation": "NASA-published Sim 04 trajectory"
+  },
+  "intendedUse": "Verify VECTOR's deterministic trimmed-aircraft propagation, SI normalization, six-state telemetry, evidence binding and TypeScript/Rust-WASM parity against a public external trajectory.",
+  "limitations": [
+    "This fixture validates one steady, subsonic, wings-level trim condition only.",
+    "It does not validate the complete DAVE-ML coefficient evaluator, controller transients, departure behavior, damage, weapons employment or named-aircraft operational performance.",
+    "It is a verification asset and is not connected to the Su-30MKI versus F-16 scenario coefficients."
+  ],
+  "propagation": {
+    "durationSeconds": 180,
+    "sampleIntervalSeconds": 60,
+    "earthRadiusM": 6378137,
+    "gravityMps2": 9.8066352
+  },
+  "initialState": {
+    "latitudeDeg": 36.0191666667,
+    "longitudeDeg": -75.6744444444,
+    "altitudeMslM": 3051.9624,
+    "velocityNedMps": {
+      "north": 121.92314130446161,
+      "east": 121.92314130446161,
+      "down": 0
+    },
+    "attitudeDeg": {
+      "yaw": 45,
+      "pitch": 2.63872639635,
+      "roll": 0
+    },
+    "bodyAngularRateRadS": {
+      "roll": 0.00004363520954975663,
+      "pitch": -0.00006889065965441224,
+      "yaw": -0.0000409162074767605
+    },
+    "mach": 0.525083366639,
+    "dynamicPressurePa": 13444.193911243801
+  },
+  "trim": {
+    "massKg": 9298.64389851896,
+    "inertiaKgM2": {
+      "roll": 12874.847237354974,
+      "pitch": 75673.62296816875,
+      "yaw": 85552.11253971134,
+      "crossRollYaw": 1331.4132252614347
+    },
+    "aerodynamicBodyForceN": {
+      "x": -6318.440737653328,
+      "y": 0,
+      "z": -90749.5151598632
+    },
+    "aerodynamicBodyMomentNm": {
+      "roll": 0,
+      "pitch": 0,
+      "yaw": 0
+    },
+    "requiredThrustN": 10516.589565202074,
+    "controls": {
+      "longitudinalStickPercentAft": 12.96,
+      "horizontalTailDegTrailingEdgeDown": -3.241,
+      "throttlePercent": 13.9019,
+      "powerLeverAnglePercent": 13.9019
+    }
+  },
+  "tolerances": {
+    "geodesicPositionM": 100,
+    "altitudeM": 0.1,
+    "speedMps": 0.02,
+    "yawDeg": 0.6,
+    "pitchDeg": 0.01,
+    "rollDeg": 0.1,
+    "bodyAngularRateRadS": 0.0001,
+    "aerodynamicForceN": 2,
+    "aerodynamicMomentNm": 0.1,
+    "mach": 0.0001,
+    "dynamicPressurePa": 1,
+    "trimForceResidualN": 400
+  },
+  "checkpoints": [
+    {
+      "timeSeconds": 0,
+      "latitudeDeg": 36.0191666667,
+      "longitudeDeg": -75.6744444444,
+      "altitudeMslM": 3051.9624,
+      "velocityNedMps": { "north": 121.92314130446161, "east": 121.92314130446161, "down": 0 },
+      "attitudeDeg": { "yaw": 45, "pitch": 2.63872639635, "roll": 0 },
+      "bodyAngularRateRadS": { "roll": 0.00004363520954975663, "pitch": -0.00006889065965441224, "yaw": -0.0000409162074767605 },
+      "aerodynamicBodyForceN": { "x": -6318.440737653328, "y": 0, "z": -90749.5151598632 },
+      "aerodynamicBodyMomentNm": { "roll": 0, "pitch": 0, "yaw": 0 },
+      "mach": 0.525083366639,
+      "dynamicPressurePa": 13444.193911243801
+    },
+    {
+      "timeSeconds": 60,
+      "latitudeDeg": 36.0849031344,
+      "longitudeDeg": -75.5930984172,
+      "altitudeMslM": 3051.9466502524797,
+      "velocityNedMps": { "north": 121.3745365594584, "east": 122.47034783219522, "down": 0.000235364045002236 },
+      "attitudeDeg": { "yaw": 45.2554553541, "pitch": 2.63861083779, "roll": -0.0416077202793 },
+      "bodyAngularRateRadS": { "roll": 0.00003342204953198624, "pitch": -0.00006886482653088065, "yaw": 0.0000031348460286675904 },
+      "aerodynamicBodyForceN": { "x": -6318.5433846373935, "y": -0.4039905701060918, "z": -90749.65737395645 },
+      "aerodynamicBodyMomentNm": { "roll": 0.0006487898941830227, "pitch": -1.2557984506032593e-8, "yaw": -0.03768654654748398 },
+      "mach": 0.52508555771,
+      "dynamicPressurePa": 13444.333045339246
+    },
+    {
+      "timeSeconds": 120,
+      "latitudeDeg": 36.1504012061,
+      "longitudeDeg": -75.511393991,
+      "altitudeMslM": 3051.95052703416,
+      "velocityNedMps": { "north": 121.02368164338961, "east": 122.81620678426562, "down": -0.000386187620997864 },
+      "attitudeDeg": { "yaw": 45.4182716369, "pitch": 2.63886104543, "roll": -0.0620345608234 },
+      "bodyAngularRateRadS": { "roll": 0.000037744676923650403, "pitch": -0.00006888003291043259, "yaw": -0.000016718806321437324 },
+      "aerodynamicBodyForceN": { "x": -6318.450752068097, "y": -0.223211351925815, "z": -90749.96456369298 },
+      "aerodynamicBodyMomentNm": { "roll": 0.00035827489902910225, "pitch": -1.2474133077660622e-8, "yaw": -0.020743991484097165 },
+      "mach": 0.525083709744,
+      "dynamicPressurePa": 13444.231784863814
+    },
+    {
+      "timeSeconds": 180,
+      "latitudeDeg": 36.2157410256,
+      "longitudeDeg": -75.4294314881,
+      "altitudeMslM": 3051.9890401295997,
+      "velocityNedMps": { "north": 120.78084578016721, "east": 123.0520764102648, "down": -0.0008324686616775841 },
+      "attitudeDeg": { "yaw": 45.5302710328, "pitch": 2.63913977229, "roll": -0.0732675758984 },
+      "bodyAngularRateRadS": { "roll": 0.000040078014101120416, "pitch": -0.00006893017069814424, "yaw": -0.00002760940734925868 },
+      "aerodynamicBodyForceN": { "x": -6318.138604744097, "y": -0.12433316923029472, "z": -90750.28973492057 },
+      "aerodynamicBodyMomentNm": { "roll": 0.0001994054902873164, "pitch": -1.2365619464498087e-8, "yaw": -0.011477797072701464 },
+      "mach": 0.525077543751,
+      "dynamicPressurePa": 13443.850179199742
+    }
+  ]
+}

@@ -1,9 +1,12 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, Calculator, CircleAlert } from "lucide-react";
+import { ArrowRight, BookOpen, Calculator, CheckCircle2, CircleAlert } from "lucide-react";
 import { ProductHeader } from "@/components/ProductHeader";
 import { ENGINE_VERSION } from "@/lib/engine/version";
 import { SCENARIO_PACKAGE_SCHEMA_VERSION } from "@/lib/scenario-package";
 import { RASP_SOURCE_CONTRACTS } from "@/lib/simulation";
+import { verifyPublicAircraftReference } from "@/lib/validation/public-aircraft-reference";
+
+const aircraftReference = verifyPublicAircraftReference();
 
 const equations = [
   {
@@ -166,6 +169,42 @@ export default function MathPage() {
             <strong>{item.name}</strong>
           </a>
         ))}
+      </section>
+      <section className="math-reference-contract" aria-labelledby="aircraft-reference-title">
+        <header>
+          <div>
+            <span>PUBLIC AIRCRAFT VERIFICATION · NASA NESC 2015</span>
+            <h2 id="aircraft-reference-title">Subsonic trim flyout reproduced within tolerance</h2>
+            <p>
+              A separate verification runner propagates the published Case 11
+              trim condition in TypeScript and Rust/WASM. It compares the same
+              position, velocity, attitude, angular-rate, force, moment, Mach,
+              dynamic-pressure and energy state without changing the operational scenario models.
+            </p>
+          </div>
+          <strong data-state={aircraftReference.status.toLowerCase()}>
+            <CheckCircle2 size={15} /> {aircraftReference.status}
+          </strong>
+        </header>
+        <div className="math-reference-metrics">
+          <article><span>Trajectory</span><strong>{aircraftReference.maximumErrors.geodesicPositionM.toFixed(1)} m</strong><p>maximum position error · 100 m gate</p></article>
+          <article><span>Speed</span><strong>{aircraftReference.maximumErrors.speedMps.toFixed(4)} m/s</strong><p>maximum speed error · 0.02 m/s gate</p></article>
+          <article><span>Altitude</span><strong>{aircraftReference.maximumErrors.altitudeM.toFixed(3)} m</strong><p>maximum altitude error · 0.1 m gate</p></article>
+          <article><span>Backend parity</span><strong>1 × 10⁻⁹</strong><p>TypeScript versus Rust/WASM numeric gate</p></article>
+        </div>
+        <footer>
+          <div>
+            <strong>What this proves</strong>
+            <p>{aircraftReference.intendedUse}</p>
+          </div>
+          <div>
+            <strong>Deliberate boundary</strong>
+            <p>{aircraftReference.limitations.at(-1)}</p>
+          </div>
+          <Link href={aircraftReference.source.caseUrl} target="_blank" rel="noreferrer">
+            <BookOpen size={14} /> Open NASA check case <ArrowRight size={13} />
+          </Link>
+        </footer>
       </section>
       <section className="math-equations">
         {equations.map((item, index) => (

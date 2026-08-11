@@ -77,6 +77,10 @@ test("server-renders model transparency and tactical-symbol references", async (
   assert.match(math, /How a displayed result is traced/);
   assert.match(math, /SHA-256 of canonical JSON/);
   assert.match(math, /NASA Glenn/);
+  assert.match(math, /Subsonic trim flyout reproduced within tolerance/);
+  assert.match(math, /maximum position error/);
+  assert.match(math, /Open NASA check case/);
+  assert.match(math, /without changing the operational scenario models/);
   assert.match(symbols, /Recognisable tactical objects, not generic dots/);
   assert.match(symbols, /Tacview-style analysis subset/);
   assert.match(symbols, /not a NATO symbol set/);

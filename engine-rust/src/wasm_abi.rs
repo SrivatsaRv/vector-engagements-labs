@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use crate::{run_json, EngineError, MAX_INPUT_BYTES};
+use crate::{run_json, run_public_aircraft_reference_json, EngineError, MAX_INPUT_BYTES};
 
 const ABI_VERSION: u32 = 1;
 
@@ -72,6 +72,28 @@ pub extern "C" fn vector_run_json() -> u32 {
         std::str::from_utf8(&input)
             .map_err(|_| EngineError::InvalidUtf8)
             .and_then(run_json)
+    });
+    match result {
+        Ok(value) => {
+            set_output(value);
+            1
+        }
+        Err(error) => {
+            set_output(error.to_string());
+            0
+        }
+    }
+}
+
+/// Execute the versioned public-aircraft reference case in the input buffer.
+#[allow(unsafe_code)]
+#[no_mangle]
+pub extern "C" fn vector_reference_run_json() -> u32 {
+    let result = INPUT.with(|input| {
+        let input = input.borrow();
+        std::str::from_utf8(&input)
+            .map_err(|_| EngineError::InvalidUtf8)
+            .and_then(run_public_aircraft_reference_json)
     });
     match result {
         Ok(value) => {
