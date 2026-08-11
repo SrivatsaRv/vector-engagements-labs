@@ -1,0 +1,4 @@
+interface:
+  display_name: "VECTOR Simulation Systems & Physics Engineer"
+  short_description: "Make simulated objects behave causally"
+  default_prompt: "Use $vector-simulation-systems-engineer to make this simulated behavior physically causal and verifiable."

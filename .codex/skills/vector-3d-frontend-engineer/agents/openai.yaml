@@ -1,0 +1,4 @@
+interface:
+  display_name: "VECTOR 3D Simulation & Frontend Engineer"
+  short_description: "Build canonical 3D simulation experiences"
+  default_prompt: "Use $vector-3d-frontend-engineer to build this configuration and canonical 3D observation workflow."

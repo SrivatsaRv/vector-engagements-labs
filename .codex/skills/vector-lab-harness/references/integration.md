@@ -1,12 +1,14 @@
-# Local release-train integration
+# Local branch and worktree integration
 
 ## What is shared
 
-All worktrees point to the same local Git object database, but each branch has its own working tree and `HEAD`. Uncommitted edits are private to the worktree. A commit is shareable by Git; a pushed branch is shareable with other chats and GitHub; a merge into `release/x86-runtime` is the integration state.
+All worktrees point to the same local Git object database, but each branch has its own working tree and `HEAD`. Uncommitted edits are private to that worktree. A commit is shareable locally; a pushed branch is shareable with other tasks and GitHub; a merge into the protected integration branch is the shared product state.
 
-## Feature-chat handoff
+The owning GitHub issue declares the integration branch. Use `main` when no active release train is declared. Never assume a historical release branch still exists.
 
-From the assigned feature worktree:
+## Feature handoff
+
+From the assigned branch or worktree:
 
 ```bash
 git status --short --branch
@@ -17,43 +19,39 @@ git commit -m "feat: <scoped change>"
 git push -u origin <feature-branch>
 ```
 
-Open the PR against `release/x86-runtime`. Include the commit SHA, tests, docs, migrations and blockers. Do not open the PR against `main`.
+Open the PR against the integration branch declared by the issue. Include the commit SHA, tests, docs, migrations, benchmarks where relevant, and blockers. Do not target another branch merely because it was used by a previous release train.
 
-## Release-steward merge
+## Integration steward
 
-From `/Users/one2n/vector-lab-worktrees/release-x86-runtime`:
+From the integration worktree:
 
 ```bash
 git fetch origin --prune
-git switch release/x86-runtime
-git pull --ff-only origin release/x86-runtime
+git switch <integration-branch>
+git pull --ff-only origin <integration-branch>
 git log --oneline --decorate -5
 ```
 
 Merge only a reviewed feature PR whose required checks pass. After merging:
 
 ```bash
-git pull --ff-only origin release/x86-runtime
+git pull --ff-only origin <integration-branch>
 make ci-local
 make integration-local
 make observability-local
 make performance-local
 ```
 
-The expensive commands may be run according to the release gate, but their results must be recorded. The release branch is the only place where cross-stream behavior is evaluated.
+Run expensive gates according to the owning issue and release policy, and record every result or justified omission. Cross-stream behavior is evaluated only from the integrated state.
 
 ## Dependent feature sync
 
-Before consuming a merged upstream contract, a feature chat must save its local work, then from its own worktree run:
+Before consuming a merged upstream contract, save local work and run:
 
 ```bash
 git status --short --branch
 git fetch origin --prune
-git rebase origin/release/x86-runtime
+git rebase origin/<integration-branch>
 ```
 
-Resolve conflicts in the feature worktree, rerun affected tests, then force-push only with an explicit branch policy; otherwise push a new commit. Never reset, clean, or discard another chat's worktree.
-
-## Current practical state
-
-The data, geo and browser worktrees currently contain uncommitted private edits. They cannot see one another's changes yet. The first shared state will exist after the owning chat commits and pushes, and the release steward merges that branch.
+Resolve conflicts in the owning worktree, rerun affected tests, and push according to branch policy. Never reset, clean, or discard another task's worktree. Never copy uncommitted files between worktrees to simulate integration.

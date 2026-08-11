@@ -21,9 +21,20 @@ Use [references/workstreams.md](references/workstreams.md) to select ownership, 
 
 GitHub epic [#47](https://github.com/SrivatsaRv/vector-engagements-labs/issues/47) owns causal order. Feature PRs target the protected integration branch declared by their issue; use `origin/main` when no active release train is declared. Rebase or merge the current integration branch before handoff.
 
+## Engineering personas
+
+The harness is the shared operating protocol, not a fifth engineer. Invoke the smallest authoritative persona for the outcome:
+
+- [$vector-staff-engineer](../vector-staff-engineer/SKILL.md) owns architecture, shared contracts, causal sequencing, and cross-stream integration.
+- [$vector-simulation-systems-engineer](../vector-simulation-systems-engineer/SKILL.md) owns dynamics, control, mission behavior, guidance, weapons, sensors, tracking, datalinks, EW, and causal validation.
+- [$vector-3d-frontend-engineer](../vector-3d-frontend-engineer/SKILL.md) owns scenario UX, canonical 2D/3D playback, interaction, telemetry, timelines, responsive presentation, and frontend performance.
+- [$vector-verification-performance-engineer](../vector-verification-performance-engineer/SKILL.md) independently owns numerical, regression, parity, browser, visual, performance, security, recovery, CI/CD, and release evidence.
+
+Do not let persona boundaries create handoff gaps. The Staff Architect owns the cross-stream outcome, specialists own their contracts, and the Verification Engineer independently decides whether the evidence proves the outcome.
+
 ## Worktree integration
 
-Worktrees share Git objects but do not share uncommitted files. A chat's edits become available to another chat only after the owning chat commits them and pushes its feature branch, followed by a merge into `origin/release/x86-runtime`.
+Worktrees share Git objects but do not share uncommitted files. A task's edits become available to another task only after the owner commits and pushes its feature branch, followed by a merge into the integration branch declared by the owning issue.
 
 Use this flow:
 
