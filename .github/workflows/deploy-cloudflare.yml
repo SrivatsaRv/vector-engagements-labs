@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Verify production dependencies or deploy an immutable revision
+        description: Read-only verification or deployment of an immutable reviewed revision
         required: true
         type: choice
         default: verify
@@ -12,41 +12,60 @@ on:
           - verify
           - deploy
       ref:
-        description: Revision to verify; production deploys require a full commit SHA
+        description: Full 40-character commit SHA from reviewed main history
         required: true
-        default: main
+        type: string
 
 permissions:
   contents: read
+  checks: read
 
 concurrency:
   group: cloudflare-production
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  admit:
     if: github.ref == 'refs/heads/main'
-    name: Deploy production Worker
+    name: Admit immutable reviewed revision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.admission.outputs.sha }}
+    steps:
+      - name: Check out trusted workflow source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+      - name: Require immutable CI-green main revision
+        id: admission
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${REQUESTED_REF}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Production operations require a full 40-character commit SHA." >&2
+            exit 1
+          fi
+          git fetch origin main --no-tags
+          test "$(git rev-parse "${REQUESTED_REF}^{commit}")" = "${REQUESTED_REF}"
+          git merge-base --is-ancestor "${REQUESTED_REF}" origin/main
+          gate_count="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${REQUESTED_REF}/check-runs?per_page=100" --jq '[.check_runs[] | select(.name == "Stage 4: Required PR Gate" and .conclusion == "success")] | length')"
+          test "${gate_count}" -ge 1
+          echo "sha=${REQUESTED_REF}" >> "${GITHUB_OUTPUT}"
+
+  verify:
+    name: Verify production dependencies read-only
+    needs: admit
     environment: production
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - name: Check out requested release
+      - name: Check out admitted revision
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref }}
-      - name: Require immutable production revision
-        if: inputs.operation == 'deploy'
-        env:
-          REQUESTED_REF: ${{ inputs.ref }}
-        run: |
-          if [[ ! "${REQUESTED_REF}" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Production deployment requires a full 40-character commit SHA." >&2
-            exit 1
-          fi
-          test "$(git rev-parse HEAD)" = "${REQUESTED_REF}"
-          git fetch origin main --no-tags
-          git merge-base --is-ancestor "${REQUESTED_REF}" origin/main
+          ref: ${{ needs.admit.outputs.sha }}
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
@@ -79,20 +98,83 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_HYPERDRIVE_ID: ${{ vars.CLOUDFLARE_HYPERDRIVE_ID }}
         run: npx wrangler hyperdrive get "${CLOUDFLARE_HYPERDRIVE_ID}"
-      - name: Verify release
+      - name: Verify admitted source
         run: make ci-local
+      - name: Verify production catalog without mutation
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_ORIGIN_URL }}
+        run: npm run db:verify
+
+  migrate:
+    if: inputs.operation == 'deploy'
+    name: Apply forward-only production migrations
+    needs:
+      - admit
+      - verify
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out admitted revision
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.admit.outputs.sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
       - name: Migrate and verify production catalog
         env:
           DATABASE_URL: ${{ secrets.DATABASE_ORIGIN_URL }}
         run: |
           npm run db:migrate
-          npm run db:seed
           npm run db:verify
+
+  deploy:
+    if: inputs.operation == 'deploy'
+    name: Deploy immutable production Worker
+    needs:
+      - admit
+      - migrate
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out admitted revision
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.admit.outputs.sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
       - name: Deploy immutable source revision
-        if: inputs.operation == 'deploy'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_HYPERDRIVE_ID: ${{ vars.CLOUDFLARE_HYPERDRIVE_ID }}
           VECTOR_PRODUCTION_HOST: ${{ vars.VECTOR_PRODUCTION_HOST }}
         run: npm run deploy
+
+  smoke:
+    if: inputs.operation == 'deploy'
+    name: Verify deployed health
+    needs: deploy
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify deployed health
+        env:
+          VECTOR_PRODUCTION_HOST: ${{ vars.VECTOR_PRODUCTION_HOST }}
+        run: |
+          set -euo pipefail
+          test -n "${VECTOR_PRODUCTION_HOST}"
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --max-time 15 "https://${VECTOR_PRODUCTION_HOST}/api/health"
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --max-time 15 "https://${VECTOR_PRODUCTION_HOST}/blogs" > /dev/null

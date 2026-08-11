@@ -13,8 +13,65 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  classify:
+    name: "Stage 0: Classify Changed Contracts"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      policy: ${{ steps.changes.outputs.policy }}
+      quality: ${{ steps.changes.outputs.quality }}
+      security_js: ${{ steps.changes.outputs.security_js }}
+      web_tests: ${{ steps.changes.outputs.web_tests }}
+      rust_tests: ${{ steps.changes.outputs.rust_tests }}
+      rust_audit: ${{ steps.changes.outputs.rust_audit }}
+      integration: ${{ steps.changes.outputs.integration }}
+      container: ${{ steps.changes.outputs.container }}
+    steps:
+      - name: Check out source and history
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22.18.0
+      - name: Classify changed paths
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${BASE_SHA}" =~ ^0+$ ]]; then
+            git show --pretty= --name-only -z "${HEAD_SHA}"
+          else
+            git diff --name-only -z "${BASE_SHA}" "${HEAD_SHA}"
+          fi | node scripts/classify-ci-changes.mjs --stdin0
+
+  policy:
+    name: "Stage 0.5: Repository Policy"
+    needs: classify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22.18.0
+      - name: Verify classifier, workflow, deployment, and persona policies
+        run: >-
+          node --test
+          tests/ci-change-classifier.test.mjs
+          tests/deployment-config.test.mjs
+          tests/persona-skills.test.mjs
+          tests/security-config.test.mjs
+
   quality:
-    name: "Stage 1: Quality Gate"
+    if: needs.classify.outputs.quality == 'true'
+    name: "Stage 1A: Web Quality"
+    needs: classify
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -25,24 +82,19 @@ jobs:
         with:
           node-version: 22.18.0
           cache: npm
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
-        with:
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          components: clippy,rustfmt
-      - name: Cache Rust builds
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
-        with:
-          workspaces: engine-rust
       - name: Install locked dependencies
         run: npm ci
-      - name: Verify formatting, generated assets, lint, and types
-        run: make ci-quality
+      - name: Verify generated assets, lint, and types
+        run: |
+          npm run symbols:verify
+          npm run models:verify
+          npm run lint
+          npm run typecheck
 
-  security:
-    name: "Stage 1.5: Supply Chain and Security Gate"
-    needs: quality
+  security_js:
+    if: needs.classify.outputs.security_js == 'true'
+    name: "Stage 1B: JavaScript Supply Chain and CodeQL"
+    needs: classify
     permissions:
       contents: read
       security-events: write
@@ -75,9 +127,29 @@ jobs:
         with:
           category: /language:javascript-typescript
 
-  tests:
-    name: "Stage 2: Unit and Contract Tests"
-    needs: security
+  web_tests:
+    if: needs.classify.outputs.web_tests == 'true'
+    name: "Stage 2A: Web and Contract Tests"
+    needs: classify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build and run JavaScript and TypeScript contracts
+        run: npm test
+
+  rust_tests:
+    if: needs.classify.outputs.rust_tests == 'true'
+    name: "Stage 2B: Rust, WASM, and Parity"
+    needs: classify
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -100,12 +172,37 @@ jobs:
           workspaces: engine-rust
       - name: Install locked dependencies
         run: npm ci
-      - name: Run Rust and TypeScript tests
-        run: make ci-tests
+      - name: Verify Rust, WASM, and parity contracts
+        run: |
+          npm run engine:rust:fmt
+          npm run engine:rust:clippy
+          npm run engine:rust:verify
+          npm run engine:rust:test
+          npm run engine:rust:doc
+          node --test tests/engine-backends.test.mjs tests/model-pack.test.mjs
+
+  rust_audit:
+    if: needs.classify.outputs.rust_audit == 'true'
+    name: "Stage 2C: Rust Dependency Audit"
+    needs: classify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
+        with:
+          toolchain: stable
+      - name: Install pinned cargo-audit
+        run: cargo install cargo-audit --locked --version 0.22.2
+      - name: Audit locked Rust dependencies
+        run: cargo audit --file engine-rust/Cargo.lock
 
   integration:
-    name: "Stage 3: Database and API Integration"
-    needs: tests
+    if: needs.classify.outputs.integration == 'true'
+    name: "Stage 3A: Database and API Integration"
+    needs: classify
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
@@ -149,11 +246,72 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  container:
+    if: needs.classify.outputs.container == 'true'
+    name: "Stage 3B: Container Rebuild"
+    needs: classify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Rebuild the application image from source
+        run: docker build --tag "vector-lab-ci:${GITHUB_SHA}" .
+
   gate:
+    if: always()
     name: "Stage 4: Required PR Gate"
-    needs: integration
+    needs:
+      - classify
+      - policy
+      - quality
+      - security_js
+      - web_tests
+      - rust_tests
+      - rust_audit
+      - integration
+      - container
     runs-on: ubuntu-24.04
     timeout-minutes: 2
+    env:
+      CLASSIFY_RESULT: ${{ needs.classify.result }}
+      POLICY_RESULT: ${{ needs.policy.result }}
+      QUALITY_SELECTED: ${{ needs.classify.outputs.quality }}
+      QUALITY_RESULT: ${{ needs.quality.result }}
+      SECURITY_JS_SELECTED: ${{ needs.classify.outputs.security_js }}
+      SECURITY_JS_RESULT: ${{ needs.security_js.result }}
+      WEB_TESTS_SELECTED: ${{ needs.classify.outputs.web_tests }}
+      WEB_TESTS_RESULT: ${{ needs.web_tests.result }}
+      RUST_TESTS_SELECTED: ${{ needs.classify.outputs.rust_tests }}
+      RUST_TESTS_RESULT: ${{ needs.rust_tests.result }}
+      RUST_AUDIT_SELECTED: ${{ needs.classify.outputs.rust_audit }}
+      RUST_AUDIT_RESULT: ${{ needs.rust_audit.result }}
+      INTEGRATION_SELECTED: ${{ needs.classify.outputs.integration }}
+      INTEGRATION_RESULT: ${{ needs.integration.result }}
+      CONTAINER_SELECTED: ${{ needs.classify.outputs.container }}
+      CONTAINER_RESULT: ${{ needs.container.result }}
     steps:
-      - name: Confirm staged validation completed
-        run: echo "Quality, security, unit, contract, database, and API gates passed."
+      - name: Verify every selected gate passed
+        run: |
+          set -euo pipefail
+          test "${CLASSIFY_RESULT}" = "success"
+          test "${POLICY_RESULT}" = "success"
+          check_selected() {
+            local selected="$1"
+            local result="$2"
+            local name="$3"
+            if [[ "${selected}" == "true" && "${result}" != "success" ]]; then
+              echo "Selected gate ${name} ended as ${result}." >&2
+              exit 1
+            fi
+          }
+          check_selected "${QUALITY_SELECTED}" "${QUALITY_RESULT}" quality
+          check_selected "${SECURITY_JS_SELECTED}" "${SECURITY_JS_RESULT}" security-js
+          check_selected "${WEB_TESTS_SELECTED}" "${WEB_TESTS_RESULT}" web-tests
+          check_selected "${RUST_TESTS_SELECTED}" "${RUST_TESTS_RESULT}" rust-tests
+          check_selected "${RUST_AUDIT_SELECTED}" "${RUST_AUDIT_RESULT}" rust-audit
+          check_selected "${INTEGRATION_SELECTED}" "${INTEGRATION_RESULT}" integration
+          check_selected "${CONTAINER_SELECTED}" "${CONTAINER_RESULT}" container
+          echo "All change-selected policy, quality, security, test, integration, and container gates passed."
