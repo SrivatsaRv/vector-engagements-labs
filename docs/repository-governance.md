@@ -85,10 +85,15 @@ semantic tag. The workflow verifies that the tag matches `package.json`,
 resolves to reviewed `main` history, and already has a successful Required PR
 Gate on that exact commit. It then reruns quality, unit, parity, production
 dependency, RustSec, PostGIS migration, and application integration checks,
-generates an SPDX SBOM and SHA-256 manifest, attests the archive, and publishes
-through the protected `release` environment. Tag pushes alone cannot execute
-release code. The `release` environment accepts protected branches and requires
-an explicit maintainer approval before publication.
+builds the production image for `linux/amd64` and `linux/arm64`, generates an
+SPDX SBOM and SHA-256 manifest, and publishes the archive plus image through the
+protected `release` environment. The image is written to GHCR with only the
+exact SemVer and full commit-SHA tags, then attested and recorded by digest.
+There is no moving `latest`, major, or minor tag. Promotion and rollback change
+the `VECTOR_IMAGE` digest consumed by Compose; they never rebuild or retag the
+artifact. Tag pushes alone cannot execute release code. The `release`
+environment accepts protected branches and requires an explicit maintainer
+approval before publication. Docker Hub is not configured.
 
 Cloudflare delivery is deliberately manual and protected by the GitHub
 `production` environment. Both verification and deployment require a full
@@ -119,6 +124,8 @@ No Cloudflare secret is stored in the repository. R2 is optional and should be i
 - Numerical or coefficient changes that can alter an outcome must appear prominently in the changelog and release notes.
 - Tags should be annotated and signed by a maintainer when local signing is configured.
 - Published tags are immutable. Corrections receive a new patch release.
+- Container promotion uses the published manifest digest; release tags are not
+  repointed and mutable convenience tags are not created.
 
 ## Ownership and contributor safety
 

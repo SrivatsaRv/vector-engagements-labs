@@ -19,19 +19,20 @@ Docker Compose is the authoritative local service topology. It builds one
 explicitly tagged application image, starts the pinned PostGIS database, applies
 checksum-tracked schema and governed-catalog migrations, loads idempotent local
 fixtures in a separate one-shot service, and serves that same image through the
-local Cloudflare runtime on port 4317.
+non-root Node production runtime on port 4317.
 
 ```bash
 make compose-up
 docker compose ps
 ```
 
-Open [http://localhost:4317](http://localhost:4317). Grafana is available at [http://localhost:4300](http://localhost:4300) using `vector` / `vector-local-only` unless `VECTOR_GRAFANA_PASSWORD` is set. The database is exposed on loopback port `55433` for inspection. Every Compose image uses an explicit version or digest; `latest` is not an admitted tag. `VECTOR_IMAGE_REPOSITORY`, `VECTOR_IMAGE_TAG`, and `VECTOR_VERSION` may be overridden together for an immutable candidate image.
+Open [http://localhost:4317](http://localhost:4317). Grafana is available at [http://localhost:4300](http://localhost:4300) using `vector` / `vector-local-only` unless `VECTOR_GRAFANA_PASSWORD` is set. The database is exposed on loopback port `55433` for inspection. Every Compose image uses an explicit version or digest; `latest` is not an admitted tag. Set `VECTOR_IMAGE` to one exact GHCR tag or digest to verify a release candidate; see [`docs/container-release.md`](docs/container-release.md).
 
 Useful routes:
 
 - `/`: product entry and scenario quick start
 - `/scenarios`: eight versioned templates
+- `/lab`: choose a governed study area, including North Punjab or Ladakh, and construct a run
 - `/workbench?scenario=a2a-crossing-intercept`: Construct, Simulate, Observe, Explain, Compare, Report
 - `/math`: published equations, model limits, and reproducibility contract
 - `/symbols`: tactical symbol and lifecycle reference
@@ -68,7 +69,7 @@ make integration-local
 make observability-local
 ```
 
-The first command runs lint, type checks, production build, route checks, and deterministic engine tests. The second applies migrations/seeds and validates PostGIS SRID, row coverage, scenario count, and model foreign keys. The third proves protected Prometheus ingestion, Tempo traces, Grafana provisioning, and bounded browser performance telemetry.
+The first command runs lint, type checks, production build, route checks, and deterministic engine tests. The second verifies the non-root production image, applies migrations/seeds, validates PostGIS SRID, row coverage, scenario count, model foreign keys, and the automated application journey. The third proves protected Prometheus ingestion, Tempo traces, Grafana provisioning, and bounded browser performance telemetry.
 
 Public API and delivery trust boundaries are documented in [`docs/security-boundaries.md`](docs/security-boundaries.md).
 

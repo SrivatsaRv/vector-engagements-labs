@@ -22,7 +22,7 @@ services:
       retries: 20
 
   migrate:
-    image: ${VECTOR_IMAGE_REPOSITORY:-reachdefence/vector-engagement-lab}:${VECTOR_IMAGE_TAG:-0.1.0-dev}
+    image: ${VECTOR_IMAGE:-vector-engagement-lab:0.1.0-dev}
     environment:
       DATABASE_URL: postgres://vector:vector@database:5432/vector
     init: true
@@ -30,14 +30,14 @@ services:
       com.reachdefence.product: vector-engagement-lab
       com.reachdefence.component: catalog-migration
       com.reachdefence.version: ${VECTOR_VERSION:-0.1.0-dev}
-    command: ["npm", "run", "db:migrate"]
+    command: ["node", "dist/admin/migrate-db.mjs"]
     depends_on:
       database:
         condition: service_healthy
     restart: "no"
 
   seed:
-    image: ${VECTOR_IMAGE_REPOSITORY:-reachdefence/vector-engagement-lab}:${VECTOR_IMAGE_TAG:-0.1.0-dev}
+    image: ${VECTOR_IMAGE:-vector-engagement-lab:0.1.0-dev}
     environment:
       DATABASE_URL: postgres://vector:vector@database:5432/vector
     init: true
@@ -45,7 +45,7 @@ services:
       com.reachdefence.product: vector-engagement-lab
       com.reachdefence.component: local-catalog-seed
       com.reachdefence.version: ${VECTOR_VERSION:-0.1.0-dev}
-    command: ["npm", "run", "db:seed"]
+    command: ["node", "dist/admin/seed-db.mjs"]
     depends_on:
       database:
         condition: service_healthy
@@ -54,17 +54,17 @@ services:
     restart: "no"
 
   vector:
-    image: ${VECTOR_IMAGE_REPOSITORY:-reachdefence/vector-engagement-lab}:${VECTOR_IMAGE_TAG:-0.1.0-dev}
+    image: ${VECTOR_IMAGE:-vector-engagement-lab:0.1.0-dev}
     build:
       context: .
       target: runtime
       args:
-        DATABASE_URL: postgres://vector:vector@database:5432/vector
-        OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
         VECTOR_VERSION: ${VECTOR_VERSION:-0.1.0-dev}
+        VECTOR_SOURCE_REVISION: ${VECTOR_SOURCE_REVISION:-local}
     environment:
       DATABASE_URL: postgres://vector:vector@database:5432/vector
       PORT: "4317"
+      VECTOR_RUNTIME: node
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       VECTOR_VERSION: ${VECTOR_VERSION:-0.1.0-dev}
       VECTOR_ENVIRONMENT: local
@@ -77,8 +77,6 @@ services:
       com.reachdefence.version: ${VECTOR_VERSION:-0.1.0-dev}
     ports:
       - "127.0.0.1:4317:4317"
-    volumes:
-      - vector_wrangler:/app/.wrangler
     depends_on:
       database:
         condition: service_healthy
@@ -169,7 +167,6 @@ services:
 
 volumes:
   vector_postgres:
-  vector_wrangler:
   vector_prometheus:
   vector_tempo:
   vector_loki:

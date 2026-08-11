@@ -17,7 +17,7 @@ Use the smallest complete set for a change. State why any applicable layer was o
 
 ## Existing baseline
 
-`make ci-local` runs quality, Rust, TypeScript, contract, parity and production-audit checks. `make integration-local` builds and starts the authoritative Compose topology, verifies governed migration data before fixture admission, covers the live PostGIS/API path, and runs automated responsive interaction checks. `make observability-local` covers telemetry; `make performance-local` covers the engine benchmark. These remain separate because they have different environment and runtime costs.
+`make ci-local` runs quality, Rust, TypeScript, contract, parity and production-audit checks. `make integration-local` validates Compose, builds and inspects the non-root production image, starts the authoritative topology, verifies governed migration data before fixture admission, covers the live PostGIS/API path, and runs automated responsive interaction checks. The image inspection rejects missing OCI identity, development `node_modules`, an unexpected command, or a root user. `make observability-local` covers telemetry; `make performance-local` covers the engine benchmark. These remain separate because they have different environment and runtime costs.
 
 Database integration additionally runs `db:credibility:verify`, which confirms
 the live immutable triggers reject same-version mutation and malformed compiled

@@ -6,6 +6,14 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ### Added
 
+- Governed North Punjab, Ladakh, Rajasthan, North East, Arabian Sea, and coastal
+  Gujarat study-area selection backed by forward-only catalog data.
+- An immutable catalog-credibility gate and a public NASA F-16 reference
+  trajectory with TypeScript/Rust-WASM parity evidence and visible math-panel
+  results.
+- A non-root, multi-architecture production image release path with immutable
+  GHCR tags, digest promotion, SBOM/provenance attestation, and Compose image
+  verification.
 - Versioned intended-use and credibility manifests, unit-bearing aircraft,
   weapon, sensor, propulsion, aerodynamic, loadout, and compatibility source
   schemas, plus deterministic immutable SI model-pack compilation shared by
@@ -21,6 +29,9 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ### Changed
 
+- Docker Compose now runs self-contained production, migration, and local-seed
+  bundles from one `VECTOR_IMAGE`; database and telemetry values are supplied
+  only at runtime and Docker Hub is not implied or configured.
 - Scenario packages advance to `vector.scenario.v3` and saved runs now bind the
   intended-use identity and exact compiled model-pack digest. Unknown objects,
   missing coefficients, incompatible stores, and unsupported combinations fail
