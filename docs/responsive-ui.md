@@ -30,6 +30,10 @@ rendering sharpness; viewport width and height govern task geometry.
 - The live 3D renderer observes its container, so orientation changes and panel reflow update the WebGL viewport without stretching or clipping.
 - Landing copy, calls to action and live preview remain within the first natural reading sequence on small screens; no fixed hero height creates blank space.
 - Report reading width remains bounded even when operational maps expand.
+- Blog editorial diagrams remain bounded at reading width on desktop. On phone,
+  their full-resolution canvas scrolls inside the figure rather than shrinking
+  technical labels below a readable size; the linked source image remains
+  available for full-resolution inspection.
 
 ## Automated proof
 
@@ -39,3 +43,9 @@ action size and placement, rail behavior, typography scaling, RASP ownership,
 3D container resize behavior, playback and legend containment, telemetry layout, Rust/WASM provenance, entity rendering, page errors, and
 horizontal overflow. Screenshots are written to the ignored
 `outputs/responsive/` directory for visual inspection.
+
+`npm run blog:visual:verify` separately validates the two high-resolution blog
+editorial diagrams at 1440×900 and 390×844. It proves asset dimensions,
+full-resolution links, five remaining Mermaid renders, desktop fit, contained
+phone scrolling, page overflow, and browser errors; screenshots are written to
+the ignored `outputs/blog-editorial/` directory.
