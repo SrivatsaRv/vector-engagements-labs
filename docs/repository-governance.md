@@ -18,9 +18,8 @@ All contributor work enters through a pull request. The `main` branch requires:
 Active changes use short-lived `feat/<scope>` branches in dedicated worktrees;
 there is no long-lived local integration or release worktree. The bottom pull
 request in a stack targets `main`. A dependent pull request targets its parent
-feature branch while under review, then is rebased and retargeted to `main`
-after that parent merges. Each stack layer receives its own merge-base diff
-review and applicable test evidence.
+feature branch, then is rebased and retargeted to `main` after that parent
+merges. Each stack layer carries its applicable test evidence.
 
 GitHub does not permit an author to approve their own pull request. During the
 solo-maintainer phase, the required approving-review count is therefore zero.

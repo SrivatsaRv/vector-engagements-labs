@@ -11,8 +11,8 @@ test("agent harness has one durable workflow authority", async () => {
   assert.match(skill, /origin\/main/);
   assert.match(skill, /feat\//);
   assert.match(skill, /stacked/i);
-  assert.match(skill, /review-agent/);
-  assert.match(skill, /git merge-base/);
+  assert.doesNotMatch(skill, /defect-first review/i);
+  assert.doesNotMatch(skill, /git merge-base/);
   assert.doesNotMatch(skill, /release\/x86-runtime/);
   assert.doesNotMatch(skill, /declared integration branch/);
 

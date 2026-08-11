@@ -1,6 +1,6 @@
 ---
 name: vector-lab-harness
-description: Project-level operating harness for Vector Engagement Labs. Use for implementation, review, planning, testing, or coordination in this repository. Routes work through GitHub issues and maintained docs, feature-branch worktrees, stacked pull requests into main, defect-first review, and proportionate verification.
+description: Project-level operating harness for Vector Engagement Labs. Use for implementation, planning, testing, or coordination in this repository. Routes work through GitHub issues and maintained docs, feature-branch worktrees, stacked pull requests into main, and proportionate verification.
 ---
 
 # Vector Lab Harness
@@ -31,19 +31,6 @@ git worktree add -b feat/<scope> <worktree-path> origin/main
 Push the branch and open the bottom pull request against `main`. For a dependent change, create another `feat/<child>` worktree from the parent feature branch and open its pull request against the parent branch so GitHub reviews only that stack layer. The stack still terminates at remote `main`. After the parent merges, fetch `origin/main`, rebase the child onto it, rerun affected tests, push with `--force-with-lease` only to the agent-owned child branch, and retarget the child pull request to `main`.
 
 Each branch, worktree, commit, and pull request owns one coherent slice. Never share uncommitted files between worktrees, copy files to simulate integration, use two worktrees on one branch, or delete/prune a worktree until `git status` proves it clean. A dependency becomes shareable only after it is committed and pushed. Use Git history and the PR stack—not a local release branch—to express ordering.
-
-## Defect-first review
-
-Before push and after any rebase, run a read-only review of the exact change that would merge. Use `$review-agent` when it is available; it must not edit, commit, push, post comments, or delegate.
-
-For the bottom PR, compare with the freshest resolvable `origin/main`. For a stacked PR, compare with its current parent branch. Resolve the merge base, then inspect the whole diff and relevant tests/call sites:
-
-```bash
-git merge-base HEAD <comparison-ref>
-git diff <merge-base-sha>
-```
-
-Report every concrete regression as a prioritized, actionable finding with a changed-line citation. Fix qualifying findings, rerun the affected checks, and repeat the review. If no issue qualifies, record `No findings.` plus material test gaps or residual risks. Review each stack layer separately; a review of the cumulative stack is not evidence for an individual child PR.
 
 ## Engineering invariants
 
@@ -91,6 +78,6 @@ Keep the developer feedback loop live while editing:
 
 ## Verification and handoff
 
-Before commit, update the relevant `docs/` contract and owning issue when scope, behavior, or acceptance changes. Run focused checks and `make ci-local`, then perform the defect-first review. Commit intentionally, push the `feat/...` branch, and open or update the correct stack-layer PR.
+Before commit, update the relevant `docs/` contract and owning issue when scope, behavior, or acceptance changes. Run focused checks and `make ci-local`. Commit intentionally, push the `feat/...` branch, and open or update the correct stack-layer PR.
 
-Every handoff records worktree, branch, commit SHA, parent/base branch, PR URL and eventual `main` target, diff summary, contracts/docs changed, migrations, each test command and result, artifacts/benchmark environment where relevant, omitted layers with reasons, review result, container/dev-session state, and blockers.
+Every handoff records worktree, branch, commit SHA, parent/base branch, PR URL and eventual `main` target, diff summary, contracts/docs changed, migrations, each test command and result, artifacts/benchmark environment where relevant, omitted layers with reasons, container/dev-session state, and blockers.

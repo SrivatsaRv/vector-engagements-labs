@@ -1,6 +1,6 @@
 # Vector Engagement Labs agent harness
 
-Use the project skill at `.codex/skills/vector-lab-harness/SKILL.md` for repository work. It is the single workflow authority for GitHub-issue routing, maintained `docs/` contracts, feature worktrees, stacked pull requests, review, and verification.
+Use the project skill at `.codex/skills/vector-lab-harness/SKILL.md` for repository work. It is the single workflow authority for GitHub-issue routing, maintained `docs/` contracts, feature worktrees, stacked pull requests, and verification.
 
 Before editing:
 
