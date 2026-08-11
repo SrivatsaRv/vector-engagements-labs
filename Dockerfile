@@ -1,4 +1,4 @@
-FROM node:22.18.0-bookworm-slim AS runtime
+FROM node:22.18.0-bookworm-slim AS dependencies
 
 WORKDIR /app
 RUN apt-get update \
@@ -6,6 +6,18 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci
+
+FROM dependencies AS development
+
+COPY . .
+ENV DATABASE_URL=postgres://vector:vector@database:5432/vector
+ENV OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+ENV VECTOR_VERSION=0.1.0
+ENV VECTOR_ENVIRONMENT=local
+EXPOSE 4317
+CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "4317"]
+
+FROM dependencies AS runtime
 
 COPY . .
 ARG DATABASE_URL=postgres://vector:vector@database:5432/vector

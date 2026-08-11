@@ -18,8 +18,8 @@ The long-term deliverable is a rigorously tested open-source simulation library 
 Docker Compose starts the pinned PostGIS database, applies checksum-tracked migrations, loads idempotent fixtures, and serves the built Worker bundle through the local Cloudflare runtime on port 4317.
 
 ```bash
-docker compose up --build -d
-docker compose ps
+docker compose -p vector-lab up --build -d
+docker compose -p vector-lab ps
 ```
 
 Open [http://localhost:4317](http://localhost:4317). Grafana is available at [http://localhost:4300](http://localhost:4300) using `vector` / `vector-local-only` unless `VECTOR_GRAFANA_PASSWORD` is set. The database is exposed on loopback port `55433` for inspection. Every Compose image uses an explicit version or digest.
@@ -38,6 +38,16 @@ For host-side development, start the database and seed it first:
 make db-up
 npm run dev -- --port 4317
 ```
+
+For containerized development with source-mounted hot reload, run:
+
+```bash
+make dev-up
+docker compose -p vector-lab -f compose.yaml -f compose.dev.yaml logs -f vector
+```
+
+Ordinary source edits are reflected without rebuilding the image. The default
+`compose.yaml` path remains the immutable production-like integration runtime.
 
 ## Canonical product journey
 

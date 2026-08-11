@@ -1,65 +1,96 @@
 ---
 name: vector-lab-harness
-description: Project-level operating harness for Vector Engagement Labs. Use when implementing, reviewing, planning, testing, or coordinating work in this repository, especially simulation physics, model data, sensing, mission behavior, 3D playback, geospatial, browser runtime, release-train, database, observability, or documentation tasks. Routes work to the owning GitHub issue and maintained docs, and enforces branch, contract, verification, and handoff rules.
+description: Project-level operating harness for Vector Engagement Labs. Use for implementation, review, planning, testing, or coordination in this repository. Routes work through GitHub issues and maintained docs, feature-branch worktrees, stacked pull requests into main, defect-first review, and proportionate verification.
 ---
 
 # Vector Lab Harness
 
-Use this skill as the repository's low-token steering layer. Treat tracked code and documentation as authoritative; do not reconstruct project history from conversation summaries.
+Use this file as the repository's workflow authority. GitHub issues own executable scope and status; maintained `docs/` files own durable contracts. Worktrees are temporary checkouts, never planning or integration authorities.
 
 ## Start every task
 
-1. Confirm the current worktree and branch with `git status --short --branch`.
-2. Run `scripts/context-slice.sh <stream>` from the repository root. Choose `data`, `physics`, `information`, `geo`, `browser`, `behavior`, `visualization`, `release`, `server`, `ui`, `security`, or `general`.
-3. Read the listed owning GitHub issue and only the listed contract documents and directly relevant source files. Read full files when changing their contract; otherwise use headings and targeted searches first.
-4. Inspect existing tests before changing behavior. Preserve unrelated user changes.
-5. State a short execution plan, then implement rather than stopping at analysis.
+1. Run `git status --short --branch`, `git worktree list`, and `git fetch --prune origin`. Preserve unrelated and uncommitted work.
+2. Find and read the owning GitHub issue, including dependencies and acceptance criteria. Use issue labels and targeted `rg` searches to identify the affected domain; do not rely on a static worktree or workstream table.
+3. Read `docs/README.md`, the directly governing contract documents, [references/contracts.md](references/contracts.md), and relevant source and tests. Read full documents only when changing their contract.
+4. Confirm the task is in a dedicated `feat/<scope>` branch worktree. State the base branch, PR dependency, intended tests, and smallest regression test before editing.
+5. Keep shared schemas and contracts versioned and owned by one domain. Record durable behavior in `docs/` and executable scope/status in the owning issue.
 
-## Stream routing
+If the issue or current checkout conflicts with this policy, stop before editing and resolve the branch/issue ownership without discarding local work.
 
-Use [references/workstreams.md](references/workstreams.md) to select ownership, branch, worktree, dependencies, and non-goals. Never create a competing schema or duplicate a contract owned by another stream.
+## Feature worktrees and stacked pull requests
 
-GitHub epic [#47](https://github.com/SrivatsaRv/vector-engagements-labs/issues/47) owns causal order. Feature PRs target the protected integration branch declared by their issue; use `origin/main` when no active release train is declared. Rebase or merge the current integration branch before handoff.
+`origin/main` is the protected integration branch and the eventual target of every change. Do not create a long-lived release/integration worktree. Create only short-lived `feat/<scope>` worktrees for active changes.
 
-## Worktree integration
+For the first change in a stack:
 
-Worktrees share Git objects but do not share uncommitted files. A chat's edits become available to another chat only after the owning chat commits them and pushes its feature branch, followed by a merge into `origin/release/x86-runtime`.
+```bash
+git fetch --prune origin
+git worktree add -b feat/<scope> <worktree-path> origin/main
+```
 
-Use this flow:
+Push the branch and open the bottom pull request against `main`. For a dependent change, create another `feat/<child>` worktree from the parent feature branch and open its pull request against the parent branch so GitHub reviews only that stack layer. The stack still terminates at remote `main`. After the parent merges, fetch `origin/main`, rebase the child onto it, rerun affected tests, push with `--force-with-lease` only to the agent-owned child branch, and retarget the child pull request to `main`.
 
-1. Feature chat works only in its assigned worktree and keeps changes scoped.
-2. Feature chat runs focused tests, `make ci-local`, updates docs, commits, and pushes its branch.
-3. The steward reviews the commit/PR and merges it into the declared integration branch.
-4. Dependent feature work runs `git fetch origin` and rebases or merges the declared integration branch after saving/committing local work.
-5. Run grouped integration and cross-stream tests from the integration worktree after every merge.
+Each branch, worktree, commit, and pull request owns one coherent slice. Never share uncommitted files between worktrees, copy files to simulate integration, use two worktrees on one branch, or delete/prune a worktree until `git status` proves it clean. A dependency becomes shareable only after it is committed and pushed. Use Git history and the PR stack—not a local release branch—to express ordering.
 
-Never copy files between worktrees, cherry-pick another chat's uncommitted state, or have two chats edit the same branch. If a shared contract is needed early, commit the smallest contract slice, push it, and let the release steward merge it before dependent implementation proceeds. Use `git status`, `git log`, and `git diff` to prove which state is being shared.
-## Context discipline
+## Defect-first review
 
-- Prefer the context-slice script, the owning GitHub issue, and targeted `rg` searches over dumping `docs/` or whole source trees.
-- Load detailed references only when the task enters that area: [references/contracts.md](references/contracts.md) contains invariants that must not be violated.
-- Do not repeat project background in code comments or task updates when a concise link to the governing document is enough.
-- Record durable contract decisions in the owning `docs/` file and executable scope/status in the owning GitHub issue so future agents do not need this conversation.
+Before push and after any rebase, run a read-only review of the exact change that would merge. Use `$review-agent` when it is available; it must not edit, commit, push, post comments, or delegate.
 
-## Engineering rules
+For the bottom PR, compare with the freshest resolvable `origin/main`. For a stacked PR, compare with its current parent branch. Resolve the merge base, then inspect the whole diff and relevant tests/call sites:
+
+```bash
+git merge-base HEAD <comparison-ref>
+git diff <merge-base-sha>
+```
+
+Report every concrete regression as a prioritized, actionable finding with a changed-line citation. Fix qualifying findings, rerun the affected checks, and repeat the review. If no issue qualifies, record `No findings.` plus material test gaps or residual risks. Review each stack layer separately; a review of the cumulative stack is not evidence for an individual child PR.
+
+## Engineering invariants
 
 - Keep one versioned simulation contract across TypeScript, Rust/WASM, records, playback, reports, and persistence.
-- Keep physics truth, observer estimates, map/render state, UI state, and durable records owned by separate layers.
-- Use deterministic fixed-step behavior, stable IDs, explicit units/datums, bounded inputs, immutable saved artifacts, and forward-only migrations.
-- Keep database access out of simulation ticks and keep the browser UI responsive by using Workers for expensive batches.
-- Do not silently fall back from missing evidence, incompatible model packs, invalid coordinates, or unsupported combinations.
-- Avoid unrelated feature work, UI redesign, high-resolution terrain, classified/operational claims, or production cutover unless explicitly assigned.
+- Keep physics truth, observer estimates, render/map state, UI state, and durable records in separate layers.
+- Use deterministic fixed steps, stable IDs, explicit units/datums, bounded inputs, immutable saved artifacts, and forward-only migrations.
+- Keep database and remote-terrain access out of ticks; keep expensive browser work behind Workers.
+- Fail closed for missing evidence, incompatible model packs, invalid coordinates, and unsupported combinations.
+- Do not add unrelated features, classified/operational claims, or production cutover work unless the issue explicitly owns them.
 
 ## Test-first execution
 
-Treat every executable action item as a contract with a test obligation. Before editing, classify the change using [references/testing.md](references/testing.md), name the smallest meaningful test that should fail before the fix, then implement the change and its tests together.
+Every executable change needs the smallest focused test that fails before the fix, the implementation, and the applicable regression layers. A build alone is not behavioral evidence. Select the smallest complete set:
 
-At minimum, choose the applicable layers: pure unit, schema/contract, Rust unit/integration, TypeScript/Rust parity, database/migration, API integration, frontend component/interaction, browser end-to-end, visual/responsive, security, regression, performance, cancellation/recovery, or observability. A documentation-only change still requires link/format validation when executable references or commands change.
+| Change | Required evidence |
+|---|---|
+| Pure math, parser, reducer, compiler, or validator | focused unit tests, boundaries/errors, deterministic repeat |
+| Schema, model pack, scenario, record, or API contract | round-trip, malformed rejection, digest/compatibility regression |
+| Rust engine or ABI | Rust unit/integration, Clippy/rustdoc, TypeScript/Rust parity, WASM integrity |
+| Database, migration, seed, or repository | empty and upgrade migration, seed/verifier, API integration |
+| API, saved run, report, or trust boundary | handler/service, admission/errors, live persistence/binding integration |
+| React, builder, map, playback, or state interaction | component/interaction, keyboard/touch/loading/error, rendered regression |
+| User journey or cross-page behavior | browser end-to-end against a built app, persistence/replay assertions |
+| Layout, viewport, map, or visual behavior | responsive contract plus changed-breakpoint screenshot/trace |
+| Performance, Worker, batching, or concurrency | benchmark/environment, p95/allocation, cancellation/timeout/recovery |
+| Observability or operations | metric/trace/log assertions and dashboard/health verification |
+| Bug fix | a regression test that reproduces the original failure |
+| Documentation or workflow | link, command, shell, and configuration validation |
 
-Do not declare an action complete because the code builds. A completed action must have passing tests, a stated reason for any omitted layer, and evidence recorded in the handoff. New behavior without a regression test is incomplete. Fixes must include a test that would have caught the regression.
+Keep Node's built-in runner and Cargo for existing suites. Introduce a browser/component framework only with a useful first suite, CI/local command, documentation, and maintenance rationale. Do not weaken or delete coverage to make a gate pass. A red or flaky test blocks handoff unless it is quarantined with an owner and issue or explicitly accepted by the maintainer.
+
+`make ci-local` is the required baseline before commit. Add the applicable integration, frontend, browser, responsive/visual, database, observability, performance, security, parity, migration, cancellation, recovery, load, and soak checks. State every omitted applicable layer and why.
+
+## Hot reload and container hygiene
+
+Keep the developer feedback loop live while editing:
+
+- Detect an existing host `npm run dev` or containerized development session before changing runtime state. Do not stop or rebuild it for ordinary source edits.
+- Use `make dev-up` for source-mounted container development. Confirm a representative edit is reflected by hot reload and that `/api/health` remains healthy; restore the development session after any test that temporarily replaces it.
+- Keep immutable production-like Compose execution for integration and release evidence. Do not mistake hot-reload behavior for a production-build test.
+- Rebuild only when dependencies, Dockerfile stages, build inputs, or generated artifacts require it. Prefer focused test processes alongside the live frontend.
+- Use the single `vector-lab` Compose project from every worktree and keep the `:dev` image separate from immutable version tags.
+- Before cleanup, inspect `docker compose -p vector-lab ps -a` and `docker image ls "reachdefence/vector-engagement-lab"`. Remove only stopped/orphaned containers belonging to this Compose project, using `docker compose -p vector-lab down --remove-orphans` only when no active session is needed. Remove stale image IDs explicitly only after proving no container references them.
+- Never run `docker system prune`, broad image globs, or volume removal as routine cleanup. Preserve named database and observability volumes unless the user explicitly authorizes their deletion.
 
 ## Verification and handoff
 
-Before commit, update relevant documentation and run `make ci-local`. Add targeted database, integration, observability, performance, browser, geospatial, Rust, parity, frontend, and regression checks as applicable. Report failures honestly; do not weaken tests, delete coverage to make a gate pass, or claim a target is measured without evidence.
+Before commit, update the relevant `docs/` contract and owning issue when scope, behavior, or acceptance changes. Run focused checks and `make ci-local`, then perform the defect-first review. Commit intentionally, push the `feat/...` branch, and open or update the correct stack-layer PR.
 
-Every feature handoff includes worktree, branch, commit SHA, PR target/URL, concise diff summary, contracts changed, migrations, tests and results, benchmark evidence where relevant, docs changed, and blockers. Release work also includes grouped integration, deterministic parity, migration, container, observability, load, soak, cancellation, and recovery evidence before promotion.
+Every handoff records worktree, branch, commit SHA, parent/base branch, PR URL and eventual `main` target, diff summary, contracts/docs changed, migrations, each test command and result, artifacts/benchmark environment where relevant, omitted layers with reasons, review result, container/dev-session state, and blockers.

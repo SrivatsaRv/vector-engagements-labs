@@ -19,6 +19,30 @@ Use the smallest complete set for a change. State why any applicable layer was o
 
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and production-audit checks. `make integration-local` covers the live PostGIS and API path; `make observability-local` covers telemetry; `make performance-local` covers the engine benchmark; responsive verification covers documented breakpoints. These remain separate because they have different environment and runtime costs.
 
+## Development-loop verification
+
+Keep an existing frontend development session running during ordinary edits and
+verify that a representative change is reflected through hot reload. Host-side
+development uses `npm run dev`; containerized development uses `make dev-up`
+with `compose.dev.yaml`, which mounts the source tree while preserving container
+dependencies and Wrangler state in named volumes. Hot reload is feedback
+evidence, not a substitute for the built-app, integration, or responsive gates.
+All worktrees address the single `vector-lab` Compose project so fixed loopback
+ports and local images do not multiply with temporary checkout names. The
+development override uses the separate
+`reachdefence/vector-engagement-lab:dev` image tag.
+
+Do not tear down a healthy development stack merely to run a focused test. If a
+production-like integration check must replace it, record the initial state and
+restore the development session afterward. Rebuild only for dependency,
+Dockerfile, generated-asset, or other build-input changes.
+
+Container cleanup is inspection-first and project-scoped. Inspect Compose state
+and the `reachdefence/vector-engagement-lab` image list, remove orphans only when
+no active session depends on them, and delete stale image IDs explicitly after
+checking references. Never use `docker system prune` or remove named database
+or observability volumes as routine test cleanup.
+
 ## Framework decision
 
 Keep Node's built-in test runner and Cargo for the existing domain and engine suites. Add `@playwright/test` as the browser end-to-end and visual runner; `playwright-core` alone is not a test framework. Add Vitest plus Testing Library only when component tests require mocking, coverage and watch mode that the built-in runner cannot provide efficiently. Introduce each dependency with a real suite, CI/local command, documentation and maintenance rationale. Do not add multiple overlapping frontend runners.

@@ -1,14 +1,20 @@
-.PHONY: ci-local ci-quality ci-tests db-up db-down compose-up integration-ci integration-local observability-local performance-local worker-local
+.PHONY: ci-local ci-quality ci-tests db-up db-down dev-up compose-up integration-ci integration-local observability-local performance-local worker-local
+
+VECTOR_COMPOSE := docker compose -p vector-lab
+VECTOR_DEV_COMPOSE := $(VECTOR_COMPOSE) -f compose.yaml -f compose.dev.yaml
 
 db-up:
-	docker compose up -d database
-	docker compose run --rm migrate
+	$(VECTOR_COMPOSE) up -d database
+	$(VECTOR_COMPOSE) run --rm migrate
 
 db-down:
-	docker compose down
+	$(VECTOR_COMPOSE) down
+
+dev-up:
+	$(VECTOR_DEV_COMPOSE) up --build -d
 
 compose-up:
-	docker compose up --build -d
+	$(VECTOR_COMPOSE) up --build -d
 
 integration-local: compose-up
 	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector npm run db:verify

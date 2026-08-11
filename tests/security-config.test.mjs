@@ -33,6 +33,30 @@ test("local Worker image includes a trusted TLS root store", async () => {
   assert.match(dockerfile, /ca-certificates/);
 });
 
+test("containerized frontend development keeps source-driven hot reload", async () => {
+  const [dockerfile, composeDev, makefile, readme] = await Promise.all([
+    read("Dockerfile"),
+    read("compose.dev.yaml"),
+    read("Makefile"),
+    read("README.md"),
+  ]);
+
+  assert.match(dockerfile, /AS development/);
+  assert.match(composeDev, /target: development/);
+  assert.match(composeDev, /image: reachdefence\/vector-engagement-lab:dev/);
+  assert.doesNotMatch(composeDev, /image: reachdefence\/vector-engagement-lab:0\.1\.0/);
+  assert.match(composeDev, /- \.\/:\/app/);
+  assert.match(composeDev, /- vector_node_modules:\/app\/node_modules/);
+  assert.match(
+    composeDev,
+    /command: \["npm", "run", "dev", "--", "--hostname", "0\.0\.0\.0", "--port", "4317"\]/,
+  );
+  assert.match(makefile, /VECTOR_COMPOSE := docker compose -p vector-lab/);
+  assert.match(makefile, /VECTOR_DEV_COMPOSE := .*compose\.dev\.yaml/);
+  assert.match(makefile, /dev-up:\s+\$\(VECTOR_DEV_COMPOSE\) up --build -d/);
+  assert.doesNotMatch(readme, /docker compose (?!-p vector-lab)/);
+});
+
 test("release and deployment workflows admit reviewed main history", async () => {
   const release = await read(".github/workflows/release.yml");
   const deploy = await read(".github/workflows/deploy-cloudflare.yml");
