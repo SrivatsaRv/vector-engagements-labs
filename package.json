@@ -44,7 +44,8 @@
     "engine:rust:clippy": "cargo clippy --manifest-path engine-rust/Cargo.toml --locked --all-targets --all-features -- -D warnings",
     "engine:rust:test": "cargo test --manifest-path engine-rust/Cargo.toml --locked --all-targets --all-features",
     "engine:rust:doc": "RUSTDOCFLAGS='-D warnings' cargo doc --manifest-path engine-rust/Cargo.toml --locked --no-deps",
-    "ui:responsive:verify": "node scripts/verify-responsive-ui.mjs"
+    "ui:responsive:verify": "node scripts/verify-responsive-ui.mjs",
+    "blog:visual:verify": "node scripts/verify-blog-editorial.mjs"
   },
   "dependencies": {
     "@types/three": "^0.185.3",

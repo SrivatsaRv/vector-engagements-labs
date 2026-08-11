@@ -108,6 +108,10 @@ test("server-renders the blogs index and post routes while preserving legacy /bl
   assert.match(post, /Reading time/);
   assert.match(post, /Training simulators and wargames optimise for different kinds of truth/);
   assert.match(post, /AI agents are useful when the simulation constrains them/);
+  assert.match(post, /Causal simulation loop/);
+  assert.match(post, /One record, six synchronized views/);
+  assert.match(post, /\/blog\/diagrams\/causal-simulation-loop\.webp/);
+  assert.match(post, /\/blog\/diagrams\/one-record-many-views\.webp/);
   assert.match(post, /Comments/);
   assert.match(post, /Copy link/);
 });

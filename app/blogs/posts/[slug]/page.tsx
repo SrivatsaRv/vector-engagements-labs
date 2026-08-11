@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { marked, type Tokens } from "marked";
 import articleMarkdown from "@/content/blog/what-engagement-simulators-need-to-model-in-2026.md?raw";
+import { BlogEditorialDiagram } from "@/components/BlogEditorialDiagram";
 import { BlogShareAndComments } from "@/components/BlogShareAndComments";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { ProductHeader } from "@/components/ProductHeader";
@@ -32,6 +33,25 @@ type TableCellToken = {
   text?: string;
   tokens?: Tokens.Generic[];
 };
+
+const EDITORIAL_DIAGRAMS = {
+  "causal-simulation-loop": {
+    src: "/blog/diagrams/causal-simulation-loop.webp",
+    alt: "Causal simulation loop showing world state, observation, bounded decisions, actions, effects, and model-time ordering.",
+    title: "Causal simulation loop",
+    caption:
+      "One evolving physical state produces bounded observations and decisions; actions return as recorded effects on that same world.",
+  },
+  "one-record-many-views": {
+    src: "/blog/diagrams/one-record-many-views.webp",
+    alt: "One record, six synchronized views: 2D command, 3D spatial, event timeline, information picture, telemetry, and report.",
+    title: "One record, six synchronized views",
+    caption:
+      "Every analytical surface reads the same frames, events, tracks, and provenance, so disagreement is a release failure rather than a visual detail.",
+  },
+} as const;
+
+type EditorialDiagramId = keyof typeof EDITORIAL_DIAGRAMS;
 
 function renderMarkdown(tokens: Tokens.Generic[]): ReactNode[] {
   return tokens.flatMap((token, index) => {
@@ -112,6 +132,18 @@ function renderMarkdown(tokens: Tokens.Generic[]): ReactNode[] {
           </div>,
         ];
       case "code":
+        if (token.lang === "editorial-diagram") {
+          const diagramId = token.text.trim() as EditorialDiagramId;
+          const diagram = EDITORIAL_DIAGRAMS[diagramId];
+          if (diagram) {
+            return [
+              <BlogEditorialDiagram
+                key={`editorial-diagram-${index}`}
+                {...diagram}
+              />,
+            ];
+          }
+        }
         if (token.lang === "mermaid") {
           return [<MermaidDiagram key={`mermaid-${index}`} code={token.text} />];
         }

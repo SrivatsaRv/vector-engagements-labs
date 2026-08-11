@@ -71,22 +71,8 @@ A simulator becomes fragile when each of those interactions is implemented as a 
 
 A better representation starts with one evolving world.
 
-```mermaid
-flowchart LR
-    WORLD["World state"] --> SENSOR["Sensors"]
-    SENSOR --> OBS["Observations"]
-    OBS --> TRACK["Tracks"]
-    TRACK --> COMMS["Information sharing"]
-    COMMS --> BEHAVIOUR["Mission behaviour"]
-    BEHAVIOUR --> ACTION["Actions"]
-    ACTION --> EFFECT["Effects"]
-    EFFECT --> WORLD
-
-    TIME["Model time"] --> WORLD
-    TIME --> SENSOR
-    TIME --> COMMS
-    TIME --> BEHAVIOUR
-    TIME --> EFFECT
+```editorial-diagram
+causal-simulation-loop
 ```
 
 The usefulness of this model is not the diagram itself. It is the separation of responsibilities.
@@ -343,16 +329,8 @@ The 2D map is still difficult to beat for force disposition, routes, sectors, se
 
 The strongest design uses all of them against the same simulation record.
 
-```mermaid
-flowchart TD
-    RUN["Simulation record"]
-
-    RUN --> MAP["2D command view"]
-    RUN --> VIEW3D["3D spatial view"]
-    RUN --> TIMELINE["Event timeline"]
-    RUN --> PICTURE["Information picture"]
-    RUN --> TELEMETRY["Telemetry"]
-    RUN --> ANALYSIS["Comparison / report"]
+```editorial-diagram
+one-record-many-views
 ```
 
 vsTASKER already demonstrates one version of this workflow, with a 2D map used for scenario editing and runtime control alongside 3D visualisation. Command has continued improving its operational map and altitude visualisation because the map remains the main reasoning surface even in a deeply modelled simulation.
