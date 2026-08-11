@@ -60,6 +60,33 @@ test("server-renders the scenario library and configured workbench", async () =>
   );
 });
 
+test("server-renders the blog index, article, and legacy alias", async () => {
+  const [indexResponse, articleResponse, aliasResponse] = await Promise.all([
+    render("/blog"),
+    render("/blog/engagement-simulators-2026-revised"),
+    render("/blogs"),
+  ]);
+
+  assert.equal(indexResponse.status, 200);
+  assert.equal(articleResponse.status, 200);
+  assert.equal(aliasResponse.status, 307);
+  assert.equal(aliasResponse.headers.get("location"), "http://localhost/blog");
+
+  const [indexHtml, articleHtml] = await Promise.all([
+    indexResponse.text(),
+    articleResponse.text(),
+  ]);
+
+  assert.match(indexHtml, /Engineering blog/);
+  assert.match(indexHtml, /What Engagement Simulators Need to Model in 2026/);
+  assert.match(indexHtml, /Blog/);
+
+  assert.match(articleHtml, /What Engagement Simulators Need to Model in 2026/);
+  assert.match(articleHtml, /Anonymous comments/);
+  assert.match(articleHtml, /Sensing pipeline/);
+  assert.match(articleHtml, /Back to blog index/);
+});
+
 test("server-renders model transparency and tactical-symbol references", async () => {
   const [mathResponse, symbolsResponse] = await Promise.all([
     render("/math"),
