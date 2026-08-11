@@ -35,6 +35,43 @@ test("production operations admit one immutable reviewed commit and never seed p
   assert.match(workflow, /Verify deployed health/);
 });
 
+test("governed study areas are migration data and local Compose keeps migration and fixture seeding separate", async () => {
+  const [migration, compose, makefile, packageJson] = await Promise.all([
+    read("db/migrations/009_governed_study_area_catalog.sql"),
+    read("compose.yaml"),
+    read("Makefile"),
+    read("package.json"),
+  ]);
+
+  for (const id of [
+    "north-punjab",
+    "rajasthan-desert",
+    "ladakh-high-altitude",
+    "north-east-mountains",
+    "arabian-sea",
+    "coastal-gujarat",
+  ]) {
+    assert.match(migration, new RegExp(`'${id}'`));
+  }
+  assert.match(migration, /ON CONFLICT \(id\) DO UPDATE SET/);
+  assert.match(compose, /migrate:[\s\S]*command: \["npm", "run", "db:migrate"\]/);
+  assert.match(compose, /seed:[\s\S]*command: \["npm", "run", "db:seed"\]/);
+  assert.match(compose, /VECTOR_IMAGE_TAG:-0\.1\.0-dev/);
+  assert.doesNotMatch(compose, /:latest(?:\s|$)/m);
+  assert.match(makefile, /npm run db:governed-data:verify\n\tnpm run db:seed/);
+  assert.match(packageJson, /"db:governed-data:verify"/);
+});
+
+test("the Place and flight workspace exposes all governed choices and blocks an incomplete catalog", async () => {
+  const workspace = await read("app/lab/page.tsx");
+
+  assert.match(workspace, /useState\(true\)/);
+  assert.match(workspace, /Governed study areas are unavailable\./);
+  assert.match(workspace, /Simulation is blocked because the PostGIS catalog/);
+  assert.match(workspace, /studyAreas\.map\(\(area\) =>/);
+  assert.match(workspace, /catalogState !== "POSTGIS"/);
+});
+
 test("Worker database adapter consumes the generated Hyperdrive binding", async () => {
   const [viteConfig, databaseAdapter] = await Promise.all([
     read("vite.config.ts"),

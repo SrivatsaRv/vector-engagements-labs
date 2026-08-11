@@ -145,6 +145,9 @@ try {
         originPickers: document.querySelectorAll(".origin-pickers details").length,
         mapControlCount: document.querySelectorAll(".scenario-authoring-map-shell .vector-map-toolbar button").length,
         cameraTelemetry: document.querySelectorAll(".scenario-authoring-map-shell .vector-map-telemetry span").length,
+        studyAreaChoices: document.querySelectorAll(".study-area-grid button").length,
+        studyAreaEditorVisible:
+          document.querySelector(".study-context-editor")?.getBoundingClientRect().height > 0,
         stepsVisible: getComputedStyle(document.querySelector(".build-steps")).display !== "none",
         summaryVisible: getComputedStyle(document.querySelector(".builder-summary")).display !== "none",
       };
@@ -159,6 +162,8 @@ try {
     assert.equal(construct.originPickers, 2, `${viewport.width}: team origin controls missing`);
     assert.equal(construct.mapControlCount, 6, `${viewport.width}: VECTOR map controls missing`);
     assert.equal(construct.cameraTelemetry, 4, `${viewport.width}: map telemetry missing`);
+    assert.equal(construct.studyAreaChoices, 6, `${viewport.width}: governed study-area choices missing`);
+    assert.equal(construct.studyAreaEditorVisible, true, `${viewport.width}: study-area choices are hidden`);
     assert.ok(successfulTiles > 0, `${viewport.width}: basemap returned no successful tiles`);
     if (viewport.label === "phone") {
       await page.getByRole("button", { name: "Basemap", exact: true }).click();
@@ -190,6 +195,8 @@ try {
       construct.scrollSurface && construct.footer && construct.scrollSurface.bottom <= construct.footer.top + 1,
       `${viewport.width}: footer overlaps the authoring surface`,
     );
+    await page.getByRole("button", { name: /^Ladakh\b/ }).click();
+    await page.locator(".study-context-summary strong", { hasText: "Ladakh · Cold and clear" }).waitFor();
     await page.screenshot({
       path: resolve(outputDirectory, `construct-${viewport.width}x${viewport.height}.png`),
       fullPage: false,

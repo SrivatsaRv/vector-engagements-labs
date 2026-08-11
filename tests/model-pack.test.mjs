@@ -17,7 +17,7 @@ import {
 
 const fixture = JSON.parse(
   await readFile(
-    new URL("../fixtures/model-packs/vector-scalar-study-v0.5.compiled.json", import.meta.url),
+    new URL("../fixtures/model-packs/vector-scalar-study-v0.6.compiled.json", import.meta.url),
     "utf8",
   ),
 );

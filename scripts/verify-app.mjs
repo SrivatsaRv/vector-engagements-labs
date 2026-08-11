@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
 import postgres from "postgres";
+import {
+  CURRENT_CREDIBILITY_MANIFEST_ID,
+  CURRENT_CREDIBILITY_MANIFEST_VERSION,
+  CURRENT_MODEL_PACK_DIGEST,
+  CURRENT_MODEL_PACK_ID,
+  CURRENT_MODEL_PACK_VERSION,
+} from "../lib/reference-model-pack.ts";
 
 const baseUrl = process.env.VECTOR_URL ?? "http://127.0.0.1:4317";
 const connectionString = process.env.DATABASE_URL;
@@ -47,17 +54,41 @@ try {
   assert.equal(catalog.platforms.length, 3);
   assert.equal(catalog.weapons.length, 8);
   assert.equal(catalog.simulationModels.length, 8);
-  assert.equal(catalog.compiledModelPacks.length, 1);
-  assert.equal(catalog.credibilityManifests.length, 2);
+  assert.ok(catalog.compiledModelPacks.length >= 1);
+  assert.ok(catalog.credibilityManifests.length >= 2);
   assert.equal(catalog.intendedUses.length, 1);
-  assert.match(catalog.compiledModelPacks[0].digest, /^[0-9a-f]{64}$/);
-  assert.equal(catalog.compiledModelPacks[0].payload.unitSystem, "SI");
+  const currentPack = catalog.compiledModelPacks.find(
+    (item) => item.id === CURRENT_MODEL_PACK_ID && item.version === CURRENT_MODEL_PACK_VERSION,
+  );
+  const currentManifest = catalog.credibilityManifests.find(
+    (item) => item.id === CURRENT_CREDIBILITY_MANIFEST_ID && item.version === CURRENT_CREDIBILITY_MANIFEST_VERSION,
+  );
+  assert.ok(currentPack);
+  assert.ok(currentManifest);
+  assert.equal(currentPack.digest, CURRENT_MODEL_PACK_DIGEST);
+  assert.equal(currentPack.payload.unitSystem, "SI");
   assert.equal(
-    catalog.credibilityManifests.find((item) => item.subject_kind === "MODEL_PACK").subject_digest,
-    catalog.compiledModelPacks[0].digest,
+    currentManifest.subject_digest,
+    currentPack.digest,
   );
   assert.ok(catalog.credibilityManifests.some((item) => item.subject_kind === "ENGINE"));
   assert.equal(catalog.installations.length, 21);
+  assert.deepEqual(
+    catalog.studyAreas.map((item) => item.id).sort(),
+    [
+      "arabian-sea",
+      "coastal-gujarat",
+      "ladakh-high-altitude",
+      "north-east-mountains",
+      "north-punjab",
+      "rajasthan-desert",
+    ],
+  );
+  assert.equal(
+    catalog.studyAreas.find((item) => item.id === "ladakh-high-altitude")
+      .default_environment_preset_id,
+    "ladakh-cold-clear",
+  );
   const pafInstallations = catalog.installations.filter((item) => item.service === "PAF");
   assert.equal(pafInstallations.length, 15);
   assert.ok(pafInstallations.every((item) => item.icao_code && item.source_id === "shield-paf-orbat-2026-05-19"));

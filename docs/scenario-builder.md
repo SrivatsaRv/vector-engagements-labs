@@ -33,7 +33,7 @@ Both Construct and Observe use the same MapLibre navigation contract. The map st
 
 Replay markers default to the catalog designation, such as `Su-30MKI`, `F-16C Block 52`, or `Astra Mk 1`. Generated engine identifiers such as `BLUE WEAPON 1` remain internal replay identity and are not presented as the operator label.
 
-The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-east mountains, the Arabian Sea, and coastal Gujarat. Their boundaries are educational visualization contexts, not operational engagement boxes. Selecting a study area is a preset choice. The first complete builder does not ask the operator to draw a study-area polygon.
+The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-east mountains, the Arabian Sea, and coastal Gujarat. Their boundaries are educational visualization contexts, not operational engagement boxes. These governed rows are delivered by checksum-tracked migration and verified against the TypeScript contract; production deployment does not run the development seed. Selecting a study area is a directly visible preset choice. The first complete builder does not ask the operator to draw a study-area polygon.
 
 ## Scenario artifact
 
@@ -128,7 +128,7 @@ reference, or map anchor.
 ### Current configured-template behavior
 
 - The selected study area and weather are explicitly labelled preconfigured.
-- `Change context` exposes the six governed regional presets and their available weather states; the operator does not draw the regional boundary.
+- Place & flight exposes the six governed regional presets immediately and may collapse them only after they have been shown. A missing/incomplete PostGIS catalog produces an actionable blocked state rather than a runnable static fallback.
 - Blue and Red each have an affiliation-scoped origin picker populated from public-reference installations inside the selected study area. Choosing an origin moves that team's aircraft to the installation; manual drag remains available when no catalog origin is appropriate.
 - Blue and Red start markers and waypoints are draggable.
 - Waypoint creation is scoped to the currently selected team and lives in that team's route inspector. The map never offers an unowned generic waypoint action.
