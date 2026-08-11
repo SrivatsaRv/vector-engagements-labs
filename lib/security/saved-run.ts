@@ -18,6 +18,9 @@ const maneuvers = new Set(["steady", "break", "weave"]);
 const radarModes = new Set(["ACTIVE", "SILENT"]);
 const trackSources = new Set(["ONBOARD_RADAR", "DATALINK", "AIRBORNE_EARLY_WARNING", "VISUAL"]);
 const decisions = new Set(["PRESS", "SUPPORT_WEAPON", "CRANK", "DEFEND", "DISENGAGE"]);
+const blueIntents = new Set(["PURE_PURSUIT", "LEAD_PURSUIT", "STERN_CONVERSION", "SUPPORT_HOLD", "EXTEND"]);
+const redIntents = new Set(["UNAWARE_TRANSIT", "BEAM", "DEFENSIVE_BREAK", "EXTEND", "RECOMMIT"]);
+const weaponPostures = new Set(["RADAR_BVR_SUPPORT", "IR_CLOSE_RANGE", "HOLD_FIRE"]);
 
 function enumValue(value: unknown, values: Set<string>, field: string) {
   if (typeof value !== "string" || !values.has(value)) {
@@ -119,6 +122,9 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
     redJammer: bool(input.redJammer, "red_jammer"),
     blueDecision: enumValue(input.blueDecision, decisions, "blue_decision") as Scenario["blueDecision"],
     redDecision: enumValue(input.redDecision, decisions, "red_decision") as Scenario["redDecision"],
+    blueIntent: enumValue(input.blueIntent ?? "LEAD_PURSUIT", blueIntents, "blue_intent") as Scenario["blueIntent"],
+    redIntent: enumValue(input.redIntent ?? "DEFENSIVE_BREAK", redIntents, "red_intent") as Scenario["redIntent"],
+    blueWeaponPosture: enumValue(input.blueWeaponPosture ?? "RADAR_BVR_SUPPORT", weaponPostures, "blue_weapon_posture") as Scenario["blueWeaponPosture"],
     profile: enumValue(input.profile, profiles, "profile") as Scenario["profile"],
     guidance: enumValue(input.guidance, guidance, "guidance") as Scenario["guidance"],
     altitude: finiteNumber(input.altitude, 0, 30_000, "altitude"),

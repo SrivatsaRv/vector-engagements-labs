@@ -241,6 +241,12 @@ pub struct Behavior {
     pub maneuver: Maneuver,
     pub commanded_g: f64,
     pub decision: TacticalDecision,
+    #[serde(default)]
+    pub intent: Option<String>,
+    #[serde(default)]
+    pub target_entity_id: Option<String>,
+    #[serde(default)]
+    pub activate_after_seconds: Option<f64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -262,6 +268,20 @@ pub struct WeaponModel {
     pub seeker_activation_range_m: f64,
     pub datalink_update_seconds: f64,
     pub commanded_cruise_altitude_m: f64,
+    #[serde(default)]
+    pub seeker_kind: Option<String>,
+    #[serde(default)]
+    pub support_mode: Option<String>,
+    #[serde(default)]
+    pub launch_authorized: Option<bool>,
+    #[serde(default)]
+    pub launch_range_m: Option<f64>,
+    #[serde(default)]
+    pub support_range_m: Option<f64>,
+    #[serde(default)]
+    pub support_available: Option<bool>,
+    #[serde(default)]
+    pub red_warning_on_launch: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -597,23 +617,149 @@ fn guidance_held(scenario: &EngineScenario, entity_id: &str, time: f64) -> bool 
     })
 }
 
-fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f64, dt: f64) {
+fn wrap_angle(value: f64) -> f64 {
+    value.sin().atan2(value.cos())
+}
+
+fn heading_to(from: Vec3, to: Vec3) -> f64 {
+    (to.y - from.y).atan2(to.x - from.x)
+}
+
+fn commanded_turn_for_heading(state: &RuntimeState, desired: f64, maximum_g: f64) -> f64 {
+    let speed = state.velocity.magnitude().max(60.0);
+    let error = wrap_angle(desired - state.heading_rad);
+    let desired_rate = (error * 0.75).clamp(-0.18, 0.18);
+    (desired_rate * speed / G0).clamp(-maximum_g, maximum_g)
+}
+
+fn intent_turn_demand(state: &mut RuntimeState, states: &[RuntimeState], time: f64) -> Option<f64> {
+    let behavior = &state.definition.behavior;
+    let intent = behavior.intent.as_deref()?;
+    let target_id = behavior.target_entity_id.as_deref()?;
+    let activation = behavior.activate_after_seconds.unwrap_or(0.0);
+    let target = states
+        .iter()
+        .find(|candidate| candidate.definition.id == target_id)?;
+    if time < activation {
+        state.phase = "Awaiting warning".to_string();
+        return Some(0.0);
+    }
+    let maximum_g = state
+        .definition
+        .aircraft
+        .as_ref()
+        .map(|model| model.maximum_command_g)
+        .unwrap_or_else(|| behavior.commanded_g.abs().max(1.0));
+    let relative = target.position.subtract(state.position);
+    let separation = relative.magnitude().max(1.0);
+    let target_heading = heading_to(state.position, target.position);
+    let away_heading = heading_to(target.position, state.position);
+    let speed = state.velocity.magnitude().max(60.0);
+    let lead_seconds = (separation / speed).clamp(4.0, 42.0);
+    let predicted = target.position.add(target.velocity.scale(lead_seconds));
+    let demand = match intent {
+        "PURE_PURSUIT" => {
+            state.phase = "Pure pursuit".to_string();
+            commanded_turn_for_heading(state, target_heading, maximum_g)
+        }
+        "LEAD_PURSUIT" => {
+            state.phase = "Lead pursuit".to_string();
+            commanded_turn_for_heading(state, heading_to(state.position, predicted), maximum_g)
+        }
+        "STERN_CONVERSION" => {
+            let stern = target
+                .position
+                .subtract(target.velocity.normalize().scale(9000.0));
+            state.phase = "Stern conversion".to_string();
+            commanded_turn_for_heading(state, heading_to(state.position, stern), maximum_g * 0.82)
+        }
+        "SUPPORT_HOLD" => {
+            state.phase = "Radar support hold".to_string();
+            commanded_turn_for_heading(
+                state,
+                heading_to(state.position, predicted),
+                maximum_g * 0.45,
+            )
+        }
+        "EXTEND" => {
+            state.phase = "Extending".to_string();
+            commanded_turn_for_heading(state, away_heading, maximum_g * 0.72)
+        }
+        "UNAWARE_TRANSIT" => {
+            state.phase = "Unaware transit".to_string();
+            0.0
+        }
+        "BEAM" => {
+            let side = if relative.cross(state.velocity).z >= 0.0 {
+                1.0
+            } else {
+                -1.0
+            };
+            state.phase = "Beaming threat".to_string();
+            commanded_turn_for_heading(
+                state,
+                target_heading + side * std::f64::consts::FRAC_PI_2,
+                maximum_g,
+            )
+        }
+        "DEFENSIVE_BREAK" => {
+            state.phase = "Defensive break".to_string();
+            behavior.commanded_g.clamp(-maximum_g, maximum_g)
+        }
+        "RECOMMIT" => {
+            let elapsed = time - activation;
+            state.phase = if elapsed < 24.0 {
+                "Extending before recommit"
+            } else {
+                "Recommitting"
+            }
+            .to_string();
+            let desired = if elapsed < 24.0 {
+                away_heading
+            } else {
+                target_heading
+            };
+            commanded_turn_for_heading(state, desired, maximum_g * 0.85)
+        }
+        _ => return None,
+    };
+    Some(demand)
+}
+
+fn update_aircraft(
+    index: usize,
+    states: &mut [RuntimeState],
+    scenario: &EngineScenario,
+    time: f64,
+    dt: f64,
+) {
+    let snapshot = states.to_vec();
+    let state = &mut states[index];
     if state.lifecycle != EntityLifecycle::Active && state.lifecycle != EntityLifecycle::Tracking {
         return;
     }
     if state.definition.kind != EntityKind::Aircraft {
         return;
     }
-    let model = state.definition.aircraft.as_ref();
     let speed = state.velocity.magnitude().max(1.0);
-    let mut turn_demand = 0.0;
-    if state.definition.behavior.maneuver != Maneuver::Steady && time >= 5.0 {
+    let mut turn_demand = intent_turn_demand(state, &snapshot, time);
+    let used_intent = turn_demand.is_some();
+    if turn_demand.is_none() {
+        turn_demand = Some(0.0);
+    }
+    if !used_intent
+        && turn_demand == Some(0.0)
+        && state.definition.behavior.maneuver != Maneuver::Steady
+        && time >= 5.0
+    {
         turn_demand = if state.definition.behavior.maneuver == Maneuver::Break {
-            state.definition.behavior.commanded_g
+            Some(state.definition.behavior.commanded_g)
         } else {
-            state.definition.behavior.commanded_g * (time * 0.55).sin()
+            Some(state.definition.behavior.commanded_g * (time * 0.55).sin())
         };
     }
+    let turn_demand = turn_demand.unwrap_or(0.0);
+    let model = state.definition.aircraft.as_ref();
     let limited_turn = model
         .map(|item| turn_demand.clamp(-item.maximum_command_g, item.maximum_command_g))
         .unwrap_or(turn_demand);
@@ -661,12 +807,13 @@ fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f6
     };
     state.position = state.position.add(state.velocity.scale(dt));
     state.commanded_g = limited_turn.abs();
-    state.phase = if limited_turn == 0.0 {
-        "Steady flight"
+    state.phase = if used_intent {
+        state.phase.clone()
+    } else if limited_turn == 0.0 {
+        "Steady flight".to_string()
     } else {
-        "Commanded maneuver"
-    }
-    .to_string();
+        "Commanded maneuver".to_string()
+    };
 }
 
 fn activate_weapons(states: &mut [RuntimeState], time: f64) {
@@ -799,6 +946,10 @@ fn update_weapon(
         z: G0,
     });
     let terminal = separation <= weapon.seeker_activation_range_m;
+    let support_available = weapon.support_available.unwrap_or(true)
+        || terminal
+        || weapon.support_mode.as_deref() == Some("INFRARED_LOCK")
+        || weapon.support_mode.as_deref() == Some("PASSIVE_HOMING");
     let update_multiplier = match state.definition.behavior.decision {
         TacticalDecision::Crank => 1.5,
         TacticalDecision::Defend => 3.0,
@@ -809,12 +960,12 @@ fn update_weapon(
         || time - state.last_guidance_update_seconds
             >= weapon.datalink_update_seconds * update_multiplier;
     let held = guidance_held(scenario, &state.definition.id, time);
-    let guidance = if held || !update_due {
+    let guidance = if held || !support_available || !update_due {
         state.last_guidance_acceleration
     } else {
         unclamped.clamp_magnitude(weapon.maximum_command_g * G0)
     };
-    if !held && update_due {
+    if !held && support_available && update_due {
         state.last_guidance_acceleration = guidance;
         state.last_guidance_update_seconds = time;
     }
@@ -837,6 +988,8 @@ fn update_weapon(
     state.thrust_newtons = thrust;
     state.phase = if burning {
         "Powered flight"
+    } else if !support_available {
+        "Support denied"
     } else if terminal {
         "Terminal guidance"
     } else {
@@ -950,7 +1103,7 @@ fn invalid_run(scenario: EngineScenario) -> EngineRun {
 pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError> {
     validate_scenario(&scenario)?;
     let mut states: Vec<RuntimeState> = scenario.entities.iter().map(RuntimeState::new).collect();
-    let primary_weapon_index = scenario.entities.iter().position(|entity| {
+    let launched_weapon_index = scenario.entities.iter().position(|entity| {
         entity.kind == EntityKind::GuidedWeapon
             && entity
                 .weapon
@@ -958,21 +1111,27 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 .and_then(|weapon| weapon.launch_time_seconds)
                 .is_some()
     });
-    let primary_target_index = primary_weapon_index.and_then(|index| {
-        let target_id = states[index]
-            .definition
-            .weapon
-            .as_ref()?
-            .target_entity_id
-            .as_str();
+    let blue_platform_index = scenario
+        .entities
+        .iter()
+        .position(|entity| entity.id == "blue-platform-1");
+    let primary_weapon_index = launched_weapon_index.or(blue_platform_index);
+    let primary_target_index = if let Some(index) = launched_weapon_index {
+        states[index].definition.weapon.as_ref().and_then(|weapon| {
+            states
+                .iter()
+                .position(|state| state.definition.id == weapon.target_entity_id)
+        })
+    } else {
         states
             .iter()
-            .position(|state| state.definition.id == target_id)
-    });
+            .position(|state| state.definition.id == "red-object-1")
+    };
     let (Some(weapon_index), Some(target_index)) = (primary_weapon_index, primary_target_index)
     else {
         return Err(EngineError::InvalidScenario(
-            "scenario must contain a launched weapon with a valid target".to_string(),
+            "scenario must contain a launched weapon or blue platform with a valid target"
+                .to_string(),
         ));
     };
     let weapon_id = states[weapon_index].definition.id.clone();
@@ -988,8 +1147,14 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
     let mut time = 0.0;
     while time <= scenario.duration_seconds + 1e-9 {
         activate_weapons(&mut states, time);
-        for state in states.iter_mut() {
-            update_aircraft(state, &scenario, time, scenario.fixed_step_seconds);
+        for index in 0..states.len() {
+            update_aircraft(
+                index,
+                &mut states,
+                &scenario,
+                time,
+                scenario.fixed_step_seconds,
+            );
         }
         for index in 0..states.len() {
             update_weapon(
@@ -1057,15 +1222,16 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
             break;
         }
         let speed = states[weapon_index].velocity.magnitude();
-        let Some(weapon) = states[weapon_index].definition.weapon.as_ref() else {
-            return Err(EngineError::InvalidScenario(
-                "primary weapon lost its model during integration".to_string(),
-            ));
-        };
-        let since_launch = time - weapon.launch_time_seconds.unwrap_or(0.0);
-        if since_launch > weapon.burn_seconds + 2.0 && speed < 80.0 && separation > 1000.0 {
-            termination = Termination::EnergyDepleted;
-            break;
+        let weapon = states[weapon_index].definition.weapon.as_ref();
+        let since_launch = time
+            - weapon
+                .and_then(|model| model.launch_time_seconds)
+                .unwrap_or(0.0);
+        if let Some(weapon) = weapon {
+            if since_launch > weapon.burn_seconds + 2.0 && speed < 80.0 && separation > 1000.0 {
+                termination = Termination::EnergyDepleted;
+                break;
+            }
         }
         if states[weapon_index].position.z <= 0.0 && time > 1.0 {
             termination = Termination::EnergyDepleted;
@@ -1158,6 +1324,9 @@ mod tests {
                 maneuver: Maneuver::Steady,
                 commanded_g: 0.0,
                 decision: TacticalDecision::Press,
+                intent: None,
+                target_entity_id: None,
+                activate_after_seconds: None,
             },
             weapon: None,
             sensor: None,
@@ -1224,6 +1393,9 @@ mod tests {
                 maneuver: Maneuver::Steady,
                 commanded_g: 0.0,
                 decision: TacticalDecision::SupportWeapon,
+                intent: None,
+                target_entity_id: None,
+                activate_after_seconds: None,
             },
             weapon: Some(WeaponModel {
                 launch_platform_id: "blue-aircraft".to_string(),
@@ -1242,6 +1414,13 @@ mod tests {
                 seeker_activation_range_m: 5_000.0,
                 datalink_update_seconds: 0.2,
                 commanded_cruise_altitude_m: 8_000.0,
+                seeker_kind: None,
+                support_mode: None,
+                launch_authorized: None,
+                launch_range_m: None,
+                support_range_m: None,
+                support_available: None,
+                red_warning_on_launch: None,
             }),
             sensor: None,
             aircraft: None,

@@ -166,6 +166,9 @@ export function buildReportExport(
         decisions: {
           blue: data.scenario.blueDecision,
           red: data.scenario.redDecision,
+          blueIntent: data.scenario.blueIntent,
+          redIntent: data.scenario.redIntent,
+          blueWeaponPosture: data.scenario.blueWeaponPosture,
         },
         environment: {
           atmosphere: "NASA educational standard atmosphere",

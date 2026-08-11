@@ -85,6 +85,9 @@ import {
 import {
   RASP_SOURCE_CONTRACTS,
   TACTICAL_DECISION_CONTRACTS,
+  BLUE_INTERCEPT_INTENT_CONTRACTS,
+  RED_TACTICAL_INTENT_CONTRACTS,
+  BLUE_WEAPON_POSTURE_CONTRACTS,
   buildRaspTrack,
   explainResult,
   getFrameAt,
@@ -453,6 +456,11 @@ function LabWorkbench({
   }, [result.timeOfFlight, run]);
 
   const frame = useMemo(() => getFrameAt(result, time), [result, time]);
+  const blueFrame = frame.entities.find((entity) => entity.id === "blue-platform-1");
+  const redFrame = frame.entities.find((entity) => entity.id === "red-object-1");
+  const blueWeaponFrame = frame.entities.find(
+    (entity) => entity.id === result.engineRun.primaryWeaponId,
+  );
   const raspTrack = useMemo(
     () =>
       scenario.domain !== "A2A" || viewMode === "TRUTH"
@@ -852,6 +860,25 @@ function LabWorkbench({
                 <Metric label="Mach" value={frame.mach.toFixed(2)} />
               </div>
             </div>
+            {scenario.domain === "A2A" && (
+              <div className="tactical-state-strip" aria-label="Current red and blue behavior state">
+                <article>
+                  <span>Blue intent</span>
+                  <strong>{BLUE_INTERCEPT_INTENT_CONTRACTS[scenario.blueIntent].label}</strong>
+                  <small>{blueFrame?.phase ?? "Not in frame"}</small>
+                </article>
+                <article>
+                  <span>Red intent</span>
+                  <strong>{RED_TACTICAL_INTENT_CONTRACTS[scenario.redIntent].label}</strong>
+                  <small>{redFrame?.phase ?? "Not in frame"}</small>
+                </article>
+                <article>
+                  <span>Weapon posture</span>
+                  <strong>{BLUE_WEAPON_POSTURE_CONTRACTS[scenario.blueWeaponPosture].label}</strong>
+                  <small>{blueWeaponFrame?.phase ?? "Weapon stowed"}</small>
+                </article>
+              </div>
+            )}
             <div
               className={`scene-wrap ${playbackSurface === "MAP" ? "map-surface" : "three-d-surface"}`}
             >
@@ -1838,10 +1865,55 @@ function ConfigureWorkspace({
                     }
                   />
                 </div>
+                <div className="decision-grid">
+                  <ChoiceButtons
+                    label="Blue intercept intent"
+                    value={scenario.blueIntent}
+                    options={[
+                      ["PURE_PURSUIT", "Pure pursuit"],
+                      ["LEAD_PURSUIT", "Lead pursuit"],
+                      ["STERN_CONVERSION", "Stern conversion"],
+                      ["SUPPORT_HOLD", "Support hold"],
+                      ["EXTEND", "Extend"],
+                    ]}
+                    onChange={(value) =>
+                      update("blueIntent", value as Scenario["blueIntent"])
+                    }
+                  />
+                  <ChoiceButtons
+                    label="Red tactical intent"
+                    value={scenario.redIntent}
+                    options={[
+                      ["UNAWARE_TRANSIT", "Unaware transit"],
+                      ["BEAM", "Beam"],
+                      ["DEFENSIVE_BREAK", "Defensive break"],
+                      ["EXTEND", "Extend"],
+                      ["RECOMMIT", "Recommit"],
+                    ]}
+                    onChange={(value) =>
+                      update("redIntent", value as Scenario["redIntent"])
+                    }
+                  />
+                </div>
+                <ChoiceButtons
+                  label="Blue weapon posture"
+                  value={scenario.blueWeaponPosture}
+                  options={[
+                    ["RADAR_BVR_SUPPORT", "Radar BVR support"],
+                    ["IR_CLOSE_RANGE", "IR / EO close range"],
+                    ["HOLD_FIRE", "Hold fire"],
+                  ]}
+                  onChange={(value) =>
+                    update(
+                      "blueWeaponPosture",
+                      value as Scenario["blueWeaponPosture"],
+                    )
+                  }
+                />
                 <p className="model-effect-note">
-                  Scope: source, radar, data-link, and jammer controls change the
-                  two air-picture views. Team decisions change the simulated
-                  aircraft and weapon behavior.
+                  Scope: source, radar, data-link, jammer, intent, and weapon
+                  posture now compile into the run. The renderer only replays
+                  the resulting aircraft, track, and support state.
                 </p>
                 <div className="rasp-effect-grid" aria-label="Current control effects">
                   {([
@@ -1868,10 +1940,16 @@ function ConfigureWorkspace({
                   <article>
                     <span>Blue Team engine effect</span>
                     <p>{TACTICAL_DECISION_CONTRACTS[scenario.blueDecision].blueEffect}</p>
+                    <p>{BLUE_INTERCEPT_INTENT_CONTRACTS[scenario.blueIntent].effect}</p>
                   </article>
                   <article>
                     <span>Red Team engine effect</span>
                     <p>{TACTICAL_DECISION_CONTRACTS[scenario.redDecision].redEffect}</p>
+                    <p>{RED_TACTICAL_INTENT_CONTRACTS[scenario.redIntent].effect}</p>
+                  </article>
+                  <article>
+                    <span>Weapon support effect</span>
+                    <p>{BLUE_WEAPON_POSTURE_CONTRACTS[scenario.blueWeaponPosture].effect}</p>
                   </article>
                 </div>
               </div>
@@ -1945,7 +2023,7 @@ function ConfigureWorkspace({
                 </strong>
                 <p>
                   {scenario.domain === "A2A"
-                    ? `Blue ${scenario.blueDecision.replaceAll("_", " ").toLowerCase()} · Red ${scenario.redDecision.replaceAll("_", " ").toLowerCase()} · IAF track from ${scenario.blueTrackSource.replaceAll("_", " ").toLowerCase()}`
+                    ? `Blue ${scenario.blueIntent.replaceAll("_", " ").toLowerCase()} · Red ${scenario.redIntent.replaceAll("_", " ").toLowerCase()} · ${scenario.blueWeaponPosture.replaceAll("_", " ").toLowerCase()}`
                     : `${definition.targetMotion === "fixed" ? "Fixed objective" : `Red ${scenario.maneuver}`} · east–west wind ${scenario.wind} m/s`}{" "}
                   · {definition.preparedEvent.title} available
                 </p>

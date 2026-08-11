@@ -121,24 +121,45 @@ test("RASP acquisition boundaries are inclusive and have explicit failure reason
   }
 });
 
-test("RASP-only controls cannot change model truth or engagement outcome", () => {
+test("information controls change truth only through declared support and awareness gates", () => {
   const baseline = simulate(DEFAULT_SCENARIO);
-  const variants = [
-    { blueRadarMode: "SILENT" },
-    { redRadarMode: "SILENT" },
-    { blueDatalink: false },
-    { redDatalink: false },
-    { blueJammer: true },
-    { redJammer: true },
-    { blueTrackSource: "VISUAL" },
-    { redTrackSource: "AIRBORNE_EARLY_WARNING" },
-  ];
-  for (const patch of variants) {
-    const changed = simulate({ ...DEFAULT_SCENARIO, ...patch });
-    assert.equal(changed.outcome, baseline.outcome);
-    assert.equal(changed.closestApproach, baseline.closestApproach);
-    assert.deepEqual(changed.frames, baseline.frames);
-  }
+  const deniedSupport = simulate({
+    ...DEFAULT_SCENARIO,
+    redJammer: true,
+    blueWeaponPosture: "RADAR_BVR_SUPPORT",
+  });
+  const noWarning = simulate({
+    ...DEFAULT_SCENARIO,
+    blueRadarMode: "SILENT",
+    blueWeaponPosture: "HOLD_FIRE",
+    redRadarMode: "SILENT",
+    redDatalink: false,
+    redTrackSource: "VISUAL",
+    redIntent: "BEAM",
+  });
+  const warned = simulate({
+    ...DEFAULT_SCENARIO,
+    blueRadarMode: "ACTIVE",
+    blueWeaponPosture: "RADAR_BVR_SUPPORT",
+    redRadarMode: "ACTIVE",
+    redDatalink: true,
+    redTrackSource: "ONBOARD_RADAR",
+    redIntent: "BEAM",
+  });
+
+  assert.notEqual(deniedSupport.closestApproach, baseline.closestApproach);
+  assert.equal(
+    deniedSupport.engineRun.scenario.entities.find((entity) => entity.id === "blue-weapon-1").weapon.supportAvailable,
+    false,
+  );
+  assert.notDeepEqual(
+    warned.frames.at(-1).entities.find((entity) => entity.id === "red-object-1").position,
+    noWarning.frames.at(-1).entities.find((entity) => entity.id === "red-object-1").position,
+  );
+  assert.equal(
+    noWarning.frames.at(-1).entities.find((entity) => entity.id === "red-object-1").phase,
+    "Awaiting warning",
+  );
 });
 
 test("each side's local source controls are isolated from the opposing RASP", () => {

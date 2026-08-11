@@ -173,7 +173,7 @@ export function validateScenario(
           : "Scenario conditions are defined",
       detail:
         scenario.domain === "A2A"
-          ? `IAF ${scenario.blueTrackSource.replaceAll("_", " ").toLowerCase()} · PAF ${scenario.redTrackSource.replaceAll("_", " ").toLowerCase()} · Blue ${scenario.blueDecision.replaceAll("_", " ").toLowerCase()} · Red ${scenario.redDecision.replaceAll("_", " ").toLowerCase()}`
+          ? `IAF ${scenario.blueTrackSource.replaceAll("_", " ").toLowerCase()} · PAF ${scenario.redTrackSource.replaceAll("_", " ").toLowerCase()} · Blue ${scenario.blueIntent.replaceAll("_", " ").toLowerCase()} · Red ${scenario.redIntent.replaceAll("_", " ").toLowerCase()} · ${scenario.blueWeaponPosture.replaceAll("_", " ").toLowerCase()}`
           : `Target motion ${definition.targetMotion} · east–west wind ${scenario.wind} m/s`,
       state: "pass",
     },

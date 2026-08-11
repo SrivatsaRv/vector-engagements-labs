@@ -17,6 +17,14 @@ import {
   withSpatialRangeM,
 } from "../lib/scenario-spatial.ts";
 
+function entityAt(result, time, id) {
+  return getFrameAt(result, time).entities.find((entity) => entity.id === id);
+}
+
+function horizontalDistance(a, b) {
+  return Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y);
+}
+
 test("standard atmosphere produces credible sea-level reference values", () => {
   const atmosphere = standardAtmosphere(0, 0);
   assert.ok(Math.abs(atmosphere.temperatureK - 288.15) < 0.1);
@@ -275,20 +283,131 @@ test("RASP source controls have explicit availability behavior for both sides", 
   }
 });
 
-test("team decisions change declared platform motion and guidance support", () => {
-  const support = simulate({ ...DEFAULT_SCENARIO, blueDecision: "SUPPORT_WEAPON" });
+test("team intent changes platform motion and team decisions change weapon support", () => {
+  const lead = simulate({ ...DEFAULT_SCENARIO, blueIntent: "LEAD_PURSUIT" });
+  const support = simulate({ ...DEFAULT_SCENARIO, blueIntent: "SUPPORT_HOLD" });
+  const extend = simulate({
+    ...DEFAULT_SCENARIO,
+    blueIntent: "EXTEND",
+  });
   const crank = simulate({ ...DEFAULT_SCENARIO, blueDecision: "CRANK" });
   const defend = simulate({ ...DEFAULT_SCENARIO, blueDecision: "DEFEND" });
-  const disengage = simulate({ ...DEFAULT_SCENARIO, blueDecision: "DISENGAGE" });
   const bluePlatform = (result) =>
     result.frames.at(-1).entities.find((item) => item.id === "blue-platform-1");
 
-  assert.equal(bluePlatform(support).commandedG, 0);
-  assert.ok(bluePlatform(crank).commandedG > 0);
-  assert.ok(bluePlatform(defend).commandedG > bluePlatform(crank).commandedG);
-  assert.ok(bluePlatform(disengage).commandedG > 0);
-  assert.notDeepEqual(bluePlatform(crank).position, bluePlatform(support).position);
-  assert.notEqual(disengage.closestApproach, support.closestApproach);
+  assert.equal(bluePlatform(lead).phase, "Lead pursuit");
+  assert.equal(bluePlatform(support).phase, "Radar support hold");
+  assert.equal(bluePlatform(extend).phase, "Extending");
+  assert.notDeepEqual(bluePlatform(extend).position, bluePlatform(lead).position);
+  assert.notEqual(crank.closestApproach, lead.closestApproach);
+  assert.notEqual(defend.closestApproach, crank.closestApproach);
+});
+
+test("Blue intercept intent materially changes flown pursuit geometry", () => {
+  const base = {
+    ...DEFAULT_SCENARIO,
+    engineBackend: "typescript",
+    blueDecision: "SUPPORT_WEAPON",
+    redIntent: "UNAWARE_TRANSIT",
+    redRadarMode: "SILENT",
+    redDatalink: false,
+    redTrackSource: "VISUAL",
+    blueWeaponPosture: "HOLD_FIRE",
+  };
+  const pure = simulate({ ...base, blueIntent: "PURE_PURSUIT" });
+  const lead = simulate({ ...base, blueIntent: "LEAD_PURSUIT" });
+  const stern = simulate({ ...base, blueIntent: "STERN_CONVERSION" });
+  const pureBlue = entityAt(pure, 35, "blue-platform-1");
+  const leadBlue = entityAt(lead, 35, "blue-platform-1");
+  const sternBlue = entityAt(stern, 35, "blue-platform-1");
+
+  assert.equal(leadBlue.phase, "Lead pursuit");
+  assert.equal(pureBlue.phase, "Pure pursuit");
+  assert.equal(sternBlue.phase, "Stern conversion");
+  assert.ok(horizontalDistance(pureBlue, leadBlue) > 500);
+  assert.ok(horizontalDistance(sternBlue, leadBlue) > 1000);
+});
+
+test("Red defensive intent is gated by modeled warning state", () => {
+  const noWarning = simulate({
+    ...DEFAULT_SCENARIO,
+    engineBackend: "typescript",
+    blueRadarMode: "SILENT",
+    blueWeaponPosture: "HOLD_FIRE",
+    redRadarMode: "SILENT",
+    redDatalink: false,
+    redTrackSource: "VISUAL",
+    redIntent: "BEAM",
+  });
+  const warned = simulate({
+    ...DEFAULT_SCENARIO,
+    engineBackend: "typescript",
+    blueRadarMode: "ACTIVE",
+    blueWeaponPosture: "RADAR_BVR_SUPPORT",
+    redRadarMode: "ACTIVE",
+    redDatalink: true,
+    redTrackSource: "ONBOARD_RADAR",
+    redIntent: "BEAM",
+  });
+  const coldRed = entityAt(noWarning, 20, "red-object-1");
+  const warnedRed = entityAt(warned, 20, "red-object-1");
+
+  assert.notEqual(warnedRed.phase, coldRed.phase);
+  assert.equal(warnedRed.phase, "Beaming threat");
+  assert.equal(coldRed.commandedG, 0);
+  assert.ok(warnedRed.commandedG > 0);
+  assert.ok(horizontalDistance(coldRed, warnedRed) > 800);
+});
+
+test("weapon posture gates launch and support by seeker semantics", () => {
+  const radarSupported = simulate({
+    ...DEFAULT_SCENARIO,
+    engineBackend: "typescript",
+    range: 46000,
+    blueWeaponPosture: "RADAR_BVR_SUPPORT",
+    blueRadarMode: "ACTIVE",
+    blueTrackSource: "ONBOARD_RADAR",
+    redJammer: false,
+  });
+  const radarDenied = simulate({
+    ...DEFAULT_SCENARIO,
+    engineBackend: "typescript",
+    range: 46000,
+    blueWeaponPosture: "RADAR_BVR_SUPPORT",
+    blueRadarMode: "ACTIVE",
+    blueTrackSource: "ONBOARD_RADAR",
+    redJammer: true,
+  });
+  const irAtBvr = simulate({
+    ...DEFAULT_SCENARIO,
+    engineBackend: "typescript",
+    range: 46000,
+    blueWeaponPosture: "IR_CLOSE_RANGE",
+  });
+  const holdFire = simulate({
+    ...DEFAULT_SCENARIO,
+    engineBackend: "typescript",
+    blueWeaponPosture: "HOLD_FIRE",
+  });
+
+  assert.equal(
+    radarSupported.engineRun.scenario.entities.find((entity) => entity.id === "blue-weapon-1").weapon.launchAuthorized,
+    true,
+  );
+  assert.equal(
+    radarDenied.engineRun.scenario.entities.find((entity) => entity.id === "blue-weapon-1").weapon.launchAuthorized,
+    false,
+  );
+  assert.equal(
+    irAtBvr.engineRun.scenario.entities.find((entity) => entity.id === "blue-weapon-1").weapon.launchAuthorized,
+    false,
+  );
+  assert.equal(
+    holdFire.engineRun.scenario.entities.find((entity) => entity.id === "blue-weapon-1").weapon.launchAuthorized,
+    false,
+  );
+  assert.ok(radarSupported.frames.some((frame) => frame.entities.some((entity) => entity.id === "blue-weapon-1")));
+  assert.ok(!irAtBvr.frames.some((frame) => frame.entities.some((entity) => entity.id === "blue-weapon-1")));
 });
 
 test("every Red Team decision produces its declared maneuver demand", () => {

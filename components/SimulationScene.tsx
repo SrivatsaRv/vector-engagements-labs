@@ -355,6 +355,7 @@ export function SimulationScene({ result, time, layers, raspTrack }: Props) {
           position = raspTrack.position;
         }
         symbol.position.copy(point(position));
+        symbol.material.rotation = Math.PI / 2 - entity.headingRad;
         const isWeapon = entity.id === result.engineRun.primaryWeaponId;
         const isTarget = entity.id === result.engineRun.primaryTargetId;
         symbol.visible =

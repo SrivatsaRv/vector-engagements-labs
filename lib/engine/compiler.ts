@@ -6,6 +6,13 @@ import type {
   ProfileId,
   Vec3,
 } from "./primitives.ts";
+import type {
+  BlueInterceptIntent,
+  BlueWeaponPosture,
+  RadarMode,
+  RedTacticalIntent,
+  TrackSource,
+} from "../simulation.ts";
 import { getCatalogObject } from "../object-catalog.ts";
 import {
   findAircraftSimulationModel,
@@ -51,8 +58,20 @@ export type ScenarioCompilerInput = {
   redFuelPercent: number;
   blueDecision: string;
   redDecision: string;
+  blueIntent: BlueInterceptIntent;
+  redIntent: RedTacticalIntent;
+  blueWeaponPosture: BlueWeaponPosture;
+  blueRadarMode: RadarMode;
+  redRadarMode: RadarMode;
+  blueTrackSource: TrackSource;
+  redTrackSource: TrackSource;
+  blueDatalink: boolean;
+  redDatalink: boolean;
+  blueJammer: boolean;
+  redJammer: boolean;
   windEastMps: number;
   windNorthMps: number;
+  visibilityKm: number;
   temperatureOffset: number;
   guidanceInterruptionAt: number | null;
   guidanceInterruptionDuration: number;
@@ -92,6 +111,32 @@ const velocity = (speed: number, headingRad: number): Vec3 => ({
   y: Math.sin(headingRad) * speed,
   z: 0,
 });
+
+function weaponSeekerKind(weaponId: string) {
+  if (weaponId.includes("mica-ir")) return "INFRARED" as const;
+  if (weaponId.includes("kh-31")) return "PASSIVE_RADAR" as const;
+  if (weaponId.includes("spice")) return "EO" as const;
+  if (weaponId.includes("akash")) return "COMMAND" as const;
+  return "ACTIVE_RADAR" as const;
+}
+
+function trackCustodyAvailable({
+  source,
+  radarMode,
+  datalink,
+  rangeM,
+  visibilityKm,
+}: {
+  source: TrackSource;
+  radarMode: RadarMode;
+  datalink: boolean;
+  rangeM: number;
+  visibilityKm: number;
+}) {
+  if (source === "ONBOARD_RADAR") return radarMode === "ACTIVE" && rangeM <= 120_000;
+  if (source === "DATALINK" || source === "AIRBORNE_EARLY_WARNING") return datalink;
+  return rangeM <= Math.min(18_000, visibilityKm * 1000);
+}
 
 function withProvenance(
   input: Omit<EngineEntityDefinition, "provenance">,
@@ -206,6 +251,60 @@ export function compileScenario(
     seekerActivationRangeM: selectedModel.seekerActivationRangeM,
     datalinkUpdateSeconds: selectedModel.datalinkUpdateSeconds,
   };
+  const blueTrackCustody = trackCustodyAvailable({
+    source: input.blueTrackSource,
+    radarMode: input.blueRadarMode,
+    datalink: input.blueDatalink,
+    rangeM: input.range,
+    visibilityKm: input.visibilityKm,
+  });
+  const redTrackCustody = trackCustodyAvailable({
+    source: input.redTrackSource,
+    radarMode: input.redRadarMode,
+    datalink: input.redDatalink,
+    rangeM: input.range,
+    visibilityKm: input.visibilityKm,
+  });
+  const seekerKind = weaponSeekerKind(blueSystem.id);
+  const selectedWeaponPosture = input.blueWeaponPosture;
+  const supportMode =
+    selectedWeaponPosture === "HOLD_FIRE"
+      ? "NONE"
+      : selectedWeaponPosture === "IR_CLOSE_RANGE"
+        ? "INFRARED_LOCK"
+        : seekerKind === "PASSIVE_RADAR"
+          ? "PASSIVE_HOMING"
+          : seekerKind === "COMMAND"
+            ? "COMMAND_GUIDANCE"
+            : "RADAR_MIDCOURSE";
+  const supportAvailable =
+    supportMode === "RADAR_MIDCOURSE" || supportMode === "COMMAND_GUIDANCE"
+      ? blueTrackCustody && input.blueRadarMode === "ACTIVE" && !input.redJammer
+      : supportMode === "INFRARED_LOCK"
+        ? (seekerKind === "INFRARED" || seekerKind === "EO") &&
+          input.range <= Math.max(4500, assumptions.seekerActivationRangeM * 1.15)
+        : supportMode === "PASSIVE_HOMING"
+          ? input.redRadarMode === "ACTIVE"
+          : false;
+  const launchAuthorized =
+    selectedWeaponPosture !== "HOLD_FIRE" &&
+    supportAvailable &&
+    input.range <=
+      (supportMode === "INFRARED_LOCK"
+        ? Math.max(4500, assumptions.seekerActivationRangeM * 1.15)
+        : profile.maxRange * 1000);
+  const redAwarenessSeconds =
+    input.redIntent === "UNAWARE_TRANSIT"
+      ? Number.POSITIVE_INFINITY
+      : input.blueWeaponPosture === "HOLD_FIRE" && !redTrackCustody
+        ? Number.POSITIVE_INFINITY
+        : input.blueRadarMode === "ACTIVE" && input.redRadarMode === "ACTIVE"
+          ? 4
+          : input.redDatalink || input.redTrackSource === "AIRBORNE_EARLY_WARNING"
+            ? 8
+            : launchAuthorized && supportMode === "RADAR_MIDCOURSE"
+              ? 10
+              : Number.POSITIVE_INFINITY;
   const blueDecisionFactor =
     input.blueDecision === "PRESS"
       ? 1.05
@@ -278,6 +377,9 @@ export function compileScenario(
         maneuver: blueIsAircraft ? bluePlatformManeuver : "steady",
         commandedG: blueIsAircraft ? bluePlatformG : 0,
         decision: input.blueDecision,
+        intent: input.blueIntent,
+        targetEntityId: "red-object-1",
+        activateAfterSeconds: 0,
       },
       aircraft: blueAircraft,
     },
@@ -326,6 +428,11 @@ export function compileScenario(
         maneuver: movingTarget ? input.maneuver : "steady",
         commandedG: movingTarget ? input.targetG * redDecisionFactor : 0,
         decision: input.redDecision,
+        intent: input.redIntent,
+        targetEntityId: "blue-platform-1",
+        activateAfterSeconds: Number.isFinite(redAwarenessSeconds)
+          ? redAwarenessSeconds
+          : 1_000_000,
       },
       aircraft: redAircraft,
     },
@@ -361,12 +468,26 @@ export function compileScenario(
         launchPlatformId: bluePlatform.id,
         targetEntityId: redTarget.id,
         guidance: input.guidance,
-        launchTimeSeconds: 0,
+        launchTimeSeconds: launchAuthorized ? 0 : null,
         ...assumptions,
         commandedCruiseAltitudeM:
           input.domain === "G2G" ? input.cruiseAltitude : input.altitude,
         navigationConstant:
           assumptions.navigationConstant * blueDecisionFactor,
+        seekerKind,
+        supportMode,
+        launchAuthorized,
+        launchRangeM:
+          supportMode === "INFRARED_LOCK"
+            ? Math.max(4500, assumptions.seekerActivationRangeM * 1.15)
+            : profile.maxRange * 1000,
+        supportRangeM:
+          supportMode === "INFRARED_LOCK"
+            ? Math.max(4500, assumptions.seekerActivationRangeM * 1.15)
+            : 120_000,
+        supportAvailable,
+        redWarningOnLaunch:
+          supportMode === "RADAR_MIDCOURSE" || supportMode === "COMMAND_GUIDANCE",
       },
     },
     blueSystem.id,

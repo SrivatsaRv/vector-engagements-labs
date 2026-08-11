@@ -84,8 +84,100 @@ function guidanceHeld(
   );
 }
 
+function wrapAngleRadians(value: number) {
+  return Math.atan2(Math.sin(value), Math.cos(value));
+}
+
+function headingTo(from: Vec3, to: Vec3) {
+  return Math.atan2(to.y - from.y, to.x - from.x);
+}
+
+function commandedTurnForHeading(
+  state: RuntimeState,
+  desiredHeadingRad: number,
+  maximumCommandG: number,
+) {
+  const speed = Math.max(60, magnitude(state.velocity));
+  const error = wrapAngleRadians(desiredHeadingRad - state.headingRad);
+  const desiredTurnRate = Math.max(-0.18, Math.min(0.18, error * 0.75));
+  return Math.max(
+    -maximumCommandG,
+    Math.min(maximumCommandG, (desiredTurnRate * speed) / G0),
+  );
+}
+
+function intentTurnDemand(
+  state: RuntimeState,
+  states: Map<string, RuntimeState>,
+  time: number,
+) {
+  const { behavior } = state.definition;
+  const model = state.definition.aircraft;
+  const maximumCommandG = model?.maximumCommandG ?? Math.max(1, Math.abs(behavior.commandedG));
+  const target =
+    behavior.targetEntityId === undefined
+      ? undefined
+      : states.get(behavior.targetEntityId);
+  const activation = behavior.activateAfterSeconds ?? 0;
+  if (!behavior.intent || !target) return undefined;
+  if (time < activation) {
+    state.phase = "Awaiting warning";
+    return 0;
+  }
+
+  const relativePosition = subtract(target.position, state.position);
+  const separation = Math.max(1, magnitude(relativePosition));
+  const targetHeading = headingTo(state.position, target.position);
+  const awayHeading = headingTo(target.position, state.position);
+  const speed = Math.max(60, magnitude(state.velocity));
+  const leadSeconds = Math.max(4, Math.min(42, separation / speed));
+  const predictedTarget = add(target.position, scale(target.velocity, leadSeconds));
+
+  if (behavior.intent === "PURE_PURSUIT") {
+    state.phase = "Pure pursuit";
+    return commandedTurnForHeading(state, targetHeading, maximumCommandG);
+  }
+  if (behavior.intent === "LEAD_PURSUIT") {
+    state.phase = "Lead pursuit";
+    return commandedTurnForHeading(state, headingTo(state.position, predictedTarget), maximumCommandG);
+  }
+  if (behavior.intent === "STERN_CONVERSION") {
+    const sternPoint = subtract(target.position, scale(normalize(target.velocity), 9000));
+    state.phase = "Stern conversion";
+    return commandedTurnForHeading(state, headingTo(state.position, sternPoint), maximumCommandG * 0.82);
+  }
+  if (behavior.intent === "SUPPORT_HOLD") {
+    state.phase = "Radar support hold";
+    return commandedTurnForHeading(state, headingTo(state.position, predictedTarget), maximumCommandG * 0.45);
+  }
+  if (behavior.intent === "EXTEND") {
+    state.phase = "Extending";
+    return commandedTurnForHeading(state, awayHeading, maximumCommandG * 0.72);
+  }
+  if (behavior.intent === "UNAWARE_TRANSIT") {
+    state.phase = "Unaware transit";
+    return 0;
+  }
+  if (behavior.intent === "BEAM") {
+    const side = cross(relativePosition, state.velocity).z >= 0 ? 1 : -1;
+    state.phase = "Beaming threat";
+    return commandedTurnForHeading(state, targetHeading + side * Math.PI / 2, maximumCommandG);
+  }
+  if (behavior.intent === "DEFENSIVE_BREAK") {
+    state.phase = "Defensive break";
+    return Math.max(-maximumCommandG, Math.min(maximumCommandG, behavior.commandedG));
+  }
+  if (behavior.intent === "RECOMMIT") {
+    state.phase = time - activation < 24 ? "Extending before recommit" : "Recommitting";
+    const desired = time - activation < 24 ? awayHeading : targetHeading;
+    return commandedTurnForHeading(state, desired, maximumCommandG * 0.85);
+  }
+  return undefined;
+}
+
 function updateKinematicEntity(
   state: RuntimeState,
+  states: Map<string, RuntimeState>,
   scenario: EngineScenario,
   time: number,
   dt: number,
@@ -95,16 +187,21 @@ function updateKinematicEntity(
   if (kind !== "AIRCRAFT") return;
   const model = state.definition.aircraft;
   const speed = Math.max(1, magnitude(state.velocity));
-  let turnDemand = 0;
-  if (behavior.maneuver !== "steady" && time >= 5) {
+  let turnDemand = intentTurnDemand(state, states, time);
+  const usedIntent = turnDemand !== undefined;
+  if (!usedIntent) {
+    turnDemand = 0;
+  }
+  if (!usedIntent && turnDemand === 0 && behavior.maneuver !== "steady" && time >= 5) {
     turnDemand =
       behavior.maneuver === "break"
         ? behavior.commandedG
         : behavior.commandedG * Math.sin(time * 0.55);
   }
+  const resolvedTurnDemand = turnDemand ?? 0;
   const limitedTurnDemand = model
-    ? Math.max(-model.maximumCommandG, Math.min(model.maximumCommandG, turnDemand))
-    : turnDemand;
+    ? Math.max(-model.maximumCommandG, Math.min(model.maximumCommandG, resolvedTurnDemand))
+    : resolvedTurnDemand;
   const atmosphere = standardAtmosphere(
     state.position.z,
     scenario.environment.temperatureOffsetC,
@@ -149,7 +246,12 @@ function updateKinematicEntity(
   };
   state.position = add(state.position, scale(state.velocity, dt));
   state.commandedG = Math.abs(limitedTurnDemand);
-  state.phase = limitedTurnDemand === 0 ? "Steady flight" : "Commanded maneuver";
+  state.phase =
+    usedIntent
+      ? state.phase
+      : limitedTurnDemand === 0
+        ? "Steady flight"
+        : "Commanded maneuver";
 }
 
 function activateWeapon(
@@ -279,6 +381,11 @@ function updateWeapon(
     gravityCompensation,
   );
   const terminalGuidance = separation <= weapon.seekerActivationRangeM;
+  const supportAvailable =
+    weapon.supportAvailable !== false ||
+    terminalGuidance ||
+    weapon.supportMode === "INFRARED_LOCK" ||
+    weapon.supportMode === "PASSIVE_HOMING";
   const updateMultiplier =
     state.definition.behavior.decision === "CRANK"
       ? 1.5
@@ -296,10 +403,10 @@ function updateWeapon(
     state.definition.id,
     time,
   );
-  const guidanceAcceleration = holdGuidance || !guidanceUpdateDue
+  const guidanceAcceleration = holdGuidance || !supportAvailable || !guidanceUpdateDue
     ? state.lastGuidanceAcceleration
     : clampMagnitude(unclampedGuidance, maximumAcceleration);
-  if (!holdGuidance && guidanceUpdateDue) {
+  if (!holdGuidance && supportAvailable && guidanceUpdateDue) {
     state.lastGuidanceAcceleration = guidanceAcceleration;
     state.lastGuidanceUpdateSeconds = time;
   }
@@ -324,6 +431,8 @@ function updateWeapon(
   state.thrustNewtons = thrust;
   state.phase = burning
     ? "Powered flight"
+    : !supportAvailable
+      ? "Support denied"
     : terminalGuidance
       ? "Terminal guidance"
       : "Midcourse guidance";
@@ -458,15 +567,19 @@ export class EngineSession {
     this.states = new Map(
       scenario.entities.map((definition) => [definition.id, initialState(definition)]),
     );
-    this.primaryWeapon = this.states.get(
-      scenario.entities.find(
-        (entity) =>
-          entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds !== null,
-      )?.id ?? "",
+    const launchedWeapon = scenario.entities.find(
+      (entity) =>
+        entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds !== null,
     );
-    this.primaryTarget = this.primaryWeapon?.definition.weapon
-      ? this.states.get(this.primaryWeapon.definition.weapon.targetEntityId)
-      : undefined;
+    const bluePlatform = scenario.entities.find(
+      (entity) => entity.id === "blue-platform-1",
+    );
+    this.primaryWeapon = this.states.get(
+      launchedWeapon?.id ?? bluePlatform?.id ?? "",
+    );
+    this.primaryTarget = launchedWeapon?.weapon
+      ? this.states.get(launchedWeapon.weapon.targetEntityId)
+      : this.states.get("red-object-1");
     this.sampleEvery = Math.max(1, Math.round(0.25 / scenario.fixedStepSeconds));
     if (!this.primaryWeapon || !this.primaryTarget) {
       this.termination = "invalid_scenario";
@@ -487,7 +600,13 @@ export class EngineSession {
       for (const state of this.states.values())
         activateWeapon(state, this.states, time);
       for (const state of this.states.values())
-        updateKinematicEntity(state, scenario, time, scenario.fixedStepSeconds);
+        updateKinematicEntity(
+          state,
+          this.states,
+          scenario,
+          time,
+          scenario.fixedStepSeconds,
+        );
       for (const state of this.states.values())
         updateWeapon(
           state,
@@ -562,9 +681,10 @@ export class EngineSession {
         this.completed = true;
       } else {
         const speed = magnitude(primaryWeapon.velocity);
-        const weapon = primaryWeapon.definition.weapon!;
-        const sinceLaunch = time - (weapon.launchTimeSeconds ?? 0);
+        const weapon = primaryWeapon.definition.weapon;
+        const sinceLaunch = time - (weapon?.launchTimeSeconds ?? 0);
         if (
+          weapon &&
           sinceLaunch > weapon.burnSeconds + 2 &&
           speed < 80 &&
           separationM > 1000

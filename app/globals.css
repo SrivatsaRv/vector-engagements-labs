@@ -710,7 +710,7 @@ a {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: 52px minmax(260px, 1fr) 40px 130px;
+  grid-template-rows: 52px 62px minmax(260px, 1fr) 40px 130px;
 }
 .sim-topline {
   display: flex;
@@ -759,6 +759,45 @@ a {
   min-width: 72px;
   padding: 10px 9px;
   border-left: 1px solid var(--line2);
+}
+.tactical-state-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line2);
+  border-bottom: 1px solid var(--line2);
+}
+.tactical-state-strip article {
+  min-width: 0;
+  padding: 9px 12px;
+  background: #fbfcfd;
+}
+.tactical-state-strip span,
+.tactical-state-strip small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tactical-state-strip span {
+  color: var(--muted);
+  font-size: 8px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.tactical-state-strip strong {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tactical-state-strip small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 8px;
 }
 .metric span {
   font-size: 8px;
@@ -3821,10 +3860,16 @@ button:disabled,
   padding: 10px;
 }
 .simulation-column {
-  grid-template-rows: 58px minmax(220px, 1fr) 44px clamp(190px, 23vh, 248px);
+  grid-template-rows: 52px 48px minmax(300px, 1fr) 40px clamp(150px, 21vh, 220px);
+}
+.tactical-state-strip article {
+  padding: 7px 10px;
+}
+.tactical-state-strip strong {
+  font-size: 9px;
 }
 .playback {
-  height: 44px;
+  height: 40px;
 }
 .playback > span {
   font-size: 9px;
@@ -5878,7 +5923,7 @@ button:disabled,
   .builder-actions { min-height: 78px; }
   .builder-actions > div button { min-width: 118px; min-height: 44px; font-size: 12px; }
   .builder-actions > div button:last-child { min-width: 190px; }
-  .simulation-column { grid-template-rows: 72px minmax(360px, 1fr) 52px clamp(270px, 24vh, 390px); }
+  .simulation-column { grid-template-rows: 72px 72px minmax(360px, 1fr) 52px clamp(270px, 24vh, 390px); }
   .sim-topline { padding: 0 18px; gap: 16px; }
   .sim-topline span,
   .metric span { font-size: 11px; }
@@ -5941,7 +5986,7 @@ button:disabled,
   .event-choice button { min-height: 150px; }
   .event-choice strong { font-size: 17px; }
   .event-choice small { font-size: 14px; }
-  .simulation-column { grid-template-rows: 88px minmax(560px, 1fr) 60px clamp(360px, 25vh, 520px); }
+  .simulation-column { grid-template-rows: 88px 84px minmax(560px, 1fr) 60px clamp(360px, 25vh, 520px); }
   .telemetry-panel svg { height: 72px; }
   .map-tactical-marker { width: 62px; height: 62px; }
   .map-tactical-marker > span { top: 59px; max-width: 220px; font-size: 12px; }
@@ -6035,7 +6080,7 @@ button:disabled,
     height: 100%;
     min-width: 0;
     overflow-y: auto;
-    grid-template-rows: auto minmax(320px, 48vh) 48px auto;
+    grid-template-rows: auto auto minmax(320px, 48vh) 48px auto;
   }
   .sim-topline {
     display: grid;
@@ -6110,7 +6155,7 @@ button:disabled,
   }
   .simulation-column {
     height: calc(100dvh - 100px);
-    grid-template-rows: max-content minmax(320px, 1fr) max-content minmax(300px, max-content);
+    grid-template-rows: max-content max-content minmax(320px, 1fr) max-content minmax(300px, max-content);
   }
   .sim-topline {
     display: grid;
@@ -6220,7 +6265,10 @@ button:disabled,
     height: 100%;
     overflow-x: hidden;
     overflow-y: auto;
-    grid-template-rows: max-content clamp(300px, 52svh, 460px) max-content max-content;
+    grid-template-rows: max-content max-content clamp(300px, 52svh, 460px) max-content max-content;
+  }
+  .tactical-state-strip {
+    grid-template-columns: minmax(0, 1fr);
   }
   .sim-topline {
     grid-template-columns: minmax(0, 1fr);

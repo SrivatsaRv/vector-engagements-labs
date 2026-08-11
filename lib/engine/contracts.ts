@@ -73,6 +73,9 @@ export type EngineEntityDefinition = {
     maneuver: Maneuver;
     commandedG: number;
     decision: string;
+    intent?: string;
+    targetEntityId?: string;
+    activateAfterSeconds?: number;
   };
   weapon?: {
     launchPlatformId: string;
@@ -91,6 +94,13 @@ export type EngineEntityDefinition = {
     seekerActivationRangeM: number;
     datalinkUpdateSeconds: number;
     commandedCruiseAltitudeM: number;
+    seekerKind?: "ACTIVE_RADAR" | "INFRARED" | "PASSIVE_RADAR" | "COMMAND" | "EO";
+    supportMode?: "RADAR_MIDCOURSE" | "INFRARED_LOCK" | "PASSIVE_HOMING" | "COMMAND_GUIDANCE" | "NONE";
+    launchAuthorized?: boolean;
+    launchRangeM?: number;
+    supportRangeM?: number;
+    supportAvailable?: boolean;
+    redWarningOnLaunch?: boolean;
   };
   sensor?: {
     detectionRadiusM: number;

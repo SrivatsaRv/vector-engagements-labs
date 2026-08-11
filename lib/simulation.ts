@@ -51,6 +51,22 @@ export type TacticalDecision =
   | "CRANK"
   | "DEFEND"
   | "DISENGAGE";
+export type BlueInterceptIntent =
+  | "PURE_PURSUIT"
+  | "LEAD_PURSUIT"
+  | "STERN_CONVERSION"
+  | "SUPPORT_HOLD"
+  | "EXTEND";
+export type RedTacticalIntent =
+  | "UNAWARE_TRANSIT"
+  | "BEAM"
+  | "DEFENSIVE_BREAK"
+  | "EXTEND"
+  | "RECOMMIT";
+export type BlueWeaponPosture =
+  | "RADAR_BVR_SUPPORT"
+  | "IR_CLOSE_RANGE"
+  | "HOLD_FIRE";
 
 export const RASP_SOURCE_CONTRACTS: Record<
   TrackSource,
@@ -66,26 +82,26 @@ export const RASP_SOURCE_CONTRACTS: Record<
     label: "Onboard radar",
     requirement: "The observing aircraft radar must be active and the opposing aircraft must be within the 120 km educational sensor boundary.",
     pictureEffect: "Creates or removes the opposing-aircraft track and changes its quality and uncertainty.",
-    physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
+    physicsEffect: "Can enable radar-supported launch and warn the opposing aircraft when the weapon posture requires radar mid-course support.",
   },
   DATALINK: {
     label: "Data link",
     requirement: "The observing side's tactical data link must be available.",
     pictureEffect: "Injects an off-board opposing-aircraft track into that side's RASP.",
-    physicsEffect: "RASP only. The separate Blue Team decision controls weapon-update cadence.",
+    physicsEffect: "Can provide coarse track custody before onboard radar lock, subject to the selected weapon posture.",
   },
   AIRBORNE_EARLY_WARNING: {
     label: "Airborne early warning",
     requirement: "The observing side's tactical data link must be available.",
     pictureEffect: "Injects a higher-quality off-board opposing-aircraft track into that side's RASP.",
-    physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
+    physicsEffect: "Can provide early warning and track custody before onboard lock, subject to the selected weapon posture.",
     limitation: "No AEW aircraft or sensor-volume entity is spawned yet; this is a declared external track source.",
   },
   VISUAL: {
     label: "Visual contact",
     requirement: "The opposing aircraft must be inside the selected weather preset's visibility distance, capped at 18 km.",
     pictureEffect: "Creates a short-range visual track without requiring radar or data link.",
-    physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
+    physicsEffect: "Can authorize short-range visual or infrared shots; it does not create radar mid-course support.",
   },
 };
 
@@ -120,6 +136,76 @@ export const TACTICAL_DECISION_CONTRACTS: Record<
   },
 };
 
+export const BLUE_INTERCEPT_INTENT_CONTRACTS: Record<
+  BlueInterceptIntent,
+  { label: string; effect: string }
+> = {
+  PURE_PURSUIT: {
+    label: "Pure pursuit",
+    effect: "Blue points at Red's current position. The visible path tends to curve behind the defender.",
+  },
+  LEAD_PURSUIT: {
+    label: "Lead pursuit",
+    effect: "Blue turns toward a predicted intercept point. The visible path cuts across Red's flight path.",
+  },
+  STERN_CONVERSION: {
+    label: "Stern conversion",
+    effect: "Blue aims to arrive behind Red instead of taking the shortest line. The path is wider and less direct.",
+  },
+  SUPPORT_HOLD: {
+    label: "Support hold",
+    effect: "Blue limits manoeuvre demand to preserve radar-supported weapon updates.",
+  },
+  EXTEND: {
+    label: "Extend",
+    effect: "Blue turns away to increase separation and break the attack geometry.",
+  },
+};
+
+export const RED_TACTICAL_INTENT_CONTRACTS: Record<
+  RedTacticalIntent,
+  { label: string; effect: string }
+> = {
+  UNAWARE_TRANSIT: {
+    label: "Unaware transit",
+    effect: "Red continues its route until a modeled warning exists; without warning it does not defend.",
+  },
+  BEAM: {
+    label: "Beam",
+    effect: "After warning, Red turns close to perpendicular to Blue to reduce closure and stress radar support.",
+  },
+  DEFENSIVE_BREAK: {
+    label: "Defensive break",
+    effect: "After warning, Red executes the selected defensive turn demand.",
+  },
+  EXTEND: {
+    label: "Extend",
+    effect: "After warning, Red turns away from Blue and tries to open range.",
+  },
+  RECOMMIT: {
+    label: "Recommit",
+    effect: "Red initially extends, then turns back after the modeled support window changes.",
+  },
+};
+
+export const BLUE_WEAPON_POSTURE_CONTRACTS: Record<
+  BlueWeaponPosture,
+  { label: string; effect: string }
+> = {
+  RADAR_BVR_SUPPORT: {
+    label: "Radar-supported BVR",
+    effect: "Requires radar or off-board track custody for launch and mid-course support before terminal seeker activation.",
+  },
+  IR_CLOSE_RANGE: {
+    label: "IR / EO close-range",
+    effect: "Does not use radar range as a kill condition. Launch requires close-range visual or seeker acquisition geometry.",
+  },
+  HOLD_FIRE: {
+    label: "Hold fire",
+    effect: "Aircraft manoeuvre and sensing still run, but the Blue weapon remains stowed.",
+  },
+};
+
 export type Scenario = {
   engineBackend: EngineBackendId;
   domain: EngagementDomain;
@@ -145,6 +231,9 @@ export type Scenario = {
   redJammer: boolean;
   blueDecision: TacticalDecision;
   redDecision: TacticalDecision;
+  blueIntent: BlueInterceptIntent;
+  redIntent: RedTacticalIntent;
+  blueWeaponPosture: BlueWeaponPosture;
   profile: ProfileId;
   guidance: Guidance;
   altitude: number;
@@ -442,6 +531,9 @@ export const DEFAULT_SCENARIO: Scenario = {
   redJammer: false,
   blueDecision: "SUPPORT_WEAPON",
   redDecision: "DEFEND",
+  blueIntent: "LEAD_PURSUIT",
+  redIntent: "DEFENSIVE_BREAK",
+  blueWeaponPosture: "RADAR_BVR_SUPPORT",
   profile: "medium",
   guidance: "loft",
   altitude: 8500,
@@ -564,8 +656,20 @@ export function prepareSimulation(
       redFuelPercent: input.redFuelPercent,
       blueDecision: input.blueDecision,
       redDecision: input.redDecision,
+      blueIntent: input.blueIntent,
+      redIntent: input.redIntent,
+      blueWeaponPosture: input.blueWeaponPosture,
+      blueRadarMode: input.blueRadarMode,
+      redRadarMode: input.redRadarMode,
+      blueTrackSource: input.blueTrackSource,
+      redTrackSource: input.redTrackSource,
+      blueDatalink: input.blueDatalink,
+      redDatalink: input.redDatalink,
+      blueJammer: input.blueJammer,
+      redJammer: input.redJammer,
       windEastMps: input.wind,
       windNorthMps: input.windNorth,
+      visibilityKm: input.visibilityKm,
       temperatureOffset: input.temperatureOffset,
       guidanceInterruptionAt: input.guidanceInterruptionAt,
       guidanceInterruptionDuration: input.guidanceInterruptionDuration,

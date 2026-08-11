@@ -441,9 +441,11 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
             }
         }
     }
-    if launched_weapon_count == 0 {
+    let has_no_launch_primary_pair =
+        entity_ids.contains("blue-platform-1") && entity_ids.contains("red-object-1");
+    if launched_weapon_count == 0 && !has_no_launch_primary_pair {
         return Err(invalid(
-            "scenario must declare at least one launched weapon",
+            "scenario must declare at least one launched weapon or a blue-platform-1/red-object-1 no-launch pair",
         ));
     }
 

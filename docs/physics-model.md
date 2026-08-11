@@ -13,7 +13,10 @@ Vector currently uses a deterministic three-dimensional point-mass reference eng
 - aircraft fuel mass, thrust demand, parasitic drag, induced drag, and load-factor-limited turning;
 - direct and commanded-loft guidance;
 - proportional-navigation acceleration demand with command limits;
-- moving target behavior and decision modifiers;
+- target-aware Blue intercept intent: pure pursuit, lead pursuit, stern conversion, support hold and extension;
+- warning-gated Red behavior: unaware transit, beaming, defensive break, extension and recommit;
+- weapon-posture launch gating for radar-supported BVR, IR/EO close-range and hold-fire states;
+- radar, data-link, visual-source and jamming controls that can affect launch/support eligibility and Red awareness through declared educational rules;
 - G2G commanded cruise altitude, with a terminal blend to objective elevation for direct paths and a higher commanded apex for lofted paths;
 - guidance-hold and wind-shift events;
 - closest approach, completion, energy/time termination, non-finite-state checks, and dry-mass margin diagnostics.
@@ -48,7 +51,9 @@ terrain, propagation, or electronic attack.
 
 Every movement trail is reconstructed only from recorded engine frames. The 3D surface adds a ground projection, vertical altitude stem, and translucent altitude curtain; these are views of the same position samples, not newly generated trajectories. A weapon does not appear before its launch lifecycle event.
 
-Model Truth remains separate from IAF and PAF RASP estimates. IAF RASP estimates the selected Red aircraft track; PAF RASP estimates the selected Blue aircraft track. Onboard radar requires an active own-side radar and the declared model range; data-link and airborne-early-warning sources require an available own-side link; visual source requires the model visual range. Opposing jamming, range, and track age degrade confidence and increase uncertainty. An unavailable path yields `NO_TRACK` and removes the opposing marker instead of falling back to truth. This is not a verified radar equation or operational C2 model.
+Model Truth remains separate from IAF and PAF RASP estimates. IAF RASP estimates the selected Red aircraft track; PAF RASP estimates the selected Blue aircraft track. Onboard radar requires an active own-side radar and the declared model range; data-link and airborne-early-warning sources require an available own-side link; visual source requires the model visual range. Opposing jamming, range, and track age degrade confidence and increase uncertainty. An unavailable path yields `NO_TRACK` and removes the opposing marker instead of falling back to truth.
+
+For A2A studies, the same declared information controls are also compiled into bounded tactical effects: radar-supported weapons require track custody and active Blue radar before terminal seeker activation; IR/EO close-range posture requires close-range visual/seeker acquisition and does not use radar range as a kill condition; Red defensive intent activates only after modeled warning or track custody. This is still an educational state machine, not a verified radar equation, missile DLZ, RWR model, or operational C2 model.
 
 ## Still outside the fidelity claim
 

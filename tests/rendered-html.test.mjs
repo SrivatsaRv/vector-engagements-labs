@@ -239,8 +239,10 @@ test("responsive workspace reserves footer space and keeps six telemetry plots i
   assert.match(css, /\.builder > footer\.builder-actions,[^{]*\{[^}]*position:\s*static/s);
   assert.match(
     css,
-    /grid-template-rows:\s*58px minmax\(220px, 1fr\) 44px clamp\(190px, 23vh, 248px\)/,
+    /grid-template-rows:\s*52px 48px minmax\(300px, 1fr\) 40px clamp\(150px, 21vh, 220px\)/,
   );
+  assert.match(css, /\.tactical-state-strip\s*\{[^}]*grid-template-columns:\s*repeat\(3,/s);
+  assert.match(css, /\.tactical-state-strip\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s);
   assert.match(css, /\.telemetry-multiples\s*\{[^}]*grid-template-columns:\s*repeat\(3,/s);
   assert.match(css, /\.scenario-authoring-map-shell\s*\{[^}]*height:\s*clamp\(/s);
   assert.match(authoringMap, /draggable:\s*true/);
