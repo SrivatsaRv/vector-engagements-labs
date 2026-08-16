@@ -63,6 +63,7 @@ const SHARED_SIMULATION_CONTRACT = [
 const ENVIRONMENT_OR_MODEL_DATA = [
   /^db\/(?:seeds|fixtures)\/(?:environment|installation|model|runway)/,
   /^fixtures\/(?:environment|model-pack)/,
+  /^lib\/(?:geospatial\/.*|study-areas\.ts)$/,
   /^scripts\/(?:generate-model-pack-fixture|verify-governed-catalog-data|verify-public-aircraft-reference)\.(?:c|m)?tsx?$/,
 ];
 
@@ -71,6 +72,7 @@ const DATABASE_OR_API = [
   /^drizzle\//,
   /^drizzle\.config\.ts$/,
   /^app\/api\//,
+  /^lib\/security\/saved-run\.ts$/,
   /^lib\/(?:report-export|scenario-package|scenarios)\.ts$/,
   /^scripts\/(?:migrate-db|seed-db|verify-app|verify-db)\.mjs$/,
 ];

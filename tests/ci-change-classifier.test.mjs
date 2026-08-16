@@ -105,6 +105,24 @@ test("environment and model fixtures select validation, parity, and integration"
     "rust_tests",
     "integration",
   ]);
+  assert.deepEqual(selected(["lib/study-areas.ts"]), [
+    "policy",
+    "quality",
+    "security_js",
+    "web_tests",
+    "rust_tests",
+    "integration",
+  ]);
+});
+
+test("saved-run admission always selects database and API integration", () => {
+  assert.deepEqual(selected(["lib/security/saved-run.ts"]), [
+    "policy",
+    "quality",
+    "security_js",
+    "web_tests",
+    "integration",
+  ]);
 });
 
 test("combined contracts take the union of their required gates", () => {
