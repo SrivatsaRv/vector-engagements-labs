@@ -26,6 +26,17 @@ test("saved-run validation rejects unbounded routes and non-finite physics", () 
   );
 });
 
+test("saved-run admission rejects a client-selected engine", () => {
+  const input = {
+    ...structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario),
+    engineBackend: "typescript",
+  };
+  assert.throws(
+    () => validateSavedScenario(input, DEFAULT_SCENARIO_DEFINITION),
+    { code: "scenario_engine_forbidden" },
+  );
+});
+
 test("saved reports are recomputed from admitted scenario inputs", async () => {
   const verified = await buildVerifiedSavedRun(
     DEFAULT_SCENARIO_DEFINITION.scenario,

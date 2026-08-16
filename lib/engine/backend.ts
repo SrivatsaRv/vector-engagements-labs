@@ -167,23 +167,6 @@ export function runEngineBackend(
   throw new Error(`Unknown VECTOR engine backend: ${exhaustive}`);
 }
 
-export const ENGINE_BACKENDS: Array<{
-  id: EngineBackendId;
-  label: string;
-  description: string;
-}> = [
-  {
-    id: "rust-wasm",
-    label: "Rust / WebAssembly",
-    description: "Compiled 3DOF engine running locally inside the browser.",
-  },
-  {
-    id: "typescript",
-    label: "TypeScript reference",
-    description: "Reference implementation retained for parity verification.",
-  },
-];
-
 export const RUST_WASM_ENGINE_ARTIFACT = {
   sha256: VECTOR_ENGINE_WASM_SHA256,
   bytes: VECTOR_ENGINE_WASM_BYTES,

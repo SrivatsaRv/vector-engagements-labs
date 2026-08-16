@@ -35,7 +35,13 @@ It is not a separate product mode. Its purpose is controlled parity testing, dia
 
 ## Selection and provenance
 
-`Scenario.engineBackend` is either `rust-wasm` or `typescript`. Rust/WASM is the default for new scenarios. The selected backend is an authored input, is recorded in `EngineRun.diagnostics.backend`, and is preserved in the report's scenario snapshot. An explicit unsupported value is an error.
+The selected production backend is owned by the content-addressed
+`DeploymentCapabilityManifest`; it is not a scenario field, URL parameter,
+saved-run preference or browser control. Rust/WASM is selected for the current
+Air deployment. The selected backend is recorded in `EngineRun.diagnostics`,
+the compiled VSR member and the VSR manifest. TypeScript remains independently
+executable through explicit verification manifests for parity and reference
+preview checks. See [`deployment-capabilities.md`](deployment-capabilities.md).
 
 ## Build and verification
 
@@ -62,8 +68,9 @@ synchronous `simulate` compatibility function. The client loads a digest-address
 compiled adapter, sends a compact run reference, and receives one transferable
 VSR. Server verification, deterministic fixtures, benchmarks, the landing sample,
 and the hidden SSR pre-run placeholder continue to use `simulate` explicitly.
-Those entry points retain authored backend provenance and never substitute
-TypeScript for a selected Rust run.
+Those entry points retain deployment backend provenance and never substitute
+TypeScript for a selected Rust run. Server-rendered pre-run and landing frames
+are explicitly labelled reference previews; they are not conducted runs.
 
 The browser protocol is common to both backends, but the numerical adapters are
 at different maturity levels:

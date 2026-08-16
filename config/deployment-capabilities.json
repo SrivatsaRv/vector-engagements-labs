@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "vector.deployment-capabilities.v1",
+  "configurationSource": "repository/deployment-capabilities",
+  "buildIdentity": "vector-labs-air-reference-2026-08",
+  "domains": {
+    "A2A": {
+      "state": "ENABLED",
+      "reason": "The Air reference programme is the active release scope.",
+      "operatorGuidance": "This capability is available in this deployment."
+    },
+    "A2G": {
+      "state": "DISABLED_BY_DEPLOYMENT",
+      "reason": "Air-to-surface simulation is outside the active release scope.",
+      "operatorGuidance": "Use an admitted Air domain scenario."
+    },
+    "G2A": {
+      "state": "DISABLED_BY_DEPLOYMENT",
+      "reason": "Surface-to-air simulation is outside the active release scope.",
+      "operatorGuidance": "Use an admitted Air domain scenario."
+    },
+    "G2G": {
+      "state": "DISABLED_BY_DEPLOYMENT",
+      "reason": "Surface-to-surface simulation is outside the active release scope.",
+      "operatorGuidance": "Use an admitted Air domain scenario."
+    }
+  },
+  "missionClasses": ["TACTICAL_INTERCEPT"],
+  "startPostures": ["AIRBORNE"],
+  "optionalCapabilities": {
+    "environment": {
+      "state": "ENABLED",
+      "reason": "The synthetic environment pack is admitted.",
+      "operatorGuidance": "This capability is available in this deployment."
+    },
+    "weather": {
+      "state": "ENABLED",
+      "reason": "Frozen study-area weather presets are admitted.",
+      "operatorGuidance": "This capability is available in this deployment."
+    },
+    "terrain": {
+      "state": "DISABLED_BY_DEPLOYMENT",
+      "reason": "Terrain interaction is not admitted in the Air reference gate.",
+      "operatorGuidance": "Use an admitted Air domain scenario."
+    },
+    "sensors": {
+      "state": "DISABLED_BY_DEPLOYMENT",
+      "reason": "Causal sensor state is pending the information-model contract.",
+      "operatorGuidance": "Use an admitted Air domain scenario."
+    },
+    "datalink": {
+      "state": "DISABLED_BY_DEPLOYMENT",
+      "reason": "Causal data-link state is pending the information-model contract.",
+      "operatorGuidance": "Use an admitted Air domain scenario."
+    },
+    "aew": {
+      "state": "DISABLED_BY_DEPLOYMENT",
+      "reason": "Causal airborne early-warning state is not admitted.",
+      "operatorGuidance": "Use an admitted Air domain scenario."
+    },
+    "ew": {
+      "state": "DISABLED_BY_DEPLOYMENT",
+      "reason": "Causal electronic-warfare state is not admitted.",
+      "operatorGuidance": "Use an admitted Air domain scenario."
+    },
+    "weapons": {
+      "state": "ENABLED",
+      "reason": "The current educational weapon flyout is admitted with its declared limits.",
+      "operatorGuidance": "This capability is available in this deployment."
+    },
+    "savedRunCompatibility": {
+      "state": "ENABLED",
+      "reason": "The current VSR schema is admitted.",
+      "operatorGuidance": "This capability is available in this deployment."
+    }
+  },
+  "admittedModelPackDigests": [
+    "f3ea60f5476b812d85ebd13ca6aa1d65a751fbca38fcad98ff458abf368efc42"
+  ],
+  "engine": {
+    "id": "rust-wasm",
+    "version": "vector-engine.v1"
+  }
+}

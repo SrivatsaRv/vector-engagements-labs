@@ -64,7 +64,10 @@ that cannot be acknowledged within the client grace period terminates the Worker
 and the next request creates a new instance.
 
 The runtime loads a compiled input once under a SHA-256 digest, then runs it by
-`digest + scenarioRef`. `RuntimeModelPackAdapter` is deliberately the only place
+`digest + scenarioRef`. The adapter carries the immutable
+`DeploymentCapabilityManifest`; the Run request cannot select a backend. The
+Worker dispatches only to the backend admitted by that manifest and the VSR
+binds the same manifest digest. `RuntimeModelPackAdapter` is deliberately the only place
 that treats the current `EngineScenario` as a model pack. It will be replaced by
 the Simulation Data Foundation contract after that work lands; no competing
 entity or model schema is introduced here.

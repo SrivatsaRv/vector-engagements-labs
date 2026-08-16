@@ -1,7 +1,10 @@
 import { performance } from "node:perf_hooks";
 import { arch, cpus, platform, release, totalmem } from "node:os";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
-import { prepareSimulation, simulate } from "../lib/simulation.ts";
+import {
+  prepareSimulation,
+  simulateWithCapabilitiesForVerification,
+} from "../lib/simulation.ts";
 import type { EngineBackendId } from "../lib/engine/contracts.ts";
 import {
   RUST_WASM_ENGINE_ARTIFACT,
@@ -16,6 +19,15 @@ import {
   encodeColumnarFrames,
   serializeVectorRecord,
 } from "../lib/record/vector-record.ts";
+import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
+
+const verificationDomains = ["A2A", "A2G", "G2A", "G2G"] as const;
+const capabilities = Object.fromEntries(
+  (["typescript", "rust-wasm"] as const).map((backend) => [
+    backend,
+    createVerificationDeploymentCapabilities(backend, verificationDomains),
+  ]),
+) as Record<EngineBackendId, ReturnType<typeof createVerificationDeploymentCapabilities>>;
 
 const warmupRounds = 2;
 const measuredRounds = Number(process.env.VECTOR_BENCHMARK_ROUNDS ?? 25);
@@ -32,17 +44,20 @@ const samples: Array<{
 
 for (const backend of backends) {
   const coldStarted = performance.now();
-  simulate({ ...SCENARIO_LIBRARY[0].scenario, engineBackend: backend });
+  simulateWithCapabilitiesForVerification(SCENARIO_LIBRARY[0].scenario, capabilities[backend]);
   coldStartMs[backend] = performance.now() - coldStarted;
   for (let round = 0; round < warmupRounds; round += 1) {
     for (const definition of SCENARIO_LIBRARY) {
-      simulate({ ...definition.scenario, engineBackend: backend });
+      simulateWithCapabilitiesForVerification(definition.scenario, capabilities[backend]);
     }
   }
   for (let round = 0; round < measuredRounds; round += 1) {
     for (const definition of SCENARIO_LIBRARY) {
       const started = performance.now();
-      const result = simulate({ ...definition.scenario, engineBackend: backend });
+      const result = simulateWithCapabilitiesForVerification(
+        definition.scenario,
+        capabilities[backend],
+      );
       samples.push({
         backend,
         id: definition.id,
@@ -100,9 +115,12 @@ const referenceBenchmarks = [
 });
 const transportEvidence = [];
 for (const backend of backends) {
-  const scenario = { ...SCENARIO_LIBRARY[0].scenario, engineBackend: backend };
-  const prepared = prepareSimulation(scenario);
-  const representative = simulate(scenario);
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const prepared = prepareSimulation(scenario, scenario.profile, capabilities[backend]);
+  const representative = simulateWithCapabilitiesForVerification(
+    scenario,
+    capabilities[backend],
+  );
   const record = await createVectorSimulationRecord(
     prepared,
     representative,

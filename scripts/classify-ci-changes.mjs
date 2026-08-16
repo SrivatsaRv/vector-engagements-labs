@@ -20,10 +20,19 @@ const WORKFLOW_CONTROL = [
 ];
 
 const WEB_SOURCE = [
+  /^config\/deployment-capabilities\.json$/,
   /^(?:app|components|content|lib|public|scripts|tests|worker)\//,
   /^(?:blog-content\.d\.ts|cloudflare-env\.d\.ts|drizzle\.config\.ts|eslint\.config\.mjs|next\.config\.ts|postcss\.config\.mjs|vite-env\.d\.ts|vite\.config\.ts)$/,
   /^(?:package|package-lock)\.json$/,
   /^tsconfig\.json$/,
+];
+
+const BROWSER_SURFACE = [
+  /^config\/deployment-capabilities\.json$/,
+  /^(?:app|components)\//,
+  /^lib\/(?:runtime\/deployment-capabilities|scenarios)\.ts$/,
+  /^tests\/(?:browser|component)\//,
+  /^(?:playwright|vitest)\.config\.ts$/,
 ];
 
 const JAVASCRIPT_SECURITY = [
@@ -67,6 +76,7 @@ const DATABASE_OR_API = [
 ];
 
 const CONTAINER_OR_RUNTIME = [
+  /^config\/deployment-capabilities\.json$/,
   /^(?:Dockerfile|compose\.ya?ml|\.dockerignore)$/,
   /^observability\//,
   /^(?:package|package-lock)\.json$/,
@@ -83,6 +93,7 @@ export function classifyChanges(inputFiles) {
     quality: false,
     security_js: false,
     web_tests: false,
+    browser_tests: false,
     rust_tests: false,
     rust_audit: false,
     integration: false,
@@ -102,6 +113,10 @@ export function classifyChanges(inputFiles) {
     if (matches(file, WEB_SOURCE)) {
       result.quality = true;
       result.web_tests = true;
+      classified = true;
+    }
+    if (matches(file, BROWSER_SURFACE)) {
+      result.browser_tests = true;
       classified = true;
     }
     if (matches(file, JAVASCRIPT_SECURITY)) {

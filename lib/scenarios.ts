@@ -594,8 +594,5 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
 export const DEFAULT_SCENARIO_DEFINITION = SCENARIO_LIBRARY[0];
 
 export function getScenarioDefinition(id: string | null | undefined) {
-  return (
-    SCENARIO_LIBRARY.find((item) => item.id === id) ??
-    DEFAULT_SCENARIO_DEFINITION
-  );
+  return SCENARIO_LIBRARY.find((item) => item.id === id);
 }

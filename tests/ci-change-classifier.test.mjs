@@ -39,6 +39,7 @@ test("frontend code receives quality, security, and web tests", () => {
     "quality",
     "security_js",
     "web_tests",
+    "browser_tests",
   ]);
 });
 
@@ -160,6 +161,7 @@ test("workflow changes fail closed through every available gate", () => {
     "quality",
     "security_js",
     "web_tests",
+    "browser_tests",
     "rust_tests",
     "rust_audit",
     "integration",
@@ -175,6 +177,7 @@ test("unclassified paths fail closed through every available gate", () => {
     "quality",
     "security_js",
     "web_tests",
+    "browser_tests",
     "rust_tests",
     "rust_audit",
     "integration",

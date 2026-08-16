@@ -34,7 +34,7 @@ test("server-renders the Vector Engagement Labs landing page", async () => {
   assert.match(html, /Vector Engagement Labs/);
   assert.match(html, /Build the scenario/);
   assert.match(html, /Pick a scenario/);
-  assert.match(html, /Live model/);
+  assert.match(html, /Reference preview/);
   assert.doesNotMatch(html, /Instructor Station|Tony Stark/i);
 });
 

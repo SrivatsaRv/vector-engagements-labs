@@ -94,8 +94,10 @@ function catalogObject(id: string, domain: Scenario["domain"], field: string) {
 export function validateSavedScenario(value: unknown, template: ScenarioDefinition): Scenario {
   if (!value || typeof value !== "object") throw new PublicApiError(400, "invalid_scenario");
   const input = value as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(input, "engineBackend")) {
+    throw new PublicApiError(400, "scenario_engine_forbidden");
+  }
   const scenario: Scenario = {
-    engineBackend: "typescript",
     domain: enumValue(input.domain, domains, "domain") as Scenario["domain"],
     name: shortString(input.name, 120, "name"),
     objective: shortString(input.objective, 500, "objective"),

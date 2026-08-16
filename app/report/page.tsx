@@ -29,7 +29,6 @@ type PrintState = "idle" | "preparing" | "printing";
 
 const fallbackScenario = {
   ...DEFAULT_SCENARIO_DEFINITION.scenario,
-  engineBackend: "typescript" as const,
 };
 
 const fallback: ReportData = {

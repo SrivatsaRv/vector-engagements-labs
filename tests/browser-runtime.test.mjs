@@ -29,10 +29,7 @@ test("browser runtime protocol identity and message admission are versioned", ()
 });
 
 test("digest adapter detects compiled-pack mutation", async () => {
-  const prepared = prepareSimulation({
-    ...SCENARIO_LIBRARY[0].scenario,
-    engineBackend: "typescript",
-  });
+  const prepared = prepareSimulation(SCENARIO_LIBRARY[0].scenario);
   const pack = await adaptPreparedSimulation(prepared);
   assert.equal(await verifyRuntimeModelPack(pack), true);
   pack.prepared.engineScenario.seed += 1;
@@ -87,7 +84,7 @@ test("client timeout terminates the stuck Worker and initializes a replacement",
     workers.push(worker);
     return worker;
   });
-  const scenario = { ...SCENARIO_LIBRARY[0].scenario, engineBackend: "typescript" };
+  const scenario = SCENARIO_LIBRARY[0].scenario;
   const stalled = client.run(scenario, "medium", { timeoutMs: 20 });
   await assert.rejects(
     client.run(scenario, "medium", { timeoutMs: 20 }),
@@ -148,7 +145,7 @@ test("client rejects a Worker crash and recovers with a fresh instance", async (
     return worker;
   });
   await assert.rejects(
-    client.run({ ...SCENARIO_LIBRARY[0].scenario, engineBackend: "typescript" }),
+    client.run(SCENARIO_LIBRARY[0].scenario),
     /crashed or lost its message channel/,
   );
   assert.equal(workers[0].terminated, true);
@@ -161,10 +158,7 @@ test("client rejects a Worker crash and recovers with a fresh instance", async (
 
 for (const batchTicks of [1, 7, 128, 2_048]) {
   test(`TypeScript model clock is invariant at ${batchTicks} ticks per batch`, () => {
-    const prepared = prepareSimulation({
-      ...SCENARIO_LIBRARY[1].scenario,
-      engineBackend: "typescript",
-    });
+    const prepared = prepareSimulation(SCENARIO_LIBRARY[1].scenario);
     const expected = runEngine(prepared.engineScenario);
     const session = new EngineSession(prepared.engineScenario);
     let priorModelTime = -1;

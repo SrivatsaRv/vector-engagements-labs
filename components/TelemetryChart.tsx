@@ -1,28 +1,34 @@
 "use client";
 
-import { getFrameAt, type SimulationResult } from "@/lib/simulation";
-import type { EngineEntityFrame } from "@/lib/engine/contracts";
-
-type EntityMetric = {
-  id: string;
-  label: string;
-  affiliation: EngineEntityFrame["affiliation"];
-  kind: EngineEntityFrame["kind"];
-  values: number[];
-  current: number;
-};
+import type { SimulationResult } from "@/lib/simulation";
+import type {
+  EngineEntityDefinition,
+  EngineEntityFrame,
+} from "@/lib/engine/contracts";
+import {
+  selectDisplayFrame,
+  selectEntityMetricSeries,
+  type EntityMetricSeries,
+} from "@/lib/frontend/selectors";
 
 const color = (affiliation: EngineEntityFrame["affiliation"]) =>
   affiliation === "BLUE" ? "#2f6fb5" : affiliation === "RED" ? "#a94f45" : "#65717a";
 
-function pathFor(values: number[], minimum: number, maximum: number) {
+function pathFor(values: Array<number | null>, minimum: number, maximum: number) {
   const span = Math.max(1e-9, maximum - minimum);
-  return values
-    .map((value, index) => {
+  let drawing = false;
+  return values.map((value, index) => {
+      if (value === null) {
+        drawing = false;
+        return "";
+      }
       const x = (index / Math.max(1, values.length - 1)) * 100;
       const y = 34 - ((value - minimum) / span) * 30;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+      const command = drawing ? "L" : "M";
+      drawing = true;
+      return `${command}${x.toFixed(2)} ${y.toFixed(2)}`;
     })
+    .filter(Boolean)
     .join(" ");
 }
 function MetricPanel({
@@ -33,10 +39,10 @@ function MetricPanel({
 }: {
   title: string;
   unit: string;
-  series: EntityMetric[];
+  series: EntityMetricSeries[];
   marker: number;
 }) {
-  const values = series.flatMap((item) => item.values);
+  const values = series.flatMap((item) => item.values).filter((value): value is number => value !== null);
   const minimum = Math.min(0, ...values);
   const maximum = Math.max(1, ...values);
   return (
@@ -62,7 +68,7 @@ function MetricPanel({
           <span key={item.id}>
             <i className={`telemetry-dot ${item.affiliation.toLowerCase()}`} />
             {item.label}
-            <strong>{Number.isFinite(item.current) ? item.current.toFixed(item.current >= 100 ? 0 : 1) : "N/A"}</strong>
+            <strong>{item.current !== null ? item.current.toFixed(item.current >= 100 ? 0 : 1) : "N/A"}</strong>
           </span>
         ))}
       </div>
@@ -77,23 +83,14 @@ export function TelemetryChart({
   result: SimulationResult;
   time: number;
 }) {
-  const frame = getFrameAt(result, time);
-  const marker = (time / Math.max(1, result.timeOfFlight)) * 100;
+  const selected = selectDisplayFrame(result, time);
+  const frame = selected.frame;
+  const marker = (selected.displayTimeSeconds / Math.max(1, result.timeOfFlight)) * 100;
   const entitySeries = (
     selector: (entity: EngineEntityFrame) => number,
-    include: (entity: EngineEntityFrame) => boolean = () => true,
-  ): EntityMetric[] =>
-    frame.entities.filter(include).map((entity) => ({
-      id: entity.id,
-      label: entity.designation,
-      affiliation: entity.affiliation,
-      kind: entity.kind,
-      values: result.frames.map((sample) => {
-        const state = sample.entities.find((item) => item.id === entity.id);
-        return state ? selector(state) : 0;
-      }),
-      current: selector(entity),
-    }));
+    include: (entity: EngineEntityDefinition) => boolean = () => true,
+  ): EntityMetricSeries[] =>
+    selectEntityMetricSeries(result, selected, selector, include);
   const primaryWeapon = frame.entities.find(
     (entity) => entity.id === result.engineRun.primaryWeaponId,
   );
@@ -102,7 +99,7 @@ export function TelemetryChart({
     label: string,
     values: number[],
     current: number,
-  ): EntityMetric => ({
+  ): EntityMetricSeries => ({
     id,
     label,
     affiliation: "NEUTRAL",
@@ -137,7 +134,7 @@ export function TelemetryChart({
         marker={marker}
         series={entitySeries(
           (entity) => entity.fuelKg,
-          (entity) => entity.lifecycle !== "STOWED" && entity.fuelKg > 0,
+          (entity) => entity.lifecycle !== "STOWED" && entity.initial.fuelKg > 0,
         )}
       />
       <MetricPanel

@@ -1,4 +1,4 @@
-.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local reference-aircraft-local air-reference-local worker-local frontend-local clean-clone-local
+.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local reference-aircraft-local air-reference-local worker-local frontend-local browser-local clean-clone-local
 
 db-up: compose-build
 	docker compose up -d database
@@ -61,8 +61,14 @@ worker-local:
 	npm run worker:verify
 
 frontend-local:
+	npm run test:component
 	@test -n "$${VECTOR_URL:-}" || (echo "VECTOR_URL must identify an already running built application" >&2; exit 1)
 	npm run ui:responsive:verify
+	npm run test:browser
+
+browser-local:
+	npm run test:component
+	npm run test:browser
 
 air-reference-local: reference-aircraft-local
 
@@ -91,6 +97,7 @@ ci-tests:
 	npm run engine:rust:test
 	npm run engine:rust:doc
 	npm test
+	npm run test:component
 
 ci-local: ci-quality ci-tests
 	npm run audit:production

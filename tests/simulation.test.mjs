@@ -5,6 +5,7 @@ import {
   buildRaspTrack,
   getFrameAt,
   simulate,
+  simulateWithCapabilitiesForVerification,
   standardAtmosphere,
 } from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
@@ -16,6 +17,12 @@ import {
   spatialHorizontalSeparationM,
   withSpatialRangeM,
 } from "../lib/scenario-spatial.ts";
+import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
+
+const allDomainCapabilities = createVerificationDeploymentCapabilities(
+  "rust-wasm",
+  ["A2A", "A2G", "G2A", "G2G"],
+);
 
 test("standard atmosphere produces credible sea-level reference values", () => {
   const atmosphere = standardAtmosphere(0, 0);
@@ -327,7 +334,10 @@ test("every configured library baseline completes its stated mission profile", (
         .map((item) => item.label)
         .join(", ")}`,
     );
-    const result = simulate(definition.scenario);
+    const result = simulateWithCapabilitiesForVerification(
+      definition.scenario,
+      allDomainCapabilities,
+    );
     assert.equal(
       result.successful,
       true,
@@ -364,8 +374,14 @@ test("surface-strike runs honor the declared cruise altitude", () => {
     (item) => item.id === "g2g-defended-route",
   );
   assert.ok(definition);
-  const direct = simulate(definition.scenario);
-  const lofted = simulate({ ...definition.scenario, guidance: "loft" });
+  const direct = simulateWithCapabilitiesForVerification(
+    definition.scenario,
+    allDomainCapabilities,
+  );
+  const lofted = simulateWithCapabilitiesForVerification(
+    { ...definition.scenario, guidance: "loft" },
+    allDomainCapabilities,
+  );
   const weaponAltitudes = (result) =>
     result.frames
       .flatMap((frame) => frame.entities)

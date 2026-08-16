@@ -9,17 +9,22 @@ import {
   SCENARIO_LIBRARY,
   type EngagementDomain,
 } from "@/lib/scenarios";
-import { getFrameAt, simulate } from "@/lib/simulation";
+import {
+  createReferencePreview,
+  getFrameAt,
+} from "@/lib/simulation";
+import { domainCapability } from "@/lib/runtime/deployment-capabilities";
 
 const DOMAINS: EngagementDomain[] = ["A2A", "A2G", "G2A", "G2G"];
 
 export function LandingMiniSim() {
   const [domain, setDomain] = useState<EngagementDomain>("A2A");
-  const definition =
-    SCENARIO_LIBRARY.find((item) => item.domain === domain) ??
-    SCENARIO_LIBRARY[0];
+  const definition = SCENARIO_LIBRARY.find((item) => item.domain === domain);
+  if (!definition || domainCapability(domain).state !== "ENABLED") {
+    throw new Error("The landing preview selected an unavailable domain.");
+  }
   const result = useMemo(
-    () => simulate({ ...definition.scenario, engineBackend: "typescript" }),
+    () => createReferencePreview(definition.scenario),
     [definition],
   );
   const [time, setTime] = useState(0);
@@ -57,16 +62,22 @@ export function LandingMiniSim() {
       <header className="landing-sim-header">
         <div>
           <span className="live-dot" />
-          Example · Live model
+          Example · Reference preview
         </div>
         <strong>{definition.title}</strong>
         <time>{time.toFixed(1).padStart(4, "0")} s</time>
       </header>
       <nav className="landing-sim-domains" aria-label="Engagement domain">
         {DOMAINS.map((item) => (
+          (() => {
+            const capability = domainCapability(item);
+            const unavailable = capability.state !== "ENABLED";
+            return (
           <button
             key={item}
             className={domain === item ? "active" : ""}
+            disabled={unavailable}
+            title={unavailable ? capability.reason : undefined}
             onClick={() => {
               setDomain(item);
               setTime(0);
@@ -76,6 +87,8 @@ export function LandingMiniSim() {
             <strong>{item}</strong>
             <span>{DOMAIN_DETAILS[item].label}</span>
           </button>
+            );
+          })()
         ))}
       </nav>
       <div className="landing-sim-stage">

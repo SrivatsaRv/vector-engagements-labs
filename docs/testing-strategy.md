@@ -68,7 +68,31 @@ strand a required check.
 
 ## Framework decision
 
-Keep Node's built-in test runner and Cargo for the existing domain and engine suites. Add `@playwright/test` as the browser end-to-end and visual runner; `playwright-core` alone is not a test framework. Add Vitest plus Testing Library only when component tests require mocking, coverage and watch mode that the built-in runner cannot provide efficiently. Introduce each dependency with a real suite, CI/local command, documentation and maintenance rationale. Do not add multiple overlapping frontend runners.
+Node's built-in test runner and Cargo remain the domain and engine runners.
+Vitest with React Testing Library and user-event owns component interactions.
+`@playwright/test` owns built-application browser journeys, traces, screenshots,
+retries and the required 390×844, 768×1024, 1366×768, 1440×900 and 1920×1080
+projects. `playwright-core` remains only for the existing specialized responsive
+inspection scripts and is not a test runner.
+
+- `npm run test:component` runs component contracts.
+- `npm run test:browser` builds and starts the application when `VECTOR_URL` is
+  absent, or tests the supplied built application when it is present.
+- `make browser-local` runs both frontend runners.
+- The change classifier selects the Browser Contract job for app, component,
+  scenario-admission, capability and runner changes. The Required PR Gate fails
+  when that selected job does not pass.
+
+The first suites prove deployment-disabled scenario presentation and direct-link
+admission with semantic assertions. #62 remains open for canonical playback
+selectors, real Worker author/run/scrub journeys, accessibility, visual baselines
+and performance budgets.
+
+`lib/frontend/selectors.ts` is the first canonical selector boundary. Telemetry
+uses its selected recorded frame and model time for both the marker and current
+values. An entity that is absent or stowed produces a series gap and `N/A`, not
+an invented zero. Map, 3D, timeline, report and the remaining telemetry selectors
+still require migration before #62 can close.
 
 ## Release evidence
 

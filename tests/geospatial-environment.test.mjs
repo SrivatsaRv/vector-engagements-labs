@@ -293,7 +293,7 @@ test("bounded terrain sampling handles flat, ridge, no-data and datum mismatch f
 });
 
 test("compiled runs freeze environment identities and record equivalent map/Three positions", () => {
-  const result = simulate({ ...DEFAULT_SCENARIO, engineBackend: "typescript" });
+  const result = simulate(DEFAULT_SCENARIO);
   const manifest = result.engineRun.scenario.geospatial.syntheticEnvironment;
   assert.equal(manifest.schemaVersion, "vector.synthetic-environment.v1");
   assert.equal(manifest.geoid.noImplicitConversion, true);
@@ -302,7 +302,6 @@ test("compiled runs freeze environment identities and record equivalent map/Thre
   assert.ok(result.envelopes.every((envelope) => envelope.basis === "DECLARED"));
   const changedWeather = simulate({
     ...DEFAULT_SCENARIO,
-    engineBackend: "typescript",
     wind: DEFAULT_SCENARIO.wind + 1,
   });
   assert.notEqual(
@@ -372,7 +371,7 @@ test("compiled runs freeze environment identities and record equivalent map/Thre
 
 test("report export carries the exact synthetic environment and recorded geographic positions", () => {
   const definition = getScenarioDefinition("a2a-crossing-intercept");
-  const scenario = { ...definition.scenario, engineBackend: "typescript" };
+  const scenario = definition.scenario;
   const result = simulate(scenario);
   const report = buildReportExport(
     {

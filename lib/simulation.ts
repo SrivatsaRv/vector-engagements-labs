@@ -5,12 +5,17 @@ import {
 } from "./engine/atmosphere.ts";
 import type {
   CoverageEnvelope,
-  EngineBackendId,
   EngineEntityDefinition,
   EngineEntityFrame,
   EngineRun,
   EngineScenario,
 } from "./engine/contracts.ts";
+import {
+  admitScenarioCapabilities,
+  createVerificationDeploymentCapabilities,
+  DEPLOYMENT_CAPABILITIES,
+  type DeploymentCapabilityManifest,
+} from "./runtime/deployment-capabilities.ts";
 import type { RecordedGeographicPosition } from "./geospatial/contracts.ts";
 import type {
   EngagementDomain,
@@ -121,7 +126,6 @@ export const TACTICAL_DECISION_CONTRACTS: Record<
 };
 
 export type Scenario = {
-  engineBackend: EngineBackendId;
   domain: EngagementDomain;
   name: string;
   objective: string;
@@ -252,6 +256,7 @@ export type VehicleProfile = {
 
 export type PreparedSimulation = {
   scenario: Scenario;
+  capabilityManifest: DeploymentCapabilityManifest;
   profileId: ProfileId;
   profile: VehicleProfile;
   engineScenario: EngineScenario;
@@ -417,7 +422,6 @@ export const getProfile = (
 ) => resolveProfile(scenario, id);
 
 export const DEFAULT_SCENARIO: Scenario = {
-  engineBackend: "rust-wasm",
   domain: "A2A",
   name: "Crossing-air-target intercept",
   objective:
@@ -512,7 +516,12 @@ function resolveProfile(input: Scenario, profileId: ProfileId): VehicleProfile {
 export function prepareSimulation(
   input: Scenario,
   profileId: ProfileId = input.profile,
+  capabilityManifest = DEPLOYMENT_CAPABILITIES,
 ): PreparedSimulation {
+  admitScenarioCapabilities(
+    input as Scenario & Record<string, unknown>,
+    capabilityManifest,
+  );
   const profile = resolveProfile(input, profileId);
   const studyArea = getStudyArea(input.studyAreaId);
   const placement = input.spatialPlan
@@ -577,7 +586,13 @@ export function prepareSimulation(
     },
     profile,
   );
-  return { scenario: input, profileId, profile, engineScenario };
+  return {
+    scenario: input,
+    capabilityManifest,
+    profileId,
+    profile,
+    engineScenario,
+  };
 }
 
 export function buildSimulationResult(
@@ -664,9 +679,32 @@ export function simulate(
   const prepared = prepareSimulation(input, profileId);
   const engineRun = runEngineBackend(
     prepared.engineScenario,
-    prepared.scenario.engineBackend,
+    prepared.capabilityManifest.engine.id,
   );
   return buildSimulationResult(prepared, engineRun);
+}
+
+export function simulateWithCapabilitiesForVerification(
+  input: Scenario,
+  capabilityManifest: DeploymentCapabilityManifest,
+  profileId: ProfileId = input.profile,
+): SimulationResult {
+  const prepared = prepareSimulation(input, profileId, capabilityManifest);
+  return buildSimulationResult(
+    prepared,
+    runEngineBackend(prepared.engineScenario, capabilityManifest.engine.id),
+  );
+}
+
+/**
+ * Produces non-authoritative frames for server rendering where the deployment
+ * Rust/WASM backend cannot be instantiated. Conducted runs never use this path.
+ */
+export function createReferencePreview(input: Scenario): SimulationResult {
+  return simulateWithCapabilitiesForVerification(
+    input,
+    createVerificationDeploymentCapabilities("typescript"),
+  );
 }
 
 export function explainResult(scenario: Scenario, result: SimulationResult) {

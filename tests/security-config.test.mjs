@@ -62,7 +62,11 @@ test("pull-request validation is change-aware with one stable required gate", as
   assert.match(ci, /npm run audit:production/);
   assert.match(ci, /cargo audit/);
   assert.match(ci, /make integration-ci/);
-  assert.doesNotMatch(ci, /ui:responsive|playwright|performance-local|benchmark-engine/);
+  assert.match(ci, /name: "Stage 2D: Browser Contract"/);
+  assert.match(ci, /npx playwright install --with-deps chromium/);
+  assert.match(ci, /npm run test:component/);
+  assert.match(ci, /npm run test:browser/);
+  assert.doesNotMatch(ci, /performance-local|benchmark-engine/);
   assert.doesNotMatch(scheduledCodeql, /pull_request:|branches: \[main\]/);
 });
 
