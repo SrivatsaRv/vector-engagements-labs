@@ -17,7 +17,24 @@ Use the smallest complete set for a change. State why any applicable layer was o
 
 ## Existing baseline
 
-`make ci-local` runs quality, Rust, TypeScript, contract, parity and production-audit checks. `make integration-local` validates Compose, builds and inspects the non-root production image, starts the authoritative topology, verifies governed migration data before fixture admission, covers the live PostGIS/API path, and runs automated responsive interaction checks. The image inspection rejects missing OCI identity, development `node_modules`, an unexpected command, or a root user. `make observability-local` covers telemetry; `make performance-local` covers the engine benchmark. These remain separate because they have different environment and runtime costs.
+`make ci-local` runs quality, Rust, TypeScript, contract, parity and
+production-audit checks. The named targeted contracts are `make worker-local`,
+`make frontend-local`, `make integration-local`, `make container-verify`,
+`make observability-local`, `make performance-local` and
+`make air-reference-local`. `frontend-local` requires `VECTOR_URL` to identify
+an already running built application; it does not start or silently substitute
+a development server. `make integration-local` validates Compose, builds and
+inspects the non-root production image, starts the authoritative topology,
+verifies governed migration data before fixture admission, covers the live
+PostGIS/API path, and runs automated responsive interaction checks. The image
+inspection rejects missing OCI identity, development `node_modules`, an
+unexpected command, or a root user. These targets remain separate because they
+have different environment and runtime costs.
+
+`make clean-clone-local` clones the current committed branch without local
+working-tree files, resolves the documented harness entry point, installs the
+lockfile and runs `make ci-local`. Run it after the candidate commit exists. It
+is not evidence for uncommitted files.
 
 Database integration additionally runs `db:credibility:verify`, which confirms
 the live immutable triggers reject same-version mutation and malformed compiled
@@ -37,9 +54,13 @@ automated gate from changed paths. Repository-policy tests always run, and an
 unknown path fails closed through every CI job. Documentation and agent-harness
 changes do not consume application, Rust, container, or PostGIS runners. Web,
 simulation, database/API, dependency, workflow, and infrastructure paths each
-add their owning gates. The single Required PR Gate is always emitted and
-verifies that every selected job passed; workflow-level path exclusions are not
-used because they can strand a required check.
+add their owning gates. Shared mission, scenario, environment, model, Worker and
+Vector Simulation Record contracts select the Rust/parity and integration gates
+that consume them. The single Required PR Gate is always emitted and verifies
+that every selected job passed and every unselected job was skipped. Failed,
+cancelled, timed-out, action-required or unexpectedly skipped selected jobs all
+fail the gate. Workflow-level path exclusions are not used because they can
+strand a required check.
 
 ## Framework decision
 

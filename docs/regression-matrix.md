@@ -20,10 +20,13 @@ This matrix is the minimum proof required before a feature milestone is committe
 ## Commit gates
 
 1. `make ci-local`
-2. `make integration-local`
-3. `make observability-local`
-4. `make performance-local`
-5. Browser breakpoint inspection for any changed workspace layout
+2. The applicable named target: `make worker-local`, `make frontend-local`,
+   `make integration-local`, `make container-verify`,
+   `make observability-local`, `make performance-local`, or
+   `make air-reference-local`
+3. `make clean-clone-local` after the candidate commit for harness, dependency,
+   generated-asset, build, or workflow changes
+4. Browser breakpoint inspection for any changed workspace layout
 
 `make integration-local` executes `npm run ui:responsive:verify` against the
 Compose application. The script captures breakpoint screenshots in the ignored

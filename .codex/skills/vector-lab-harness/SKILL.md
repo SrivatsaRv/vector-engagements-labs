@@ -10,7 +10,7 @@ Use this skill as the repository's low-token steering layer. Treat tracked code 
 ## Start every task
 
 1. Confirm the current worktree and branch with `git status --short --branch`.
-2. Run `scripts/context-slice.sh <stream>` from the repository root. Choose `data`, `physics`, `information`, `geo`, `browser`, `behavior`, `visualization`, `release`, `server`, `ui`, `security`, or `general`.
+2. Run the tracked `scripts/context-slice.sh <stream>` entry point from the repository root. Choose `data`, `physics`, `information`, `geo`, `browser`, `behavior`, `visualization`, `release`, `server`, `ui`, `security`, or `general`. The entry point resolves the project skill implementation and must work in a clean clone.
 3. Read the listed owning GitHub issue and only the listed contract documents and directly relevant source files. Read full files when changing their contract; otherwise use headings and targeted searches first.
 4. Inspect existing tests before changing behavior. Preserve unrelated user changes.
 5. State a short execution plan, then implement rather than stopping at analysis.

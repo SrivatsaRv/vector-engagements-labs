@@ -54,6 +54,69 @@ test("public aircraft evidence changes receive web and Rust parity gates", () =>
   );
 });
 
+test("shared Air-runtime contracts select web and Rust parity", () => {
+  for (const file of [
+    "lib/scenario-contract.ts",
+    "lib/scenario-draft.ts",
+    "lib/simulation-contract.ts",
+    "lib/vector-record.ts",
+  ]) {
+    assert.deepEqual(selected([file]), [
+      "policy",
+      "quality",
+      "security_js",
+      "web_tests",
+      "rust_tests",
+    ]);
+  }
+  assert.deepEqual(selected(["worker/protocol.ts"]), [
+    "policy",
+    "quality",
+    "security_js",
+    "web_tests",
+    "rust_tests",
+    "integration",
+    "container",
+  ]);
+});
+
+test("environment and model fixtures select validation, parity, and integration", () => {
+  for (const file of [
+    "fixtures/environment/north-punjab.json",
+    "fixtures/model-pack/fighter.json",
+  ]) {
+    assert.deepEqual(selected([file]), [
+      "policy",
+      "quality",
+      "web_tests",
+      "rust_tests",
+      "integration",
+    ]);
+  }
+  assert.deepEqual(selected(["scripts/verify-governed-catalog-data.ts"]), [
+    "policy",
+    "quality",
+    "security_js",
+    "web_tests",
+    "rust_tests",
+    "integration",
+  ]);
+});
+
+test("combined contracts take the union of their required gates", () => {
+  assert.deepEqual(
+    selected(["lib/simulation-contract.ts", "db/migrations/009_example.sql"]),
+    [
+      "policy",
+      "quality",
+      "security_js",
+      "web_tests",
+      "rust_tests",
+      "integration",
+    ],
+  );
+});
+
 test("Cargo manifest changes add the Rust dependency audit", () => {
   assert.deepEqual(selected(["engine-rust/Cargo.lock"]), [
     "policy",

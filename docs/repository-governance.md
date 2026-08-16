@@ -49,6 +49,13 @@ Compose, runtime-binding, dependency, and workflow changes add an image rebuild
 and the integration gates. Unknown paths run everything until ownership is
 declared in `scripts/classify-ci-changes.mjs`.
 
+The gate implementation is a tracked, unit-tested script rather than inline
+workflow shell. It accepts only explicit `true` or `false` selections, requires
+success for every selected job, requires `skipped` for every unselected job,
+and rejects missing, cancelled, timed-out or action-required results. Shared
+mission, scenario, environment, model, Worker and recording contracts select
+their TypeScript/Rust parity and integration consumers.
+
 Browser/responsive checks and performance benchmarks are deliberately not run
 on GitHub-hosted pull-request runners. They remain explicit maintainer checks
 through `make integration-local` and `make performance-local`, where the

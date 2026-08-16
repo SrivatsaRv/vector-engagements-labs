@@ -60,12 +60,14 @@ jobs:
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: 22.18.0
-      - name: Verify classifier, workflow, deployment, and persona policies
+      - name: Verify harness, classifier, workflow, deployment, and persona policies
         run: >-
           node --test
+          tests/harness-execution.test.mjs
           tests/ci-change-classifier.test.mjs
           tests/deployment-config.test.mjs
           tests/persona-skills.test.mjs
+          tests/required-pr-gate.test.mjs
           tests/security-config.test.mjs
 
   quality:
@@ -294,24 +296,4 @@ jobs:
       CONTAINER_RESULT: ${{ needs.container.result }}
     steps:
       - name: Verify every selected gate passed
-        run: |
-          set -euo pipefail
-          test "${CLASSIFY_RESULT}" = "success"
-          test "${POLICY_RESULT}" = "success"
-          check_selected() {
-            local selected="$1"
-            local result="$2"
-            local name="$3"
-            if [[ "${selected}" == "true" && "${result}" != "success" ]]; then
-              echo "Selected gate ${name} ended as ${result}." >&2
-              exit 1
-            fi
-          }
-          check_selected "${QUALITY_SELECTED}" "${QUALITY_RESULT}" quality
-          check_selected "${SECURITY_JS_SELECTED}" "${SECURITY_JS_RESULT}" security-js
-          check_selected "${WEB_TESTS_SELECTED}" "${WEB_TESTS_RESULT}" web-tests
-          check_selected "${RUST_TESTS_SELECTED}" "${RUST_TESTS_RESULT}" rust-tests
-          check_selected "${RUST_AUDIT_SELECTED}" "${RUST_AUDIT_RESULT}" rust-audit
-          check_selected "${INTEGRATION_SELECTED}" "${INTEGRATION_RESULT}" integration
-          check_selected "${CONTAINER_SELECTED}" "${CONTAINER_RESULT}" container
-          echo "All change-selected policy, quality, security, test, integration, and container gates passed."
+        run: node scripts/verify-required-gates.mjs
