@@ -9,6 +9,10 @@ import { ENGINE_VERSION } from "@/lib/engine/version";
 import { OBJECT_CATALOG } from "@/lib/object-catalog";
 import { compileModelPack } from "@/lib/model-pack";
 import { createCurrentModelPackSource } from "@/lib/reference-model-pack";
+import {
+  EnvironmentAdmissionError,
+  resolveEnvironmentSelection,
+} from "@/lib/study-areas";
 import { finiteNumber, PublicApiError, shortString } from "./public-api";
 
 const domains = new Set(["A2A", "A2G", "G2A", "G2G"]);
@@ -145,6 +149,14 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
     seed: finiteNumber(input.seed, 0, 2_147_483_647, "seed"),
   };
   if (scenario.domain !== template.domain) throw new PublicApiError(409, "scenario_domain_mismatch");
+  try {
+    resolveEnvironmentSelection(scenario);
+  } catch (error) {
+    if (error instanceof EnvironmentAdmissionError) {
+      throw new PublicApiError(400, error.code, error.message);
+    }
+    throw error;
+  }
   catalogObject(scenario.bluePlatformId, scenario.domain, "blue_platform");
   catalogObject(scenario.blueSystemId, scenario.domain, "blue_system");
   catalogObject(scenario.redObjectId, scenario.domain, "red_object");

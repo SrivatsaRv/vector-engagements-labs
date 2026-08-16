@@ -9,6 +9,14 @@ weather assumptions, and `db:governed-data:verify` proves the database matches
 the maintained TypeScript contract before fixture seeding. Runtime requests do
 not create or repair these rows.
 
+Environment selection is fail closed. `studyAreaId` and `weatherPresetId` are
+resolved together before compilation. An unknown area returns
+`ENVIRONMENT_STUDY_AREA_UNKNOWN`; an unknown or cross-area weather preset
+returns `ENVIRONMENT_WEATHER_PRESET_UNKNOWN`. Both errors identify the authored
+field. Compilation and saved-run admission use the same resolver. Defaults are
+allowed only when an operator explicitly creates or changes a draft; they are
+not error recovery for stale or imported identities.
+
 ## Coordinate authority
 
 VECTOR uses the WGS84 ellipsoid (`EPSG:7030`) and the transform contract
