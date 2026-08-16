@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "vector.runtime-stub-ledger.v1",
+  "policyVersion": "1.0.0",
+  "releaseGate": "#39",
+  "programmeGate": "#66",
+  "classifications": [
+    "fixture_only",
+    "explicit_supported_assumption",
+    "replacement_required",
+    "forbidden_silent_fallback"
+  ],
+  "entries": [
+    { "id": "STUB-01", "title": "Duplicate installation catalogue authority", "classification": "replacement_required", "releaseBlocking": true, "owners": ["#61", "#60"], "evidence": ["lib/installations.ts", "scripts/seed-db.ts"], "resolution": "Publish immutable installation datasets in PostGIS and reference their identity from missions." },
+    { "id": "STUB-02", "title": "Base selection drops installation and runway identity", "classification": "replacement_required", "releaseBlocking": true, "owners": ["#60", "#40"], "evidence": ["components/ScenarioAuthoringMap.tsx"], "resolution": "Carry installation and runway identities through draft, compiled mission, VSR, and report." },
+    { "id": "STUB-03", "title": "Installation and runway are collapsed into one row", "classification": "replacement_required", "releaseBlocking": true, "owners": ["#61"], "evidence": ["db/schema.ts"], "resolution": "Create immutable installation and runway versions with evidence and datum fields." },
+    { "id": "STUB-04", "title": "Unknown study area silently becomes North Punjab", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#61", "#60"], "evidence": ["lib/study-areas.ts", "lib/scenario-validation.ts"], "resolution": "Reject unknown or stale environment-pack identities at every admission boundary." },
+    { "id": "STUB-05", "title": "Synthetic regional weather and reference-plane terrain", "classification": "explicit_supported_assumption", "releaseBlocking": true, "owners": ["#61"], "evidence": ["lib/study-areas.ts", "db/migrations/009_governed_study_area_catalog.sql", "lib/geospatial/synthetic-environment.ts"], "resolution": "Replace regional claims with versioned environment packs or label and constrain the synthetic teaching fixture." },
+    { "id": "STUB-06", "title": "Zero geoid, absent airspace, and synthetic terrain samplers", "classification": "fixture_only", "releaseBlocking": true, "owners": ["#61"], "evidence": ["lib/geospatial/vertical-datums.ts", "lib/geospatial/terrain.ts", "lib/geospatial/synthetic-environment.ts"], "resolution": "Admit versioned datum, terrain, and airspace coverage before real-region claims." },
+    { "id": "STUB-07", "title": "Scalar assumption aircraft models", "classification": "explicit_supported_assumption", "releaseBlocking": true, "owners": ["#64"], "evidence": ["lib/simulation-models.ts", "lib/reference-model-pack.ts"], "resolution": "Require independently validated aircraft model-pack fields and fail closed when absent." },
+    { "id": "STUB-08", "title": "Assumption weapon models and powered glide proxy", "classification": "explicit_supported_assumption", "releaseBlocking": true, "owners": ["#28"], "evidence": ["lib/simulation-models.ts"], "resolution": "Replace with variant-specific weapon packs and remove the powered glide proxy." },
+    { "id": "STUB-09", "title": "Database weapon lookup falls back to in-memory models", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#64", "#28"], "evidence": ["lib/simulation-models.ts"], "resolution": "Compile one admitted immutable model pack; reject missing models." },
+    { "id": "STUB-10", "title": "Fixed intent demand and sinusoidal manoeuvre behavior", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#38", "#64"], "evidence": ["lib/engine/compiler.ts", "lib/engine/core.ts"], "resolution": "Use admitted aircraft authority, bounded commands, and achieved dynamics." },
+    { "id": "STUB-11", "title": "Hand-authored RASP confidence and track offsets", "classification": "explicit_supported_assumption", "releaseBlocking": true, "owners": ["#26"], "evidence": ["lib/simulation.ts"], "resolution": "Produce side-owned measurements and tracks from the information engine." },
+    { "id": "STUB-12", "title": "Declared circular sensor and weapon envelopes", "classification": "explicit_supported_assumption", "releaseBlocking": true, "owners": ["#26", "#28", "#41"], "evidence": ["lib/map-layer-contracts.ts"], "resolution": "Render computed sensing, support, and engagement states from the canonical run." },
+    { "id": "STUB-13", "title": "Temporary runtime model-pack adapter", "classification": "replacement_required", "releaseBlocking": true, "owners": ["#64", "#28", "#26"], "evidence": ["lib/runtime/protocol.ts"], "resolution": "Transport the versioned compiled pack and canonical VSR contracts directly." },
+    { "id": "STUB-14", "title": "Playback reconstructs missing WGS84 coordinates", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#41", "#62"], "evidence": ["lib/map-layer-contracts.ts"], "resolution": "Record geographic state or mark the geographic layer unsupported." },
+    { "id": "STUB-15", "title": "Report initializes with simulated example data", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#41", "#32"], "evidence": ["app/report/page.tsx"], "resolution": "Require explicit sample mode; never represent failed saved-run loading as a result." },
+    { "id": "STUB-16", "title": "Source-less public-reference catalogue records", "classification": "replacement_required", "releaseBlocking": true, "owners": ["#66", "#31"], "evidence": ["lib/object-catalog.ts"], "resolution": "Supply field evidence or make the named object unavailable." },
+    { "id": "STUB-17", "title": "Rust legacy runner converts errors into invalid-run records", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#63"], "evidence": ["engine-rust/src/lib.rs"], "resolution": "Return typed errors and prevent invalid records from satisfying success paths." },
+    { "id": "STUB-18", "title": "Weapon behavior inferred from identifiers", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#28"], "evidence": ["lib/simulation.ts"], "resolution": "Load seeker, support, propulsion, guidance, and warning behavior from the admitted weapon variant." },
+    { "id": "STUB-19", "title": "Fixed sensor, warning, intent, and recommit constants", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#26", "#38"], "evidence": ["lib/engine/compiler.ts", "lib/engine/core.ts"], "resolution": "Use admitted sensor and behavior packs with independent validation." },
+    { "id": "STUB-20", "title": "Weapon authorization ignores compiled geometry and support fields", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#28"], "evidence": ["lib/engine/compiler.ts", "lib/engine/core.ts"], "resolution": "Use one geometry and weapon-support contract for launch and flyout." },
+    { "id": "STUB-21", "title": "Intent and support accept arbitrary strings", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#38", "#28"], "evidence": ["lib/engine/contracts.ts", "engine-rust/src/lib.rs"], "resolution": "Use exhaustive typed enums and reject unknown states in both engines." },
+    { "id": "STUB-22", "title": "AEW warning ignores datalink dependency", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#26", "#67"], "evidence": ["lib/engine/compiler.ts"], "resolution": "Gate warning on admitted sensor, track, and datalink state." },
+    { "id": "STUB-23", "title": "No-launch telemetry aliases aircraft as weapon", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#28", "#41"], "evidence": ["lib/simulation.ts"], "resolution": "Represent absent weapon state explicitly." },
+    { "id": "STUB-24", "title": "Disabled-domain routes silently open A2A", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#67", "#40"], "evidence": ["lib/scenarios.ts"], "resolution": "Return an unavailable-domain state from the centralized capability manifest." },
+    { "id": "STUB-25", "title": "Saved-run admission invents causal fields", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#60", "#67"], "evidence": ["app/api/runs/route.ts"], "resolution": "Reject or explicitly migrate incomplete records without invented behavior." },
+    { "id": "STUB-26", "title": "Condition and comparison controls advertise ungoverned runs", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#40", "#41"], "evidence": ["app/lab/page.tsx", "lib/scenarios.ts"], "resolution": "Remove controls until each variant produces a governed canonical run." },
+    { "id": "STUB-27", "title": "Geometry diagram and map layer controls are not canonical consumers", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#41"], "evidence": ["app/lab/page.tsx"], "resolution": "Drive geometry and layer availability from the selected canonical frame." },
+    { "id": "STUB-28", "title": "Active run errors can remain invisible", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#40", "#62"], "evidence": ["app/lab/page.tsx"], "resolution": "Render typed loading, failed, stale, unsupported, and recovery states." },
+    { "id": "STUB-29", "title": "Report export substitutes a generic weapon profile", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#28", "#41"], "evidence": ["lib/report-export.ts"], "resolution": "Reject a report whose run lacks its admitted weapon model identity." }
+  ],
+  "indicatorPolicy": {
+    "roots": ["app", "components", "lib", "engine-rust/src", "db/migrations", "scripts"],
+    "extensions": [".js", ".mjs", ".ts", ".tsx", ".rs", ".sql"],
+    "indicators": [
+      { "id": "unfinished-marker", "expression": "\\b(?:TODO|FIXME|HACK|STUB)\\b", "flags": "i" },
+      { "id": "temporary", "expression": "\\btemporary\\b", "flags": "i" },
+      { "id": "fallback", "expression": "fallback\\w*\\b", "flags": "i" },
+      { "id": "model-assumption", "expression": "MODEL_ASSUMPTION", "flags": "" },
+      { "id": "named-duel-id", "expression": "(?:blue-platform-1|red-object-1)", "flags": "" },
+      { "id": "guidance-hold", "expression": "GUIDANCE_HOLD", "flags": "" },
+      { "id": "sinusoidal-behavior", "expression": "behavior\\.commandedG \\* Math\\.sin", "flags": "" }
+    ],
+    "allowances": [
+      { "path": "scripts/seed-db.ts", "indicator": "model-assumption", "expectedLines": 1, "entryIds": ["STUB-16"] },
+      { "path": "db/migrations/009_governed_study_area_catalog.sql", "indicator": "model-assumption", "expectedLines": 6, "entryIds": ["STUB-05"] },
+      { "path": "engine-rust/src/lib.rs", "indicator": "model-assumption", "expectedLines": 1, "entryIds": ["STUB-07", "STUB-21"] },
+      { "path": "engine-rust/src/lib.rs", "indicator": "fallback", "expectedLines": 2, "entryIds": ["STUB-17"] },
+      { "path": "lib/scenarios.ts", "indicator": "temporary", "expectedLines": 1, "entryIds": ["STUB-26"] },
+      { "path": "lib/study-areas.ts", "indicator": "model-assumption", "expectedLines": 2, "entryIds": ["STUB-05"] },
+      { "path": "lib/simulation-models.ts", "indicator": "model-assumption", "expectedLines": 13, "entryIds": ["STUB-07", "STUB-08"] },
+      { "path": "lib/simulation-models.ts", "indicator": "temporary", "expectedLines": 1, "entryIds": ["STUB-08"] },
+      { "path": "lib/engine/compiler.ts", "indicator": "model-assumption", "expectedLines": 3, "entryIds": ["STUB-07", "STUB-08", "STUB-12"] },
+      { "path": "lib/runtime/protocol.ts", "indicator": "temporary", "expectedLines": 1, "entryIds": ["STUB-13"] },
+      { "path": "lib/map-layer-contracts.ts", "indicator": "fallback", "expectedLines": 2, "entryIds": ["STUB-14"] },
+      { "path": "lib/report-export.ts", "indicator": "fallback", "expectedLines": 2, "entryIds": ["STUB-29"] },
+      { "path": "app/report/page.tsx", "indicator": "fallback", "expectedLines": 6, "entryIds": ["STUB-15"] }
+      ,{ "path": "lib/engine/compiler.ts", "indicator": "named-duel-id", "expectedLines": 2, "entryIds": ["STUB-10"] }
+      ,{ "path": "lib/simulation.ts", "indicator": "named-duel-id", "expectedLines": 2, "entryIds": ["STUB-11", "STUB-23"] }
+      ,{ "path": "engine-rust/src/lib.rs", "indicator": "guidance-hold", "expectedLines": 1, "entryIds": ["STUB-26"] }
+      ,{ "path": "lib/engine/contracts.ts", "indicator": "guidance-hold", "expectedLines": 1, "entryIds": ["STUB-26"] }
+      ,{ "path": "lib/engine/compiler.ts", "indicator": "guidance-hold", "expectedLines": 1, "entryIds": ["STUB-26"] }
+      ,{ "path": "lib/engine/core.ts", "indicator": "guidance-hold", "expectedLines": 1, "entryIds": ["STUB-26"] }
+      ,{ "path": "lib/engine/core.ts", "indicator": "sinusoidal-behavior", "expectedLines": 1, "entryIds": ["STUB-10"] }
+    ],
+    "exemptions": [
+      { "path": "lib/engine/contracts.ts", "indicator": "model-assumption", "expectedLines": 1, "classification": "contract-vocabulary", "rationale": "The enum declares a value state and does not supply a model value." },
+      { "path": "lib/capability-data.ts", "indicator": "model-assumption", "expectedLines": 1, "classification": "contract-vocabulary", "rationale": "The enum declares disclosure vocabulary." },
+      { "path": "lib/capability-data.ts", "indicator": "temporary", "expectedLines": 1, "classification": "operator-disclosure", "rationale": "The text discloses STUB-08 to the operator." },
+      { "path": "components/EngagementMap.tsx", "indicator": "fallback", "expectedLines": 1, "classification": "render-resilience", "rationale": "This comment describes keeping the non-causal map surface usable after initialization failure." },
+      { "path": "app/lab/page.tsx", "indicator": "fallback", "expectedLines": 1, "classification": "fail-closed-assertion", "rationale": "This comment states that engine selection does not silently fall through." },
+      { "path": "app/math/page.tsx", "indicator": "fallback", "expectedLines": 1, "classification": "operator-disclosure", "rationale": "The page labels calculated display values; it does not supply runtime truth." },
+      { "path": "lib/security/public-api.ts", "indicator": "fallback", "expectedLines": 2, "classification": "error-default", "rationale": "The HTTP error helper requires an explicit status default and does not supply causal state." },
+      { "path": "lib/blog.server.ts", "indicator": "fallback", "expectedLines": 3, "classification": "content-default", "rationale": "Reading-time presentation defaults do not enter simulation state." },
+      { "path": "app/blogs/posts/[slug]/page.tsx", "indicator": "fallback", "expectedLines": 2, "classification": "content-default", "rationale": "Markdown rendering defaults do not enter simulation state." }
+      ,{ "path": "scripts/classify-ci-changes.mjs", "indicator": "unfinished-marker", "expectedLines": 3, "classification": "policy-path-name", "rationale": "These expressions select the runtime-stub policy files; they do not mark unfinished production behavior." }
+    ]
+  },
+  "sourcePolicy": {
+    "path": "lib/object-catalog.ts",
+    "entryId": "STUB-16",
+    "expectedSourceLessPublicReferences": 9
+  }
+}

@@ -17,6 +17,9 @@ test("documentation and project skills use only the stable policy gate", () => {
       "docs/repository-governance.md",
       ".codex/skills/vector-lab-harness/SKILL.md",
       "tests/persona-skills.test.mjs",
+      "governance/runtime-stub-ledger.v1.json",
+      "scripts/verify-runtime-stub-ledger.mjs",
+      "tests/runtime-stub-ledger.test.mjs",
     ]),
     ["policy"],
   );

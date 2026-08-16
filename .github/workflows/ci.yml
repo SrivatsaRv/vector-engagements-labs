@@ -61,14 +61,16 @@ jobs:
         with:
           node-version: 22.18.0
       - name: Verify harness, classifier, workflow, deployment, and persona policies
-        run: >-
-          node --test
-          tests/harness-execution.test.mjs
-          tests/ci-change-classifier.test.mjs
-          tests/deployment-config.test.mjs
-          tests/persona-skills.test.mjs
-          tests/required-pr-gate.test.mjs
-          tests/security-config.test.mjs
+        run: |
+          npm run policy:runtime-stubs:verify
+          node --test \
+            tests/harness-execution.test.mjs \
+            tests/ci-change-classifier.test.mjs \
+            tests/deployment-config.test.mjs \
+            tests/persona-skills.test.mjs \
+            tests/required-pr-gate.test.mjs \
+            tests/runtime-stub-ledger.test.mjs \
+            tests/security-config.test.mjs
 
   quality:
     if: needs.classify.outputs.quality == 'true'

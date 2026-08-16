@@ -56,6 +56,14 @@ and rejects missing, cancelled, timed-out or action-required results. Shared
 mission, scenario, environment, model, Worker and recording contracts select
 their TypeScript/Rust parity and integration consumers.
 
+The release gate also consumes
+`governance/runtime-stub-ledger.v1.json`. The ledger records each known causal
+stub, evidence path, owning issue, classification and required resolution.
+`npm run policy:runtime-stubs:verify` fails when an indicator is added, removed,
+renamed or suppressed without updating the ledger. Every current entry remains
+release-blocking until its owning issue replaces the behavior or makes the
+capability explicitly unavailable.
+
 Browser/responsive checks and performance benchmarks are deliberately not run
 on GitHub-hosted pull-request runners. They remain explicit maintainer checks
 through `make integration-local` and `make performance-local`, where the

@@ -7,7 +7,9 @@ const POLICY_ONLY = [
   /^(?:AGENTS|CHANGELOG|CODE_OF_CONDUCT|CONTRIBUTING|GOVERNANCE|NOTICE|README|SECURITY)\.md$/,
   /^(?:LICENSE|NOTICE)$/,
   /^\.github\/(?:CODEOWNERS|pull_request_template\.md)$/,
-  /^tests\/(?:ci-change-classifier|deployment-config|persona-skills|security-config)\.test\.mjs$/,
+  /^governance\/runtime-stub-ledger\.v1\.json$/,
+  /^scripts\/verify-runtime-stub-ledger\.mjs$/,
+  /^tests\/(?:ci-change-classifier|deployment-config|harness-execution|persona-skills|required-pr-gate|runtime-stub-ledger|security-config)\.test\.mjs$/,
 ];
 
 const WORKFLOW_CONTROL = [

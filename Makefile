@@ -77,6 +77,7 @@ clean-clone-local:
 		make ci-local
 
 ci-quality:
+	npm run policy:runtime-stubs:verify
 	npm run symbols:verify
 	npm run models:verify
 	npm run reference-aircraft:verify
