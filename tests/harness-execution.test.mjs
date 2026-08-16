@@ -53,3 +53,15 @@ test("the pull request template requires layer-specific evidence", async () => {
   assert.match(template, /Omitted layers and reasons/);
   assert.match(template, /pushed commit SHA/i);
 });
+
+test("the script-based Required PR Gate checks out the tested revision", async () => {
+  const workflow = await readFile(".github/workflows/ci.yml", "utf8");
+  const gate = workflow.split(/^  gate:/m)[1];
+  assert.ok(gate, "Required PR Gate job is missing");
+  const checkout = gate.indexOf("uses: actions/checkout@");
+  const nodeSetup = gate.indexOf("uses: actions/setup-node@");
+  const verification = gate.indexOf("run: node scripts/verify-required-gates.mjs");
+  assert.ok(checkout >= 0, "Required PR Gate does not check out source");
+  assert.ok(nodeSetup > checkout, "Required PR Gate does not pin Node after checkout");
+  assert.ok(verification > nodeSetup, "Required PR Gate runs before its source and runtime exist");
+});
