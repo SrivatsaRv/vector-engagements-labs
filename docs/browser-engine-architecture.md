@@ -38,11 +38,11 @@ write position back to the engine. See
 
 `lib/engine/contracts.ts` defines the boundary; `compiler.ts` resolves the scenario; `core.ts` integrates it. No loop assumes two, four, or another fixed entity count.
 
-TypeScript is the conformance reference; Rust/WASM is the authored default for
-new interactive scenarios because it passes the current eight-scenario parity
-corpus. “Reference” describes independent verification ownership, not silent
-runtime fallback. The dedicated browser Worker keeps execution away from
-interaction rendering, and neither backend changes scenario or frame schemas.
+TypeScript is the selected engine for the current Cloudflare deployment.
+Rust/WASM passes the current eight-scenario parity corpus and remains an
+independently executable candidate, but it is not admitted by this deployment.
+The dedicated browser Worker keeps execution away from interaction rendering,
+and neither backend changes scenario or frame schemas.
 
 ## Dedicated simulation Worker
 

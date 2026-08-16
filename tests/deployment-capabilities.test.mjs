@@ -44,6 +44,5 @@ test("a scenario cannot select or override the deployment engine", () => {
       error instanceof CapabilityAdmissionError &&
       error.code === "SCENARIO_ENGINE_FORBIDDEN",
   );
-  assert.equal(DEPLOYMENT_CAPABILITIES.engine.id, "rust-wasm");
+  assert.equal(DEPLOYMENT_CAPABILITIES.engine.id, "typescript");
 });
-

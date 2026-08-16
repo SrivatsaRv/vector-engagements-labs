@@ -22,9 +22,10 @@ binds its schema and digest in `manifest.json`.
   visible as future study material, but they have no Run link.
 - A disabled or unknown direct link shows an unavailable state. It never opens
   the default A2A scenario.
-- Rust/WASM is the selected production engine. TypeScript remains available only
-  through an explicitly named verification manifest for parity tests and
-  non-authoritative server-rendered preview frames.
+- TypeScript is the selected production engine for the current Cloudflare
+  deployment. Rust/WASM remains independently executable for parity verification
+  and can replace TypeScript only through a reviewed manifest change after its
+  server packaging is admitted.
 - Terrain, causal sensors, data link, AEW and EW are not admitted. Their deeper
   runtime removal and diagnostics are tracked by #67 and the #66 ledger.
 
@@ -43,4 +44,3 @@ binds its schema and digest in `manifest.json`.
 Ticks do not read files, environment variables, databases or networks. A future
 service-side configuration loader must produce this same manifest and digest;
 it must not add a second capability authority.
-

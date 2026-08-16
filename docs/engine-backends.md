@@ -37,11 +37,12 @@ It is not a separate product mode. Its purpose is controlled parity testing, dia
 
 The selected production backend is owned by the content-addressed
 `DeploymentCapabilityManifest`; it is not a scenario field, URL parameter,
-saved-run preference or browser control. Rust/WASM is selected for the current
-Air deployment. The selected backend is recorded in `EngineRun.diagnostics`,
-the compiled VSR member and the VSR manifest. TypeScript remains independently
-executable through explicit verification manifests for parity and reference
-preview checks. See [`deployment-capabilities.md`](deployment-capabilities.md).
+saved-run preference or browser control. TypeScript is selected for the current
+Cloudflare Air deployment because the present embedded Rust/WASM loader is not
+admitted in the server runtime. The selected backend is recorded in
+`EngineRun.diagnostics`, the compiled VSR member and the VSR manifest. Rust/WASM
+remains independently executable through explicit verification manifests for
+parity checks. See [`deployment-capabilities.md`](deployment-capabilities.md).
 
 ## Build and verification
 
