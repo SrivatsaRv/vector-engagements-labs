@@ -51,6 +51,11 @@ state. A value is marked `recorded`, `computed`, `assumed`, or `unknown`. The
 viewer always prefers recorded values; computed fallback values identify their
 formula version. Map/3D projection is never persisted as model truth.
 
+The current aircraft sample also records the active route-point index, requested
+velocity, accepted steering acceleration, achieved velocity, and limiter state.
+The columnar frame codec preserves these values so replay and live playback use
+the same control evidence without rerunning the engine.
+
 The compiled environment freezes `vector.synthetic-environment.v1` identities
 and SHA-256 digests for transform, geoid, terrain, weather, atmosphere, study
 area, routes, installations and airspace. A viewer may degrade missing optional

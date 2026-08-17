@@ -123,7 +123,17 @@ type FrameColumn =
   | "dragNewtons"
   | "thrustNewtons"
   | "commandedG"
-  | "availableG";
+  | "availableG"
+  | "routePointIndex"
+  | "requestedVelocityX"
+  | "requestedVelocityY"
+  | "requestedVelocityZ"
+  | "acceptedSteeringAccelerationX"
+  | "acceptedSteeringAccelerationY"
+  | "acceptedSteeringAccelerationZ"
+  | "achievedVelocityX"
+  | "achievedVelocityY"
+  | "achievedVelocityZ";
 
 const FRAME_COLUMNS: FrameColumn[] = [
   "positionX",
@@ -142,6 +152,16 @@ const FRAME_COLUMNS: FrameColumn[] = [
   "thrustNewtons",
   "commandedG",
   "availableG",
+  "routePointIndex",
+  "requestedVelocityX",
+  "requestedVelocityY",
+  "requestedVelocityZ",
+  "acceptedSteeringAccelerationX",
+  "acceptedSteeringAccelerationY",
+  "acceptedSteeringAccelerationZ",
+  "achievedVelocityX",
+  "achievedVelocityY",
+  "achievedVelocityZ",
 ];
 
 type EntityMetadata = Pick<
@@ -158,13 +178,19 @@ type EntityMetadata = Pick<
   | "valueState"
 >;
 
+type StoredEntityMetadata = EntityMetadata & {
+  aircraftControlLimiter?: NonNullable<
+    EngineEntityFrame["aircraftControl"]
+  >["limiter"];
+};
+
 type FrameHeader = {
   schemaVersion: typeof VECTOR_FRAME_SCHEMA;
   columns: FrameColumn[];
   frames: Array<
     Omit<EngineFrame, "entities"> & { entityOffset: number; entityCount: number }
   >;
-  entities: EntityMetadata[];
+  entities: StoredEntityMetadata[];
 };
 
 function jsonBytes(value: unknown) {
@@ -187,6 +213,26 @@ function entityColumnValue(entity: EngineEntityFrame, column: FrameColumn) {
   if (column === "velocityX") return entity.velocity.x;
   if (column === "velocityY") return entity.velocity.y;
   if (column === "velocityZ") return entity.velocity.z;
+  if (column === "routePointIndex")
+    return entity.aircraftControl?.routePointIndex ?? Number.NaN;
+  if (column === "requestedVelocityX")
+    return entity.aircraftControl?.requestedVelocityMps.x ?? Number.NaN;
+  if (column === "requestedVelocityY")
+    return entity.aircraftControl?.requestedVelocityMps.y ?? Number.NaN;
+  if (column === "requestedVelocityZ")
+    return entity.aircraftControl?.requestedVelocityMps.z ?? Number.NaN;
+  if (column === "acceptedSteeringAccelerationX")
+    return entity.aircraftControl?.acceptedSteeringAccelerationMps2.x ?? Number.NaN;
+  if (column === "acceptedSteeringAccelerationY")
+    return entity.aircraftControl?.acceptedSteeringAccelerationMps2.y ?? Number.NaN;
+  if (column === "acceptedSteeringAccelerationZ")
+    return entity.aircraftControl?.acceptedSteeringAccelerationMps2.z ?? Number.NaN;
+  if (column === "achievedVelocityX")
+    return entity.aircraftControl?.achievedVelocityMps.x ?? Number.NaN;
+  if (column === "achievedVelocityY")
+    return entity.aircraftControl?.achievedVelocityMps.y ?? Number.NaN;
+  if (column === "achievedVelocityZ")
+    return entity.aircraftControl?.achievedVelocityMps.z ?? Number.NaN;
   return entity[column];
 }
 
@@ -222,6 +268,9 @@ export function encodeColumnarFrames(frames: EngineFrame[]): Uint8Array {
       lifecycle: entity.lifecycle,
       phase: entity.phase,
       valueState: entity.valueState,
+      ...(entity.aircraftControl
+        ? { aircraftControlLimiter: entity.aircraftControl.limiter }
+        : {}),
     })),
   };
   const headerBytes = jsonBytes(header);
@@ -279,7 +328,10 @@ export function decodeColumnarFrames(bytes: Uint8Array): EngineFrame[] {
         Float64Array.BYTES_PER_ELEMENT,
       true,
     );
-  const decodedEntities = header.entities.map((metadata, index): EngineEntityFrame => ({
+  const decodedEntities = header.entities.map((storedMetadata, index): EngineEntityFrame => {
+    const { aircraftControlLimiter, ...metadata } = storedMetadata;
+    const routePointIndex = column("routePointIndex", index);
+    return {
     ...metadata,
     position: {
       x: column("positionX", index),
@@ -301,7 +353,31 @@ export function decodeColumnarFrames(bytes: Uint8Array): EngineFrame[] {
     thrustNewtons: column("thrustNewtons", index),
     commandedG: column("commandedG", index),
     availableG: column("availableG", index),
-  }));
+    ...(aircraftControlLimiter
+      ? {
+          aircraftControl: {
+            routePointIndex: Number.isNaN(routePointIndex) ? null : routePointIndex,
+            requestedVelocityMps: {
+              x: column("requestedVelocityX", index),
+              y: column("requestedVelocityY", index),
+              z: column("requestedVelocityZ", index),
+            },
+            acceptedSteeringAccelerationMps2: {
+              x: column("acceptedSteeringAccelerationX", index),
+              y: column("acceptedSteeringAccelerationY", index),
+              z: column("acceptedSteeringAccelerationZ", index),
+            },
+            achievedVelocityMps: {
+              x: column("achievedVelocityX", index),
+              y: column("achievedVelocityY", index),
+              z: column("achievedVelocityZ", index),
+            },
+            limiter: aircraftControlLimiter,
+          },
+        }
+      : {}),
+  };
+  });
   return header.frames.map(({ entityOffset: offset, entityCount: count, ...frame }) => ({
     ...frame,
     entities: decodedEntities.slice(offset, offset + count),

@@ -163,6 +163,69 @@ test("explicit backend selection never silently falls through", () => {
   );
 });
 
+test("Rust/WASM and TypeScript preserve parity for a turning and climbing route", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", [
+    "A2A",
+  ]);
+  const scenario = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  scenario.durationSeconds = 8;
+  const red = scenario.entities.find((entity) => entity.id === "red-object-1");
+  red.route = [
+    { ...red.initial.position },
+    {
+      x: red.initial.position.x - 5000,
+      y: red.initial.position.y + 5000,
+      z: red.initial.position.z + 1500,
+    },
+  ];
+
+  const typescript = runEngineBackend(structuredClone(scenario), "typescript");
+  const rust = runEngineBackend(structuredClone(scenario), "rust-wasm");
+  const typescriptRed = typescript.frames.at(-1).entities.find(
+    (entity) => entity.id === red.id,
+  );
+  const rustRed = rust.frames.at(-1).entities.find((entity) => entity.id === red.id);
+
+  for (const axis of ["x", "y", "z"]) {
+    close(
+      rustRed.position[axis],
+      typescriptRed.position[axis],
+      1e-6,
+      `route position ${axis}`,
+    );
+    close(
+      rustRed.velocity[axis],
+      typescriptRed.velocity[axis],
+      1e-6,
+      `route velocity ${axis}`,
+    );
+  }
+  assert.equal(
+    rustRed.aircraftControl.routePointIndex,
+    typescriptRed.aircraftControl.routePointIndex,
+  );
+  assert.equal(rustRed.aircraftControl.limiter, typescriptRed.aircraftControl.limiter);
+  for (const vectorName of [
+    "requestedVelocityMps",
+    "acceptedSteeringAccelerationMps2",
+    "achievedVelocityMps",
+  ]) {
+    for (const axis of ["x", "y", "z"]) {
+      close(
+        rustRed.aircraftControl[vectorName][axis],
+        typescriptRed.aircraftControl[vectorName][axis],
+        1e-9,
+        `${vectorName} ${axis}`,
+      );
+    }
+  }
+});
+
 test("scenario compilation fails closed for unknown objects and incompatible loadouts", () => {
   const definition = SCENARIO_LIBRARY[0];
   const profile = getProfile(definition.scenario);
