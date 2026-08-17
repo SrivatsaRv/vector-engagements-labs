@@ -30,7 +30,10 @@ an already running built application; it does not start or silently substitute
 a development server. `make integration-local` validates Compose, builds and
 inspects the non-root production image, starts the authoritative topology,
 verifies governed migration data before fixture admission, covers the live
-PostGIS/API path, and runs automated responsive interaction checks. The image
+PostGIS/API path, and runs automated responsive interaction checks. The
+responsive verifier reads the configuration-owned engine identity from
+`config/deployment-capabilities.json` and requires the observed run to use that
+backend; it must not hardcode a TypeScript or Rust/WASM selection. The image
 inspection rejects missing OCI identity, development `node_modules`, an
 unexpected command, or a root user. These targets remain separate because they
 have different environment and runtime costs.
