@@ -21,6 +21,12 @@ A runnable scenario declares a PostGIS-backed `study_area_id` and a weather pres
 - public-educational environment presets;
 - an explicit data-state label.
 
+An existing draft, import or saved run never falls back to the first study area
+or the area's default weather. Unknown and cross-area identities block
+validation and compilation with a stable field-addressed error. A default
+weather preset is applied only as a visible authoring action when the operator
+selects a valid study area.
+
 Configured authoring positions carry WGS84 longitude/latitude and an explicit
 MSL altitude. Compilation performs the declared geoid operation, converts to
 ECEF, then to the study area's stable local ENU frame. The record retains both

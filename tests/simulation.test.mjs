@@ -43,6 +43,23 @@ test("every configured study area carries its selected weather state into the sc
   }
 });
 
+test("simulation fails closed for unknown environment identities", () => {
+  assert.throws(
+    () => simulate({ ...DEFAULT_SCENARIO, studyAreaId: "unknown-area" }),
+    {
+      code: "ENVIRONMENT_STUDY_AREA_UNKNOWN",
+      fieldPath: "studyAreaId",
+    },
+  );
+  assert.throws(
+    () => simulate({ ...DEFAULT_SCENARIO, weatherPresetId: "unknown-weather" }),
+    {
+      code: "ENVIRONMENT_WEATHER_PRESET_UNKNOWN",
+      fieldPath: "weatherPresetId",
+    },
+  );
+});
+
 test("both horizontal wind components reach the compiled physics environment", () => {
   const scenario = { ...DEFAULT_SCENARIO, wind: 11, windNorth: -13 };
   const result = simulate(scenario);

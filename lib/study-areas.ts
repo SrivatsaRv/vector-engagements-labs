@@ -159,12 +159,59 @@ export const STUDY_AREAS: StudyArea[] = [
   },
 ];
 
-export function getStudyArea(id: string) {
-  return STUDY_AREAS.find((area) => area.id === id) ?? STUDY_AREAS[0];
+export type EnvironmentAdmissionCode =
+  | "ENVIRONMENT_STUDY_AREA_UNKNOWN"
+  | "ENVIRONMENT_WEATHER_PRESET_UNKNOWN";
+
+export class EnvironmentAdmissionError extends Error {
+  readonly code: EnvironmentAdmissionCode;
+  readonly fieldPath: "studyAreaId" | "weatherPresetId";
+  readonly rejectedIdentity: string;
+
+  constructor(
+    code: EnvironmentAdmissionCode,
+    fieldPath: "studyAreaId" | "weatherPresetId",
+    rejectedIdentity: string,
+  ) {
+    super(`${fieldPath} does not identify an admitted environment record.`);
+    this.name = "EnvironmentAdmissionError";
+    this.code = code;
+    this.fieldPath = fieldPath;
+    this.rejectedIdentity = rejectedIdentity;
+  }
 }
 
-export function getWeatherPreset(area: StudyArea, presetId: string) {
-  return area.weatherPresets.find((preset) => preset.id === presetId)
-    ?? area.weatherPresets.find((preset) => preset.id === area.defaultWeatherPresetId)
-    ?? area.weatherPresets[0];
+export function getStudyArea(id: string): StudyArea {
+  const area = STUDY_AREAS.find((candidate) => candidate.id === id);
+  if (!area) {
+    throw new EnvironmentAdmissionError(
+      "ENVIRONMENT_STUDY_AREA_UNKNOWN",
+      "studyAreaId",
+      id,
+    );
+  }
+  return area;
+}
+
+export function getWeatherPreset(area: StudyArea, presetId: string): WeatherPreset {
+  const preset = area.weatherPresets.find((candidate) => candidate.id === presetId);
+  if (!preset) {
+    throw new EnvironmentAdmissionError(
+      "ENVIRONMENT_WEATHER_PRESET_UNKNOWN",
+      "weatherPresetId",
+      presetId,
+    );
+  }
+  return preset;
+}
+
+export function resolveEnvironmentSelection(input: {
+  studyAreaId: string;
+  weatherPresetId: string;
+}) {
+  const studyArea = getStudyArea(input.studyAreaId);
+  return {
+    studyArea,
+    weatherPreset: getWeatherPreset(studyArea, input.weatherPresetId),
+  };
 }

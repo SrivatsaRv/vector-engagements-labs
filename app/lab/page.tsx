@@ -1056,8 +1056,9 @@ function ConfigureWorkspace({
     scenario.altitude,
     scenario.temperatureOffset,
   );
-  const selectedStudyArea =
-    studyAreas.find((area) => area.id === scenario.studyAreaId) ?? studyAreas[0];
+  const selectedStudyArea = studyAreas.find(
+    (area) => area.id === scenario.studyAreaId,
+  );
   const selectedWeather = selectedStudyArea?.weatherPresets.find(
     (preset) => preset.id === scenario.weatherPresetId,
   );

@@ -37,6 +37,26 @@ test("saved-run admission rejects a client-selected engine", () => {
   );
 });
 
+test("saved-run admission does not invent missing environment identity", () => {
+  const unknownArea = {
+    ...structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario),
+    studyAreaId: "unknown-area",
+  };
+  assert.throws(
+    () => validateSavedScenario(unknownArea, DEFAULT_SCENARIO_DEFINITION),
+    { code: "ENVIRONMENT_STUDY_AREA_UNKNOWN" },
+  );
+
+  const unknownWeather = {
+    ...structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario),
+    weatherPresetId: "unknown-weather",
+  };
+  assert.throws(
+    () => validateSavedScenario(unknownWeather, DEFAULT_SCENARIO_DEFINITION),
+    { code: "ENVIRONMENT_WEATHER_PRESET_UNKNOWN" },
+  );
+});
+
 test("saved reports are recomputed from admitted scenario inputs", async () => {
   const verified = await buildVerifiedSavedRun(
     DEFAULT_SCENARIO_DEFINITION.scenario,
