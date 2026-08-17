@@ -166,8 +166,6 @@ export type Scenario = {
   humidityPercent: number;
   temperatureOffset: number;
   spatialPlan?: ScenarioSpatialPlan;
-  guidanceInterruptionAt: number | null;
-  guidanceInterruptionDuration: number;
   lossIncreaseAt: number | null;
   lossIncreaseAmount: number;
   seed: number;
@@ -462,8 +460,6 @@ export const DEFAULT_SCENARIO: Scenario = {
   visibilityKm: 25,
   humidityPercent: 35,
   temperatureOffset: 0,
-  guidanceInterruptionAt: null,
-  guidanceInterruptionDuration: 8,
   lossIncreaseAt: null,
   lossIncreaseAmount: 8,
   seed: 42,
@@ -576,8 +572,6 @@ export function prepareSimulation(
       windEastMps: input.wind,
       windNorthMps: input.windNorth,
       temperatureOffset: input.temperatureOffset,
-      guidanceInterruptionAt: input.guidanceInterruptionAt,
-      guidanceInterruptionDuration: input.guidanceInterruptionDuration,
       windShiftAt: input.lossIncreaseAt,
       windShiftEastMps: input.lossIncreaseAmount,
       windShiftNorthMps: 0,
@@ -815,12 +809,6 @@ export function buildRaspTrack(
   if (!sourceAvailable) confidence = 0;
   confidence -= Math.max(0, rangeKm - 25) * 0.32;
   if (opposingJammer) confidence -= 17;
-  const interrupted =
-    scenario.guidanceInterruptionAt !== null &&
-    frame.t >= scenario.guidanceInterruptionAt &&
-    frame.t <
-      scenario.guidanceInterruptionAt + scenario.guidanceInterruptionDuration;
-  if (interrupted && isBlue) confidence -= 34;
   confidence = Math.round(Math.max(0, Math.min(98, confidence)));
   const uncertaintyMeters = Math.round(
     sourceAvailable
@@ -854,18 +842,8 @@ export function buildRaspTrack(
           : trackSource === "DATALINK"
             ? "Tactical data link"
             : "Visual observation",
-    lastUpdateSeconds:
-      !sourceAvailable
-        ? frame.t
-        : interrupted && isBlue
-        ? Math.max(0, frame.t - (scenario.guidanceInterruptionAt ?? 0))
-        : 0.1,
-    ageSeconds:
-      !sourceAvailable
-        ? frame.t
-        : interrupted && isBlue
-        ? Math.max(0, frame.t - (scenario.guidanceInterruptionAt ?? 0))
-        : 0.1,
+    lastUpdateSeconds: sourceAvailable ? 0.1 : frame.t,
+    ageSeconds: sourceAvailable ? 0.1 : frame.t,
     confidence,
     uncertaintyMeters,
     position,
@@ -874,10 +852,7 @@ export function buildRaspTrack(
     visible: sourceAvailable,
     status,
     availabilityReason: availability.reason,
-    effectScope:
-      interrupted && isBlue
-        ? "AIR_PICTURE_AND_GUIDANCE_EVENT"
-        : "AIR_PICTURE_ONLY",
+    effectScope: "AIR_PICTURE_ONLY",
     stateExplanation: opposingJammer && sourceAvailable
       ? `${availability.explanation} Opposing jamming reduces the VECTOR track-quality index by 17 points.`
       : availability.explanation,

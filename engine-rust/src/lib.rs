@@ -189,8 +189,6 @@ pub enum AtmosphereModel {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum EngineEventType {
-    #[serde(rename = "GUIDANCE_HOLD")]
-    GuidanceHold,
     #[serde(rename = "WIND_SHIFT")]
     WindShift,
 }
@@ -403,8 +401,7 @@ pub struct EngineEvent {
     pub event_type: EngineEventType,
     pub start_seconds: f64,
     pub duration_seconds: f64,
-    pub entity_id: Option<String>,
-    pub vector_mps: Option<Vec3>,
+    pub vector_mps: Vec3,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -609,27 +606,11 @@ fn active_wind(scenario: &EngineScenario, time: f64) -> Vec3 {
                 && time >= event.start_seconds
                 && time < event.start_seconds + event.duration_seconds
             {
-                event
-                    .vector_mps
-                    .map(|vector| wind.add(vector))
-                    .unwrap_or(wind)
+                wind.add(event.vector_mps)
             } else {
                 wind
             }
         })
-}
-
-fn guidance_held(scenario: &EngineScenario, entity_id: &str, time: f64) -> bool {
-    scenario.events.iter().any(|event| {
-        event.event_type == EngineEventType::GuidanceHold
-            && event
-                .entity_id
-                .as_deref()
-                .map(|id| id == entity_id)
-                .unwrap_or(true)
-            && time >= event.start_seconds
-            && time < event.start_seconds + event.duration_seconds
-    })
 }
 
 fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f64, dt: f64) {
@@ -904,13 +885,12 @@ fn update_weapon(
     let update_due = terminal
         || time - state.last_guidance_update_seconds
             >= weapon.datalink_update_seconds * update_multiplier;
-    let held = guidance_held(scenario, &state.definition.id, time);
-    let guidance = if held || !update_due {
+    let guidance = if !update_due {
         state.last_guidance_acceleration
     } else {
         unclamped.clamp_magnitude(weapon.maximum_command_g * G0)
     };
-    if !held && update_due {
+    if update_due {
         state.last_guidance_acceleration = guidance;
         state.last_guidance_update_seconds = time;
     }
@@ -1579,6 +1559,26 @@ mod tests {
     fn scenario_json_rejects_unknown_typed_state() -> Result<(), Box<dyn std::error::Error>> {
         let mut input = serde_json::to_value(scenario())?;
         input["domain"] = serde_json::Value::String("NAVAL".to_string());
+        let encoded = serde_json::to_string(&input)?;
+        assert!(matches!(
+            run_json(&encoded),
+            Err(EngineError::InvalidJson(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn scenario_json_rejects_removed_guidance_hold_event() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let mut input = serde_json::to_value(scenario())?;
+        let removed_event_type = ["GUIDANCE", "HOLD"].join("_");
+        input["events"] = serde_json::json!([{
+            "id": "removed-condition",
+            "type": removed_event_type,
+            "startSeconds": 1.0,
+            "durationSeconds": 8.0,
+            "vectorMps": { "x": 0.0, "y": 0.0, "z": 0.0 }
+        }]);
         let encoded = serde_json::to_string(&input)?;
         assert!(matches!(
             run_json(&encoded),

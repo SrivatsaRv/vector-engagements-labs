@@ -163,11 +163,10 @@ export type EngineScenario = {
   };
   events: Array<{
     id: string;
-    type: "GUIDANCE_HOLD" | "WIND_SHIFT";
+    type: "WIND_SHIFT";
     startSeconds: number;
     durationSeconds: number;
-    entityId?: string;
-    vectorMps?: Vec3;
+    vectorMps: Vec3;
   }>;
 };
 

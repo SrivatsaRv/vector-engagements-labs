@@ -38,7 +38,6 @@ export function isScenarioDefinition(value: unknown): value is ScenarioDefinitio
       Array.isArray(candidate.tags) &&
       Array.isArray(candidate.focusOptions) &&
       candidate.runVariants?.length === 3 &&
-      candidate.preparedEvent &&
       candidate.scenario &&
       candidate.scenario.domain === candidate.domain &&
       candidate.scenario.name &&

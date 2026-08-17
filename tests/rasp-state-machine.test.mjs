@@ -160,32 +160,6 @@ test("each side's local source controls are isolated from the opposing RASP", ()
   assert.deepEqual(buildRaspTrack(pafLocalChange, frame, "IAF"), baselineIaf);
 });
 
-test("track-information interruption uses exact half-open state boundaries", () => {
-  const result = simulate(DEFAULT_SCENARIO);
-  const base = getFrameAt(result, 12);
-  const scenario = {
-    ...DEFAULT_SCENARIO,
-    guidanceInterruptionAt: 10,
-    guidanceInterruptionDuration: 8,
-  };
-  const samples = [
-    [9.999, "AIR_PICTURE_ONLY"],
-    [10, "AIR_PICTURE_AND_GUIDANCE_EVENT"],
-    [17.999, "AIR_PICTURE_AND_GUIDANCE_EVENT"],
-    [18, "AIR_PICTURE_ONLY"],
-    [18.001, "AIR_PICTURE_ONLY"],
-  ];
-  for (const [t, scope] of samples) {
-    const track = buildRaspTrack(scenario, { ...base, t }, "IAF");
-    assert.equal(track.effectScope, scope);
-    assert.equal(track.ageSeconds > 0.1, scope === "AIR_PICTURE_AND_GUIDANCE_EVENT" && t > 10.1);
-  }
-  assert.equal(
-    buildRaspTrack(scenario, { ...base, t: 12 }, "PAF").effectScope,
-    "AIR_PICTURE_ONLY",
-  );
-});
-
 test("all offered Blue and Red decision pairs are finite, deterministic, and declared", () => {
   const blueDecisions = ["PRESS", "SUPPORT_WEAPON", "CRANK", "DEFEND", "DISENGAGE"];
   const redDecisions = ["PRESS", "CRANK", "DEFEND", "DISENGAGE"];

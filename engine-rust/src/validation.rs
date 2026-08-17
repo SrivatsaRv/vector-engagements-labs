@@ -489,20 +489,11 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
             return Err(invalid(format!("duplicate event id {}", event.id)));
         }
         non_negative(&format!("{root}.startSeconds"), event.start_seconds)?;
-        non_negative(&format!("{root}.durationSeconds"), event.duration_seconds)?;
+        positive(&format!("{root}.durationSeconds"), event.duration_seconds)?;
         if event.start_seconds + event.duration_seconds > scenario.duration_seconds {
             return Err(invalid(format!("{root} extends beyond scenario duration")));
         }
-        if let Some(entity_id) = &event.entity_id {
-            if !entity_ids.contains(entity_id.as_str()) {
-                return Err(invalid(format!(
-                    "{root} references missing entity {entity_id}"
-                )));
-            }
-        }
-        if let Some(value) = event.vector_mps {
-            vector(&format!("{root}.vectorMps"), value)?;
-        }
+        vector(&format!("{root}.vectorMps"), event.vector_mps)?;
     }
 
     Ok(())

@@ -182,15 +182,6 @@ export function validateScenario(
       state: "pass",
     },
     {
-      id: "prepared-condition",
-      label: "Prepared condition has an explicit effect",
-      detail:
-        definition.preparedEvent.physicsEffect === "guidance-hold"
-          ? "When applied, Blue guidance holds the last line-of-sight command for eight model seconds and the IAF RASP track ages."
-          : "When applied, the eastward wind component increases by 8 m/s from the selected model time.",
-      state: "pass",
-    },
-    {
       id: "provenance",
       label: "Sources, assumptions, and versions will be frozen with the run",
       detail: `${definition.id}@${definition.version} · ${ENGINE_VERSION} · ${simulationModel?.id ?? "model unavailable"}@${simulationModel?.version ?? "unknown"}`,

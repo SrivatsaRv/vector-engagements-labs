@@ -56,7 +56,6 @@
       { "path": "db/migrations/009_governed_study_area_catalog.sql", "indicator": "model-assumption", "expectedLines": 6, "entryIds": ["STUB-05"] },
       { "path": "engine-rust/src/lib.rs", "indicator": "model-assumption", "expectedLines": 1, "entryIds": ["STUB-07", "STUB-21"] },
       { "path": "engine-rust/src/lib.rs", "indicator": "fallback", "expectedLines": 2, "entryIds": ["STUB-17"] },
-      { "path": "lib/scenarios.ts", "indicator": "temporary", "expectedLines": 1, "entryIds": ["STUB-26"] },
       { "path": "lib/study-areas.ts", "indicator": "model-assumption", "expectedLines": 2, "entryIds": ["STUB-05"] },
       { "path": "lib/simulation-models.ts", "indicator": "model-assumption", "expectedLines": 13, "entryIds": ["STUB-07", "STUB-08"] },
       { "path": "lib/simulation-models.ts", "indicator": "temporary", "expectedLines": 1, "entryIds": ["STUB-08"] },
@@ -67,10 +66,6 @@
       { "path": "app/report/page.tsx", "indicator": "fallback", "expectedLines": 6, "entryIds": ["STUB-15"] }
       ,{ "path": "lib/engine/compiler.ts", "indicator": "named-duel-id", "expectedLines": 2, "entryIds": ["STUB-10"] }
       ,{ "path": "lib/simulation.ts", "indicator": "named-duel-id", "expectedLines": 2, "entryIds": ["STUB-11", "STUB-23"] }
-      ,{ "path": "engine-rust/src/lib.rs", "indicator": "guidance-hold", "expectedLines": 1, "entryIds": ["STUB-26"] }
-      ,{ "path": "lib/engine/contracts.ts", "indicator": "guidance-hold", "expectedLines": 1, "entryIds": ["STUB-26"] }
-      ,{ "path": "lib/engine/compiler.ts", "indicator": "guidance-hold", "expectedLines": 1, "entryIds": ["STUB-26"] }
-      ,{ "path": "lib/engine/core.ts", "indicator": "guidance-hold", "expectedLines": 1, "entryIds": ["STUB-26"] }
     ],
     "exemptions": [
       { "path": "lib/engine/contracts.ts", "indicator": "model-assumption", "expectedLines": 1, "classification": "contract-vocabulary", "rationale": "The enum declares a value state and does not supply a model value." },

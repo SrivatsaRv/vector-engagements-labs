@@ -208,7 +208,6 @@ function LabWorkbench({
       detail: `${definition.title} · template ${definition.version}`,
     },
   ]);
-  const [conditionArmed, setConditionArmed] = useState(false);
   const [savedRunId, setSavedRunId] = useState<string | null>(null);
   const [draftRevision, setDraftRevision] = useState(0);
   const [runDraftRevision, setRunDraftRevision] = useState<number | null>(null);
@@ -494,56 +493,6 @@ function LabWorkbench({
           ),
     [frame, scenario, viewMode],
   );
-  const guidanceInterruptionRemaining =
-    scenario.guidanceInterruptionAt !== null &&
-    time >= scenario.guidanceInterruptionAt &&
-    time < scenario.guidanceInterruptionAt + scenario.guidanceInterruptionDuration
-      ? scenario.guidanceInterruptionAt +
-        scenario.guidanceInterruptionDuration -
-        time
-      : null;
-  const injectCondition = async () => {
-    const changed =
-      definition.preparedEvent.physicsEffect === "guidance-hold"
-        ? {
-            ...scenario,
-            guidanceInterruptionAt: time,
-            guidanceInterruptionDuration: definition.preparedEvent.duration,
-          }
-        : { ...scenario, lossIncreaseAt: time, lossIncreaseAmount: 8 };
-    setScenario(changed);
-    try {
-      setRuntimeState("initialization");
-      const completion = await simulationClient.run(changed, changed.profile, {
-        onState: setRuntimeState,
-        onProgress: ({ progress }) => setRunProgress(progress),
-      });
-      setResult(completion.result);
-    } catch (error) {
-      if (error instanceof BrowserSimulationCancelledError) {
-        setRuntimeState("ready");
-        setSaveError("Condition run cancelled.");
-        return;
-      }
-      setRuntimeState("failed");
-      setSaveError(error instanceof Error ? error.message : "Condition run failed.");
-      return;
-    }
-    setConditionArmed(false);
-    setComparison(null);
-    setSavedRunId(null);
-    setSaveError(null);
-    setEvents((items) => [
-      ...items,
-      {
-        id: Date.now(),
-        time,
-        type: "fault",
-        title: definition.preparedEvent.title,
-        detail: definition.preparedEvent.description,
-      },
-    ]);
-  };
   const addObservation = () =>
     setEvents((items) => [
       ...items,
@@ -586,7 +535,6 @@ function LabWorkbench({
   const resetRun = async () => {
     const baseline = {
       ...scenario,
-      guidanceInterruptionAt: null,
       lossIncreaseAt: null,
     };
     setScenario(baseline);
@@ -778,25 +726,6 @@ function LabWorkbench({
               <strong>Run 01 · {playing ? "Playing" : "Paused"}</strong>
             </div>
             <section>
-              <h2>Condition injection</h2>
-              <button
-                className={conditionArmed ? "fault active" : "fault"}
-                onClick={() => setConditionArmed((value) => !value)}
-              >
-                <TriangleAlert size={15} />
-                <span>
-                  <strong>{definition.preparedEvent.title}</strong>
-                  <small>{definition.preparedEvent.description}</small>
-                </span>
-                <em>{conditionArmed ? "ARMED" : "AVAILABLE"}</em>
-              </button>
-              {conditionArmed && (
-                <button className="inject" onClick={injectCondition}>
-                  Apply at {time.toFixed(1)} s
-                </button>
-              )}
-            </section>
-            <section>
               <h2>Run tools</h2>
               <button className="tool-button" onClick={addObservation}>
                 <Flag size={15} />
@@ -832,11 +761,6 @@ function LabWorkbench({
                 <strong>
                   {blueSystem.designation} · {scenario.guidance} path
                 </strong>
-                {guidanceInterruptionRemaining !== null && (
-                  <em className="active-state-notice">
-                    Guidance update hold · {guidanceInterruptionRemaining.toFixed(1)} s remaining
-                  </em>
-                )}
               </div>
               {scenario.domain === "A2A" && (
                 <div className="picture-switch" aria-label="Air picture view">
@@ -1912,15 +1836,6 @@ function ConfigureWorkspace({
               it with the preset northward wind and subtracts that wind vector
               from ground velocity to calculate aerodynamic drag.
             </p>
-            <article className="prepared-event">
-              <TriangleAlert size={17} />
-              <div>
-                <span>AVAILABLE DURING RUN</span>
-                <strong>{definition.preparedEvent.title}</strong>
-                <p>{definition.preparedEvent.description}</p>
-              </div>
-              <em>PHYSICS EFFECT</em>
-            </article>
           </section>
         )}
         {step === 4 && (
@@ -1967,8 +1882,7 @@ function ConfigureWorkspace({
                 <p>
                   {scenario.domain === "A2A"
                     ? `Blue ${scenario.blueDecision.replaceAll("_", " ").toLowerCase()} · Red ${scenario.redDecision.replaceAll("_", " ").toLowerCase()} · IAF track from ${scenario.blueTrackSource.replaceAll("_", " ").toLowerCase()}`
-                    : `${definition.targetMotion === "fixed" ? "Fixed objective" : `Red ${scenario.maneuver}`} · east–west wind ${scenario.wind} m/s`}{" "}
-                  · {definition.preparedEvent.title} available
+                    : `${definition.targetMotion === "fixed" ? "Fixed objective" : `Red ${scenario.maneuver}`} · east–west wind ${scenario.wind} m/s`}
                 </p>
                 <button onClick={() => setStep(3)}>Edit conditions</button>
               </div>

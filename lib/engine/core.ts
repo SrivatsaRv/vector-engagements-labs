@@ -81,20 +81,6 @@ function activeWind(scenario: EngineScenario, time: number) {
   );
 }
 
-function guidanceHeld(
-  scenario: EngineScenario,
-  entityId: string,
-  time: number,
-) {
-  return scenario.events.some(
-    (event) =>
-      event.type === "GUIDANCE_HOLD" &&
-      (!event.entityId || event.entityId === entityId) &&
-      time >= event.startSeconds &&
-      time < event.startSeconds + event.durationSeconds,
-  );
-}
-
 function updateKinematicEntity(
   state: RuntimeState,
   scenario: EngineScenario,
@@ -371,15 +357,10 @@ function updateWeapon(
     terminalGuidance ||
     time - state.lastGuidanceUpdateSeconds >=
       weapon.datalinkUpdateSeconds * updateMultiplier;
-  const holdGuidance = guidanceHeld(
-    scenario,
-    state.definition.id,
-    time,
-  );
-  const guidanceAcceleration = holdGuidance || !guidanceUpdateDue
+  const guidanceAcceleration = !guidanceUpdateDue
     ? state.lastGuidanceAcceleration
     : clampMagnitude(unclampedGuidance, maximumAcceleration);
-  if (!holdGuidance && guidanceUpdateDue) {
+  if (guidanceUpdateDue) {
     state.lastGuidanceAcceleration = guidanceAcceleration;
     state.lastGuidanceUpdateSeconds = time;
   }
@@ -528,6 +509,26 @@ export class EngineSession {
 
   constructor(scenario: EngineScenario) {
     this.scenario = scenario;
+    for (const [index, event] of scenario.events.entries()) {
+      const values = [
+        event.startSeconds,
+        event.durationSeconds,
+        event.vectorMps.x,
+        event.vectorMps.y,
+        event.vectorMps.z,
+      ];
+      if (values.some((value) => !Number.isFinite(value))) {
+        throw new Error(`Engine event ${index} contains a non-finite value.`);
+      }
+      if (event.startSeconds < 0 || event.durationSeconds <= 0) {
+        throw new Error(
+          `Engine event ${index} requires a non-negative start and positive duration.`,
+        );
+      }
+      if (event.type !== "WIND_SHIFT") {
+        throw new Error(`Unsupported engine event type at index ${index}.`);
+      }
+    }
     const unmodeledAircraft = scenario.entities.find(
       (entity) => entity.kind === "AIRCRAFT" && !entity.aircraft,
     );

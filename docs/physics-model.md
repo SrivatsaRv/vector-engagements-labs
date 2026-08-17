@@ -15,7 +15,7 @@ Vector currently uses a deterministic three-dimensional point-mass reference eng
 - proportional-navigation acceleration demand with command limits;
 - deterministic execution of authored airborne route points;
 - G2G commanded cruise altitude, with a terminal blend to objective elevation for direct paths and a higher commanded apex for lofted paths;
-- guidance-hold and wind-shift events;
+- governed wind-shift events;
 - closest approach, completion, energy/time termination, non-finite-state checks, and dry-mass margin diagnostics.
 
 The current scalar coefficients remain in versioned `simulation_models` rows for
@@ -35,6 +35,10 @@ the trim-propagation and evidence pipeline, not an upgrade to the operational
 scenario flight model. See [`public-aircraft-reference.md`](public-aircraft-reference.md).
 
 Aircraft motion uses the same standard atmosphere and wind field as a launched vehicle. The current aircraft coefficient set resolves dynamic pressure, load-factor lift demand, parasitic and induced drag, available thrust, fuel flow, mass, and the steering limit on every fixed step. Aircraft admission requires initial mass to equal admitted empty mass, initial fuel, and the launch mass of every linked stowed store. Fuel burn cannot reduce mass below empty mass plus installed-store mass. Release removes the store identity and its declared launch mass once, and the weapon inherits launcher position, velocity, and heading. The engine steers the velocity vector towards the next authored three-dimensional route point. It records the requested velocity, accepted steering acceleration, achieved velocity, active route-point index, load-factor limiter state, store mass, and installed-store identities. It does not use the scenario intent label to invent a turn or a permanent circular path. An aircraft without an admitted aircraft model is rejected. This is an educational point-mass route executor, not a flight-manual or manufacturer engine deck.
+
+The runtime accepts only the governed wind-shift event. The removed guidance-hold
+experiment cannot enter TypeScript, Rust/WASM, saved-run, RASP, report, or browser
+state. Information loss will return only through the typed #26/#28 support path.
 
 Sensor and air-defence envelopes are scenario-declared volumes and are explicitly
 labeled `DECLARED`. Detection, tracking, engagement, and minimum-range rings

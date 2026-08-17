@@ -54,8 +54,6 @@ export type ScenarioCompilerInput = {
   windEastMps: number;
   windNorthMps: number;
   temperatureOffset: number;
-  guidanceInterruptionAt: number | null;
-  guidanceInterruptionDuration: number;
   windShiftAt: number | null;
   windShiftEastMps: number;
   windShiftNorthMps: number;
@@ -521,17 +519,6 @@ export function compileScenario(
     },
     completion: { distanceMeters: 180 },
     events: [
-      ...(input.guidanceInterruptionAt === null
-        ? []
-        : [
-            {
-              id: "guidance-hold-1",
-              type: "GUIDANCE_HOLD" as const,
-              startSeconds: input.guidanceInterruptionAt,
-              durationSeconds: input.guidanceInterruptionDuration,
-              entityId: blueWeapon.id,
-            },
-          ]),
       ...(input.windShiftAt === null
         ? []
         : [

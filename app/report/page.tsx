@@ -460,12 +460,6 @@ export default function ReportPage() {
                     <dd>{scenario.targetSpeed === 0 ? "fixed" : "moving"}</dd>
                     <dt>Eastward wind velocity</dt>
                     <dd>{scenario.wind} m/s</dd>
-                    <dt>Guidance interruption</dt>
-                    <dd>
-                      {scenario.guidanceInterruptionAt == null
-                        ? "not applied"
-                        : `applied at ${scenario.guidanceInterruptionAt.toFixed(1)} s`}
-                    </dd>
                     <dt>Wind shift</dt>
                     <dd>
                       {scenario.lossIncreaseAt == null
