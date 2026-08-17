@@ -15,9 +15,12 @@ VECTOR separates the engine's model truth from each side's estimated air picture
 | Opposing jammer on/off | Subtracts 17 points from VECTOR's track-quality index | Larger uncertainty and potentially degraded/coasting status | None |
 | Blue Team decision | Always available | Decision appears in run and report | Changes Blue aircraft maneuver and weapon-update cadence |
 | Red Team decision | Always available | Decision appears in run and report | Scales Red aircraft maneuver demand |
-| Track-information interruption | Event applied during a run | IAF track ages and its quality/uncertainty deteriorate | Blue weapon holds its last guidance command for the declared duration |
 
 The current track-quality index is an educational VECTOR state variable. It is not detection probability, intelligence confidence, or a measured sensor-performance value.
+
+The workbench does not provide a track-interruption control. The engine does not
+accept a guidance-hold event. A future update-loss study must use the typed
+observation, track, and weapon-support contracts owned by issues #26 and #28.
 
 ## Source state transitions
 
@@ -34,8 +37,6 @@ SOURCE SELECTED
        └─ quality < 30 ────────────────────> COASTING
 ```
 
-Interruption boundaries are half-open: the event is active at `start <= t < start + duration`. The exact end time returns to the source-derived state.
-
 ## Regression matrix
 
 The automated matrix is generated in `tests/rasp-state-machine.test.mjs` and covers:
@@ -44,7 +45,6 @@ The automated matrix is generated in `tests/rasp-state-machine.test.mjs` and cov
 - source dependency invariants for IAF and PAF independently;
 - visual-acquisition boundaries immediately below, at and above selected visibility;
 - radar boundary immediately below, at and above 120 km;
-- interruption before, at start, during, at exact end and after the event;
 - 5 Blue decisions × 4 Red decisions for deterministic, finite frames and declared motion/guidance effects;
 - isolation: a side's radar and data link cannot change the other side's picture; only the opposing jammer may degrade it;
 - truth invariance: RASP-only controls cannot move model-truth entities or alter the engagement outcome.

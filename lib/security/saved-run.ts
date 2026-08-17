@@ -142,8 +142,6 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
     humidityPercent: finiteNumber(input.humidityPercent, 0, 100, "humidity"),
     temperatureOffset: finiteNumber(input.temperatureOffset, -80, 80, "temperature_offset"),
     spatialPlan: spatialPlan(input.spatialPlan),
-    guidanceInterruptionAt: optionalTime(input.guidanceInterruptionAt, "guidance_interruption_at"),
-    guidanceInterruptionDuration: finiteNumber(input.guidanceInterruptionDuration, 0, 60, "guidance_interruption_duration"),
     lossIncreaseAt: optionalTime(input.lossIncreaseAt, "wind_shift_at"),
     lossIncreaseAmount: finiteNumber(input.lossIncreaseAmount, -150, 150, "wind_shift"),
     seed: finiteNumber(input.seed, 0, 2_147_483_647, "seed"),

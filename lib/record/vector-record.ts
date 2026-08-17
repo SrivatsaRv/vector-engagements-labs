@@ -397,7 +397,6 @@ function stableEvents(result: SimulationResult): VectorRecordEvent[] {
       schemaVersion: VECTOR_EVENT_SCHEMA,
       t: event.startSeconds,
       type: "ENGINE_INPUT",
-      entityId: event.entityId,
       detail: `${event.type}:${event.id}`,
     });
   }

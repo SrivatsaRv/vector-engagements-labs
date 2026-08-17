@@ -19,12 +19,6 @@ export type FocusOption = {
   description: string;
   objective: string;
 };
-export type PreparedEvent = {
-  title: string;
-  description: string;
-  duration: number;
-  physicsEffect: "guidance-hold" | "loss-increase";
-};
 export type RunVariant = { title: string; description: string };
 
 export type ScenarioDefinition = {
@@ -45,7 +39,6 @@ export type ScenarioDefinition = {
   targetMotion: "moving" | "fixed";
   environment: string;
   focusOptions: FocusOption[];
-  preparedEvent: PreparedEvent;
   runVariants: [RunVariant, RunVariant, RunVariant];
   presetRationale: { profile: string; geometry: string; conditions: string };
   scenario: Scenario;
@@ -118,11 +111,11 @@ const movingFocus: FocusOption[] = [
       "Measure how target maneuver changes closing distance and intercept demand.",
   },
   {
-    title: "Tracking interruption",
+    title: "Route contrast",
     description:
-      "Measure how an eight-second loss of updated target position changes the run.",
+      "Compare how an authored route changes aircraft position and intercept geometry.",
     objective:
-      "Measure how a temporary loss of updated target position changes the result.",
+      "Measure how an authored route changes aircraft position and intercept geometry.",
   },
 ];
 const fixedFocus: FocusOption[] = [
@@ -146,26 +139,11 @@ const fixedFocus: FocusOption[] = [
       "Measure how an east–west wind changes flight time and terminal speed.",
   },
 ];
-const trackEvent: PreparedEvent = {
-  title: "Track-information interruption",
-  description:
-    "For eight model seconds, guidance holds the last available line-of-sight command instead of receiving updates.",
-  duration: 8,
-  physicsEffect: "guidance-hold",
-};
-const navigationEvent: PreparedEvent = {
-  title: "Wind shift",
-  description:
-    "From the selected model time onward, the eastward wind component increases by 8 m/s.",
-  duration: 0,
-  physicsEffect: "loss-increase",
-};
 const movingRuns: [RunVariant, RunVariant, RunVariant] = [
   { title: "Baseline", description: "Configured geometry and target behavior" },
   {
-    title: "Information interruption",
-    description:
-      "Repeat the run with an eight-second guidance-information hold",
+    title: "Short-range profile",
+    description: "Repeat the run with the short-range study profile",
   },
   {
     title: "Higher target demand",
@@ -206,7 +184,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     targetMotion: "moving",
     environment: "Standard atmosphere · no terrain model",
     focusOptions: movingFocus,
-    preparedEvent: trackEvent,
     runVariants: movingRuns,
     presetRationale: {
       profile:
@@ -249,7 +226,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     targetMotion: "moving",
     environment: "Standard atmosphere · no terrain model",
     focusOptions: movingFocus,
-    preparedEvent: trackEvent,
     runVariants: movingRuns,
     presetRationale: {
       profile:
@@ -297,7 +273,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     targetMotion: "fixed",
     environment: "Standard atmosphere · fixed objective · no terrain masking",
     focusOptions: fixedFocus,
-    preparedEvent: navigationEvent,
     runVariants: fixedRuns,
     presetRationale: {
       profile:
@@ -349,7 +324,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     environment:
       "Standard atmosphere · fixed objective · air-defence response not calculated",
     focusOptions: fixedFocus,
-    preparedEvent: navigationEvent,
     runVariants: fixedRuns,
     presetRationale: {
       profile:
@@ -400,7 +374,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     targetMotion: "moving",
     environment: "Standard atmosphere · one active air-defence layer",
     focusOptions: movingFocus,
-    preparedEvent: trackEvent,
     runVariants: movingRuns,
     presetRationale: {
       profile:
@@ -451,7 +424,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     targetMotion: "moving",
     environment: "Standard atmosphere · one active layer resolved per run",
     focusOptions: movingFocus,
-    preparedEvent: trackEvent,
     runVariants: movingRuns,
     presetRationale: {
       profile:
@@ -502,7 +474,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     targetMotion: "fixed",
     environment: "Standard atmosphere · fixed objective · no terrain model",
     focusOptions: fixedFocus,
-    preparedEvent: navigationEvent,
     runVariants: fixedRuns,
     presetRationale: {
       profile:
@@ -555,7 +526,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     environment:
       "Standard atmosphere · fixed objective · defence interaction not modeled",
     focusOptions: fixedFocus,
-    preparedEvent: navigationEvent,
     runVariants: fixedRuns,
     presetRationale: {
       profile:

@@ -450,17 +450,6 @@ test("surface-strike validation blocks a zero cruise altitude", () => {
   assert.equal(canConduct(checks), false);
 });
 
-test("prepared guidance interruption changes a run without corrupting state", () => {
-  const baseline = simulate(DEFAULT_SCENARIO);
-  const interrupted = simulate({
-    ...DEFAULT_SCENARIO,
-    guidanceInterruptionAt: 8,
-    guidanceInterruptionDuration: 12,
-  });
-  assert.notEqual(interrupted.closestApproach, baseline.closestApproach);
-  assert.equal(interrupted.engineRun.diagnostics.nonFiniteStateCount, 0);
-});
-
 test("extreme declared conditions remain finite and deterministic", () => {
   const scenario = {
     ...DEFAULT_SCENARIO,

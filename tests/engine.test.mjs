@@ -139,6 +139,28 @@ test("generic engine updates every spawned entity deterministically", () => {
   assert.ok(first.closestApproachM < 10000);
 });
 
+test("engine rejects removed and malformed runtime events", () => {
+  const removed = admitTestAircraft(testScenario());
+  removed.events = [{
+    id: "removed-condition",
+    type: "GUIDANCE_HOLD",
+    startSeconds: 1,
+    durationSeconds: 8,
+    vectorMps: { x: 0, y: 0, z: 0 },
+  }];
+  assert.throws(() => runEngine(removed), /Unsupported engine event type/);
+
+  const malformed = admitTestAircraft(testScenario());
+  malformed.events = [{
+    id: "bad-wind-shift",
+    type: "WIND_SHIFT",
+    startSeconds: 1,
+    durationSeconds: 0,
+    vectorMps: { x: 8, y: 0, z: 0 },
+  }];
+  assert.throws(() => runEngine(malformed), /positive duration/);
+});
+
 test("engine entity count is supplied by the scenario, not fixed in code", () => {
   const scenario = admitTestAircraft(testScenario());
   scenario.entities.push({

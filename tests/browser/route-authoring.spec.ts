@@ -148,5 +148,7 @@ test("route inputs fail visibly, recover, and drive the real Worker run", async 
   } else {
     await expect(page.getByText(/Run 01 · (Playing|Paused)/i)).toBeVisible({ timeout: 30_000 });
   }
+  await expect(page.getByText("Condition injection", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Track-information interruption", { exact: true })).toHaveCount(0);
   expect(runtimeErrors).toEqual([]);
 });
