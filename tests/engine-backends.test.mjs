@@ -226,6 +226,50 @@ test("Rust/WASM and TypeScript preserve parity for a turning and climbing route"
   }
 });
 
+test("Rust/WASM and TypeScript preserve aircraft store-mass transfer at release", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", [
+    "A2A",
+  ]);
+  const scenario = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  scenario.durationSeconds = 4;
+  const weapon = scenario.entities.find((entity) => entity.weapon);
+  assert.ok(weapon?.weapon);
+  weapon.weapon.launchTimeSeconds = 2;
+  const launcherId = weapon.weapon.launchPlatformId;
+
+  const typescript = runEngineBackend(structuredClone(scenario), "typescript");
+  const rust = runEngineBackend(structuredClone(scenario), "rust-wasm");
+  for (const sampleTime of [1.5, 2, 3]) {
+    const typescriptFrame = typescript.frames.find((frame) => frame.t >= sampleTime);
+    const rustFrame = rust.frames.find((frame) => frame.t >= sampleTime);
+    const typescriptLauncher = typescriptFrame.entities.find(
+      (entity) => entity.id === launcherId,
+    );
+    const rustLauncher = rustFrame.entities.find((entity) => entity.id === launcherId);
+    close(
+      rustLauncher.massKg,
+      typescriptLauncher.massKg,
+      1e-8,
+      `launcher mass at ${sampleTime} s`,
+    );
+    close(
+      rustLauncher.storeMassKg,
+      typescriptLauncher.storeMassKg,
+      1e-8,
+      `store mass at ${sampleTime} s`,
+    );
+    assert.deepEqual(
+      rustLauncher.installedStoreIds,
+      typescriptLauncher.installedStoreIds,
+    );
+  }
+});
+
 test("scenario compilation fails closed for unknown objects and incompatible loadouts", () => {
   const definition = SCENARIO_LIBRARY[0];
   const profile = getProfile(definition.scenario);

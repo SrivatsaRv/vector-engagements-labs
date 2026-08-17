@@ -53,7 +53,7 @@ depends on mutable UI state.
 
 ## Builder expansion boundary
 
-The configured-template builder edits every input used by the eight validated templates. Its **Place & flight** surface now performs direct geographic start placement, heading, altitude and speed editing, and Blue/Red route and waypoint authoring inside a selected preset study area. Map gestures and numeric fields update one spatial plan; compilation converts it to local east-north-up engine state. Authored routes remain declared intent beside the computed engine track; the current engine does not silently force an aircraft to follow a drawn route.
+The configured-template builder edits every input used by the eight validated templates. Its **Place & flight** surface now performs direct geographic start placement, heading, altitude and speed editing, and Blue/Red route and waypoint authoring inside a selected preset study area. Map gestures and numeric fields update one spatial plan; compilation converts it to local east-north-up engine state. The admitted point-mass aircraft controller executes compiled three-dimensional route points and records requested, accepted, and achieved movement. The authored route remains visible beside the computed track so the two cannot be confused.
 
 The next expansion adds database-backed arbitrary entity collections, supporting sensor nodes, target/launch relationship authoring, and the complete blank-scenario path. Those capabilities must extend the same scenario contract; they must not introduce a second simulation-state format.
 
@@ -129,7 +129,7 @@ The system governs:
 - stowed-to-launched weapon lifecycle;
 - dependency-safe removal and duplication;
 - canonical package compilation, version, and content hash;
-- explicit engine-backend selection and fail-closed dispatch;
+- deployment-owned engine-backend selection and fail-closed dispatch;
 - blocking validation before simulation.
 
 An authored area of interest is not a substitute for the study-area preset. If

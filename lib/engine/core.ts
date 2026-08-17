@@ -29,6 +29,8 @@ type RuntimeState = {
   headingRad: number;
   commandedG: number;
   availableG: number;
+  storeMassKg: number;
+  installedStoreIds: Set<string>;
   dragNewtons: number;
   thrustNewtons: number;
   phase: string;
@@ -55,6 +57,8 @@ function initialState(definition: EngineEntityDefinition): RuntimeState {
     headingRad: definition.initial.headingRad,
     commandedG: 0,
     availableG: definition.weapon?.maximumCommandG ?? 9,
+    storeMassKg: 0,
+    installedStoreIds: new Set(),
     dragNewtons: 0,
     thrustNewtons: 0,
     phase: definition.lifecycle === "STOWED" ? "Stowed" : "Initial state",
@@ -183,7 +187,10 @@ function updateKinematicEntity(
         : 0;
     const consumed = Math.min(state.fuelKg, fuelFlow * dt);
     state.fuelKg -= consumed;
-    state.massKg = Math.max(model.emptyMassKg, state.massKg - consumed);
+    state.massKg = Math.max(
+      model.emptyMassKg + state.storeMassKg,
+      state.massKg - consumed,
+    );
     state.dragNewtons = drag;
     state.thrustNewtons = state.fuelKg > 0 ? thrustDemand : 0;
     longitudinalAcceleration =
@@ -226,6 +233,15 @@ function activateWeapon(
   if (state.lifecycle !== "STOWED" || time < weapon.launchTimeSeconds) return;
   const launcher = states.get(weapon.launchPlatformId);
   if (launcher) {
+    if (launcher.definition.kind === "AIRCRAFT") {
+      if (!launcher.installedStoreIds.delete(state.definition.id)) {
+        throw new Error(
+          `Aircraft ${launcher.definition.id} does not carry store ${state.definition.id}.`,
+        );
+      }
+      launcher.storeMassKg -= weapon.launchMassKg;
+      launcher.massKg -= weapon.launchMassKg;
+    }
     state.position = { ...launcher.position };
     state.velocity = { ...launcher.velocity };
     state.headingRad = launcher.headingRad;
@@ -423,6 +439,8 @@ function toFrame(
     thrustNewtons: state.thrustNewtons,
     commandedG: state.commandedG,
     availableG: state.availableG,
+    storeMassKg: state.storeMassKg,
+    installedStoreIds: [...state.installedStoreIds].sort(),
     phase: state.phase,
     valueState: state.definition.provenance.valueState,
     ...(state.aircraftControl
@@ -518,6 +536,26 @@ export class EngineSession {
         `Aircraft ${unmodeledAircraft.id} has no admitted aircraft model.`,
       );
     }
+    for (const aircraft of scenario.entities.filter(
+      (entity) => entity.kind === "AIRCRAFT",
+    )) {
+      const installedStores = scenario.entities.filter(
+        (entity) =>
+          entity.lifecycle === "STOWED" &&
+          entity.weapon?.launchPlatformId === aircraft.id,
+      );
+      const storeMassKg = installedStores.reduce(
+        (total, store) => total + store.weapon!.launchMassKg,
+        0,
+      );
+      const expectedMassKg =
+        aircraft.aircraft!.emptyMassKg + aircraft.initial.fuelKg + storeMassKg;
+      if (Math.abs(aircraft.initial.massKg - expectedMassKg) > 1e-6) {
+        throw new Error(
+          `Aircraft ${aircraft.id} initial mass must equal empty mass, fuel, and installed stores.`,
+        );
+      }
+    }
     const legacyStudyArea = scenario.environment.studyArea;
     this.recordingOrigin = scenario.geospatial?.origin ?? {
       schemaVersion: "vector.scenario-origin.v1" as const,
@@ -533,6 +571,13 @@ export class EngineSession {
     this.states = new Map(
       scenario.entities.map((definition) => [definition.id, initialState(definition)]),
     );
+    for (const store of scenario.entities) {
+      if (store.lifecycle !== "STOWED" || !store.weapon) continue;
+      const launcher = this.states.get(store.weapon.launchPlatformId);
+      if (!launcher || launcher.definition.kind !== "AIRCRAFT") continue;
+      launcher.installedStoreIds.add(store.id);
+      launcher.storeMassKg += store.weapon.launchMassKg;
+    }
     this.primaryWeapon = this.states.get(
       scenario.entities.find(
         (entity) =>

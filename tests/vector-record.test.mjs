@@ -104,11 +104,11 @@ test("VSR rejects corruption before exposing replay data", async () => {
 test("columnar frame decoder rejects an unsupported member schema", () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const bytes = encodeColumnarFrames(simulate(scenario).engineRun.frames);
-  const encodedSchema = new TextEncoder().encode("vector.frames.columnar.v1");
+  const encodedSchema = new TextEncoder().encode("vector.frames.columnar.v2");
   const offset = bytes.findIndex((_, index) =>
     encodedSchema.every((value, inner) => bytes[index + inner] === value),
   );
   assert.ok(offset > 0);
-  bytes[offset + encodedSchema.length - 1] = "2".charCodeAt(0);
+  bytes[offset + encodedSchema.length - 1] = "9".charCodeAt(0);
   assert.throws(() => decodeColumnarFrames(bytes), /schema is unsupported/);
 });

@@ -192,6 +192,8 @@ export type EngineEntityFrame = {
   thrustNewtons: number;
   commandedG: number;
   availableG: number;
+  storeMassKg: number;
+  installedStoreIds: string[];
   phase: string;
   valueState: ModelValueState;
   aircraftControl?: {
