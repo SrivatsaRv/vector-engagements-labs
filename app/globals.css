@@ -5257,7 +5257,31 @@ button:disabled,
 .authoring-team-tabs button { min-height: 42px; padding: 0 16px; border: 0; border-right: 1px solid #d8dde0; background: #f8f9f9; color: #59656f; text-align: left; font-size: 11px; font-weight: 700; }
 .authoring-team-tabs button:last-child { border-right: 0; }
 .authoring-team-tabs button.active { background: #fff; box-shadow: inset 0 -3px 0 #263642; color: #26313a; }
-.authoring-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(170px, .8fr); gap: 10px; }
+.spatial-entity-editor { display: grid; gap: 12px; margin-bottom: 12px; }
+.spatial-editor-heading { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; align-items: baseline; }
+.spatial-editor-heading span { color: #2f6fb5; font-size: 9px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.spatial-entity-editor.red .spatial-editor-heading span { color: #a94f45; }
+.spatial-editor-heading strong { color: #26313a; font-size: 12px; }
+.spatial-editor-heading small { grid-column: 1 / -1; color: #77828a; font-size: 9px; }
+.spatial-entity-editor fieldset { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; min-width: 0; margin: 0; padding: 10px; border: 1px solid #d3d9dc; }
+.spatial-entity-editor legend { padding: 0 5px; color: #59656f; font-size: 9px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.spatial-entity-editor label { display: grid; grid-template-columns: 1fr auto; gap: 4px 6px; min-width: 0; color: #56636d; font-size: 9px; font-weight: 700; }
+.spatial-entity-editor label span { color: #808990; font-weight: 500; }
+.spatial-entity-editor input { grid-column: 1 / -1; min-width: 0; width: 100%; min-height: 36px; padding: 0 9px; border: 1px solid #cdd4d8; background: #fff; color: #26313a; font: 650 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+.spatial-entity-editor input:focus { border-color: #2f6fb5; outline: 2px solid rgba(47,111,181,.14); outline-offset: 0; }
+.spatial-entity-editor input[aria-invalid="true"] { border-color: #a94f45; background: #fff9f8; }
+.field-error, .spatial-editor-status { margin: 0; color: #94453d; font-size: 9px; line-height: 1.4; }
+.spatial-editor-status { padding: 7px 9px; border-left: 2px solid #a94f45; background: #fff9f8; }
+.route-coordinate-editor { display: grid; gap: 8px; }
+.route-coordinate-editor > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.route-coordinate-editor > header div { display: grid; gap: 2px; }
+.route-coordinate-editor > header span { color: #77828a; font-size: 9px; }
+.route-coordinate-editor > header strong { color: #26313a; font-size: 11px; }
+.route-coordinate-editor button { min-height: 32px; padding: 0 10px; border: 1px solid #cbd2d6; background: #fff; color: #344b5e; font-size: 9px; font-weight: 750; }
+.route-coordinate-editor button:hover { border-color: #8f9ba4; background: #f1f4f6; }
+.route-coordinate-editor fieldset { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; }
+.route-coordinate-editor fieldset .field-error { grid-column: 1 / -1; }
+.authoring-fields { display: grid; grid-template-columns: minmax(220px, 1fr); gap: 10px; }
 .authoring-fields label { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; color: #56636d; font-size: 10px; font-weight: 700; }
 .authoring-fields label span { color: #808990; font-size: 9px; font-weight: 500; }
 .authoring-fields input { grid-column: 1 / -1; width: 100%; min-height: 38px; padding: 0 10px; border: 1px solid #cdd4d8; background: #fff; color: #26313a; font: 650 12px/1 system-ui, sans-serif; }
@@ -5274,10 +5298,14 @@ button:disabled,
   .scenario-authoring-surface > header { display: grid; }
   .authoring-tools { width: max-content; }
   .authoring-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .spatial-entity-editor fieldset { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 720px) {
   .scenario-authoring-map-shell { height: 320px; }
   .authoring-team-tabs, .authoring-fields { grid-template-columns: 1fr; }
+  .spatial-entity-editor fieldset,
+  .route-coordinate-editor fieldset { grid-template-columns: 1fr; }
+  .route-coordinate-editor fieldset > button { width: 100%; }
   .study-context-summary { align-items: stretch; display: grid; }
   .study-context-summary > button { width: max-content; }
 }

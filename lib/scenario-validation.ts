@@ -5,7 +5,10 @@ import { getCatalogObject } from "./object-catalog.ts";
 import { ENGINE_VERSION } from "./engine/version.ts";
 import { findWeaponSimulationModel } from "./simulation-models.ts";
 import { STUDY_AREAS } from "./study-areas.ts";
-import { isPointInsideStudyArea } from "./scenario-spatial.ts";
+import {
+  hasNonZeroRouteLegs,
+  isPointInsideStudyArea,
+} from "./scenario-spatial.ts";
 
 export type ValidationState = "pass" | "warning" | "error";
 export type ValidationItem = {
@@ -77,6 +80,7 @@ export function validateScenario(
           Number.isFinite(entity.speedMps) &&
           entity.speedMps >= 0 &&
           entity.route.length >= 1 &&
+          hasNonZeroRouteLegs(entity, studyArea) &&
           Math.abs(entity.route[0].longitude - entity.position.longitude) < 1e-9 &&
           Math.abs(entity.route[0].latitude - entity.position.latitude) < 1e-9 &&
           Math.abs(entity.route[0].altitudeM - entity.position.altitudeM) < 1e-6,

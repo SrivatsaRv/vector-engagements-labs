@@ -237,3 +237,19 @@ export function isPointInsideStudyArea(
     point.latitude <= north
   );
 }
+
+export function hasNonZeroRouteLegs(
+  entity: ScenarioSpatialEntity,
+  area: StudyArea,
+) {
+  const localRoute = entity.route.map((point) => geographicToLocal(point, area));
+  return localRoute.every((point, index) => {
+    if (index === 0) return true;
+    const previous = localRoute[index - 1];
+    return Math.hypot(
+      point.x - previous.x,
+      point.y - previous.y,
+      point.z - previous.z,
+    ) > 1;
+  });
+}
