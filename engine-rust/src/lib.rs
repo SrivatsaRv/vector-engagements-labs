@@ -465,6 +465,8 @@ pub struct EntityFrame {
     pub thrust_newtons: f64,
     pub commanded_g: f64,
     pub available_g: f64,
+    pub store_mass_kg: f64,
+    pub installed_store_ids: Vec<String>,
     pub phase: String,
     pub value_state: ModelValueState,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -532,6 +534,8 @@ struct RuntimeState {
     heading_rad: f64,
     commanded_g: f64,
     available_g: f64,
+    store_mass_kg: f64,
+    installed_store_ids: Vec<String>,
     drag_newtons: f64,
     thrust_newtons: f64,
     phase: String,
@@ -562,6 +566,8 @@ impl RuntimeState {
                 .as_ref()
                 .map(|model| model.maximum_command_g)
                 .unwrap_or(9.0),
+            store_mass_kg: 0.0,
+            installed_store_ids: Vec::new(),
             drag_newtons: 0.0,
             thrust_newtons: 0.0,
             phase: if definition.lifecycle == EntityLifecycle::Stowed {
@@ -704,7 +710,7 @@ fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f6
         };
         let consumed = state.fuel_kg.min(fuel_flow * dt);
         state.fuel_kg -= consumed;
-        state.mass_kg = model.empty_mass_kg.max(state.mass_kg - consumed);
+        state.mass_kg = (model.empty_mass_kg + state.store_mass_kg).max(state.mass_kg - consumed);
         state.drag_newtons = drag;
         state.thrust_newtons = if state.fuel_kg > 0.0 {
             thrust_demand
@@ -747,7 +753,7 @@ fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f6
 
 fn activate_weapons(states: &mut [RuntimeState], time: f64) {
     for index in 0..states.len() {
-        let Some(weapon) = states[index].definition.weapon.as_ref() else {
+        let Some(weapon) = states[index].definition.weapon.clone() else {
             continue;
         };
         let Some(launch_time) = weapon.launch_time_seconds else {
@@ -756,14 +762,28 @@ fn activate_weapons(states: &mut [RuntimeState], time: f64) {
         if states[index].lifecycle != EntityLifecycle::Stowed || time < launch_time {
             continue;
         }
-        let launcher_id = weapon.launch_platform_id.clone();
-        if let Some(launcher) = states
+        let launcher_id = weapon.launch_platform_id;
+        if let Some(launcher_index) = states
             .iter()
-            .find(|state| state.definition.id == launcher_id)
+            .position(|state| state.definition.id == launcher_id)
         {
-            let position = launcher.position;
-            let velocity = launcher.velocity;
-            let heading = launcher.heading_rad;
+            let position = states[launcher_index].position;
+            let velocity = states[launcher_index].velocity;
+            let heading = states[launcher_index].heading_rad;
+            if states[launcher_index].definition.kind == EntityKind::Aircraft {
+                let Some(store_index) = states[launcher_index]
+                    .installed_store_ids
+                    .iter()
+                    .position(|id| id == &states[index].definition.id)
+                else {
+                    continue;
+                };
+                states[launcher_index]
+                    .installed_store_ids
+                    .remove(store_index);
+                states[launcher_index].store_mass_kg -= weapon.launch_mass_kg;
+                states[launcher_index].mass_kg -= weapon.launch_mass_kg;
+            }
             states[index].position = position;
             states[index].velocity = velocity;
             states[index].heading_rad = heading;
@@ -946,6 +966,8 @@ fn entity_frame(state: &RuntimeState, scenario: &EngineScenario) -> EntityFrame 
         thrust_newtons: state.thrust_newtons,
         commanded_g: state.commanded_g,
         available_g: state.available_g,
+        store_mass_kg: state.store_mass_kg,
+        installed_store_ids: state.installed_store_ids.clone(),
         phase: state.phase.clone(),
         value_state: state.definition.provenance.value_state,
         aircraft_control: state.aircraft_control.clone(),
@@ -1027,6 +1049,23 @@ fn invalid_run(scenario: EngineScenario) -> EngineRun {
 pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError> {
     validate_scenario(&scenario)?;
     let mut states: Vec<RuntimeState> = scenario.entities.iter().map(RuntimeState::new).collect();
+    for store in &scenario.entities {
+        let Some(weapon) = store.weapon.as_ref() else {
+            continue;
+        };
+        if store.lifecycle != EntityLifecycle::Stowed {
+            continue;
+        }
+        if let Some(launcher) = states
+            .iter_mut()
+            .find(|state| state.definition.id == weapon.launch_platform_id)
+        {
+            if launcher.definition.kind == EntityKind::Aircraft {
+                launcher.installed_store_ids.push(store.id.clone());
+                launcher.store_mass_kg += weapon.launch_mass_kg;
+            }
+        }
+    }
     let primary_weapon_index = scenario.entities.iter().position(|entity| {
         entity.kind == EntityKind::GuidedWeapon
             && entity
@@ -1253,7 +1292,7 @@ mod tests {
     }
 
     fn scenario() -> EngineScenario {
-        let blue = entity(
+        let mut blue = entity(
             "blue-aircraft",
             Affiliation::Blue,
             Vec3 {
@@ -1267,6 +1306,7 @@ mod tests {
                 z: 0.0,
             },
         );
+        blue.initial.mass_kg += 180.0;
         let red = entity(
             "red-aircraft",
             Affiliation::Red,
@@ -1403,6 +1443,71 @@ mod tests {
                 entity.id == "blue-weapon" && entity.lifecycle == EntityLifecycle::Active
             })));
         assert_eq!(run.diagnostics.non_finite_state_count, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn store_release_conserves_aircraft_mass() -> Result<(), Box<dyn std::error::Error>> {
+        let run = try_run_engine(scenario())?;
+        let before = run
+            .frames
+            .iter()
+            .find(|frame| frame.t < 1.0 && frame.t > 0.5)
+            .and_then(|frame| {
+                frame
+                    .entities
+                    .iter()
+                    .find(|entity| entity.id == "blue-aircraft")
+            })
+            .ok_or("run has no aircraft frame before launch")?;
+        let after = run
+            .frames
+            .iter()
+            .find(|frame| frame.t >= 1.0)
+            .and_then(|frame| {
+                frame
+                    .entities
+                    .iter()
+                    .find(|entity| entity.id == "blue-aircraft")
+            })
+            .ok_or("run has no aircraft frame after launch")?;
+        let later = run
+            .frames
+            .iter()
+            .find(|frame| frame.t >= 2.0)
+            .and_then(|frame| {
+                frame
+                    .entities
+                    .iter()
+                    .find(|entity| entity.id == "blue-aircraft")
+            })
+            .ok_or("run has no later aircraft frame")?;
+
+        assert_eq!(before.store_mass_kg, 180.0);
+        assert_eq!(before.installed_store_ids, vec!["blue-weapon"]);
+        assert!((before.mass_kg - before.fuel_kg - 8_180.0).abs() < 1e-8);
+        assert_eq!(after.store_mass_kg, 0.0);
+        assert!(after.installed_store_ids.is_empty());
+        assert!((after.mass_kg - after.fuel_kg - 8_000.0).abs() < 1e-8);
+        assert!((later.mass_kg - later.fuel_kg - 8_000.0).abs() < 1e-8);
+        Ok(())
+    }
+
+    #[test]
+    fn scenario_validation_rejects_missing_installed_store_mass(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut input = scenario();
+        input
+            .entities
+            .first_mut()
+            .ok_or("scenario fixture has no aircraft")?
+            .initial
+            .mass_kg -= 180.0;
+        assert!(matches!(
+            validate_scenario(&input),
+            Err(EngineError::InvalidScenario(message))
+                if message.contains("initial mass must equal empty mass, fuel, and installed stores")
+        ));
         Ok(())
     }
 

@@ -10,7 +10,7 @@ Vector currently uses a deterministic three-dimensional point-mass reference eng
 - air-relative velocity with an explicit three-axis wind vector;
 - launch-state inheritance;
 - thrust taper, propellant mass depletion, aerodynamic drag, and gravity;
-- aircraft fuel mass, thrust demand, parasitic drag, induced drag, and load-factor-limited three-axis route steering;
+- aircraft empty, fuel, and installed-store mass; thrust demand; parasitic drag; induced drag; and load-factor-limited three-axis route steering;
 - direct and commanded-loft guidance;
 - proportional-navigation acceleration demand with command limits;
 - deterministic execution of authored airborne route points;
@@ -34,7 +34,7 @@ dynamic-pressure, energy and trim-residual tolerances. This is a validation of
 the trim-propagation and evidence pipeline, not an upgrade to the operational
 scenario flight model. See [`public-aircraft-reference.md`](public-aircraft-reference.md).
 
-Aircraft motion uses the same standard atmosphere and wind field as a launched vehicle. The current aircraft coefficient set resolves dynamic pressure, load-factor lift demand, parasitic and induced drag, available thrust, fuel flow, mass, and the steering limit on every fixed step. The engine steers the velocity vector towards the next authored three-dimensional route point. It records the requested velocity, accepted steering acceleration, achieved velocity, active route-point index, and load-factor limiter state. It does not use the scenario intent label to invent a turn or a permanent circular path. An aircraft without an admitted aircraft model is rejected. This is an educational point-mass route executor, not a flight-manual or manufacturer engine deck.
+Aircraft motion uses the same standard atmosphere and wind field as a launched vehicle. The current aircraft coefficient set resolves dynamic pressure, load-factor lift demand, parasitic and induced drag, available thrust, fuel flow, mass, and the steering limit on every fixed step. Aircraft admission requires initial mass to equal admitted empty mass, initial fuel, and the launch mass of every linked stowed store. Fuel burn cannot reduce mass below empty mass plus installed-store mass. Release removes the store identity and its declared launch mass once, and the weapon inherits launcher position, velocity, and heading. The engine steers the velocity vector towards the next authored three-dimensional route point. It records the requested velocity, accepted steering acceleration, achieved velocity, active route-point index, load-factor limiter state, store mass, and installed-store identities. It does not use the scenario intent label to invent a turn or a permanent circular path. An aircraft without an admitted aircraft model is rejected. This is an educational point-mass route executor, not a flight-manual or manufacturer engine deck.
 
 Sensor and air-defence envelopes are scenario-declared volumes and are explicitly
 labeled `DECLARED`. Detection, tracking, engagement, and minimum-range rings
@@ -52,7 +52,7 @@ Model Truth remains separate from IAF and PAF RASP estimates. IAF RASP estimates
 
 ## Still outside the fidelity claim
 
-Complete nonlinear aircraft coefficient-table and engine-map execution; maneuvering 6DOF attitude/control transients; pilot decision logic; take-off, landing, and runway operations; detailed seeker/autopilot/fuze/warhead behavior; production terrain ingestion or terrain-aware sensor state; waveform-level EW and countermeasures; probability of kill; validated operational routes or current force disposition.
+Complete nonlinear aircraft coefficient-table and engine-map execution; store drag, station moments, jettison, and other store-consumption events; maneuvering 6DOF attitude/control transients; pilot decision logic; take-off, landing, and runway operations; detailed seeker/autopilot/fuze/warhead behavior; production terrain ingestion or terrain-aware sensor state; waveform-level EW and countermeasures; probability of kill; validated operational routes or current force disposition.
 
 ## Rust/WASM gate
 

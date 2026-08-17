@@ -193,6 +193,17 @@ export function compileScenario(
   if (!selectedModel.domains.includes(input.domain)) {
     throw new Error(`Weapon model ${selectedModel.id} does not support ${input.domain}`);
   }
+  const redSelectedModel = redSystem
+    ? findWeaponSimulationModel(redSystem.id)
+    : undefined;
+  if (redSystem && !redSelectedModel) {
+    throw new Error(`Missing weapon model for ${redSystem.id}`);
+  }
+  if (redSelectedModel && !redSelectedModel.domains.includes(input.domain)) {
+    throw new Error(
+      `Weapon model ${redSelectedModel.id} does not support ${input.domain}`,
+    );
+  }
   const assumptions = {
     launchMassKg: selectedModel.launchMassKg,
     dryMassKg: selectedModel.dryMassKg,
@@ -248,7 +259,9 @@ export function compileScenario(
         position: { ...blueStart },
         velocity: velocity(blueIsAircraft ? input.launcherSpeed : 0, blueHeadingRad),
         headingRad: blueHeadingRad,
-        massKg: blueAircraft ? blueAircraft.emptyMassKg + blueFuelKg : 12000,
+        massKg: blueAircraft
+          ? blueAircraft.emptyMassKg + blueFuelKg + assumptions.launchMassKg
+          : 12000,
         fuelKg: blueFuelKg,
       },
       behavior: {
@@ -296,7 +309,11 @@ export function compileScenario(
         position: { ...redStart },
         velocity: velocity(movingTarget ? input.targetSpeed : 0, redHeadingRad),
         headingRad: redHeadingRad,
-        massKg: redAircraft ? redAircraft.emptyMassKg + redFuelKg : 10000,
+        massKg: redAircraft
+          ? redAircraft.emptyMassKg +
+            redFuelKg +
+            (redSelectedModel?.launchMassKg ?? 0)
+          : 10000,
         fuelKg: redFuelKg,
       },
       behavior: {
@@ -359,11 +376,7 @@ export function compileScenario(
   ];
 
   if (redSystem) {
-    const redModel = findWeaponSimulationModel(redSystem.id);
-    if (!redModel) throw new Error(`Missing weapon model for ${redSystem.id}`);
-    if (!redModel.domains.includes(input.domain)) {
-      throw new Error(`Weapon model ${redModel.id} does not support ${input.domain}`);
-    }
+    const redModel = redSelectedModel!;
     const redAssumptions = {
       launchMassKg: redModel.launchMassKg,
       dryMassKg: redModel.dryMassKg,

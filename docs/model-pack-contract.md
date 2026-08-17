@@ -163,7 +163,12 @@ membership are both required. Station capacity and rule capacity are enforced.
 An absent rule is not permission and no generic weapon coefficient fallback
 exists. The configured-template compiler now also rejects unknown catalog
 objects, missing aircraft/weapon models, domain mismatch, and incompatible
-platform/store combinations.
+platform/store combinations. The compiled engine package derives installed
+aircraft inventory only from linked stowed weapon entities. Their declared
+launch masses are included in aircraft initial mass and transferred out of the
+aircraft exactly once at release. Store drag, station moments, and jettison
+remain outside the current model and must not be inferred from compatibility
+metadata.
 
 ## Persistence
 

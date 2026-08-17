@@ -16,7 +16,7 @@ import {
 } from "../simulation.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
-export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v1" as const;
+export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v2" as const;
 export const VECTOR_EVENT_SCHEMA = "vector.events.v1" as const;
 export const MAX_VECTOR_RECORD_BYTES = 64 * 1024 * 1024;
 
@@ -124,6 +124,7 @@ type FrameColumn =
   | "thrustNewtons"
   | "commandedG"
   | "availableG"
+  | "storeMassKg"
   | "routePointIndex"
   | "requestedVelocityX"
   | "requestedVelocityY"
@@ -152,6 +153,7 @@ const FRAME_COLUMNS: FrameColumn[] = [
   "thrustNewtons",
   "commandedG",
   "availableG",
+  "storeMassKg",
   "routePointIndex",
   "requestedVelocityX",
   "requestedVelocityY",
@@ -179,6 +181,7 @@ type EntityMetadata = Pick<
 >;
 
 type StoredEntityMetadata = EntityMetadata & {
+  installedStoreIds: string[];
   aircraftControlLimiter?: NonNullable<
     EngineEntityFrame["aircraftControl"]
   >["limiter"];
@@ -268,6 +271,7 @@ export function encodeColumnarFrames(frames: EngineFrame[]): Uint8Array {
       lifecycle: entity.lifecycle,
       phase: entity.phase,
       valueState: entity.valueState,
+      installedStoreIds: entity.installedStoreIds,
       ...(entity.aircraftControl
         ? { aircraftControlLimiter: entity.aircraftControl.limiter }
         : {}),
@@ -329,7 +333,7 @@ export function decodeColumnarFrames(bytes: Uint8Array): EngineFrame[] {
       true,
     );
   const decodedEntities = header.entities.map((storedMetadata, index): EngineEntityFrame => {
-    const { aircraftControlLimiter, ...metadata } = storedMetadata;
+    const { aircraftControlLimiter, installedStoreIds, ...metadata } = storedMetadata;
     const routePointIndex = column("routePointIndex", index);
     return {
     ...metadata,
@@ -353,6 +357,8 @@ export function decodeColumnarFrames(bytes: Uint8Array): EngineFrame[] {
     thrustNewtons: column("thrustNewtons", index),
     commandedG: column("commandedG", index),
     availableG: column("availableG", index),
+    storeMassKg: column("storeMassKg", index),
+    installedStoreIds,
     ...(aircraftControlLimiter
       ? {
           aircraftControl: {

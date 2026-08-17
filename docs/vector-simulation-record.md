@@ -52,7 +52,8 @@ viewer always prefers recorded values; computed fallback values identify their
 formula version. Map/3D projection is never persisted as model truth.
 
 The current aircraft sample also records the active route-point index, requested
-velocity, accepted steering acceleration, achieved velocity, and limiter state.
+velocity, accepted steering acceleration, achieved velocity, limiter state,
+installed-store mass, and the sorted identities of installed stores.
 The columnar frame codec preserves these values so replay and live playback use
 the same control evidence without rerunning the engine.
 
@@ -62,7 +63,7 @@ area, routes, installations and airspace. A viewer may degrade missing optional
 presentation assets, but may not silently substitute a physics-affecting
 environment dataset.
 
-Weapons remain loadout inventory before launch. A launch event creates the weapon's first world sample with the launch platform position and inherited velocity. Static objects may omit unchanged samples. The viewer interpolates only properties explicitly declared interpolable.
+Weapons remain loadout inventory before launch. Aircraft frames preserve the installed inventory identities and total store mass while the weapon is stowed. A launch event removes that store and its declared launch mass from the aircraft once, then creates the weapon's first world sample with the launch platform position and inherited velocity. Static objects may omit unchanged samples. The viewer interpolates only properties explicitly declared interpolable.
 
 ## Integrity and replay
 
@@ -83,9 +84,11 @@ read model is sufficient for the existing map, Three.js, telemetry, RASP,
 explanation, and report consumers.
 
 `frames.arrow` currently contains the versioned VECTOR columnar codec
-`vector.frames.columnar.v1`: string/lifecycle metadata is encoded once in a
+`vector.frames.columnar.v2`: string/lifecycle and installed-store identity
+metadata is encoded once in a
 canonical header and all numerical entity fields are stored as contiguous f64
-columns. The historical path is retained for compatibility, but this first
+columns, including total installed-store mass. The historical path is retained
+for compatibility, but this
 implementation is not Apache Arrow IPC. An Arrow IPC adapter and downloadable
 ZIP container remain follow-up interoperability work; changing the frame codec
 requires a new member schema version and fixture migration.

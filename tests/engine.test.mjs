@@ -43,7 +43,7 @@ function testScenario() {
           position: { x: 0, y: 0, z: 8000 },
           velocity: { x: 250, y: 0, z: 0 },
           headingRad: 0,
-          massKg: 18000,
+          massKg: 18180,
           fuelKg: 4000,
         },
       },
@@ -60,7 +60,7 @@ function testScenario() {
           position: { x: 10000, y: 1500, z: 8500 },
           velocity: { x: -220, y: 0, z: 0 },
           headingRad: Math.PI,
-          massKg: 12000,
+          massKg: 16500,
           fuelKg: 2500,
         },
       },
@@ -186,6 +186,74 @@ test("stowed weapons become observable only when their launch event occurs", () 
   assert.ok(
     Math.abs(launchedWeapon.position.x - launchPlatform.position.x) < 100,
     "launch position should inherit the platform state",
+  );
+});
+
+test("aircraft mass conserves empty mass, fuel, and installed stores across release", () => {
+  const scenario = admitTestAircraft(testScenario());
+  const weapon = scenario.entities.find((entity) => entity.id === "weapon-blue");
+  weapon.weapon.launchTimeSeconds = 2;
+  const run = runEngine(scenario);
+  const before = run.frames.find((frame) => frame.t < 2 && frame.t > 1.5);
+  const after = run.frames.find((frame) => frame.t >= 2);
+  const later = run.frames.find((frame) => frame.t >= 3);
+  const beforeAircraft = before.entities.find((entity) => entity.id === "aircraft-blue");
+  const afterAircraft = after.entities.find((entity) => entity.id === "aircraft-blue");
+  const laterAircraft = later.entities.find((entity) => entity.id === "aircraft-blue");
+
+  assert.equal(beforeAircraft.storeMassKg, weapon.weapon.launchMassKg);
+  assert.deepEqual(beforeAircraft.installedStoreIds, [weapon.id]);
+  assert.equal(afterAircraft.storeMassKg, 0);
+  assert.deepEqual(afterAircraft.installedStoreIds, []);
+  assert.ok(
+    Math.abs(
+      beforeAircraft.massKg - beforeAircraft.fuelKg -
+        (testAircraftModel.emptyMassKg + weapon.weapon.launchMassKg),
+    ) < 1e-8,
+  );
+  assert.ok(
+    Math.abs(
+      afterAircraft.massKg - afterAircraft.fuelKg - testAircraftModel.emptyMassKg,
+    ) < 1e-8,
+  );
+  assert.ok(
+    Math.abs(
+      laterAircraft.massKg - laterAircraft.fuelKg - testAircraftModel.emptyMassKg,
+    ) < 1e-8,
+    "a released store must not be removed twice",
+  );
+});
+
+test("aircraft admission rejects an initial mass that omits installed stores", () => {
+  const scenario = admitTestAircraft(testScenario());
+  const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
+  blue.initial.massKg -= 180;
+  assert.throws(
+    () => runEngine(scenario),
+    /initial mass must equal empty mass, fuel, and installed stores/,
+  );
+});
+
+test("fuel exhaustion preserves empty mass and all installed store mass", () => {
+  const scenario = admitTestAircraft(testScenario());
+  const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
+  const weapon = scenario.entities.find((entity) => entity.id === "weapon-blue");
+  weapon.weapon.launchTimeSeconds = scenario.durationSeconds + 1;
+  blue.initial.fuelKg = 1;
+  blue.initial.massKg = testAircraftModel.emptyMassKg + 1 + weapon.weapon.launchMassKg;
+  blue.aircraft.specificFuelConsumptionKgPerNewtonSecond = 1;
+
+  const run = runEngine(scenario);
+  const finalAircraft = run.frames.at(-1).entities.find(
+    (entity) => entity.id === blue.id,
+  );
+  assert.equal(finalAircraft.fuelKg, 0);
+  assert.equal(finalAircraft.storeMassKg, weapon.weapon.launchMassKg);
+  assert.ok(
+    Math.abs(
+      finalAircraft.massKg -
+        (testAircraftModel.emptyMassKg + weapon.weapon.launchMassKg),
+    ) < 1e-8,
   );
 });
 

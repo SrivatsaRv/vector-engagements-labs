@@ -446,6 +446,35 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
             }
         }
     }
+    for aircraft in scenario
+        .entities
+        .iter()
+        .filter(|entity| entity.kind == crate::EntityKind::Aircraft)
+    {
+        let aircraft_model = aircraft
+            .aircraft
+            .as_ref()
+            .ok_or_else(|| invalid(format!("aircraft {} has no aircraft model", aircraft.id)))?;
+        let installed_store_mass_kg: f64 = scenario
+            .entities
+            .iter()
+            .filter_map(|entity| {
+                entity.weapon.as_ref().and_then(|weapon| {
+                    (entity.lifecycle == crate::EntityLifecycle::Stowed
+                        && weapon.launch_platform_id == aircraft.id)
+                        .then_some(weapon.launch_mass_kg)
+                })
+            })
+            .sum();
+        let expected_mass_kg =
+            aircraft_model.empty_mass_kg + aircraft.initial.fuel_kg + installed_store_mass_kg;
+        if (aircraft.initial.mass_kg - expected_mass_kg).abs() > 1e-6 {
+            return Err(invalid(format!(
+                "aircraft {} initial mass must equal empty mass, fuel, and installed stores",
+                aircraft.id
+            )));
+        }
+    }
     if launched_weapon_count == 0 {
         return Err(invalid(
             "scenario must declare at least one launched weapon",
