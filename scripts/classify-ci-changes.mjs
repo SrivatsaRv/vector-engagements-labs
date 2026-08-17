@@ -7,7 +7,9 @@ const POLICY_ONLY = [
   /^(?:AGENTS|CHANGELOG|CODE_OF_CONDUCT|CONTRIBUTING|GOVERNANCE|NOTICE|README|SECURITY)\.md$/,
   /^(?:LICENSE|NOTICE)$/,
   /^\.github\/(?:CODEOWNERS|pull_request_template\.md)$/,
-  /^tests\/(?:ci-change-classifier|deployment-config|persona-skills|security-config)\.test\.mjs$/,
+  /^governance\/runtime-stub-ledger\.v1\.json$/,
+  /^scripts\/verify-runtime-stub-ledger\.mjs$/,
+  /^tests\/(?:ci-change-classifier|deployment-config|harness-execution|persona-skills|required-pr-gate|runtime-stub-ledger|security-config)\.test\.mjs$/,
 ];
 
 const WORKFLOW_CONTROL = [
@@ -42,6 +44,18 @@ const RUST_CONTRACT = [
 ];
 
 const RUST_MANIFEST = [/^engine-rust\/(?:Cargo\.toml|Cargo\.lock)$/];
+
+const SHARED_SIMULATION_CONTRACT = [
+  /^fixtures\/(?:environment|model-pack|scenario|simulation|vector-record)/,
+  /^lib\/(?:environment-pack|model-pack|reference-model-pack|scenario-contract|scenario-draft|scenario-package|scenarios|simulation-contract|simulation-models|vector-record)\.ts$/,
+  /^worker\/(?:protocol|simulation-worker)\.(?:c|m)?tsx?$/,
+];
+
+const ENVIRONMENT_OR_MODEL_DATA = [
+  /^db\/(?:seeds|fixtures)\/(?:environment|installation|model|runway)/,
+  /^fixtures\/(?:environment|model-pack)/,
+  /^scripts\/(?:generate-model-pack-fixture|verify-governed-catalog-data|verify-public-aircraft-reference)\.(?:c|m)?tsx?$/,
+];
 
 const DATABASE_OR_API = [
   /^db\//,
@@ -101,6 +115,19 @@ export function classifyChanges(inputFiles) {
     }
     if (matches(file, RUST_MANIFEST)) {
       result.rust_audit = true;
+      classified = true;
+    }
+    if (matches(file, SHARED_SIMULATION_CONTRACT)) {
+      result.quality = true;
+      result.web_tests = true;
+      result.rust_tests = true;
+      classified = true;
+    }
+    if (matches(file, ENVIRONMENT_OR_MODEL_DATA)) {
+      result.quality = true;
+      result.web_tests = true;
+      result.rust_tests = true;
+      result.integration = true;
       classified = true;
     }
     if (matches(file, DATABASE_OR_API)) {

@@ -1,0 +1,62 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  collectIndicatorObservations,
+  findSourceLessPublicReferences,
+  validateIndicatorInventory,
+  verifyRuntimeStubLedger,
+} from "../scripts/verify-runtime-stub-ledger.mjs";
+import ledger from "../governance/runtime-stub-ledger.v1.json" with { type: "json" };
+
+test("the runtime stub ledger is complete, ordered, source-backed, and executable", () => {
+  const result = verifyRuntimeStubLedger();
+  assert.equal(result.entries, 29);
+  assert.equal(result.releaseBlocking, 29);
+  assert.ok(result.indicatorLines > 0);
+  assert.equal(result.sourceLessPublicReferences, 9);
+  assert.match(result.sha256, /^[a-f0-9]{64}$/u);
+});
+
+test("source-less public references are inventoried instead of silently admitted", () => {
+  const source = [
+    '{ id: "known", dataState: "PUBLIC_REFERENCE", sourceIds: ["source"] },',
+    '{ id: "unknown", dataState: "PUBLIC_REFERENCE" },',
+    '{ id: "user", dataState: "USER_DEFINED" },',
+  ].join("\n");
+  assert.deepEqual(findSourceLessPublicReferences(source), [{ line: 2 }]);
+});
+
+test("a new production fallback fails without an owning ledger entry", () => {
+  const observations = collectIndicatorObservations(process.cwd(), ledger.indicatorPolicy);
+  observations.push({ path: "lib/new-causal-runtime.ts", indicator: "fallback", line: 10 });
+  assert.throws(
+    () => validateIndicatorInventory(observations, ledger),
+    /Unclassified fallback at lib\/new-causal-runtime\.ts:10/,
+  );
+});
+
+test("deleting or suppressing a classified indicator requires a ledger update", () => {
+  const observations = collectIndicatorObservations(process.cwd(), ledger.indicatorPolicy);
+  const reduced = observations.filter(
+    (item, index) =>
+      index !== observations.findIndex(
+        (candidate) =>
+          candidate.path === "engine-rust/src/lib.rs" && candidate.indicator === "fallback",
+      ),
+  );
+  assert.throws(
+    () => validateIndicatorInventory(reduced, ledger),
+    /engine-rust\/src\/lib\.rs \(fallback\) has 1 classified lines; ledger expects 2/,
+  );
+});
+
+test("allowances cannot cite a missing owning issue entry", () => {
+  const observations = collectIndicatorObservations(process.cwd(), ledger.indicatorPolicy);
+  const tampered = structuredClone(ledger);
+  tampered.indicatorPolicy.allowances[0].entryIds = ["STUB-99"];
+  assert.throws(
+    () => validateIndicatorInventory(observations, tampered),
+    /references unknown STUB-99/,
+  );
+});

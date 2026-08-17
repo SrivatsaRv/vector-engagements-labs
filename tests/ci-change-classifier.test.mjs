@@ -17,6 +17,9 @@ test("documentation and project skills use only the stable policy gate", () => {
       "docs/repository-governance.md",
       ".codex/skills/vector-lab-harness/SKILL.md",
       "tests/persona-skills.test.mjs",
+      "governance/runtime-stub-ledger.v1.json",
+      "scripts/verify-runtime-stub-ledger.mjs",
+      "tests/runtime-stub-ledger.test.mjs",
     ]),
     ["policy"],
   );
@@ -51,6 +54,69 @@ test("public aircraft evidence changes receive web and Rust parity gates", () =>
   assert.deepEqual(
     selected(["fixtures/public-reference/nasa-nesc-2015-f16-case11.json"]),
     ["policy", "web_tests", "rust_tests"],
+  );
+});
+
+test("shared Air-runtime contracts select web and Rust parity", () => {
+  for (const file of [
+    "lib/scenario-contract.ts",
+    "lib/scenario-draft.ts",
+    "lib/simulation-contract.ts",
+    "lib/vector-record.ts",
+  ]) {
+    assert.deepEqual(selected([file]), [
+      "policy",
+      "quality",
+      "security_js",
+      "web_tests",
+      "rust_tests",
+    ]);
+  }
+  assert.deepEqual(selected(["worker/protocol.ts"]), [
+    "policy",
+    "quality",
+    "security_js",
+    "web_tests",
+    "rust_tests",
+    "integration",
+    "container",
+  ]);
+});
+
+test("environment and model fixtures select validation, parity, and integration", () => {
+  for (const file of [
+    "fixtures/environment/north-punjab.json",
+    "fixtures/model-pack/fighter.json",
+  ]) {
+    assert.deepEqual(selected([file]), [
+      "policy",
+      "quality",
+      "web_tests",
+      "rust_tests",
+      "integration",
+    ]);
+  }
+  assert.deepEqual(selected(["scripts/verify-governed-catalog-data.ts"]), [
+    "policy",
+    "quality",
+    "security_js",
+    "web_tests",
+    "rust_tests",
+    "integration",
+  ]);
+});
+
+test("combined contracts take the union of their required gates", () => {
+  assert.deepEqual(
+    selected(["lib/simulation-contract.ts", "db/migrations/009_example.sql"]),
+    [
+      "policy",
+      "quality",
+      "security_js",
+      "web_tests",
+      "rust_tests",
+      "integration",
+    ],
   );
 });
 

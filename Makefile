@@ -1,4 +1,4 @@
-.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local reference-aircraft-local worker-local
+.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local reference-aircraft-local air-reference-local worker-local frontend-local clean-clone-local
 
 db-up: compose-build
 	docker compose up -d database
@@ -60,7 +60,24 @@ worker-local:
 	npm run runtime:verify
 	npm run worker:verify
 
+frontend-local:
+	@test -n "$${VECTOR_URL:-}" || (echo "VECTOR_URL must identify an already running built application" >&2; exit 1)
+	npm run ui:responsive:verify
+
+air-reference-local: reference-aircraft-local
+
+clean-clone-local:
+	@set -eu; \
+		temporary_root="$$(mktemp -d)"; \
+		trap 'rm -rf "$$temporary_root"' EXIT INT TERM; \
+		git clone --quiet --no-local --branch "$$(git branch --show-current)" . "$$temporary_root/repository"; \
+		cd "$$temporary_root/repository"; \
+		scripts/context-slice.sh release >/dev/null; \
+		npm ci; \
+		make ci-local
+
 ci-quality:
+	npm run policy:runtime-stubs:verify
 	npm run symbols:verify
 	npm run models:verify
 	npm run reference-aircraft:verify

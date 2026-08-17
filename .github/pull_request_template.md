@@ -2,11 +2,19 @@
 
 Describe the behavior and the owning contract.
 
+Owning issue: <!-- Required. Use #number and state whether this closes the issue or delivers a named slice. -->
+
 ## Why
 
 State the problem, evidence, and intended user or engine outcome.
 
 ## Verification
+
+- Pushed commit SHA: <!-- Exact SHA tested; do not cite a dirty working tree. -->
+- Test layer / command / result / artifact:
+  - <!-- Add one row for every applicable layer. -->
+- Omitted layers and reasons:
+  - <!-- Write None or identify the owning follow-up issue. -->
 
 - [ ] `make ci-local`
 - [ ] Integration checks when persistence, API, map, report, or UI behavior changed
