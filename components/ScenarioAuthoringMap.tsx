@@ -1,19 +1,19 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogObject } from "@/lib/object-catalog";
 import type { MapInstallation } from "@/components/EngagementMap";
 import type { Scenario } from "@/lib/simulation";
 import {
   createDefaultSpatialPlan,
   isPointInsideStudyArea,
-  normalizeHeading,
   type ScenarioSpatialPlan,
 } from "@/lib/scenario-spatial";
 import type { StudyArea } from "@/lib/study-areas";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
 import { VectorMapControls, type MapCameraTelemetry } from "@/components/VectorMapControls";
+import { SpatialEntityEditor } from "@/components/SpatialEntityEditor";
 import {
   buildVectorMapStyle,
   readVectorBasemap,
@@ -31,6 +31,7 @@ type Props = {
   redObject: CatalogObject;
   installations: MapInstallation[];
   onChange: (plan: ScenarioSpatialPlan) => void;
+  onValidityChange: (valid: boolean) => void;
 };
 
 export function ScenarioAuthoringMap({
@@ -40,6 +41,7 @@ export function ScenarioAuthoringMap({
   redObject,
   installations,
   onChange,
+  onValidityChange,
 }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
@@ -51,6 +53,7 @@ export function ScenarioAuthoringMap({
   const [mapError, setMapError] = useState("");
   const [basemap, setBasemap] = useState<VectorBasemap>("MINIMAL");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [teamValidity, setTeamValidity] = useState({ blue: true, red: true });
   const [camera, setCamera] = useState<MapCameraTelemetry>({
     longitude: studyArea.anchor.longitude,
     latitude: studyArea.anchor.latitude,
@@ -76,6 +79,13 @@ export function ScenarioAuthoringMap({
     [scenario, studyArea],
   );
   const planRef = useRef(plan);
+  const reportSelectedValidity = useCallback(
+    (valid: boolean) =>
+      setTeamValidity((current) =>
+        current[selected] === valid ? current : { ...current, [selected]: valid },
+      ),
+    [selected],
+  );
 
   useEffect(() => {
     queueMicrotask(() => setBasemap(readVectorBasemap()));
@@ -102,6 +112,9 @@ export function ScenarioAuthoringMap({
     planRef.current = plan;
     if (!scenario.spatialPlan) onChangeRef.current(plan);
   }, [plan, scenario.spatialPlan]);
+  useEffect(() => {
+    onValidityChange(teamValidity.blue && teamValidity.red);
+  }, [onValidityChange, teamValidity]);
 
   useEffect(() => {
     if (!mount.current) return;
@@ -571,10 +584,16 @@ export function ScenarioAuthoringMap({
             </button>
           ))}
         </div>
+        <SpatialEntityEditor
+          key={`${selected}:${JSON.stringify(selectedEntity)}`}
+          team={selected}
+          designation={selectedObject.designation}
+          entity={selectedEntity}
+          studyArea={studyArea}
+          onChange={(entity) => updateEntity(selected, entity)}
+          onValidityChange={reportSelectedValidity}
+        />
         <div className="authoring-fields">
-          <label>Altitude <span>m ASL</span><input type="number" min={0} max={25000} value={Math.round(selectedEntity.position.altitudeM)} onChange={(event) => updateEntity(selected, { position: { ...selectedEntity.position, altitudeM: Number(event.target.value) } })} /></label>
-          <label>Heading <span>degrees true</span><input type="number" min={0} max={359} value={Math.round(selectedEntity.headingDeg)} onChange={(event) => updateEntity(selected, { headingDeg: normalizeHeading(Number(event.target.value)) })} /></label>
-          <label>Speed <span>m/s</span><input type="number" min={0} max={1500} value={Math.round(selectedEntity.speedMps)} onChange={(event) => updateEntity(selected, { speedMps: Math.max(0, Number(event.target.value)) })} /></label>
           <div className="authoring-route-summary">
             <span>Declared route</span>
             <strong>

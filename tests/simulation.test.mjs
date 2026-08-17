@@ -88,6 +88,7 @@ test("map-authored start positions, headings, speeds and routes compile into eng
       1,
   );
   assert.ok(Math.abs(spatialAspectDeg(plan, area) - DEFAULT_SCENARIO.aspect) < 0.01);
+  plan.blue.route[1] = { ...plan.blue.route[1], altitudeM: 9_200 };
 
   const result = simulate({ ...DEFAULT_SCENARIO, spatialPlan: plan });
   const scenario = result.engineRun.scenario;
@@ -95,6 +96,10 @@ test("map-authored start positions, headings, speeds and routes compile into eng
   const red = scenario.entities.find((entity) => entity.id === "red-object-1");
   assert.equal(blue.route.length, plan.blue.route.length);
   assert.equal(red.route.length, plan.red.route.length);
+  assert.ok(
+    blue.route[1].z > blue.route[0].z + 500,
+    "the edited waypoint altitude must reach the compiled three-dimensional route",
+  );
   assert.equal(Math.round(blue.initial.position.z), DEFAULT_SCENARIO.altitude);
   assert.equal(
     Math.round(red.initial.position.z),
@@ -166,6 +171,29 @@ test("validation blocks malformed authored headings, speeds and route origins", 
   plan.blue.headingDeg = 360;
   plan.red.speedMps = -1;
   plan.blue.route[0] = { ...plan.blue.route[0], latitude: plan.blue.route[0].latitude + 0.01 };
+  const checks = validateScenario(definition, {
+    ...definition.scenario,
+    spatialPlan: plan,
+  });
+  assert.equal(checks.find((item) => item.id === "authored-placement")?.state, "error");
+  assert.equal(canConduct(checks), false);
+});
+
+test("validation blocks a zero-length authored route leg", () => {
+  const definition = SCENARIO_LIBRARY.find(
+    (item) => item.id === "a2a-crossing-intercept",
+  );
+  const area = getStudyArea(definition.scenario.studyAreaId);
+  const plan = createDefaultSpatialPlan({
+    studyArea: area,
+    rangeM: definition.scenario.range,
+    blueAltitudeM: definition.scenario.altitude,
+    redAltitudeM: definition.scenario.altitude + definition.scenario.targetDelta,
+    blueSpeedMps: definition.scenario.launcherSpeed,
+    redSpeedMps: definition.scenario.targetSpeed,
+    crossingAngleDeg: definition.scenario.aspect,
+  });
+  plan.blue.route[1] = { ...plan.blue.route[0] };
   const checks = validateScenario(definition, {
     ...definition.scenario,
     spatialPlan: plan,

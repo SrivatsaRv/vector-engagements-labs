@@ -229,13 +229,24 @@ function LabWorkbench({
   const [catalogStudyAreas, setCatalogStudyAreas] = useState<StudyArea[]>([]);
   const [catalogCredibility, setCatalogCredibility] =
     useState<CatalogCredibilityAdmission | null>(null);
+  const [spatialInputsValid, setSpatialInputsValid] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("TRUTH");
   const [playbackSurface, setPlaybackSurface] =
     useState<PlaybackSurface>("MAP");
-  const validations = useMemo(
-    () => validateScenario(definition, scenario),
-    [definition, scenario],
-  );
+  const validations = useMemo(() => {
+    const items = validateScenario(definition, scenario);
+    return spatialInputsValid
+      ? items
+      : [
+          ...items,
+          {
+            id: "authored-flight-input",
+            label: "A flight input is invalid",
+            detail: "Correct the marked start or route value in Place & flight.",
+            state: "error" as const,
+          },
+        ];
+  }, [definition, scenario, spatialInputsValid]);
   const blueSystem = getCatalogObject(scenario.blueSystemId);
   const runtimeBusy =
     runtimeState === "initialization" ||
@@ -376,7 +387,7 @@ function LabWorkbench({
       return;
     }
     const checks = validateScenario(definition, scenario);
-    if (!canConduct(checks)) {
+    if (!spatialInputsValid || !canConduct(checks)) {
       setWorkspace("configure");
       setBuildStep(4);
       return;
@@ -420,7 +431,7 @@ function LabWorkbench({
         detail: `${getCatalogObject(scenario.blueSystemId).designation} · ${findWeaponSimulationModel(scenario.blueSystemId)?.id ?? "model unavailable"}@${findWeaponSimulationModel(scenario.blueSystemId)?.version ?? "unknown"} · ${scenario.guidance} path · ${formatDistanceKm(scenario.range)} km`,
       },
     ]);
-  }, [catalogState, definition, draftRevision, scenario, simulationClient]);
+  }, [catalogState, definition, draftRevision, scenario, simulationClient, spatialInputsValid]);
 
   useEffect(() => {
     if (!playing) return;
@@ -739,6 +750,8 @@ function LabWorkbench({
           catalogState={catalogState}
           credibility={catalogCredibility}
           installations={catalogInstallations}
+          spatialInputsValid={spatialInputsValid}
+          onSpatialValidityChange={setSpatialInputsValid}
           run={run}
         />
       )}
@@ -1010,6 +1023,8 @@ function ConfigureWorkspace({
   catalogState,
   credibility,
   installations,
+  spatialInputsValid,
+  onSpatialValidityChange,
   run,
 }: {
   definition: ScenarioDefinition;
@@ -1024,6 +1039,8 @@ function ConfigureWorkspace({
   catalogState: "loading" | "POSTGIS" | "error";
   credibility: CatalogCredibilityAdmission | null;
   installations: MapInstallation[];
+  spatialInputsValid: boolean;
+  onSpatialValidityChange: (valid: boolean) => void;
   run: () => void;
 }) {
   const [contextExpanded, setContextExpanded] = useState(true);
@@ -1194,7 +1211,11 @@ function ConfigureWorkspace({
       "The template is ready when its setup checks pass. These checks test completeness and consistency; they do not certify real-world performance.",
     ],
   ];
-  const advance = () => (step === 4 ? run() : setStep(step + 1));
+  const navigateStep = (value: number) => {
+    if (step === 2 && !spatialInputsValid && value !== 2) return;
+    setStep(value);
+  };
+  const advance = () => (step === 4 ? run() : navigateStep(step + 1));
   return (
     <section className="build-workspace">
       <aside className="build-steps">
@@ -1203,7 +1224,7 @@ function ConfigureWorkspace({
           <button
             className={index === step ? "active" : ""}
             key={label}
-            onClick={() => setStep(index)}
+            onClick={() => navigateStep(index)}
             aria-current={index === step ? "step" : undefined}
           >
             <i>{index + 1}</i>
@@ -1494,12 +1515,14 @@ function ConfigureWorkspace({
             </div>
             {selectedStudyArea && (
               <ScenarioAuthoringMap
+                key={selectedStudyArea.id}
                 scenario={scenario}
                 studyArea={selectedStudyArea}
                 blueObject={bluePlatform}
                 redObject={redObject}
                 installations={installations}
                 onChange={applySpatialPlan}
+                onValidityChange={onSpatialValidityChange}
               />
             )}
             <div className="compact-controls">
@@ -1986,12 +2009,15 @@ function ConfigureWorkspace({
           </span>
           <div>
             {step > 0 && (
-              <button className="back-action" onClick={() => setStep(step - 1)}>
+              <button className="back-action" onClick={() => navigateStep(step - 1)}>
                 Back
               </button>
             )}
             <button
-              disabled={step === 4 && !canConduct(validations)}
+              disabled={
+                (step === 2 && !spatialInputsValid) ||
+                (step === 4 && !canConduct(validations))
+              }
               onClick={advance}
             >
               {step === 4 ? (

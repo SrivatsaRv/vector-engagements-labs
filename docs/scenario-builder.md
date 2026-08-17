@@ -144,6 +144,7 @@ reference, or map anchor.
 - Blue and Red each have an affiliation-scoped origin picker populated from public-reference installations inside the selected study area. Choosing an origin moves that team's aircraft to the installation; manual drag remains available when no catalog origin is appropriate.
 - Blue and Red start markers and waypoints are draggable.
 - Waypoint creation is scoped to the currently selected team and lives in that team's route inspector. The map never offers an unowned generic waypoint action.
-- The selected entity inspector edits explicit MSL altitude, true heading, speed, and route state.
+- The selected entity inspector edits WGS84 start coordinates, explicit MSL altitude, true heading, true airspeed, and each waypoint's WGS84 coordinates and MSL altitude. This provides a keyboard-accessible alternative to map placement.
+- Numeric editors retain intermediate text. Empty, non-finite, out-of-area, negative, over-limit, and uncommitted values keep the operator in Place & flight and block validation instead of being discarded, normalized, or clamped into a different scenario.
 - Drag and numeric edits synchronize starting distance, altitude difference, aspect, and platform speeds before compilation.
-- Validation blocks non-finite state, negative speed or altitude, invalid headings, mismatched route origins, and any start or waypoint outside the preset boundary.
+- Validation blocks non-finite state, negative speed or altitude, invalid headings, mismatched route origins, zero-length route legs, and any start or waypoint outside the preset boundary.
