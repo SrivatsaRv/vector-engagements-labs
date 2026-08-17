@@ -114,9 +114,16 @@ const testAircraftModel = {
   maximumCommandG: 9,
 };
 
+function admitTestAircraft(scenario) {
+  for (const entity of scenario.entities) {
+    if (entity.kind === "AIRCRAFT") entity.aircraft = { ...testAircraftModel };
+  }
+  return scenario;
+}
+
 test("generic engine updates every spawned entity deterministically", () => {
-  const first = runEngine(testScenario());
-  const second = runEngine(testScenario());
+  const first = runEngine(admitTestAircraft(testScenario()));
+  const second = runEngine(admitTestAircraft(testScenario()));
   assert.deepEqual(first, second);
   assert.ok(first.frames.length > 10);
   assert.equal(first.frames[0].entities.length, 3);
@@ -133,7 +140,7 @@ test("generic engine updates every spawned entity deterministically", () => {
 });
 
 test("engine entity count is supplied by the scenario, not fixed in code", () => {
-  const scenario = testScenario();
+  const scenario = admitTestAircraft(testScenario());
   scenario.entities.push({
     ...baseEntity,
     id: "observer-1",
@@ -156,7 +163,7 @@ test("engine entity count is supplied by the scenario, not fixed in code", () =>
 });
 
 test("stowed weapons become observable only when their launch event occurs", () => {
-  const scenario = testScenario();
+  const scenario = admitTestAircraft(testScenario());
   const weapon = scenario.entities.find((entity) => entity.id === "weapon-blue");
   weapon.weapon.launchTimeSeconds = 2;
   const run = runEngine(scenario);
@@ -183,7 +190,7 @@ test("stowed weapons become observable only when their launch event occurs", () 
 });
 
 test("an unlaunched carried weapon remains inventory, not a world entity", () => {
-  const scenario = testScenario();
+  const scenario = admitTestAircraft(testScenario());
   const weapon = scenario.entities.find((entity) => entity.id === "weapon-blue");
   weapon.weapon.launchTimeSeconds = null;
   const run = runEngine(scenario);
@@ -196,7 +203,7 @@ test("an unlaunched carried weapon remains inventory, not a world entity", () =>
 });
 
 test("sensor entities publish separate detection, tracking, engagement, and minimum-range envelopes", () => {
-  const scenario = testScenario();
+  const scenario = admitTestAircraft(testScenario());
   scenario.entities[0].sensor = {
     detectionRadiusM: 90000,
     trackingRadiusM: 70000,
@@ -217,11 +224,13 @@ test("sensor entities publish separate detection, tracking, engagement, and mini
 });
 
 test("aircraft dynamics consume fuel and expose thrust, drag, mass, and maneuver authority", () => {
-  const scenario = testScenario();
+  const scenario = admitTestAircraft(testScenario());
   const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
   blue.aircraft = testAircraftModel;
-  blue.behavior.commandedG = 4;
-  blue.behavior.maneuver = "break";
+  blue.route = [
+    { ...blue.initial.position },
+    { x: 5000, y: 5000, z: 9000 },
+  ];
   const run = runEngine(scenario);
   const first = run.frames[0].entities.find((entity) => entity.id === "aircraft-blue");
   const last = run.frames.at(-1).entities.find((entity) => entity.id === "aircraft-blue");
@@ -232,5 +241,59 @@ test("aircraft dynamics consume fuel and expose thrust, drag, mass, and maneuver
   assert.ok(last.dragNewtons > 0, "air-relative drag must be computed");
   assert.ok(last.thrustNewtons > 0, "available fuel must permit modeled thrust");
   assert.equal(last.availableG, testAircraftModel.maximumCommandG);
-  assert.ok(last.commandedG > 0 && last.commandedG <= last.availableG);
+  assert.ok(
+    run.frames.some((frame) => {
+      const entity = frame.entities.find((item) => item.id === blue.id);
+      return entity.commandedG > 0 && entity.commandedG <= entity.availableG;
+    }),
+  );
+});
+
+test("aircraft without an admitted model fail closed", () => {
+  assert.throws(
+    () => runEngine(testScenario()),
+    /Aircraft aircraft-blue has no admitted aircraft model/,
+  );
+});
+
+test("aircraft follow authored three-dimensional routes with bounded recorded control", () => {
+  const scenario = admitTestAircraft(testScenario());
+  const red = scenario.entities.find((entity) => entity.id === "aircraft-red");
+  red.route = [
+    { ...red.initial.position },
+    { x: 10000, y: 9000, z: 10500 },
+  ];
+
+  const run = runEngine(scenario);
+  const first = run.frames[0].entities.find((entity) => entity.id === red.id);
+  const last = run.frames.at(-1).entities.find((entity) => entity.id === red.id);
+
+  assert.ok(first && last?.aircraftControl);
+  assert.ok(last.position.y > first.position.y + 100, "route must change horizontal position");
+  assert.ok(last.position.z > first.position.z + 25, "route must change altitude");
+  assert.ok(last.headingRad < Math.PI, "heading must turn toward the authored route");
+  assert.ok(last.aircraftControl.requestedVelocityMps.z > 0);
+  assert.ok(
+    Math.hypot(
+      last.aircraftControl.acceptedSteeringAccelerationMps2.x,
+      last.aircraftControl.acceptedSteeringAccelerationMps2.y,
+      last.aircraftControl.acceptedSteeringAccelerationMps2.z,
+    ) <= testAircraftModel.maximumCommandG * 9.80665 + 1e-9,
+  );
+  assert.deepEqual(last.aircraftControl.achievedVelocityMps, last.velocity);
+});
+
+test("changing one authored route changes the recorded aircraft trail", () => {
+  const leftScenario = admitTestAircraft(testScenario());
+  const rightScenario = structuredClone(leftScenario);
+  const leftRed = leftScenario.entities.find((entity) => entity.id === "aircraft-red");
+  const rightRed = rightScenario.entities.find((entity) => entity.id === "aircraft-red");
+  leftRed.route = [{ ...leftRed.initial.position }, { x: 0, y: 9000, z: 8500 }];
+  rightRed.route = [{ ...rightRed.initial.position }, { x: 0, y: -9000, z: 8500 }];
+
+  const left = runEngine(leftScenario).frames.at(-1).entities.find((entity) => entity.id === "aircraft-red");
+  const right = runEngine(rightScenario).frames.at(-1).entities.find((entity) => entity.id === "aircraft-red");
+
+  assert.ok(left.position.y > right.position.y + 100);
+  assert.notDeepEqual(left.position, right.position);
 });

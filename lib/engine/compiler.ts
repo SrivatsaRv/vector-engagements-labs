@@ -216,29 +216,6 @@ export function compileScenario(
           : input.blueDecision === "DISENGAGE"
             ? 0.45
             : 1;
-  const redDecisionFactor =
-    input.redDecision === "DEFEND"
-      ? 1
-      : input.redDecision === "CRANK"
-        ? 0.7
-        : input.redDecision === "DISENGAGE"
-          ? 0.55
-      : 0.25;
-  const bluePlatformManeuver =
-    input.blueDecision === "CRANK" ||
-    input.blueDecision === "DEFEND" ||
-    input.blueDecision === "DISENGAGE"
-      ? "break"
-      : "steady";
-  const bluePlatformG =
-    input.blueDecision === "CRANK"
-      ? 2.5
-      : input.blueDecision === "DEFEND"
-        ? 5
-        : input.blueDecision === "DISENGAGE"
-          ? -4
-          : 0;
-
   const bluePlatform = withProvenance(
     {
       id: "blue-platform-1",
@@ -275,8 +252,8 @@ export function compileScenario(
         fuelKg: blueFuelKg,
       },
       behavior: {
-        maneuver: blueIsAircraft ? bluePlatformManeuver : "steady",
-        commandedG: blueIsAircraft ? bluePlatformG : 0,
+        maneuver: "steady",
+        commandedG: 0,
         decision: input.blueDecision,
       },
       aircraft: blueAircraft,
@@ -323,8 +300,8 @@ export function compileScenario(
         fuelKg: redFuelKg,
       },
       behavior: {
-        maneuver: movingTarget ? input.maneuver : "steady",
-        commandedG: movingTarget ? input.targetG * redDecisionFactor : 0,
+        maneuver: "steady",
+        commandedG: 0,
         decision: input.redDecision,
       },
       aircraft: redAircraft,

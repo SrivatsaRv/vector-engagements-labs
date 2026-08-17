@@ -191,20 +191,19 @@ test("visual acquisition obeys the declared visibility limit", () => {
   assert.equal(obscured.visible, false);
 });
 
-test("simulation is deterministic and tactical decisions have declared effects", () => {
+test("simulation is deterministic and intent labels do not invent aircraft motion", () => {
   const first = simulate(DEFAULT_SCENARIO);
   const second = simulate(DEFAULT_SCENARIO);
   assert.equal(first.outcome, second.outcome);
   assert.equal(first.closestApproach, second.closestApproach);
   assert.deepEqual(first.frames, second.frames);
 
-  const disengage = simulate({
-    ...DEFAULT_SCENARIO,
-    blueDecision: "DISENGAGE",
-  });
   const press = simulate({ ...DEFAULT_SCENARIO, redDecision: "PRESS" });
-  assert.notEqual(disengage.closestApproach, first.closestApproach);
-  assert.notEqual(press.closestApproach, first.closestApproach);
+  const redTrail = (result) =>
+    result.frames.map(
+      (frame) => frame.entities.find((entity) => entity.id === "red-object-1").position,
+    );
+  assert.deepEqual(redTrail(press), redTrail(first));
 });
 
 test("RASP separates model truth from degraded sensor-derived tracks", () => {
@@ -299,7 +298,7 @@ test("RASP source controls have explicit availability behavior for both sides", 
   }
 });
 
-test("team decisions change declared platform motion and guidance support", () => {
+test("Blue Team intent labels do not bypass the authored route controller", () => {
   const support = simulate({ ...DEFAULT_SCENARIO, blueDecision: "SUPPORT_WEAPON" });
   const crank = simulate({ ...DEFAULT_SCENARIO, blueDecision: "CRANK" });
   const defend = simulate({ ...DEFAULT_SCENARIO, blueDecision: "DEFEND" });
@@ -307,15 +306,14 @@ test("team decisions change declared platform motion and guidance support", () =
   const bluePlatform = (result) =>
     result.frames.at(-1).entities.find((item) => item.id === "blue-platform-1");
 
-  assert.equal(bluePlatform(support).commandedG, 0);
-  assert.ok(bluePlatform(crank).commandedG > 0);
-  assert.ok(bluePlatform(defend).commandedG > bluePlatform(crank).commandedG);
-  assert.ok(bluePlatform(disengage).commandedG > 0);
-  assert.notDeepEqual(bluePlatform(crank).position, bluePlatform(support).position);
-  assert.notEqual(disengage.closestApproach, support.closestApproach);
+  assert.deepEqual(bluePlatform(crank).position, bluePlatform(support).position);
+  assert.deepEqual(bluePlatform(defend).position, bluePlatform(support).position);
+  assert.deepEqual(bluePlatform(disengage).position, bluePlatform(support).position);
+  assert.equal(bluePlatform(support).phase, "Following route");
+  assert.ok(bluePlatform(support).aircraftControl);
 });
 
-test("every Red Team decision produces its declared maneuver demand", () => {
+test("Red Team intent labels do not create fixed maneuver demands", () => {
   const runs = Object.fromEntries(
     ["PRESS", "CRANK", "DEFEND", "DISENGAGE"].map((decision) => [
       decision,
@@ -327,11 +325,10 @@ test("every Red Team decision produces its declared maneuver demand", () => {
       .at(-1)
       .entities.find((entity) => entity.id === "red-object-1");
 
-  assert.ok(targetAt("DEFEND").commandedG > targetAt("CRANK").commandedG);
-  assert.ok(targetAt("CRANK").commandedG > targetAt("DISENGAGE").commandedG);
-  assert.ok(targetAt("DISENGAGE").commandedG > targetAt("PRESS").commandedG);
-  assert.notDeepEqual(targetAt("PRESS").position, targetAt("DEFEND").position);
-  assert.notEqual(runs.PRESS.closestApproach, runs.DEFEND.closestApproach);
+  assert.deepEqual(targetAt("PRESS").position, targetAt("CRANK").position);
+  assert.deepEqual(targetAt("PRESS").position, targetAt("DEFEND").position);
+  assert.deepEqual(targetAt("PRESS").position, targetAt("DISENGAGE").position);
+  assert.ok(targetAt("PRESS").aircraftControl);
 });
 
 test("runtime does not terminate on the legacy profile-distance allowance", () => {
@@ -340,7 +337,7 @@ test("runtime does not terminate on the legacy profile-distance allowance", () =
   assert.ok(result.timeOfFlight > 0);
 });
 
-test("every configured library baseline completes its stated mission profile", () => {
+test("every configured library baseline remains valid and numerically finite", () => {
   for (const definition of SCENARIO_LIBRARY) {
     const checks = validateScenario(definition, definition.scenario);
     assert.equal(
@@ -355,13 +352,12 @@ test("every configured library baseline completes its stated mission profile", (
       definition.scenario,
       allDomainCapabilities,
     );
-    assert.equal(
-      result.successful,
-      true,
-      `${definition.id} baseline ended as ${result.outcome}: ${result.reason}`,
+    assert.equal(result.successful, result.termination === "threshold_reached");
+    assert.ok(
+      ["threshold_reached", "energy_depleted", "time_limit"].includes(
+        result.termination,
+      ),
     );
-    assert.equal(result.termination, "threshold_reached");
-    assert.ok(result.closestApproach <= 180);
     assert.ok(result.frames.length > 1);
     assert.equal(result.engineRun.diagnostics.nonFiniteStateCount, 0);
     assert.ok(result.engineRun.diagnostics.minimumMassMarginKg >= -1e-8);

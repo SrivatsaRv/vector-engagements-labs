@@ -32,6 +32,8 @@ type RuntimeState = {
   dragNewtons: number;
   thrustNewtons: number;
   phase: string;
+  routePointIndex: number;
+  aircraftControl?: NonNullable<EngineEntityFrame["aircraftControl"]>;
   lastGuidanceAcceleration: Vec3;
   lastGuidanceUpdateSeconds: number;
 };
@@ -39,6 +41,10 @@ type RuntimeState = {
 const G0 = 9.80665;
 
 function initialState(definition: EngineEntityDefinition): RuntimeState {
+  const firstRoutePoint = definition.route?.[0];
+  const startsAtFirstRoutePoint =
+    firstRoutePoint !== undefined &&
+    magnitude(subtract(firstRoutePoint, definition.initial.position)) <= 1e-6;
   return {
     definition,
     lifecycle: definition.lifecycle,
@@ -52,6 +58,7 @@ function initialState(definition: EngineEntityDefinition): RuntimeState {
     dragNewtons: 0,
     thrustNewtons: 0,
     phase: definition.lifecycle === "STOWED" ? "Stowed" : "Initial state",
+    routePointIndex: startsAtFirstRoutePoint ? 1 : 0,
     lastGuidanceAcceleration: { x: 0, y: 0, z: 0 },
     lastGuidanceUpdateSeconds: Number.NEGATIVE_INFINITY,
   };
@@ -91,20 +98,63 @@ function updateKinematicEntity(
   dt: number,
 ) {
   if (state.lifecycle !== "ACTIVE" && state.lifecycle !== "TRACKING") return;
-  const { behavior, kind } = state.definition;
+  const { kind } = state.definition;
   if (kind !== "AIRCRAFT") return;
-  const model = state.definition.aircraft;
+  const model = state.definition.aircraft!;
   const speed = Math.max(1, magnitude(state.velocity));
-  let turnDemand = 0;
-  if (behavior.maneuver !== "steady" && time >= 5) {
-    turnDemand =
-      behavior.maneuver === "break"
-        ? behavior.commandedG
-        : behavior.commandedG * Math.sin(time * 0.55);
+  const route = state.definition.route ?? [];
+  let routePoint = route[state.routePointIndex];
+  const captureRadiusM = Math.max(1, speed * dt * 2);
+  while (
+    routePoint &&
+    state.routePointIndex < route.length - 1 &&
+    magnitude(subtract(routePoint, state.position)) <= captureRadiusM
+  ) {
+    state.routePointIndex += 1;
+    routePoint = route[state.routePointIndex];
   }
-  const limitedTurnDemand = model
-    ? Math.max(-model.maximumCommandG, Math.min(model.maximumCommandG, turnDemand))
-    : turnDemand;
+  const currentDirection = normalize(state.velocity);
+  const requestedDirection = routePoint
+    ? normalize(subtract(routePoint, state.position))
+    : currentDirection;
+  const directionCross = magnitude(cross(requestedDirection, currentDirection));
+  const directionAligned =
+    dot(requestedDirection, currentDirection) > 0 && directionCross < 1e-9;
+  const requestedVelocity = directionAligned
+    ? scale(currentDirection, speed)
+    : scale(requestedDirection, speed);
+  let requestedSteeringAcceleration = scale(
+    subtract(requestedVelocity, state.velocity),
+    1 / dt,
+  );
+  requestedSteeringAcceleration = subtract(
+    requestedSteeringAcceleration,
+    scale(
+      currentDirection,
+      dot(requestedSteeringAcceleration, currentDirection),
+    ),
+  );
+  if (directionAligned || magnitude(requestedSteeringAcceleration) < 1e-9) {
+    requestedSteeringAcceleration = { x: 0, y: 0, z: 0 };
+  }
+  if (
+    routePoint &&
+    dot(normalize(requestedVelocity), currentDirection) < -0.999 &&
+    magnitude(requestedSteeringAcceleration) < 1e-6
+  ) {
+    requestedSteeringAcceleration = {
+      x: -currentDirection.y * model.maximumCommandG * G0,
+      y: currentDirection.x * model.maximumCommandG * G0,
+      z: 0,
+    };
+  }
+  const acceptedSteeringAcceleration = clampMagnitude(
+    requestedSteeringAcceleration,
+    model.maximumCommandG * G0,
+  );
+  const steeringLimited =
+    magnitude(requestedSteeringAcceleration) >
+    magnitude(acceptedSteeringAcceleration) + 1e-9;
   const atmosphere = standardAtmosphere(
     state.position.z,
     scenario.environment.temperatureOffsetC,
@@ -112,9 +162,10 @@ function updateKinematicEntity(
   const airRelative = subtract(state.velocity, activeWind(scenario, time));
   const airspeed = Math.max(1, magnitude(airRelative));
   let longitudinalAcceleration = 0;
-  if (model) {
+  {
     const dynamicPressure = Math.max(1, 0.5 * atmosphere.densityKgM3 * airspeed * airspeed);
-    const loadFactor = Math.sqrt(1 + limitedTurnDemand * limitedTurnDemand);
+    const steeringG = magnitude(acceptedSteeringAcceleration) / G0;
+    const loadFactor = Math.sqrt(1 + steeringG * steeringG);
     const liftCoefficient =
       (state.massKg * G0 * loadFactor) /
       (dynamicPressure * model.referenceAreaM2);
@@ -124,7 +175,7 @@ function updateKinematicEntity(
     const drag = dynamicPressure * model.referenceAreaM2 * dragCoefficient;
     const thrustDemand = Math.min(
       model.maximumThrustNewtons,
-      drag * (limitedTurnDemand === 0 ? 1.02 : 1.18),
+      drag * (steeringG === 0 ? 1.02 : 1.18),
     );
     const fuelFlow =
       state.fuelKg > 0
@@ -140,16 +191,29 @@ function updateKinematicEntity(
     state.availableG = model.maximumCommandG;
   }
   const nextSpeed = Math.max(60, speed + longitudinalAcceleration * dt);
-  const turnRate = (limitedTurnDemand * G0) / nextSpeed;
-  state.headingRad += turnRate * dt;
-  state.velocity = {
-    x: Math.cos(state.headingRad) * nextSpeed,
-    y: Math.sin(state.headingRad) * nextSpeed,
-    z: state.velocity.z,
-  };
+  const steeredVelocity = add(
+    state.velocity,
+    scale(acceptedSteeringAcceleration, dt),
+  );
+  state.velocity =
+    magnitude(acceptedSteeringAcceleration) === 0
+      ? scale(state.velocity, nextSpeed / speed)
+      : scale(normalize(steeredVelocity), nextSpeed);
+  state.headingRad = Math.atan2(state.velocity.y, state.velocity.x);
   state.position = add(state.position, scale(state.velocity, dt));
-  state.commandedG = Math.abs(limitedTurnDemand);
-  state.phase = limitedTurnDemand === 0 ? "Steady flight" : "Commanded maneuver";
+  state.commandedG = magnitude(acceptedSteeringAcceleration) / G0;
+  state.phase = routePoint ? "Following route" : "Route complete";
+  state.aircraftControl = {
+    routePointIndex: routePoint ? state.routePointIndex : null,
+    requestedVelocityMps: requestedVelocity,
+    acceptedSteeringAccelerationMps2: acceptedSteeringAcceleration,
+    achievedVelocityMps: { ...state.velocity },
+    limiter: routePoint
+      ? steeringLimited
+        ? "LOAD_FACTOR"
+        : "NONE"
+      : "ROUTE_COMPLETE",
+  };
 }
 
 function activateWeapon(
@@ -361,6 +425,9 @@ function toFrame(
     availableG: state.availableG,
     phase: state.phase,
     valueState: state.definition.provenance.valueState,
+    ...(state.aircraftControl
+      ? { aircraftControl: structuredClone(state.aircraftControl) }
+      : {}),
   };
 }
 
@@ -443,6 +510,14 @@ export class EngineSession {
 
   constructor(scenario: EngineScenario) {
     this.scenario = scenario;
+    const unmodeledAircraft = scenario.entities.find(
+      (entity) => entity.kind === "AIRCRAFT" && !entity.aircraft,
+    );
+    if (unmodeledAircraft) {
+      throw new Error(
+        `Aircraft ${unmodeledAircraft.id} has no admitted aircraft model.`,
+      );
+    }
     const legacyStudyArea = scenario.environment.studyArea;
     this.recordingOrigin = scenario.geospatial?.origin ?? {
       schemaVersion: "vector.scenario-origin.v1" as const,

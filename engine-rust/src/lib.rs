@@ -426,6 +426,24 @@ pub struct EngineScenario {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AircraftControlFrame {
+    pub route_point_index: Option<usize>,
+    pub requested_velocity_mps: Vec3,
+    pub accepted_steering_acceleration_mps2: Vec3,
+    pub achieved_velocity_mps: Vec3,
+    pub limiter: AircraftControlLimiter,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AircraftControlLimiter {
+    LoadFactor,
+    None,
+    RouteComplete,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EntityFrame {
     pub id: String,
     pub rddf_id: String,
@@ -449,6 +467,8 @@ pub struct EntityFrame {
     pub available_g: f64,
     pub phase: String,
     pub value_state: ModelValueState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aircraft_control: Option<AircraftControlFrame>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -515,12 +535,19 @@ struct RuntimeState {
     drag_newtons: f64,
     thrust_newtons: f64,
     phase: String,
+    route_point_index: usize,
+    aircraft_control: Option<AircraftControlFrame>,
     last_guidance_acceleration: Vec3,
     last_guidance_update_seconds: f64,
 }
 
 impl RuntimeState {
     fn new(definition: &EntityDefinition) -> Self {
+        let starts_at_first_route_point = definition
+            .route
+            .first()
+            .map(|point| point.subtract(definition.initial.position).magnitude() <= 1e-6)
+            .unwrap_or(false);
         Self {
             definition: definition.clone(),
             lifecycle: definition.lifecycle,
@@ -543,6 +570,8 @@ impl RuntimeState {
                 "Initial state"
             }
             .to_string(),
+            route_point_index: usize::from(starts_at_first_route_point),
+            aircraft_control: None,
             last_guidance_acceleration: Vec3::default(),
             last_guidance_update_seconds: f64::NEG_INFINITY,
         }
@@ -604,29 +633,62 @@ fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f6
     if state.definition.kind != EntityKind::Aircraft {
         return;
     }
-    let model = state.definition.aircraft.as_ref();
+    let Some(model) = state.definition.aircraft.as_ref() else {
+        return;
+    };
     let speed = state.velocity.magnitude().max(1.0);
-    let mut turn_demand = 0.0;
-    if state.definition.behavior.maneuver != Maneuver::Steady && time >= 5.0 {
-        turn_demand = if state.definition.behavior.maneuver == Maneuver::Break {
-            state.definition.behavior.commanded_g
-        } else {
-            state.definition.behavior.commanded_g * (time * 0.55).sin()
+    let capture_radius_m = (speed * dt * 2.0).max(1.0);
+    while state.route_point_index < state.definition.route.len().saturating_sub(1)
+        && state
+            .definition
+            .route
+            .get(state.route_point_index)
+            .map(|point| point.subtract(state.position).magnitude() <= capture_radius_m)
+            .unwrap_or(false)
+    {
+        state.route_point_index += 1;
+    }
+    let route_point = state.definition.route.get(state.route_point_index).copied();
+    let current_direction = state.velocity.normalize();
+    let requested_direction = route_point
+        .map(|point| point.subtract(state.position).normalize())
+        .unwrap_or(current_direction);
+    let direction_cross = requested_direction.cross(current_direction).magnitude();
+    let direction_aligned =
+        requested_direction.dot(current_direction) > 0.0 && direction_cross < 1e-9;
+    let requested_velocity = if direction_aligned {
+        current_direction.scale(speed)
+    } else {
+        requested_direction.scale(speed)
+    };
+    let mut requested_steering = requested_velocity.subtract(state.velocity).scale(1.0 / dt);
+    requested_steering = requested_steering
+        .subtract(current_direction.scale(requested_steering.dot(current_direction)));
+    if direction_aligned || requested_steering.magnitude() < 1e-9 {
+        requested_steering = Vec3::default();
+    }
+    if route_point.is_some()
+        && requested_velocity.normalize().dot(current_direction) < -0.999
+        && requested_steering.magnitude() < 1e-6
+    {
+        requested_steering = Vec3 {
+            x: -current_direction.y * model.maximum_command_g * G0,
+            y: current_direction.x * model.maximum_command_g * G0,
+            z: 0.0,
         };
     }
-    let limited_turn = model
-        .map(|item| turn_demand.clamp(-item.maximum_command_g, item.maximum_command_g))
-        .unwrap_or(turn_demand);
+    let accepted_steering = requested_steering.clamp_magnitude(model.maximum_command_g * G0);
+    let steering_limited = requested_steering.magnitude() > accepted_steering.magnitude() + 1e-9;
     let (density, _) = atmosphere(state.position.z, scenario.environment.temperature_offset_c);
     let airspeed = state
         .velocity
         .subtract(active_wind(scenario, time))
         .magnitude()
         .max(1.0);
-    let mut longitudinal_acceleration = 0.0;
-    if let Some(model) = model {
+    let longitudinal_acceleration = {
         let dynamic_pressure = (0.5 * density * airspeed * airspeed).max(1.0);
-        let load_factor = (1.0 + limited_turn * limited_turn).sqrt();
+        let steering_g = accepted_steering.magnitude() / G0;
+        let load_factor = (1.0 + steering_g * steering_g).sqrt();
         let lift_coefficient =
             state.mass_kg * G0 * load_factor / (dynamic_pressure * model.reference_area_m2);
         let drag_coefficient = model.zero_lift_drag_coefficient
@@ -634,7 +696,7 @@ fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f6
         let drag = dynamic_pressure * model.reference_area_m2 * drag_coefficient;
         let thrust_demand = model
             .maximum_thrust_newtons
-            .min(drag * if limited_turn == 0.0 { 1.02 } else { 1.18 });
+            .min(drag * if steering_g == 0.0 { 1.02 } else { 1.18 });
         let fuel_flow = if state.fuel_kg > 0.0 {
             thrust_demand * model.specific_fuel_consumption_kg_per_newton_second
         } else {
@@ -649,24 +711,38 @@ fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f6
         } else {
             0.0
         };
-        longitudinal_acceleration = (state.thrust_newtons - state.drag_newtons) / state.mass_kg;
         state.available_g = model.maximum_command_g;
-    }
-    let next_speed = (speed + longitudinal_acceleration * dt).max(60.0);
-    state.heading_rad += limited_turn * G0 / next_speed * dt;
-    state.velocity = Vec3 {
-        x: state.heading_rad.cos() * next_speed,
-        y: state.heading_rad.sin() * next_speed,
-        z: state.velocity.z,
+        (state.thrust_newtons - state.drag_newtons) / state.mass_kg
     };
-    state.position = state.position.add(state.velocity.scale(dt));
-    state.commanded_g = limited_turn.abs();
-    state.phase = if limited_turn == 0.0 {
-        "Steady flight"
+    let next_speed = (speed + longitudinal_acceleration * dt).max(60.0);
+    let steered_velocity = state.velocity.add(accepted_steering.scale(dt));
+    state.velocity = if accepted_steering.magnitude() == 0.0 {
+        state.velocity.scale(next_speed / speed)
     } else {
-        "Commanded maneuver"
+        steered_velocity.normalize().scale(next_speed)
+    };
+    state.heading_rad = state.velocity.y.atan2(state.velocity.x);
+    state.position = state.position.add(state.velocity.scale(dt));
+    state.commanded_g = accepted_steering.magnitude() / G0;
+    state.phase = if route_point.is_some() {
+        "Following route"
+    } else {
+        "Route complete"
     }
     .to_string();
+    state.aircraft_control = Some(AircraftControlFrame {
+        route_point_index: route_point.map(|_| state.route_point_index),
+        requested_velocity_mps: requested_velocity,
+        accepted_steering_acceleration_mps2: accepted_steering,
+        achieved_velocity_mps: state.velocity,
+        limiter: if route_point.is_none() {
+            AircraftControlLimiter::RouteComplete
+        } else if steering_limited {
+            AircraftControlLimiter::LoadFactor
+        } else {
+            AircraftControlLimiter::None
+        },
+    });
 }
 
 fn activate_weapons(states: &mut [RuntimeState], time: f64) {
@@ -872,6 +948,7 @@ fn entity_frame(state: &RuntimeState, scenario: &EngineScenario) -> EntityFrame 
         available_g: state.available_g,
         phase: state.phase.clone(),
         value_state: state.definition.provenance.value_state,
+        aircraft_control: state.aircraft_control.clone(),
     }
 }
 
@@ -1161,7 +1238,16 @@ mod tests {
             },
             weapon: None,
             sensor: None,
-            aircraft: None,
+            aircraft: Some(AircraftModel {
+                empty_mass_kg: 8_000.0,
+                fuel_capacity_kg: 3_000.0,
+                reference_area_m2: 30.0,
+                zero_lift_drag_coefficient: 0.025,
+                induced_drag_factor: 0.08,
+                maximum_thrust_newtons: 120_000.0,
+                specific_fuel_consumption_kg_per_newton_second: 0.000025,
+                maximum_command_g: 9.0,
+            }),
             provenance: provenance(),
         }
     }
@@ -1354,6 +1440,22 @@ mod tests {
         assert!(matches!(
             validate_scenario(&input),
             Err(EngineError::InvalidScenario(message)) if message.contains("missing target")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn scenario_validation_rejects_aircraft_without_a_model(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut input = scenario();
+        input
+            .entities
+            .first_mut()
+            .ok_or("scenario fixture has no aircraft")?
+            .aircraft = None;
+        assert!(matches!(
+            validate_scenario(&input),
+            Err(EngineError::InvalidScenario(message)) if message.contains("aircraft is required")
         ));
         Ok(())
     }

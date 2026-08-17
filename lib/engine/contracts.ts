@@ -194,6 +194,13 @@ export type EngineEntityFrame = {
   availableG: number;
   phase: string;
   valueState: ModelValueState;
+  aircraftControl?: {
+    routePointIndex: number | null;
+    requestedVelocityMps: Vec3;
+    acceptedSteeringAccelerationMps2: Vec3;
+    achievedVelocityMps: Vec3;
+    limiter: "LOAD_FACTOR" | "NONE" | "ROUTE_COMPLETE";
+  };
 };
 
 export type CoverageEnvelope = {

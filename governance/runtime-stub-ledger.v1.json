@@ -19,7 +19,7 @@
     { "id": "STUB-07", "title": "Scalar assumption aircraft models", "classification": "explicit_supported_assumption", "releaseBlocking": true, "owners": ["#64"], "evidence": ["lib/simulation-models.ts", "lib/reference-model-pack.ts"], "resolution": "Require independently validated aircraft model-pack fields and fail closed when absent." },
     { "id": "STUB-08", "title": "Assumption weapon models and powered glide proxy", "classification": "explicit_supported_assumption", "releaseBlocking": true, "owners": ["#28"], "evidence": ["lib/simulation-models.ts"], "resolution": "Replace with variant-specific weapon packs and remove the powered glide proxy." },
     { "id": "STUB-09", "title": "Database weapon lookup falls back to in-memory models", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#64", "#28"], "evidence": ["lib/simulation-models.ts"], "resolution": "Compile one admitted immutable model pack; reject missing models." },
-    { "id": "STUB-10", "title": "Fixed intent demand and sinusoidal manoeuvre behavior", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#38", "#64"], "evidence": ["lib/engine/compiler.ts", "lib/engine/core.ts"], "resolution": "Use admitted aircraft authority, bounded commands, and achieved dynamics." },
+    { "id": "STUB-10", "title": "Named actor identities remain in the compiled movement contract", "classification": "replacement_required", "releaseBlocking": true, "owners": ["#38", "#64"], "evidence": ["lib/engine/compiler.ts"], "resolution": "Allocate actor identities from the authored force package instead of fixed duel slots." },
     { "id": "STUB-11", "title": "Hand-authored RASP confidence and track offsets", "classification": "explicit_supported_assumption", "releaseBlocking": true, "owners": ["#26"], "evidence": ["lib/simulation.ts"], "resolution": "Produce side-owned measurements and tracks from the information engine." },
     { "id": "STUB-12", "title": "Declared circular sensor and weapon envelopes", "classification": "explicit_supported_assumption", "releaseBlocking": true, "owners": ["#26", "#28", "#41"], "evidence": ["lib/map-layer-contracts.ts"], "resolution": "Render computed sensing, support, and engagement states from the canonical run." },
     { "id": "STUB-13", "title": "Temporary runtime model-pack adapter", "classification": "replacement_required", "releaseBlocking": true, "owners": ["#64", "#28", "#26"], "evidence": ["lib/runtime/protocol.ts"], "resolution": "Transport the versioned compiled pack and canonical VSR contracts directly." },
@@ -49,8 +49,7 @@
       { "id": "fallback", "expression": "fallback\\w*\\b", "flags": "i" },
       { "id": "model-assumption", "expression": "MODEL_ASSUMPTION", "flags": "" },
       { "id": "named-duel-id", "expression": "(?:blue-platform-1|red-object-1)", "flags": "" },
-      { "id": "guidance-hold", "expression": "GUIDANCE_HOLD", "flags": "" },
-      { "id": "sinusoidal-behavior", "expression": "behavior\\.commandedG \\* Math\\.sin", "flags": "" }
+      { "id": "guidance-hold", "expression": "GUIDANCE_HOLD", "flags": "" }
     ],
     "allowances": [
       { "path": "scripts/seed-db.ts", "indicator": "model-assumption", "expectedLines": 1, "entryIds": ["STUB-16"] },
@@ -72,7 +71,6 @@
       ,{ "path": "lib/engine/contracts.ts", "indicator": "guidance-hold", "expectedLines": 1, "entryIds": ["STUB-26"] }
       ,{ "path": "lib/engine/compiler.ts", "indicator": "guidance-hold", "expectedLines": 1, "entryIds": ["STUB-26"] }
       ,{ "path": "lib/engine/core.ts", "indicator": "guidance-hold", "expectedLines": 1, "entryIds": ["STUB-26"] }
-      ,{ "path": "lib/engine/core.ts", "indicator": "sinusoidal-behavior", "expectedLines": 1, "entryIds": ["STUB-10"] }
     ],
     "exemptions": [
       { "path": "lib/engine/contracts.ts", "indicator": "model-assumption", "expectedLines": 1, "classification": "contract-vocabulary", "rationale": "The enum declares a value state and does not supply a model value." },

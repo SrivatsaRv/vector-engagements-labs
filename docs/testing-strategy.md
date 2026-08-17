@@ -20,8 +20,8 @@ Use the smallest complete set for a change. State why any applicable layer was o
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and
 production-audit checks. It first verifies the machine-readable runtime stub
 ledger. A new or removed production fallback, temporary adapter, model
-assumption, named-duel identifier, scripted guidance hold, sinusoidal behavior,
-or source-less public reference must update its owning ledger entry; an
+assumption, named-duel identifier, scripted guidance hold, or source-less public
+reference must update its owning ledger entry; an
 unclassified occurrence fails. The named targeted contracts are `make worker-local`,
 `make frontend-local`, `make integration-local`, `make container-verify`,
 `make observability-local`, `make performance-local` and

@@ -146,6 +146,11 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
         vector(&format!("{root}.route[{route_index}]"), point)?;
     }
 
+    if entity.kind == crate::EntityKind::Aircraft && entity.aircraft.is_none() {
+        return Err(invalid(format!(
+            "{root}.aircraft is required for an aircraft entity"
+        )));
+    }
     if let Some(aircraft) = &entity.aircraft {
         positive(
             &format!("{root}.aircraft.emptyMassKg"),
