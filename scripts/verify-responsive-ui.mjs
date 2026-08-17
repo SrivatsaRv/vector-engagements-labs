@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
 import { chromium } from "playwright-core";
@@ -9,6 +9,14 @@ const chromePath =
   process.env.VECTOR_CHROME_PATH ??
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const outputDirectory = resolve("outputs/responsive");
+const deploymentCapabilities = JSON.parse(
+  readFileSync(new URL("../config/deployment-capabilities.json", import.meta.url), "utf8"),
+);
+const expectedEngineBackend = deploymentCapabilities.engine?.id;
+assert.ok(
+  expectedEngineBackend === "typescript" || expectedEngineBackend === "rust-wasm",
+  "deployment capability manifest must declare a supported engine backend",
+);
 const breakpoints = [
   { label: "compact-phone", width: 320, height: 568, family: "phone" },
   { label: "phone", width: 390, height: 844, family: "phone" },
@@ -248,7 +256,7 @@ try {
     assert.match(credibilityText, /vector-scalar-study-models@0\.6\.0/);
     assert.equal(await runButton.isEnabled(), true, `${viewport.width}: calibrated template is not runnable`);
     await runButton.click();
-    await page.locator('.session-layout[data-engine-backend="rust-wasm"]').waitFor();
+    await page.locator(".session-layout").waitFor();
     await page.waitForFunction(() => {
       const map = document.querySelector(".engagement-map");
       return Boolean(
@@ -282,7 +290,11 @@ try {
       assert.equal(observe.sessionScrollable, true, `${viewport.width}: phone replay cannot reach telemetry`);
     }
     assert.ok(observe.entities >= 2, `${viewport.width}: engine entities not rendered`);
-    assert.equal(observe.backend, "rust-wasm", `${viewport.width}: selected browser backend did not run`);
+    assert.equal(
+      observe.backend,
+      expectedEngineBackend,
+      `${viewport.width}: deployed browser backend does not match the capability manifest`,
+    );
     await page.getByRole("button", { name: "3D", exact: true }).click();
     await page.waitForFunction(() => Boolean(document.querySelector(".three-d-surface .simulation-scene canvas")));
     await page.waitForTimeout(100);
