@@ -239,7 +239,6 @@ export class BrowserSimulationClient {
           runId,
           packDigest: pack.digest,
           scenarioRef: pack.scenarioRef,
-          backend: scenario.engineBackend,
           batchTicks: Math.max(1, Math.min(4_096, Math.floor(options.batchTicks ?? 128))),
           progressIntervalMs: Math.max(
             50,
@@ -253,7 +252,7 @@ export class BrowserSimulationClient {
         throw new BrowserSimulationCancelledError("Browser simulation run cancelled.");
       }
       if (response.type !== "completed") throw new Error("Browser simulation ended without a record.");
-      if (response.backend !== scenario.engineBackend) {
+      if (response.backend !== pack.prepared.capabilityManifest.engine.id) {
         throw new Error("Browser simulation completion provenance is invalid.");
       }
       try {

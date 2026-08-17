@@ -90,20 +90,7 @@ async function executeRun(request: Extract<BrowserRuntimeRequest, { type: "run" 
     });
     return;
   }
-  if (request.backend !== pack.prepared.scenario.engineBackend) {
-    state = "failed";
-    respond({
-      protocol: BROWSER_RUNTIME_PROTOCOL,
-      requestId: request.requestId,
-      type: "failed",
-      state,
-      runId: request.runId,
-      code: "engine",
-      message: "Requested backend does not match authored backend provenance.",
-      recoverable: false,
-    });
-    return;
-  }
+  const backend = pack.prepared.capabilityManifest.engine.id;
   const run: ActiveRun = {
     requestId: request.requestId,
     runId: request.runId,
@@ -116,7 +103,7 @@ async function executeRun(request: Extract<BrowserRuntimeRequest, { type: "run" 
   let engineRun: EngineRun;
   let boundaryCalls = 0;
   try {
-    if (request.backend === "typescript") {
+    if (backend === "typescript") {
       const session = new EngineSession(pack.prepared.engineScenario);
       let lastProgress = 0;
       while (!session.isCompleted()) {
@@ -170,7 +157,7 @@ async function executeRun(request: Extract<BrowserRuntimeRequest, { type: "run" 
         active = null;
         return;
       }
-      engineRun = runEngineBackend(pack.prepared.engineScenario, "rust-wasm");
+      engineRun = runEngineBackend(pack.prepared.engineScenario, backend);
     }
     if (run.cancelled) {
       state = "ready";
@@ -195,7 +182,7 @@ async function executeRun(request: Extract<BrowserRuntimeRequest, { type: "run" 
         type: "completed",
         state,
         runId: request.runId,
-        backend: request.backend,
+        backend,
         recordId: record.manifest.recordId,
         contentDigest: record.manifest.contentDigest,
         byteLength: serialized.byteLength,

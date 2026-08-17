@@ -5,8 +5,12 @@ import {
   runEngineBackend,
 } from "../lib/engine/backend.ts";
 import { compileScenario } from "../lib/engine/compiler.ts";
-import { getProfile, simulate } from "../lib/simulation.ts";
+import {
+  getProfile,
+  simulateWithCapabilitiesForVerification,
+} from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
+import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
 
 const close = (actual, expected, tolerance, label) => {
   assert.ok(
@@ -23,14 +27,15 @@ test("committed Rust/WASM artifact has a stable integrity identity", () => {
 
 for (const definition of SCENARIO_LIBRARY) {
   test(`Rust/WASM matches TypeScript for ${definition.id}`, () => {
-    const typescript = simulate({
-      ...definition.scenario,
-      engineBackend: "typescript",
-    });
-    const rust = simulate({
-      ...definition.scenario,
-      engineBackend: "rust-wasm",
-    });
+    const domains = ["A2A", "A2G", "G2A", "G2G"];
+    const typescript = simulateWithCapabilitiesForVerification(
+      definition.scenario,
+      createVerificationDeploymentCapabilities("typescript", domains),
+    );
+    const rust = simulateWithCapabilitiesForVerification(
+      definition.scenario,
+      createVerificationDeploymentCapabilities("rust-wasm", domains),
+    );
 
     assert.equal(typescript.engineRun.diagnostics.backend, "typescript");
     assert.equal(rust.engineRun.diagnostics.backend, "rust-wasm");

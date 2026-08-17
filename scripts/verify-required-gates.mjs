@@ -8,6 +8,11 @@ export const REQUIRED_GATES = [
     result: "SECURITY_JS_RESULT",
   },
   { key: "web-tests", selected: "WEB_TESTS_SELECTED", result: "WEB_TESTS_RESULT" },
+  {
+    key: "browser-tests",
+    selected: "BROWSER_TESTS_SELECTED",
+    result: "BROWSER_TESTS_RESULT",
+  },
   { key: "rust-tests", selected: "RUST_TESTS_SELECTED", result: "RUST_TESTS_RESULT" },
   { key: "rust-audit", selected: "RUST_AUDIT_SELECTED", result: "RUST_AUDIT_RESULT" },
   { key: "integration", selected: "INTEGRATION_SELECTED", result: "INTEGRATION_RESULT" },

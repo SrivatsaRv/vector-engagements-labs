@@ -34,6 +34,11 @@ required replay member and carries a content digest. Opening verifies bounds,
 duplicate paths, SHA-256, required members, schema versions, backend provenance,
 and frozen report/frame agreement before returning replay data.
 
+`compiled.json` also contains the complete
+`vector.deployment-capabilities.v1` manifest. `manifest.json` binds its schema
+and SHA-256 digest beside the selected engine identity. Replay rejects a record
+when the compiled capability identity and record manifest disagree.
+
 Basemap tiles are referenced by provider and style revision, not silently embedded. A portable export may include explicitly licensed terrain or static assets. Missing optional assets must degrade to class silhouettes and a neutral terrain surface without changing telemetry.
 
 ## Frame contract

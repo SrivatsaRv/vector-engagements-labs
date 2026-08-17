@@ -50,6 +50,10 @@ export type VectorRecordManifest = {
     compatibilityAbi: "typescript-batched-v1" | "rust-json-v1";
     artifactSha256?: string;
   };
+  deploymentCapabilities: {
+    schemaVersion: "vector.deployment-capabilities.v1";
+    digest: string;
+  };
   requiredViewerFeatures: string[];
   members: VectorRecordMember[];
 };
@@ -385,7 +389,10 @@ export async function createVectorSimulationRecord(
   result: SimulationResult,
   createdAt = new Date().toISOString(),
 ): Promise<VectorSimulationRecord> {
-  if (result.engineRun.diagnostics.backend !== prepared.scenario.engineBackend) {
+  if (
+    result.engineRun.diagnostics.backend !==
+    prepared.capabilityManifest.engine.id
+  ) {
     throw new Error("Record backend provenance does not match the selected backend.");
   }
   const report: RecordReport = {
@@ -424,6 +431,7 @@ export async function createVectorSimulationRecord(
       "application/json",
       true,
       jsonBytes({
+        capabilityManifest: prepared.capabilityManifest,
         profileId: prepared.profileId,
         profile: prepared.profile,
         engineScenario: prepared.engineScenario,
@@ -478,15 +486,19 @@ export async function createVectorSimulationRecord(
       runtimeProtocol: "vector.browser-runtime.v1",
     },
     backend: {
-      selected: prepared.scenario.engineBackend,
+      selected: prepared.capabilityManifest.engine.id,
       engineScenarioVersion: prepared.engineScenario.version,
       compatibilityAbi:
-        prepared.scenario.engineBackend === "rust-wasm"
+        prepared.capabilityManifest.engine.id === "rust-wasm"
           ? "rust-json-v1"
           : "typescript-batched-v1",
-      ...(prepared.scenario.engineBackend === "rust-wasm"
+      ...(prepared.capabilityManifest.engine.id === "rust-wasm"
         ? { artifactSha256: RUST_WASM_ENGINE_ARTIFACT.sha256 }
         : {}),
+    },
+    deploymentCapabilities: {
+      schemaVersion: prepared.capabilityManifest.schemaVersion,
+      digest: prepared.capabilityManifest.digest,
     },
     requiredViewerFeatures: [
       VECTOR_FRAME_SCHEMA,
@@ -631,7 +643,8 @@ export async function openVectorSimulationRecord(
   };
   if (
     engineRun.diagnostics.backend !== manifest.backend.selected ||
-    scenario.engineBackend !== manifest.backend.selected
+    compiled.capabilityManifest.engine.id !== manifest.backend.selected ||
+    compiled.capabilityManifest.digest !== manifest.deploymentCapabilities.digest
   ) {
     throw new Error("VECTOR record backend provenance is inconsistent.");
   }

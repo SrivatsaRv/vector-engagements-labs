@@ -7,6 +7,7 @@ import { chromium } from "playwright-core";
 import { adaptPreparedSimulation } from "../lib/runtime/model-pack-adapter.ts";
 import { prepareSimulation } from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
+import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
 
 type RuntimeMessage = {
   type: string;
@@ -71,8 +72,14 @@ const browser = await chromium.launch({ executablePath: chromePath, headless: tr
 
 const packs = await Promise.all(
   (["typescript", "rust-wasm"] as const).map(async (backend) => {
-    const scenario = { ...SCENARIO_LIBRARY[0].scenario, engineBackend: backend };
-    return { backend, pack: await adaptPreparedSimulation(prepareSimulation(scenario)) };
+    const scenario = SCENARIO_LIBRARY[0].scenario;
+    const capabilities = createVerificationDeploymentCapabilities(backend);
+    return {
+      backend,
+      pack: await adaptPreparedSimulation(
+        prepareSimulation(scenario, scenario.profile, capabilities),
+      ),
+    };
   }),
 );
 
@@ -81,9 +88,9 @@ try {
   await page.goto(origin);
   await page.evaluate("globalThis.__name = (target) => target");
   const results: WorkerVerificationResult[] = [];
-  for (const { backend, pack } of packs) {
+  for (const { pack } of packs) {
     const result = await page.evaluate(
-      async ({ backend: selectedBackend, pack: selectedPack, workerUrl }) => {
+      async ({ pack: selectedPack, workerUrl }) => {
         const protocol = "vector.browser-runtime.v1";
         const worker = new Worker(workerUrl, { type: "module" });
         const states: string[] = [];
@@ -126,7 +133,6 @@ try {
           runId: "run-1",
           packDigest: selectedPack.digest,
           scenarioRef: selectedPack.scenarioRef,
-          backend: selectedBackend,
           batchTicks: 128,
           progressIntervalMs: 50,
         });
@@ -245,7 +251,7 @@ try {
           detachedAfterRecycle,
         };
       },
-      { backend, pack, workerUrl: `${origin}/assets/${workerName}` },
+      { pack, workerUrl: `${origin}/assets/${workerName}` },
     );
     results.push(result);
   }

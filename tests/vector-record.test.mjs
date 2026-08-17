@@ -7,13 +7,18 @@ import {
   openVectorSimulationRecord,
   serializeVectorRecord,
 } from "../lib/record/vector-record.ts";
-import { prepareSimulation, simulate } from "../lib/simulation.ts";
+import {
+  prepareSimulation,
+  simulate,
+  simulateWithCapabilitiesForVerification,
+} from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
+import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
 
 const createdAt = "2026-08-06T00:00:00.000Z";
 
 test("columnar frame transport round-trips exact engine frames", () => {
-  const scenario = { ...SCENARIO_LIBRARY[0].scenario, engineBackend: "typescript" };
+  const scenario = SCENARIO_LIBRARY[0].scenario;
   const result = simulate(scenario);
   const bytes = encodeColumnarFrames(result.engineRun.frames);
   assert.deepEqual(decodeColumnarFrames(bytes), result.engineRun.frames);
@@ -22,9 +27,10 @@ test("columnar frame transport round-trips exact engine frames", () => {
 
 for (const backend of ["typescript", "rust-wasm"]) {
   test(`VSR replays without physics and preserves ${backend} provenance`, async () => {
-    const scenario = { ...SCENARIO_LIBRARY[0].scenario, engineBackend: backend };
-    const prepared = prepareSimulation(scenario);
-    const result = simulate(scenario);
+    const scenario = SCENARIO_LIBRARY[0].scenario;
+    const capabilities = createVerificationDeploymentCapabilities(backend);
+    const prepared = prepareSimulation(scenario, scenario.profile, capabilities);
+    const result = simulateWithCapabilitiesForVerification(scenario, capabilities);
     const record = await createVectorSimulationRecord(prepared, result, createdAt);
     const serialized = serializeVectorRecord(record);
     const opened = await openVectorSimulationRecord(
@@ -33,6 +39,14 @@ for (const backend of ["typescript", "rust-wasm"]) {
     );
 
     assert.equal(opened.manifest.backend.selected, backend);
+    assert.equal(
+      opened.manifest.deploymentCapabilities.digest,
+      capabilities.digest,
+    );
+    assert.equal(
+      opened.manifest.deploymentCapabilities.schemaVersion,
+      "vector.deployment-capabilities.v1",
+    );
     assert.equal(opened.result.engineRun.diagnostics.backend, backend);
     assert.deepEqual(opened.result.frames, result.frames);
     assert.deepEqual(opened.result.envelopes, result.envelopes);
@@ -44,7 +58,7 @@ for (const backend of ["typescript", "rust-wasm"]) {
 }
 
 test("VSR content identity and stable event ordering are deterministic", async () => {
-  const scenario = { ...SCENARIO_LIBRARY[1].scenario, engineBackend: "typescript" };
+  const scenario = SCENARIO_LIBRARY[1].scenario;
   const prepared = prepareSimulation(scenario);
   const result = simulate(scenario);
   const first = await createVectorSimulationRecord(prepared, result, createdAt);
@@ -63,7 +77,7 @@ test("VSR content identity and stable event ordering are deterministic", async (
 });
 
 test("VSR rejects corruption before exposing replay data", async () => {
-  const scenario = { ...SCENARIO_LIBRARY[0].scenario, engineBackend: "typescript" };
+  const scenario = SCENARIO_LIBRARY[0].scenario;
   const record = await createVectorSimulationRecord(
     prepareSimulation(scenario),
     simulate(scenario),
@@ -88,7 +102,7 @@ test("VSR rejects corruption before exposing replay data", async () => {
 });
 
 test("columnar frame decoder rejects an unsupported member schema", () => {
-  const scenario = { ...SCENARIO_LIBRARY[0].scenario, engineBackend: "typescript" };
+  const scenario = SCENARIO_LIBRARY[0].scenario;
   const bytes = encodeColumnarFrames(simulate(scenario).engineRun.frames);
   const encodedSchema = new TextEncoder().encode("vector.frames.columnar.v1");
   const offset = bytes.findIndex((_, index) =>

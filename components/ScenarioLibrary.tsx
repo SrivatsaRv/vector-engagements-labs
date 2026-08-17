@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Crosshair, Map, Shield, Target } from "lucide-react";
 import { useState } from "react";
 import { DOMAIN_DETAILS, SCENARIO_LIBRARY, type EngagementDomain } from "@/lib/scenarios";
+import { domainCapability } from "@/lib/runtime/deployment-capabilities";
 
 const DOMAINS: EngagementDomain[] = ["A2A", "A2G", "G2A", "G2G"];
 const DOMAIN_ICONS = { A2A: Crosshair, A2G: Target, G2A: Shield, G2G: Map };
@@ -23,10 +24,12 @@ export function ScenarioLibrary({ compact = false }: { compact?: boolean }) {
     <div className="scenario-card-grid">
       {visible.map((item) => {
         const Icon = DOMAIN_ICONS[item.domain];
+        const capability = domainCapability(item.domain);
+        const unavailable = capability.state !== "ENABLED";
         return <article className="scenario-card" key={item.id}>
           <header><span className="scenario-domain"><Icon size={14}/>{item.domain}</span><span>{item.complexity}</span></header>
           <div className="scenario-card-body"><span>{DOMAIN_DETAILS[item.domain].label}</span><h3>{item.title}</h3><p>{item.summary}</p><dl><div><dt className="force-friendly">Blue Team</dt><dd>{item.blue}</dd></div><div><dt className="force-hostile">Red Team</dt><dd>{item.red}</dd></div><div><dt>Target object</dt><dd>{item.targetProfile}</dd></div><div><dt>Map setting</dt><dd>{item.theatre}</dd></div></dl></div>
-          <footer><span>Scenario {item.version}</span><Link href={`/workbench?scenario=${item.id}`}>Review and run <ArrowRight size={13}/></Link></footer>
+          <footer><span>Scenario {item.version}</span>{unavailable ? <span role="status" title={capability.operatorGuidance}>{capability.reason}</span> : <Link href={`/workbench?scenario=${item.id}`}>Review and run <ArrowRight size={13}/></Link>}</footer>
         </article>;
       })}
     </div>

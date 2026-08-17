@@ -20,7 +20,12 @@ import { OBJECT_CATALOG } from "../lib/object-catalog.ts";
 import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import { buildReportExport } from "../lib/report-export.ts";
 import { getScenarioDefinition } from "../lib/scenarios.ts";
-import { getFrameAt, simulate } from "../lib/simulation.ts";
+import {
+  getFrameAt,
+  simulate,
+  simulateWithCapabilitiesForVerification,
+} from "../lib/simulation.ts";
+import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
 
 test("both MapLibre surfaces use the same-origin module worker prepared at build time", () => {
   const authoringMap = readFileSync(new URL("../components/ScenarioAuthoringMap.tsx", import.meta.url), "utf8");
@@ -105,7 +110,10 @@ test("map contract produces installations, routes, launch, tracks and vectors fr
 
 test("air-defence coverage layers retain owner, kind, altitude and provenance", () => {
   const definition = getScenarioDefinition("g2a-layered-screen");
-  const result = simulate(definition.scenario);
+  const result = simulateWithCapabilitiesForVerification(
+    definition.scenario,
+    createVerificationDeploymentCapabilities("rust-wasm", ["G2A"]),
+  );
   const origin = result.engineRun.scenario.environment.studyArea.anchor;
   const frame = getFrameAt(result, 5);
   const features = buildCoverageFeatures(result, frame, origin);

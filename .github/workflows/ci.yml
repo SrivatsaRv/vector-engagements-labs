@@ -22,6 +22,7 @@ jobs:
       quality: ${{ steps.changes.outputs.quality }}
       security_js: ${{ steps.changes.outputs.security_js }}
       web_tests: ${{ steps.changes.outputs.web_tests }}
+      browser_tests: ${{ steps.changes.outputs.browser_tests }}
       rust_tests: ${{ steps.changes.outputs.rust_tests }}
       rust_audit: ${{ steps.changes.outputs.rust_audit }}
       integration: ${{ steps.changes.outputs.integration }}
@@ -185,6 +186,37 @@ jobs:
           npm run engine:rust:doc
           node --test tests/engine-backends.test.mjs tests/model-pack.test.mjs
 
+  browser_tests:
+    if: needs.classify.outputs.browser_tests == 'true'
+    name: "Stage 2D: Browser Contract"
+    needs: classify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - name: Install locked dependencies and browser
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run component and built-browser contracts
+        run: |
+          npm run test:component
+          npm run test:browser
+      - name: Upload browser evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: browser-contract-evidence
+          path: outputs/
+          if-no-files-found: ignore
+          retention-days: 7
+
   rust_audit:
     if: needs.classify.outputs.rust_audit == 'true'
     name: "Stage 2C: Rust Dependency Audit"
@@ -273,6 +305,7 @@ jobs:
       - quality
       - security_js
       - web_tests
+      - browser_tests
       - rust_tests
       - rust_audit
       - integration
@@ -288,6 +321,8 @@ jobs:
       SECURITY_JS_RESULT: ${{ needs.security_js.result }}
       WEB_TESTS_SELECTED: ${{ needs.classify.outputs.web_tests }}
       WEB_TESTS_RESULT: ${{ needs.web_tests.result }}
+      BROWSER_TESTS_SELECTED: ${{ needs.classify.outputs.browser_tests }}
+      BROWSER_TESTS_RESULT: ${{ needs.browser_tests.result }}
       RUST_TESTS_SELECTED: ${{ needs.classify.outputs.rust_tests }}
       RUST_TESTS_RESULT: ${{ needs.rust_tests.result }}
       RUST_AUDIT_SELECTED: ${{ needs.classify.outputs.rust_audit }}

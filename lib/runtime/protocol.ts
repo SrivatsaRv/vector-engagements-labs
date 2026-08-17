@@ -42,7 +42,6 @@ export type BrowserRuntimeRequest =
       runId: string;
       packDigest: string;
       scenarioRef: string;
-      backend: EngineBackendId;
       batchTicks: number;
       progressIntervalMs: number;
     })
