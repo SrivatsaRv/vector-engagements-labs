@@ -66,20 +66,19 @@
       { "path": "lib/report-export.ts", "indicator": "fallback", "expectedLines": 2, "entryIds": ["STUB-29"] },
       { "path": "app/report/page.tsx", "indicator": "fallback", "expectedLines": 6, "entryIds": ["STUB-15"] }
       ,{ "path": "lib/engine/compiler.ts", "indicator": "named-duel-id", "expectedLines": 2, "entryIds": ["STUB-10"] }
-      ,{ "path": "lib/simulation.ts", "indicator": "named-duel-id", "expectedLines": 0, "entryIds": ["STUB-11", "STUB-23"] }
       ,{ "path": "lib/information-state.ts", "indicator": "named-duel-id", "expectedLines": 1, "entryIds": ["STUB-11"] }
     ],
     "exemptions": [
-      { "path": "lib/engine/contracts.ts", "indicator": "model-assumption", "expectedLines": 1, "classification": "contract-vocabulary", "rationale": "The enum declares a value state and does not supply a model value." },
-      { "path": "lib/capability-data.ts", "indicator": "model-assumption", "expectedLines": 1, "classification": "contract-vocabulary", "rationale": "The enum declares disclosure vocabulary." },
-      { "path": "lib/capability-data.ts", "indicator": "temporary", "expectedLines": 1, "classification": "operator-disclosure", "rationale": "The text discloses STUB-08 to the operator." },
-      { "path": "components/EngagementMap.tsx", "indicator": "fallback", "expectedLines": 1, "classification": "render-resilience", "rationale": "This comment describes keeping the non-causal map surface usable after initialization failure." },
-      { "path": "app/lab/page.tsx", "indicator": "fallback", "expectedLines": 1, "classification": "fail-closed-assertion", "rationale": "This comment states that engine selection does not silently fall through." },
-      { "path": "app/math/page.tsx", "indicator": "fallback", "expectedLines": 1, "classification": "operator-disclosure", "rationale": "The page labels calculated display values; it does not supply runtime truth." },
-      { "path": "lib/security/public-api.ts", "indicator": "fallback", "expectedLines": 2, "classification": "error-default", "rationale": "The HTTP error helper requires an explicit status default and does not supply causal state." },
-      { "path": "lib/blog.server.ts", "indicator": "fallback", "expectedLines": 3, "classification": "content-default", "rationale": "Reading-time presentation defaults do not enter simulation state." },
-      { "path": "app/blogs/posts/[slug]/page.tsx", "indicator": "fallback", "expectedLines": 2, "classification": "content-default", "rationale": "Markdown rendering defaults do not enter simulation state." }
-      ,{ "path": "scripts/classify-ci-changes.mjs", "indicator": "unfinished-marker", "expectedLines": 3, "classification": "policy-path-name", "rationale": "These expressions select the runtime-stub policy files; they do not mark unfinished production behavior." }
+      { "path": "lib/engine/contracts.ts", "indicator": "model-assumption", "expectedLines": 1, "classification": "contract-vocabulary", "rationale": "The enum declares a value state and does not supply a model value.", "owners": ["#66"] },
+      { "path": "lib/capability-data.ts", "indicator": "model-assumption", "expectedLines": 1, "classification": "contract-vocabulary", "rationale": "The enum declares disclosure vocabulary.", "owners": ["#66"] },
+      { "path": "lib/capability-data.ts", "indicator": "temporary", "expectedLines": 1, "classification": "operator-disclosure", "rationale": "The text discloses STUB-08 to the operator.", "owners": ["#66"] },
+      { "path": "components/EngagementMap.tsx", "indicator": "fallback", "expectedLines": 1, "classification": "render-resilience", "rationale": "This comment describes keeping the non-causal map surface usable after initialization failure.", "owners": ["#66"] },
+      { "path": "app/lab/page.tsx", "indicator": "fallback", "expectedLines": 1, "classification": "fail-closed-assertion", "rationale": "This comment states that engine selection does not silently fall through.", "owners": ["#66"] },
+      { "path": "app/math/page.tsx", "indicator": "fallback", "expectedLines": 1, "classification": "operator-disclosure", "rationale": "The page labels calculated display values; it does not supply runtime truth.", "owners": ["#66"] },
+      { "path": "lib/security/public-api.ts", "indicator": "fallback", "expectedLines": 2, "classification": "error-default", "rationale": "The HTTP error helper requires an explicit status default and does not supply causal state.", "owners": ["#66"] },
+      { "path": "lib/blog.server.ts", "indicator": "fallback", "expectedLines": 3, "classification": "content-default", "rationale": "Reading-time presentation defaults do not enter simulation state.", "owners": ["#66"] },
+      { "path": "app/blogs/posts/[slug]/page.tsx", "indicator": "fallback", "expectedLines": 2, "classification": "content-default", "rationale": "Markdown rendering defaults do not enter simulation state.", "owners": ["#66"] }
+      ,{ "path": "scripts/classify-ci-changes.mjs", "indicator": "unfinished-marker", "expectedLines": 3, "classification": "policy-path-name", "rationale": "These expressions select the runtime-stub policy files; they do not mark unfinished production behavior.", "owners": ["#66"] }
     ]
   },
   "sourcePolicy": {

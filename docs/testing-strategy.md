@@ -22,7 +22,9 @@ production-audit checks. It first verifies the machine-readable runtime stub
 ledger. A new or removed production fallback, temporary adapter, model
 assumption, named-duel identifier, scripted guidance hold, or source-less public
 reference must update its owning ledger entry; an
-unclassified occurrence fails. The named targeted contracts are `make worker-local`,
+unclassified occurrence fails. A zero-match policy control is rejected because
+it can hide a classified indicator; every exemption has an accountable issue
+owner and a non-causal rationale. The named targeted contracts are `make worker-local`,
 `make frontend-local`, `make integration-local`, `make container-verify`,
 `make observability-local`, `make performance-local` and
 `make air-reference-local`. `frontend-local` requires `VECTOR_URL` to identify

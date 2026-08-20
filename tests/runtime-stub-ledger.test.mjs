@@ -36,6 +36,15 @@ test("a new production fallback fails without an owning ledger entry", () => {
   );
 });
 
+test("a new production approximation indicator fails without an owning ledger entry", () => {
+  const observations = collectIndicatorObservations(process.cwd(), ledger.indicatorPolicy);
+  observations.push({ path: "lib/new-causal-runtime.ts", indicator: "model-assumption", line: 10 });
+  assert.throws(
+    () => validateIndicatorInventory(observations, ledger),
+    /Unclassified model-assumption at lib\/new-causal-runtime\.ts:10/,
+  );
+});
+
 test("deleting or suppressing a classified indicator requires a ledger update", () => {
   const observations = collectIndicatorObservations(process.cwd(), ledger.indicatorPolicy);
   const reduced = observations.filter(
@@ -58,5 +67,25 @@ test("allowances cannot cite a missing owning issue entry", () => {
   assert.throws(
     () => validateIndicatorInventory(observations, tampered),
     /references unknown STUB-99/,
+  );
+});
+
+test("a zero-match control cannot suppress a classified production indicator", () => {
+  const observations = collectIndicatorObservations(process.cwd(), ledger.indicatorPolicy);
+  const tampered = structuredClone(ledger);
+  tampered.indicatorPolicy.allowances[0].expectedLines = 0;
+  assert.throws(
+    () => validateIndicatorInventory(observations, tampered),
+    /zero-match controls hide indicators instead of governing them/,
+  );
+});
+
+test("an exemption cannot hide an indicator without accountable issue ownership", () => {
+  const observations = collectIndicatorObservations(process.cwd(), ledger.indicatorPolicy);
+  const tampered = structuredClone(ledger);
+  delete tampered.indicatorPolicy.exemptions[0].owners;
+  assert.throws(
+    () => validateIndicatorInventory(observations, tampered),
+    /Exemption lib\/engine\/contracts\.ts requires an owning GitHub issue/,
   );
 });
