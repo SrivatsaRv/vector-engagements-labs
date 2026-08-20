@@ -14,6 +14,11 @@ test("a disabled domain link cannot fall through to the A2A workbench", async ({
 });
 
 test("the A2A builder does not present disabled information or fixed-turn behavior as active", async ({ page }) => {
+  await page.route("**/api/catalog", (route) => route.fulfill({
+    status: 503,
+    contentType: "application/json",
+    body: JSON.stringify({ error: "service_unavailable" }),
+  }));
   await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided");
 
   await page.getByRole("button", { name: "4 Admitted conditions", exact: true }).click();
