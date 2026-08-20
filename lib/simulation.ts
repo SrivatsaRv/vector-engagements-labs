@@ -27,6 +27,11 @@ import type {
 import type { ScenarioSpatialPlan } from "./scenario-spatial.ts";
 import { geographicToLocal } from "./scenario-spatial.ts";
 import { getStudyArea } from "./study-areas.ts";
+import {
+  buildSidePictures,
+  informationAvailability,
+  type TrackState,
+} from "./information-state.ts";
 
 export { standardAtmosphere } from "./engine/atmosphere.ts";
 export type { AtmosphereState } from "./engine/atmosphere.ts";
@@ -49,7 +54,9 @@ export type RaspAvailabilityReason =
   | "RADAR_SILENT"
   | "RADAR_OUT_OF_RANGE"
   | "DATALINK_UNAVAILABLE"
-  | "BEYOND_VISUAL_RANGE";
+  | "DATALINK_SOURCE_UNAVAILABLE"
+  | "BEYOND_VISUAL_RANGE"
+  | "SENSOR_UNSUPPORTED";
 export type TacticalDecision =
   | "PRESS"
   | "SUPPORT_WEAPON"
@@ -69,27 +76,27 @@ export const RASP_SOURCE_CONTRACTS: Record<
 > = {
   ONBOARD_RADAR: {
     label: "Onboard radar",
-    requirement: "The observing aircraft radar must be active and the opposing aircraft must be within the 120 km educational sensor boundary.",
-    pictureEffect: "Creates or removes the opposing-aircraft track and changes its quality and uncertainty.",
+    requirement: "The observing radar must be active, a scan must be due, and geometry must fall inside the admitted public-educational sensor model.",
+    pictureEffect: "Creates observations which confirm, coast, or lose a side-owned opposing-aircraft track.",
     physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
   },
   DATALINK: {
     label: "Data link",
     requirement: "The observing side's tactical data link must be available.",
-    pictureEffect: "Injects an off-board opposing-aircraft track into that side's RASP.",
+    pictureEffect: "Unavailable until an admitted sender-side observation and typed delivery message are present.",
     physicsEffect: "RASP only. The separate Blue Team decision controls weapon-update cadence.",
   },
   AIRBORNE_EARLY_WARNING: {
     label: "Airborne early warning",
     requirement: "The observing side's tactical data link must be available.",
-    pictureEffect: "Injects a higher-quality off-board opposing-aircraft track into that side's RASP.",
+    pictureEffect: "Unavailable until an admitted AEW source, sender-side track, and typed delivery message are present.",
     physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
     limitation: "No AEW aircraft or sensor-volume entity is spawned yet; this is a declared external track source.",
   },
   VISUAL: {
     label: "Visual contact",
     requirement: "The opposing aircraft must be inside the selected weather preset's visibility distance, capped at 18 km.",
-    pictureEffect: "Creates a short-range visual track without requiring radar or data link.",
+    pictureEffect: "Creates visual observations inside the declared visibility boundary without requiring radar or data link.",
     physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
   },
 };
@@ -205,10 +212,10 @@ export type RaspTrack = {
   confidence: number;
   uncertaintyMeters: number;
   position: Vec3;
-  truthPosition: Vec3;
   observedEntityId: string;
   visible: boolean;
   status: "TRACKING" | "DEGRADED" | "COASTING" | "NO_TRACK";
+  trackState: TrackState;
   availabilityReason: RaspAvailabilityReason;
   effectScope: "AIR_PICTURE_ONLY" | "AIR_PICTURE_AND_GUIDANCE_EVENT";
   stateExplanation: string;
@@ -719,61 +726,7 @@ export function evaluateRaspSourceAvailability(
   frame: Frame,
   perspective: "IAF" | "PAF",
 ): { available: boolean; reason: RaspAvailabilityReason; explanation: string } {
-  const isBlue = perspective === "IAF";
-  const radarMode = isBlue ? scenario.blueRadarMode : scenario.redRadarMode;
-  const trackSource = isBlue ? scenario.blueTrackSource : scenario.redTrackSource;
-  const datalink = isBlue ? scenario.blueDatalink : scenario.redDatalink;
-  const observedEntityId = isBlue ? "red-object-1" : "blue-platform-1";
-  const observedEntity = frame.entities.find((entity) => entity.id === observedEntityId);
-  if (!observedEntity) {
-    return {
-      available: false,
-      reason: "NO_OBSERVED_ENTITY",
-      explanation: "The opposing aircraft is not present in this engine frame.",
-    };
-  }
-  const rangeKm = frame.range / 1000;
-  if (trackSource === "ONBOARD_RADAR") {
-    if (radarMode !== "ACTIVE") {
-      return {
-        available: false,
-        reason: "RADAR_SILENT",
-        explanation: "The selected onboard radar is silent.",
-      };
-    }
-    if (rangeKm > 120) {
-      return {
-        available: false,
-        reason: "RADAR_OUT_OF_RANGE",
-        explanation: "The opposing aircraft is outside the current 120 km educational radar boundary.",
-      };
-    }
-  }
-  if (
-    (trackSource === "DATALINK" || trackSource === "AIRBORNE_EARLY_WARNING") &&
-    !datalink
-  ) {
-    return {
-      available: false,
-      reason: "DATALINK_UNAVAILABLE",
-      explanation: "The selected off-board track cannot enter the air picture because the tactical data link is unavailable.",
-    };
-  }
-  if (
-    trackSource === "VISUAL" &&
-    rangeKm > Math.min(18, scenario.visibilityKm)
-  ) {
-    return {
-      available: false,
-      reason: "BEYOND_VISUAL_RANGE",
-      explanation: `The opposing aircraft is beyond the ${Math.min(18, scenario.visibilityKm).toFixed(0)} km visual-acquisition boundary for this run.`,
-    };
-  }
-  return {
-    available: true,
-    reason: "AVAILABLE",
-    explanation: RASP_SOURCE_CONTRACTS[trackSource].pictureEffect,
-  };
+  return informationAvailability(scenario, frame, perspective);
 }
 
 export function buildRaspTrack(
@@ -781,82 +734,8 @@ export function buildRaspTrack(
   frame: Frame,
   perspective: "IAF" | "PAF",
 ): RaspTrack {
-  const isBlue = perspective === "IAF";
-  const trackSource = isBlue
-    ? scenario.blueTrackSource
-    : scenario.redTrackSource;
-  const opposingJammer = isBlue ? scenario.redJammer : scenario.blueJammer;
-  // Each national RASP presents its estimate of the opposing aircraft track.
-  // Guided weapons remain separate lifecycle entities and can be added later as
-  // missile-warning tracks without replacing the aircraft picture.
-  const observedEntityId = isBlue ? "red-object-1" : "blue-platform-1";
-  const observedEntity = frame.entities.find((entity) => entity.id === observedEntityId);
-  const truthPosition = observedEntity?.position ?? (isBlue ? frame.target : frame.interceptor);
-  const rangeKm = frame.range / 1000;
-  const sourceBase: Record<TrackSource, number> = {
-    ONBOARD_RADAR: 82,
-    DATALINK: 78,
-    AIRBORNE_EARLY_WARNING: 90,
-    VISUAL: 72,
-  };
-  const availability = evaluateRaspSourceAvailability(
-    scenario,
-    frame,
-    perspective,
-  );
-  const sourceAvailable = availability.available;
-  let confidence = sourceBase[trackSource];
-  if (!sourceAvailable) confidence = 0;
-  confidence -= Math.max(0, rangeKm - 25) * 0.32;
-  if (opposingJammer) confidence -= 17;
-  confidence = Math.round(Math.max(0, Math.min(98, confidence)));
-  const uncertaintyMeters = Math.round(
-    sourceAvailable
-      ? 120 + Math.pow(100 - confidence, 1.55) * 11
-      : 25000,
-  );
-  const phase = scenario.seed * 0.37 + frame.t * 0.13 + (isBlue ? 0 : 1.9);
-  const position = {
-    x: truthPosition.x + Math.cos(phase) * uncertaintyMeters * 0.46,
-    y: truthPosition.y + Math.sin(phase) * uncertaintyMeters * 0.46,
-    z: truthPosition.z + Math.sin(phase * 0.7) * uncertaintyMeters * 0.18,
-  };
-  const status = !sourceAvailable
-    ? "NO_TRACK"
-    : confidence < 30
-      ? "COASTING"
-      : confidence < 60
-        ? "DEGRADED"
-        : "TRACKING";
-  return {
-    perspective,
-    trackId: isBlue ? "R-021" : "B-014",
-    classification: "Fighter-sized airborne track",
-    identification:
-      confidence >= 70 ? "HOSTILE" : confidence >= 45 ? "SUSPECT" : "UNKNOWN",
-    source:
-      trackSource === "ONBOARD_RADAR"
-        ? "Onboard fire-control radar"
-        : trackSource === "AIRBORNE_EARLY_WARNING"
-          ? "Airborne early-warning support"
-          : trackSource === "DATALINK"
-            ? "Tactical data link"
-            : "Visual observation",
-    lastUpdateSeconds: sourceAvailable ? 0.1 : frame.t,
-    ageSeconds: sourceAvailable ? 0.1 : frame.t,
-    confidence,
-    uncertaintyMeters,
-    position,
-    truthPosition,
-    observedEntityId,
-    visible: sourceAvailable,
-    status,
-    availabilityReason: availability.reason,
-    effectScope: "AIR_PICTURE_ONLY",
-    stateExplanation: opposingJammer && sourceAvailable
-      ? `${availability.explanation} Opposing jamming reduces the VECTOR track-quality index by 17 points.`
-      : availability.explanation,
-  };
+  return buildSidePictures(scenario, [frame])
+    .find((picture) => picture.perspective === perspective)!;
 }
 
 export function getFrameAt(result: SimulationResult, time: number) {

@@ -2237,11 +2237,12 @@ function CapabilityNotice() {
     <section className="configured-note" role="status">
       <CircleAlert size={16} />
       <div>
-        <strong>Information and tactical-policy controls are unavailable.</strong>
+        <strong>Information-state availability is deployment governed.</strong>
         <p>
-          This run uses the authored aircraft routes, admitted loadout, and
-          frozen environmental inputs. It does not claim radar tracks, data
-          link, airborne early warning, jamming, or virtual-pilot decisions.
+          This run uses authored aircraft routes, admitted loadout, frozen
+          environmental inputs, and the admitted public-educational sensor
+          measurement model. Data link, airborne early warning, and virtual-
+          pilot behavior remain unavailable unless their own capability is admitted.
         </p>
         <p>
           Sensors: {sensors.state.toLowerCase().replaceAll("_", " ")}. {sensors.reason}

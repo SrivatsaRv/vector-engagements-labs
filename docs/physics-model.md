@@ -48,6 +48,14 @@ synthetic fixtures now exist, but the current engine does not feed LOS into
 sensor state or infer radii from transmitter power, radar cross-section,
 terrain, propagation, or electronic attack.
 
+The admitted #26 information adapter consumes recorded truth frames to make
+side-owned measurements at its declared scan cadence. It derives observations,
+track confirmation/coasting/loss, covariance and a bounded compatible-jamming
+effect without exposing a truth position in the observer record. It is an
+educational measurement model with explicit constants, not named-system sensor
+performance. Datalink/AEW and weapon support fail closed until their typed
+sender/message and #28 interfaces are implemented.
+
 ## Presentation truth
 
 Every movement trail is reconstructed only from recorded engine frames. The 3D surface adds a ground projection, vertical altitude stem, and translucent altitude curtain; these are views of the same position samples, not newly generated trajectories. A weapon does not appear before its launch lifecycle event.

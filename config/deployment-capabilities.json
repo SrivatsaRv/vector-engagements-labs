@@ -43,8 +43,8 @@
       "operatorGuidance": "Use an admitted Air domain scenario."
     },
     "sensors": {
-      "state": "DISABLED_BY_DEPLOYMENT",
-      "reason": "Causal sensor state is pending the information-model contract.",
+      "state": "ENABLED",
+      "reason": "The deterministic public-educational SensorState to TrackState contract is admitted.",
       "operatorGuidance": "Use an admitted Air domain scenario."
     },
     "datalink": {
@@ -58,8 +58,8 @@
       "operatorGuidance": "Use an admitted Air domain scenario."
     },
     "ew": {
-      "state": "DISABLED_BY_DEPLOYMENT",
-      "reason": "Causal electronic-warfare state is not admitted.",
+      "state": "ENABLED",
+      "reason": "The bounded public-educational radar-jamming measurement effect is admitted.",
       "operatorGuidance": "Use an admitted Air domain scenario."
     },
     "weapons": {

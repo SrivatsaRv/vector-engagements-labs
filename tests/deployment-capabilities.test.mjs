@@ -57,8 +57,9 @@ test("deployment configuration rejects incomplete or unknown capability maps", (
       error instanceof CapabilityAdmissionError &&
       error.code === "CAPABILITY_CONFIG_INVALID",
   );
-  assert.equal(isOptionalCapabilityEnabled("sensors"), false);
-  assert.equal(isOptionalCapabilityEnabled("ew"), false);
+  assert.equal(isOptionalCapabilityEnabled("sensors"), true);
+  assert.equal(isOptionalCapabilityEnabled("ew"), true);
+  assert.equal(isOptionalCapabilityEnabled("datalink"), false);
 });
 
 test("a scenario cannot select or override the deployment engine", () => {

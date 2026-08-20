@@ -2,192 +2,78 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DEFAULT_SCENARIO,
-  RASP_SOURCE_CONTRACTS,
-  TACTICAL_DECISION_CONTRACTS,
-  buildRaspTrack,
-  evaluateRaspSourceAvailability,
   getFrameAt,
   simulate,
 } from "../lib/simulation.ts";
+import {
+  INFORMATION_MODEL,
+  buildSidePictures,
+  informationAvailability,
+} from "../lib/information-state.ts";
 
-const perspectives = ["IAF", "PAF"];
-const sources = ["ONBOARD_RADAR", "DATALINK", "AIRBORNE_EARLY_WARNING", "VISUAL"];
-const radarModes = ["ACTIVE", "SILENT"];
-const linkStates = [true, false];
-const jammerStates = [true, false];
+const result = simulate(DEFAULT_SCENARIO);
+const frame = getFrameAt(result, 5);
 
-function keysFor(perspective) {
-  return perspective === "IAF"
-    ? {
-        source: "blueTrackSource",
-        radar: "blueRadarMode",
-        link: "blueDatalink",
-        opposingJammer: "redJammer",
-      }
-    : {
-        source: "redTrackSource",
-        radar: "redRadarMode",
-        link: "redDatalink",
-        opposingJammer: "blueJammer",
-      };
-}
-
-test("RASP regression matrix covers every source dependency for both perspectives", () => {
-  const result = simulate(DEFAULT_SCENARIO);
-  const baseFrame = getFrameAt(result, 5);
-  let rows = 0;
-  for (const perspective of perspectives) {
-    const keys = keysFor(perspective);
-    for (const source of sources) {
-      for (const radarMode of radarModes) {
-        for (const datalink of linkStates) {
-          for (const jammer of jammerStates) {
-            for (const rangeM of [15000, 65000]) {
-              const scenario = {
-                ...DEFAULT_SCENARIO,
-                [keys.source]: source,
-                [keys.radar]: radarMode,
-                [keys.link]: datalink,
-                [keys.opposingJammer]: jammer,
-                visibilityKm: 18,
-              };
-              const frame = { ...baseFrame, range: rangeM };
-              const expected =
-                source === "ONBOARD_RADAR"
-                  ? radarMode === "ACTIVE" && rangeM <= 120000
-                  : source === "DATALINK" || source === "AIRBORNE_EARLY_WARNING"
-                    ? datalink
-                    : rangeM <= 18000;
-              const availability = evaluateRaspSourceAvailability(
-                scenario,
-                frame,
-                perspective,
-              );
-              const track = buildRaspTrack(scenario, frame, perspective);
-              assert.equal(availability.available, expected);
-              assert.equal(track.visible, expected);
-              assert.equal(track.status === "NO_TRACK", !expected);
-              assert.equal(track.effectScope, "AIR_PICTURE_ONLY");
-              assert.ok(track.stateExplanation.length > 20);
-              rows += 1;
-            }
-          }
-        }
-      }
-    }
-  }
-  assert.equal(rows, 128);
+test("onboard observation admits only a declared scan and makes a confirmed track", () => {
+  const pictures = buildSidePictures(DEFAULT_SCENARIO, result.frames.filter((item) => item.t <= 3));
+  const iaf = pictures.filter((item) => item.perspective === "IAF");
+  assert.equal(iaf[0].trackState, "PLOT");
+  assert.equal(iaf.at(-1).trackState, "CONFIRMED");
+  assert.equal(iaf.at(-1).status, "TRACKING");
+  assert.equal(iaf.at(-1).identification, "UNKNOWN");
+  assert.equal(iaf.at(-1).trackId, "IAF-red-object-1-track-v1");
+  assert.ok(iaf.at(-1).uncertaintyMeters >= INFORMATION_MODEL.measurementFloorM);
 });
 
-test("RASP acquisition boundaries are inclusive and have explicit failure reasons", () => {
-  const result = simulate(DEFAULT_SCENARIO);
-  const base = getFrameAt(result, 5);
-  for (const perspective of perspectives) {
-    const keys = keysFor(perspective);
-    for (const [range, expected, reason] of [
-      [119999, true, "AVAILABLE"],
-      [120000, true, "AVAILABLE"],
-      [120001, false, "RADAR_OUT_OF_RANGE"],
-    ]) {
-      const state = evaluateRaspSourceAvailability(
-        {
-          ...DEFAULT_SCENARIO,
-          [keys.source]: "ONBOARD_RADAR",
-          [keys.radar]: "ACTIVE",
-        },
-        { ...base, range },
-        perspective,
-      );
-      assert.equal(state.available, expected);
-      assert.equal(state.reason, reason);
-    }
-    for (const [range, expected, reason] of [
-      [11999, true, "AVAILABLE"],
-      [12000, true, "AVAILABLE"],
-      [12001, false, "BEYOND_VISUAL_RANGE"],
-    ]) {
-      const state = evaluateRaspSourceAvailability(
-        {
-          ...DEFAULT_SCENARIO,
-          [keys.source]: "VISUAL",
-          visibilityKm: 12,
-        },
-        { ...base, range },
-        perspective,
-      );
-      assert.equal(state.available, expected);
-      assert.equal(state.reason, reason);
-    }
+test("radar state and model boundary change canonical track history", () => {
+  const baseline = informationAvailability(DEFAULT_SCENARIO, { ...frame, range: 80_000 }, "IAF");
+  const beyond = informationAvailability(DEFAULT_SCENARIO, { ...frame, range: 80_001 }, "IAF");
+  const silent = informationAvailability({ ...DEFAULT_SCENARIO, blueRadarMode: "SILENT" }, frame, "IAF");
+  assert.equal(baseline.available, true);
+  assert.equal(beyond.reason, "RADAR_OUT_OF_RANGE");
+  assert.equal(silent.reason, "RADAR_SILENT");
+});
+
+test("compatible EW reduces admitted radar range and increases measurement uncertainty", () => {
+  const closeFrame = { ...frame, range: 30_000 };
+  const nominal = buildSidePictures(DEFAULT_SCENARIO, [{ ...closeFrame, t: 0 }, { ...closeFrame, t: 1 }]).filter((item) => item.perspective === "IAF").at(-1);
+  const jammed = buildSidePictures({ ...DEFAULT_SCENARIO, redJammer: true }, [{ ...closeFrame, t: 0 }, { ...closeFrame, t: 1 }]).filter((item) => item.perspective === "IAF").at(-1);
+  assert.equal(nominal?.trackState, "CONFIRMED");
+  assert.equal(jammed?.trackState, "CONFIRMED");
+  assert.ok((jammed?.uncertaintyMeters ?? 0) > (nominal?.uncertaintyMeters ?? Infinity));
+  const blocked = buildSidePictures({ ...DEFAULT_SCENARIO, redJammer: true }, [{ ...frame, range: 60_000, t: 0 }]).filter((item) => item.perspective === "IAF").at(-1);
+  assert.equal(blocked?.trackState, "NONE");
+});
+
+test("loss coasts then expires without substituting model truth", () => {
+  const active = { ...frame, t: 0 };
+  const silentAt2 = { ...frame, t: 2 };
+  const silentAt6 = { ...frame, t: 6 };
+  const pictures = buildSidePictures(
+    { ...DEFAULT_SCENARIO, blueRadarMode: "SILENT" },
+    [active, silentAt2, silentAt6],
+  );
+  const iaf = pictures.filter((item) => item.perspective === "IAF");
+  assert.equal(iaf[0].trackState, "NONE");
+  assert.equal(iaf[1].trackState, "NONE");
+  assert.equal(iaf[2].visible, false);
+});
+
+test("off-board sources fail closed until an admitted sender observation exists", () => {
+  for (const source of ["DATALINK", "AIRBORNE_EARLY_WARNING"]) {
+    const availability = informationAvailability(
+      { ...DEFAULT_SCENARIO, blueTrackSource: source, blueDatalink: true },
+      frame,
+      "IAF",
+    );
+    assert.equal(availability.reason, "DATALINK_SOURCE_UNAVAILABLE");
   }
 });
 
-test("RASP-only controls cannot change model truth or engagement outcome", () => {
-  const baseline = simulate(DEFAULT_SCENARIO);
-  const variants = [
-    { blueRadarMode: "SILENT" },
-    { redRadarMode: "SILENT" },
-    { blueDatalink: false },
-    { redDatalink: false },
-    { blueJammer: true },
-    { redJammer: true },
-    { blueTrackSource: "VISUAL" },
-    { redTrackSource: "AIRBORNE_EARLY_WARNING" },
-  ];
-  for (const patch of variants) {
-    const changed = simulate({ ...DEFAULT_SCENARIO, ...patch });
-    assert.equal(changed.outcome, baseline.outcome);
-    assert.equal(changed.closestApproach, baseline.closestApproach);
-    assert.deepEqual(changed.frames, baseline.frames);
-  }
-});
-
-test("unadmitted tactical decision labels cannot alter compiled guidance or flight", () => {
-  const baseline = simulate(DEFAULT_SCENARIO);
-  for (const blueDecision of ["PRESS", "SUPPORT_WEAPON", "CRANK", "DEFEND", "DISENGAGE"]) {
-    for (const redDecision of ["PRESS", "CRANK", "DEFEND", "DISENGAGE"]) {
-      const changed = simulate({ ...DEFAULT_SCENARIO, blueDecision, redDecision });
-      assert.deepEqual(changed.engineRun.frames, baseline.engineRun.frames);
-      assert.equal(changed.engineRun.closestApproachM, baseline.engineRun.closestApproachM);
-      assert.equal(changed.engineRun.termination, baseline.engineRun.termination);
-    }
-  }
-});
-
-test("each side's local source controls are isolated from the opposing RASP", () => {
-  const result = simulate(DEFAULT_SCENARIO);
-  const frame = getFrameAt(result, 20);
-  const baselineIaf = buildRaspTrack(DEFAULT_SCENARIO, frame, "IAF");
-  const baselinePaf = buildRaspTrack(DEFAULT_SCENARIO, frame, "PAF");
-  const iafLocalChange = {
-    ...DEFAULT_SCENARIO,
-    blueRadarMode: "SILENT",
-    blueDatalink: false,
-  };
-  const pafLocalChange = {
-    ...DEFAULT_SCENARIO,
-    redRadarMode: "SILENT",
-    redDatalink: false,
-  };
-  assert.deepEqual(buildRaspTrack(iafLocalChange, frame, "PAF"), baselinePaf);
-  assert.deepEqual(buildRaspTrack(pafLocalChange, frame, "IAF"), baselineIaf);
-});
-
-test("all offered Blue and Red decision pairs are finite, deterministic, and declared", () => {
-  const blueDecisions = ["PRESS", "SUPPORT_WEAPON", "CRANK", "DEFEND", "DISENGAGE"];
-  const redDecisions = ["PRESS", "CRANK", "DEFEND", "DISENGAGE"];
-  let rows = 0;
-  for (const blueDecision of blueDecisions) {
-    for (const redDecision of redDecisions) {
-      const scenario = { ...DEFAULT_SCENARIO, blueDecision, redDecision };
-      const first = simulate(scenario);
-      const second = simulate(scenario);
-      assert.ok(TACTICAL_DECISION_CONTRACTS[blueDecision].blueEffect.length > 20);
-      assert.ok(TACTICAL_DECISION_CONTRACTS[redDecision].redEffect.length > 20);
-      assert.deepEqual(first.frames, second.frames);
-      assert.ok(first.frames.every((frame) => Number.isFinite(frame.range)));
-      rows += 1;
-    }
-  }
-  assert.equal(rows, 20);
-  assert.deepEqual(Object.keys(RASP_SOURCE_CONTRACTS).sort(), [...sources].sort());
+test("pictures are deterministic and never expose a truth-position field", () => {
+  const first = buildSidePictures(DEFAULT_SCENARIO, result.frames.slice(0, 100));
+  const second = buildSidePictures(DEFAULT_SCENARIO, result.frames.slice(0, 100));
+  assert.deepEqual(first, second);
+  assert.ok(first.every((picture) => !("truthPosition" in picture)));
+  assert.ok(first.every((picture) => Number.isFinite(picture.uncertaintyMeters)));
 });

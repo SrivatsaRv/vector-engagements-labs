@@ -234,7 +234,7 @@ test("simulation is deterministic and intent labels do not invent aircraft motio
   assert.deepEqual(redTrail(press), redTrail(first));
 });
 
-test("RASP separates model truth from degraded sensor-derived tracks", () => {
+test("RASP returns no visible track when its admitted sensor is unavailable", () => {
   const result = simulate(DEFAULT_SCENARIO);
   const frame = getFrameAt(result, 30);
   const nominal = buildRaspTrack(DEFAULT_SCENARIO, frame, "IAF");
@@ -248,12 +248,12 @@ test("RASP separates model truth from degraded sensor-derived tracks", () => {
     frame,
     "IAF",
   );
-  assert.equal(nominal.status, "TRACKING");
+  assert.equal(nominal.status, "DEGRADED");
   assert.equal(degraded.status, "NO_TRACK");
   assert.equal(degraded.visible, false);
   assert.ok(degraded.confidence < nominal.confidence);
-  assert.ok(degraded.uncertaintyMeters > nominal.uncertaintyMeters);
-  assert.notDeepEqual(degraded.position, degraded.truthPosition);
+  assert.equal(degraded.trackState, "NONE");
+  assert.ok(!("truthPosition" in degraded));
 });
 
 test("RASP source controls have explicit availability behavior for both sides", () => {
@@ -286,8 +286,8 @@ test("RASP source controls have explicit availability behavior for both sides", 
           { ...DEFAULT_SCENARIO, [sourceKey]: source, [linkKey]: true },
           farFrame,
           perspective,
-        ).visible,
-        true,
+        ).availabilityReason,
+        "DATALINK_SOURCE_UNAVAILABLE",
       );
       assert.equal(
         buildRaspTrack(
@@ -321,8 +321,7 @@ test("RASP source controls have explicit availability behavior for both sides", 
       farFrame,
       perspective,
     );
-    assert.ok(jammed.confidence < radarTrack.confidence);
-    assert.ok(jammed.uncertaintyMeters > radarTrack.uncertaintyMeters);
+    assert.equal(jammed.trackState, "NONE");
   }
 });
 
