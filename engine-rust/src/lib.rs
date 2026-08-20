@@ -156,6 +156,37 @@ pub enum WeaponFlightState {
     TargetUnavailable,
 }
 
+/// Closed model-pack declaration. It does not claim a simulated seeker.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum WeaponSeekerMode {
+    #[serde(rename = "UNAVAILABLE")]
+    Unavailable,
+    #[serde(rename = "ACTIVE_RADAR")]
+    ActiveRadar,
+    #[serde(rename = "INFRARED")]
+    Infrared,
+    #[serde(rename = "PASSIVE_RADIATION")]
+    PassiveRadiation,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum WeaponSupportRequirement {
+    #[serde(rename = "UNAVAILABLE")]
+    Unavailable,
+    #[serde(rename = "NONE")]
+    None,
+    #[serde(rename = "TRACK_UPDATE")]
+    TrackUpdate,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum WeaponLaunchAuthorization {
+    #[serde(rename = "SCHEDULED_TEST_ONLY")]
+    ScheduledTestOnly,
+    #[serde(rename = "TRACK_REQUIRED")]
+    TrackRequired,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Maneuver {
@@ -276,6 +307,19 @@ pub struct WeaponModel {
     pub seeker_activation_range_m: f64,
     pub datalink_update_seconds: f64,
     pub commanded_cruise_altitude_m: f64,
+    pub admission: WeaponAdmission,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeaponAdmission {
+    pub model_pack_digest: String,
+    pub weapon_model_id: String,
+    pub station_id: String,
+    pub compatibility_rule_id: String,
+    pub seeker_mode: WeaponSeekerMode,
+    pub support_requirement: WeaponSupportRequirement,
+    pub launch_authorization: WeaponLaunchAuthorization,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -1375,6 +1419,17 @@ mod tests {
                 seeker_activation_range_m: 5_000.0,
                 datalink_update_seconds: 0.2,
                 commanded_cruise_altitude_m: 8_000.0,
+                admission: WeaponAdmission {
+                    model_pack_digest:
+                        "181379ad76df8cdbf08666788bf1aace54b05651ce1d2e852487d651c6fb0e1d"
+                            .to_string(),
+                    weapon_model_id: "native-test-model".to_string(),
+                    station_id: "fixture-station".to_string(),
+                    compatibility_rule_id: "fixture-rule".to_string(),
+                    seeker_mode: WeaponSeekerMode::Unavailable,
+                    support_requirement: WeaponSupportRequirement::Unavailable,
+                    launch_authorization: WeaponLaunchAuthorization::ScheduledTestOnly,
+                },
             }),
             sensor: None,
             aircraft: None,
@@ -1587,6 +1642,14 @@ mod tests {
         let mut input = serde_json::to_value(scenario())?;
         input["domain"] = serde_json::Value::String("NAVAL".to_string());
         let encoded = serde_json::to_string(&input)?;
+        assert!(matches!(
+            run_json(&encoded),
+            Err(EngineError::InvalidJson(_))
+        ));
+        let mut weapon_input = serde_json::to_value(scenario())?;
+        weapon_input["entities"][2]["weapon"]["admission"]["supportRequirement"] =
+            serde_json::Value::String("TYPO_SUPPORT".to_string());
+        let encoded = serde_json::to_string(&weapon_input)?;
         assert!(matches!(
             run_json(&encoded),
             Err(EngineError::InvalidJson(_))

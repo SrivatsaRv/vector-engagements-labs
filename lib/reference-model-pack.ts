@@ -15,8 +15,8 @@ import {
 } from "./model-pack.ts";
 
 export const CURRENT_MODEL_PACK_ID = "vector-scalar-study-models";
-export const CURRENT_MODEL_PACK_VERSION = "0.6.0";
-export const CURRENT_MODEL_PACK_DIGEST = "f3ea60f5476b812d85ebd13ca6aa1d65a751fbca38fcad98ff458abf368efc42";
+export const CURRENT_MODEL_PACK_VERSION = "0.7.0";
+export const CURRENT_MODEL_PACK_DIGEST = "a27f1060f523c8b9552dec67f26eabdb5bc8b0528d1f389fe5a79ae256f993c2";
 export const CURRENT_INTENDED_USE_ID = "vector.intended-use.geometry-teaching";
 export const CURRENT_INTENDED_USE_VERSION = "1.0.0";
 export const CURRENT_CREDIBILITY_MANIFEST_ID = "vector-scalar-study-credibility";
@@ -263,7 +263,10 @@ export function createCurrentModelPackSource(): ModelPackSource {
     limitationIds: [LIMITATION_ID],
     aerodynamicModelId: `${item.weaponId}-aerodynamic-study-v05`,
     propulsionModelId: `${item.weaponId}-propulsion-study-v05`,
-    sensorModelId: "declared-envelope-sensor-study-v05",
+      sensorModelId: "declared-envelope-sensor-study-v05",
+      seekerMode: "UNAVAILABLE" as const,
+      supportRequirement: "UNAVAILABLE" as const,
+      launchAuthorization: "SCHEDULED_TEST_ONLY" as const,
     dependsOn: [
       `${item.weaponId}-aerodynamic-study-v05`,
       `${item.weaponId}-propulsion-study-v05`,
@@ -274,6 +277,8 @@ export function createCurrentModelPackSource(): ModelPackSource {
     maximumCommandLoadFactor: quantity(item.maximumCommandG, "g0"),
     seekerActivationRange: quantity(item.seekerActivationRangeM, "m"),
     datalinkUpdatePeriod: quantity(item.datalinkUpdateSeconds, "s"),
+    thrustTaperSpeed: quantity(item.thrustTaperSpeedMps, "m/s"),
+    navigationConstant: quantity(item.navigationConstant, "1"),
   }));
 
   return {

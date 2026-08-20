@@ -225,10 +225,22 @@ export type WeaponModelSource = ModelSourceBase & {
   aerodynamicModelId: string;
   propulsionModelId: string;
   sensorModelId?: string;
+  /** Declared seeker category. `UNAVAILABLE` is an explicit no-seeker claim. */
+  seekerMode: WeaponSeekerMode;
+  /** Declared support dependency; never infer this from a weapon name. */
+  supportRequirement: WeaponSupportRequirement;
+  /** Current launch authority is deliberately limited to scheduled test release. */
+  launchAuthorization: WeaponLaunchAuthorization;
   maximumCommandLoadFactor: Quantity;
   seekerActivationRange: Quantity;
   datalinkUpdatePeriod: Quantity;
+  thrustTaperSpeed: Quantity;
+  navigationConstant: Quantity;
 };
+
+export type WeaponSeekerMode = "UNAVAILABLE" | "ACTIVE_RADAR" | "INFRARED" | "PASSIVE_RADIATION";
+export type WeaponSupportRequirement = "UNAVAILABLE" | "NONE" | "TRACK_UPDATE";
+export type WeaponLaunchAuthorization = "SCHEDULED_TEST_ONLY" | "TRACK_REQUIRED";
 
 export type LoadoutStationSource = {
   id: string;
@@ -344,9 +356,14 @@ export type CompiledWeaponModel = CompiledModelBase & {
   aerodynamicModelIndex: number;
   propulsionModelIndex: number;
   sensorModelIndex: number | null;
+  seekerMode: WeaponSeekerMode;
+  supportRequirement: WeaponSupportRequirement;
+  launchAuthorization: WeaponLaunchAuthorization;
   maximumCommandLoadFactorG: number;
   seekerActivationRangeM: number;
   datalinkUpdatePeriodS: number;
+  thrustTaperSpeedMps: number;
+  navigationConstant: number;
 };
 
 export type CompiledLoadoutModel = CompiledModelBase & {
@@ -441,6 +458,9 @@ export class ModelPackValidationError extends Error {
 const ID_PATTERN = /^[a-z0-9]+(?:[._:/-][a-z0-9]+)*$/;
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
+const WEAPON_SEEKER_MODES: WeaponSeekerMode[] = ["UNAVAILABLE", "ACTIVE_RADAR", "INFRARED", "PASSIVE_RADIATION"];
+const WEAPON_SUPPORT_REQUIREMENTS: WeaponSupportRequirement[] = ["UNAVAILABLE", "NONE", "TRACK_UPDATE"];
+const WEAPON_LAUNCH_AUTHORIZATIONS: WeaponLaunchAuthorization[] = ["SCHEDULED_TEST_ONLY", "TRACK_REQUIRED"];
 
 const UNIT_CONVERSIONS: Record<SourceUnit, { unit: SiUnit; scale: number }> = {
   "1": { unit: "1", scale: 1 },
@@ -932,6 +952,9 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
     if (aerodynamicModelIndex === undefined) issues.push(`weapons[${index}] references missing aerodynamic model ${item.aerodynamicModelId}`);
     if (propulsionModelIndex === undefined) issues.push(`weapons[${index}] references missing propulsion model ${item.propulsionModelId}`);
     if (item.sensorModelId && sensorModelIndex === undefined) issues.push(`weapons[${index}] references missing sensor model ${item.sensorModelId}`);
+    if (!WEAPON_SEEKER_MODES.includes(item.seekerMode)) issues.push(`weapons[${index}].seekerMode is unsupported`);
+    if (!WEAPON_SUPPORT_REQUIREMENTS.includes(item.supportRequirement)) issues.push(`weapons[${index}].supportRequirement is unsupported`);
+    if (!WEAPON_LAUNCH_AUTHORIZATIONS.includes(item.launchAuthorization)) issues.push(`weapons[${index}].launchAuthorization is unsupported`);
     const launchMassKg = normalizeQuantity(issues, `weapons[${index}].launchMass`, item.launchMass, "kg", evidenceIds);
     const dryMassKg = normalizeQuantity(issues, `weapons[${index}].dryMass`, item.dryMass, "kg", evidenceIds);
     if (dryMassKg > launchMassKg) issues.push(`weapons[${index}].dryMass must not exceed launchMass`);
@@ -947,9 +970,14 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
       aerodynamicModelIndex: aerodynamicModelIndex ?? -1,
       propulsionModelIndex: propulsionModelIndex ?? -1,
       sensorModelIndex: sensorModelIndex ?? null,
+      seekerMode: item.seekerMode,
+      supportRequirement: item.supportRequirement,
+      launchAuthorization: item.launchAuthorization,
       maximumCommandLoadFactorG: normalizeQuantity(issues, `weapons[${index}].maximumCommandLoadFactor`, item.maximumCommandLoadFactor, "g0", evidenceIds),
       seekerActivationRangeM: normalizeQuantity(issues, `weapons[${index}].seekerActivationRange`, item.seekerActivationRange, "m", evidenceIds),
       datalinkUpdatePeriodS: normalizeQuantity(issues, `weapons[${index}].datalinkUpdatePeriod`, item.datalinkUpdatePeriod, "s", evidenceIds),
+      thrustTaperSpeedMps: normalizeQuantity(issues, `weapons[${index}].thrustTaperSpeed`, item.thrustTaperSpeed, "m/s", evidenceIds),
+      navigationConstant: normalizeQuantity(issues, `weapons[${index}].navigationConstant`, item.navigationConstant, "1", evidenceIds),
     };
   });
   weapons.forEach((item, index) => {
@@ -958,7 +986,9 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
       item.dryMassKg <= 0 ||
       item.maximumCommandLoadFactorG <= 0 ||
       item.seekerActivationRangeM < 0 ||
-      item.datalinkUpdatePeriodS <= 0
+      item.datalinkUpdatePeriodS <= 0 ||
+      item.thrustTaperSpeedMps <= 0 ||
+      item.navigationConstant <= 0
     ) {
       issues.push(`weapons[${index}] contains values outside its physical domain`);
     }

@@ -14,10 +14,11 @@ import {
   CURRENT_MODEL_PACK_DIGEST,
   createCurrentModelPackSource,
 } from "../lib/reference-model-pack.ts";
+import { resolveCompiledWeaponAdmission } from "../lib/engine/weapon-admission.ts";
 
 const fixture = JSON.parse(
   await readFile(
-    new URL("../fixtures/model-packs/vector-scalar-study-v0.6.compiled.json", import.meta.url),
+    new URL("../fixtures/model-packs/vector-scalar-study-v0.7.compiled.json", import.meta.url),
     "utf8",
   ),
 );
@@ -37,6 +38,9 @@ test("model source compiles deterministically to the committed immutable SI fixt
   assert.equal(Object.isFrozen(first.pack.weapons[0]), true);
   assert.equal(first.pack.aerodynamics[0].coefficientTables[1].axes[0].unit, "rad");
   assert.ok(Math.abs(first.pack.aerodynamics[0].coefficientTables[1].axes[0].values[0] + Math.PI / 18) < 1e-12);
+  assert.equal(first.pack.weapons[0].seekerMode, "UNAVAILABLE");
+  assert.equal(first.pack.weapons[0].supportRequirement, "UNAVAILABLE");
+  assert.equal(first.pack.weapons[0].launchAuthorization, "SCHEDULED_TEST_ONLY");
 });
 
 test("one physical value changes the digest and invalidates approved evidence", async () => {
@@ -87,6 +91,12 @@ test("source validation rejects missing units, coefficients, evidence, reference
     (source) => {
       source.propulsion[0].thrustTable.values[0] = Number.NaN;
     },
+    (source) => {
+      source.weapons[0].seekerMode = undefined;
+    },
+    (source) => {
+      source.weapons[0].supportRequirement = "TYPO_SUPPORT";
+    },
   ];
   for (const mutate of mutations) {
     const source = cloneSource();
@@ -108,6 +118,25 @@ test("aircraft admission rejects a component or table that cannot cover its decl
   await assert.rejects(
     compileModelPack(insufficientTableEnvironment),
     /thrustTable\.validityDomain does not cover its admitted aircraft validity domain/,
+  );
+});
+
+test("weapon admission is resolved only from compiled identity, station, and compatibility", () => {
+  const pack = structuredClone(fixture.pack);
+  const weapon = pack.weapons[0];
+  const platform = pack.compatibility.find((item) => item.storeModelIndex === 0)?.platformCatalogObjectId;
+  assert.ok(platform);
+  const admitted = resolveCompiledWeaponAdmission(pack, platform, weapon.catalogObjectId);
+  assert.equal(admitted.admission.modelPackDigest, pack.digest);
+  assert.equal(admitted.admission.weaponModelId, weapon.id);
+  assert.throws(
+    () => resolveCompiledWeaponAdmission(pack, platform, "unknown-weapon"),
+    /Missing compiled weapon model/,
+  );
+  pack.compatibility = pack.compatibility.filter((item) => item.storeModelIndex !== 0);
+  assert.throws(
+    () => resolveCompiledWeaponAdmission(pack, platform, weapon.catalogObjectId),
+    /Incompatible loadout/,
   );
 });
 

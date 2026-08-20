@@ -6,6 +6,11 @@ import type {
 } from "./primitives.ts";
 import type { ScenarioModelPatch } from "../model-pack.ts";
 import type {
+  WeaponLaunchAuthorization,
+  WeaponSeekerMode,
+  WeaponSupportRequirement,
+} from "../model-pack.ts";
+import type {
   CoverageBasis,
   GeographicEntityState,
   RecordedGeographicPosition,
@@ -60,6 +65,17 @@ export type ModelValueState =
   | "USER_PROVIDED"
   | "UNKNOWN";
 
+/** Immutable proof that a store was admitted from one compiled model pack. */
+export type WeaponAdmission = {
+  modelPackDigest: string;
+  weaponModelId: string;
+  stationId: string;
+  compatibilityRuleId: string;
+  seekerMode: WeaponSeekerMode;
+  supportRequirement: WeaponSupportRequirement;
+  launchAuthorization: WeaponLaunchAuthorization;
+};
+
 export type EngineEntityDefinition = {
   id: string;
   rddfId: string;
@@ -99,6 +115,7 @@ export type EngineEntityDefinition = {
     seekerActivationRangeM: number;
     datalinkUpdateSeconds: number;
     commandedCruiseAltitudeM: number;
+    admission: WeaponAdmission;
   };
   sensor?: {
     detectionRadiusM: number;

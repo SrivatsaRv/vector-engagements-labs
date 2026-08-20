@@ -14,7 +14,7 @@ import { ENGINE_VERSION } from "../lib/engine/version.ts";
 const bundle = JSON.parse(
   await readFile(
     new URL(
-      "../fixtures/model-packs/vector-scalar-study-v0.6.compiled.json",
+      "../fixtures/model-packs/vector-scalar-study-v0.7.compiled.json",
       import.meta.url,
     ),
     "utf8",

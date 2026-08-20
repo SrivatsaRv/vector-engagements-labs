@@ -24,6 +24,11 @@ engine from launch/lifecycle and propulsion/guidance conditions and is replayed
 unchanged by consumers. It is not a seeker, target-track, data-link, or support
 claim. Typed seeker and support state remains blocked on the #26/#28 interface
 and must fail closed rather than being inferred from a weapon name or truth.
+The current compiled weapon admissions explicitly record `UNAVAILABLE` seeker
+and support requirements plus `SCHEDULED_TEST_ONLY` launch authorization. The
+existing deterministic fly-out remains a bounded educational trajectory test;
+it does not claim operational seeker acquisition, data-link support, warning,
+or support loss/recovery.
 
 The current scalar coefficients remain in versioned `simulation_models` rows for
 catalog delivery and are also compiled into the immutable

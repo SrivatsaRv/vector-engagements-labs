@@ -7,7 +7,9 @@ const baseEntity = {
   behavior: { maneuver: "steady", commandedG: 0, decision: "PRESS" },
   provenance: {
     sourceObjectId: "test",
+    modelId: "test-model",
     modelVersion: "test-v1",
+    modelPackDigest: "1111111111111111111111111111111111111111111111111111111111111111",
     valueState: "MODEL_ASSUMPTION",
   },
 };
@@ -21,6 +23,9 @@ function testScenario() {
     seed: 42,
     durationSeconds: 12,
     fixedStepSeconds: 0.05,
+    modelPack: {
+      digest: "1111111111111111111111111111111111111111111111111111111111111111",
+    },
     environment: {
       gravityMps2: 9.80665,
       temperatureOffsetC: 0,
@@ -97,6 +102,15 @@ function testScenario() {
           maximumCommandG: 28,
           seekerActivationRangeM: 5000,
           datalinkUpdateSeconds: 0.2,
+          admission: {
+            modelPackDigest: "1111111111111111111111111111111111111111111111111111111111111111",
+            weaponModelId: "test-model",
+            stationId: "test-station",
+            compatibilityRuleId: "test-compatibility",
+            seekerMode: "UNAVAILABLE",
+            supportRequirement: "UNAVAILABLE",
+            launchAuthorization: "SCHEDULED_TEST_ONLY",
+          },
         },
       },
     ],
@@ -138,6 +152,12 @@ test("generic engine updates every spawned entity deterministically", () => {
   assert.ok(lastWeapon.massKg < firstWeapon.massKg);
   assert.equal(firstWeapon.weaponFlightState, "BOOST");
   assert.ok(first.closestApproachM < 10000);
+});
+
+test("TypeScript engine rejects an unknown weapon support declaration", () => {
+  const scenario = admitTestAircraft(testScenario());
+  scenario.entities.find((entity) => entity.weapon).weapon.admission.supportRequirement = "TYPO_SUPPORT";
+  assert.throws(() => runEngine(scenario), /no valid compiled admission/);
 });
 
 test("weapon flight state is a closed achieved-state contract", () => {
