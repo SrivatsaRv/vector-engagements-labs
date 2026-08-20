@@ -29,6 +29,13 @@ import {
   createUniformWeatherVectorField,
 } from "../lib/geospatial/synthetic-environment.ts";
 import {
+  PHASE_A_INSTALLATION_GAPS,
+  assertPhaseAEnvironmentPack,
+  createPhaseAEnvironmentPack,
+  createPhaseAEnvironmentSampler,
+} from "../lib/geospatial/environment-pack.ts";
+import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
+import {
   geographicToLocal,
   localToGeographic,
   scenarioOrigin,
@@ -239,6 +246,89 @@ test("weather-vector and atmosphere fields are versioned deterministic interface
     originDatum: "ELLIPSOID",
   });
   assert.ok(atmosphere.sample({ x: 0, y: 0, z: 0 }, 100).densityKgM3 > 0);
+});
+
+test("Phase A environment packs bind explicit synthetic terrain, datum, atmosphere and bounded installation coverage", () => {
+  const area = getStudyArea("north-punjab");
+  const preset = getWeatherPreset(area, "north-punjab-clear");
+  const pack = createPhaseAEnvironmentPack({
+    studyArea: area,
+    weatherPreset: preset,
+    installations: PUBLIC_INSTALLATIONS,
+  });
+  assertPhaseAEnvironmentPack(pack);
+  assert.equal(pack.schemaVersion, "vector.environment-pack.v1");
+  assert.equal(pack.provenance, "MODEL_ASSUMPTION");
+  assert.equal(pack.coverage.verticalDatum, "MSL");
+  assert.equal(pack.terrain.referenceElevationMslM, area.surfaceElevationM);
+  assert.equal(pack.installationCoverage.includedRecordCount, PUBLIC_INSTALLATIONS.length);
+  assert.equal(pack.installationCoverage.declaredServiceCoverage, "BOUNDED_PUBLIC_REFERENCE_FIXTURE");
+  assert.deepEqual(pack.installationCoverage.knownGaps, PHASE_A_INSTALLATION_GAPS);
+  assert.match(pack.identity.digest, /^sha256:[0-9a-f]{64}$/);
+  assert.throws(
+    () => assertPhaseAEnvironmentPack({
+      ...pack,
+      installationCoverage: { ...pack.installationCoverage, declaredServiceCoverage: "COMPLETE" },
+    }),
+    /must not claim complete service coverage/,
+  );
+  assert.throws(
+    () => assertPhaseAEnvironmentPack({
+      ...pack,
+      identity: { ...pack.identity, digest: `sha256:${"f".repeat(64)}` },
+    }),
+    /does not match its canonical content/,
+  );
+});
+
+test("Phase A Worker-ready sampler is deterministic, bounded, cancellable and does not hide datum or terrain assumptions", () => {
+  const area = getStudyArea("ladakh-high-altitude");
+  const preset = getWeatherPreset(area, "ladakh-cold-clear");
+  const pack = createPhaseAEnvironmentPack({ studyArea: area, weatherPreset: preset, installations: PUBLIC_INSTALLATIONS });
+  const sampler = createPhaseAEnvironmentSampler(pack);
+  const query = { eastM: 0, northM: 0, upM: 3_300, modelTimeSeconds: 12 };
+  const first = sampler.sample(query);
+  const second = sampler.sample(query);
+  assert.deepEqual(first, second);
+  assert.equal(first.terrain.elevation?.datum, "MSL");
+  assert.equal(first.terrain.elevation?.valueM, area.surfaceElevationM);
+  assert.equal(first.windEnuMps.x, preset.windEastMps);
+  assert.ok(first.atmosphere.densityKgM3 > 0);
+  assert.throws(
+    () => sampler.sampleBatch(Array.from({ length: 4097 }, () => query)),
+    /maximum is 4096/,
+  );
+  const controller = new AbortController();
+  controller.abort();
+  assert.throws(
+    () => sampler.sampleBatch([query], controller.signal),
+    (error) => error?.name === "AbortError",
+  );
+  assert.throws(
+    () => sampler.sample({ ...query, upM: Number.NaN }),
+    /finite local coordinates and model time/,
+  );
+});
+
+test("different Phase A packs differ through declared pack values, not a region-name branch", () => {
+  const northPunjab = getStudyArea("north-punjab");
+  const ladakh = getStudyArea("ladakh-high-altitude");
+  const punjabPack = createPhaseAEnvironmentPack({
+    studyArea: northPunjab,
+    weatherPreset: getWeatherPreset(northPunjab, "north-punjab-clear"),
+    installations: PUBLIC_INSTALLATIONS,
+  });
+  const ladakhPack = createPhaseAEnvironmentPack({
+    studyArea: ladakh,
+    weatherPreset: getWeatherPreset(ladakh, "ladakh-cold-clear"),
+    installations: PUBLIC_INSTALLATIONS,
+  });
+  const query = { eastM: 0, northM: 0, upM: 3_300, modelTimeSeconds: 0 };
+  const punjab = createPhaseAEnvironmentSampler(punjabPack).sample(query);
+  const ladakhSample = createPhaseAEnvironmentSampler(ladakhPack).sample(query);
+  assert.notEqual(punjabPack.identity.digest, ladakhPack.identity.digest);
+  assert.notEqual(punjab.terrain.elevation?.valueM, ladakhSample.terrain.elevation?.valueM);
+  assert.notEqual(punjab.atmosphere.temperatureK, ladakhSample.atmosphere.temperatureK);
 });
 
 test("bounded terrain sampling handles flat, ridge, no-data and datum mismatch fixtures", () => {
