@@ -232,6 +232,7 @@ export type RaspTrack = {
 export type TerminationCode =
   | "threshold_reached"
   | "energy_depleted"
+  | "target_unavailable"
   | "time_limit"
   | "invalid_scenario";
 
@@ -241,6 +242,7 @@ export type SimulationResult = {
     | "Intercept"
     | "Objective reached"
     | "Energy depleted"
+    | "Target unavailable"
     | "Modeled distance exhausted"
     | "Time limit reached";
   successful: boolean;
@@ -659,6 +661,8 @@ export function buildSimulationResult(
       : "Intercept"
     : engineRun.termination === "energy_depleted"
       ? "Energy depleted"
+      : engineRun.termination === "target_unavailable"
+        ? "Target unavailable"
       : "Time limit reached";
   const reason = successful
     ? fixedObjective
@@ -666,6 +670,8 @@ export function buildSimulationResult(
       : "The guided vehicle reached the configured intercept-completion distance."
     : engineRun.termination === "energy_depleted"
       ? "The vehicle reached the reference surface or fell below the continuation-speed condition after powered flight."
+      : engineRun.termination === "target_unavailable"
+        ? "The assigned target became unavailable. The engine terminated the guided vehicle without using a substitute target state."
       : engineRun.termination === "invalid_scenario"
         ? "The scenario did not contain an active guided vehicle and a valid assigned objective."
         : `The run reached ${engineScenario.durationSeconds} model seconds before the completion distance.`;
@@ -737,6 +743,9 @@ export function explainResult(scenario: Scenario, result: SimulationResult) {
   }
   if (result.termination === "energy_depleted") {
     return `After ${weapon?.weapon?.burnSeconds ?? 0} seconds of powered flight, modeled speed fell below the continuation threshold with ${Math.round(result.closestApproach / 1000)} km still separating the vehicle and objective.`;
+  }
+  if (result.termination === "target_unavailable") {
+    return "The assigned target became unavailable. The engine terminated the guided vehicle without using a substitute target state.";
   }
   return `The run reached its model-time limit before the 180 m completion threshold. Review distance, flight path, and wind assumptions.`;
 }

@@ -717,7 +717,10 @@ export class EngineSession {
         });
       }
 
-      if (separationM <= scenario.completion.distanceMeters) {
+      if (primaryWeapon.weaponFlightState === "TARGET_UNAVAILABLE") {
+        this.termination = "target_unavailable";
+        this.completed = true;
+      } else if (separationM <= scenario.completion.distanceMeters) {
         this.termination = "threshold_reached";
         this.completed = true;
       } else {

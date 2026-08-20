@@ -264,6 +264,8 @@ pub enum Termination {
     ThresholdReached,
     #[serde(rename = "energy_depleted")]
     EnergyDepleted,
+    #[serde(rename = "target_unavailable")]
+    TargetUnavailable,
     #[serde(rename = "time_limit")]
     TimeLimit,
     #[serde(rename = "invalid_scenario")]
@@ -871,6 +873,7 @@ fn update_weapon(
     if target.lifecycle == EntityLifecycle::Terminated {
         states[index].lifecycle = EntityLifecycle::Terminated;
         states[index].phase = "Target unavailable".to_string();
+        states[index].weapon_flight_state = Some(WeaponFlightState::TargetUnavailable);
         return;
     }
     let state = &mut states[index];
@@ -1221,6 +1224,10 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 line_of_sight_rate_rad_s: los_rate,
             });
         }
+        if states[weapon_index].weapon_flight_state == Some(WeaponFlightState::TargetUnavailable) {
+            termination = Termination::TargetUnavailable;
+            break;
+        }
         if separation <= scenario.completion.distance_meters {
             termination = Termination::ThresholdReached;
             break;
@@ -1507,6 +1514,45 @@ mod tests {
                 entity.id == "blue-weapon" && entity.lifecycle == EntityLifecycle::Active
             })));
         assert_eq!(run.diagnostics.non_finite_state_count, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn unavailable_assigned_target_terminates_the_weapon_without_continuation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut unavailable_target = scenario();
+        let target = unavailable_target
+            .entities
+            .iter_mut()
+            .find(|entity| entity.id == "red-aircraft")
+            .ok_or("scenario has no assigned target")?;
+        target.lifecycle = EntityLifecycle::Terminated;
+        let weapon = unavailable_target
+            .entities
+            .iter_mut()
+            .find(|entity| entity.id == "blue-weapon")
+            .and_then(|entity| entity.weapon.as_mut())
+            .ok_or("scenario has no launched weapon")?;
+        weapon.launch_time_seconds = Some(0.0);
+
+        let run = try_run_engine(unavailable_target)?;
+        assert_eq!(run.termination, Termination::TargetUnavailable);
+        assert_eq!(run.diagnostics.integrated_steps, 1);
+        let weapon = run
+            .frames
+            .first()
+            .and_then(|frame| {
+                frame
+                    .entities
+                    .iter()
+                    .find(|entity| entity.id == "blue-weapon")
+            })
+            .ok_or("run has no weapon frame")?;
+        assert_eq!(weapon.lifecycle, EntityLifecycle::Terminated);
+        assert_eq!(
+            weapon.weapon_flight_state,
+            Some(WeaponFlightState::TargetUnavailable)
+        );
         Ok(())
     }
 
