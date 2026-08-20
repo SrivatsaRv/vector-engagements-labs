@@ -35,6 +35,19 @@ export type OptionalCapability =
   | "weapons"
   | "savedRunCompatibility";
 
+const DOMAINS: readonly EngagementDomain[] = ["A2A", "A2G", "G2A", "G2G"];
+const OPTIONAL_CAPABILITIES: readonly OptionalCapability[] = [
+  "environment",
+  "weather",
+  "terrain",
+  "sensors",
+  "datalink",
+  "aew",
+  "ew",
+  "weapons",
+  "savedRunCompatibility",
+];
+
 export type DeploymentCapabilityManifest = {
   schemaVersion: typeof DEPLOYMENT_CAPABILITY_SCHEMA;
   digest: string;
@@ -103,6 +116,21 @@ function validateDecision(path: string, decision: CapabilityDecision) {
   }
 }
 
+function validateExactKeys(
+  path: string,
+  actual: Record<string, unknown>,
+  expected: readonly string[],
+) {
+  const unknown = Object.keys(actual).filter((key) => !expected.includes(key));
+  const missing = expected.filter((key) => !Object.hasOwn(actual, key));
+  if (unknown.length || missing.length) {
+    throw new CapabilityAdmissionError(
+      "CAPABILITY_CONFIG_INVALID",
+      `${path} must declare exactly the supported capability keys.`,
+    );
+  }
+}
+
 export function createDeploymentCapabilityManifest(
   input: DeploymentCapabilityInput,
 ): DeploymentCapabilityManifest {
@@ -112,6 +140,12 @@ export function createDeploymentCapabilityManifest(
       "The deployment engine is not supported.",
     );
   }
+  validateExactKeys("domains", input.domains, DOMAINS);
+  validateExactKeys(
+    "optionalCapabilities",
+    input.optionalCapabilities,
+    OPTIONAL_CAPABILITIES,
+  );
   for (const [domain, decision] of Object.entries(input.domains)) {
     validateDecision(`domains.${domain}`, decision);
   }
@@ -178,6 +212,21 @@ export function domainCapability(
   manifest = DEPLOYMENT_CAPABILITIES,
 ) {
   return manifest.domains[domain];
+}
+
+/** The manifest is the sole deployment authority for optional subsystem use. */
+export function optionalCapability(
+  capability: OptionalCapability,
+  manifest = DEPLOYMENT_CAPABILITIES,
+) {
+  return manifest.optionalCapabilities[capability];
+}
+
+export function isOptionalCapabilityEnabled(
+  capability: OptionalCapability,
+  manifest = DEPLOYMENT_CAPABILITIES,
+) {
+  return optionalCapability(capability, manifest).state === "ENABLED";
 }
 
 export function admitScenarioCapabilities(

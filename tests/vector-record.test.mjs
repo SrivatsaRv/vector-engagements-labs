@@ -52,7 +52,11 @@ for (const backend of ["typescript", "rust-wasm"]) {
     assert.deepEqual(opened.result.envelopes, result.envelopes);
     assert.equal(opened.result.reason, result.reason);
     assert.ok(opened.events.length > 0);
-    assert.ok(opened.pictures.length > 0);
+    assert.deepEqual(
+      opened.pictures,
+      [],
+      "disabled sensors must not emit observer tracks into a saved record",
+    );
     assert.match(opened.manifest.recordId, /^[a-f0-9]{64}$/);
   });
 }

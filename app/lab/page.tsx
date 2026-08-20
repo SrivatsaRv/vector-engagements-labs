@@ -19,7 +19,6 @@ import {
   Layers3,
   Pause,
   Play,
-  Radio,
   RotateCcw,
   Save,
   Settings2,
@@ -60,7 +59,10 @@ import {
   registerDatabaseSimulationModels,
 } from "@/lib/simulation-models";
 import { ENGINE_VERSION } from "@/lib/engine/version";
-import { domainCapability } from "@/lib/runtime/deployment-capabilities";
+import {
+  domainCapability,
+  optionalCapability,
+} from "@/lib/runtime/deployment-capabilities";
 import {
   BrowserSimulationCancelledError,
   BrowserSimulationClient,
@@ -83,21 +85,16 @@ import {
   type StoredScenarioPackage,
 } from "@/lib/scenario-package";
 import {
-  RASP_SOURCE_CONTRACTS,
-  TACTICAL_DECISION_CONTRACTS,
-  buildRaspTrack,
   createReferencePreview,
   explainResult,
   getFrameAt,
   standardAtmosphere,
   type ProfileId,
-  type RaspTrack,
   type Scenario,
   type SimulationResult,
 } from "@/lib/simulation";
 
 type Workspace = "configure" | "run" | "results";
-type ViewMode = "TRUTH" | "IAF_RASP" | "PAF_RASP";
 type PlaybackSurface = "MAP" | "THREE_D";
 type EventItem = {
   id: number;
@@ -110,7 +107,7 @@ const CONFIGURE_STEPS = [
   "Define",
   "Forces & loadouts",
   "Place & flight",
-  "Sensors & decisions",
+  "Admitted conditions",
   "Validate",
 ];
 
@@ -229,7 +226,6 @@ function LabWorkbench({
   const [catalogCredibility, setCatalogCredibility] =
     useState<CatalogCredibilityAdmission | null>(null);
   const [spatialInputsValid, setSpatialInputsValid] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>("TRUTH");
   const [playbackSurface, setPlaybackSurface] =
     useState<PlaybackSurface>("MAP");
   const validations = useMemo(() => {
@@ -482,17 +478,6 @@ function LabWorkbench({
   }, [result.timeOfFlight, run]);
 
   const frame = useMemo(() => getFrameAt(result, time), [result, time]);
-  const raspTrack = useMemo(
-    () =>
-      scenario.domain !== "A2A" || viewMode === "TRUTH"
-        ? undefined
-        : buildRaspTrack(
-            scenario,
-            frame,
-            viewMode === "IAF_RASP" ? "IAF" : "PAF",
-          ),
-    [frame, scenario, viewMode],
-  );
   const addObservation = () =>
     setEvents((items) => [
       ...items,
@@ -753,34 +738,11 @@ function LabWorkbench({
           <section className="simulation-column">
             <div className="sim-topline">
               <div className="sim-identity">
-                <span>
-                  {viewMode === "TRUTH"
-                    ? "Model truth"
-                    : "Sensor-derived air picture"}
-                </span>
+                <span>Computed model state</span>
                 <strong>
                   {blueSystem.designation} · {scenario.guidance} path
                 </strong>
               </div>
-              {scenario.domain === "A2A" && (
-                <div className="picture-switch" aria-label="Air picture view">
-                  {(["TRUTH", "IAF_RASP", "PAF_RASP"] as ViewMode[]).map(
-                    (mode) => (
-                      <button
-                        key={mode}
-                        className={viewMode === mode ? "active" : ""}
-                        onClick={() => setViewMode(mode)}
-                      >
-                        {mode === "TRUTH"
-                          ? "Model Truth"
-                          : mode === "IAF_RASP"
-                            ? "IAF RASP"
-                            : "PAF RASP"}
-                      </button>
-                    ),
-                  )}
-                </div>
-              )}
               <div className="picture-switch surface-switch" aria-label="Playback surface">
                 <button
                   className={playbackSurface === "MAP" ? "active" : ""}
@@ -816,7 +778,6 @@ function LabWorkbench({
                   result={result}
                   time={time}
                   installations={catalogInstallations}
-                  raspTrack={raspTrack}
                 />
               ) : (
                 <SimulationScene
@@ -824,7 +785,6 @@ function LabWorkbench({
                   time={time}
                   profile={scenario.profile}
                   layers={layers}
-                  raspTrack={raspTrack}
                 />
               )}
               <div className="symbol-key">
@@ -840,18 +800,9 @@ function LabWorkbench({
                     {entity.designation} · {entity.lifecycle.toLowerCase()}
                   </span>
                 ))}
-                {raspTrack && (
-                  <span>
-                    <i className="uncertainty-symbol" />
-                    Track uncertainty
-                  </span>
-                )}
               </div>
               <div className="view-note">
-                {viewMode === "TRUTH"
-                  ? "Computed model state"
-                  : "What this side can observe; uncertainty is deliberately visible"}{" "}
-                · {playbackSurface === "MAP" ? "pan or zoom the geographic surface" : "drag to orbit · scroll to zoom"}
+                Computed model state · {playbackSurface === "MAP" ? "pan or zoom the geographic surface" : "drag to orbit · scroll to zoom"}
               </div>
             </div>
             <Playback
@@ -873,9 +824,7 @@ function LabWorkbench({
           </section>
           <aside className="session-right">
             <Outcome result={result} />
-            {raspTrack ? (
-              <RaspPanel track={raspTrack} />
-            ) : comparison ? (
+            {comparison ? (
               <Comparison scenario={scenario} data={comparison} />
             ) : (
               <Geometry frame={frame} />
@@ -1121,13 +1070,9 @@ function ConfigureWorkspace({
       "Set distance, altitude, speed, crossing angle, and the weapon flight path. Derived atmosphere and geometry update from these inputs.",
     ],
     [
-      "Sensors & decisions",
-      fixed
-        ? "Which fixed-objective conditions apply?"
-        : "What can each side see, and what will each side do?",
-      fixed
-        ? "A fixed objective cannot maneuver. Adjust the wind or prepare a condition change."
-        : "Set the Red aircraft maneuver, radar and data-link state, electronic warfare, and the next tactical decision.",
+      "Admitted conditions",
+      "What is available in this deployment?",
+      "Route, flight state, loadout, and frozen weather inputs are admitted. Sensor, electronic-warfare, and tactical-policy controls remain unavailable until their causal runtime contracts land.",
     ],
     [
       "Validate",
@@ -1614,213 +1559,7 @@ function ConfigureWorkspace({
         )}
         {step === 3 && (
           <section className="authoring-section">
-            {fixed ? (
-              <div className="fixed-condition">
-                <strong>Fixed objective</strong>
-                <p>
-                  Objective speed is locked to 0 m/s. Evasive turns and g-demand
-                  do not apply to this mission set.
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="event-choice">
-                  <button
-                    className={scenario.maneuver === "steady" ? "active" : ""}
-                    onClick={() => update("maneuver", "steady")}
-                  >
-                    <strong>{scenario.domain === "A2A" ? "Hold heading" : "Straight transit"}</strong>
-                    <small>The Red aircraft keeps its starting heading and speed.</small>
-                  </button>
-                  <button
-                    className={scenario.maneuver === "break" ? "active" : ""}
-                    onClick={() => update("maneuver", "break")}
-                  >
-                    <strong>Defensive turn</strong>
-                    <small>At T+5 seconds, Red begins a sustained turn using the selected g demand.</small>
-                  </button>
-                  <button
-                    className={scenario.maneuver === "weave" ? "active" : ""}
-                    onClick={() => update("maneuver", "weave")}
-                  >
-                    <strong>Reversing turns</strong>
-                    <small>After T+5 seconds, Red alternates left and right turns at the selected demand.</small>
-                  </button>
-                </div>
-                <Range
-                  label="Opposing-track turn demand"
-                  value={scenario.targetG}
-                  min={0}
-                  max={9}
-                  step={0.5}
-                  unit="g"
-                  onChange={(value) => update("targetG", value)}
-                />
-              </>
-            )}
-            {scenario.domain === "A2A" && (
-              <div className="information-setup">
-                <header>
-                  <span>REAL AIR SITUATION PICTURE INPUTS</span>
-                  <strong>What does each side know?</strong>
-                  <p>
-                    These controls shape the IAF and PAF air pictures. Model
-                    Truth remains available separately.
-                  </p>
-                </header>
-                <ChoiceButtons
-                  label="IAF source for the Red track"
-                  value={scenario.blueTrackSource}
-                  options={[
-                    ["ONBOARD_RADAR", "Onboard radar"],
-                    ["DATALINK", "Data link"],
-                    ["AIRBORNE_EARLY_WARNING", "Airborne early warning"],
-                    ["VISUAL", "Visual contact"],
-                  ]}
-                  onChange={(value) =>
-                    update(
-                      "blueTrackSource",
-                      value as Scenario["blueTrackSource"],
-                    )
-                  }
-                />
-                <ChoiceButtons
-                  label="PAF source for the Blue track"
-                  value={scenario.redTrackSource}
-                  options={[
-                    ["ONBOARD_RADAR", "Onboard radar"],
-                    ["DATALINK", "Data link"],
-                    ["AIRBORNE_EARLY_WARNING", "Airborne early warning"],
-                    ["VISUAL", "Visual contact"],
-                  ]}
-                  onChange={(value) =>
-                    update(
-                      "redTrackSource",
-                      value as Scenario["redTrackSource"],
-                    )
-                  }
-                />
-                <div className="information-grid">
-                  <BinaryChoice
-                    label="IAF radar"
-                    value={scenario.blueRadarMode === "ACTIVE"}
-                    onLabel="Active"
-                    offLabel="Silent"
-                    team="blue"
-                    onChange={(value) =>
-                      update("blueRadarMode", value ? "ACTIVE" : "SILENT")
-                    }
-                  />
-                  <BinaryChoice
-                    label="PAF radar"
-                    value={scenario.redRadarMode === "ACTIVE"}
-                    onLabel="Active"
-                    offLabel="Silent"
-                    team="red"
-                    onChange={(value) =>
-                      update("redRadarMode", value ? "ACTIVE" : "SILENT")
-                    }
-                  />
-                  <BinaryChoice
-                    label="IAF data link"
-                    value={scenario.blueDatalink}
-                    onLabel="Available"
-                    offLabel="Unavailable"
-                    team="blue"
-                    onChange={(value) => update("blueDatalink", value)}
-                  />
-                  <BinaryChoice
-                    label="PAF data link"
-                    value={scenario.redDatalink}
-                    onLabel="Available"
-                    offLabel="Unavailable"
-                    team="red"
-                    onChange={(value) => update("redDatalink", value)}
-                  />
-                  <BinaryChoice
-                    label="IAF jammer"
-                    value={scenario.blueJammer}
-                    onLabel="On"
-                    offLabel="Off"
-                    team="blue"
-                    onChange={(value) => update("blueJammer", value)}
-                  />
-                  <BinaryChoice
-                    label="PAF jammer"
-                    value={scenario.redJammer}
-                    onLabel="On"
-                    offLabel="Off"
-                    team="red"
-                    onChange={(value) => update("redJammer", value)}
-                  />
-                </div>
-                <div className="decision-grid">
-                  <ChoiceButtons
-                    label="Blue Team decision"
-                    value={scenario.blueDecision}
-                    options={[
-                      ["PRESS", "Continue toward target"],
-                      ["SUPPORT_WEAPON", "Support the weapon"],
-                      ["CRANK", "Turn while supporting"],
-                      ["DEFEND", "Defend"],
-                      ["DISENGAGE", "Disengage"],
-                    ]}
-                    onChange={(value) =>
-                      update("blueDecision", value as Scenario["blueDecision"])
-                    }
-                  />
-                  <ChoiceButtons
-                    label="Red Team decision"
-                    value={scenario.redDecision}
-                    options={[
-                      ["PRESS", "Continue toward target"],
-                      ["CRANK", "Turn for position"],
-                      ["DEFEND", "Defend"],
-                      ["DISENGAGE", "Disengage"],
-                    ]}
-                    onChange={(value) =>
-                      update("redDecision", value as Scenario["redDecision"])
-                    }
-                  />
-                </div>
-                <p className="model-effect-note">
-                  Scope: source, radar, data-link, and jammer controls change the
-                  two air-picture views. Team decisions change the simulated
-                  aircraft and weapon behavior.
-                </p>
-                <div className="rasp-effect-grid" aria-label="Current control effects">
-                  {([
-                    ["blue", "IAF view of Red", scenario.blueTrackSource, scenario.blueRadarMode, scenario.blueDatalink, scenario.redJammer],
-                    ["red", "PAF view of Blue", scenario.redTrackSource, scenario.redRadarMode, scenario.redDatalink, scenario.blueJammer],
-                  ] as const).map(([team, title, source, radarMode, datalink, opposingJammer]) => {
-                    const contract = RASP_SOURCE_CONTRACTS[source];
-                    const unavailable =
-                      (source === "ONBOARD_RADAR" && radarMode === "SILENT") ||
-                      ((source === "DATALINK" || source === "AIRBORNE_EARLY_WARNING") && !datalink);
-                    return (
-                      <article key={title} className={`${team} ${unavailable ? "unavailable" : "available"}`}>
-                        <span>{title}</span>
-                        <strong>{contract.label} · {unavailable ? "unavailable at start" : "available at start"}</strong>
-                        <p>{contract.requirement}</p>
-                        <p><b>Run display:</b> select this RASP above the map or 3D view to see the estimated marker, track state, age, and uncertainty.</p>
-                        {opposingJammer && <em>Opposing jammer reduces the displayed track-quality index.</em>}
-                        {contract.limitation && <em>{contract.limitation}</em>}
-                      </article>
-                    );
-                  })}
-                </div>
-                <div className="decision-effect-grid" aria-label="Selected decision effects">
-                  <article>
-                    <span>Blue Team engine effect</span>
-                    <p>{TACTICAL_DECISION_CONTRACTS[scenario.blueDecision].blueEffect}</p>
-                  </article>
-                  <article>
-                    <span>Red Team engine effect</span>
-                    <p>{TACTICAL_DECISION_CONTRACTS[scenario.redDecision].redEffect}</p>
-                  </article>
-                </div>
-              </div>
-            )}
+            <CapabilityNotice />
             <Range
               label="Eastward wind velocity"
               value={scenario.wind}
@@ -1873,18 +1612,12 @@ function ConfigureWorkspace({
                 <button onClick={() => setStep(2)}>Edit flight</button>
               </div>
               <div>
-                <span>Sensors &amp; decisions</span>
-                <strong>
-                  {fixed
-                    ? "Fixed objective"
-                    : `${scenario.maneuver} · ${scenario.targetG} g`}
-                </strong>
+                <span>Admitted conditions</span>
+                <strong>Route and frozen environment</strong>
                 <p>
-                  {scenario.domain === "A2A"
-                    ? `Blue ${scenario.blueDecision.replaceAll("_", " ").toLowerCase()} · Red ${scenario.redDecision.replaceAll("_", " ").toLowerCase()} · IAF track from ${scenario.blueTrackSource.replaceAll("_", " ").toLowerCase()}`
-                    : `${definition.targetMotion === "fixed" ? "Fixed objective" : `Red ${scenario.maneuver}`} · east–west wind ${scenario.wind} m/s`}
+                  Sensor, EW, and tactical-policy controls are unavailable in this deployment.
                 </p>
-                <button onClick={() => setStep(3)}>Edit conditions</button>
+                <button onClick={() => setStep(3)}>View admission</button>
               </div>
               <article className={`credibility-admission ${credibility?.state === "ADMITTED" ? "admitted" : "limited"}`}>
                 <span>MODEL CREDIBILITY</span>
@@ -2303,75 +2036,6 @@ function Quantity({
   );
 }
 
-function ChoiceButtons({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: Array<[string, string]>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <fieldset className="choice-buttons">
-      <legend>{label}</legend>
-      <div>
-        {options.map(([id, name]) => (
-          <button
-            type="button"
-            key={id}
-            className={value === id ? "active" : ""}
-            aria-pressed={value === id}
-            onClick={() => onChange(id)}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-
-function BinaryChoice({
-  label,
-  value,
-  onLabel,
-  offLabel,
-  team,
-  onChange,
-}: {
-  label: string;
-  value: boolean;
-  onLabel: string;
-  offLabel: string;
-  team: "blue" | "red";
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <fieldset className={`binary-choice ${team}`}>
-      <legend>{label}</legend>
-      <button
-        type="button"
-        className={value ? "active" : ""}
-        aria-pressed={value}
-        onClick={() => onChange(true)}
-      >
-        {onLabel}
-      </button>
-      <button
-        type="button"
-        className={!value ? "active" : ""}
-        aria-pressed={!value}
-        onClick={() => onChange(false)}
-      >
-        {offLabel}
-      </button>
-    </fieldset>
-  );
-}
-
 function Range({
   label,
   value,
@@ -2551,42 +2215,26 @@ function Comparison({
     </section>
   );
 }
-function RaspPanel({ track }: { track: RaspTrack }) {
+function CapabilityNotice() {
+  const sensors = optionalCapability("sensors");
+  const datalink = optionalCapability("datalink");
+  const ew = optionalCapability("ew");
   return (
-    <section className={`right-card rasp-card ${track.status.toLowerCase()}`}>
-      <div className="right-title">
-        <Radio size={15} />
-        <strong>{track.perspective} Real Air Situation Picture</strong>
-        <span>{track.status}</span>
+    <section className="configured-note" role="status">
+      <CircleAlert size={16} />
+      <div>
+        <strong>Information and tactical-policy controls are unavailable.</strong>
+        <p>
+          This run uses the authored aircraft routes, admitted loadout, and
+          frozen environmental inputs. It does not claim radar tracks, data
+          link, airborne early warning, jamming, or virtual-pilot decisions.
+        </p>
+        <p>
+          Sensors: {sensors.state.toLowerCase().replaceAll("_", " ")}. {sensors.reason}
+          {" "}Data link: {datalink.state.toLowerCase().replaceAll("_", " ")}. {datalink.reason}
+          {" "}EW: {ew.state.toLowerCase().replaceAll("_", " ")}. {ew.reason}
+        </p>
       </div>
-      <div className="rasp-track-title">
-        <span>TRACK {track.trackId}</span>
-        <strong>{track.classification}</strong>
-        <em>{track.identification}</em>
-      </div>
-      <dl>
-        <dt>Source</dt>
-        <dd>{track.source}</dd>
-        <dt>Confidence</dt>
-        <dd>{track.confidence}%</dd>
-        <dt>Track age</dt>
-        <dd>{track.ageSeconds.toFixed(1)} s</dd>
-        <dt>Position uncertainty</dt>
-        <dd>±{track.uncertaintyMeters} m</dd>
-        <dt>State reason</dt>
-        <dd>{track.availabilityReason.replaceAll("_", " ").toLowerCase()}</dd>
-        <dt>Effect scope</dt>
-        <dd>
-          {track.effectScope === "AIR_PICTURE_ONLY"
-            ? "Air picture only"
-            : "Air picture and guidance event"}
-        </dd>
-      </dl>
-      <p>
-        {track.stateExplanation} {track.visible
-          ? "The amber ring shows positional uncertainty; Model Truth remains separate."
-          : "Model Truth remains unchanged."}
-      </p>
     </section>
   );
 }

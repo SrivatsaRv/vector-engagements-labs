@@ -215,16 +215,6 @@ export function compileScenario(
     seekerActivationRangeM: selectedModel.seekerActivationRangeM,
     datalinkUpdateSeconds: selectedModel.datalinkUpdateSeconds,
   };
-  const blueDecisionFactor =
-    input.blueDecision === "PRESS"
-      ? 1.05
-      : input.blueDecision === "CRANK"
-        ? 0.9
-        : input.blueDecision === "DEFEND"
-          ? 0.75
-          : input.blueDecision === "DISENGAGE"
-            ? 0.45
-            : 1;
   const bluePlatform = withProvenance(
     {
       id: "blue-platform-1",
@@ -265,7 +255,9 @@ export function compileScenario(
       behavior: {
         maneuver: "steady",
         commandedG: 0,
-        decision: input.blueDecision,
+        // Tactical policy is not admitted yet. Aircraft movement follows its
+        // authored route; weapon guidance uses its declared model-pack rate.
+        decision: "PRESS",
       },
       aircraft: blueAircraft,
     },
@@ -317,7 +309,7 @@ export function compileScenario(
       behavior: {
         maneuver: "steady",
         commandedG: 0,
-        decision: input.redDecision,
+        decision: "PRESS",
       },
       aircraft: redAircraft,
     },
@@ -347,7 +339,7 @@ export function compileScenario(
       behavior: {
         maneuver: "steady",
         commandedG: 0,
-        decision: input.blueDecision,
+        decision: "PRESS",
       },
       weapon: {
         launchPlatformId: bluePlatform.id,
@@ -357,8 +349,7 @@ export function compileScenario(
         ...assumptions,
         commandedCruiseAltitudeM:
           input.domain === "G2G" ? input.cruiseAltitude : input.altitude,
-        navigationConstant:
-          assumptions.navigationConstant * blueDecisionFactor,
+        navigationConstant: assumptions.navigationConstant,
       },
     },
     blueSystem.id,
@@ -409,7 +400,7 @@ export function compileScenario(
           behavior: {
             maneuver: "steady",
             commandedG: 0,
-            decision: input.redDecision,
+            decision: "PRESS",
           },
           weapon: {
             launchPlatformId: redTarget.id,

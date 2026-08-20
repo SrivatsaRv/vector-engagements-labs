@@ -173,7 +173,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     domain: "A2A",
     title: "Su-30MKI / Astra versus F-16C Block 52",
     summary:
-      "Put a Su-30MKI and F-16C into a crossing fight. Change the distance, angle, target turn, and radar picture.",
+      "Put a Su-30MKI and F-16C into a crossing study. Change the authored distance, angle, and routes.",
     blue: "Su-30MKI carrying Astra Mk 1",
     red: "PAF F-16C Block 52 carrying AIM-120C-5",
     targetProfile: "PAF F-16C Block 52",
@@ -191,13 +191,13 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       geometry:
         "A 145° crossing angle and 1,500 m altitude difference create a crossing intercept rather than a head-on pass or tail chase.",
       conditions:
-        "The F-16 begins a four-g defensive break after five model seconds. Both radars and data links start available.",
+        "Both aircraft use their admitted starting states and authored routes. Sensor, data-link, EW, and tactical-policy behavior are unavailable in this deployment.",
     },
     scenario: scenario({
       domain: "A2A",
       name: "IAF Su-30MKI versus PAF F-16C Block 52",
       objective:
-        "Compare how starting distance, crossing angle, and a defensive turn change the Astra intercept opportunity.",
+        "Compare how starting distance, crossing angle, and authored routes change the Astra intercept opportunity.",
       bluePlatformId: "su-30mki",
       blueSystemId: "astra-mk1",
       redObjectId: "f-16c-block52-paf",

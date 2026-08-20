@@ -345,18 +345,10 @@ function updateWeapon(
     gravityCompensation,
   );
   const terminalGuidance = separation <= weapon.seekerActivationRangeM;
-  const updateMultiplier =
-    state.definition.behavior.decision === "CRANK"
-      ? 1.5
-      : state.definition.behavior.decision === "DEFEND"
-        ? 3
-        : state.definition.behavior.decision === "DISENGAGE"
-          ? Number.POSITIVE_INFINITY
-          : 1;
   const guidanceUpdateDue =
     terminalGuidance ||
     time - state.lastGuidanceUpdateSeconds >=
-      weapon.datalinkUpdateSeconds * updateMultiplier;
+      weapon.datalinkUpdateSeconds;
   const guidanceAcceleration = !guidanceUpdateDue
     ? state.lastGuidanceAcceleration
     : clampMagnitude(unclampedGuidance, maximumAcceleration);

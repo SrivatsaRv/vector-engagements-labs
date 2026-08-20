@@ -14,6 +14,7 @@ import {
   type Scenario,
   type SimulationResult,
 } from "../simulation.ts";
+import { isOptionalCapabilityEnabled } from "../runtime/deployment-capabilities.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v2" as const;
@@ -441,7 +442,12 @@ function stableEvents(result: SimulationResult): VectorRecordEvent[] {
 }
 
 function recordPictures(prepared: PreparedSimulation, result: SimulationResult) {
-  if (prepared.scenario.domain !== "A2A") return [];
+  if (
+    prepared.scenario.domain !== "A2A" ||
+    !isOptionalCapabilityEnabled("sensors", prepared.capabilityManifest)
+  ) {
+    return [];
+  }
   return result.frames.flatMap((frame) => [
     buildRaspTrack(prepared.scenario, frame, "IAF"),
     buildRaspTrack(prepared.scenario, frame, "PAF"),

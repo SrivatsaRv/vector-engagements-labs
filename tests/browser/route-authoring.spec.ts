@@ -129,15 +129,22 @@ test("route inputs fail visibly, recover, and drive the real Worker run", async 
   if (!compact) await page.getByRole("button", { name: /Validate/i }).click();
   await expect(speed).toHaveValue("-1");
   await expect(page.getByText(/Correct the marked flight inputs/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: /Next: Sensors & decisions/i })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /Next: Admitted conditions/i })).toBeDisabled();
 
   await speed.fill("275");
   await speed.press("Enter");
   if (compact) {
-    await page.getByRole("button", { name: /Next: Sensors & decisions/i }).click();
+    await page.getByRole("button", { name: /Next: Admitted conditions/i }).click();
+    await expect(page.getByText(/Information and tactical-policy controls are unavailable/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /IAF radar/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Defensive turn/i })).toHaveCount(0);
     await page.getByRole("button", { name: /Next: Validate/i }).click();
   } else {
-    await page.getByRole("button", { name: /Validate/i }).click();
+    await page.getByRole("button", { name: "4 Admitted conditions" }).click();
+    await expect(page.getByText(/Information and tactical-policy controls are unavailable/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /IAF radar/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Defensive turn/i })).toHaveCount(0);
+    await page.getByRole("button", { name: "5 Validate" }).click();
   }
   await expect(page.getByText(/Authored positions and routes are inside/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /run baseline/i })).toBeEnabled();
@@ -150,5 +157,7 @@ test("route inputs fail visibly, recover, and drive the real Worker run", async 
   }
   await expect(page.getByText("Condition injection", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Track-information interruption", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /IAF RASP/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /PAF RASP/i })).toHaveCount(0);
   expect(runtimeErrors).toEqual([]);
 });

@@ -141,6 +141,18 @@ test("RASP-only controls cannot change model truth or engagement outcome", () =>
   }
 });
 
+test("unadmitted tactical decision labels cannot alter compiled guidance or flight", () => {
+  const baseline = simulate(DEFAULT_SCENARIO);
+  for (const blueDecision of ["PRESS", "SUPPORT_WEAPON", "CRANK", "DEFEND", "DISENGAGE"]) {
+    for (const redDecision of ["PRESS", "CRANK", "DEFEND", "DISENGAGE"]) {
+      const changed = simulate({ ...DEFAULT_SCENARIO, blueDecision, redDecision });
+      assert.deepEqual(changed.engineRun.frames, baseline.engineRun.frames);
+      assert.equal(changed.engineRun.closestApproachM, baseline.engineRun.closestApproachM);
+      assert.equal(changed.engineRun.termination, baseline.engineRun.termination);
+    }
+  }
+});
+
 test("each side's local source controls are isolated from the opposing RASP", () => {
   const result = simulate(DEFAULT_SCENARIO);
   const frame = getFrameAt(result, 20);

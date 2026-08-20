@@ -4,8 +4,10 @@ import {
   CapabilityAdmissionError,
   DEPLOYMENT_CAPABILITIES,
   admitScenarioCapabilities,
+  createDeploymentCapabilityManifest,
   createVerificationDeploymentCapabilities,
   domainCapability,
+  isOptionalCapabilityEnabled,
 } from "../lib/runtime/deployment-capabilities.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { prepareSimulation } from "../lib/simulation.ts";
@@ -31,6 +33,32 @@ test("the deployment admits A2A and fails closed for every other domain", () => 
     (error) =>
       error instanceof CapabilityAdmissionError && error.code === "DOMAIN_DISABLED",
   );
+});
+
+test("deployment configuration rejects incomplete or unknown capability maps", () => {
+  const incompleteDomains = structuredClone(DEPLOYMENT_CAPABILITIES);
+  delete incompleteDomains.domains.G2G;
+  assert.throws(
+    () => createDeploymentCapabilityManifest(incompleteDomains),
+    (error) =>
+      error instanceof CapabilityAdmissionError &&
+      error.code === "CAPABILITY_CONFIG_INVALID",
+  );
+
+  const unknownOptionalCapability = structuredClone(DEPLOYMENT_CAPABILITIES);
+  unknownOptionalCapability.optionalCapabilities.unreviewed = {
+    state: "ENABLED",
+    reason: "invalid fixture",
+    operatorGuidance: "invalid fixture",
+  };
+  assert.throws(
+    () => createDeploymentCapabilityManifest(unknownOptionalCapability),
+    (error) =>
+      error instanceof CapabilityAdmissionError &&
+      error.code === "CAPABILITY_CONFIG_INVALID",
+  );
+  assert.equal(isOptionalCapabilityEnabled("sensors"), false);
+  assert.equal(isOptionalCapabilityEnabled("ew"), false);
 });
 
 test("a scenario cannot select or override the deployment engine", () => {
