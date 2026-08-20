@@ -553,6 +553,8 @@ export function prepareSimulation(
         redRoute: input.spatialPlan.red.route.map((point) =>
           geographicToLocal(point, studyArea),
         ),
+        blueOriginReference: input.spatialPlan.blue.originReference,
+        redOriginReference: input.spatialPlan.red.originReference,
       }
     : undefined;
   const engineScenario = compileScenario(

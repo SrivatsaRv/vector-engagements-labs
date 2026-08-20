@@ -6,6 +6,8 @@ export class PublicApiError extends Error {
     readonly code: string,
     message = code,
     readonly headers?: HeadersInit,
+    /** Internal field address for deterministic admission/replay handling. */
+    readonly fieldPath?: string,
   ) {
     super(message);
   }

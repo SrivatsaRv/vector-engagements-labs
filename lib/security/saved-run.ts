@@ -13,6 +13,11 @@ import {
   EnvironmentAdmissionError,
   resolveEnvironmentSelection,
 } from "@/lib/study-areas";
+import {
+  MissionAdmissionError,
+  resolveInstallationOriginReference,
+  type InstallationOriginReference,
+} from "@/lib/mission-admission";
 import { finiteNumber, PublicApiError, shortString } from "./public-api";
 import { SAVED_RUN_LIFECYCLE_POLICY } from "./admission-policy";
 
@@ -75,9 +80,45 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
           ),
         };
       }),
+      originReference: installationOriginReference(
+        placement.originReference,
+        `${name}_origin_reference`,
+      ),
     };
   };
   return { blue: side(candidate.blue, "blue"), red: side(candidate.red, "red") };
+}
+
+function installationOriginReference(
+  value: unknown,
+  field: string,
+): InstallationOriginReference | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object") {
+    throw new PublicApiError(400, `invalid_${field}`);
+  }
+  const input = value as Record<string, unknown>;
+  const environment = input.environment;
+  if (!environment || typeof environment !== "object") {
+    throw new PublicApiError(400, `invalid_${field}_environment`);
+  }
+  const environmentInput = environment as Record<string, unknown>;
+  if (input.schemaVersion !== "vector.installation-origin.v1") {
+    throw new PublicApiError(400, `invalid_${field}_schema_version`);
+  }
+  const reference: InstallationOriginReference = {
+    schemaVersion: input.schemaVersion,
+    installationId: shortString(input.installationId, 120, `${field}_installation_id`),
+    sourceId: shortString(input.sourceId, 160, `${field}_source_id`),
+    environment: {
+      studyAreaId: shortString(environmentInput.studyAreaId, 80, `${field}_study_area_id`),
+      weatherPresetId: shortString(environmentInput.weatherPresetId, 80, `${field}_weather_preset_id`),
+    },
+  };
+  if (input.runwayId !== undefined) {
+    reference.runwayId = shortString(input.runwayId, 120, `${field}_runway_id`);
+  }
+  return reference;
 }
 
 function explicitMsl(value: unknown, field: string): "MSL" {
@@ -150,9 +191,20 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
   if (scenario.domain !== template.domain) throw new PublicApiError(409, "scenario_domain_mismatch");
   try {
     resolveEnvironmentSelection(scenario);
+    for (const [team, placement] of Object.entries(scenario.spatialPlan ?? {})) {
+      resolveInstallationOriginReference({
+        reference: placement.originReference,
+        studyAreaId: scenario.studyAreaId,
+        weatherPresetId: scenario.weatherPresetId,
+        fieldPath: `spatialPlan.${team}.originReference`,
+      });
+    }
   } catch (error) {
     if (error instanceof EnvironmentAdmissionError) {
-      throw new PublicApiError(400, error.code, error.message);
+      throw new PublicApiError(400, error.code, error.message, undefined, error.fieldPath);
+    }
+    if (error instanceof MissionAdmissionError) {
+      throw new PublicApiError(400, error.code, error.message, undefined, error.fieldPath);
     }
     throw error;
   }

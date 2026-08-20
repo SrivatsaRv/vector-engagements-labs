@@ -8,6 +8,7 @@ import {
   SYNTHETIC_ZERO_GEOID,
   convertWithGeoid,
 } from "./geospatial/vertical-datums.ts";
+import type { InstallationOriginReference } from "./mission-admission.ts";
 
 export type ScenarioSpatialPoint = {
   longitude: number;
@@ -21,6 +22,8 @@ export type ScenarioSpatialEntity = {
   headingDeg: number;
   speedMps: number;
   route: ScenarioSpatialPoint[];
+  /** Present only when an admitted public installation was selected. */
+  originReference?: InstallationOriginReference;
 };
 
 export type ScenarioSpatialPlan = {

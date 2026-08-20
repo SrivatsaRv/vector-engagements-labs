@@ -57,6 +57,38 @@ test("saved-run admission does not invent missing environment identity", () => {
   );
 });
 
+test("saved-run admission rejects stale selected-installation and runway identities", () => {
+  const scenario = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario) as Record<string, unknown>;
+  scenario.spatialPlan = {
+    blue: {
+      position: { longitude: 75.633227, latitude: 32.236929, altitudeM: 8500, verticalDatum: "MSL" },
+      headingDeg: 90,
+      speedMps: 270,
+      route: [],
+      originReference: {
+        schemaVersion: "vector.installation-origin.v1",
+        installationId: "iaf-pathankot",
+        sourceId: "iaf-stations-wikipedia",
+        environment: { studyAreaId: "north-punjab", weatherPresetId: "north-punjab-clear" },
+        runwayId: "rwy-09",
+      },
+    },
+    red: {
+      position: { longitude: 74.2, latitude: 31.8, altitudeM: 10_000, verticalDatum: "MSL" },
+      headingDeg: 270,
+      speedMps: 250,
+      route: [],
+    },
+  };
+  assert.throws(
+    () => validateSavedScenario(scenario, DEFAULT_SCENARIO_DEFINITION),
+    {
+      code: "MISSION_RUNWAY_UNAVAILABLE",
+      fieldPath: "spatialPlan.blue.originReference.runwayId",
+    },
+  );
+});
+
 test("saved reports are recomputed from admitted scenario inputs", async () => {
   const verified = await buildVerifiedSavedRun(
     DEFAULT_SCENARIO_DEFINITION.scenario,

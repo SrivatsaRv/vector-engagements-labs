@@ -24,6 +24,22 @@ import {
 
 type TeamKey = "blue" | "red";
 
+function originReference(
+  installation: MapInstallation,
+  studyAreaId: string,
+  weatherPresetId: string,
+) {
+  return {
+    schemaVersion: "vector.installation-origin.v1" as const,
+    installationId: installation.id,
+    sourceId: installation.source_id,
+    environment: {
+      studyAreaId,
+      weatherPresetId,
+    },
+  };
+}
+
 type Props = {
   scenario: Scenario;
   studyArea: StudyArea;
@@ -317,6 +333,11 @@ export function ScenarioAuthoringMap({
                 route: current[team].route.map((routePoint, index) =>
                   index === 0 ? point : routePoint,
                 ),
+                originReference: originReference(
+                  installation,
+                  scenario.studyAreaId,
+                  scenario.weatherPresetId,
+                ),
               },
             });
             setMessage(`${installation.name} selected as the ${team === "blue" ? "Blue" : "Red"} origin.`);
@@ -383,6 +404,7 @@ export function ScenarioAuthoringMap({
                 route: current[team].route.map((routePoint, index) =>
                   index === 0 ? point : routePoint,
                 ),
+                originReference: undefined,
               },
             });
             setMessage(`${team === "blue" ? "Blue" : "Red"} start position updated.`);
@@ -480,7 +502,7 @@ export function ScenarioAuthoringMap({
         ),
       });
     });
-  }, [blueObject, installations, plan, ready, redObject, selected, studyArea]);
+  }, [blueObject, installations, plan, ready, redObject, scenario.studyAreaId, scenario.weatherPresetId, selected, studyArea]);
 
   const updateEntity = (
     team: TeamKey,
@@ -515,6 +537,11 @@ export function ScenarioAuthoringMap({
         position,
         route: entity.route.map((point, index) =>
           index === 0 ? position : point,
+        ),
+        originReference: originReference(
+          installation,
+          scenario.studyAreaId,
+          scenario.weatherPresetId,
         ),
       },
     });
