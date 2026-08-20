@@ -39,6 +39,8 @@ const definitions: Record<string, { help: string; type: "counter" | "gauge" | "h
   vector_browser_long_task_duration_seconds: { help: "Browser main-thread long task duration", type: "histogram" },
   vector_browser_navigation_duration_seconds: { help: "Browser navigation duration", type: "histogram" },
   vector_telemetry_events_rejected_total: { help: "Rejected browser telemetry events", type: "counter" },
+  vector_basemap_tile_requests_total: { help: "Basemap tile relay outcomes", type: "counter" },
+  vector_basemap_tile_duration_seconds: { help: "Basemap tile relay duration", type: "histogram" },
 };
 
 const defaultBuckets = [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];

@@ -129,13 +129,13 @@ test("server-renders the blogs index and post routes while preserving legacy /bl
 test("basemap proxy rejects invalid tile coordinates without contacting an upstream", async () => {
   const response = await render("/api/map-tile?z=99&x=0&y=0");
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: "invalid_tile_coordinate" });
+  assert.deepEqual(await response.json(), { error: "invalid_tile_request" });
 });
 
 test("basemap proxy rejects an unknown governed map mode", async () => {
   const response = await render("/api/map-tile?mode=imaginary&z=1&x=0&y=0");
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: "invalid_tile_coordinate" });
+  assert.deepEqual(await response.json(), { error: "invalid_tile_request" });
 });
 
 test("VECTOR map controls share the MIAR-derived navigation contract", async () => {

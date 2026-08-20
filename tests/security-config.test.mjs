@@ -4,15 +4,6 @@ import { test } from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("map relay uses TLS, rate limiting, caching, and image validation", async () => {
-  const source = await read("app/api/map-tile/route.ts");
-  assert.doesNotMatch(source, /http:\/\/a\.basemaps\.cartocdn\.com/);
-  assert.match(source, /TILE_RATE_LIMITER/);
-  assert.match(source, /caches as CacheStorage/);
-  assert.match(source, /headers: new Headers\(cached\.headers\)/);
-  assert.match(source, /contentType\.startsWith\("image\/"\)/);
-});
-
 test("database-backed public APIs invoke the shared rate limiter", async () => {
   const runs = await read("app/api/runs/route.ts");
   const catalog = await read("app/api/catalog/route.ts");

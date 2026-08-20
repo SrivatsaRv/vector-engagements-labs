@@ -82,6 +82,12 @@ digests and content mismatches fail closed with dataset/version context. Basemap
 selection is recorded only as presentation provenance and cannot alter
 simulation.
 
+The presentation-only basemap relay has a separate cache identity contract,
+`vector-basemap-tile.v1`. Exactly one canonical mode/zoom/x/y tuple selects a
+fixed provider tile. It cannot modify a scenario, environment manifest, map
+geometry, or replay frame. Refer to `security-boundaries.md` for its request,
+cache, expiry, size, and failure bounds.
+
 Weather uses a versioned ENU vector-field interface sampled by geographic
 position and model time. Atmosphere uses a separate versioned field interface.
 The current point-mass adapter samples scenario-local up relative to the

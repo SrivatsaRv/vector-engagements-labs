@@ -59,11 +59,22 @@ all development ports on `127.0.0.1`.
 
 ## Catalog and basemap relay
 
-The catalog is cached for five minutes. The tile relay uses HTTPS upstreams,
-validates image content types, has a three-second timeout, caches successful
-responses, and uses a dedicated Cloudflare Rate Limiting binding. Public APIs
-use a separate binding. These are safety controls, not billing guarantees;
-account spending limits and abuse monitoring remain deployment duties.
+The catalog is cached for five minutes. The tile relay uses the versioned
+`vector-basemap-tile.v1` tuple: exactly one `mode`, `z`, `x`, and `y`, all
+strictly canonical. Unknown, duplicate, encoded, empty, conflicting, leading-
+zero, or out-of-range input is rejected before cache or upstream work. Reordered
+valid query fields share one cache identity. The tuple selects a fixed HTTPS
+provider; it has a three-second timeout, accepts PNG or WebP only, buffers at
+most 4 MiB, coalesces identical misses, and caches only successful bounded
+responses for 24 hours. Cache schema appears in the response and cache key, so
+an intentional schema change invalidates prior entries without a broad purge.
+Expired responses are deleted and refetched; failed, timed-out, partial,
+oversized, and misleading-media responses are never cached. Node uses a bounded
+process cache and Workers use Cache API; both preserve the same tuple and
+headers. The relay emits bounded hit, miss, rejection, and error counters plus
+latency. It uses a dedicated Cloudflare Rate Limiting binding. Public APIs use
+a separate binding. These are safety controls, not billing guarantees; account
+spending limits and abuse monitoring remain deployment duties.
 
 ## Delivery trust
 
