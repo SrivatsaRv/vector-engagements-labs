@@ -32,6 +32,10 @@ export function verifyRequiredGates(environment) {
   if (requireResult(environment, "POLICY_RESULT") !== "success") {
     throw new Error(`Repository policy ended as ${environment.POLICY_RESULT}.`);
   }
+  const reviewKind = requireResult(environment, "PR_REVIEW_KIND");
+  if (!["slice", "completion-review", "not-applicable"].includes(reviewKind)) {
+    throw new Error(`PR review kind must be slice, completion-review, or not-applicable; received ${reviewKind}.`);
+  }
 
   for (const gate of REQUIRED_GATES) {
     const selected = environment[gate.selected];

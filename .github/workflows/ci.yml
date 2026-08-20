@@ -2,6 +2,7 @@ name: Continuous Integration
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
   push:
     branches: [main]
 
@@ -52,6 +53,8 @@ jobs:
   policy:
     name: "Stage 0.5: Repository Policy"
     needs: classify
+    outputs:
+      pr_review_kind: ${{ steps.pr_closure.outputs.kind }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -61,6 +64,9 @@ jobs:
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: 22.18.0
+      - name: Classify governed parent-issue closure
+        id: pr_closure
+        run: node scripts/verify-pr-closure-governance.mjs
       - name: Verify harness, classifier, workflow, deployment, and persona policies
         run: |
           npm run policy:runtime-stubs:verify
@@ -69,6 +75,7 @@ jobs:
             tests/ci-change-classifier.test.mjs \
             tests/deployment-config.test.mjs \
             tests/persona-skills.test.mjs \
+            tests/pr-closure-governance.test.mjs \
             tests/required-pr-gate.test.mjs \
             tests/runtime-stub-ledger.test.mjs \
             tests/security-config.test.mjs
@@ -315,6 +322,7 @@ jobs:
     env:
       CLASSIFY_RESULT: ${{ needs.classify.result }}
       POLICY_RESULT: ${{ needs.policy.result }}
+      PR_REVIEW_KIND: ${{ needs.policy.outputs.pr_review_kind }}
       QUALITY_SELECTED: ${{ needs.classify.outputs.quality }}
       QUALITY_RESULT: ${{ needs.quality.result }}
       SECURITY_JS_SELECTED: ${{ needs.classify.outputs.security_js }}

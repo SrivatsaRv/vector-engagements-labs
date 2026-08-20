@@ -4,6 +4,21 @@ Describe the behavior and the owning contract.
 
 Owning issue: <!-- Required. Use #number and state whether this closes the issue or delivers a named slice. -->
 
+## Closure classification
+
+- [ ] Feature slice: use `Refs #NN`; list the parent acceptance criteria still unmet below. Do not use `Fixes`, `Closes`, or `Resolves` for a governed parent issue.
+- [ ] Completion review: use only when this PR proves every parent criterion. Add the `completion-review` label and the machine-readable checklist from `docs/repository-governance.md`. A completion review may close one governed parent issue only.
+
+Acceptance criteria addressed (criterion → test/evidence):
+
+- <!-- Required for every claimed criterion. -->
+
+Acceptance criteria still unmet (and why):
+
+- <!-- Required for slices. Write None only for a completion review. -->
+
+Closure verdict: <!-- Required. State “parent remains open” for a slice. -->
+
 ## Why
 
 State the problem, evidence, and intended user or engine outcome.

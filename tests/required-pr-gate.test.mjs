@@ -4,7 +4,7 @@ import test from "node:test";
 import { REQUIRED_GATES, verifyRequiredGates } from "../scripts/verify-required-gates.mjs";
 
 const successfulEnvironment = () => {
-  const environment = { CLASSIFY_RESULT: "success", POLICY_RESULT: "success" };
+  const environment = { CLASSIFY_RESULT: "success", POLICY_RESULT: "success", PR_REVIEW_KIND: "slice" };
   for (const gate of REQUIRED_GATES) {
     environment[gate.selected] = "true";
     environment[gate.result] = "success";
@@ -51,4 +51,10 @@ test("the required gate rejects failed policy and classifier jobs", () => {
   const policyFailed = successfulEnvironment();
   policyFailed.POLICY_RESULT = "failure";
   assert.throws(() => verifyRequiredGates(policyFailed), /policy ended as failure/i);
+});
+
+test("the required gate rejects an invalid PR review classification", () => {
+  const environment = successfulEnvironment();
+  environment.PR_REVIEW_KIND = "unknown";
+  assert.throws(() => verifyRequiredGates(environment), /PR review kind must be/i);
 });

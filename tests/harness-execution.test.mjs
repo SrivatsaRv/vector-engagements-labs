@@ -52,6 +52,9 @@ test("the pull request template requires layer-specific evidence", async () => {
   assert.match(template, /Test layer/);
   assert.match(template, /Omitted layers and reasons/);
   assert.match(template, /pushed commit SHA/i);
+  assert.match(template, /Closure classification/);
+  assert.match(template, /Acceptance criteria addressed/);
+  assert.match(template, /Closure verdict/);
 });
 
 test("the script-based Required PR Gate checks out the tested revision", async () => {
@@ -64,4 +67,5 @@ test("the script-based Required PR Gate checks out the tested revision", async (
   assert.ok(checkout >= 0, "Required PR Gate does not check out source");
   assert.ok(nodeSetup > checkout, "Required PR Gate does not pin Node after checkout");
   assert.ok(verification > nodeSetup, "Required PR Gate runs before its source and runtime exist");
+  assert.match(gate, /PR_REVIEW_KIND/);
 });
