@@ -126,6 +126,27 @@ test("server-renders the blogs index and post routes while preserving legacy /bl
   assert.match(post, /Copy link/);
 });
 
+test("report examples require explicit sample mode and are not constructed for unavailable saved runs", async () => {
+  const [missingResponse, sampleResponse, reportSource] = await Promise.all([
+    render("/report"),
+    render("/report?sample=1"),
+    readFile(new URL("../app/report/page.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.equal(missingResponse.status, 200);
+  assert.equal(sampleResponse.status, 200);
+
+  const [missing, sample] = await Promise.all([
+    missingResponse.text(),
+    sampleResponse.text(),
+  ]);
+  assert.match(missing, /Saved run unavailable/);
+  assert.doesNotMatch(missing, /Example result/);
+  assert.match(sample, /Example result/);
+  assert.match(reportSource, /function createExampleReport\(/);
+  assert.doesNotMatch(reportSource, /const fallback: ReportData =/);
+  assert.match(reportSource, /sampleMode \? createExampleReport\(\) : null/);
+});
+
 test("basemap proxy rejects invalid tile coordinates without contacting an upstream", async () => {
   const response = await render("/api/map-tile?z=99&x=0&y=0");
   assert.equal(response.status, 400);

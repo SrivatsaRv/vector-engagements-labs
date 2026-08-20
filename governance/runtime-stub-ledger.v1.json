@@ -24,7 +24,7 @@
     { "id": "STUB-12", "title": "Declared circular sensor and weapon envelopes", "classification": "explicit_supported_assumption", "releaseBlocking": true, "owners": ["#26", "#28", "#41"], "evidence": ["lib/map-layer-contracts.ts"], "resolution": "Render computed sensing, support, and engagement states from the canonical run." },
     { "id": "STUB-13", "title": "Temporary runtime model-pack adapter", "classification": "replacement_required", "releaseBlocking": true, "owners": ["#64", "#28", "#26"], "evidence": ["lib/runtime/protocol.ts"], "resolution": "Transport the versioned compiled pack and canonical VSR contracts directly." },
     { "id": "STUB-14", "title": "Playback reconstructs missing WGS84 coordinates", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#41", "#62"], "evidence": ["lib/map-layer-contracts.ts"], "resolution": "Record geographic state or mark the geographic layer unsupported." },
-    { "id": "STUB-15", "title": "Report initializes with simulated example data", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#41", "#32"], "evidence": ["app/report/page.tsx"], "resolution": "Require explicit sample mode; never represent failed saved-run loading as a result." },
+    { "id": "STUB-15", "title": "Report sample fixture and saved-run absence boundary", "classification": "fixture_only", "releaseBlocking": true, "owners": ["#41", "#32"], "evidence": ["app/report/page.tsx", "tests/rendered-html.test.mjs"], "resolution": "Construct the example report only for explicit sample mode; fail closed when a saved run or its library identity is unavailable. #41/#32 still require end-to-end saved-run replay evidence before retirement." },
     { "id": "STUB-16", "title": "Source-less public-reference catalogue records", "classification": "replacement_required", "releaseBlocking": true, "owners": ["#66", "#31"], "evidence": ["lib/object-catalog.ts"], "resolution": "Supply field evidence or make the named object unavailable." },
     { "id": "STUB-17", "title": "Rust legacy runner converts errors into invalid-run records", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#63"], "evidence": ["engine-rust/src/lib.rs"], "resolution": "Return typed errors and prevent invalid records from satisfying success paths." },
     { "id": "STUB-18", "title": "Weapon behavior inferred from identifiers", "classification": "forbidden_silent_fallback", "releaseBlocking": true, "owners": ["#28"], "evidence": ["lib/simulation.ts"], "resolution": "Load seeker, support, propulsion, guidance, and warning behavior from the admitted weapon variant." },
@@ -64,8 +64,7 @@
       { "path": "lib/runtime/protocol.ts", "indicator": "temporary", "expectedLines": 1, "entryIds": ["STUB-13"] },
       { "path": "lib/map-layer-contracts.ts", "indicator": "fallback", "expectedLines": 2, "entryIds": ["STUB-14"] },
       { "path": "lib/report-export.ts", "indicator": "fallback", "expectedLines": 2, "entryIds": ["STUB-29"] },
-      { "path": "app/report/page.tsx", "indicator": "fallback", "expectedLines": 6, "entryIds": ["STUB-15"] }
-      ,{ "path": "lib/engine/compiler.ts", "indicator": "named-duel-id", "expectedLines": 2, "entryIds": ["STUB-10"] }
+      { "path": "lib/engine/compiler.ts", "indicator": "named-duel-id", "expectedLines": 2, "entryIds": ["STUB-10"] }
       ,{ "path": "lib/information-state.ts", "indicator": "named-duel-id", "expectedLines": 1, "entryIds": ["STUB-11"] }
     ],
     "exemptions": [
