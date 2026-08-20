@@ -559,6 +559,33 @@ function normalizeValidityDomain(
   };
 }
 
+function validityDomainCovers(
+  provider: SiValidityDomain,
+  required: SiValidityDomain,
+) {
+  const coversRange = (
+    available: { minimum: number; maximum: number },
+    demanded: { minimum: number; maximum: number },
+  ) => available.minimum <= demanded.minimum && available.maximum >= demanded.maximum;
+  return coversRange(provider.altitudeM, required.altitudeM) &&
+    coversRange(provider.mach, required.mach) &&
+    coversRange(provider.angleOfAttackRad, required.angleOfAttackRad) &&
+    coversRange(provider.loadFactorG, required.loadFactorG) &&
+    required.configurations.every((value) => provider.configurations.includes(value)) &&
+    required.environments.every((value) => provider.environments.includes(value));
+}
+
+function requireValidityDomainCoverage(
+  issues: string[],
+  path: string,
+  provider: SiValidityDomain,
+  required: SiValidityDomain,
+) {
+  if (!validityDomainCovers(provider, required)) {
+    issues.push(`${path}.validityDomain does not cover its admitted aircraft validity domain`);
+  }
+}
+
 function compileTable(
   issues: string[],
   path: string,
@@ -845,6 +872,56 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
     if (item.emptyMassKg <= 0 || item.fuelCapacityKg < 0 || item.maximumCommandLoadFactorG <= 0) {
       issues.push(`aircraft[${index}] mass and load-factor values are outside their physical domain`);
     }
+    const aerodynamic = aerodynamics[item.aerodynamicModelIndex];
+    if (aerodynamic) {
+      requireValidityDomainCoverage(
+        issues,
+        `aircraft[${index}].aerodynamicModel`,
+        aerodynamic.validityDomain,
+        item.validityDomain,
+      );
+      aerodynamic.coefficientTables.forEach((table, tableIndex) => {
+        requireValidityDomainCoverage(
+          issues,
+          `aircraft[${index}].aerodynamicModel.coefficientTables[${tableIndex}]`,
+          table.validityDomain,
+          item.validityDomain,
+        );
+      });
+    }
+    item.propulsionModelIndexes.forEach((propulsionIndex, propulsionPosition) => {
+      const propulsionModel = propulsion[propulsionIndex];
+      if (!propulsionModel) return;
+      requireValidityDomainCoverage(
+        issues,
+        `aircraft[${index}].propulsionModels[${propulsionPosition}]`,
+        propulsionModel.validityDomain,
+        item.validityDomain,
+      );
+      requireValidityDomainCoverage(
+        issues,
+        `aircraft[${index}].propulsionModels[${propulsionPosition}].thrustTable`,
+        propulsionModel.thrustTable.validityDomain,
+        item.validityDomain,
+      );
+      requireValidityDomainCoverage(
+        issues,
+        `aircraft[${index}].propulsionModels[${propulsionPosition}].fuelFlowTable`,
+        propulsionModel.fuelFlowTable.validityDomain,
+        item.validityDomain,
+      );
+    });
+    item.sensorModelIndexes.forEach((sensorIndex, sensorPosition) => {
+      const sensor = sensors[sensorIndex];
+      if (sensor) {
+        requireValidityDomainCoverage(
+          issues,
+          `aircraft[${index}].sensorModels[${sensorPosition}]`,
+          sensor.validityDomain,
+          item.validityDomain,
+        );
+      }
+    });
   });
 
   const weapons = source.weapons.map((item, index): CompiledWeaponModel => {
@@ -932,6 +1009,18 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
         };
       }),
     };
+  });
+
+  aircraft.forEach((item, index) => {
+    const loadout = loadouts[item.loadoutModelIndex];
+    if (loadout) {
+      requireValidityDomainCoverage(
+        issues,
+        `aircraft[${index}].loadoutModel`,
+        loadout.validityDomain,
+        item.validityDomain,
+      );
+    }
   });
 
   const compatibility = source.compatibility.map((item, index): CompiledCompatibilityRule => {

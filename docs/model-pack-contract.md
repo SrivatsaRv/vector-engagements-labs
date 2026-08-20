@@ -241,6 +241,13 @@ contract migration and regression-continuity fixture, not a fidelity upgrade.
 8. Preserve the blocking named-performance limitation until representative
    verification and validation cases pass against the new digest.
 
+Aircraft admission also proves that every selected aerodynamic model and its
+tables, propulsion model and thrust/fuel tables, sensor model, and loadout
+model covers the aircraft's full declared validity domain. A component with a
+narrower altitude, Mach, angle-of-attack, load-factor, configuration, or
+environment envelope rejects the pack during compilation and Rust/WASM
+validation. The runtime must not fill the gap with a scalar fallback.
+
 ## Verification
 
 - `npm run models:verify` rejects a stale generated fixture.
