@@ -16,7 +16,6 @@ test("a disabled domain link cannot fall through to the A2A workbench", async ({
 test("the A2A builder does not present disabled information or fixed-turn behavior as active", async ({ page }) => {
   await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided");
 
-  await page.locator(".catalog-state.POSTGIS").waitFor({ state: "attached" });
   await page.getByRole("button", { name: "4 Admitted conditions", exact: true }).click();
   await expect(
     page.getByRole("status").filter({
