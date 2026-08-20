@@ -9,9 +9,11 @@ import type {
 import { getCatalogObject } from "../object-catalog.ts";
 import {
   findAircraftSimulationModel,
-  findWeaponSimulationModel,
-  isModelLoadoutCompatible,
 } from "../simulation-models.ts";
+import {
+  CURRENT_COMPILED_MODEL_PACK,
+  resolveCompiledWeaponAdmission,
+} from "./weapon-admission.ts";
 import { getStudyArea, getWeatherPreset } from "../study-areas.ts";
 import { COMPILED_MODEL_PACK_SCHEMA_VERSION } from "../model-pack.ts";
 import {
@@ -91,6 +93,40 @@ const velocity = (speed: number, headingRad: number): Vec3 => ({
   z: 0,
 });
 
+function compiledWeaponRuntime(weapon: (typeof CURRENT_COMPILED_MODEL_PACK.weapons)[number]) {
+  const aerodynamic = CURRENT_COMPILED_MODEL_PACK.aerodynamics[weapon.aerodynamicModelIndex];
+  const propulsion = CURRENT_COMPILED_MODEL_PACK.propulsion[weapon.propulsionModelIndex];
+  const dragTable = aerodynamic?.coefficientTables[0];
+  const thrustAxis = propulsion?.thrustTable.axes.find((axis) => axis.semantic === "TIME");
+  const thrust = propulsion?.thrustTable.values[0];
+  const burnSeconds = thrustAxis?.values.at(-1);
+  const dragCoefficient = dragTable?.values[0];
+  if (
+    !aerodynamic ||
+    thrust === undefined ||
+    burnSeconds === undefined ||
+    dragCoefficient === undefined ||
+    !Number.isFinite(thrust) ||
+    !Number.isFinite(burnSeconds) ||
+    !Number.isFinite(dragCoefficient)
+  ) {
+    throw new Error(`Compiled weapon dependencies are incomplete for ${weapon.catalogObjectId}`);
+  }
+  return {
+    launchMassKg: weapon.launchMassKg,
+    dryMassKg: weapon.dryMassKg,
+    burnSeconds,
+    thrustNewtons: thrust,
+    thrustTaperSpeedMps: weapon.thrustTaperSpeedMps,
+    referenceAreaM2: aerodynamic.referenceAreaM2,
+    dragCoefficient,
+    navigationConstant: weapon.navigationConstant,
+    maximumCommandG: weapon.maximumCommandLoadFactorG,
+    seekerActivationRangeM: weapon.seekerActivationRangeM,
+    datalinkUpdateSeconds: weapon.datalinkUpdatePeriodS,
+  };
+}
+
 function withProvenance(
   input: Omit<EngineEntityDefinition, "provenance">,
   sourceObjectId: string,
@@ -119,12 +155,6 @@ export function compileScenario(
   const redObject = getCatalogObject(input.redObjectId);
   const redSystem =
     input.domain === "A2A" ? getCatalogObject(input.redSystemId) : undefined;
-  if (!isModelLoadoutCompatible(blueObject.id, blueSystem.id)) {
-    throw new Error(`Incompatible loadout: ${blueSystem.id} on ${blueObject.id}`);
-  }
-  if (redSystem && !isModelLoadoutCompatible(redObject.id, redSystem.id)) {
-    throw new Error(`Incompatible loadout: ${redSystem.id} on ${redObject.id}`);
-  }
   const studyArea = getStudyArea(input.studyAreaId);
   const weatherPreset = getWeatherPreset(studyArea, input.weatherPresetId);
   const targetHeadingRad = ((180 - input.aspect) * Math.PI) / 180;
@@ -186,35 +216,15 @@ export function compileScenario(
   const redFuelKg = redAircraft
     ? redAircraft.fuelCapacityKg * (input.redFuelPercent / 100)
     : 0;
-  const selectedModel = findWeaponSimulationModel(input.blueSystemId);
-  if (!selectedModel) throw new Error(`Missing weapon model for ${input.blueSystemId}`);
-  if (!selectedModel.domains.includes(input.domain)) {
-    throw new Error(`Weapon model ${selectedModel.id} does not support ${input.domain}`);
-  }
-  const redSelectedModel = redSystem
-    ? findWeaponSimulationModel(redSystem.id)
+  const blueCompiledWeapon = resolveCompiledWeaponAdmission(
+    CURRENT_COMPILED_MODEL_PACK,
+    blueObject.id,
+    blueSystem.id,
+  );
+  const redCompiledWeapon = redSystem
+    ? resolveCompiledWeaponAdmission(CURRENT_COMPILED_MODEL_PACK, redObject.id, redSystem.id)
     : undefined;
-  if (redSystem && !redSelectedModel) {
-    throw new Error(`Missing weapon model for ${redSystem.id}`);
-  }
-  if (redSelectedModel && !redSelectedModel.domains.includes(input.domain)) {
-    throw new Error(
-      `Weapon model ${redSelectedModel.id} does not support ${input.domain}`,
-    );
-  }
-  const assumptions = {
-    launchMassKg: selectedModel.launchMassKg,
-    dryMassKg: selectedModel.dryMassKg,
-    burnSeconds: selectedModel.poweredFlightSeconds,
-    thrustNewtons: selectedModel.thrustNewtons,
-    thrustTaperSpeedMps: selectedModel.thrustTaperSpeedMps,
-    referenceAreaM2: selectedModel.referenceAreaM2,
-    dragCoefficient: selectedModel.dragCoefficient,
-    navigationConstant: selectedModel.navigationConstant,
-    maximumCommandG: selectedModel.maximumCommandG,
-    seekerActivationRangeM: selectedModel.seekerActivationRangeM,
-    datalinkUpdateSeconds: selectedModel.datalinkUpdateSeconds,
-  };
+  const assumptions = compiledWeaponRuntime(blueCompiledWeapon.weapon);
   const bluePlatform = withProvenance(
     {
       id: "blue-platform-1",
@@ -302,7 +312,7 @@ export function compileScenario(
         massKg: redAircraft
           ? redAircraft.emptyMassKg +
             redFuelKg +
-            (redSelectedModel?.launchMassKg ?? 0)
+            (redCompiledWeapon?.weapon.launchMassKg ?? 0)
           : 10000,
         fuelKg: redFuelKg,
       },
@@ -350,12 +360,13 @@ export function compileScenario(
         commandedCruiseAltitudeM:
           input.domain === "G2G" ? input.cruiseAltitude : input.altitude,
         navigationConstant: assumptions.navigationConstant,
+        admission: blueCompiledWeapon.admission,
       },
     },
     blueSystem.id,
-    selectedModel.id,
-    selectedModel.valueState,
-    selectedModel.version,
+    blueCompiledWeapon.weapon.id,
+    "MODEL_ASSUMPTION",
+    blueCompiledWeapon.weapon.version,
   );
 
   const entities: EngineEntityDefinition[] = [
@@ -365,20 +376,8 @@ export function compileScenario(
   ];
 
   if (redSystem) {
-    const redModel = redSelectedModel!;
-    const redAssumptions = {
-      launchMassKg: redModel.launchMassKg,
-      dryMassKg: redModel.dryMassKg,
-      burnSeconds: redModel.poweredFlightSeconds,
-      thrustNewtons: redModel.thrustNewtons,
-      thrustTaperSpeedMps: redModel.thrustTaperSpeedMps,
-      referenceAreaM2: redModel.referenceAreaM2,
-      dragCoefficient: redModel.dragCoefficient,
-      navigationConstant: redModel.navigationConstant,
-      maximumCommandG: redModel.maximumCommandG,
-      seekerActivationRangeM: redModel.seekerActivationRangeM,
-      datalinkUpdateSeconds: redModel.datalinkUpdateSeconds,
-    };
+    const redModel = redCompiledWeapon!;
+    const redAssumptions = compiledWeaponRuntime(redModel.weapon);
     entities.push(
       withProvenance(
         {
@@ -409,12 +408,13 @@ export function compileScenario(
             launchTimeSeconds: null,
             ...redAssumptions,
             commandedCruiseAltitudeM: redTarget.initial.position.z,
+            admission: redModel.admission,
           },
         },
         redSystem.id,
-        redModel.id,
-        redModel.valueState,
-        redModel.version,
+        redModel.weapon.id,
+        "MODEL_ASSUMPTION",
+        redModel.weapon.version,
       ),
     );
   }

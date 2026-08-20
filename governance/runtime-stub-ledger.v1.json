@@ -60,7 +60,7 @@
       { "path": "lib/geospatial/environment-pack.ts", "indicator": "model-assumption", "expectedLines": 2, "entryIds": ["STUB-05"] },
       { "path": "lib/simulation-models.ts", "indicator": "model-assumption", "expectedLines": 13, "entryIds": ["STUB-07", "STUB-08"] },
       { "path": "lib/simulation-models.ts", "indicator": "temporary", "expectedLines": 1, "entryIds": ["STUB-08"] },
-      { "path": "lib/engine/compiler.ts", "indicator": "model-assumption", "expectedLines": 3, "entryIds": ["STUB-07", "STUB-08", "STUB-12"] },
+      { "path": "lib/engine/compiler.ts", "indicator": "model-assumption", "expectedLines": 5, "entryIds": ["STUB-07", "STUB-08", "STUB-12"] },
       { "path": "lib/runtime/protocol.ts", "indicator": "temporary", "expectedLines": 1, "entryIds": ["STUB-13"] },
       { "path": "lib/map-layer-contracts.ts", "indicator": "fallback", "expectedLines": 2, "entryIds": ["STUB-14"] },
       { "path": "lib/report-export.ts", "indicator": "fallback", "expectedLines": 2, "entryIds": ["STUB-29"] },

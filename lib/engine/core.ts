@@ -543,6 +543,38 @@ export class EngineSession {
         `Aircraft ${unmodeledAircraft.id} has no admitted aircraft model.`,
       );
     }
+    const admittedWeaponSeekerModes = new Set([
+      "UNAVAILABLE",
+      "ACTIVE_RADAR",
+      "INFRARED",
+      "PASSIVE_RADIATION",
+    ]);
+    const admittedWeaponSupportRequirements = new Set([
+      "UNAVAILABLE",
+      "NONE",
+      "TRACK_UPDATE",
+    ]);
+    const admittedLaunchAuthorizations = new Set([
+      "SCHEDULED_TEST_ONLY",
+      "TRACK_REQUIRED",
+    ]);
+    for (const entity of scenario.entities) {
+      if (!entity.weapon) continue;
+      const admission = entity.weapon.admission;
+      if (
+        !admission ||
+        admission.modelPackDigest !== scenario.modelPack.digest ||
+        admission.modelPackDigest !== entity.provenance.modelPackDigest ||
+        admission.weaponModelId !== entity.provenance.modelId ||
+        !admission.stationId ||
+        !admission.compatibilityRuleId ||
+        !admittedWeaponSeekerModes.has(admission.seekerMode) ||
+        !admittedWeaponSupportRequirements.has(admission.supportRequirement) ||
+        !admittedLaunchAuthorizations.has(admission.launchAuthorization)
+      ) {
+        throw new Error(`Weapon ${entity.id} has no valid compiled admission.`);
+      }
+    }
     for (const aircraft of scenario.entities.filter(
       (entity) => entity.kind === "AIRCRAFT",
     )) {

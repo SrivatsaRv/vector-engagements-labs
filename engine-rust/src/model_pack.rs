@@ -598,7 +598,7 @@ mod tests {
 
     fn fixture_pack_json() -> Result<String, Box<dyn std::error::Error>> {
         let bundle: Value = serde_json::from_str(include_str!(
-            "../../fixtures/model-packs/vector-scalar-study-v0.6.compiled.json"
+            "../../fixtures/model-packs/vector-scalar-study-v0.7.compiled.json"
         ))?;
         Ok(serde_json::to_string(&bundle["pack"])?)
     }

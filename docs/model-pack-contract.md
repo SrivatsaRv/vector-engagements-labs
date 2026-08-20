@@ -38,7 +38,7 @@ The source of truth is [`lib/model-pack.ts`](../lib/model-pack.ts). Rust consume
 the same compiled JSON contract in
 [`engine-rust/src/model_pack.rs`](../engine-rust/src/model_pack.rs). The committed
 cross-language fixture is
-[`fixtures/model-packs/vector-scalar-study-v0.6.compiled.json`](../fixtures/model-packs/vector-scalar-study-v0.6.compiled.json).
+[`fixtures/model-packs/vector-scalar-study-v0.7.compiled.json`](../fixtures/model-packs/vector-scalar-study-v0.7.compiled.json).
 
 ## Source definition
 
@@ -170,6 +170,15 @@ aircraft exactly once at release. Store drag, station moments, and jettison
 remain outside the current model and must not be inferred from compatibility
 metadata.
 
+Each compiled weapon also declares a closed seeker mode, support requirement,
+and launch authorization. The current reference pack declares all three as
+unavailable or scheduled-test-only. This is explicit admission evidence, not an
+operational seeker, data-link, or warning claim. A compiler selects a store only
+after resolving its catalog identity, compiled weapon model, aircraft/loadout,
+station, supported compatibility rule, and matching content digest. Missing or
+incompatible data rejects the scenario; it never falls back to the legacy model
+authoring list or a weapon-name heuristic.
+
 ## Persistence
 
 Forward migration
@@ -216,8 +225,8 @@ deployments continue to apply the forward-only numbered migrations in
 
 ```text
 id:      vector-scalar-study-models
-version: 0.6.0
-digest:  f3ea60f5476b812d85ebd13ca6aa1d65a751fbca38fcad98ff458abf368efc42
+version: 0.7.0
+digest:  a27f1060f523c8b9552dec67f26eabdb5bc8b0528d1f389fe5a79ae256f993c2
 state:   DRAFT
 ```
 

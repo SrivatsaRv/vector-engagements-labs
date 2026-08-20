@@ -282,6 +282,22 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
             &format!("{root}.weapon.commandedCruiseAltitudeM"),
             weapon.commanded_cruise_altitude_m,
         )?;
+        sha256_digest(
+            &format!("{root}.weapon.admission.modelPackDigest"),
+            &weapon.admission.model_pack_digest,
+        )?;
+        identifier(
+            &format!("{root}.weapon.admission.weaponModelId"),
+            &weapon.admission.weapon_model_id,
+        )?;
+        identifier(
+            &format!("{root}.weapon.admission.stationId"),
+            &weapon.admission.station_id,
+        )?;
+        identifier(
+            &format!("{root}.weapon.admission.compatibilityRuleId"),
+            &weapon.admission.compatibility_rule_id,
+        )?;
     }
     Ok(())
 }
@@ -414,6 +430,17 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
                 "entity {} model-pack digest does not match scenario",
                 entity.id
             )));
+        }
+        if let Some(weapon) = &entity.weapon {
+            if weapon.admission.model_pack_digest != scenario.model_pack.digest
+                || weapon.admission.model_pack_digest != entity.provenance.model_pack_digest
+                || weapon.admission.weapon_model_id != entity.provenance.model_id
+            {
+                return Err(invalid(format!(
+                    "weapon {} admission does not match scenario provenance",
+                    entity.id
+                )));
+            }
         }
         if !entity_ids.insert(entity.id.as_str()) {
             return Err(invalid(format!("duplicate entity id {}", entity.id)));
