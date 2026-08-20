@@ -8,8 +8,10 @@ const POLICY_ONLY = [
   /^(?:LICENSE|NOTICE)$/,
   /^\.github\/(?:CODEOWNERS|pull_request_template\.md)$/,
   /^governance\/runtime-stub-ledger\.v1\.json$/,
+  /^governance\/issue-closure-governance\.v1\.json$/,
   /^scripts\/verify-runtime-stub-ledger\.mjs$/,
-  /^tests\/(?:ci-change-classifier|deployment-config|harness-execution|persona-skills|required-pr-gate|runtime-stub-ledger|security-config)\.test\.mjs$/,
+  /^scripts\/verify-pr-closure-governance\.mjs$/,
+  /^tests\/(?:ci-change-classifier|deployment-config|harness-execution|persona-skills|pr-closure-governance|required-pr-gate|runtime-stub-ledger|security-config)\.test\.mjs$/,
 ];
 
 const WORKFLOW_CONTROL = [

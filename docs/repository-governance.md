@@ -56,6 +56,48 @@ and rejects missing, cancelled, timed-out or action-required results. Shared
 mission, scenario, environment, model, Worker and recording contracts select
 their TypeScript/Rust parity and integration consumers.
 
+### Parent-issue closure governance
+
+A merged bounded pull request proves only its stated slice. It does not close a
+governed parent capability issue. Feature slices must use `Refs #NN`, state the
+acceptance criteria still unmet, and state the closure verdict `parent remains
+open`. They must not use `Fixes`, `Closes`, or `Resolves` for governed parent
+issues.
+
+The tracked
+[`governance/issue-closure-governance.v1.json`](../governance/issue-closure-governance.v1.json)
+lists governed parent issues, their acceptance-criterion IDs and required test
+layers. CI reads the pull-request event and classifies it as `slice`,
+`completion-review`, or `not-applicable` for a non-PR build. The Required PR
+Gate receives that classification; a green build therefore proves the selected
+slice, never automatic parent completion.
+
+Only a dedicated completion-review PR may close a governed parent. It must have
+the `completion-review` label, close exactly one governed parent, and include
+this machine-readable checklist in its body:
+
+```html
+<!-- vector-completion-review
+{
+  "parentIssue": 64,
+  "acceptanceCriteria": [
+    { "id": "external-reference-case", "evidence": "link to independent evidence" }
+  ],
+  "testLayers": [
+    { "name": "unit-numerical", "result": "passed", "evidence": "command and artifact" }
+  ],
+  "omittedLayers": []
+}
+-->
+```
+
+The actual checklist must include every acceptance ID and every required test
+layer declared for that parent, each with non-empty evidence and `passed`
+result. It cannot omit a required layer. The policy has regressions for partial
+closures of #64 and #41 and for incomplete checklists. Add a parent to the
+governed list before accepting its first feature slice; update its IDs only when
+the owning issue acceptance criteria change.
+
 The release gate also consumes
 `governance/runtime-stub-ledger.v1.json`. The ledger records each known causal
 stub, evidence path, owning issue, classification and required resolution.
