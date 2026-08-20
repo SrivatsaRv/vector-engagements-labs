@@ -16,7 +16,7 @@ Vector currently uses a deterministic three-dimensional point-mass reference eng
 - deterministic execution of authored airborne route points;
 - G2G commanded cruise altitude, with a terminal blend to objective elevation for direct paths and a higher commanded apex for lofted paths;
 - governed wind-shift events;
-- closest approach, completion, energy/time termination, non-finite-state checks, and dry-mass margin diagnostics.
+- closest approach, completion, energy, target-unavailable, and time termination; non-finite-state checks; and dry-mass margin diagnostics.
 
 Weapon frames carry a closed achieved flight-state value: `STOWED`, `BOOST`,
 `COAST`, `TERMINAL_GUIDANCE`, or `TARGET_UNAVAILABLE`. It is derived by the
@@ -29,6 +29,13 @@ and support requirements plus `SCHEDULED_TEST_ONLY` launch authorization. The
 existing deterministic fly-out remains a bounded educational trajectory test;
 it does not claim operational seeker acquisition, data-link support, warning,
 or support loss/recovery.
+
+If an admitted weapon's assigned target is already terminated or becomes
+terminated, both engines set its achieved state to `TARGET_UNAVAILABLE`,
+terminate that weapon, and end the run with `target_unavailable` in the same
+fixed step. They do not continue toward a substitute, cached, or truth-derived
+target state. This is a typed lifecycle boundary, not seeker or support
+modelling.
 
 The current scalar coefficients remain in versioned `simulation_models` rows for
 catalog delivery and are also compiled into the immutable

@@ -11,6 +11,10 @@ import {
 } from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
+import {
+  decodeColumnarFrames,
+  encodeColumnarFrames,
+} from "../lib/record/vector-record.ts";
 
 const close = (actual, expected, tolerance, label) => {
   assert.ok(
@@ -249,6 +253,45 @@ test("Rust/WASM and TypeScript preserve parity for a turning and climbing route"
         `${vectorName} ${axis}`,
       );
     }
+  }
+});
+
+test("both engines terminate an admitted weapon when its assigned target is unavailable", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", [
+    "A2A",
+  ]);
+  const scenario = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const target = scenario.entities.find((entity) => entity.id === "red-object-1");
+  assert.ok(target, "fixture must contain the primary weapon target");
+  target.lifecycle = "TERMINATED";
+
+  const typescript = runEngineBackend(structuredClone(scenario), "typescript");
+  const rust = runEngineBackend(structuredClone(scenario), "rust-wasm");
+
+  for (const [name, run] of [["TypeScript", typescript], ["Rust/WASM", rust]]) {
+    assert.equal(run.termination, "target_unavailable", `${name} termination`);
+    assert.equal(run.diagnostics.integratedSteps, 1, `${name} must not continue a dead weapon`);
+    const weapon = run.frames[0].entities.find(
+      (entity) => entity.id === run.primaryWeaponId,
+    );
+    assert.equal(weapon?.lifecycle, "TERMINATED", `${name} weapon lifecycle`);
+    assert.equal(
+      weapon?.weaponFlightState,
+      "TARGET_UNAVAILABLE",
+      `${name} weapon state`,
+    );
+    const replayWeapon = decodeColumnarFrames(encodeColumnarFrames(run.frames))[0]
+      .entities.find((entity) => entity.id === run.primaryWeaponId);
+    assert.equal(
+      replayWeapon?.weaponFlightState,
+      "TARGET_UNAVAILABLE",
+      `${name} VSR weapon state`,
+    );
   }
 });
 

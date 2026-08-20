@@ -269,6 +269,7 @@ export type EngineRun = {
   termination:
     | "threshold_reached"
     | "energy_depleted"
+    | "target_unavailable"
     | "time_limit"
     | "invalid_scenario";
   closestApproachM: number;
