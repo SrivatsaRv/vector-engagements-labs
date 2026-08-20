@@ -1,4 +1,8 @@
 import { sha256Hex } from "../canonical-json.ts";
+import {
+  admitWorkerCapabilityManifest,
+  type CapabilityManifestIdentity,
+} from "./deployment-capabilities.ts";
 import type { PreparedSimulation } from "../simulation.ts";
 import type { RuntimeModelPackAdapter } from "./protocol.ts";
 
@@ -17,4 +21,25 @@ export async function adaptPreparedSimulation(
 export async function verifyRuntimeModelPack(pack: RuntimeModelPackAdapter) {
   const { digest, ...content } = pack;
   return digest === (await sha256Hex(content));
+}
+
+/**
+ * This is the Worker admission boundary for a structured-cloned compiled
+ * scenario. It validates both the adapter bytes and the deployment authority
+ * embedded in the adapter before a Worker stores or executes it.
+ */
+export async function admitRuntimeModelPack(
+  pack: RuntimeModelPackAdapter,
+): Promise<CapabilityManifestIdentity> {
+  if (!(await verifyRuntimeModelPack(pack))) {
+    throw new Error("The model-pack adapter digest is invalid.");
+  }
+  const manifest = admitWorkerCapabilityManifest(
+    pack.prepared.capabilityManifest,
+  );
+  return {
+    schemaVersion: manifest.schemaVersion,
+    digest: manifest.digest,
+    engineId: manifest.engine.id,
+  };
 }

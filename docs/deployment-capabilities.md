@@ -16,6 +16,26 @@ The compiler and browser Worker receive the validated manifest once and use its
 engine identity. The VSR records the complete manifest in `compiled.json` and
 binds its schema and digest in `manifest.json`.
 
+## Worker admission boundary
+
+The browser Worker re-hashes the complete structured-cloned capability manifest
+inside every compiled model-pack adapter before it stores the adapter. It also
+requires that verified digest to equal the deployment manifest embedded in that
+Worker. A stale, modified, or different-deployment manifest receives the stable
+`capability-manifest-stale` protocol failure and cannot reach engine execution.
+The failure contains no scenario payload or environment configuration.
+
+The browser client constructs the simulation Worker with the bundler-recognized
+module-Worker expression. The production build emits a same-origin JavaScript
+asset rather than serving the source TypeScript file as media. A normal admitted
+browser run is therefore a regression check on both manifest admission and
+production Worker loading.
+
+This check is an admission guard, not a complete structured-diagnostics system:
+it does not yet emit correlated compile, persistence, replay, cancellation, or
+recovery events, and it does not introduce a logging sink. Those #67 acceptance
+criteria remain open.
+
 ## Current admitted surface
 
 - A2A and the `TACTICAL_INTERCEPT` / `AIRBORNE` foundation are enabled.

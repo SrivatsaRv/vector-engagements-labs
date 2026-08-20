@@ -104,7 +104,7 @@ async function catalogFixture() {
   };
 }
 
-test("route inputs fail visibly, recover, and drive the real Worker run", async ({ page }) => {
+test("a current deployment manifest drives the real Worker run after route recovery", async ({ page }) => {
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const catalog = await catalogFixture();
@@ -167,6 +167,9 @@ test("route inputs fail visibly, recover, and drive the real Worker run", async 
   } else {
     await expect(page.getByText(/Run 01 · (Playing|Paused)/i)).toBeVisible({ timeout: 30_000 });
   }
+  await expect(
+    page.locator('.catalog-state[data-runtime-state="completed"]'),
+  ).toHaveText("Worker · completed");
   await expect(page.getByText("Condition injection", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Track-information interruption", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /IAF RASP/i })).toHaveCount(0);

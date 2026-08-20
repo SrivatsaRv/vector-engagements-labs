@@ -16,10 +16,22 @@ import {
   type BrowserRuntimeState,
 } from "./protocol.ts";
 
+async function createSimulationWorker() {
+  // Vinext must own the Worker URL. Importing the Vite worker module produces
+  // a same-origin JavaScript asset, unlike a source `import.meta.url` which
+  // Vinext serializes as a file: URL in the browser client bundle.
+  const { default: SimulationWorker } = await import(
+    "./simulation.worker.ts?worker"
+  );
+  return new SimulationWorker({ name: "vector-simulation-runtime" });
+}
+
 type WorkerLike = Pick<
   Worker,
   "postMessage" | "terminate" | "addEventListener" | "removeEventListener"
 >;
+
+type WorkerFactory = () => WorkerLike | Promise<WorkerLike>;
 
 /**
  * Creates the separately bounded environment Worker. Route and ground-start
@@ -70,8 +82,9 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const CANCEL_GRACE_MS = 100;
 
 export class BrowserSimulationClient {
-  private readonly workerFactory: () => WorkerLike;
+  private readonly workerFactory: WorkerFactory;
   private worker: WorkerLike | null = null;
+  private workerLoading: Promise<WorkerLike> | null = null;
   private state: BrowserRuntimeState = "initialization";
   private sequence = 0;
   private initialized: Promise<void> | null = null;
@@ -84,13 +97,7 @@ export class BrowserSimulationClient {
     | ((progress: BrowserSimulationProgress) => void)
     | null = null;
 
-  constructor(
-    workerFactory: () => WorkerLike = () =>
-      new Worker(new URL("./simulation.worker.ts", import.meta.url), {
-        type: "module",
-        name: "vector-simulation-runtime",
-      }),
-  ) {
+  constructor(workerFactory: WorkerFactory = createSimulationWorker) {
     this.workerFactory = workerFactory;
   }
 
@@ -103,15 +110,19 @@ export class BrowserSimulationClient {
     return `${prefix}-${this.sequence}`;
   }
 
-  private ensureWorker() {
+  private async ensureWorker() {
     if (this.worker) return this.worker;
-    const worker = this.workerFactory();
-    worker.addEventListener("message", this.handleMessage as EventListener);
-    worker.addEventListener("error", this.handleCrash as EventListener);
-    worker.addEventListener("messageerror", this.handleCrash as EventListener);
-    this.worker = worker;
-    this.state = "initialization";
-    return worker;
+    if (!this.workerLoading) {
+      this.workerLoading = Promise.resolve(this.workerFactory()).then((worker) => {
+        worker.addEventListener("message", this.handleMessage as EventListener);
+        worker.addEventListener("error", this.handleCrash as EventListener);
+        worker.addEventListener("messageerror", this.handleCrash as EventListener);
+        this.worker = worker;
+        this.state = "initialization";
+        return worker;
+      });
+    }
+    return this.workerLoading;
   }
 
   private readonly handleMessage = (event: MessageEvent<BrowserRuntimeResponse>) => {
@@ -163,6 +174,7 @@ export class BrowserSimulationClient {
       this.worker.terminate();
     }
     this.worker = null;
+    this.workerLoading = null;
     this.initialized = null;
     this.loadedDigests.clear();
     this.preparing = false;
@@ -172,13 +184,13 @@ export class BrowserSimulationClient {
     this.state = nextState;
   }
 
-  private request(
+  private async request(
     message: BrowserRuntimeRequest,
     accept: Pending["accept"],
     timeoutMs = DEFAULT_TIMEOUT_MS,
     transfer: Transferable[] = [],
   ) {
-    const worker = this.ensureWorker();
+    const worker = await this.ensureWorker();
     return new Promise<BrowserRuntimeResponse>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(message.requestId);
