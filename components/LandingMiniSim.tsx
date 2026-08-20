@@ -11,9 +11,9 @@ import {
 } from "@/lib/scenarios";
 import {
   createReferencePreview,
-  getFrameAt,
 } from "@/lib/simulation";
 import { domainCapability } from "@/lib/runtime/deployment-capabilities";
+import { selectDisplayFrame } from "@/lib/frontend/selectors";
 
 const DOMAINS: EngagementDomain[] = ["A2A", "A2G", "G2A", "G2G"];
 
@@ -29,7 +29,8 @@ export function LandingMiniSim() {
   );
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(true);
-  const frame = getFrameAt(result, time);
+  const selected = selectDisplayFrame(result, time);
+  const frame = selected.frame;
 
   useEffect(() => {
     if (!playing) return;
@@ -65,7 +66,7 @@ export function LandingMiniSim() {
           Example · Reference preview
         </div>
         <strong>{definition.title}</strong>
-        <time>{time.toFixed(1).padStart(4, "0")} s</time>
+        <time>{selected.displayTimeSeconds.toFixed(1).padStart(4, "0")} s</time>
       </header>
       <nav className="landing-sim-domains" aria-label="Engagement domain">
         {DOMAINS.map((item) => (
@@ -94,7 +95,7 @@ export function LandingMiniSim() {
       <div className="landing-sim-stage">
         <SimulationScene
           result={result}
-          time={time}
+          selected={selected}
           profile={definition.scenario.profile}
           layers={{ interceptor: true, target: true, lineOfSight: true }}
         />

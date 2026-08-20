@@ -64,6 +64,9 @@ that same value. A known catalog object may not fall back to a generic dot.
 - Study-area boundaries are low-contrast dashed polygons.
 
 Every layer is generated from the saved engine scenario or its recorded frames. No tactical layer may be painted from unrelated page state.
+All playback surfaces consume the same selected recorded-frame identity; an
+in-between scrub request cannot make the Map, 3D surface, telemetry, or visible
+model time disagree about the displayed state.
 
 ## Information views
 

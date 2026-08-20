@@ -30,6 +30,16 @@ This matrix is the minimum proof required before a feature milestone is committe
 - `tests/browser/route-authoring.spec.ts` proves the inspector remains visible
   after a real Worker run at desktop and compact viewports.
 
+### Canonical playback frame (#62 slice)
+
+- `tests/frontend-selectors.test.mjs` proves a requested scrub position resolves
+  to one recorded frame and its exact model-time identity.
+- `tests/component/viewport-telemetry.test.tsx` proves telemetry shows the
+  selected recorded-frame time, not an in-between browser request.
+- `tests/browser/route-authoring.spec.ts` uses real keyboard scrubbing and
+  proves Map, playback controls, and telemetry share one display-time identity
+  at all five required viewports.
+
 1. `make ci-local`
 2. The applicable named target: `make worker-local`, `make frontend-local`,
    `make integration-local`, `make container-verify`,
