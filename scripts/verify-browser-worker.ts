@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
 import { chromium } from "playwright-core";
@@ -11,6 +11,7 @@ import { createVerificationDeploymentCapabilities } from "../lib/runtime/deploym
 import { createPhaseAEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
 import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import { getStudyArea, getWeatherPreset } from "../lib/study-areas.ts";
+import { resolveBrowserWorkerAssets } from "./browser-worker-assets.ts";
 
 type RuntimeMessage = {
   type: string;
@@ -46,15 +47,11 @@ type WorkerVerificationResult = {
   detachedAfterRecycle: boolean;
 };
 
-const assetDirectory = resolve("dist/client/assets");
-const workerName = readdirSync(assetDirectory).find((name) =>
-  /^simulation\.worker-.*\.js$/.test(name),
-);
-if (!workerName) throw new Error("Build the production browser Worker before verification.");
-const environmentWorkerName = readdirSync(assetDirectory).find((name) =>
-  /^environment-sampler\.worker-.*\.js$/.test(name),
-);
-if (!environmentWorkerName) throw new Error("Build the production environment Worker before verification.");
+const {
+  assetDirectory,
+  simulationWorkerName: workerName,
+  environmentWorkerName,
+} = resolveBrowserWorkerAssets();
 const workerBytes = readFileSync(resolve(assetDirectory, workerName));
 const environmentWorkerBytes = readFileSync(resolve(assetDirectory, environmentWorkerName));
 const server = createServer((request, response) => {

@@ -78,6 +78,15 @@ verification and decoding. The Worker retains at most two returned buffers, each
 no larger than 64 MiB, and uses a power-of-two capacity so subsequent records can
 reuse storage. No `SharedArrayBuffer` or cross-origin isolation is required.
 
+## Built Worker verification
+
+`npm run worker:verify` loads the two production Worker artifacts from the
+declared Vinext client output directory, `dist/client/_next/static`. It requires
+exactly one hashed simulation Worker and one hashed environment-sampler Worker.
+Missing or ambiguous assets fail the verification before a browser is started;
+the verifier never searches arbitrary build directories or substitutes source
+files.
+
 ## Clock ownership
 
 - The Worker session owns fixed-step model time.
