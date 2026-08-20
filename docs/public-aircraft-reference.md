@@ -53,3 +53,9 @@ These numbers are a local regression record, not an x86-64, browser rendering, c
 This slice validates evidence ingestion, unit normalization, trim propagation, six-state telemetry, force/moment/control metadata, external time-history comparison, bounded execution and backend parity. It does not yet execute every nonlinear DAVE-ML coefficient table, propulsion map or controller transient. It does not validate departure, high-angle-of-attack, supersonic, damage or combat behavior.
 
 The next flight-model expansion must add a separately versioned maneuvering case and full coefficient/control evaluator before the platform upgrades the operational scenario from its current educational point-mass claim. Corrections create a new fixture version and digest; published evidence is never mutated in place.
+
+The reference fixture is a verification asset only. It cannot expand the
+validity domain of a scenario aircraft or satisfy an aircraft model-pack
+component that has incomplete coverage. Compiled-pack admission checks those
+domains independently in TypeScript and Rust/WASM, and rejects a gap rather
+than borrowing values from this trim fixture or a scalar regression model.

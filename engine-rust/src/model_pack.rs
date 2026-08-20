@@ -45,12 +45,31 @@ pub struct CompiledAxis {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct NumericRange {
+    pub minimum: f64,
+    pub maximum: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ValidityDomain {
+    pub altitude_m: NumericRange,
+    pub mach: NumericRange,
+    pub angle_of_attack_rad: NumericRange,
+    pub load_factor_g: NumericRange,
+    pub configurations: Vec<String>,
+    pub environments: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CompiledTable {
     pub id: String,
     pub output_unit: String,
     pub axes: Vec<CompiledAxis>,
     pub values: Vec<f64>,
     pub evidence_ref_ids: Vec<String>,
+    pub validity_domain: ValidityDomain,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -61,6 +80,7 @@ pub struct AerodynamicModel {
     pub reference_chord_m: f64,
     pub reference_span_m: f64,
     pub coefficient_tables: Vec<CompiledTable>,
+    pub validity_domain: ValidityDomain,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -71,6 +91,7 @@ pub struct PropulsionModel {
     pub thrust_table: CompiledTable,
     pub fuel_flow_table: CompiledTable,
     pub spool_time_s: f64,
+    pub validity_domain: ValidityDomain,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -82,6 +103,7 @@ pub struct SensorModel {
     pub scan_period_s: f64,
     pub azimuth_field_of_view_rad: f64,
     pub elevation_field_of_view_rad: f64,
+    pub validity_domain: ValidityDomain,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -96,6 +118,7 @@ pub struct AircraftModel {
     pub sensor_model_indexes: Vec<usize>,
     pub loadout_model_index: usize,
     pub maximum_command_load_factor_g: f64,
+    pub validity_domain: ValidityDomain,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -111,6 +134,7 @@ pub struct WeaponModel {
     pub maximum_command_load_factor_g: f64,
     pub seeker_activation_range_m: f64,
     pub datalink_update_period_s: f64,
+    pub validity_domain: ValidityDomain,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -128,6 +152,7 @@ pub struct LoadoutModel {
     pub id: String,
     pub platform_catalog_object_id: String,
     pub stations: Vec<LoadoutStation>,
+    pub validity_domain: ValidityDomain,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -175,6 +200,68 @@ fn finite_non_negative(path: &str, value: f64) -> Result<(), EngineError> {
     }
 }
 
+fn validate_range(path: &str, range: &NumericRange) -> Result<(), EngineError> {
+    if range.minimum.is_finite() && range.maximum.is_finite() && range.minimum <= range.maximum {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "{path} must be finite with minimum not greater than maximum"
+        )))
+    }
+}
+
+fn validate_validity_domain(path: &str, domain: &ValidityDomain) -> Result<(), EngineError> {
+    validate_range(&format!("{path}.altitudeM"), &domain.altitude_m)?;
+    validate_range(&format!("{path}.mach"), &domain.mach)?;
+    validate_range(
+        &format!("{path}.angleOfAttackRad"),
+        &domain.angle_of_attack_rad,
+    )?;
+    validate_range(&format!("{path}.loadFactorG"), &domain.load_factor_g)?;
+    if domain.configurations.is_empty()
+        || domain.environments.is_empty()
+        || domain.configurations.iter().any(|value| value.is_empty())
+        || domain.environments.iter().any(|value| value.is_empty())
+    {
+        return Err(invalid(format!(
+            "{path} requires non-empty configurations and environments"
+        )));
+    }
+    Ok(())
+}
+
+fn validity_domain_covers(provider: &ValidityDomain, required: &ValidityDomain) -> bool {
+    let covers = |available: &NumericRange, demanded: &NumericRange| {
+        available.minimum <= demanded.minimum && available.maximum >= demanded.maximum
+    };
+    covers(&provider.altitude_m, &required.altitude_m)
+        && covers(&provider.mach, &required.mach)
+        && covers(&provider.angle_of_attack_rad, &required.angle_of_attack_rad)
+        && covers(&provider.load_factor_g, &required.load_factor_g)
+        && required
+            .configurations
+            .iter()
+            .all(|value| provider.configurations.contains(value))
+        && required
+            .environments
+            .iter()
+            .all(|value| provider.environments.contains(value))
+}
+
+fn require_validity_domain_coverage(
+    path: &str,
+    provider: &ValidityDomain,
+    required: &ValidityDomain,
+) -> Result<(), EngineError> {
+    if validity_domain_covers(provider, required) {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "{path}.validityDomain does not cover its admitted aircraft validity domain"
+        )))
+    }
+}
+
 fn unique_ids<'a>(
     path: &str,
     values: impl IntoIterator<Item = &'a str>,
@@ -189,6 +276,10 @@ fn unique_ids<'a>(
 }
 
 fn validate_table(table: &CompiledTable) -> Result<(), EngineError> {
+    validate_validity_domain(
+        &format!("table {}.validityDomain", table.id),
+        &table.validity_domain,
+    )?;
     if table.axes.is_empty() {
         return Err(invalid(format!("table {} has no axes", table.id)));
     }
@@ -312,6 +403,10 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
     )?;
 
     for model in &pack.aerodynamics {
+        validate_validity_domain(
+            &format!("aerodynamic model {}.validityDomain", model.id),
+            &model.validity_domain,
+        )?;
         finite_non_negative("aerodynamic reference area", model.reference_area_m2)?;
         finite_non_negative("aerodynamic reference chord", model.reference_chord_m)?;
         finite_non_negative("aerodynamic reference span", model.reference_span_m)?;
@@ -326,6 +421,10 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
         }
     }
     for model in &pack.propulsion {
+        validate_validity_domain(
+            &format!("propulsion model {}.validityDomain", model.id),
+            &model.validity_domain,
+        )?;
         if model.engine_count == 0 {
             return Err(invalid(format!(
                 "propulsion model {} has zero engines",
@@ -337,6 +436,10 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
         finite_non_negative("propulsion spool time", model.spool_time_s)?;
     }
     for model in &pack.sensors {
+        validate_validity_domain(
+            &format!("sensor model {}.validityDomain", model.id),
+            &model.validity_domain,
+        )?;
         finite_non_negative("sensor detection range", model.detection_range_m)?;
         finite_non_negative("sensor minimum range", model.minimum_range_m)?;
         finite_non_negative("sensor scan period", model.scan_period_s)?;
@@ -350,6 +453,10 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
         )?;
     }
     for model in &pack.aircraft {
+        validate_validity_domain(
+            &format!("aircraft model {}.validityDomain", model.id),
+            &model.validity_domain,
+        )?;
         finite_non_negative("aircraft empty mass", model.empty_mass_kg)?;
         finite_non_negative("aircraft fuel capacity", model.fuel_capacity_kg)?;
         if model.aerodynamic_model_index >= pack.aerodynamics.len()
@@ -368,8 +475,64 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
                 model.id
             )));
         }
+        let aerodynamic = &pack.aerodynamics[model.aerodynamic_model_index];
+        require_validity_domain_coverage(
+            &format!("aircraft model {} aerodynamicModel", model.id),
+            &aerodynamic.validity_domain,
+            &model.validity_domain,
+        )?;
+        for (index, table) in aerodynamic.coefficient_tables.iter().enumerate() {
+            require_validity_domain_coverage(
+                &format!(
+                    "aircraft model {} aerodynamicModel coefficientTables[{index}]",
+                    model.id
+                ),
+                &table.validity_domain,
+                &model.validity_domain,
+            )?;
+        }
+        for (index, propulsion_index) in model.propulsion_model_indexes.iter().enumerate() {
+            let propulsion = &pack.propulsion[*propulsion_index];
+            require_validity_domain_coverage(
+                &format!("aircraft model {} propulsionModels[{index}]", model.id),
+                &propulsion.validity_domain,
+                &model.validity_domain,
+            )?;
+            require_validity_domain_coverage(
+                &format!(
+                    "aircraft model {} propulsionModels[{index}] thrustTable",
+                    model.id
+                ),
+                &propulsion.thrust_table.validity_domain,
+                &model.validity_domain,
+            )?;
+            require_validity_domain_coverage(
+                &format!(
+                    "aircraft model {} propulsionModels[{index}] fuelFlowTable",
+                    model.id
+                ),
+                &propulsion.fuel_flow_table.validity_domain,
+                &model.validity_domain,
+            )?;
+        }
+        for (index, sensor_index) in model.sensor_model_indexes.iter().enumerate() {
+            require_validity_domain_coverage(
+                &format!("aircraft model {} sensorModels[{index}]", model.id),
+                &pack.sensors[*sensor_index].validity_domain,
+                &model.validity_domain,
+            )?;
+        }
+        require_validity_domain_coverage(
+            &format!("aircraft model {} loadoutModel", model.id),
+            &pack.loadouts[model.loadout_model_index].validity_domain,
+            &model.validity_domain,
+        )?;
     }
     for model in &pack.weapons {
+        validate_validity_domain(
+            &format!("weapon model {}.validityDomain", model.id),
+            &model.validity_domain,
+        )?;
         finite_non_negative("weapon launch mass", model.launch_mass_kg)?;
         finite_non_negative("weapon dry mass", model.dry_mass_kg)?;
         if model.dry_mass_kg > model.launch_mass_kg
@@ -386,6 +549,10 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
         }
     }
     for loadout in &pack.loadouts {
+        validate_validity_domain(
+            &format!("loadout {}.validityDomain", loadout.id),
+            &loadout.validity_domain,
+        )?;
         for station in &loadout.stations {
             if station.maximum_quantity == 0
                 || station
@@ -452,6 +619,23 @@ mod tests {
         value["weapons"][0]["aerodynamicModelIndex"] = Value::from(999);
         let tampered = serde_json::to_string(&value)?;
         assert!(validate_model_pack_json(&tampered).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_an_aircraft_envelope_that_exceeds_its_admitted_component(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut value: Value = serde_json::from_str(&fixture_pack_json()?)?;
+        value["aircraft"][0]["validityDomain"]["mach"]["maximum"] = Value::from(6.0);
+        let digest = digest_payload(&value)?;
+        value["digest"] = Value::from(digest);
+        let error = match validate_model_pack_json(&serde_json::to_string(&value)?) {
+            Ok(_) => return Err("component envelope gap must fail closed".into()),
+            Err(error) => error,
+        };
+        assert!(error
+            .to_string()
+            .contains("does not cover its admitted aircraft validity domain"));
         Ok(())
     }
 }

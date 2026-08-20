@@ -95,6 +95,22 @@ test("source validation rejects missing units, coefficients, evidence, reference
   }
 });
 
+test("aircraft admission rejects a component or table that cannot cover its declared validity envelope", async () => {
+  const insufficientAerodynamicEnvelope = cloneSource();
+  insufficientAerodynamicEnvelope.aerodynamics[0].validityDomain.mach.maximum = 0.8;
+  await assert.rejects(
+    compileModelPack(insufficientAerodynamicEnvelope),
+    /aerodynamicModel\.validityDomain does not cover its admitted aircraft validity domain/,
+  );
+
+  const insufficientTableEnvironment = cloneSource();
+  insufficientTableEnvironment.propulsion[0].thrustTable.validityDomain.environments = ["OTHER_ENVIRONMENT"];
+  await assert.rejects(
+    compileModelPack(insufficientTableEnvironment),
+    /thrustTable\.validityDomain does not cover its admitted aircraft validity domain/,
+  );
+});
+
 test("instances enforce catalog identity, station capacity and compatibility", async () => {
   const { pack } = await compileModelPack(cloneSource());
   const aircraft = pack.aircraft[0];
