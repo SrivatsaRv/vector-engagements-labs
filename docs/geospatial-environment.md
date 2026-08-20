@@ -97,6 +97,40 @@ uniform presets and the educational standard atmosphere. The interfaces permit
 later explicit-datum geographic fields and bounded grids without changing
 entity contracts.
 
+## Phase A executable EnvironmentPack
+
+`vector.environment-pack.v1` is the executable, Worker-loadable Phase A
+boundary for future ground and route work. It is constructed from explicitly
+selected governed draft inputs and has an immutable ID, version, and SHA-256
+digest. It carries explicit WGS84
+coverage geometry, MSL terrain datum, no-data policy, synthetic reference
+surface, educational standard-atmosphere policy, ENU weather vector, and an
+installation/runway-coverage identity.
+
+The Phase A pack is deliberately `MODEL_ASSUMPTION` and
+`PUBLIC_EDUCATIONAL`. Its terrain is a deterministic constant MSL reference
+plane and its atmosphere is the documented NASA educational approximation. It
+makes no claim of Punjab, Ladakh, or other regional DEM/weather fidelity. Phase
+B must publish separately versioned, licensed, source-cited terrain, geoid, and
+atmospheric datasets before regional terrain masking, collision, or operational
+weather can be admitted.
+
+The bounded EnvironmentSampler materializes a pack wholly in the browser
+Worker. It accepts only finite local coordinates and model time, rejects a
+request over the pack maximum, supports cancellation at batch boundaries, and
+does not access a network, database, or map tile during sampling. The dedicated
+`environment-sampler.worker.ts` caches at most four packs and rejects a missing
+or malformed pack. The current engine continues to use its existing compiled
+atmosphere adapter; #64 will bind the admitted pack to ground and route
+admission and runtime sampling.
+
+Installation coverage is separately declared as
+`BOUNDED_PUBLIC_REFERENCE_FIXTURE`. The current 21 public-reference points are
+not all IAF or PAF bases. Runway evidence is text-only or absent; therefore no
+Phase A installation is eligible to prove a ground/runway start. A future
+runway record must include the required geometry, MSL elevation, datum,
+provenance, uncertainty, and mission-start evidence before it can be offered.
+
 ## Terrain and geometric line of sight
 
 `TerrainSampler` is a local interface with content identity, declared rectangular

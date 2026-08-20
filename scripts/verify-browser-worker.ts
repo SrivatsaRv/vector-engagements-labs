@@ -8,6 +8,9 @@ import { adaptPreparedSimulation } from "../lib/runtime/model-pack-adapter.ts";
 import { prepareSimulation } from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
+import { createPhaseAEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
+import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
+import { getStudyArea, getWeatherPreset } from "../lib/study-areas.ts";
 
 type RuntimeMessage = {
   type: string;
@@ -48,14 +51,24 @@ const workerName = readdirSync(assetDirectory).find((name) =>
   /^simulation\.worker-.*\.js$/.test(name),
 );
 if (!workerName) throw new Error("Build the production browser Worker before verification.");
+const environmentWorkerName = readdirSync(assetDirectory).find((name) =>
+  /^environment-sampler\.worker-.*\.js$/.test(name),
+);
+if (!environmentWorkerName) throw new Error("Build the production environment Worker before verification.");
 const workerBytes = readFileSync(resolve(assetDirectory, workerName));
+const environmentWorkerBytes = readFileSync(resolve(assetDirectory, environmentWorkerName));
 const server = createServer((request, response) => {
-  if (request.url === `/assets/${workerName}`) {
+  const assets = new Map([
+    [`/assets/${workerName}`, workerBytes],
+    [`/assets/${environmentWorkerName}`, environmentWorkerBytes],
+  ]);
+  const bytes = assets.get(request.url ?? "");
+  if (bytes) {
     response.writeHead(200, {
       "content-type": "text/javascript; charset=utf-8",
       "cache-control": "no-store",
     });
-    response.end(workerBytes);
+    response.end(bytes);
     return;
   }
   response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
@@ -82,11 +95,50 @@ const packs = await Promise.all(
     };
   }),
 );
+const phaseAArea = getStudyArea("north-punjab");
+const phaseAPack = createPhaseAEnvironmentPack({
+  studyArea: phaseAArea,
+  weatherPreset: getWeatherPreset(phaseAArea, "north-punjab-clear"),
+  installations: PUBLIC_INSTALLATIONS,
+});
 
 try {
   const page = await browser.newPage();
   await page.goto(origin);
   await page.evaluate("globalThis.__name = (target) => target");
+  const environmentVerification = await page.evaluate(
+    async ({ workerUrl, pack }) => {
+      const worker = new Worker(workerUrl, { type: "module" });
+      const receive = (type: string, requestId: string) => new Promise<Record<string, unknown>>((resolveWait, rejectWait) => {
+        const timeout = setTimeout(() => rejectWait(new Error(`Environment Worker ${type} timed out.`)), 5_000);
+        const listener = (event: MessageEvent<Record<string, unknown>>) => {
+          if (event.data?.requestId !== requestId || event.data.type !== type) return;
+          clearTimeout(timeout);
+          worker.removeEventListener("message", listener);
+          resolveWait(event.data);
+        };
+        worker.addEventListener("message", listener);
+      });
+      const loaded = receive("loaded", "environment-load");
+      worker.postMessage({ type: "load", requestId: "environment-load", pack });
+      await loaded;
+      const sampled = receive("sampled", "environment-sample");
+      worker.postMessage({
+        type: "sample",
+        requestId: "environment-sample",
+        digest: pack.identity.digest,
+        queries: [{ eastM: 0, northM: 0, upM: 8_500, modelTimeSeconds: 0 }],
+      });
+      const response = await sampled;
+      worker.terminate();
+      return response;
+    },
+    { workerUrl: `${origin}/assets/${environmentWorkerName}`, pack: phaseAPack },
+  );
+  assert.equal(environmentVerification.type, "sampled");
+  const environmentSamples = environmentVerification.samples as Array<{ terrain: { elevation: { datum: string; valueM: number } } }>;
+  assert.equal(environmentSamples[0]?.terrain.elevation.datum, "MSL");
+  assert.equal(environmentSamples[0]?.terrain.elevation.valueM, phaseAArea.surfaceElevationM);
   const results: WorkerVerificationResult[] = [];
   for (const { pack } of packs) {
     const result = await page.evaluate(
@@ -369,7 +421,7 @@ try {
   assert.ok(cancellation.messages.includes("cancelled"));
 
   process.stdout.write(
-    `${JSON.stringify({ workerAsset: workerName, backends: results, cancellation })}\n`,
+    `${JSON.stringify({ workerAsset: workerName, environmentWorkerAsset: environmentWorkerName, backends: results, cancellation })}\n`,
   );
 } finally {
   await browser.close();

@@ -21,6 +21,18 @@ type WorkerLike = Pick<
   "postMessage" | "terminate" | "addEventListener" | "removeEventListener"
 >;
 
+/**
+ * Creates the separately bounded environment Worker. Route and ground-start
+ * admission in #64 will own its request protocol; simulation ticks never use
+ * a Worker, database, or network to obtain environment data.
+ */
+export function createEnvironmentSamplerWorker() {
+  return new Worker(
+    new URL("../geospatial/environment-sampler.worker.ts", import.meta.url),
+    { type: "module", name: "vector-environment-sampler" },
+  );
+}
+
 export type BrowserSimulationProgress = {
   modelTimeSeconds: number;
   integratedSteps: number;

@@ -58,3 +58,13 @@ study-area, route, installation and airspace dataset versions/digests in
 fixtures are `MODEL_ASSUMPTION`; they do not upgrade PostGIS installation points
 or public-source assertions. A future production terrain/geoid ingest publishes
 new content identities rather than mutating a saved run.
+
+## Environment-pack installation coverage
+
+Phase A publishes `vector.environment-pack.v1` with an explicit
+`BOUNDED_PUBLIC_REFERENCE_FIXTURE` installation coverage identity. Its included
+record count is the maintained fixture count, with known gaps and an explicit
+`TEXT_ONLY_OR_ABSENT` runway-evidence state. It must never be rendered or
+validated as a complete IAF/PAF base catalogue. PostGIS remains the canonical
+geometry source for the existing points; the Phase A pack only binds the exact
+coverage identity required by future ground-start admission.
