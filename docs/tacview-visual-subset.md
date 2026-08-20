@@ -68,3 +68,15 @@ Every layer is generated from the saved engine scenario or its recorded frames. 
 ## Information views
 
 Model Truth uses the recorded engine position. IAF and PAF air-picture views replace only the observed opposing track with the selected side’s sensor-derived position and uncertainty. The truth state remains available as a separate view and is never blended into a RASP label.
+
+The selection-driven **Selected track state** inspector consumes one
+`pictures.jsonl` sample whose `modelTimeSeconds` exactly matches the selected
+display frame. It shows the observer-picture owner, track lifecycle, sample
+freshness, source, availability cause and uncertainty. If the sample is absent
+or it has no admitted visible position, the inspector states that condition and
+does not invent a position, confidence, or zero uncertainty. Its IAF/PAF
+selector changes browser presentation only; it cannot change a run or record.
+
+This first inspector intentionally does not render radar volumes, seeker state,
+weapon support, or inferred observations. Those require the remaining #26 and
+#28 contracts.

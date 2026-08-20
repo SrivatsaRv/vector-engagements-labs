@@ -203,6 +203,8 @@ export type Frame = {
 
 export type RaspTrack = {
   perspective: "IAF" | "PAF";
+  /** Model-clock identity of this observer-picture sample. */
+  modelTimeSeconds: number;
   trackId: string;
   classification: string;
   identification: "FRIEND" | "HOSTILE" | "SUSPECT" | "UNKNOWN";

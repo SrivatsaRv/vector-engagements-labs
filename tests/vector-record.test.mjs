@@ -60,6 +60,12 @@ for (const backend of ["typescript", "rust-wasm"]) {
     assert.ok(opened.events.length > 0);
     assert.ok(opened.pictures.length > 0, "admitted sensor state must be recorded");
     assert.ok(opened.pictures.every((picture) => picture.trackState));
+    assert.ok(
+      opened.pictures.every((picture) =>
+        opened.result.frames.some((frame) => frame.t === picture.modelTimeSeconds),
+      ),
+      "each observer-picture sample must identify its recorded frame",
+    );
     assert.ok(opened.pictures.every((picture) => !("truthPosition" in picture)));
     assert.match(opened.manifest.recordId, /^[a-f0-9]{64}$/);
   });

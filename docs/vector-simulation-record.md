@@ -41,6 +41,12 @@ when the compiled capability identity and record manifest disagree.
 
 Basemap tiles are referenced by provider and style revision, not silently embedded. A portable export may include explicitly licensed terrain or static assets. Missing optional assets must degrade to class silhouettes and a neutral terrain surface without changing telemetry.
 
+Each `pictures.jsonl` entry carries `modelTimeSeconds`, the model-clock identity
+of that observer-picture sample. Consumers select it by that exact frame time,
+not by array order, last-update time, or a rendered interpolation. A missing
+picture is an explicit unavailable state; viewers may not synthesize track
+position, confidence, freshness, or uncertainty.
+
 ## Frame contract
 
 Each entity sample may carry scenario-local f64 position and an entity-keyed WGS84

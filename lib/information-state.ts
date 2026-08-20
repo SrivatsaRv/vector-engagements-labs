@@ -165,6 +165,7 @@ function snapshot(
   const visible = track.state !== "NONE" && track.state !== "LOST" && track.state !== "UNSUPPORTED" && Boolean(last);
   return {
     perspective,
+    modelTimeSeconds: frame.t,
     trackId: `${perspective}-${config.observedEntityId}-track-v1`,
     classification: "Unidentified airborne track",
     identification: "UNKNOWN",
