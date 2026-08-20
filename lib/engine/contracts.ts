@@ -17,6 +17,7 @@ import type {
   ScenarioOrigin,
 } from "../geospatial/contracts.ts";
 import type { SyntheticEnvironmentManifest } from "../geospatial/synthetic-environment.ts";
+import type { InstallationOriginReference } from "../mission-admission.ts";
 
 export type EntityKind =
   | "AIRCRAFT"
@@ -166,6 +167,10 @@ export type EngineScenario = {
     origin: ScenarioOrigin;
     initialPositions: GeographicEntityState[];
     syntheticEnvironment: SyntheticEnvironmentManifest;
+    originReferences: Array<{
+      entityId: string;
+      reference: InstallationOriginReference;
+    }>;
   };
   environment: {
     gravityMps2: number;

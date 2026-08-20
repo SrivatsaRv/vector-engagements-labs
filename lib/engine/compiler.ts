@@ -26,6 +26,10 @@ import {
 import { localFrameToGeographic } from "../geospatial/geodesy.ts";
 import { scenarioOrigin } from "../scenario-spatial.ts";
 import { buildSyntheticEnvironmentManifest } from "../geospatial/synthetic-environment.ts";
+import {
+  resolveInstallationOriginReference,
+  type InstallationOriginReference,
+} from "../mission-admission.ts";
 
 export type ScenarioCompilerInput = {
   id: string;
@@ -67,6 +71,8 @@ export type ScenarioCompilerInput = {
     redHeadingRad: number;
     blueRoute: Vec3[];
     redRoute: Vec3[];
+    blueOriginReference?: InstallationOriginReference;
+    redOriginReference?: InstallationOriginReference;
   };
 };
 
@@ -157,6 +163,18 @@ export function compileScenario(
     input.domain === "A2A" ? getCatalogObject(input.redSystemId) : undefined;
   const studyArea = getStudyArea(input.studyAreaId);
   const weatherPreset = getWeatherPreset(studyArea, input.weatherPresetId);
+  const admittedOriginReferences = [
+    [input.placement?.blueOriginReference, "placement.blue.originReference"],
+    [input.placement?.redOriginReference, "placement.red.originReference"],
+  ] as const;
+  admittedOriginReferences.forEach(([reference, fieldPath]) => {
+    resolveInstallationOriginReference({
+      reference,
+      studyAreaId: input.studyAreaId,
+      weatherPresetId: input.weatherPresetId,
+      fieldPath,
+    });
+  });
   const targetHeadingRad = ((180 - input.aspect) * Math.PI) / 180;
   const blueStart = input.placement?.blueStart ?? {
     x: 0,
@@ -451,11 +469,20 @@ export function compileScenario(
     entityId: entity.id,
     points: (entity.route ?? []).map((point) => ({ ...point })),
   }));
+  const compiledOriginReferences = [
+    input.placement?.blueOriginReference
+      ? { entityId: bluePlatform.id, reference: input.placement.blueOriginReference }
+      : undefined,
+    input.placement?.redOriginReference
+      ? { entityId: redTarget.id, reference: input.placement.redOriginReference }
+      : undefined,
+  ].filter((item): item is NonNullable<typeof item> => item !== undefined);
   const syntheticEnvironment = buildSyntheticEnvironmentManifest({
     studyArea,
     weatherPreset,
     origin,
     routes,
+    originReferences: compiledOriginReferences,
     effectiveWeather: {
       windEastMps: input.windEastMps,
       windNorthMps: input.windNorthMps,
@@ -491,6 +518,7 @@ export function compileScenario(
         position: localFrameToGeographic(entity.initial.position, origin),
       })),
       syntheticEnvironment,
+      originReferences: compiledOriginReferences,
     },
     environment: {
       gravityMps2: 9.80665,

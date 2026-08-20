@@ -9,6 +9,7 @@ import type {
 import { sha256Identity } from "./digest.ts";
 import { SYNTHETIC_ZERO_GEOID } from "./vertical-datums.ts";
 import { standardAtmosphere } from "../engine/atmosphere.ts";
+import type { InstallationOriginReference } from "../mission-admission.ts";
 
 export type SyntheticEnvironmentManifest = {
   schemaVersion: "vector.synthetic-environment.v1";
@@ -35,6 +36,8 @@ export type SyntheticEnvironmentManifest = {
   };
   studyArea: DatasetIdentity;
   routes: DatasetIdentity;
+  /** Immutable selected-base identities; empty for manual airborne placement. */
+  missionOrigins: DatasetIdentity;
   datasets: {
     installations: DatasetIdentity;
     airspace: DatasetIdentity;
@@ -109,13 +112,17 @@ export function buildSyntheticEnvironmentManifest(input: {
   weatherPreset: WeatherPreset;
   origin: ScenarioOrigin;
   routes: Array<{ entityId: string; points: Vec3[] }>;
+  originReferences: Array<{
+    entityId: string;
+    reference: InstallationOriginReference;
+  }>;
   effectiveWeather: {
     windEastMps: number;
     windNorthMps: number;
     temperatureOffsetC: number;
   };
 }): SyntheticEnvironmentManifest {
-  const { studyArea, weatherPreset, origin, routes, effectiveWeather } = input;
+  const { studyArea, weatherPreset, origin, routes, originReferences, effectiveWeather } = input;
   const weather = createUniformWeatherVectorField(
     weatherPreset,
     effectiveWeather,
@@ -167,6 +174,11 @@ export function buildSyntheticEnvironmentManifest(input: {
       terrainClass: studyArea.terrainClass,
     }),
     routes: identity("routes:compiled-scenario", "1.0.0", routes),
+    missionOrigins: identity(
+      "mission-origins:compiled-scenario",
+      "1.0.0",
+      originReferences,
+    ),
     datasets: {
       installations: identity(
         "installations:public-reference",

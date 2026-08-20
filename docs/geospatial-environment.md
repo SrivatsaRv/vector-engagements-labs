@@ -130,6 +130,14 @@ not all IAF or PAF bases. Runway evidence is text-only or absent; therefore no
 Phase A installation is eligible to prove a ground/runway start. A future
 runway record must include the required geometry, MSL elevation, datum,
 provenance, uncertainty, and mission-start evidence before it can be offered.
+An `vector.installation-origin.v1` airborne reference may identify a selected
+public installation, its source and the selected environment, but it cannot
+assert runway use. Compilation resolves it against the governed catalog and
+rejects missing, stale, out-of-area, cross-environment and runway identities;
+the point coordinate is not an admission fallback. Admitted selected-origin
+references are stored in the compiled engine scenario and contribute to the
+`missionOrigins` dataset digest in the frozen synthetic-environment manifest,
+which is retained in the VSR and report provenance.
 
 ## Terrain and geometric line of sight
 

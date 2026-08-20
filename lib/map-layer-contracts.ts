@@ -12,6 +12,7 @@ export type MapInstallationRecord = {
   elevation_ft?: number | null;
   runway_info?: string | null;
   installation_type: string;
+  source_id: string;
   longitude: number;
   latitude: number;
 };
