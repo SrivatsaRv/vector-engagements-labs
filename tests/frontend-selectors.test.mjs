@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   selectDisplayFrame,
   selectEntityMetricSeries,
+  selectObserverEntityPresentation,
   selectRecordedTrackState,
 } from "../lib/frontend/selectors.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
@@ -20,6 +21,24 @@ test("display-time selection returns one canonical recorded frame identity", () 
   assert.throws(
     () => selectDisplayFrame({ ...result, frames: [] }, 0),
     /empty record/,
+  );
+});
+
+test("observer-picture rendering hides an unavailable track instead of using world truth", () => {
+  const selected = selectDisplayFrame(result, result.frames[0].t);
+  const unavailablePictures = buildSidePictures(
+    { ...SCENARIO_LIBRARY[0].scenario, blueRadarMode: "SILENT" },
+    [selected.frame],
+  );
+  const unavailable = unavailablePictures.find((picture) => picture.perspective === "IAF");
+  assert.ok(unavailable);
+  assert.deepEqual(
+    selectObserverEntityPresentation(unavailable, unavailable.observedEntityId),
+    { state: "HIDDEN" },
+  );
+  assert.deepEqual(
+    selectObserverEntityPresentation(unavailable, "blue-platform-1"),
+    { state: "MODEL_TRUTH" },
   );
 });
 

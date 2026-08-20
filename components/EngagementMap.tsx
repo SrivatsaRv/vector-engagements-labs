@@ -8,6 +8,7 @@ import type { RaspTrack, SimulationResult } from "@/lib/simulation";
 import { getFrameAt } from "@/lib/simulation";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
 import { emitBrowserTelemetry } from "@/lib/observability/client";
+import { selectObserverEntityPresentation } from "@/lib/frontend/selectors";
 import {
   buildCoverageFeatures,
   buildDeclaredRouteFeatures,
@@ -408,12 +409,21 @@ export function EngagementMap({ result, time, installations, raspTrack, layoutRe
           return score(right) - score(left) || left.id.localeCompare(right.id);
         })
         .reduce((priorities, entity, index) => priorities.set(entity.id, index), new Map<string, number>());
+      const hiddenObserverEntityId = raspTrack &&
+        selectObserverEntityPresentation(raspTrack, raspTrack.observedEntityId).state === "HIDDEN"
+        ? raspTrack.observedEntityId
+        : undefined;
       for (const entity of frame.entities) {
-        const isObservedTrack = raspTrack?.observedEntityId === entity.id;
-        const displayPosition = isObservedTrack && raspTrack?.visible && raspTrack.position
-          ? raspTrack.position
+        const observerPresentation = selectObserverEntityPresentation(raspTrack, entity.id);
+        if (observerPresentation.state === "HIDDEN") {
+          markers.current.get(entity.id)?.remove();
+          markers.current.delete(entity.id);
+          continue;
+        }
+        const displayPosition = observerPresentation.state === "ESTIMATED"
+          ? observerPresentation.position
           : entity.position;
-        const displayLngLat = isObservedTrack && raspTrack?.visible
+        const displayLngLat = observerPresentation.state === "ESTIMATED"
           ? localToLngLat(displayPosition, origin)
           : recordedLngLat(
               frame.geographicPositions,
@@ -445,10 +455,6 @@ export function EngagementMap({ result, time, installations, raspTrack, layoutRe
           `${90 - (entity.headingRad * 180) / Math.PI}deg`,
         );
         marker.getElement().classList.toggle("is-stowed", entity.lifecycle === "STOWED");
-        marker.getElement().classList.toggle(
-          "is-hidden-track",
-          Boolean(isObservedTrack && !raspTrack?.visible),
-        );
         marker.getElement().dataset.labelPriority = String(labelPriority.get(entity.id) ?? 99);
       }
       let uncertainty = markers.current.get("rasp-uncertainty");
@@ -478,13 +484,13 @@ export function EngagementMap({ result, time, installations, raspTrack, layoutRe
           frame,
           time,
           origin,
-          raspTrack?.observedEntityId,
+          hiddenObserverEntityId,
         ),
       });
       const vectors = map.getSource("direction-vectors") as import("maplibre-gl").GeoJSONSource | undefined;
       vectors?.setData({
         type: "FeatureCollection",
-        features: buildDirectionVectorFeatures(frame, origin),
+        features: buildDirectionVectorFeatures(frame, origin, hiddenObserverEntityId),
       });
       const coverage = map.getSource("coverage-envelopes") as import("maplibre-gl").GeoJSONSource | undefined;
       coverage?.setData({

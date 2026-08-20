@@ -108,3 +108,22 @@ export function selectRecordedTrackState(
     displayTimeSeconds: selected.displayTimeSeconds,
   };
 }
+
+export type ObserverEntityPresentation =
+  | { state: "MODEL_TRUTH" }
+  | { state: "HIDDEN" }
+  | { state: "ESTIMATED"; position: NonNullable<RaspTrack["position"]> };
+
+/**
+ * Decides whether an entity may appear in a side-owned observer picture.
+ * A track without an admitted visible estimate fails closed. Callers that did
+ * not select an observer picture retain the separate Model Truth view.
+ */
+export function selectObserverEntityPresentation(
+  track: RaspTrack | undefined,
+  entityId: string,
+): ObserverEntityPresentation {
+  if (!track || track.observedEntityId !== entityId) return { state: "MODEL_TRUTH" };
+  if (!track.visible || !track.position) return { state: "HIDDEN" };
+  return { state: "ESTIMATED", position: track.position };
+}
