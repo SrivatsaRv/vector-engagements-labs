@@ -20,7 +20,11 @@ async function databaseRuntime(): Promise<{
     // Vinext resolves the static import above for workerd. Docker places this
     // Node-specific adapter beside the server bundle, keeping credentials as
     // runtime configuration rather than build inputs.
-    const nodeAdapter = "./node-postgres.mjs";
+    // Vinext places this module in dist/server/_next/static at runtime, while
+    // the generated Node adapter is emitted at dist/server/node-postgres.mjs.
+    // Resolve from the emitted module location, not process.cwd(), so a
+    // production Node container cannot fall through to the Worker adapter.
+    const nodeAdapter = new URL("../../node-postgres.mjs", import.meta.url).href;
     let postgres = workerPostgres;
     try {
       ({ default: postgres } = await import(/* @vite-ignore */ nodeAdapter) as {

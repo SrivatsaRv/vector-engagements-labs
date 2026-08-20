@@ -34,6 +34,14 @@ try {
   assert.equal(health.status, 200);
   const healthPayload = await health.json();
   assert.equal(healthPayload.status, "ready");
+  assert.equal(healthPayload.publicApiAdmission.policyVersion, "public-api-admission.v1");
+  assert.equal(healthPayload.publicApiAdmission.ready, true);
+  assert.ok(
+    ["postgres-fixed-window", "cloudflare-rate-limiting"].includes(
+      healthPayload.publicApiAdmission.limiter,
+    ),
+    "health must expose an admitted runtime limiter without secrets",
+  );
 
   const incomplete = await fetch(`${baseUrl}/api/runs`, {
     method: "POST",

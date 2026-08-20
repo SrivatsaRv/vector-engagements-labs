@@ -61,7 +61,14 @@ export function publicApiError(error: unknown, fallbackStatus = 500) {
     });
   }
   const requestId = crypto.randomUUID();
-  console.error(`[public-api:${requestId}] request failed`);
+  // Keep failure logs parseable without reflecting exception text, which can
+  // contain connection details or user-controlled values. The request ID is
+  // returned to the caller and can be joined with this bounded event.
+  console.error(JSON.stringify({
+    event: "public_api_request_failed",
+    requestId,
+    errorType: error instanceof Error ? error.name : "unknown",
+  }));
   return Response.json(
     { error: "service_unavailable", requestId },
     { status: fallbackStatus },

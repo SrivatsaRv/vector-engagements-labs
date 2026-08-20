@@ -29,6 +29,17 @@ Admission adds bounded outcome counters for saved-run acceptance, quota/capacity
 rejection, unavailable enforcement, and retention cleanup. IP addresses,
 actor hashes, run IDs, and lease IDs are never labels or structured-log values.
 
+`/api/health` includes non-secret admission readback: policy version, runtime,
+limiter adapter identity, and readiness. It returns HTTP 503 when the declared
+Node limiter store or either Cloudflare rate-limit binding is absent. This is a
+deployment configuration check; the following database readiness query verifies
+the configured Node store is reachable.
+
+Unexpected public API failures emit the bounded JSON event
+`public_api_request_failed` with a request ID and error class. Exception text,
+connection strings, actor identities, request bodies, and limiter keys are not
+logged or returned to the public response.
+
 Production metrics return 404 unless `METRICS_BEARER_TOKEN` is configured as a Worker secret and presented as a Bearer token. Compose uses a local scrape token and every endpoint is bound to loopback.
 
 Compose runs the application through Wrangler's development proxy. The local
