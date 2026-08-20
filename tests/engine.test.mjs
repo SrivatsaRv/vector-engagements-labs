@@ -413,6 +413,42 @@ test("aircraft follow authored three-dimensional routes with bounded recorded co
   assert.deepEqual(last.aircraftControl.achievedVelocityMps, last.velocity);
 });
 
+test("aircraft records the guidance request separately from its load-factor-limited command", () => {
+  const scenario = admitTestAircraft(testScenario());
+  const red = scenario.entities.find((entity) => entity.id === "aircraft-red");
+  red.route = [
+    { ...red.initial.position },
+    {
+      x: red.initial.position.x,
+      y: red.initial.position.y + 10_000,
+      z: red.initial.position.z,
+    },
+  ];
+
+  const frame = runEngine(scenario).frames[0].entities.find(
+    (entity) => entity.id === red.id,
+  );
+
+  assert.ok(frame?.aircraftControl);
+  // Independent kinematic oracle: a 90-degree route request at the initial
+  // speed requires a lateral velocity change of speed / fixed-step.
+  const expectedRequestedLateralAcceleration =
+    Math.abs(red.initial.velocity.x) / scenario.fixedStepSeconds;
+  assert.equal(
+    frame.aircraftControl.requestedSteeringAccelerationMps2.y,
+    expectedRequestedLateralAcceleration,
+  );
+  assert.equal(frame.aircraftControl.requestedSteeringAccelerationMps2.x, 0);
+  assert.equal(frame.aircraftControl.limiter, "LOAD_FACTOR");
+  assert.ok(
+    Math.hypot(
+      frame.aircraftControl.acceptedSteeringAccelerationMps2.x,
+      frame.aircraftControl.acceptedSteeringAccelerationMps2.y,
+      frame.aircraftControl.acceptedSteeringAccelerationMps2.z,
+    ) < expectedRequestedLateralAcceleration,
+  );
+});
+
 test("changing one authored route changes the recorded aircraft trail", () => {
   const leftScenario = admitTestAircraft(testScenario());
   const rightScenario = structuredClone(leftScenario);

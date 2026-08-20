@@ -203,6 +203,7 @@ function updateKinematicEntity(
   state.aircraftControl = {
     routePointIndex: routePoint ? state.routePointIndex : null,
     requestedVelocityMps: requestedVelocity,
+    requestedSteeringAccelerationMps2: requestedSteeringAcceleration,
     acceptedSteeringAccelerationMps2: acceptedSteeringAcceleration,
     achievedVelocityMps: { ...state.velocity },
     limiter: routePoint

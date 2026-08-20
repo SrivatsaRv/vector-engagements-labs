@@ -486,6 +486,7 @@ pub struct EngineScenario {
 pub struct AircraftControlFrame {
     pub route_point_index: Option<usize>,
     pub requested_velocity_mps: Vec3,
+    pub requested_steering_acceleration_mps2: Vec3,
     pub accepted_steering_acceleration_mps2: Vec3,
     pub achieved_velocity_mps: Vec3,
     pub limiter: AircraftControlLimiter,
@@ -788,6 +789,7 @@ fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f6
     state.aircraft_control = Some(AircraftControlFrame {
         route_point_index: route_point.map(|_| state.route_point_index),
         requested_velocity_mps: requested_velocity,
+        requested_steering_acceleration_mps2: requested_steering,
         accepted_steering_acceleration_mps2: accepted_steering,
         achieved_velocity_mps: state.velocity,
         limiter: if route_point.is_none() {

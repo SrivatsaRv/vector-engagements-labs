@@ -28,6 +28,14 @@ test("columnar frame transport round-trips exact engine frames", () => {
       .some((entity) => entity.weaponFlightState === "BOOST"),
     "weapon lifecycle evidence must survive VSR encoding",
   );
+  const control = decodeColumnarFrames(bytes)
+    .flatMap((frame) => frame.entities)
+    .find((entity) => entity.aircraftControl)?.aircraftControl;
+  assert.ok(control, "aircraft control evidence must survive VSR encoding");
+  assert.ok(
+    Number.isFinite(control.requestedSteeringAccelerationMps2.x),
+    "the requested steering acceleration must be replayable, not reconstructed",
+  );
   assert.ok(bytes.byteLength > 0);
 });
 
@@ -124,11 +132,25 @@ test("VSR rejects corruption before exposing replay data", async () => {
 test("columnar frame decoder rejects an unsupported member schema", () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const bytes = encodeColumnarFrames(simulate(scenario).engineRun.frames);
-  const encodedSchema = new TextEncoder().encode("vector.frames.columnar.v2");
+  const encodedSchema = new TextEncoder().encode("vector.frames.columnar.v3");
   const offset = bytes.findIndex((_, index) =>
     encodedSchema.every((value, inner) => bytes[index + inner] === value),
   );
   assert.ok(offset > 0);
   bytes[offset + encodedSchema.length - 1] = "9".charCodeAt(0);
   assert.throws(() => decodeColumnarFrames(bytes), /schema is unsupported/);
+});
+
+test("columnar frame decoder rejects v2 records because their command evidence is incomplete", () => {
+  const bytes = encodeColumnarFrames(simulate(SCENARIO_LIBRARY[0].scenario).engineRun.frames);
+  const encodedSchema = new TextEncoder().encode("vector.frames.columnar.v3");
+  const offset = bytes.findIndex((_, index) =>
+    encodedSchema.every((value, inner) => bytes[index + inner] === value),
+  );
+  assert.ok(offset > 0);
+  bytes[offset + encodedSchema.length - 1] = "2".charCodeAt(0);
+  assert.throws(
+    () => decodeColumnarFrames(bytes),
+    /v2 omits requested steering command evidence/,
+  );
 });
