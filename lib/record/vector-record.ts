@@ -17,7 +17,7 @@ import { buildSidePictures } from "../information-state.ts";
 import { isOptionalCapabilityEnabled } from "../runtime/deployment-capabilities.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
-export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v2" as const;
+export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v3" as const;
 export const VECTOR_EVENT_SCHEMA = "vector.events.v1" as const;
 export const MAX_VECTOR_RECORD_BYTES = 64 * 1024 * 1024;
 
@@ -130,6 +130,9 @@ type FrameColumn =
   | "requestedVelocityX"
   | "requestedVelocityY"
   | "requestedVelocityZ"
+  | "requestedSteeringAccelerationX"
+  | "requestedSteeringAccelerationY"
+  | "requestedSteeringAccelerationZ"
   | "acceptedSteeringAccelerationX"
   | "acceptedSteeringAccelerationY"
   | "acceptedSteeringAccelerationZ"
@@ -159,6 +162,9 @@ const FRAME_COLUMNS: FrameColumn[] = [
   "requestedVelocityX",
   "requestedVelocityY",
   "requestedVelocityZ",
+  "requestedSteeringAccelerationX",
+  "requestedSteeringAccelerationY",
+  "requestedSteeringAccelerationZ",
   "acceptedSteeringAccelerationX",
   "acceptedSteeringAccelerationY",
   "acceptedSteeringAccelerationZ",
@@ -190,7 +196,7 @@ type StoredEntityMetadata = EntityMetadata & {
 };
 
 type FrameHeader = {
-  schemaVersion: typeof VECTOR_FRAME_SCHEMA;
+  schemaVersion: string;
   columns: FrameColumn[];
   frames: Array<
     Omit<EngineFrame, "entities"> & { entityOffset: number; entityCount: number }
@@ -226,6 +232,12 @@ function entityColumnValue(entity: EngineEntityFrame, column: FrameColumn) {
     return entity.aircraftControl?.requestedVelocityMps.y ?? Number.NaN;
   if (column === "requestedVelocityZ")
     return entity.aircraftControl?.requestedVelocityMps.z ?? Number.NaN;
+  if (column === "requestedSteeringAccelerationX")
+    return entity.aircraftControl?.requestedSteeringAccelerationMps2.x ?? Number.NaN;
+  if (column === "requestedSteeringAccelerationY")
+    return entity.aircraftControl?.requestedSteeringAccelerationMps2.y ?? Number.NaN;
+  if (column === "requestedSteeringAccelerationZ")
+    return entity.aircraftControl?.requestedSteeringAccelerationMps2.z ?? Number.NaN;
   if (column === "acceptedSteeringAccelerationX")
     return entity.aircraftControl?.acceptedSteeringAccelerationMps2.x ?? Number.NaN;
   if (column === "acceptedSteeringAccelerationY")
@@ -315,6 +327,11 @@ export function decodeColumnarFrames(bytes: Uint8Array): EngineFrame[] {
   const header = JSON.parse(
     decoder.decode(bytes.subarray(12, 12 + headerLength)),
   ) as FrameHeader;
+  if (header.schemaVersion === "vector.frames.columnar.v2") {
+    throw new Error(
+      "VECTOR frame schema v2 omits requested steering command evidence; regenerate the record with v3.",
+    );
+  }
   if (
     header.schemaVersion !== VECTOR_FRAME_SCHEMA ||
     canonicalJson(header.columns) !== canonicalJson(FRAME_COLUMNS)
@@ -372,6 +389,11 @@ export function decodeColumnarFrames(bytes: Uint8Array): EngineFrame[] {
               x: column("requestedVelocityX", index),
               y: column("requestedVelocityY", index),
               z: column("requestedVelocityZ", index),
+            },
+            requestedSteeringAccelerationMps2: {
+              x: column("requestedSteeringAccelerationX", index),
+              y: column("requestedSteeringAccelerationY", index),
+              z: column("requestedSteeringAccelerationZ", index),
             },
             acceptedSteeringAccelerationMps2: {
               x: column("acceptedSteeringAccelerationX", index),

@@ -229,6 +229,7 @@ export type EngineEntityFrame = {
   aircraftControl?: {
     routePointIndex: number | null;
     requestedVelocityMps: Vec3;
+    requestedSteeringAccelerationMps2: Vec3;
     acceptedSteeringAccelerationMps2: Vec3;
     achievedVelocityMps: Vec3;
     limiter: "LOAD_FACTOR" | "NONE" | "ROUTE_COMPLETE";

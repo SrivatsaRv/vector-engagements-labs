@@ -210,6 +210,7 @@ test("Rust/WASM and TypeScript preserve parity for a turning and climbing route"
   assert.equal(rustRed.aircraftControl.limiter, typescriptRed.aircraftControl.limiter);
   for (const vectorName of [
     "requestedVelocityMps",
+    "requestedSteeringAccelerationMps2",
     "acceptedSteeringAccelerationMps2",
     "achievedVelocityMps",
   ]) {
