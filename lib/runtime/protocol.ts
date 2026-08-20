@@ -96,7 +96,13 @@ export type BrowserRuntimeResponse =
   | (RuntimeResponseBase & {
       type: "failed";
       runId?: string;
-      code: "protocol" | "missing-pack" | "timeout" | "engine" | "record";
+      code:
+        | "protocol"
+        | "missing-pack"
+        | "timeout"
+        | "engine"
+        | "record"
+        | "capability-manifest-stale";
       message: string;
       recoverable: boolean;
     })

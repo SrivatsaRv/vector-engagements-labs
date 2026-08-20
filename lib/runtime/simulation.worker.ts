@@ -8,7 +8,8 @@ import {
   serializeVectorRecord,
 } from "../record/vector-record.ts";
 import { buildSimulationResult } from "../simulation.ts";
-import { verifyRuntimeModelPack } from "./model-pack-adapter.ts";
+import { CapabilityAdmissionError } from "./deployment-capabilities.ts";
+import { admitRuntimeModelPack } from "./model-pack-adapter.ts";
 import {
   BROWSER_RUNTIME_PROTOCOL,
   isRuntimeRequest,
@@ -234,35 +235,42 @@ workerScope.addEventListener("message", (event: MessageEvent<unknown>) => {
     return;
   }
   if (request.type === "load-model-pack") {
-    void verifyRuntimeModelPack(request.pack).then((valid) => {
-      if (!valid) {
+    void admitRuntimeModelPack(request.pack)
+      .then(() => {
+        const cached = packs.has(request.pack.digest);
+        if (!cached) {
+          if (packs.size >= MAX_PACKS) packs.delete(packs.keys().next().value!);
+          packs.set(request.pack.digest, request.pack);
+        }
+        state = "ready";
+        respond({
+          protocol: BROWSER_RUNTIME_PROTOCOL,
+          requestId: request.requestId,
+          type: "model-pack-loaded",
+          state,
+          digest: request.pack.digest,
+          cached,
+        });
+      })
+      .catch((error: unknown) => {
         state = "failed";
         respond({
           protocol: BROWSER_RUNTIME_PROTOCOL,
           requestId: request.requestId,
           type: "failed",
           state,
-          code: "protocol",
-          message: "The model-pack adapter digest is invalid.",
+          code:
+            error instanceof CapabilityAdmissionError &&
+            error.code === "CAPABILITY_MANIFEST_STALE"
+              ? "capability-manifest-stale"
+              : "protocol",
+          message:
+            error instanceof Error
+              ? error.message
+              : "The model-pack adapter cannot be admitted.",
           recoverable: false,
         });
-        return;
-      }
-      const cached = packs.has(request.pack.digest);
-      if (!cached) {
-        if (packs.size >= MAX_PACKS) packs.delete(packs.keys().next().value!);
-        packs.set(request.pack.digest, request.pack);
-      }
-      state = "ready";
-      respond({
-        protocol: BROWSER_RUNTIME_PROTOCOL,
-        requestId: request.requestId,
-        type: "model-pack-loaded",
-        state,
-        digest: request.pack.digest,
-        cached,
       });
-    });
     return;
   }
   if (request.type === "run") {

@@ -69,6 +69,18 @@ export type DeploymentCapabilityInput = Omit<
   "digest"
 >;
 
+/**
+ * A deployment artifact can cross a browser Worker boundary, but it must not
+ * become a second configuration authority there. This verification result is
+ * deliberately small and contains no scenario, environment, or request data.
+ */
+export type CapabilityManifestIdentity = Pick<
+  DeploymentCapabilityManifest,
+  "schemaVersion" | "digest"
+> & {
+  engineId: EngineBackendId;
+};
+
 const STATES = new Set<CapabilityState>([
   "ENABLED",
   "DISABLED_BY_DEPLOYMENT",
@@ -134,6 +146,12 @@ function validateExactKeys(
 export function createDeploymentCapabilityManifest(
   input: DeploymentCapabilityInput,
 ): DeploymentCapabilityManifest {
+  if (input.schemaVersion !== DEPLOYMENT_CAPABILITY_SCHEMA) {
+    throw new CapabilityAdmissionError(
+      "CAPABILITY_CONFIG_INVALID",
+      "The deployment capability manifest schema is not supported.",
+    );
+  }
   if (!BACKENDS.has(input.engine.id)) {
     throw new CapabilityAdmissionError(
       "CAPABILITY_CONFIG_INVALID",
@@ -168,6 +186,59 @@ export function createDeploymentCapabilityManifest(
   }
   const digest = sha256HexSync(input);
   return Object.freeze({ ...input, digest });
+}
+
+function manifestInput(
+  manifest: DeploymentCapabilityManifest,
+): DeploymentCapabilityInput {
+  return Object.fromEntries(
+    Object.entries(manifest).filter(([key]) => key !== "digest"),
+  ) as DeploymentCapabilityInput;
+}
+
+/**
+ * Recompute the content address after a structured-clone or persisted record
+ * boundary. A correct shape with a changed digest is stale, not admissible.
+ */
+export function verifyCapabilityManifest(
+  manifest: DeploymentCapabilityManifest,
+): DeploymentCapabilityManifest {
+  const expected = createDeploymentCapabilityManifest(manifestInput(manifest));
+  if (manifest.digest !== expected.digest) {
+    throw new CapabilityAdmissionError(
+      "CAPABILITY_MANIFEST_STALE",
+      "The deployment capability manifest digest does not match its content.",
+    );
+  }
+  return expected;
+}
+
+export function capabilityManifestIdentity(
+  manifest: DeploymentCapabilityManifest,
+): CapabilityManifestIdentity {
+  return {
+    schemaVersion: manifest.schemaVersion,
+    digest: manifest.digest,
+    engineId: manifest.engine.id,
+  };
+}
+
+/**
+ * Product Workers use the manifest embedded in their own deployment. A
+ * well-formed manifest from another deployment is explicitly stale; only
+ * parity fixtures may use a verification manifest outside this boundary.
+ */
+export function admitWorkerCapabilityManifest(
+  manifest: DeploymentCapabilityManifest,
+): DeploymentCapabilityManifest {
+  const verified = verifyCapabilityManifest(manifest);
+  if (verified.digest !== DEPLOYMENT_CAPABILITIES.digest) {
+    throw new CapabilityAdmissionError(
+      "CAPABILITY_MANIFEST_STALE",
+      "The compiled scenario was prepared for a different deployment capability manifest.",
+    );
+  }
+  return verified;
 }
 
 const enabled = (reason: string): CapabilityDecision => ({
