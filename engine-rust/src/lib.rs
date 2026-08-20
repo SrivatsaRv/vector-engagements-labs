@@ -876,15 +876,8 @@ fn update_weapon(
         z: G0,
     });
     let terminal = separation <= weapon.seeker_activation_range_m;
-    let update_multiplier = match state.definition.behavior.decision {
-        TacticalDecision::Crank => 1.5,
-        TacticalDecision::Defend => 3.0,
-        TacticalDecision::Disengage => f64::INFINITY,
-        _ => 1.0,
-    };
-    let update_due = terminal
-        || time - state.last_guidance_update_seconds
-            >= weapon.datalink_update_seconds * update_multiplier;
+    let update_due =
+        terminal || time - state.last_guidance_update_seconds >= weapon.datalink_update_seconds;
     let guidance = if !update_due {
         state.last_guidance_acceleration
     } else {

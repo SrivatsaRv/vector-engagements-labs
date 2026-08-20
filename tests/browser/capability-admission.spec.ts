@@ -12,4 +12,3 @@ test("a disabled domain link cannot fall through to the A2A workbench", async ({
   await expect(page.getByText(/Su-30MKI \/ Astra versus F-16C/i)).toHaveCount(0);
   expect(runtimeErrors).toEqual([]);
 });
-

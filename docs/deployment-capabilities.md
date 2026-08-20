@@ -1,7 +1,8 @@
 # Deployment capability admission
 
-Status: foundation implemented for issues #67 and #62. Diagnostics and full
-optional-subsystem propagation remain open in #67.
+Status: #67 is in progress. Domain admission and deployment-only backend
+selection are implemented. Structured diagnostics, stale-manifest recovery, and
+future subsystem admission remain open.
 
 `config/deployment-capabilities.json` is the deployment-owned source for the
 domain, engine, model-pack and optional-capability admission boundary. The build
@@ -26,8 +27,15 @@ binds its schema and digest in `manifest.json`.
   deployment. Rust/WASM remains independently executable for parity verification
   and can replace TypeScript only through a reviewed manifest change after its
   server packaging is admitted.
-- Terrain, causal sensors, data link, AEW and EW are not admitted. Their deeper
-  runtime removal and diagnostics are tracked by #67 and the #66 ledger.
+- Terrain, causal sensors, data link, AEW and EW are not admitted. The product
+  does not expose their controls, RASP selector, observer-track layers, or saved
+  observer tracks. It shows an explicit unavailable state instead.
+- Tactical policy is not admitted. The product does not expose defensive-turn,
+  g-demand, or team-decision controls; authored route following remains the
+  admitted aircraft-motion authority.
+- The compiler ignores legacy tactical-decision fields and uses only the
+  versioned weapon model's guidance parameters. This prevents a label from
+  changing a run while the virtual-pilot contract is unavailable.
 
 ## Change and rollback
 

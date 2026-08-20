@@ -148,3 +148,8 @@ reference, or map anchor.
 - Numeric editors retain intermediate text. Empty, non-finite, out-of-area, negative, over-limit, and uncommitted values keep the operator in Place & flight and block validation instead of being discarded, normalized, or clamped into a different scenario.
 - Drag and numeric edits synchronize starting distance, altitude difference, aspect, and platform speeds before compilation.
 - Validation blocks non-finite state, negative speed or altitude, invalid headings, mismatched route origins, zero-length route legs, and any start or waypoint outside the preset boundary.
+- The current Air deployment exposes only admitted route, flight-state, loadout,
+  and frozen-environment inputs. Sensor, data-link, AEW, EW, defensive-turn,
+  g-demand, and tactical-decision controls are unavailable until their owning
+  runtime contracts are admitted. They cannot alter an authored run by a hidden
+  default or label-only setting.

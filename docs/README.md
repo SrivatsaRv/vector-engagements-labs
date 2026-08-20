@@ -93,7 +93,9 @@ The contract is cross-domain. A2A is the first proving domain because it stresse
 - Engagement-scale map fitting for readable trajectories plus an explicit regional station-context extent.
 - Three.js playback with exact recorded tracks, ground projections, altitude curtains, altitude stems, and synchronized model time.
 - Small-multiple telemetry from the same engine frames.
-- Model Truth, IAF RASP, and PAF RASP separation.
+- Model Truth is the only admitted observer surface in the current Air
+  deployment. IAF/PAF RASP, sensor, data-link, AEW, and EW views return only
+  after their information-model contract is admitted.
 - Run snapshots saved to Postgres and a dedicated PDF-like report route with explicit print and JSON behavior.
 - A hosted `/math` page that publishes equations, value states, limitations, and the package/hash/model/frame reproducibility chain.
 - A public-reference verification panel that reports NASA NESC Case 11 trajectory errors and the TypeScript/Rust-WASM parity gate without relabeling it as operational F-16 or Su-30MKI performance.
