@@ -171,6 +171,12 @@ test("route inputs fail visibly, recover, and drive the real Worker run", async 
   await expect(page.getByText("Track-information interruption", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /IAF RASP/i })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /PAF RASP/i })).toHaveCount(0);
+  const trackInspector = page.locator(".track-state-inspector:visible");
+  await trackInspector.scrollIntoViewIfNeeded();
+  await expect(trackInspector).toBeVisible();
+  await expect(trackInspector.getByRole("tab", { name: "IAF picture" })).toHaveAttribute("aria-selected", "true");
+  await trackInspector.getByRole("tab", { name: "PAF picture" }).click();
+  await expect(trackInspector.getByRole("tab", { name: "PAF picture" })).toHaveAttribute("aria-selected", "true");
   if (!compact) {
     await page.getByRole("button", { name: "Pause run", exact: true }).click();
     await expect(page.getByText("Run 01 · Paused", { exact: true })).toBeVisible();

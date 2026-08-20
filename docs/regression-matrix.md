@@ -19,6 +19,17 @@ This matrix is the minimum proof required before a feature milestone is committe
 
 ## Commit gates
 
+### Selected track-state inspector (#41 slice)
+
+- `tests/frontend-selectors.test.mjs` proves an IAF/PAF picture is selected by
+  the canonical display-frame time and that an absent record stays explicitly
+  unavailable.
+- `tests/component/track-state-inspector.test.tsx` proves the VECTOR inspector
+  consumes a frozen canonical sample, keeps observer-picture selection in UI
+  state, and never substitutes zero-valued track data for an absent sample.
+- `tests/browser/route-authoring.spec.ts` proves the inspector remains visible
+  after a real Worker run at desktop and compact viewports.
+
 1. `make ci-local`
 2. The applicable named target: `make worker-local`, `make frontend-local`,
    `make integration-local`, `make container-verify`,

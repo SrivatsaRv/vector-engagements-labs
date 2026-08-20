@@ -3,9 +3,11 @@ import test from "node:test";
 import {
   selectDisplayFrame,
   selectEntityMetricSeries,
+  selectRecordedTrackState,
 } from "../lib/frontend/selectors.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { simulate } from "../lib/simulation.ts";
+import { buildSidePictures } from "../lib/information-state.ts";
 
 const result = simulate(SCENARIO_LIBRARY[0].scenario);
 
@@ -36,3 +38,19 @@ test("entity metric series use gaps instead of invented zeroes", () => {
   assert.ok(redWeapon.values.every((value) => value === null || Number.isFinite(value)));
 });
 
+test("recorded track selection uses the selected frame identity and fails explicit", () => {
+  const selected = selectDisplayFrame(result, result.frames[3].t);
+  const pictures = buildSidePictures(SCENARIO_LIBRARY[0].scenario, result.frames);
+  const track = selectRecordedTrackState(pictures, selected, "IAF");
+  assert.equal(track.state, "AVAILABLE");
+  assert.equal(track.track.modelTimeSeconds, selected.displayTimeSeconds);
+  assert.equal(track.track.perspective, "IAF");
+
+  const missing = selectRecordedTrackState([], selected, "PAF");
+  assert.deepEqual(missing, {
+    state: "UNAVAILABLE",
+    perspective: "PAF",
+    displayTimeSeconds: selected.displayTimeSeconds,
+    reason: "PICTURE_NOT_RECORDED",
+  });
+});

@@ -938,6 +938,72 @@ a {
 .right-card {
   border-bottom: 1px solid var(--line);
 }
+.compact-track-inspector {
+  display: none;
+}
+.track-perspective-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--line2);
+}
+.track-perspective-tabs button {
+  min-height: 29px;
+  border: 0;
+  border-right: 1px solid var(--line2);
+  background: #fff;
+  color: var(--muted);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.track-perspective-tabs button:last-child { border-right: 0; }
+.track-perspective-tabs button[aria-selected="true"] {
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 700;
+}
+.track-state-data {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin: 0;
+}
+.track-state-data > div {
+  min-width: 0;
+  padding: 7px 10px;
+  border-right: 1px solid var(--line2);
+  border-bottom: 1px solid var(--line2);
+}
+.track-state-data > div:nth-child(even) { border-right: 0; }
+.track-state-data dt {
+  color: var(--muted);
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.track-state-data dd {
+  margin: 3px 0 0;
+  color: var(--ink);
+  font-size: 9px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.track-state-note,
+.track-state-unavailable {
+  margin: 0;
+  padding: 9px 10px;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.45;
+}
+.track-state-unavailable {
+  display: flex;
+  gap: 6px;
+  color: #715f43;
+  background: #faf6ed;
+  border-top: 1px solid #e7ddca;
+}
+.track-state-unavailable svg { flex: 0 0 auto; color: var(--amber); }
 .right-title {
   height: 35px;
   padding: 0 10px;
@@ -1878,6 +1944,10 @@ a {
   .session-left,
   .session-right {
     display: none;
+  }
+  .compact-track-inspector {
+    display: block;
+    border-top: 1px solid var(--line);
   }
   .simulation-column {
     height: calc(100vh - 87px);

@@ -2,7 +2,7 @@ import type {
   EngineEntityDefinition,
   EngineEntityFrame,
 } from "../engine/contracts.ts";
-import type { Frame, SimulationResult } from "../simulation.ts";
+import type { Frame, RaspTrack, SimulationResult } from "../simulation.ts";
 
 export type SelectedDisplayFrame = {
   frame: Frame;
@@ -65,4 +65,46 @@ export function selectEntityMetricSeries(
       current: values[selected.frameIndex] ?? null,
     };
   });
+}
+
+export type SelectedTrackState =
+  | {
+      state: "AVAILABLE";
+      track: RaspTrack;
+      displayTimeSeconds: number;
+    }
+  | {
+      state: "UNAVAILABLE";
+      perspective: "IAF" | "PAF";
+      displayTimeSeconds: number;
+      reason: "PICTURE_NOT_RECORDED";
+    };
+
+/**
+ * Select one recorded, side-owned picture sample for the already selected
+ * frame. This selector never derives a track, position, confidence, or value.
+ */
+export function selectRecordedTrackState(
+  pictures: readonly RaspTrack[],
+  selected: SelectedDisplayFrame,
+  perspective: "IAF" | "PAF",
+): SelectedTrackState {
+  const track = pictures.find(
+    (candidate) =>
+      candidate.perspective === perspective &&
+      candidate.modelTimeSeconds === selected.displayTimeSeconds,
+  );
+  if (!track) {
+    return {
+      state: "UNAVAILABLE",
+      perspective,
+      displayTimeSeconds: selected.displayTimeSeconds,
+      reason: "PICTURE_NOT_RECORDED",
+    };
+  }
+  return {
+    state: "AVAILABLE",
+    track,
+    displayTimeSeconds: selected.displayTimeSeconds,
+  };
 }

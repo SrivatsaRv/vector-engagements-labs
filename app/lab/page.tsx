@@ -32,6 +32,7 @@ import { ScenarioAuthoringMap } from "@/components/ScenarioAuthoringMap";
 import { SimulationScene } from "@/components/SimulationScene";
 import { TacticalSymbol } from "@/components/TacticalSymbol";
 import { ViewportTelemetry } from "@/components/ViewportTelemetry";
+import { TrackStateInspector } from "@/components/TrackStateInspector";
 import {
   canConduct,
   validateScenario,
@@ -90,9 +91,15 @@ import {
   getFrameAt,
   standardAtmosphere,
   type ProfileId,
+  type RaspTrack,
   type Scenario,
   type SimulationResult,
 } from "@/lib/simulation";
+import { buildSidePictures } from "@/lib/information-state";
+import {
+  selectDisplayFrame,
+  selectRecordedTrackState,
+} from "@/lib/frontend/selectors";
 
 type Workspace = "configure" | "run" | "results";
 type PlaybackSurface = "MAP" | "THREE_D";
@@ -110,6 +117,13 @@ const CONFIGURE_STEPS = [
   "Admitted conditions",
   "Validate",
 ];
+
+function freezeRecordedPictures(pictures: RaspTrack[]): readonly RaspTrack[] {
+  return Object.freeze(pictures.map((picture) => Object.freeze({
+    ...picture,
+    position: Object.freeze({ ...picture.position }),
+  })));
+}
 
 function formatDistanceKm(distanceM: number) {
   const kilometers = distanceM / 1000;
@@ -229,6 +243,7 @@ function LabWorkbench({
   const [playbackSurface, setPlaybackSurface] =
     useState<PlaybackSurface>("MAP");
   const [telemetryExpanded, setTelemetryExpanded] = useState(false);
+  const [trackPerspective, setTrackPerspective] = useState<"IAF" | "PAF">("IAF");
 
   useEffect(() => {
     const restore = window.requestAnimationFrame(() => {
@@ -490,7 +505,19 @@ function LabWorkbench({
     return () => window.removeEventListener("keydown", keys);
   }, [result.timeOfFlight, run]);
 
-  const frame = useMemo(() => getFrameAt(result, time), [result, time]);
+  const selectedDisplayFrame = useMemo(
+    () => selectDisplayFrame(result, time),
+    [result, time],
+  );
+  const frame = selectedDisplayFrame.frame;
+  const recordedPictures = useMemo(
+    () => freezeRecordedPictures(buildSidePictures(scenario, result.frames)),
+    [result.frames, scenario],
+  );
+  const selectedTrackState = useMemo(
+    () => selectRecordedTrackState(recordedPictures, selectedDisplayFrame, trackPerspective),
+    [recordedPictures, selectedDisplayFrame, trackPerspective],
+  );
   const addObservation = () =>
     setEvents((items) => [
       ...items,
@@ -835,9 +862,21 @@ function LabWorkbench({
               result={result}
               time={time}
             />
+            <div className="compact-track-inspector">
+              <TrackStateInspector
+                selected={selectedTrackState}
+                perspective={trackPerspective}
+                onPerspectiveChange={setTrackPerspective}
+              />
+            </div>
           </section>
           <aside className="session-right">
             <Outcome result={result} />
+            <TrackStateInspector
+              selected={selectedTrackState}
+              perspective={trackPerspective}
+              onPerspectiveChange={setTrackPerspective}
+            />
             {comparison ? (
               <Comparison scenario={scenario} data={comparison} />
             ) : (
