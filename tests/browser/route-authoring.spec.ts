@@ -111,6 +111,10 @@ test("route inputs fail visibly, recover, and drive the real Worker run", async 
   await page.route("**/api/catalog", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
   );
+  // Tile transport has its own bounded cache contract. This journey exercises
+  // the real MapLibre canvas/markers/resize path without coupling every
+  // viewport to the tile proxy's network sockets.
+  await page.route("**/api/map-tile?**", (route) => route.abort());
 
   await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided");
   await expect(page.locator(".catalog-state.POSTGIS")).toHaveText("PostGIS catalog connected");
