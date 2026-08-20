@@ -83,3 +83,19 @@ existing semantic tag in reviewed `main` history. They run the full gate,
 generate checksums and an SPDX SBOM, and attest archives before protected
 publication. Production deploys accept only a full commit SHA in `origin/main`
 history and require the workflow itself to be dispatched from `main`.
+
+## Browser response baseline
+
+`browser-response-policy.v1` applies the same response headers at the
+Cloudflare Worker boundary and the Node production server. The policy sets a
+self-only default source, denies framing and plugin objects, prevents MIME
+sniffing, limits referrers, and disables unused browser permissions. The
+headers are tested on built Worker and Node HTML responses; source inspection
+alone is not evidence.
+
+The current framework produces inline bootstrap and style payloads. Therefore
+the baseline explicitly permits inline script and style content and does not
+claim to prevent inline-script injection. Repository content must continue to
+use structural rendering and text nodes. A later #70 slice must inventory the
+approved payloads and replace these allowances with a tested nonce/hash CSP
+before future operator-authored content is admitted.
