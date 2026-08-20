@@ -19,6 +19,14 @@ adapter that cannot enforce its declared limiter rejects the request with
 `rate_limit_unavailable`; it must not fall back to unlimited access. Rate-limit
 rejections use `rate_limit_exceeded` and include `Retry-After`.
 
+`/api/health` is an admission-readiness check. It reports the non-secret
+policy version, runtime adapter, limiter identity, and `ready` state only after
+the deployment has configured the required limiter backend. A missing Node
+database URL or either Cloudflare limiter binding returns
+`rate_limit_unavailable` with HTTP 503. The normal health database query then
+proves the configured backing store is reachable; it does not expose a
+connection string, client identity, or limiter state.
+
 Node accepts only the Cloudflare canonical client-IP header when that header is
 provided by the edge. A direct Node deployment has no trusted peer-address
 adapter yet, so anonymous callers share one conservative budget rather than

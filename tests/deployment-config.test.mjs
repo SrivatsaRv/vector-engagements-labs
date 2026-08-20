@@ -134,9 +134,10 @@ test("catalog credibility is admitted as one immutable database/API/UI chain", a
 });
 
 test("Worker database adapter consumes the generated Hyperdrive binding", async () => {
-  const [viteConfig, databaseAdapter] = await Promise.all([
+  const [viteConfig, databaseAdapter, runtimeBuilder] = await Promise.all([
     read("vite.config.ts"),
     read("db/index.ts"),
+    read("scripts/build-runtime-bundles.mjs"),
   ]);
 
   assert.match(viteConfig, /binding: "HYPERDRIVE"/);
@@ -161,6 +162,12 @@ test("Worker database adapter consumes the generated Hyperdrive binding", async 
     "local builds need nodejs_compat while vinext deploy must not duplicate it",
   );
   assert.match(databaseAdapter, /runtime\.HYPERDRIVE\?\.connectionString/);
+  assert.match(
+    databaseAdapter,
+    /new URL\("\.\.\/\.\.\/node-postgres\.mjs", import\.meta\.url\)\.href/,
+    "Node admission must resolve its generated adapter beside the built server bundle",
+  );
+  assert.match(runtimeBuilder, /dist\/server\/node-postgres\.mjs/);
 });
 
 test("public environment example contains placeholders, not production values", async () => {
