@@ -9,6 +9,7 @@ import {
 } from "@/lib/simulation";
 import type { EngineEntityFrame } from "@/lib/engine/contracts";
 import { cameraRelativeThreePosition } from "@/lib/geospatial/geodesy";
+import { selectObserverEntityPresentation } from "@/lib/frontend/selectors";
 
 type Props = {
   result: SimulationResult;
@@ -367,10 +368,19 @@ export function SimulationScene({ result, time, layers, raspTrack, layoutRevisio
           current.scene.add(groundMarker);
         }
 
-        let position = entity.position;
-        if (raspTrack && entity.id === raspTrack.observedEntityId && raspTrack.visible) {
-          position = raspTrack.position;
+        const observerPresentation = selectObserverEntityPresentation(raspTrack, entity.id);
+        if (observerPresentation.state === "HIDDEN") {
+          symbol.visible = false;
+          current.paths.get(entity.id)!.visible = false;
+          current.groundPaths.get(entity.id)!.visible = false;
+          current.altitudeCurtains.get(entity.id)!.visible = false;
+          current.altitudeStems.get(entity.id)!.visible = false;
+          current.groundMarkers.get(entity.id)!.visible = false;
+          continue;
         }
+        const position = observerPresentation.state === "ESTIMATED"
+          ? observerPresentation.position
+          : entity.position;
         symbol.position.copy(point(position));
         const isWeapon = entity.id === result.engineRun.primaryWeaponId;
         const isTarget = entity.id === result.engineRun.primaryTargetId;
@@ -458,8 +468,8 @@ export function SimulationScene({ result, time, layers, raspTrack, layoutRevisio
         ]);
       }
       current.lineOfSight.visible = layers.lineOfSight && Boolean(primaryWeapon && primaryTarget);
-      current.uncertainty.visible = Boolean(raspTrack?.visible);
-      if (raspTrack?.visible) {
+      current.uncertainty.visible = Boolean(raspTrack?.visible && raspTrack.position);
+      if (raspTrack?.visible && raspTrack.position) {
         current.uncertainty.position.copy(point(raspTrack.position));
         current.uncertainty.scale.setScalar(Math.max(350, raspTrack.uncertaintyMeters));
       }

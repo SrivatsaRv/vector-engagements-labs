@@ -192,9 +192,10 @@ export function buildTrackFeatures(
 export function buildDirectionVectorFeatures(
   frame: { entities: EngineEntityFrame[]; geographicPositions?: RecordedGeographicPosition[] },
   origin: MapOrigin,
+  hiddenEntityId?: string,
 ) {
   return frame.entities
-    .filter((entity) => entity.lifecycle !== "STOWED")
+    .filter((entity) => entity.lifecycle !== "STOWED" && entity.id !== hiddenEntityId)
     .map((entity) => {
       const lengthSeconds = entity.kind === "GUIDED_WEAPON" ? 5 : 12;
       return {

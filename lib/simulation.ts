@@ -213,7 +213,11 @@ export type RaspTrack = {
   ageSeconds: number;
   confidence: number;
   uncertaintyMeters: number;
-  position: Vec3;
+  /**
+   * Side-owned position estimate. It is absent when this observer has no
+   * admitted track; consumers must not substitute a zero or world-truth value.
+   */
+  position?: Vec3;
   observedEntityId: string;
   visible: boolean;
   status: "TRACKING" | "DEGRADED" | "COASTING" | "NO_TRACK";

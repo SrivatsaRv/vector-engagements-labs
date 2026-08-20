@@ -106,6 +106,8 @@ test("map contract produces installations, routes, launch, tracks and vectors fr
   const vectors = buildDirectionVectorFeatures(frame, origin);
   assert.equal(vectors.length, frame.entities.filter((entity) => entity.lifecycle !== "STOWED").length);
   assert.ok(vectors.every((feature) => feature.geometry.coordinates.length === 2));
+  const withoutRedVector = buildDirectionVectorFeatures(frame, origin, "red-object-1");
+  assert.equal(withoutRedVector.some((feature) => feature.properties.entityId === "red-object-1"), false);
 });
 
 test("air-defence coverage layers retain owner, kind, altitude and provenance", () => {
