@@ -27,9 +27,11 @@ binds its schema and digest in `manifest.json`.
   deployment. Rust/WASM remains independently executable for parity verification
   and can replace TypeScript only through a reviewed manifest change after its
   server packaging is admitted.
-- Terrain, causal sensors, data link, AEW and EW are not admitted. The product
-  does not expose their controls, RASP selector, observer-track layers, or saved
-  observer tracks. It shows an explicit unavailable state instead.
+- The bounded TypeScript SensorState → Observation → TrackState model and its
+  compatible radar-jamming measurement effect are admitted. Saved records carry
+  observer pictures. Data link and AEW remain disabled because no admitted
+  sender-side observation/message path exists; they fail closed rather than
+  injecting a track. Terrain interaction remains disabled.
 - Tactical policy is not admitted. The product does not expose defensive-turn,
   g-demand, or team-decision controls; authored route following remains the
   admitted aircraft-motion authority.

@@ -1,52 +1,63 @@
-# VECTOR RASP State Machine
+# VECTOR information-state contract
 
-VECTOR separates the engine's model truth from each side's estimated air picture. RASP controls never move a truth entity unless this document explicitly assigns an engine effect.
+Status: first deterministic TypeScript information-state slice for #26. It is
+an educational measurement model, not a claim about a named radar, data link,
+or jammer.
 
-## Current state contract
+## Authority and separation
 
-| Input | Availability rule | Visible consequence | Engine consequence |
-| --- | --- | --- | --- |
-| Onboard radar | Own radar active and opposing aircraft within the 120 km educational sensor boundary | Opposing-aircraft track, status, uncertainty, age and identification | None |
-| Data link | Own tactical data link available | Injected off-board opposing-aircraft track | None; weapon-update cadence is a separate Blue Team decision |
-| Airborne early warning | Own tactical data link available | Higher-quality injected off-board opposing-aircraft track | None; no AEW aircraft or sensor entity is spawned yet |
-| Visual contact | Opposing aircraft inside `min(18 km, selected visibility)` | Short-range visual track | None |
-| Own radar active/silent | Gates only an onboard-radar source | Track present or `NO_TRACK` | None |
-| Own data link available/unavailable | Gates data-link and AEW sources | Track present or `NO_TRACK` | None |
-| Opposing jammer on/off | Subtracts 17 points from VECTOR's track-quality index | Larger uncertainty and potentially degraded/coasting status | None |
-| Blue Team decision | Always available | Decision appears in run and report | Changes Blue aircraft maneuver and weapon-update cadence |
-| Red Team decision | Always available | Decision appears in run and report | Scales Red aircraft maneuver demand |
+The engine records WorldTruth frames. `lib/information-state.ts` consumes a
+frame only to create a side-owned `Observation`; it then derives `TrackState`
+and an observer `RaspTrack`. The RASP read model contains no truth-position
+field. Rendering consumes only the recorded observer picture when that view is
+selected. A UI setting cannot create a track.
 
-The current track-quality index is an educational VECTOR state variable. It is not detection probability, intelligence confidence, or a measured sensor-performance value.
+## Admitted model
 
-The workbench does not provide a track-interruption control. The engine does not
-accept a guidance-hold event. A future update-loss study must use the typed
-observation, track, and weapon-support contracts owned by issues #26 and #28.
+`vector.a2a-information-study.v1@1.0.0` schedules a scan each 1 s. Its
+declared public-educational assumptions are an 80 km maximum radar measurement
+range, a 1 km minimum range, a 4 s coast interval, two observations to confirm
+a track, a 150 m measurement floor, and range-proportional uncertainty. The
+model ID, units, limitations, and constants are exported from the information
+module and tests. They are not named-platform performance values.
 
-## Source state transitions
+Compatible opposing jamming scales the admitted radar measurement range and
+increases covariance from the same model. It does not move a truth entity,
+write an icon-only state, or affect weapon guidance. Terrain, waveform,
+probability-of-detection, false targets, AEW entities and operational support
+remain outside this slice.
+
+## State transitions
 
 ```text
-SOURCE SELECTED
-  ├─ required entity absent ───────────────> NO_TRACK / NO_OBSERVED_ENTITY
-  ├─ onboard radar + radar silent ─────────> NO_TRACK / RADAR_SILENT
-  ├─ onboard radar + range > 120 km ───────> NO_TRACK / RADAR_OUT_OF_RANGE
-  ├─ data link or AEW + link unavailable ──> NO_TRACK / DATALINK_UNAVAILABLE
-  ├─ visual + beyond visibility boundary ──> NO_TRACK / BEYOND_VISUAL_RANGE
-  └─ source available
-       ├─ quality >= 60 ───────────────────> TRACKING
-       ├─ quality >= 30 ───────────────────> DEGRADED
-       └─ quality < 30 ────────────────────> COASTING
+OFF/STANDBY/SEARCH -> scan due -> Observation -> PLOT -> CONFIRMED
+no observation after a track -> COASTING -> LOST
+missing sensor capability -> UNSUPPORTED
+radar silent / outside range -> NONE (or COASTING while a previous observation is fresh)
 ```
 
-## Regression matrix
+`SensorState` values are `OFF`, `STANDBY`, `SEARCH`, `ACQUIRE`, `TRACK`,
+`SUPPORT`, `DEGRADED`, and `FAILED`. `TrackState` values are `NONE`, `PLOT`,
+`TENTATIVE`, `CONFIRMED`, `COASTING`, `LOST`, and `UNSUPPORTED`.
 
-The automated matrix is generated in `tests/rasp-state-machine.test.mjs` and covers:
+Data-link and AEW selections fail closed as `DATALINK_SOURCE_UNAVAILABLE`
+until a sender-side observation and an admitted typed message path exist. A
+link checkbox never injects truth. Weapon support remains unavailable pending
+#28's versioned support interface.
 
-- 2 perspectives × 4 sources × 2 radar modes × 2 data-link states × 2 jammer states at far and near geometry;
-- source dependency invariants for IAF and PAF independently;
-- visual-acquisition boundaries immediately below, at and above selected visibility;
-- radar boundary immediately below, at and above 120 km;
-- 5 Blue decisions × 4 Red decisions for deterministic, finite frames and declared motion/guidance effects;
-- isolation: a side's radar and data link cannot change the other side's picture; only the opposing jammer may degrade it;
-- truth invariance: RASP-only controls cannot move model-truth entities or alter the engagement outcome.
+## Record and parity boundary
 
-Any future sensor, AEW, IADS or electronic-warfare behavior must first add an explicit state transition here, then add a failing regression row, before adding a visible control.
+VSR `pictures.jsonl` records each observer sample with owner, source,
+timestamp, uncertainty, transition state and reason. The information derivation
+is a TypeScript record/read-model adapter, outside the Rust integrator's current
+physics-parity surface. #26 remains open for the Rust/Worker implementation,
+typed datalink transport, terrain LOS, weapon-support interface, UI RASP view,
+and performance/browser evidence.
+
+## Regression evidence
+
+`tests/rasp-state-machine.test.mjs` proves scan/confirmation, exact range
+boundary, radar-silent contrast, EW range/covariance contrast, deterministic
+output, absence of truth-position leakage, and fail-closed off-board sources.
+`tests/vector-record.test.mjs` proves admitted observer pictures survive VSR
+round-trip without a physics rerun.

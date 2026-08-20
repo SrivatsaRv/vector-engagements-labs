@@ -7,13 +7,13 @@ import type {
 } from "../engine/contracts.ts";
 import { sha256Bytes } from "../runtime/digest.ts";
 import {
-  buildRaspTrack,
   buildSimulationResult,
   type PreparedSimulation,
   type RaspTrack,
   type Scenario,
   type SimulationResult,
 } from "../simulation.ts";
+import { buildSidePictures } from "../information-state.ts";
 import { isOptionalCapabilityEnabled } from "../runtime/deployment-capabilities.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
@@ -448,10 +448,11 @@ function recordPictures(prepared: PreparedSimulation, result: SimulationResult) 
   ) {
     return [];
   }
-  return result.frames.flatMap((frame) => [
-    buildRaspTrack(prepared.scenario, frame, "IAF"),
-    buildRaspTrack(prepared.scenario, frame, "PAF"),
-  ]);
+  return buildSidePictures(
+    prepared.scenario,
+    result.frames,
+    prepared.capabilityManifest,
+  );
 }
 
 async function member(

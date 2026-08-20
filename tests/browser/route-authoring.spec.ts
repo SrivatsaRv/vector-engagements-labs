@@ -139,13 +139,21 @@ test("route inputs fail visibly, recover, and drive the real Worker run", async 
   await speed.press("Enter");
   if (compact) {
     await page.getByRole("button", { name: /Next: Admitted conditions/i }).click();
-    await expect(page.getByText(/Information and tactical-policy controls are unavailable/i)).toBeVisible();
+    await expect(
+      page.getByText(
+        /Sensor, (EW|electronic-warfare), and tactical-policy controls (are|remain) unavailable/i,
+      ),
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: /IAF radar/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Defensive turn/i })).toHaveCount(0);
     await page.getByRole("button", { name: /Next: Validate/i }).click();
   } else {
     await page.getByRole("button", { name: "4 Admitted conditions" }).click();
-    await expect(page.getByText(/Information and tactical-policy controls are unavailable/i)).toBeVisible();
+    await expect(
+      page.getByText(
+        /Sensor, (EW|electronic-warfare), and tactical-policy controls (are|remain) unavailable/i,
+      ),
+    ).toBeVisible();
     await expect(page.getByRole("button", { name: /IAF radar/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Defensive turn/i })).toHaveCount(0);
     await page.getByRole("button", { name: "5 Validate" }).click();
