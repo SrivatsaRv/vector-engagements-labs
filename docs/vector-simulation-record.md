@@ -54,6 +54,10 @@ formula version. Map/3D projection is never persisted as model truth.
 The current aircraft sample also records the active route-point index, requested
 velocity, accepted steering acceleration, achieved velocity, limiter state,
 installed-store mass, and the sorted identities of installed stores.
+Weapon samples additionally record the closed achieved `weaponFlightState`
+(`BOOST`, `COAST`, `TERMINAL_GUIDANCE`, or `TARGET_UNAVAILABLE` after launch).
+This is distinct from free-text presentation phase and does not imply seeker or
+support availability.
 The columnar frame codec preserves these values so replay and live playback use
 the same control evidence without rerunning the engine.
 

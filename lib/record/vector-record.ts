@@ -178,6 +178,7 @@ type EntityMetadata = Pick<
   | "symbolRole"
   | "lifecycle"
   | "phase"
+  | "weaponFlightState"
   | "valueState"
 >;
 
@@ -271,6 +272,9 @@ export function encodeColumnarFrames(frames: EngineFrame[]): Uint8Array {
       symbolRole: entity.symbolRole,
       lifecycle: entity.lifecycle,
       phase: entity.phase,
+      ...(entity.weaponFlightState
+        ? { weaponFlightState: entity.weaponFlightState }
+        : {}),
       valueState: entity.valueState,
       installedStoreIds: entity.installedStoreIds,
       ...(entity.aircraftControl

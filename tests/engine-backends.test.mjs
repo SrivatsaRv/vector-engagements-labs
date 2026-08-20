@@ -81,8 +81,8 @@ for (const definition of SCENARIO_LIBRARY) {
       close(rustFrame.range, typescriptFrame.range, 1e-6, `frame ${frameIndex} range`);
       close(rustFrame.speed, typescriptFrame.speed, 1e-6, `frame ${frameIndex} speed`);
       assert.deepEqual(
-        rustFrame.entities.map((entity) => [entity.id, entity.lifecycle, entity.phase]),
-        typescriptFrame.entities.map((entity) => [entity.id, entity.lifecycle, entity.phase]),
+        rustFrame.entities.map((entity) => [entity.id, entity.lifecycle, entity.phase, entity.weaponFlightState]),
+        typescriptFrame.entities.map((entity) => [entity.id, entity.lifecycle, entity.phase, entity.weaponFlightState]),
       );
       assert.deepEqual(
         rustFrame.geographicPositions.map((item) => item.entityId),

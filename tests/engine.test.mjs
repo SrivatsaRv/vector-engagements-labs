@@ -136,7 +136,27 @@ test("generic engine updates every spawned entity deterministically", () => {
   const firstWeapon = first.frames[0].entities.find((item) => item.id === "weapon-blue");
   const lastWeapon = first.frames.at(-1).entities.find((item) => item.id === "weapon-blue");
   assert.ok(lastWeapon.massKg < firstWeapon.massKg);
+  assert.equal(firstWeapon.weaponFlightState, "BOOST");
   assert.ok(first.closestApproachM < 10000);
+});
+
+test("weapon flight state is a closed achieved-state contract", () => {
+  const scenario = admitTestAircraft(testScenario());
+  scenario.durationSeconds = 8;
+  const run = runEngine(scenario);
+  const states = new Set(
+    run.frames
+      .flatMap((frame) => frame.entities)
+      .filter((entity) => entity.id === "weapon-blue")
+      .map((entity) => entity.weaponFlightState),
+  );
+  assert.deepEqual([...states].sort(), ["BOOST", "COAST", "TERMINAL_GUIDANCE"]);
+  assert.ok(
+    run.frames
+      .flatMap((frame) => frame.entities)
+      .filter((entity) => entity.kind !== "GUIDED_WEAPON")
+      .every((entity) => entity.weaponFlightState === undefined),
+  );
 });
 
 test("engine rejects removed and malformed runtime events", () => {

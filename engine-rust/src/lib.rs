@@ -140,6 +140,22 @@ pub enum EntityLifecycle {
     Terminated,
 }
 
+/// Achieved propulsion/guidance stage. Seeker and support state are not
+/// emitted until the typed #26/#28 information interface is admitted.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+pub enum WeaponFlightState {
+    #[serde(rename = "STOWED")]
+    Stowed,
+    #[serde(rename = "BOOST")]
+    Boost,
+    #[serde(rename = "COAST")]
+    Coast,
+    #[serde(rename = "TERMINAL_GUIDANCE")]
+    TerminalGuidance,
+    #[serde(rename = "TARGET_UNAVAILABLE")]
+    TargetUnavailable,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Maneuver {
@@ -465,6 +481,8 @@ pub struct EntityFrame {
     pub store_mass_kg: f64,
     pub installed_store_ids: Vec<String>,
     pub phase: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weapon_flight_state: Option<WeaponFlightState>,
     pub value_state: ModelValueState,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aircraft_control: Option<AircraftControlFrame>,
@@ -536,6 +554,7 @@ struct RuntimeState {
     drag_newtons: f64,
     thrust_newtons: f64,
     phase: String,
+    weapon_flight_state: Option<WeaponFlightState>,
     route_point_index: usize,
     aircraft_control: Option<AircraftControlFrame>,
     last_guidance_acceleration: Vec3,
@@ -573,6 +592,11 @@ impl RuntimeState {
                 "Initial state"
             }
             .to_string(),
+            weapon_flight_state: if definition.kind == EntityKind::GuidedWeapon {
+                Some(WeaponFlightState::Stowed)
+            } else {
+                None
+            },
             route_point_index: usize::from(starts_at_first_route_point),
             aircraft_control: None,
             last_guidance_acceleration: Vec3::default(),
@@ -771,6 +795,7 @@ fn activate_weapons(states: &mut [RuntimeState], time: f64) {
         }
         states[index].lifecycle = EntityLifecycle::Active;
         states[index].phase = "Launched".to_string();
+        states[index].weapon_flight_state = Some(WeaponFlightState::Boost);
     }
 }
 
@@ -794,6 +819,7 @@ fn update_weapon(
     else {
         states[index].lifecycle = EntityLifecycle::Terminated;
         states[index].phase = "Target unavailable".to_string();
+        states[index].weapon_flight_state = Some(WeaponFlightState::TargetUnavailable);
         return;
     };
     if target.lifecycle == EntityLifecycle::Terminated {
@@ -912,6 +938,13 @@ fn update_weapon(
         "Midcourse guidance"
     }
     .to_string();
+    state.weapon_flight_state = Some(if burning {
+        WeaponFlightState::Boost
+    } else if terminal {
+        WeaponFlightState::TerminalGuidance
+    } else {
+        WeaponFlightState::Coast
+    });
 }
 
 fn entity_frame(state: &RuntimeState, scenario: &EngineScenario) -> EntityFrame {
@@ -942,6 +975,7 @@ fn entity_frame(state: &RuntimeState, scenario: &EngineScenario) -> EntityFrame 
         store_mass_kg: state.store_mass_kg,
         installed_store_ids: state.installed_store_ids.clone(),
         phase: state.phase.clone(),
+        weapon_flight_state: state.weapon_flight_state,
         value_state: state.definition.provenance.value_state,
         aircraft_control: state.aircraft_control.clone(),
     }
