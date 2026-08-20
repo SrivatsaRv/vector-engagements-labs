@@ -46,6 +46,14 @@ export type EntityLifecycle =
   | "ENGAGING"
   | "TERMINATED";
 
+/** Achieved propulsion/guidance stage; not a seeker or support claim. */
+export type WeaponFlightState =
+  | "STOWED"
+  | "BOOST"
+  | "COAST"
+  | "TERMINAL_GUIDANCE"
+  | "TARGET_UNAVAILABLE";
+
 export type ModelValueState =
   | "SOURCED"
   | "MODEL_ASSUMPTION"
@@ -194,6 +202,7 @@ export type EngineEntityFrame = {
   storeMassKg: number;
   installedStoreIds: string[];
   phase: string;
+  weaponFlightState?: WeaponFlightState;
   valueState: ModelValueState;
   aircraftControl?: {
     routePointIndex: number | null;

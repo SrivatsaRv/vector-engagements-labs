@@ -5,6 +5,7 @@ import type {
   EngineEntityFrame,
   EngineRun,
   EngineScenario,
+  WeaponFlightState,
 } from "./contracts.ts";
 import type { Vec3 } from "./primitives.ts";
 import {
@@ -34,6 +35,7 @@ type RuntimeState = {
   dragNewtons: number;
   thrustNewtons: number;
   phase: string;
+  weaponFlightState?: WeaponFlightState;
   routePointIndex: number;
   aircraftControl?: NonNullable<EngineEntityFrame["aircraftControl"]>;
   lastGuidanceAcceleration: Vec3;
@@ -62,6 +64,8 @@ function initialState(definition: EngineEntityDefinition): RuntimeState {
     dragNewtons: 0,
     thrustNewtons: 0,
     phase: definition.lifecycle === "STOWED" ? "Stowed" : "Initial state",
+    weaponFlightState:
+      definition.kind === "GUIDED_WEAPON" ? "STOWED" : undefined,
     routePointIndex: startsAtFirstRoutePoint ? 1 : 0,
     lastGuidanceAcceleration: { x: 0, y: 0, z: 0 },
     lastGuidanceUpdateSeconds: Number.NEGATIVE_INFINITY,
@@ -234,6 +238,7 @@ function activateWeapon(
   }
   state.lifecycle = "ACTIVE";
   state.phase = "Launched";
+  state.weaponFlightState = "BOOST";
 }
 
 function updateWeapon(
@@ -249,6 +254,7 @@ function updateWeapon(
   if (!target || target.lifecycle === "TERMINATED") {
     state.lifecycle = "TERMINATED";
     state.phase = "Target unavailable";
+    state.weaponFlightState = "TARGET_UNAVAILABLE";
     return;
   }
 
@@ -380,6 +386,11 @@ function updateWeapon(
     : terminalGuidance
       ? "Terminal guidance"
       : "Midcourse guidance";
+  state.weaponFlightState = burning
+    ? "BOOST"
+    : terminalGuidance
+      ? "TERMINAL_GUIDANCE"
+      : "COAST";
 }
 
 function toFrame(
@@ -415,6 +426,9 @@ function toFrame(
     storeMassKg: state.storeMassKg,
     installedStoreIds: [...state.installedStoreIds].sort(),
     phase: state.phase,
+    ...(state.weaponFlightState
+      ? { weaponFlightState: state.weaponFlightState }
+      : {}),
     valueState: state.definition.provenance.valueState,
     ...(state.aircraftControl
       ? { aircraftControl: structuredClone(state.aircraftControl) }

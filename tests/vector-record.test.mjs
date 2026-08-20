@@ -22,6 +22,12 @@ test("columnar frame transport round-trips exact engine frames", () => {
   const result = simulate(scenario);
   const bytes = encodeColumnarFrames(result.engineRun.frames);
   assert.deepEqual(decodeColumnarFrames(bytes), result.engineRun.frames);
+  assert.ok(
+    decodeColumnarFrames(bytes)
+      .flatMap((frame) => frame.entities)
+      .some((entity) => entity.weaponFlightState === "BOOST"),
+    "weapon lifecycle evidence must survive VSR encoding",
+  );
   assert.ok(bytes.byteLength > 0);
 });
 

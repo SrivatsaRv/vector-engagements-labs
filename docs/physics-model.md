@@ -18,6 +18,13 @@ Vector currently uses a deterministic three-dimensional point-mass reference eng
 - governed wind-shift events;
 - closest approach, completion, energy/time termination, non-finite-state checks, and dry-mass margin diagnostics.
 
+Weapon frames carry a closed achieved flight-state value: `STOWED`, `BOOST`,
+`COAST`, `TERMINAL_GUIDANCE`, or `TARGET_UNAVAILABLE`. It is derived by the
+engine from launch/lifecycle and propulsion/guidance conditions and is replayed
+unchanged by consumers. It is not a seeker, target-track, data-link, or support
+claim. Typed seeker and support state remains blocked on the #26/#28 interface
+and must fail closed rather than being inferred from a weapon name or truth.
+
 The current scalar coefficients remain in versioned `simulation_models` rows for
 catalog delivery and are also compiled into the immutable
 `vector.compiled-model-pack.v1` regression fixture. Public source assertions,
