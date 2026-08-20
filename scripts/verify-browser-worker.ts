@@ -7,7 +7,10 @@ import { chromium } from "playwright-core";
 import { adaptPreparedSimulation } from "../lib/runtime/model-pack-adapter.ts";
 import { prepareSimulation } from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
-import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
+import {
+  DEPLOYMENT_CAPABILITIES,
+  createVerificationDeploymentCapabilities,
+} from "../lib/runtime/deployment-capabilities.ts";
 import { createPhaseAEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
 import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import { getStudyArea, getWeatherPreset } from "../lib/study-areas.ts";
@@ -16,6 +19,8 @@ import { resolveBrowserWorkerAssets } from "./browser-worker-assets.ts";
 type RuntimeMessage = {
   type: string;
   state: string;
+  code?: string;
+  message?: string;
   backend: "typescript" | "rust-wasm";
   recordId: string;
   boundaryCalls: number;
@@ -23,17 +28,8 @@ type RuntimeMessage = {
   recordBuffer: ArrayBuffer;
 };
 
-type ParitySample = {
-  t: number;
-  separationM: number;
-  speedMps: number;
-  position: number[];
-  lifecycle: string;
-  phase: string;
-};
-
 type WorkerVerificationResult = {
-  backend: "typescript" | "rust-wasm";
+  backend: typeof DEPLOYMENT_CAPABILITIES.engine.id;
   recordId: string;
   boundaryCalls: number;
   byteLength: number;
@@ -42,7 +38,7 @@ type WorkerVerificationResult = {
   mainThreadTurns: number;
   wallMs: number;
   frameCount: number;
-  paritySamples: ParitySample[];
+  staleAdmissionError: string;
   transferredByteLength: number;
   detachedAfterRecycle: boolean;
 };
@@ -80,17 +76,16 @@ const chromePath =
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const browser = await chromium.launch({ executablePath: chromePath, headless: true });
 
-const packs = await Promise.all(
-  (["typescript", "rust-wasm"] as const).map(async (backend) => {
-    const scenario = SCENARIO_LIBRARY[0].scenario;
-    const capabilities = createVerificationDeploymentCapabilities(backend);
-    return {
-      backend,
-      pack: await adaptPreparedSimulation(
-        prepareSimulation(scenario, scenario.profile, capabilities),
-      ),
-    };
-  }),
+const scenario = SCENARIO_LIBRARY[0].scenario;
+const pack = await adaptPreparedSimulation(
+  prepareSimulation(scenario, scenario.profile, DEPLOYMENT_CAPABILITIES),
+);
+const stalePack = await adaptPreparedSimulation(
+  prepareSimulation(
+    scenario,
+    scenario.profile,
+    createVerificationDeploymentCapabilities(DEPLOYMENT_CAPABILITIES.engine.id),
+  ),
 );
 const phaseAArea = getStudyArea("north-punjab");
 const phaseAPack = createPhaseAEnvironmentPack({
@@ -136,12 +131,10 @@ try {
   const environmentSamples = environmentVerification.samples as Array<{ terrain: { elevation: { datum: string; valueM: number } } }>;
   assert.equal(environmentSamples[0]?.terrain.elevation.datum, "MSL");
   assert.equal(environmentSamples[0]?.terrain.elevation.valueM, phaseAArea.surfaceElevationM);
-  const results: WorkerVerificationResult[] = [];
-  for (const { pack } of packs) {
-    const result = await page.evaluate(
-      async ({ pack: selectedPack, workerUrl }) => {
+  const result: WorkerVerificationResult = await page.evaluate(
+      async ({ pack: selectedPack, stalePack: rejectedPack, workerUrl }) => {
         const protocol = "vector.browser-runtime.v1";
-        const worker = new Worker(workerUrl, { type: "module" });
+        const worker = new Worker(workerUrl, { name: "vector-simulation-runtime" });
         const states: string[] = [];
         let mainThreadTurns = 0;
         const startedAt = performance.now();
@@ -162,6 +155,16 @@ try {
             const receive = (event: MessageEvent) => {
               const message = event.data as RuntimeMessage;
               if (message?.state) states.push(message.state);
+              if (message?.type === "failed") {
+                clearTimeout(timeout);
+                worker.removeEventListener("message", receive);
+                rejectWait(
+                  new Error(
+                    `Worker verification failed: ${message.code ?? "unknown"}: ${message.message ?? "No message."}`,
+                  ),
+                );
+                return;
+              }
               if (!accept(message)) return;
               clearTimeout(timeout);
               worker.removeEventListener("message", receive);
@@ -172,6 +175,14 @@ try {
         const initialized = waitFor((message) => message.type === "initialized");
         send({ requestId: "initialize", type: "initialize" });
         await initialized;
+        const staleAdmission = waitFor(
+          (message) => message.type === "model-pack-loaded",
+        );
+        send({ requestId: "stale-load", type: "load-model-pack", pack: rejectedPack });
+        const staleAdmissionError = await staleAdmission.then(
+          () => "unexpected model-pack admission",
+          (error: Error) => error.message,
+        );
         const loaded = waitFor((message) => message.type === "model-pack-loaded");
         send({ requestId: "load", type: "load-model-pack", pack: selectedPack });
         await loaded;
@@ -235,44 +246,6 @@ try {
           }>;
           entities: Array<{ id: string; lifecycle: string; phase: string }>;
         };
-        const numeric = new DataView(
-          frames.buffer,
-          frames.byteOffset + 12 + frameHeaderLength,
-        );
-        const numericValue = (column: string, entityIndex: number) =>
-          numeric.getFloat64(
-            (frameHeader.columns.indexOf(column) * frameHeader.entities.length +
-              entityIndex) *
-              Float64Array.BYTES_PER_ELEMENT,
-            true,
-          );
-        const checkpointIndexes = [
-          0,
-          Math.floor(frameHeader.frames.length / 2),
-          frameHeader.frames.length - 1,
-        ];
-        const paritySamples = checkpointIndexes.map((frameIndex) => {
-          const frame = frameHeader.frames[frameIndex];
-          const entityIndex = frameHeader.entities.findIndex(
-            (entity, index) =>
-              index >= frame.entityOffset &&
-              index < frame.entityOffset + frame.entityCount &&
-              entity.id === frame.primaryWeaponId,
-          );
-          if (entityIndex < 0) throw new Error("Primary weapon sample is missing.");
-          return {
-            t: frame.t,
-            separationM: frame.separationM,
-            speedMps: numericValue("speedMps", entityIndex),
-            position: [
-              numericValue("positionX", entityIndex),
-              numericValue("positionY", entityIndex),
-              numericValue("positionZ", entityIndex),
-            ],
-            lifecycle: frameHeader.entities[entityIndex].lifecycle,
-            phase: frameHeader.entities[entityIndex].phase,
-          };
-        });
         const transferredByteLength = completion.recordBuffer.byteLength;
         worker.postMessage(
           {
@@ -295,53 +268,27 @@ try {
           mainThreadTurns,
           wallMs: performance.now() - startedAt,
           frameCount: frameHeader.frames.length,
-          paritySamples,
+          staleAdmissionError,
           transferredByteLength,
           detachedAfterRecycle,
         };
       },
-      { pack, workerUrl: `${origin}/assets/${workerName}` },
+      { pack, stalePack, workerUrl: `${origin}/assets/${workerName}` },
     );
-    results.push(result);
-  }
 
-  for (const result of results) {
-    assert.match(result.recordId, /^[a-f0-9]{64}$/);
-    assert.equal(result.magic, "VECTOR1\0");
-    assert.ok(result.byteLength > 1_000);
-    assert.ok(result.states.includes("ready"));
-    assert.ok(result.states.includes("running"));
-    assert.ok(result.states.includes("completed"));
-    assert.ok(result.mainThreadTurns > 0, "main thread did not remain responsive");
-    assert.ok(result.transferredByteLength >= result.byteLength);
-    assert.equal(result.detachedAfterRecycle, true);
-  }
-  assert.equal(results[0].backend, "typescript");
-  assert.equal(results[1].backend, "rust-wasm");
-  assert.ok(results[0].boundaryCalls > 1);
-  assert.equal(results[1].boundaryCalls, 1);
-  assert.equal(results[0].frameCount, results[1].frameCount);
-  const close = (left: number, right: number, tolerance: number, label: string) =>
-    assert.ok(
-      Math.abs(left - right) <= tolerance,
-      `${label}: ${left} differed from ${right}`,
-    );
-  for (const [index, typescript] of results[0].paritySamples.entries()) {
-    const rust = results[1].paritySamples[index];
-    close(typescript.t, rust.t, 1e-9, `checkpoint ${index} time`);
-    close(
-      typescript.separationM,
-      rust.separationM,
-      1e-6,
-      `checkpoint ${index} separation`,
-    );
-    close(typescript.speedMps, rust.speedMps, 1e-6, `checkpoint ${index} speed`);
-    for (const [axis, value] of typescript.position.entries()) {
-      close(value, rust.position[axis], 1e-6, `checkpoint ${index} position ${axis}`);
-    }
-    assert.equal(typescript.lifecycle, rust.lifecycle);
-    assert.equal(typescript.phase, rust.phase);
-  }
+  assert.match(result.recordId, /^[a-f0-9]{64}$/);
+  assert.equal(result.magic, "VECTOR1\0");
+  assert.ok(result.byteLength > 1_000);
+  assert.ok(result.states.includes("ready"));
+  assert.ok(result.states.includes("running"));
+  assert.ok(result.states.includes("completed"));
+  assert.ok(result.mainThreadTurns > 0, "main thread did not remain responsive");
+  assert.ok(result.transferredByteLength >= result.byteLength);
+  assert.equal(result.detachedAfterRecycle, true);
+  assert.equal(result.backend, DEPLOYMENT_CAPABILITIES.engine.id);
+  assert.ok(result.boundaryCalls > 1);
+  assert.ok(result.states.includes("failed"));
+  assert.match(result.staleAdmissionError, /capability-manifest-stale/);
 
   const cancellation = await page.evaluate(
     async ({ pack, workerUrl }) => {
@@ -410,7 +357,7 @@ try {
       worker.terminate();
       return { state: completion.state, messages };
     },
-    { pack: packs[0].pack, workerUrl: `${origin}/assets/${workerName}` },
+    { pack, workerUrl: `${origin}/assets/${workerName}` },
   );
   assert.equal(cancellation.state, "ready");
   assert.ok(cancellation.messages.includes("progress"));
@@ -418,7 +365,7 @@ try {
   assert.ok(cancellation.messages.includes("cancelled"));
 
   process.stdout.write(
-    `${JSON.stringify({ workerAsset: workerName, environmentWorkerAsset: environmentWorkerName, backends: results, cancellation })}\n`,
+    `${JSON.stringify({ workerAsset: workerName, environmentWorkerAsset: environmentWorkerName, backend: result, cancellation })}\n`,
   );
 } finally {
   await browser.close();

@@ -87,6 +87,15 @@ Missing or ambiguous assets fail the verification before a browser is started;
 the verifier never searches arbitrary build directories or substitutes source
 files.
 
+The built-browser verification prepares its model-pack adapter with the exact
+`DEPLOYMENT_CAPABILITIES` artifact embedded in the emitted Worker. It verifies
+the one backend admitted by that manifest, including initialization, model-pack
+admission, run, transferable record, and cancellation. It never injects a
+verification-only manifest to exercise an unselected backend: that would be
+correctly rejected as stale at the Worker boundary. Cross-backend numerical
+parity remains owned by `tests/engine-backends.test.mjs` outside the deployed
+browser admission path.
+
 ## Clock ownership
 
 - The Worker session owns fixed-step model time.
