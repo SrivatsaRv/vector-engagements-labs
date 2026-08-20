@@ -64,8 +64,8 @@ test("pull-request validation is change-aware with one stable required gate", as
 test("Cloudflare toolchain is current and no longer dependency-ignored", async () => {
   const manifest = JSON.parse(await read("package.json"));
   const dependabot = await read(".github/dependabot.yml");
-  assert.equal(manifest.devDependencies["@cloudflare/vite-plugin"], "1.50.0");
-  assert.equal(manifest.devDependencies.wrangler, "4.118.0");
+  assert.equal(manifest.devDependencies["@cloudflare/vite-plugin"], "1.52.1");
+  assert.equal(manifest.devDependencies.wrangler, "4.123.0");
   assert.doesNotMatch(dependabot, /dependency-name: "wrangler"/);
   assert.doesNotMatch(dependabot, /dependency-name: "@cloudflare\/vite-plugin"/);
 });
