@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ViewportTelemetry } from "@/components/ViewportTelemetry";
+import { selectDisplayFrame } from "@/lib/frontend/selectors";
 import { createReferencePreview } from "@/lib/simulation";
 import { getScenarioDefinition } from "@/lib/scenarios";
 
@@ -18,7 +19,7 @@ describe("ViewportTelemetry", () => {
         expanded={false}
         onExpandedChange={onExpandedChange}
         result={result}
-        time={3.5}
+        selected={selectDisplayFrame(result, 3.5)}
       />,
     );
 
@@ -32,17 +33,19 @@ describe("ViewportTelemetry", () => {
     expect(onExpandedChange).toHaveBeenCalledWith(true);
   });
 
-  it("uses the supplied canonical time in expanded telemetry without owning playback", () => {
+  it("renders the selected recorded-frame time instead of an in-between scrub request", () => {
+    const selected = selectDisplayFrame(result, 11.38);
     render(
       <ViewportTelemetry
         expanded
         onExpandedChange={() => undefined}
         result={result}
-        time={11.25}
+        selected={selected}
       />,
     );
 
-    expect(screen.getByText(/computed at 11\.3 model seconds/i)).toBeVisible();
+    expect(selected.displayTimeSeconds).toBe(11.5);
+    expect(screen.getByText(/computed at 11\.5 model seconds/i)).toBeVisible();
     expect(screen.getByText("Altitude")).toBeVisible();
     expect(screen.getByRole("button", { name: /collapse telemetry/i })).toHaveAttribute("aria-expanded", "true");
   });

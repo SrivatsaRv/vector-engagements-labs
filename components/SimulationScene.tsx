@@ -2,18 +2,20 @@
 
 import { useEffect, useRef } from "react";
 import {
-  getFrameAt,
   type ProfileId,
   type RaspTrack,
   type SimulationResult,
 } from "@/lib/simulation";
 import type { EngineEntityFrame } from "@/lib/engine/contracts";
 import { cameraRelativeThreePosition } from "@/lib/geospatial/geodesy";
-import { selectObserverEntityPresentation } from "@/lib/frontend/selectors";
+import {
+  selectObserverEntityPresentation,
+  type SelectedDisplayFrame,
+} from "@/lib/frontend/selectors";
 
 type Props = {
   result: SimulationResult;
-  time: number;
+  selected: SelectedDisplayFrame;
   profile: ProfileId;
   layers: { interceptor: boolean; target: boolean; lineOfSight: boolean };
   raspTrack?: RaspTrack;
@@ -144,7 +146,7 @@ function drawFrame(
   context.restore();
 }
 
-export function SimulationScene({ result, time, layers, raspTrack, layoutRevision = 0 }: Props) {
+export function SimulationScene({ result, selected, layers, raspTrack, layoutRevision = 0 }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const state = useRef<ThreeState | null>(null);
 
@@ -271,7 +273,7 @@ export function SimulationScene({ result, time, layers, raspTrack, layoutRevisio
   useEffect(() => {
     import("three").then((THREE) => {
       const current = state.current;
-      const frame = getFrameAt(result, time);
+      const frame = selected.frame;
       if (!current || !frame) return;
       const point = (position: EngineEntityFrame["position"]) => {
         const [x, y, z] = cameraRelativeThreePosition(position);
@@ -390,7 +392,7 @@ export function SimulationScene({ result, time, layers, raspTrack, layoutRevisio
 
         const path = current.paths.get(entity.id)!;
         const points = result.frames
-          .filter((sample) => sample.t <= time)
+          .filter((sample) => sample.t <= selected.displayTimeSeconds)
           .map((sample) => sample.entities.find((item) => item.id === entity.id))
           .filter((item): item is EngineEntityFrame => Boolean(item))
           .filter((item) => item.lifecycle !== "STOWED")
@@ -474,13 +476,15 @@ export function SimulationScene({ result, time, layers, raspTrack, layoutRevisio
         current.uncertainty.scale.setScalar(Math.max(350, raspTrack.uncertaintyMeters));
       }
     });
-  }, [layers, raspTrack, result, time]);
+  }, [layers, raspTrack, result, selected]);
 
   return (
     <div
       className="simulation-scene"
       ref={mount}
       aria-label="Three-dimensional engagement geometry with tactical entity symbols"
+      data-display-frame-index={selected.frameIndex}
+      data-display-time={selected.displayTimeSeconds}
     />
   );
 }

@@ -183,11 +183,22 @@ test("a current deployment manifest drives the real Worker run after route recov
   if (!compact) {
     await page.getByRole("button", { name: "Pause run", exact: true }).click();
     await expect(page.getByText("Run 01 · Paused", { exact: true })).toBeVisible();
+  } else {
+    await page.getByRole("button", { name: "Pause playback", exact: true }).click();
   }
+  const timeline = page.getByRole("slider", { name: "Run timeline" });
+  await timeline.focus();
+  await page.keyboard.press("End");
+  await page.keyboard.press("ArrowLeft");
+  const mapDisplayTime = await page.locator(".engagement-map-shell").getAttribute("data-display-time");
+  expect(mapDisplayTime).not.toBeNull();
+  await expect(page.locator(".playback [data-display-time]")).toHaveAttribute("data-display-time", mapDisplayTime!);
+  await expect(page.locator(".telemetry-title [data-display-time]")).toHaveAttribute("data-display-time", mapDisplayTime!);
   await expect(page.locator(".telemetry.is-collapsed")).toBeVisible();
   const telemetryToggle = page.getByRole("button", { name: /expand telemetry/i });
   await expect(telemetryToggle).toHaveAttribute("aria-expanded", "false");
   await expect(telemetryToggle).toHaveAttribute("aria-controls", "synchronized-run-telemetry");
+  await expect(page.locator(".telemetry-title [data-display-time]")).toHaveAttribute("data-display-time", mapDisplayTime!);
   await expect(page.locator(".map-context-disclosure summary")).toHaveText("Study area");
   const collapsed = await page.evaluate(() => ({
     sceneHeight: document.querySelector(".scene-wrap")?.getBoundingClientRect().height ?? 0,

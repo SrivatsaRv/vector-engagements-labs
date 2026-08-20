@@ -5,10 +5,12 @@ import { useEffect, useRef, useState } from "react";
 import { CircleHelp, Layers3 } from "lucide-react";
 import { VectorMapControls, type MapCameraTelemetry } from "@/components/VectorMapControls";
 import type { RaspTrack, SimulationResult } from "@/lib/simulation";
-import { getFrameAt } from "@/lib/simulation";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
 import { emitBrowserTelemetry } from "@/lib/observability/client";
-import { selectObserverEntityPresentation } from "@/lib/frontend/selectors";
+import {
+  selectObserverEntityPresentation,
+  type SelectedDisplayFrame,
+} from "@/lib/frontend/selectors";
 import {
   buildCoverageFeatures,
   buildDeclaredRouteFeatures,
@@ -33,14 +35,14 @@ export type MapInstallation = MapInstallationRecord;
 
 type Props = {
   result: SimulationResult;
-  time: number;
+  selected: SelectedDisplayFrame;
   installations: MapInstallation[];
   raspTrack?: RaspTrack;
   layoutRevision?: number;
 };
 type MapScope = "ENGAGEMENT" | "REGION";
 
-export function EngagementMap({ result, time, installations, raspTrack, layoutRevision = 0 }: Props) {
+export function EngagementMap({ result, selected, installations, raspTrack, layoutRevision = 0 }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
   const markers = useRef<Map<string, import("maplibre-gl").Marker>>(new Map());
@@ -387,7 +389,8 @@ export function EngagementMap({ result, time, installations, raspTrack, layoutRe
 
   useEffect(() => {
     const map = mapRef.current;
-    const frame = getFrameAt(result, time);
+    const frame = selected.frame;
+    const displayTimeSeconds = selected.displayTimeSeconds;
     if (!map || !frame || mapStatus !== "ready") return;
     import("maplibre-gl").then((maplibregl) => {
       const visibleEntityIds = new Set(frame.entities.map((entity) => entity.id));
@@ -482,7 +485,7 @@ export function EngagementMap({ result, time, installations, raspTrack, layoutRe
         features: buildTrackFeatures(
           result,
           frame,
-          time,
+          displayTimeSeconds,
           origin,
           hiddenObserverEntityId,
         ),
@@ -500,15 +503,19 @@ export function EngagementMap({ result, time, installations, raspTrack, layoutRe
       const launchFilter: import("maplibre-gl").FilterSpecification = [
         "<=",
         ["get", "modelTime"],
-        time,
+        displayTimeSeconds,
       ];
       map.setFilter("launch-events", launchFilter);
       map.setFilter("launch-event-labels", launchFilter);
     });
-  }, [mapStatus, origin, result, time, raspTrack]);
+  }, [mapStatus, origin, result, selected, raspTrack]);
 
   return (
-    <div className="engagement-map-shell">
+    <div
+      className="engagement-map-shell"
+      data-display-frame-index={selected.frameIndex}
+      data-display-time={selected.displayTimeSeconds}
+    >
       <div className="map-scope-switch" aria-label="Map extent">
         <button
           className={mapScope === "ENGAGEMENT" ? "active" : ""}

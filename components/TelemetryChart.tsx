@@ -6,9 +6,9 @@ import type {
   EngineEntityFrame,
 } from "@/lib/engine/contracts";
 import {
-  selectDisplayFrame,
   selectEntityMetricSeries,
   type EntityMetricSeries,
+  type SelectedDisplayFrame,
 } from "@/lib/frontend/selectors";
 
 const color = (affiliation: EngineEntityFrame["affiliation"]) =>
@@ -78,12 +78,11 @@ function MetricPanel({
 
 export function TelemetryChart({
   result,
-  time,
+  selected,
 }: {
   result: SimulationResult;
-  time: number;
+  selected: SelectedDisplayFrame;
 }) {
-  const selected = selectDisplayFrame(result, time);
   const frame = selected.frame;
   const marker = (selected.displayTimeSeconds / Math.max(1, result.timeOfFlight)) * 100;
   const entitySeries = (

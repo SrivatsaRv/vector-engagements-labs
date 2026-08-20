@@ -523,7 +523,7 @@ function LabWorkbench({
       ...items,
       {
         id: Date.now(),
-        time,
+        time: selectedDisplayFrame.displayTimeSeconds,
         type: "observation",
         title: "Observation saved",
         detail: "This model time was marked for the Results timeline.",
@@ -798,7 +798,7 @@ function LabWorkbench({
                 </button>
               </div>
               <div className="live-metrics">
-                <Metric label="Time" value={`${time.toFixed(1)} s`} />
+                <Metric label="Time" value={`${selectedDisplayFrame.displayTimeSeconds.toFixed(1)} s`} />
                 <Metric
                   label="3D separation"
                   value={`${(frame.range / 1000).toFixed(1)} km`}
@@ -816,14 +816,14 @@ function LabWorkbench({
               {playbackSurface === "MAP" ? (
                 <EngagementMap
                   result={result}
-                  time={time}
+                  selected={selectedDisplayFrame}
                   installations={catalogInstallations}
                   layoutRevision={telemetryExpanded ? 1 : 0}
                 />
               ) : (
                 <SimulationScene
                   result={result}
-                  time={time}
+                  selected={selectedDisplayFrame}
                   profile={scenario.profile}
                   layers={layers}
                   layoutRevision={telemetryExpanded ? 1 : 0}
@@ -850,6 +850,7 @@ function LabWorkbench({
             <Playback
               result={result}
               time={time}
+              displayTimeSeconds={selectedDisplayFrame.displayTimeSeconds}
               setTime={setTime}
               playing={playing}
               setPlaying={setPlaying}
@@ -860,7 +861,7 @@ function LabWorkbench({
               expanded={telemetryExpanded}
               onExpandedChange={setTelemetryDisclosure}
               result={result}
-              time={time}
+              selected={selectedDisplayFrame}
             />
             <div className="compact-track-inspector">
               <TrackStateInspector
@@ -2127,6 +2128,7 @@ function Range({
 function Playback({
   result,
   time,
+  displayTimeSeconds,
   setTime,
   playing,
   setPlaying,
@@ -2135,6 +2137,7 @@ function Playback({
 }: {
   result: SimulationResult;
   time: number;
+  displayTimeSeconds: number;
   setTime: (value: number) => void;
   playing: boolean;
   setPlaying: (value: boolean) => void;
@@ -2162,8 +2165,8 @@ function Playback({
         value={time}
         onChange={(event) => setTime(Number(event.target.value))}
       />
-      <span>
-        {time.toFixed(1)} / {result.timeOfFlight.toFixed(1)} s
+      <span data-display-time={displayTimeSeconds}>
+        {displayTimeSeconds.toFixed(1)} / {result.timeOfFlight.toFixed(1)} s
       </span>
       <div>
         {[0.5, 1, 2, 4].map((value) => (

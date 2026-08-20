@@ -6,11 +6,11 @@ import { SimulationScene } from "@/components/SimulationScene";
 import { PrintTrajectory } from "@/components/PrintTrajectory";
 import {
   buildRaspTrack,
-  getFrameAt,
   type Scenario,
   type SimulationResult,
 } from "@/lib/simulation";
 import { findWeaponSimulationModel } from "@/lib/simulation-models";
+import { selectDisplayFrame } from "@/lib/frontend/selectors";
 
 export function ReportReplay({
   scenario,
@@ -23,7 +23,8 @@ export function ReportReplay({
     Math.min(result.timeOfFlight * 0.42, result.timeOfFlight),
   );
   const [playing, setPlaying] = useState(false);
-  const frame = getFrameAt(result, time);
+  const selected = selectDisplayFrame(result, time);
+  const frame = selected.frame;
   const iafTrack = useMemo(
     () => buildRaspTrack(scenario, frame, "IAF"),
     [frame, scenario],
@@ -81,12 +82,12 @@ export function ReportReplay({
       <div className="report-replay-stage">
         <SimulationScene
           result={result}
-          time={time}
+          selected={selected}
           profile={scenario.profile}
           layers={{ interceptor: true, target: true, lineOfSight: true }}
         />
         <div className="report-replay-metrics">
-          <ReportReplayMetric label="Time" value={`${time.toFixed(1)} s`} />
+          <ReportReplayMetric label="Time" value={`${selected.displayTimeSeconds.toFixed(1)} s`} />
           <ReportReplayMetric label="Phase" value={frame.phase} />
           <ReportReplayMetric
             label="3D separation"
@@ -146,14 +147,14 @@ export function ReportReplay({
           }}
         />
         <span>
-          {time.toFixed(1)} / {result.timeOfFlight.toFixed(1)} s
+          {selected.displayTimeSeconds.toFixed(1)} / {result.timeOfFlight.toFixed(1)} s
         </span>
       </div>
       <div className="report-profile-results">
         <header>
           <span>
             {airCombat
-              ? `What each side could see at ${time.toFixed(1)} s`
+              ? `What each side could see at ${selected.displayTimeSeconds.toFixed(1)} s`
               : "Recorded model state and declared assumptions"}
           </span>
           <strong>

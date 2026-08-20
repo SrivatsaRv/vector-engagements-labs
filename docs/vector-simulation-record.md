@@ -47,6 +47,12 @@ not by array order, last-update time, or a rendered interpolation. A missing
 picture is an explicit unavailable state; viewers may not synthesize track
 position, confidence, freshness, or uncertainty.
 
+Browser playback first resolves one `SelectedDisplayFrame` from a requested
+scrub position. Map, 3D, timeline-linked telemetry, observer-picture selection,
+and visible model-time labels consume that same recorded frame identity and its
+`displayTimeSeconds`. The raw scrub request remains browser interaction state;
+it is not displayed as if it were a separate model sample.
+
 ## Frame contract
 
 Each entity sample may carry scenario-local f64 position and an entity-keyed WGS84
