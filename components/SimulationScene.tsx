@@ -16,6 +16,7 @@ type Props = {
   profile: ProfileId;
   layers: { interceptor: boolean; target: boolean; lineOfSight: boolean };
   raspTrack?: RaspTrack;
+  layoutRevision?: number;
 };
 
 type ThreeState = {
@@ -142,7 +143,7 @@ function drawFrame(
   context.restore();
 }
 
-export function SimulationScene({ result, time, layers, raspTrack }: Props) {
+export function SimulationScene({ result, time, layers, raspTrack, layoutRevision = 0 }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const state = useRef<ThreeState | null>(null);
 
@@ -249,6 +250,22 @@ export function SimulationScene({ result, time, layers, raspTrack }: Props) {
       state.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const current = state.current;
+    const mountElement = mount.current;
+    if (!current || !mountElement) return;
+    const frame = requestAnimationFrame(() => {
+      const width = mountElement.clientWidth;
+      const height = mountElement.clientHeight;
+      if (!width || !height) return;
+      current.camera.aspect = width / height;
+      current.camera.updateProjectionMatrix();
+      current.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      current.renderer.setSize(width, height);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [layoutRevision]);
 
   useEffect(() => {
     import("three").then((THREE) => {

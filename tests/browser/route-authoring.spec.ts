@@ -111,6 +111,10 @@ test("route inputs fail visibly, recover, and drive the real Worker run", async 
   await page.route("**/api/catalog", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
   );
+  // Tile transport has its own bounded cache contract. This journey exercises
+  // the real MapLibre canvas/markers/resize path without coupling every
+  // viewport to the tile proxy's network sockets.
+  await page.route("**/api/map-tile?**", (route) => route.abort());
 
   await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided");
   await expect(page.locator(".catalog-state.POSTGIS")).toHaveText("PostGIS catalog connected");
@@ -159,5 +163,48 @@ test("route inputs fail visibly, recover, and drive the real Worker run", async 
   await expect(page.getByText("Track-information interruption", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /IAF RASP/i })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /PAF RASP/i })).toHaveCount(0);
+  if (!compact) {
+    await page.getByRole("button", { name: "Pause run", exact: true }).click();
+    await expect(page.getByText("Run 01 · Paused", { exact: true })).toBeVisible();
+  }
+  await expect(page.locator(".telemetry.is-collapsed")).toBeVisible();
+  const telemetryToggle = page.getByRole("button", { name: /expand telemetry/i });
+  await expect(telemetryToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(telemetryToggle).toHaveAttribute("aria-controls", "synchronized-run-telemetry");
+  await expect(page.locator(".map-context-disclosure summary")).toHaveText("Study area");
+  const collapsed = await page.evaluate(() => ({
+    sceneHeight: document.querySelector(".scene-wrap")?.getBoundingClientRect().height ?? 0,
+    canvasHeight: document.querySelector(".engagement-map canvas")?.getBoundingClientRect().height ?? 0,
+    camera: document.querySelector(".vector-map-telemetry")?.textContent,
+    time: document.querySelector(".telemetry-title > div")?.textContent,
+    attribution: document.querySelector(".maplibregl-ctrl-attrib")?.getBoundingClientRect().height ?? 0,
+  }));
+  if (compact) {
+    await telemetryToggle.focus();
+    await page.keyboard.press("Enter");
+  } else {
+    await telemetryToggle.click();
+  }
+  await expect(page.locator(".telemetry.is-expanded")).toBeVisible();
+  await expect(page.getByRole("button", { name: /collapse telemetry/i })).toHaveAttribute("aria-expanded", "true");
+  await page.waitForFunction(() => {
+    const scene = document.querySelector(".scene-wrap")?.getBoundingClientRect();
+    const canvas = document.querySelector(".engagement-map canvas")?.getBoundingClientRect();
+    return Boolean(scene && canvas && Math.abs(scene.height - canvas.height) <= 2);
+  });
+  const expanded = await page.evaluate(() => ({
+    sceneHeight: document.querySelector(".scene-wrap")?.getBoundingClientRect().height ?? 0,
+    canvasHeight: document.querySelector(".engagement-map canvas")?.getBoundingClientRect().height ?? 0,
+    camera: document.querySelector(".vector-map-telemetry")?.textContent,
+    time: document.querySelector(".telemetry-title > div")?.textContent,
+  }));
+  expect(collapsed.sceneHeight).toBeGreaterThan(expanded.sceneHeight);
+  expect(Math.abs(collapsed.canvasHeight - collapsed.sceneHeight)).toBeLessThanOrEqual(2);
+  expect(Math.abs(expanded.canvasHeight - expanded.sceneHeight)).toBeLessThanOrEqual(2);
+  if (!compact) {
+    expect(expanded.camera).toBe(collapsed.camera);
+    expect(expanded.time).toBe(collapsed.time);
+  }
+  expect(collapsed.attribution).toBeGreaterThan(0);
   expect(runtimeErrors).toEqual([]);
 });

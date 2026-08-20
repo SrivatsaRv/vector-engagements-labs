@@ -35,6 +35,34 @@ rendering sharpness; viewport width and height govern task geometry.
   technical labels below a readable size; the linked source image remains
   available for full-resolution inspection.
 
+## Observe viewport shell
+
+The Observe workspace uses one centre-column grid. The Map or 3D surface owns
+the remaining row after the control strip and playback rail; it does not own a
+fixed height. Synchronized telemetry is collapsed by default for a browser
+session and expands only on request. Its visibility is presentation state, not
+scenario or record state, so it cannot change playback time, frame identity or
+saved output.
+
+| Slot | Content | Compact rule |
+| --- | --- | --- |
+| North-west | Navigation and basemap controls | Fixed safe inset and touch-sized controls |
+| North-east | Fit run and study-area extent | Surface-scoped controls only |
+| South-west | Layer legend | Summary first; available layers are disclosed on request |
+| South-east | Camera readout and MapLibre attribution | Attribution remains visible; context moves to Info |
+| Lower right | Study-area limitation and help | Compact Info disclosure; no permanent prose banner |
+
+Entity labels use a deterministic priority: engaging entity, guided weapon,
+then aircraft, with stable ID order as the tie-breaker. The highest-priority
+labels use bounded leader offsets; lower-priority labels compact while their
+symbols, affiliation frame and browser title remain available. The renderer
+does not infer tactical relevance beyond canonical lifecycle and kind.
+
+MapLibre and Three.js observe committed container dimensions. A telemetry
+transition therefore reallocates the canvas row while preserving camera/extent
+unless the operator explicitly chooses Fit. Reduced-motion preference removes
+nonessential marker transitions.
+
 ## Automated proof
 
 `npm run ui:responsive:verify` launches system Chrome at every viewport above.

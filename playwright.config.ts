@@ -8,6 +8,10 @@ export default defineConfig({
   outputDir: "outputs/playwright",
   reporter: [["list"], ["html", { outputFolder: "outputs/playwright-report", open: "never" }]],
   retries: process.env.CI ? 1 : 0,
+  // The built Worker runtime owns one local process. Serial CI projects avoid
+  // concurrent map-tile and Worker requests tearing down that process while a
+  // different viewport is still asserting the same canonical run.
+  workers: process.env.CI ? 1 : undefined,
   use: {
     baseURL: externalBaseUrl ?? `http://127.0.0.1:${port}`,
     trace: "retain-on-failure",
@@ -30,4 +34,3 @@ export default defineConfig({
         timeout: 180_000,
       },
 });
-
