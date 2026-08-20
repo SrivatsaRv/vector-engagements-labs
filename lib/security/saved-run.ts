@@ -14,6 +14,7 @@ import {
   resolveEnvironmentSelection,
 } from "@/lib/study-areas";
 import { finiteNumber, PublicApiError, shortString } from "./public-api";
+import { SAVED_RUN_LIFECYCLE_POLICY } from "./admission-policy";
 
 const domains = new Set(["A2A", "A2G", "G2A", "G2G"]);
 const profiles = new Set(["short", "medium", "sustained"]);
@@ -181,6 +182,9 @@ export async function buildVerifiedSavedRun(
   }
   const result = simulate(scenario);
   if (result.frames.length === 0 || result.frames.length > 10_000) {
+    throw new PublicApiError(422, "simulation_output_rejected");
+  }
+  if (new TextEncoder().encode(JSON.stringify(result.frames)).byteLength > SAVED_RUN_LIFECYCLE_POLICY.maxServerResultBytes) {
     throw new PublicApiError(422, "simulation_output_rejected");
   }
   const model = findWeaponSimulationModel(scenario.blueSystemId);

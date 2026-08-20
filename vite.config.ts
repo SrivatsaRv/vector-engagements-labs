@@ -1,5 +1,6 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
+import { PUBLIC_API_ADMISSION_POLICY } from "./lib/security/admission-policy.ts";
 
 const LOCAL_HYPERDRIVE_ID = "00000000-0000-4000-8000-000000000000";
 const hyperdriveId =
@@ -36,12 +37,18 @@ const localBindingConfig = {
     {
       name: "PUBLIC_API_RATE_LIMITER",
       namespace_id: "22001",
-      simple: { limit: 120, period: 60 as const },
+      simple: {
+        limit: PUBLIC_API_ADMISSION_POLICY.PUBLIC_API_RATE_LIMITER.limit,
+        period: PUBLIC_API_ADMISSION_POLICY.PUBLIC_API_RATE_LIMITER.periodSeconds as 60,
+      },
     },
     {
       name: "TILE_RATE_LIMITER",
       namespace_id: "22002",
-      simple: { limit: 600, period: 60 as const },
+      simple: {
+        limit: PUBLIC_API_ADMISSION_POLICY.TILE_RATE_LIMITER.limit,
+        period: PUBLIC_API_ADMISSION_POLICY.TILE_RATE_LIMITER.periodSeconds as 60,
+      },
     },
   ],
   ...(isVinextDeploy

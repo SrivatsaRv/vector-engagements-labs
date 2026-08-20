@@ -36,7 +36,8 @@ The application should accept platform-neutral ports and bind them at the edge:
 - `ARTIFACTS`: optional R2 bucket for immutable records and exports;
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: external telemetry collector;
 - `PUBLIC_API_RATE_LIMITER` and `TILE_RATE_LIMITER`: independent anonymous
-  traffic budgets;
+  traffic budgets, declared in `public-api-admission.v1` and mirrored by the
+  Node/Postgres adapter;
 - `METRICS_BEARER_TOKEN`: secret protecting production Prometheus output;
 - `APP_ENV`, `APP_VERSION`, and `LOG_LEVEL`: non-secret release configuration.
 

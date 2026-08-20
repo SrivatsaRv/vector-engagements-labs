@@ -12,6 +12,26 @@ server-generated report. Request bodies are capped at 96 KiB, route plans at 64
 waypoints per side, and physics inputs at documented finite study limits.
 Database connections, locks, and statements have explicit timeouts.
 
+`public-api-admission.v1` is the versioned anonymous-admission policy. The
+Cloudflare edge uses its two declared Rate Limiting bindings; Node/container
+deployments use the same limits in Postgres-backed fixed windows. A deployed
+adapter that cannot enforce its declared limiter rejects the request with
+`rate_limit_unavailable`; it must not fall back to unlimited access. Rate-limit
+rejections use `rate_limit_exceeded` and include `Retry-After`.
+
+Node accepts only the Cloudflare canonical client-IP header when that header is
+provided by the edge. A direct Node deployment has no trusted peer-address
+adapter yet, so anonymous callers share one conservative budget rather than
+trusting a spoofable forwarding header. This is safe but intentionally not a
+multi-tenant identity solution.
+
+`saved-run-lifecycle.v1` separately caps anonymous saved-run recomputations,
+daily accepted writes, stored result bytes, and record retention. A Postgres-backed lease table
+enforces the global recomputation limit across Node processes; lease expiry
+prevents a crashed process retaining capacity. Release performs bounded expiry
+cleanup. Admission rejects use stable quota, capacity, or unavailable codes;
+the `/api/health` readback identifies the active non-secret admission adapter.
+
 The Cloudflare application Worker that validates APIs and saved runs is not the
 browser simulation Web Worker. Interactive physics has no database or network
 capability in its protocol: it receives a validated digest-addressed compiled

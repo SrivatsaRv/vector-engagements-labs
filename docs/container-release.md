@@ -100,6 +100,7 @@ committed or baked into an image.
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | deployment | OpenTelemetry collector endpoint |
 | `METRICS_BEARER_TOKEN` | secret manager or local Compose | Protects metrics reads |
 | `VECTOR_ENVIRONMENT` | deployment | Enables explicitly bounded environment behavior |
+| `VECTOR_RUNTIME` | deployment | `node` selects the Postgres-backed public API admission adapter; do not omit it in a Node deployment |
 | `PORT`, `HOST` | deployment | HTTP port binding |
 
 Cloudflare production continues to use the Hyperdrive binding rather than the

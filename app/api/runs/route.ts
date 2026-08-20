@@ -11,6 +11,7 @@ import {
   shortString,
 } from "@/lib/security/public-api";
 import { buildVerifiedSavedRun } from "@/lib/security/saved-run";
+import { admitSavedRun, releaseSavedRunAdmission } from "@/lib/security/saved-run-admission";
 import { enforceRateLimit } from "@/lib/security/runtime";
 
 const MAX_SAVED_RUN_REQUEST_BYTES = 96 * 1024;
@@ -142,7 +143,10 @@ export async function POST(request: Request) {
       }
       const templatePackage = template.package;
 
-      const simulationStarted = performance.now();
+      const admission = await admitSavedRun(request);
+      try {
+
+        const simulationStarted = performance.now();
       incrementCounter("vector_scenario_runs_started_total", { domain: templatePackage.domain, engine_version: ENGINE_VERSION });
       addGauge("vector_scenario_runs_active", 1, { domain: templatePackage.domain });
       let verified;
@@ -193,7 +197,10 @@ export async function POST(request: Request) {
         RETURNING id, created_at
       `);
       incrementCounter("vector_reports_total", { domain: scenario.domain, outcome: "saved" });
-      return Response.json(rows[0], { status: 201, headers: { "cache-control": "no-store" } });
+        return Response.json(rows[0], { status: 201, headers: { "cache-control": "no-store" } });
+      } finally {
+        await releaseSavedRunAdmission(admission);
+      }
     } catch (error) {
       incrementCounter("vector_reports_total", { domain: "unknown", outcome: "failed" });
       return publicApiError(error, 503);

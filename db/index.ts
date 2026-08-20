@@ -21,9 +21,19 @@ async function databaseRuntime(): Promise<{
     // Node-specific adapter beside the server bundle, keeping credentials as
     // runtime configuration rather than build inputs.
     const nodeAdapter = "./node-postgres.mjs";
-    const { default: postgres } = await import(/* @vite-ignore */ nodeAdapter) as {
-      default: PostgresFactory;
-    };
+    let postgres = workerPostgres;
+    try {
+      ({ default: postgres } = await import(/* @vite-ignore */ nodeAdapter) as {
+        default: PostgresFactory;
+      });
+    } catch (error) {
+      // The generated adapter is copied beside the production bundle. Source
+      // mode (including real Node/Postgres integration tests) uses the same
+      // already-imported client rather than requiring a build artifact.
+      if (!(error instanceof Error) || !("code" in error) || error.code !== "ERR_MODULE_NOT_FOUND") {
+        throw error;
+      }
+    }
     return { connectionString, postgres };
   }
 
