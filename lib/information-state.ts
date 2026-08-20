@@ -174,7 +174,7 @@ function snapshot(
     ageSeconds: age,
     confidence: track.state === "CONFIRMED" ? 80 : track.state === "TENTATIVE" ? 55 : track.state === "PLOT" ? 35 : track.state === "COASTING" ? 20 : 0,
     uncertaintyMeters: last ? Math.round(last.covarianceMeters + age * 250) : 0,
-    position: last ? { ...last.position } : { x: 0, y: 0, z: 0 },
+    ...(last ? { position: { ...last.position } } : {}),
     observedEntityId: config.observedEntityId,
     visible,
     status: status(track.state),

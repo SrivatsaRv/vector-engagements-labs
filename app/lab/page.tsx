@@ -121,7 +121,7 @@ const CONFIGURE_STEPS = [
 function freezeRecordedPictures(pictures: RaspTrack[]): readonly RaspTrack[] {
   return Object.freeze(pictures.map((picture) => Object.freeze({
     ...picture,
-    position: Object.freeze({ ...picture.position }),
+    ...(picture.position ? { position: Object.freeze({ ...picture.position }) } : {}),
   })));
 }
 

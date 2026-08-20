@@ -45,6 +45,12 @@ until a sender-side observation and an admitted typed message path exist. A
 link checkbox never injects truth. Weapon support remains unavailable pending
 #28's versioned support interface.
 
+An unavailable observer picture has no `position` member. It does not serialize
+`{x:0,y:0,z:0}`, reuse the last world position, or request a renderer fallback.
+The map and 3D surface may show Model Truth only in their separately selected
+truth view; an observer-picture view hides the entity until it has an admitted
+side-owned estimate.
+
 ## Record and parity boundary
 
 VSR `pictures.jsonl` records each observer sample with owner, source,

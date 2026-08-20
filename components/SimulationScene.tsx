@@ -368,7 +368,7 @@ export function SimulationScene({ result, time, layers, raspTrack, layoutRevisio
         }
 
         let position = entity.position;
-        if (raspTrack && entity.id === raspTrack.observedEntityId && raspTrack.visible) {
+        if (raspTrack && entity.id === raspTrack.observedEntityId && raspTrack.visible && raspTrack.position) {
           position = raspTrack.position;
         }
         symbol.position.copy(point(position));
@@ -458,8 +458,8 @@ export function SimulationScene({ result, time, layers, raspTrack, layoutRevisio
         ]);
       }
       current.lineOfSight.visible = layers.lineOfSight && Boolean(primaryWeapon && primaryTarget);
-      current.uncertainty.visible = Boolean(raspTrack?.visible);
-      if (raspTrack?.visible) {
+      current.uncertainty.visible = Boolean(raspTrack?.visible && raspTrack.position);
+      if (raspTrack?.visible && raspTrack.position) {
         current.uncertainty.position.copy(point(raspTrack.position));
         current.uncertainty.scale.setScalar(Math.max(350, raspTrack.uncertaintyMeters));
       }

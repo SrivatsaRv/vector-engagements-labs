@@ -410,7 +410,7 @@ export function EngagementMap({ result, time, installations, raspTrack, layoutRe
         .reduce((priorities, entity, index) => priorities.set(entity.id, index), new Map<string, number>());
       for (const entity of frame.entities) {
         const isObservedTrack = raspTrack?.observedEntityId === entity.id;
-        const displayPosition = isObservedTrack && raspTrack?.visible
+        const displayPosition = isObservedTrack && raspTrack?.visible && raspTrack.position
           ? raspTrack.position
           : entity.position;
         const displayLngLat = isObservedTrack && raspTrack?.visible
@@ -452,7 +452,7 @@ export function EngagementMap({ result, time, installations, raspTrack, layoutRe
         marker.getElement().dataset.labelPriority = String(labelPriority.get(entity.id) ?? 99);
       }
       let uncertainty = markers.current.get("rasp-uncertainty");
-      if (raspTrack?.visible) {
+      if (raspTrack?.visible && raspTrack.position) {
         if (!uncertainty) {
           const element = document.createElement("div");
           element.className = "map-rasp-uncertainty";

@@ -67,6 +67,12 @@ for (const backend of ["typescript", "rust-wasm"]) {
       "each observer-picture sample must identify its recorded frame",
     );
     assert.ok(opened.pictures.every((picture) => !("truthPosition" in picture)));
+    assert.ok(
+      opened.pictures
+        .filter((picture) => !picture.visible)
+        .every((picture) => !("position" in picture)),
+      "an unavailable observer picture must not serialize a synthetic position",
+    );
     assert.match(opened.manifest.recordId, /^[a-f0-9]{64}$/);
   });
 }

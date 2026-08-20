@@ -59,6 +59,16 @@ test("loss coasts then expires without substituting model truth", () => {
   assert.equal(iaf[2].visible, false);
 });
 
+test("an unavailable track has no synthetic position", () => {
+  const pictures = buildSidePictures(
+    { ...DEFAULT_SCENARIO, blueRadarMode: "SILENT" },
+    [{ ...frame, t: 0 }],
+  );
+  const unavailable = pictures.find((picture) => picture.perspective === "IAF");
+  assert.equal(unavailable?.visible, false);
+  assert.equal("position" in (unavailable ?? {}), false);
+});
+
 test("off-board sources fail closed until an admitted sender observation exists", () => {
   for (const source of ["DATALINK", "AIRBORNE_EARLY_WARNING"]) {
     const availability = informationAvailability(
