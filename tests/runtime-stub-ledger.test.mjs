@@ -27,6 +27,19 @@ test("source-less public references are inventoried instead of silently admitted
   assert.deepEqual(findSourceLessPublicReferences(source), [{ line: 2 }]);
 });
 
+test("report examples have no production fallback allowance", () => {
+  assert.equal(
+    ledger.indicatorPolicy.allowances.some(
+      (allowance) => allowance.path === "app/report/page.tsx",
+    ),
+    false,
+  );
+  assert.equal(
+    ledger.entries.find((entry) => entry.id === "STUB-15")?.classification,
+    "fixture_only",
+  );
+});
+
 test("a new production fallback fails without an owning ledger entry", () => {
   const observations = collectIndicatorObservations(process.cwd(), ledger.indicatorPolicy);
   observations.push({ path: "lib/new-causal-runtime.ts", indicator: "fallback", line: 10 });

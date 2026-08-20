@@ -19,6 +19,7 @@ import {
   buildReportExport,
   reportExportFilename,
   type ReportData,
+  type ReportLibraryScenario,
 } from "@/lib/report-export";
 import { simulate, standardAtmosphere } from "@/lib/simulation";
 import { ENGINE_VERSION } from "@/lib/engine/version";
@@ -26,63 +27,65 @@ import { getStudyArea, getWeatherPreset } from "@/lib/study-areas";
 
 type ActionState = "idle" | "preparing" | "done" | "error";
 type PrintState = "idle" | "preparing" | "printing";
+type StoredReport = ReportData & { libraryScenario: ReportLibraryScenario };
 
-const fallbackScenario = {
-  ...DEFAULT_SCENARIO_DEFINITION.scenario,
-};
-
-const fallback: ReportData = {
-  scenario: fallbackScenario,
-  result: simulate(fallbackScenario),
-  events: [
-    {
-      id: 1,
-      time: 0,
-      type: "run",
-      title: "Scenario initialized",
-      detail: "Guided crossing-target scenario",
+function createExampleReport(): StoredReport {
+  const scenario = { ...DEFAULT_SCENARIO_DEFINITION.scenario };
+  return {
+    scenario,
+    result: simulate(scenario),
+    events: [
+      {
+        id: 1,
+        time: 0,
+        type: "run",
+        title: "Scenario initialized",
+        detail: "Guided crossing-target scenario",
+      },
+      {
+        id: 2,
+        time: 12.5,
+        type: "observation",
+        title: "Decision point marked",
+        detail: "Geometry began changing rapidly",
+      },
+      {
+        id: 3,
+        time: 18,
+        type: "fault",
+        title: "Track quality degraded",
+        detail: "Prepared 8-second fault introduced",
+      },
+    ],
+    createdAt: "2026-08-02T10:00:00.000Z",
+    engine: ENGINE_VERSION,
+    profileVersion: "public-study-v0.5",
+    packageProvenance: {
+      schemaVersion: "vector.scenario.v3",
+      contentHash: "example",
+      draftRevision: 0,
+      intendedUse: DEFAULT_SCENARIO_DEFINITION.intendedUse,
+      modelPack: DEFAULT_SCENARIO_DEFINITION.modelPack,
     },
-    {
-      id: 2,
-      time: 12.5,
-      type: "observation",
-      title: "Decision point marked",
-      detail: "Geometry began changing rapidly",
+    libraryScenario: {
+      id: DEFAULT_SCENARIO_DEFINITION.id,
+      version: DEFAULT_SCENARIO_DEFINITION.version,
+      domain: DEFAULT_SCENARIO_DEFINITION.domain,
+      title: DEFAULT_SCENARIO_DEFINITION.title,
+      scope: DEFAULT_SCENARIO_DEFINITION.scope,
+      targetProfile: DEFAULT_SCENARIO_DEFINITION.targetProfile,
+      theatre: DEFAULT_SCENARIO_DEFINITION.theatre,
     },
-    {
-      id: 3,
-      time: 18,
-      type: "fault",
-      title: "Track quality degraded",
-      detail: "Prepared 8-second fault introduced",
-    },
-  ],
-  createdAt: "2026-08-02T10:00:00.000Z",
-  engine: ENGINE_VERSION,
-  profileVersion: "public-study-v0.5",
-  packageProvenance: {
-    schemaVersion: "vector.scenario.v3",
-    contentHash: "example",
-    draftRevision: 0,
-    intendedUse: DEFAULT_SCENARIO_DEFINITION.intendedUse,
-    modelPack: DEFAULT_SCENARIO_DEFINITION.modelPack,
-  },
-  libraryScenario: {
-    id: DEFAULT_SCENARIO_DEFINITION.id,
-    version: DEFAULT_SCENARIO_DEFINITION.version,
-    domain: DEFAULT_SCENARIO_DEFINITION.domain,
-    title: DEFAULT_SCENARIO_DEFINITION.title,
-    scope: DEFAULT_SCENARIO_DEFINITION.scope,
-    targetProfile: DEFAULT_SCENARIO_DEFINITION.targetProfile,
-    theatre: DEFAULT_SCENARIO_DEFINITION.theatre,
-  },
-};
+  };
+}
 
 export default function ReportPage() {
   const searchParams = useSearchParams();
   const sampleMode = searchParams.get("sample") === "1";
   const runId = searchParams.get("run");
-  const [data, setData] = useState<ReportData>(fallback);
+  const [data, setData] = useState<StoredReport | null>(() =>
+    sampleMode ? createExampleReport() : null,
+  );
   const [loadState, setLoadState] = useState<
     "example" | "loading" | "saved" | "error"
   >(sampleMode ? "example" : runId ? "loading" : "error");
@@ -100,8 +103,8 @@ export default function ReportPage() {
           run: { modelAssumptions?: { report?: ReportData } };
         };
         const report = payload.run.modelAssumptions?.report;
-        if (!report) throw new Error("report unavailable");
-        setData(report);
+        if (!report?.libraryScenario) throw new Error("report unavailable");
+        setData(report as StoredReport);
         setLoadState("saved");
       })
       .catch((error) => {
@@ -122,8 +125,38 @@ export default function ReportPage() {
     };
   }, []);
 
+  if (!data) {
+    return (
+      <main className="report-page">
+        <header className="report-nav">
+          <Link href={`/workbench?scenario=${DEFAULT_SCENARIO_DEFINITION.id}`}>
+            <ArrowLeft size={15} />
+            Back to workbench
+          </Link>
+        </header>
+        {loadState === "loading" ? (
+          <section className="report-load-error" aria-live="polite">
+            <strong>Preparing saved report</strong>
+            <p>Loading the frozen scenario package, engine frames, and source record.</p>
+          </section>
+        ) : (
+          <section className="report-load-error" role="alert">
+            <strong>Saved run unavailable</strong>
+            <p>
+              This page will not substitute example data for a missing run. Return
+              to the workbench, conduct the experiment, and save it again.
+            </p>
+            <Link href={`/workbench?scenario=${DEFAULT_SCENARIO_DEFINITION.id}`}>
+              Return to the configured scenario
+            </Link>
+          </section>
+        )}
+      </main>
+    );
+  }
+
   const { scenario, result } = data;
-  const libraryScenario = data.libraryScenario ?? fallback.libraryScenario!;
+  const libraryScenario = data.libraryScenario;
   const bluePlatform = findPlatform(scenario.bluePlatformId);
   const blueWeapon = findWeapon(scenario.blueSystemId);
   const redPlatform = findPlatform(scenario.redObjectId);
@@ -229,24 +262,6 @@ export default function ReportPage() {
           </button>
         </div>
       </header>
-      {loadState === "loading" && (
-        <section className="report-load-error" aria-live="polite">
-          <strong>Preparing saved report</strong>
-          <p>Loading the frozen scenario package, engine frames, and source record.</p>
-        </section>
-      )}
-      {loadState === "error" && (
-        <section className="report-load-error" role="alert">
-          <strong>Saved run unavailable</strong>
-          <p>
-            This page will not substitute example data for a missing run. Return
-            to the workbench, conduct the experiment, and save it again.
-          </p>
-          <Link href={`/workbench?scenario=${libraryScenario.id}`}>
-            Return to the configured scenario
-          </Link>
-        </section>
-      )}
       {(loadState === "saved" || loadState === "example") && (
         <article className="report-sheet">
           <header>

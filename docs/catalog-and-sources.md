@@ -45,6 +45,11 @@ The S-200 template is a historical public-reference case and does not claim curr
 6. `/api/runs` rejects a stale package or engine mismatch, recomputes the frame hash, and saves all provenance with the report payload.
 7. `/report?run=<id>` reads only the saved snapshot. It never substitutes the current template or a sample run.
 
+The explicit `/report?sample=1` route may construct the illustrative fixture.
+All other report routes start without a report object. A missing saved run, or a
+saved report without its frozen library identity, renders an unavailable state
+and does not create, display, export, or print example data.
+
 This is semantic versioning plus content-addressed verification, not Git. Template maintainers publish a new row version when authored behavior changes; old saved runs remain bound to their original package and frame hashes.
 
 No missing value may be silently promoted to sourced truth.
