@@ -5,6 +5,7 @@ export class PublicApiError extends Error {
     readonly status: number,
     readonly code: string,
     message = code,
+    readonly headers?: HeadersInit,
   ) {
     super(message);
   }
@@ -52,7 +53,10 @@ export async function readBoundedJson(
 
 export function publicApiError(error: unknown, fallbackStatus = 500) {
   if (error instanceof PublicApiError) {
-    return Response.json({ error: error.code }, { status: error.status });
+    return Response.json({ error: error.code }, {
+      status: error.status,
+      headers: error.headers,
+    });
   }
   const requestId = crypto.randomUUID();
   console.error(`[public-api:${requestId}] request failed`);

@@ -31,6 +31,7 @@ compose-up-candidate: compose-pull
 integration-local: compose-up
 	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector npm run db:verify
 	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector npm run db:credibility:verify
+	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector npm run test:admission:integration
 	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector VECTOR_URL=http://127.0.0.1:4317 npm run app:verify
 	VECTOR_URL=http://127.0.0.1:4317 npm run ui:responsive:verify
 
@@ -40,6 +41,7 @@ integration-ci:
 	npm run db:seed
 	npm run db:verify
 	npm run db:credibility:verify
+	npm run test:admission:integration
 	@set -eu; \
 		npx wrangler dev --config dist/server/wrangler.json --ip 127.0.0.1 --port "$${PORT:-4317}" > /tmp/vector-integration.log 2>&1 & \
 		app_pid=$$!; \

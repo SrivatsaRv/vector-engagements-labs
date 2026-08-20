@@ -265,6 +265,25 @@ export const savedRunSnapshots = pgTable("saved_run_snapshots", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const publicApiRateWindows = pgTable("public_api_rate_windows", {
+  policyId: text("policy_id").notNull(),
+  actorHash: text("actor_hash").notNull(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
+  requestCount: integer("request_count").notNull(),
+}, (table) => [primaryKey({ columns: [table.policyId, table.actorHash, table.windowStartedAt] })]);
+
+export const savedRunAdmissionSlots = pgTable("saved_run_admission_slots", {
+  slot: integer("slot").primaryKey(),
+  leaseId: text("lease_id"),
+  leasedUntil: timestamp("leased_until", { withTimezone: true }),
+});
+
+export const anonymousSavedRunUsage = pgTable("anonymous_saved_run_usage", {
+  actorHash: text("actor_hash").notNull(),
+  usageDay: timestamp("usage_day", { withTimezone: false, mode: "date" }).notNull(),
+  acceptedRuns: integer("accepted_runs").notNull(),
+}, (table) => [primaryKey({ columns: [table.actorHash, table.usageDay] })]);
+
 export const blogPostComments = pgTable("blog_post_comments", {
   id: text("id").primaryKey(),
   slug: text("slug").notNull(),
