@@ -53,12 +53,20 @@ side-owned estimate.
 
 ## Record and parity boundary
 
-VSR `pictures.jsonl` records each observer sample with owner, source,
-timestamp, uncertainty, transition state and reason. The information derivation
-is a TypeScript record/read-model adapter, outside the Rust integrator's current
-physics-parity surface. #26 remains open for the Rust/Worker implementation,
-typed datalink transport, terrain LOS, weapon-support interface, UI RASP view,
-and performance/browser evidence.
+The completed `SimulationResult` owns one immutable `RaspTrack[]` sequence. It
+is derived once from canonical engine frames after admission, then the same
+sequence is consumed by live playback, report replay, and VSR
+`pictures.jsonl`. A VSR requires the hashed `vector.pictures.v1` member and
+checks that each sample has one unique side/frame identity, finite telemetry,
+and no hidden truth-position field. Replay reads that member; it does not derive
+a replacement picture from stored world frames.
+
+The information derivation is a TypeScript adapter over equivalent canonical
+frames. TypeScript/Rust parity evidence therefore proves equivalent-frame
+adapter output within the declared positional tolerance; it is not a Rust-native
+sensor-model implementation. #26 remains open for native Rust/Worker
+information state, typed datalink transport, terrain LOS, weapon-support
+interface, canonical RASP UX, and performance/browser evidence.
 
 ## Regression evidence
 

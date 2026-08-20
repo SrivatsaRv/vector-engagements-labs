@@ -13,12 +13,11 @@ import {
   type Scenario,
   type SimulationResult,
 } from "../simulation.ts";
-import { buildSidePictures } from "../information-state.ts";
-import { isOptionalCapabilityEnabled } from "../runtime/deployment-capabilities.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v3" as const;
 export const VECTOR_EVENT_SCHEMA = "vector.events.v1" as const;
+export const VECTOR_PICTURE_SCHEMA = "vector.pictures.v1" as const;
 export const MAX_VECTOR_RECORD_BYTES = 64 * 1024 * 1024;
 
 const RECORD_MAGIC = new TextEncoder().encode("VECTOR1\0");
@@ -467,20 +466,6 @@ function stableEvents(result: SimulationResult): VectorRecordEvent[] {
     }));
 }
 
-function recordPictures(prepared: PreparedSimulation, result: SimulationResult) {
-  if (
-    prepared.scenario.domain !== "A2A" ||
-    !isOptionalCapabilityEnabled("sensors", prepared.capabilityManifest)
-  ) {
-    return [];
-  }
-  return buildSidePictures(
-    prepared.scenario,
-    result.frames,
-    prepared.capabilityManifest,
-  );
-}
-
 async function member(
   path: string,
   schemaVersion: string,
@@ -536,7 +521,7 @@ export async function createVectorSimulationRecord(
     ],
   };
   const events = stableEvents(result);
-  const pictures = recordPictures(prepared, result);
+  const pictures = result.pictures;
   const nonManifest = await Promise.all([
     member("scenario.json", "vector.scenario.v2", "application/json", true, jsonBytes(prepared.scenario)),
     member(
@@ -568,7 +553,7 @@ export async function createVectorSimulationRecord(
     ),
     member(
       "pictures.jsonl",
-      "vector.pictures.v1",
+      VECTOR_PICTURE_SCHEMA,
       "application/x-ndjson",
       true,
       encoder.encode(pictures.map((picture) => canonicalJson(picture)).join("\n")),
@@ -617,7 +602,7 @@ export async function createVectorSimulationRecord(
     requiredViewerFeatures: [
       VECTOR_FRAME_SCHEMA,
       VECTOR_EVENT_SCHEMA,
-      "vector.pictures.v1",
+      VECTOR_PICTURE_SCHEMA,
       "vector.report.v1",
     ],
     members: nonManifest.map(({ bytes, ...item }) => ({
@@ -743,6 +728,14 @@ export async function openVectorSimulationRecord(
       throw new Error(`Required VECTOR record member ${item.path} does not match its manifest.`);
     }
   }
+  const pictureMember = header.members.find((candidate) => candidate.path === "pictures.jsonl");
+  if (
+    !pictureMember ||
+    pictureMember.schemaVersion !== VECTOR_PICTURE_SCHEMA ||
+    !manifest.requiredViewerFeatures.includes(VECTOR_PICTURE_SCHEMA)
+  ) {
+    throw new Error("VECTOR record does not admit the required observer-picture schema.");
+  }
   const scenario = JSON.parse(decoder.decode(required("scenario.json"))) as Scenario;
   const compiled = JSON.parse(decoder.decode(required("compiled.json"))) as Omit<
     PreparedSimulation,
@@ -763,7 +756,8 @@ export async function openVectorSimulationRecord(
     throw new Error("VECTOR record backend provenance is inconsistent.");
   }
   const prepared: PreparedSimulation = { scenario, ...compiled };
-  const result = buildSimulationResult(prepared, engineRun);
+  const pictures = jsonLines<RaspTrack>(required("pictures.jsonl"));
+  const result = buildSimulationResult(prepared, engineRun, pictures);
   if (
     result.termination !== report.result.termination ||
     result.timeOfFlight !== report.result.timeOfFlight
@@ -775,7 +769,7 @@ export async function openVectorSimulationRecord(
     scenario,
     result,
     events: jsonLines<VectorRecordEvent>(required("events.jsonl")),
-    pictures: jsonLines<RaspTrack>(required("pictures.jsonl")),
+    pictures,
     report,
   };
 }

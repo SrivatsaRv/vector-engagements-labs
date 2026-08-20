@@ -19,6 +19,23 @@ const close = (actual, expected, tolerance, label) => {
   );
 };
 
+const assertPictureParity = (actual, expected, label) => {
+  assert.equal(actual.length, expected.length, `${label}: picture count`);
+  for (let index = 0; index < actual.length; index += 1) {
+    const actualPicture = actual[index];
+    const expectedPicture = expected[index];
+    const { position: actualPosition, ...actualMetadata } = actualPicture;
+    const { position: expectedPosition, ...expectedMetadata } = expectedPicture;
+    assert.deepEqual(actualMetadata, expectedMetadata, `${label}: picture ${index} metadata`);
+    assert.equal(Boolean(actualPosition), Boolean(expectedPosition), `${label}: picture ${index} position availability`);
+    if (actualPosition && expectedPosition) {
+      close(actualPosition.x, expectedPosition.x, 1e-6, `${label}: picture ${index} x`);
+      close(actualPosition.y, expectedPosition.y, 1e-6, `${label}: picture ${index} y`);
+      close(actualPosition.z, expectedPosition.z, 1e-6, `${label}: picture ${index} z`);
+    }
+  }
+};
+
 test("committed Rust/WASM artifact has a stable integrity identity", () => {
   assert.match(RUST_WASM_ENGINE_ARTIFACT.sha256, /^[a-f0-9]{64}$/);
   assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes > 100_000);
@@ -54,6 +71,16 @@ for (const definition of SCENARIO_LIBRARY) {
     assert.equal(rust.termination, typescript.termination);
     assert.equal(rust.outcome, typescript.outcome);
     assert.equal(rust.frames.length, typescript.frames.length);
+    if (definition.scenario.domain === "A2A") {
+      assert.ok(typescript.pictures.length > 0, "the admitted information adapter must publish canonical pictures");
+    } else {
+      assert.equal(typescript.pictures.length, 0, "non-A2A runs must not fabricate observer pictures");
+    }
+    assertPictureParity(
+      rust.pictures,
+      typescript.pictures,
+      "equivalent TypeScript and Rust engine frames must yield the same versioned observer pictures",
+    );
     assert.equal(rust.entityManifest.length, typescript.entityManifest.length);
     assert.deepEqual(
       rust.engineRun.scenario.geospatial.syntheticEnvironment,

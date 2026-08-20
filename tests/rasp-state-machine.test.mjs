@@ -69,6 +69,17 @@ test("an unavailable track has no synthetic position", () => {
   assert.equal("position" in (unavailable ?? {}), false);
 });
 
+test("a lost track removes its stale estimate instead of retaining world-derived position", () => {
+  const pictures = buildSidePictures(
+    DEFAULT_SCENARIO,
+    [{ ...frame, range: 10_000, t: 0 }, { ...frame, range: 90_000, t: 5 }],
+  );
+  const lost = pictures.filter((picture) => picture.perspective === "IAF").at(-1);
+  assert.equal(lost?.trackState, "LOST");
+  assert.equal(lost?.visible, false);
+  assert.equal("position" in (lost ?? {}), false);
+});
+
 test("off-board sources fail closed until an admitted sender observation exists", () => {
   for (const source of ["DATALINK", "AIRBORNE_EARLY_WARNING"]) {
     const availability = informationAvailability(
@@ -86,4 +97,14 @@ test("pictures are deterministic and never expose a truth-position field", () =>
   assert.deepEqual(first, second);
   assert.ok(first.every((picture) => !("truthPosition" in picture)));
   assert.ok(first.every((picture) => Number.isFinite(picture.uncertaintyMeters)));
+});
+
+test("a completed run owns its canonical observer pictures instead of making a presentation-time track", () => {
+  const completed = simulate(DEFAULT_SCENARIO);
+  assert.ok(Array.isArray(completed.pictures), "completed runs must carry their recorded observer pictures");
+  assert.deepEqual(
+    completed.pictures,
+    buildSidePictures(DEFAULT_SCENARIO, completed.frames),
+    "the information adapter must derive the picture once from canonical frames",
+  );
 });
