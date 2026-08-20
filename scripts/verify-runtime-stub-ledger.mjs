@@ -56,7 +56,7 @@ export function validateIndicatorInventory(observations, ledger) {
   for (const control of controls) {
     const key = keyFor(control);
     assert(!controlsByKey.has(key), `Duplicate indicator control for ${control.path} (${control.indicator}).`);
-    assert(Number.isInteger(control.expectedLines) && control.expectedLines >= 0, `Invalid expectedLines for ${control.path}.`);
+    assert(Number.isInteger(control.expectedLines) && control.expectedLines > 0, `Invalid expectedLines for ${control.path}; zero-match controls hide indicators instead of governing them.`);
     if (control.kind === "allowance") {
       assert(control.entryIds.length > 0, `Allowance ${control.path} has no ledger owner.`);
       for (const entryId of control.entryIds) {
@@ -64,6 +64,10 @@ export function validateIndicatorInventory(observations, ledger) {
       }
     } else {
       assert(control.classification && control.rationale, `Exemption ${control.path} lacks classification or rationale.`);
+      assert(
+        Array.isArray(control.owners) && control.owners.length > 0 && control.owners.every((owner) => /^#\d+$/u.test(owner)),
+        `Exemption ${control.path} requires an owning GitHub issue.`,
+      );
     }
     controlsByKey.set(key, control);
   }

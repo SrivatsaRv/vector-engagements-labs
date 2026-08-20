@@ -64,6 +64,14 @@ renamed or suppressed without updating the ledger. Every current entry remains
 release-blocking until its owning issue replaces the behavior or makes the
 capability explicitly unavailable.
 
+Policy controls are evidence, not a suppression switch. Each classified
+production indicator must have one or more observed lines: zero-match
+allowances are invalid. Allowances inherit accountable issue ownership from
+their ledger entries. Exemptions are permitted only for non-causal code paths
+and must state their rationale and the owning issue; #66 owns those policy
+exceptions. A new fallback or model-assumption indicator without that evidence
+fails the local and PR gate.
+
 Browser/responsive checks and performance benchmarks are deliberately not run
 on GitHub-hosted pull-request runners. They remain explicit maintainer checks
 through `make integration-local` and `make performance-local`, where the
