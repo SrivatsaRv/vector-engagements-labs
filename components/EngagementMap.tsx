@@ -2,6 +2,7 @@
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
+import { CircleHelp, Layers3 } from "lucide-react";
 import { VectorMapControls, type MapCameraTelemetry } from "@/components/VectorMapControls";
 import type { RaspTrack, SimulationResult } from "@/lib/simulation";
 import { getFrameAt } from "@/lib/simulation";
@@ -34,10 +35,11 @@ type Props = {
   time: number;
   installations: MapInstallation[];
   raspTrack?: RaspTrack;
+  layoutRevision?: number;
 };
 type MapScope = "ENGAGEMENT" | "REGION";
 
-export function EngagementMap({ result, time, installations, raspTrack }: Props) {
+export function EngagementMap({ result, time, installations, raspTrack, layoutRevision = 0 }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("maplibre-gl").Map | null>(null);
   const markers = useRef<Map<string, import("maplibre-gl").Marker>>(new Map());
@@ -373,6 +375,15 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
     );
   }, [mapScope, mapStatus, origin, result, spatial.bounds]);
 
+  // ResizeObserver covers ordinary reflow. The disclosure commits a grid-row
+  // change, so explicitly schedule the MapLibre resize after that commit too.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const frame = requestAnimationFrame(() => map.resize());
+    return () => cancelAnimationFrame(frame);
+  }, [layoutRevision]);
+
   useEffect(() => {
     const map = mapRef.current;
     const frame = getFrameAt(result, time);
@@ -388,6 +399,15 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
         marker.remove();
         markers.current.delete(id);
       }
+      const labelPriority = [...frame.entities]
+        .sort((left, right) => {
+          const score = (entity: typeof left) =>
+            (entity.lifecycle === "ENGAGING" ? 40 : 0) +
+            (entity.kind === "GUIDED_WEAPON" ? 20 : 0) +
+            (entity.kind === "AIRCRAFT" ? 10 : 0);
+          return score(right) - score(left) || left.id.localeCompare(right.id);
+        })
+        .reduce((priorities, entity, index) => priorities.set(entity.id, index), new Map<string, number>());
       for (const entity of frame.entities) {
         const isObservedTrack = raspTrack?.observedEntityId === entity.id;
         const displayPosition = isObservedTrack && raspTrack?.visible
@@ -412,6 +432,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           // catalog object; a later presentation setting may deliberately
           // switch to a declared scenario callsign.
           if (label) label.textContent = entity.designation;
+          element.dataset.labelPriority = String(labelPriority.get(entity.id) ?? 99);
           element.title = `${entity.designation} · ${entity.lifecycle.toLowerCase()}`;
           const createdMarker = new maplibregl.Marker({ element, anchor: "center" });
           createdMarker.setLngLat(displayLngLat).addTo(map);
@@ -428,6 +449,7 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           "is-hidden-track",
           Boolean(isObservedTrack && !raspTrack?.visible),
         );
+        marker.getElement().dataset.labelPriority = String(labelPriority.get(entity.id) ?? 99);
       }
       let uncertainty = markers.current.get("rasp-uncertainty");
       if (raspTrack?.visible) {
@@ -515,14 +537,24 @@ export function EngagementMap({ result, time, installations, raspTrack }: Props)
           <span>{mapStatus === "error" ? mapError : "Preparing geographic context and overlays."}</span>
         </div>
       )}
-      <div className="map-layer-legend" aria-label="Map layer legend">
-        <span><i className="route" />Declared route</span>
-        <span><i className="track" />Recorded trajectory</span>
-        <span><i className="sensor" />Sensor coverage</span>
-        <span><i className="engagement" />Engagement envelope</span>
-        <span><i className="launch" />Launch</span>
-      </div>
-      <div className="map-data-note">{spatial.name} · public educational area · right-drag or touch to rotate · tilt is a context preview</div>
+      <details className="map-layer-legend">
+        <summary><Layers3 size={14} aria-hidden="true" /> Layers <span>5 available</span></summary>
+        <div aria-label="Map layer legend">
+          <span><i className="route" />Declared route</span>
+          <span><i className="track" />Recorded trajectory</span>
+          <span><i className="sensor" />Sensor coverage</span>
+          <span><i className="engagement" />Engagement envelope</span>
+          <span><i className="launch" />Launch</span>
+        </div>
+      </details>
+      <details className="map-context-disclosure">
+        <summary><CircleHelp size={14} aria-hidden="true" /> Study area</summary>
+        <div>
+          <strong>{spatial.name}</strong>
+          <p>Public educational area. This map gives geographic context only.</p>
+          <p>Drag to pan. Use the controls for extent, layers and tilt preview.</p>
+        </div>
+      </details>
     </div>
   );
 }

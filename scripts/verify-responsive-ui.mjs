@@ -295,6 +295,44 @@ try {
       expectedEngineBackend,
       `${viewport.width}: deployed browser backend does not match the capability manifest`,
     );
+    await page.getByRole("button", { name: "Pause playback", exact: true }).click();
+    const collapsedFrame = await page.evaluate(() => ({
+      sceneHeight: document.querySelector(".scene-wrap")?.getBoundingClientRect().height ?? 0,
+      canvasHeight: document.querySelector(".engagement-map canvas")?.getBoundingClientRect().height ?? 0,
+      camera: document.querySelector(".engagement-map-shell .vector-map-telemetry")?.textContent,
+      time: document.querySelector(".telemetry-title > div")?.textContent,
+      legend: document.querySelector(".map-layer-legend")?.getBoundingClientRect(),
+      attribution: document.querySelector(".engagement-map-shell .maplibregl-ctrl-attrib")?.getBoundingClientRect(),
+    }));
+    const telemetryToggle = page.getByRole("button", { name: /expand telemetry/i });
+    if (viewport.family === "phone") {
+      await telemetryToggle.focus();
+      await page.keyboard.press("Enter");
+    } else {
+      await telemetryToggle.click();
+    }
+    await page.waitForFunction(() => document.querySelector(".telemetry.is-expanded") !== null);
+    await page.waitForFunction(() => {
+      const scene = document.querySelector(".scene-wrap")?.getBoundingClientRect();
+      const canvas = document.querySelector(".engagement-map canvas")?.getBoundingClientRect();
+      return Boolean(scene && canvas && Math.abs(scene.height - canvas.height) <= 2);
+    });
+    const expandedFrame = await page.evaluate(() => ({
+      sceneHeight: document.querySelector(".scene-wrap")?.getBoundingClientRect().height ?? 0,
+      canvasHeight: document.querySelector(".engagement-map canvas")?.getBoundingClientRect().height ?? 0,
+      camera: document.querySelector(".engagement-map-shell .vector-map-telemetry")?.textContent,
+      time: document.querySelector(".telemetry-title > div")?.textContent,
+      telemetryPanels: document.querySelectorAll(".telemetry-panel").length,
+    }));
+    assert.equal(expandedFrame.telemetryPanels, 6, `${viewport.width}: expanded telemetry lost a chart`);
+    assert.ok(collapsedFrame.sceneHeight > expandedFrame.sceneHeight, `${viewport.width}: collapsed telemetry did not release map height`);
+    assert.ok(Math.abs(collapsedFrame.canvasHeight - collapsedFrame.sceneHeight) <= 2, `${viewport.width}: collapsed MapLibre canvas did not resize`);
+    assert.ok(Math.abs(expandedFrame.canvasHeight - expandedFrame.sceneHeight) <= 2, `${viewport.width}: expanded MapLibre canvas did not resize`);
+    assert.equal(collapsedFrame.camera, expandedFrame.camera, `${viewport.width}: telemetry changed the map camera`);
+    assert.equal(collapsedFrame.time, expandedFrame.time, `${viewport.width}: telemetry changed canonical display time`);
+    assert.ok(collapsedFrame.attribution, `${viewport.width}: MapLibre attribution is missing`);
+    await page.getByRole("button", { name: /collapse telemetry/i }).click();
+    await page.waitForFunction(() => document.querySelector(".telemetry.is-collapsed") !== null);
     await page.getByRole("button", { name: "3D", exact: true }).click();
     await page.waitForFunction(() => Boolean(document.querySelector(".three-d-surface .simulation-scene canvas")));
     await page.waitForTimeout(100);

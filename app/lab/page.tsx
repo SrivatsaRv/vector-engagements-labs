@@ -31,7 +31,7 @@ import { EngagementMap, type MapInstallation } from "@/components/EngagementMap"
 import { ScenarioAuthoringMap } from "@/components/ScenarioAuthoringMap";
 import { SimulationScene } from "@/components/SimulationScene";
 import { TacticalSymbol } from "@/components/TacticalSymbol";
-import { TelemetryChart } from "@/components/TelemetryChart";
+import { ViewportTelemetry } from "@/components/ViewportTelemetry";
 import {
   canConduct,
   validateScenario,
@@ -228,6 +228,19 @@ function LabWorkbench({
   const [spatialInputsValid, setSpatialInputsValid] = useState(true);
   const [playbackSurface, setPlaybackSurface] =
     useState<PlaybackSurface>("MAP");
+  const [telemetryExpanded, setTelemetryExpanded] = useState(false);
+
+  useEffect(() => {
+    const restore = window.requestAnimationFrame(() => {
+      setTelemetryExpanded(sessionStorage.getItem("vector.telemetry.expanded.v1") === "true");
+    });
+    return () => window.cancelAnimationFrame(restore);
+  }, []);
+
+  const setTelemetryDisclosure = useCallback((expanded: boolean) => {
+    sessionStorage.setItem("vector.telemetry.expanded.v1", String(expanded));
+    setTelemetryExpanded(expanded);
+  }, []);
   const validations = useMemo(() => {
     const items = validateScenario(definition, scenario);
     return spatialInputsValid
@@ -735,7 +748,7 @@ function LabWorkbench({
               ))}
             </section>
           </aside>
-          <section className="simulation-column">
+          <section className={`simulation-column ${telemetryExpanded ? "telemetry-expanded" : "telemetry-collapsed"}`}>
             <div className="sim-topline">
               <div className="sim-identity">
                 <span>Computed model state</span>
@@ -778,6 +791,7 @@ function LabWorkbench({
                   result={result}
                   time={time}
                   installations={catalogInstallations}
+                  layoutRevision={telemetryExpanded ? 1 : 0}
                 />
               ) : (
                 <SimulationScene
@@ -785,6 +799,7 @@ function LabWorkbench({
                   time={time}
                   profile={scenario.profile}
                   layers={layers}
+                  layoutRevision={telemetryExpanded ? 1 : 0}
                 />
               )}
               <div className="symbol-key">
@@ -814,13 +829,12 @@ function LabWorkbench({
               speed={speed}
               setSpeed={setSpeed}
             />
-            <div className="telemetry">
-              <div className="telemetry-title">
-                <strong>Synchronized run telemetry</strong>
-                <span>Computed at {time.toFixed(1)} model seconds</span>
-              </div>
-              <TelemetryChart result={result} time={time} />
-            </div>
+            <ViewportTelemetry
+              expanded={telemetryExpanded}
+              onExpandedChange={setTelemetryDisclosure}
+              result={result}
+              time={time}
+            />
           </section>
           <aside className="session-right">
             <Outcome result={result} />
