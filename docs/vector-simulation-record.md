@@ -41,11 +41,14 @@ when the compiled capability identity and record manifest disagree.
 
 Basemap tiles are referenced by provider and style revision, not silently embedded. A portable export may include explicitly licensed terrain or static assets. Missing optional assets must degrade to class silhouettes and a neutral terrain surface without changing telemetry.
 
-Each `pictures.jsonl` entry carries `modelTimeSeconds`, the model-clock identity
+Each `pictures.jsonl` entry uses the required `vector.pictures.v1` schema and
+its member hash is bound by `manifest.json`. It carries `modelTimeSeconds`, the model-clock identity
 of that observer-picture sample. Consumers select it by that exact frame time,
 not by array order, last-update time, or a rendered interpolation. A missing
 picture is an explicit unavailable state; viewers may not synthesize track
-position, confidence, freshness, or uncertainty.
+position, confidence, freshness, or uncertainty. A replay validates one unique
+side/frame sample per admitted A2A frame, finite telemetry, and the absence of
+a hidden truth position before exposing the record.
 
 Browser playback first resolves one `SelectedDisplayFrame` from a requested
 scrub position. Map, 3D, timeline-linked telemetry, observer-picture selection,

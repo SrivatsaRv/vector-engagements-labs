@@ -174,7 +174,7 @@ function snapshot(
     ageSeconds: age,
     confidence: track.state === "CONFIRMED" ? 80 : track.state === "TENTATIVE" ? 55 : track.state === "PLOT" ? 35 : track.state === "COASTING" ? 20 : 0,
     uncertaintyMeters: last ? Math.round(last.covarianceMeters + age * 250) : 0,
-    ...(last ? { position: { ...last.position } } : {}),
+    ...(last && visible ? { position: { ...last.position } } : {}),
     observedEntityId: config.observedEntityId,
     visible,
     status: status(track.state),
@@ -219,4 +219,49 @@ export function buildSidePictures(
     }
   }
   return output;
+}
+
+/**
+ * Reject a replay picture set that cannot be tied to the immutable frame
+ * sequence. This validates record shape only; it deliberately does not
+ * regenerate observations from world state while a saved run is being opened.
+ */
+export function assertRecordedSidePictures(
+  scenario: Scenario,
+  frames: readonly Frame[],
+  pictures: readonly RaspTrack[],
+  manifest?: DeploymentCapabilityManifest,
+) {
+  const sensorsAdmitted = !manifest || isOptionalCapabilityEnabled("sensors", manifest);
+  const expectedCount = scenario.domain === "A2A" && sensorsAdmitted
+    ? frames.length * 2
+    : 0;
+  if (pictures.length !== expectedCount) {
+    throw new Error(`Recorded observer-picture count ${pictures.length} does not match the admitted frame boundary ${expectedCount}.`);
+  }
+  const frameTimes = new Set(frames.map((frame) => frame.t));
+  const keys = new Set<string>();
+  for (const picture of pictures) {
+    if (!frameTimes.has(picture.modelTimeSeconds)) {
+      throw new Error("Recorded observer picture does not identify a canonical frame.");
+    }
+    const key = `${picture.perspective}:${picture.modelTimeSeconds}`;
+    if (keys.has(key)) throw new Error("Recorded observer picture has a duplicate side/frame identity.");
+    keys.add(key);
+    if ("truthPosition" in picture) {
+      throw new Error("Recorded observer picture exposes a prohibited truth position.");
+    }
+    if (!Number.isFinite(picture.lastUpdateSeconds) ||
+      !Number.isFinite(picture.ageSeconds) || picture.ageSeconds < 0 ||
+      !Number.isFinite(picture.confidence) || !Number.isFinite(picture.uncertaintyMeters) ||
+      picture.uncertaintyMeters < 0) {
+      throw new Error("Recorded observer picture contains invalid track telemetry.");
+    }
+    if (!picture.visible && picture.position) {
+      throw new Error("An unavailable recorded observer picture must not carry a position.");
+    }
+    if (picture.position && ![picture.position.x, picture.position.y, picture.position.z].every(Number.isFinite)) {
+      throw new Error("Recorded observer picture contains a non-finite estimated position.");
+    }
+  }
 }

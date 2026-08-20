@@ -14,6 +14,7 @@ import {
   admitScenarioCapabilities,
   createVerificationDeploymentCapabilities,
   DEPLOYMENT_CAPABILITIES,
+  isOptionalCapabilityEnabled,
   type DeploymentCapabilityManifest,
 } from "./runtime/deployment-capabilities.ts";
 import type { RecordedGeographicPosition } from "./geospatial/contracts.ts";
@@ -29,6 +30,7 @@ import { geographicToLocal } from "./scenario-spatial.ts";
 import { getStudyArea } from "./study-areas.ts";
 import {
   buildSidePictures,
+  assertRecordedSidePictures,
   informationAvailability,
   type TrackState,
 } from "./information-state.ts";
@@ -251,6 +253,8 @@ export type SimulationResult = {
   engineRun: EngineRun;
   entityManifest: EngineEntityDefinition[];
   envelopes: CoverageEnvelope[];
+  /** Immutable side-owned observer-picture samples for this completed run. */
+  pictures: RaspTrack[];
 };
 
 export type VehicleProfile = {
@@ -607,6 +611,7 @@ export function prepareSimulation(
 export function buildSimulationResult(
   prepared: PreparedSimulation,
   engineRun: EngineRun,
+  recordedPictures?: RaspTrack[],
 ): SimulationResult {
   const { scenario: input, profile, engineScenario } = prepared;
   const frames: Frame[] = engineRun.frames.map((engineFrame) => {
@@ -665,6 +670,12 @@ export function buildSimulationResult(
         ? "The scenario did not contain an active guided vehicle and a valid assigned objective."
         : `The run reached ${engineScenario.durationSeconds} model seconds before the completion distance.`;
   const last = frames.at(-1);
+  const pictures = recordedPictures ?? (
+    input.domain === "A2A" && isOptionalCapabilityEnabled("sensors", prepared.capabilityManifest)
+      ? buildSidePictures(input, frames, prepared.capabilityManifest)
+      : []
+  );
+  assertRecordedSidePictures(input, frames, pictures, prepared.capabilityManifest);
   return {
     frames,
     outcome,
@@ -678,6 +689,7 @@ export function buildSimulationResult(
     engineRun,
     entityManifest: engineRun.scenario.entities,
     envelopes: engineRun.envelopes,
+    pictures,
   };
 }
 

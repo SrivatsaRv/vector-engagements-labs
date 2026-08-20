@@ -67,6 +67,11 @@ for (const backend of ["typescript", "rust-wasm"]) {
     assert.equal(opened.result.reason, result.reason);
     assert.ok(opened.events.length > 0);
     assert.ok(opened.pictures.length > 0, "admitted sensor state must be recorded");
+    assert.deepEqual(
+      opened.result.pictures,
+      opened.pictures,
+      "replay must expose the immutable recorded observer pictures, not rebuild them",
+    );
     assert.ok(opened.pictures.every((picture) => picture.trackState));
     assert.ok(
       opened.pictures.every((picture) =>
@@ -126,6 +131,28 @@ test("VSR rejects corruption before exposing replay data", async () => {
   await assert.rejects(
     openVectorSimulationRecord(missing.buffer, missing.byteLength),
     /events\.jsonl.*does not match its manifest/,
+  );
+});
+
+test("VSR rejects an observer-picture member with an unadmitted schema", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const record = await createVectorSimulationRecord(
+    prepareSimulation(scenario),
+    simulate(scenario),
+    createdAt,
+  );
+  const unsupportedPictures = {
+    ...record,
+    members: record.members.map((member) =>
+      member.path === "pictures.jsonl"
+        ? { ...member, schemaVersion: "vector.pictures.v2" }
+        : member,
+    ),
+  };
+  const serialized = serializeVectorRecord(unsupportedPictures);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /does not admit the required observer-picture schema/,
   );
 });
 

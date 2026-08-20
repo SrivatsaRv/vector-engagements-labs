@@ -95,7 +95,6 @@ import {
   type Scenario,
   type SimulationResult,
 } from "@/lib/simulation";
-import { buildSidePictures } from "@/lib/information-state";
 import {
   selectDisplayFrame,
   selectRecordedTrackState,
@@ -511,8 +510,8 @@ function LabWorkbench({
   );
   const frame = selectedDisplayFrame.frame;
   const recordedPictures = useMemo(
-    () => freezeRecordedPictures(buildSidePictures(scenario, result.frames)),
-    [result.frames, scenario],
+    () => freezeRecordedPictures(result.pictures),
+    [result.pictures],
   );
   const selectedTrackState = useMemo(
     () => selectRecordedTrackState(recordedPictures, selectedDisplayFrame, trackPerspective),
