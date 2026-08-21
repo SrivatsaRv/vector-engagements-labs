@@ -261,6 +261,10 @@ test("a current deployment manifest drives the real Worker run after route recov
   await expect(page.locator(".playback [data-display-time]")).toHaveAttribute("data-display-time", mapDisplayTime!);
   await expect(page.locator(".telemetry-title [data-display-time]")).toHaveAttribute("data-display-time", mapDisplayTime!);
   await expect(page.locator(".current-geometry")).toHaveAttribute("data-display-time", mapDisplayTime!);
+  const routeTransition = page.locator(".route-transition-inspector:visible").first();
+  await expect(routeTransition).toHaveAttribute("data-display-time", mapDisplayTime!);
+  await expect(routeTransition).toHaveAttribute("data-frame-index", await page.locator(".engagement-map-shell").getAttribute("data-display-frame-index") ?? "");
+  await expect(routeTransition).toContainText(/Fly-over|Fly-by|Route complete|unavailable/i);
   await expect(page.locator(".current-geometry")).not.toContainText("Relative-position diagram");
   await expect(page.locator(".telemetry.is-collapsed")).toBeVisible();
   const telemetryToggle = page.getByRole("button", { name: /expand telemetry/i });

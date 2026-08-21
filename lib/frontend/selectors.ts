@@ -10,6 +10,111 @@ export type SelectedDisplayFrame = {
   displayTimeSeconds: number;
 };
 
+export type RouteTransitionState =
+  | {
+      state: "ACTIVE";
+      entityId: string;
+      designation: string;
+      displayTimeSeconds: number;
+      frameIndex: number;
+      routeSchemaVersion: "vector.route-plan.v1" | "vector.route-plan.v2";
+      semantics: "LEGACY_ALL_FLY_BY" | "DECLARED";
+      waypointIndex: number;
+      waypointCount: number;
+      transition: "FLY_BY" | "FLY_OVER";
+      acceptanceRadiusM: number | null;
+      limiter: NonNullable<EngineEntityFrame["aircraftControl"]>["limiter"];
+    }
+  | {
+      state: "COMPLETE";
+      entityId: string;
+      designation: string;
+      displayTimeSeconds: number;
+      frameIndex: number;
+      routeSchemaVersion: "vector.route-plan.v1" | "vector.route-plan.v2";
+      semantics: "LEGACY_ALL_FLY_BY" | "DECLARED";
+      waypointCount: number;
+    }
+  | {
+      state: "UNAVAILABLE";
+      entityId: string;
+      designation: string;
+      displayTimeSeconds: number;
+      frameIndex: number;
+      reason:
+        | "ROUTE_NOT_COMPILED"
+        | "ROUTE_CONTROL_NOT_RECORDED"
+        | "ROUTE_POINT_NOT_RECORDED"
+        | "ROUTE_TRANSITION_NOT_RECORDED";
+    };
+
+/**
+ * Presents the route transition that the engine recorded as active at the
+ * selected display frame. The selector reads the immutable compiled route and
+ * frame-owned route-point index; it never advances a route or estimates a turn.
+ */
+export function selectRouteTransitionStates(
+  result: SimulationResult,
+  selected: SelectedDisplayFrame,
+): RouteTransitionState[] {
+  return result.engineRun.scenario.entities
+    .filter((definition) => definition.kind === "AIRCRAFT")
+    .map((definition): RouteTransitionState => {
+      const frameEntity = selected.frame.entities.find(
+        (entity) => entity.id === definition.id,
+      );
+      const common = {
+        entityId: definition.id,
+        designation: definition.designation,
+        displayTimeSeconds: selected.displayTimeSeconds,
+        frameIndex: selected.frameIndex,
+      };
+      const route = definition.route;
+      const routePlan = definition.routePlan;
+      if (!route || !routePlan || route.length !== routePlan.waypointAcceptanceRadiiM.length) {
+        return { ...common, state: "UNAVAILABLE", reason: "ROUTE_NOT_COMPILED" };
+      }
+      if (!frameEntity?.aircraftControl) {
+        return { ...common, state: "UNAVAILABLE", reason: "ROUTE_CONTROL_NOT_RECORDED" };
+      }
+      const { routePointIndex } = frameEntity.aircraftControl;
+      const semantics = routePlan.schemaVersion === "vector.route-plan.v1"
+        ? "LEGACY_ALL_FLY_BY"
+        : "DECLARED";
+      if (routePointIndex === null || frameEntity.aircraftControl.limiter === "ROUTE_COMPLETE") {
+        return {
+          ...common,
+          state: "COMPLETE",
+          routeSchemaVersion: routePlan.schemaVersion,
+          semantics,
+          waypointCount: route.length,
+        };
+      }
+      if (!Number.isInteger(routePointIndex) || routePointIndex <= 0 || routePointIndex >= route.length) {
+        return { ...common, state: "UNAVAILABLE", reason: "ROUTE_POINT_NOT_RECORDED" };
+      }
+      const transition = routePlan.schemaVersion === "vector.route-plan.v1"
+        ? "FLY_BY"
+        : routePlan.waypointTransitions?.[routePointIndex];
+      if (transition !== "FLY_BY" && transition !== "FLY_OVER") {
+        return { ...common, state: "UNAVAILABLE", reason: "ROUTE_TRANSITION_NOT_RECORDED" };
+      }
+      return {
+        ...common,
+        state: "ACTIVE",
+        routeSchemaVersion: routePlan.schemaVersion,
+        semantics,
+        waypointIndex: routePointIndex,
+        waypointCount: route.length,
+        transition,
+        acceptanceRadiusM: transition === "FLY_BY"
+          ? routePlan.waypointAcceptanceRadiiM[routePointIndex] ?? null
+          : null,
+        limiter: frameEntity.aircraftControl.limiter,
+      };
+    });
+}
+
 export function selectDisplayFrame(
   result: SimulationResult,
   requestedTimeSeconds: number,

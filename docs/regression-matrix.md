@@ -51,6 +51,19 @@ This matrix is the minimum proof required before a feature milestone is committe
   3D, timeline, telemetry, and Current geometry on one display time and that
   the retired relative-position placeholder is absent.
 
+### Route transition replay binding (#41/#60 slice)
+
+- `tests/frontend-selectors.test.mjs` proves the active transition comes from
+  the selected frame's recorded route-point index and immutable compiled v2
+  route, exposes v1 all-fly-by semantics, and fails closed when route control
+  is absent.
+- `tests/component/route-transition-inspector.test.tsx` proves the inspector
+  identifies the exact frame and presents active, legacy, and unavailable
+  route states without mutating it.
+- `tests/browser/route-authoring.spec.ts` proves the real Worker route journey
+  keeps the inspector, Map, playback, telemetry, and geometry on one selected
+  frame identity at all five supported viewports.
+
 1. `make ci-local`
 2. The applicable named target: `make worker-local`, `make frontend-local`,
    `make integration-local`, `make container-verify`,

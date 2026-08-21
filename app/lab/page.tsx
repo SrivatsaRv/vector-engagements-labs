@@ -34,6 +34,7 @@ import { TacticalSymbolLegend } from "@/components/TacticalSymbolLegend";
 import { ViewportTelemetry } from "@/components/ViewportTelemetry";
 import { TrackStateInspector } from "@/components/TrackStateInspector";
 import { CurrentGeometry } from "@/components/CurrentGeometry";
+import { RouteTransitionInspector } from "@/components/RouteTransitionInspector";
 import { applyTacticalLabelPolicy, presentTacticalSymbol } from "@/lib/tactical-symbol-contract";
 import {
   canConduct,
@@ -101,6 +102,7 @@ import {
   selectCurrentGeometry,
   selectDisplayFrame,
   selectRecordedTrackState,
+  selectRouteTransitionStates,
 } from "@/lib/frontend/selectors";
 
 type Workspace = "configure" | "run" | "results";
@@ -544,6 +546,10 @@ function LabWorkbench({
     () => selectCurrentGeometry(result, selectedDisplayFrame),
     [result, selectedDisplayFrame],
   );
+  const selectedRouteTransitions = useMemo(
+    () => selectRouteTransitionStates(result, selectedDisplayFrame),
+    [result, selectedDisplayFrame],
+  );
   const addObservation = () =>
     setEvents((items) => [
       ...items,
@@ -904,6 +910,7 @@ function LabWorkbench({
                 perspective={trackPerspective}
                 onPerspectiveChange={setTrackPerspective}
               />
+              <RouteTransitionInspector transitions={selectedRouteTransitions} />
             </div>
           </section>
           <aside className="session-right">
@@ -918,6 +925,7 @@ function LabWorkbench({
             ) : (
               <CurrentGeometry geometry={selectedGeometry} />
             )}
+            <RouteTransitionInspector transitions={selectedRouteTransitions} />
             <section className="right-card">
               <div className="right-title">
                 <Layers3 size={15} />
