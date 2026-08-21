@@ -38,4 +38,22 @@ describe("TacticalSymbolLegend", () => {
     expect(screen.getByText("Unavailable")).toBeVisible();
     expect(screen.queryByText(/generic/i)).not.toBeInTheDocument();
   });
+
+  it("keeps hidden map-label detail available to assistive technology in the legend", () => {
+    const selected = presentTacticalSymbol({
+      id: "blue-selected",
+      designation: "Blue Selected",
+      kind: "AIRCRAFT",
+      affiliation: "BLUE",
+      lifecycle: "ACTIVE",
+      symbolRole: "FIGHTER",
+      headingRad: 0,
+      headingRequired: true,
+      selected: true,
+      valueState: "WORLD",
+    });
+    render(<TacticalSymbolLegend symbols={[selected]} label="Selected tactical entity" />);
+    expect(screen.getByRole("list", { name: "Selected tactical entity" })).toBeVisible();
+    expect(screen.getByLabelText(/blue selected: blue fighter.*selected/i)).toBeVisible();
+  });
 });

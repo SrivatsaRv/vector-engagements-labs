@@ -5287,6 +5287,8 @@ button:disabled,
 .map-status.error strong { color: #9b473e; }
 .map-status.error { inset: auto 12px 48px auto; max-width: 320px; padding: 12px 14px; border: 1px solid #d8beba; background: rgba(255,255,255,.96); text-align: left; }
 .map-tactical-marker { width: 42px; height: 42px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.22)); cursor: pointer; }
+.map-tactical-marker:focus-visible { outline: 2px solid #26313a; outline-offset: 3px; }
+.map-tactical-marker[data-selected="true"] > span { border-color: #26313a; box-shadow: 0 0 0 2px rgba(47,111,181,.2); }
 .map-tactical-marker svg { width: 100%; height: 100%; }
 .map-tactical-marker svg[data-kind="AIRCRAFT"] .tactical-heading-layer,
 .map-tactical-marker svg[data-kind="GUIDED_WEAPON"] .tactical-heading-layer {

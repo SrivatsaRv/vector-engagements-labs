@@ -7,8 +7,9 @@ import { VectorMapControls, type MapCameraTelemetry } from "@/components/VectorM
 import type { RaspTrack, SimulationResult } from "@/lib/simulation";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
 import {
-  applyTacticalLabelPolicy,
+  applyTacticalLabelCollisionPolicy,
   presentTacticalSymbol,
+  tacticalSymbolAccessibleName,
 } from "@/lib/tactical-symbol-contract";
 import { emitBrowserTelemetry } from "@/lib/observability/client";
 import {
@@ -57,6 +58,9 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
   const [mapError, setMapError] = useState("");
   const [basemap, setBasemap] = useState<VectorBasemap>("MINIMAL");
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // This is deliberately view-local. Selecting a marker changes label detail
+  // only; it cannot change the selected replay frame or a saved run.
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [camera, setCamera] = useState<MapCameraTelemetry>({
     longitude: 0,
     latitude: 0,
@@ -403,7 +407,11 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
     const map = mapRef.current;
     const frame = selected.frame;
     const displayTimeSeconds = selected.displayTimeSeconds;
-    if (!map || !frame || mapStatus !== "ready") return;
+    // Overlay presentation can remain available when tile transport fails
+    // after MapLibre has accepted the style. The status still tells the
+    // operator that geographic context is unavailable; it must not freeze
+    // canonical-frame marker selection or label disclosure.
+    if (!map || !frame || !map.getStyle()) return;
     import("maplibre-gl").then((maplibregl) => {
       const visibleEntityIds = new Set(frame.entities.map((entity) => entity.id));
       for (const [id, marker] of markers.current.entries()) {
@@ -415,7 +423,7 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
         marker.remove();
         markers.current.delete(id);
       }
-      const presentations = applyTacticalLabelPolicy(frame.entities.map((entity) => presentTacticalSymbol({
+      const basePresentations = frame.entities.map((entity) => presentTacticalSymbol({
         id: entity.id,
         designation: entity.designation,
         kind: entity.kind,
@@ -424,8 +432,22 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
         symbolRole: entity.symbolRole,
         headingRad: entity.headingRad,
         headingRequired: true,
+        selected: entity.id === selectedEntityId,
         valueState: "WORLD",
-      })));
+      }));
+      const presentations = applyTacticalLabelCollisionPolicy(
+        basePresentations,
+        frame.entities.map((entity) => {
+          const [longitude, latitude] = recordedLngLat(
+            frame.geographicPositions,
+            entity.id,
+            entity.position,
+            origin,
+          );
+          const point = map.project([longitude, latitude]);
+          return { id: entity.id, x: point.x, y: point.y };
+        }),
+      );
       const presentationById = new Map(presentations.map((presentation) => [presentation.id, presentation]));
       for (const entity of frame.entities) {
         const observerPresentation = selectObserverEntityPresentation(raspTrack, entity.id);
@@ -452,6 +474,15 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           const element = document.createElement("div");
           element.className = "map-tactical-marker";
           element.innerHTML = `${tacticalSymbolMarkup(presentation)}<span></span>`;
+          element.tabIndex = 0;
+          element.setAttribute("role", "button");
+          element.addEventListener("click", () => setSelectedEntityId(entity.id));
+          element.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setSelectedEntityId(entity.id);
+            }
+          });
           const label = element.querySelector("span");
           // Generated engine callsigns preserve replay identity but are not
           // useful operator labels. Default map presentation names the actual
@@ -459,6 +490,7 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           // switch to a declared scenario callsign.
           if (label) label.textContent = entity.designation;
           element.dataset.labelVisibility = presentation.label.visibility;
+          element.dataset.selected = String(presentation.availability === "AVAILABLE" && presentation.selected);
           element.title = presentation.availability === "AVAILABLE"
             ? `${presentation.designation} · ${presentation.lifecycle.toLowerCase()}`
             : presentation.label.text;
@@ -469,6 +501,11 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
         }
         const label = marker.getElement().querySelector("span");
         if (label) label.textContent = presentation.label.text;
+        marker.getElement().setAttribute("aria-label", tacticalSymbolAccessibleName(presentation));
+        marker.getElement().setAttribute(
+          "aria-pressed",
+          String(presentation.availability === "AVAILABLE" && presentation.selected),
+        );
         const svg = marker.getElement().querySelector("svg");
         if (
           svg?.getAttribute("data-availability") !== presentation.availability
@@ -484,6 +521,7 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           marker.getElement().style.setProperty("--entity-heading", `${presentation.headingDeg}deg`);
         }
         marker.getElement().dataset.labelVisibility = presentation.label.visibility;
+        marker.getElement().dataset.selected = String(presentation.availability === "AVAILABLE" && presentation.selected);
       }
       // No uncertainty marker is shown until an admitted sensor model emits a
       // side-owned position estimate.
@@ -517,7 +555,7 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
       map.setFilter("launch-events", launchFilter);
       map.setFilter("launch-event-labels", launchFilter);
     });
-  }, [mapStatus, origin, result, selected, raspTrack]);
+  }, [mapStatus, origin, result, selected, raspTrack, selectedEntityId]);
 
   return (
     <div

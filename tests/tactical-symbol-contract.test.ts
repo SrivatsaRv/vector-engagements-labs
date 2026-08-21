@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  applyTacticalLabelCollisionPolicy,
   applyTacticalLabelPolicy,
   presentTacticalSymbol,
   tacticalSymbolAccessibleName,
@@ -88,4 +89,19 @@ test("presentation and decluttering cannot mutate canonical inputs", () => {
   const presentation = presentTacticalSymbol(input);
   applyTacticalLabelPolicy([presentation]);
   assert.deepEqual(input, before);
+});
+
+test("projected-label collisions hide lower priority detail while a selected entity remains visible", () => {
+  const symbols = [
+    fighter({ id: "blue-1", designation: "Blue One" }),
+    fighter({ id: "red-selected", designation: "Red Selected", affiliation: "RED", selected: true }),
+    fighter({ id: "blue-2", designation: "Blue Two" }),
+  ];
+  const anchors = symbols.map((symbol) => ({ id: symbol.id, x: 100, y: 100 }));
+  const rendered = applyTacticalLabelCollisionPolicy(symbols, anchors);
+  const byId = new Map(rendered.map((symbol) => [symbol.id, symbol]));
+  assert.equal(byId.get("red-selected")?.label.visibility, "VISIBLE");
+  assert.equal(byId.get("blue-1")?.label.visibility, "COMPACT");
+  assert.equal(byId.get("blue-2")?.label.visibility, "HIDDEN");
+  assert.deepEqual(symbols.map((symbol) => symbol.label.visibility), ["VISIBLE", "VISIBLE", "VISIBLE"]);
 });

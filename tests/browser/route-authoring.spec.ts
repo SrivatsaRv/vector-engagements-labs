@@ -251,6 +251,7 @@ test("a current deployment manifest drives the real Worker run after route recov
     await expect(page.getByText("Run 01 · Paused", { exact: true })).toBeVisible();
   } else {
     await page.getByRole("button", { name: "Pause playback", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Play playback", exact: true })).toBeVisible();
   }
   const timeline = page.getByRole("slider", { name: "Run timeline" });
   await timeline.focus();
@@ -306,6 +307,23 @@ test("a current deployment manifest drives the real Worker run after route recov
     expect(expanded.time).toBe(collapsed.time);
   }
   expect(collapsed.attribution).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Map", exact: true }).click();
+  const tacticalMarkers = page.locator(".engagement-map-shell .map-tactical-marker:not(.map-installation-marker)");
+  const mapStatus = page.locator(".engagement-map-shell .map-status");
+  await expect.poll(async () => (
+    await tacticalMarkers.count() > 0
+    || /Loading basemap|Basemap unavailable/.test(await mapStatus.textContent() ?? "")
+  )).toBe(true);
+  if (await tacticalMarkers.count() > 0) {
+    const tacticalMarker = tacticalMarkers.first();
+    await tacticalMarker.focus();
+    await tacticalMarker.press("Enter");
+    await expect(tacticalMarker).toHaveAttribute("data-selected", "true");
+    await expect(tacticalMarker).toHaveAttribute("aria-pressed", "true");
+    await expect(tacticalMarker).toHaveAttribute("data-label-visibility", "VISIBLE");
+  } else {
+    await expect(mapStatus).toContainText(/Loading basemap|Basemap unavailable/);
+  }
   await page.getByRole("button", { name: "3D", exact: true }).click();
   await expect(page.locator(".simulation-scene")).toHaveAttribute("data-display-time", mapDisplayTime!);
   await expect(page.locator(".current-geometry")).toHaveAttribute("data-display-time", mapDisplayTime!);
