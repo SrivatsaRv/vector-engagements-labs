@@ -93,6 +93,12 @@ export type WeaponAdmission = {
   launchAuthorization: WeaponLaunchAuthorization;
 };
 
+/** A compiled flight-plan constraint; waypoint 0 is the aircraft start. */
+export type RoutePlan = {
+  schemaVersion: "vector.route-plan.v1";
+  waypointAcceptanceRadiiM: number[];
+};
+
 export type EngineEntityDefinition = {
   id: string;
   rddfId: string;
@@ -103,6 +109,7 @@ export type EngineEntityDefinition = {
   symbolRole: TacticalSymbolRole;
   lifecycle: EntityLifecycle;
   route?: Vec3[];
+  routePlan?: RoutePlan;
   initial: {
     position: Vec3;
     velocity: Vec3;

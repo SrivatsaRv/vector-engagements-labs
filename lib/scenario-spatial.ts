@@ -22,6 +22,8 @@ export type ScenarioSpatialEntity = {
   headingDeg: number;
   speedMps: number;
   route: ScenarioSpatialPoint[];
+  /** One explicit acceptance radius per route point; only waypoint radii are consumed. */
+  routeAcceptanceRadiiM: number[];
   /** Present only when an admitted public installation was selected. */
   originReference?: InstallationOriginReference;
 };
@@ -30,6 +32,9 @@ export type ScenarioSpatialPlan = {
   blue: ScenarioSpatialEntity;
   red: ScenarioSpatialEntity;
 };
+
+export const ROUTE_PLAN_SCHEMA_VERSION = "vector.route-plan.v1";
+export const DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M = 500;
 
 /**
  * Apply an airborne start edit without allowing an installation reference to
@@ -48,6 +53,7 @@ export function withAirborneStart(
     ...entity,
     position,
     route: entity.route.map((point, index) => (index === 0 ? position : point)),
+    routeAcceptanceRadiiM: [...entity.routeAcceptanceRadiiM],
     originReference: movedHorizontally ? undefined : entity.originReference,
   };
 }
@@ -137,6 +143,7 @@ export function createDefaultSpatialPlan(input: {
           input.studyArea,
         ),
       ],
+      routeAcceptanceRadiiM: [1, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
     },
     red: {
       position: red,
@@ -160,6 +167,7 @@ export function createDefaultSpatialPlan(input: {
           input.studyArea,
         ),
       ],
+      routeAcceptanceRadiiM: [1, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
     },
   };
 }
@@ -276,4 +284,12 @@ export function hasNonZeroRouteLegs(
       point.z - previous.z,
     ) > 1;
   });
+}
+
+export function hasValidRouteAcceptanceRadii(entity: ScenarioSpatialEntity) {
+  return entity.routeAcceptanceRadiiM.length === entity.route.length &&
+    entity.routeAcceptanceRadiiM.every((radius, index) =>
+      Number.isFinite(radius) && radius >= 1 && radius <= 25_000 &&
+        (index > 0 || radius === 1),
+    );
 }

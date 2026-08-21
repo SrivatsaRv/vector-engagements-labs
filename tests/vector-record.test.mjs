@@ -62,6 +62,11 @@ for (const backend of ["typescript", "rust-wasm"]) {
       "vector.deployment-capabilities.v1",
     );
     assert.equal(opened.result.engineRun.diagnostics.backend, backend);
+    assert.deepEqual(
+      opened.result.engineRun.scenario.entities.find((entity) => entity.id === "red-object-1")?.routePlan,
+      result.engineRun.scenario.entities.find((entity) => entity.id === "red-object-1")?.routePlan,
+      "VSR must retain the compiled fly-by route constraint for replay audit",
+    );
     assert.deepEqual(opened.result.frames, result.frames);
     assert.deepEqual(opened.result.envelopes, result.envelopes);
     assert.equal(opened.result.reason, result.reason);

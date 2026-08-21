@@ -94,6 +94,22 @@ describe("SpatialEntityEditor", () => {
     await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
   });
 
+  it("does not admit a waypoint acceptance radius outside the compiled contract", async () => {
+    const user = userEvent.setup();
+    const onValidityChange = vi.fn();
+    render(<Harness onValidityChange={onValidityChange} />);
+    const route = screen.getByRole("region", { name: /test aircraft route coordinates/i });
+    const radius = within(route).getByRole("textbox", { name: /acceptance radius/i });
+
+    expect(screen.getByTestId("compiled-route-plan-preview")).toHaveTextContent("vector.route-plan.v1");
+    await user.clear(radius);
+    await user.type(radius, "0");
+
+    expect(radius).toHaveAttribute("aria-invalid", "true");
+    expect(route).toHaveTextContent(/acceptance radius must be from 1 to 25,000 m/i);
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
+  });
+
   it("changes a selected installation origin into manual airborne placement when coordinates change", async () => {
     const user = userEvent.setup();
     const onValidityChange = vi.fn();

@@ -86,6 +86,7 @@ test("saved-run admission rejects stale selected-installation and runway identit
       headingDeg: 90,
       speedMps: 270,
       route: [],
+      routeAcceptanceRadiiM: [],
       originReference: {
         schemaVersion: "vector.installation-origin.v1",
         installationId: "iaf-pathankot",
@@ -99,6 +100,7 @@ test("saved-run admission rejects stale selected-installation and runway identit
       headingDeg: 270,
       speedMps: 250,
       route: [],
+      routeAcceptanceRadiiM: [],
     },
   };
   assert.throws(

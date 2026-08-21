@@ -56,6 +56,17 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
     const point = placement.position as Record<string, unknown>;
     const route = Array.isArray(placement.route) ? placement.route : [];
     if (route.length > 64) throw new PublicApiError(400, `invalid_${name}_route`);
+    const routeAcceptanceRadiiM = placement.routeAcceptanceRadiiM;
+    if (!Array.isArray(routeAcceptanceRadiiM) || routeAcceptanceRadiiM.length !== route.length) {
+      throw new PublicApiError(400, `invalid_${name}_route_plan`);
+    }
+    const acceptedRadii = routeAcceptanceRadiiM.map((entry, index) => {
+      const radius = finiteNumber(entry, 1, 25_000, `${name}_route_acceptance_radius_${index}`);
+      if (index === 0 && radius !== 1) {
+        throw new PublicApiError(400, `invalid_${name}_route_plan`);
+      }
+      return radius;
+    });
     return {
       position: {
         longitude: finiteNumber(point.longitude, 60, 100, `${name}_longitude`),
@@ -78,6 +89,7 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
           ),
         };
       }),
+      routeAcceptanceRadiiM: acceptedRadii,
       originReference: installationOriginReference(
         placement.originReference,
         `${name}_origin_reference`,

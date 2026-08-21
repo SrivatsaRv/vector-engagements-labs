@@ -7,6 +7,7 @@ import { findWeaponSimulationModel } from "./simulation-models.ts";
 import { STUDY_AREAS } from "./study-areas.ts";
 import {
   hasNonZeroRouteLegs,
+  hasValidRouteAcceptanceRadii,
   isPointInsideStudyArea,
 } from "./scenario-spatial.ts";
 
@@ -79,6 +80,7 @@ export function validateScenario(
           entity.speedMps >= 0 &&
           entity.route.length >= 1 &&
           hasNonZeroRouteLegs(entity, studyArea) &&
+          hasValidRouteAcceptanceRadii(entity) &&
           Math.abs(entity.route[0].longitude - entity.position.longitude) < 1e-9 &&
           Math.abs(entity.route[0].latitude - entity.position.latitude) < 1e-9 &&
           Math.abs(entity.route[0].altitudeM - entity.position.altitudeM) < 1e-6,

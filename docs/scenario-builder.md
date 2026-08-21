@@ -55,6 +55,17 @@ depends on mutable UI state.
 
 The configured-template builder edits every input used by the eight validated templates. Its **Place & flight** surface now performs direct geographic start placement, heading, altitude and speed editing, and Blue/Red route and waypoint authoring inside a selected preset study area. Map gestures and numeric fields update one spatial plan; compilation converts it to local east-north-up engine state. The admitted point-mass aircraft controller executes compiled three-dimensional route points and records requested, accepted, and achieved movement. The authored route remains visible beside the computed track so the two cannot be confused.
 
+Each configured route also compiles a `vector.route-plan.v1` constraint with one
+acceptance radius per route point. The initial point has the fixed sentinel
+radius `1 m`; every following value is an explicit fly-by capture distance in
+metres (`1..25,000 m`). When the aircraft reaches the greater of this declared
+radius and the fixed-step travel guard, it begins steering to the next leg.
+Changing the radius therefore changes an executed transition and the recorded
+trajectory; it is not a display-only waypoint property. Missing, non-finite,
+out-of-range, or length-mismatched radius arrays block validation and compiled
+engine admission. The configured authoring UI shows the exact schema that will
+be compiled and preserves invalid text until the operator corrects it.
+
 The next expansion adds database-backed arbitrary entity collections, supporting sensor nodes, target/launch relationship authoring, and the complete blank-scenario path. Those capabilities must extend the same scenario contract; they must not introduce a second simulation-state format.
 
 The internal `vector.scenario-draft.v1` state contract now provides the safe authoring foundation: an actually empty draft, stable entity and waypoint IDs, draft revisions, geographic position, heading, speed, routes, loadouts, target/launch references, dependency-safe deletion, duplication, and blocking validation. It remains unexposed until the blank-scenario surface can compile and run the authored package end to end; VECTOR does not ship a builder button that terminates in an incomplete workflow.
@@ -149,10 +160,10 @@ reference, or map anchor.
   identity before compilation. Altitude-only edits retain the selected
   installation identity because they do not move its geographic origin.
 - Waypoint creation is scoped to the currently selected team and lives in that team's route inspector. The map never offers an unowned generic waypoint action.
-- The selected entity inspector edits WGS84 start coordinates, explicit MSL altitude, true heading, true airspeed, and each waypoint's WGS84 coordinates and MSL altitude. This provides a keyboard-accessible alternative to map placement.
+- The selected entity inspector edits WGS84 start coordinates, explicit MSL altitude, true heading, true airspeed, and each waypoint's WGS84 coordinates, MSL altitude, and fly-by acceptance radius. This provides a keyboard-accessible alternative to map placement.
 - Numeric editors retain intermediate text. Empty, non-finite, out-of-area, negative, over-limit, and uncommitted values keep the operator in Place & flight and block validation instead of being discarded, normalized, or clamped into a different scenario.
 - Drag and numeric edits synchronize starting distance, altitude difference, aspect, and platform speeds before compilation.
-- Validation blocks non-finite state, negative speed or altitude, invalid headings, mismatched route origins, zero-length route legs, and any start or waypoint outside the preset boundary.
+- Validation blocks non-finite state, negative speed or altitude, invalid headings, mismatched route origins, zero-length route legs, missing or invalid `vector.route-plan.v1` radii, and any start or waypoint outside the preset boundary.
 - The current Air deployment exposes only admitted route, flight-state, loadout,
   and frozen-environment inputs. Sensor, data-link, AEW, EW, defensive-turn,
   g-demand, and tactical-decision controls are unavailable until their owning

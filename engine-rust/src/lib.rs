@@ -382,11 +382,20 @@ pub struct EntityDefinition {
     pub lifecycle: EntityLifecycle,
     #[serde(default)]
     pub route: Vec<Vec3>,
+    #[serde(default)]
+    pub route_plan: Option<RoutePlan>,
     pub initial: InitialState,
     pub weapon: Option<WeaponModel>,
     pub sensor: Option<SensorModel>,
     pub aircraft: Option<AircraftModel>,
     pub provenance: Provenance,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoutePlan {
+    pub schema_version: String,
+    pub waypoint_acceptance_radii_m: Vec<f64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -699,13 +708,25 @@ fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f6
         return;
     };
     let speed = state.velocity.magnitude().max(1.0);
-    let capture_radius_m = (speed * dt * 2.0).max(1.0);
     while state.route_point_index < state.definition.route.len().saturating_sub(1)
         && state
             .definition
             .route
             .get(state.route_point_index)
-            .map(|point| point.subtract(state.position).magnitude() <= capture_radius_m)
+            .map(|point| {
+                let declared_radius = state
+                    .definition
+                    .route_plan
+                    .as_ref()
+                    .and_then(|plan| {
+                        plan.waypoint_acceptance_radii_m
+                            .get(state.route_point_index)
+                    })
+                    .copied()
+                    .unwrap_or(f64::NAN);
+                let capture_radius_m = (speed * dt * 2.0).max(declared_radius).max(1.0);
+                point.subtract(state.position).magnitude() <= capture_radius_m
+            })
             .unwrap_or(false)
     {
         state.route_point_index += 1;
@@ -1328,6 +1349,7 @@ mod tests {
             symbol_role: "FIGHTER".to_string(),
             lifecycle: EntityLifecycle::Active,
             route: Vec::new(),
+            route_plan: None,
             initial: InitialState {
                 position,
                 velocity,
@@ -1391,6 +1413,7 @@ mod tests {
             symbol_role: "GUIDED_MISSILE".to_string(),
             lifecycle: EntityLifecycle::Stowed,
             route: Vec::new(),
+            route_plan: None,
             initial: InitialState {
                 position: Vec3 {
                     x: 0.0,

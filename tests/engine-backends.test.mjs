@@ -209,6 +209,10 @@ test("Rust/WASM and TypeScript preserve parity for a turning and climbing route"
       z: red.initial.position.z + 1500,
     },
   ];
+  red.routePlan = {
+    schemaVersion: "vector.route-plan.v1",
+    waypointAcceptanceRadiiM: [1, 25],
+  };
 
   const typescript = runEngineBackend(structuredClone(scenario), "typescript");
   const rust = runEngineBackend(structuredClone(scenario), "rust-wasm");
@@ -251,6 +255,74 @@ test("Rust/WASM and TypeScript preserve parity for a turning and climbing route"
       );
     }
   }
+});
+
+test("both engines record the same fly-by turn transition and radius contrast", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const base = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  base.durationSeconds = 12;
+  const red = base.entities.find((entity) => entity.id === "red-object-1");
+  red.route = [
+    { ...red.initial.position },
+    { x: red.initial.position.x + 5_000, y: red.initial.position.y, z: red.initial.position.z },
+    { x: red.initial.position.x + 5_000, y: red.initial.position.y + 8_000, z: red.initial.position.z + 1_000 },
+  ];
+
+  const tight = structuredClone(base);
+  tight.entities.find((entity) => entity.id === red.id).routePlan = {
+    schemaVersion: "vector.route-plan.v1",
+    waypointAcceptanceRadiiM: [1, 25, 25],
+  };
+  const wide = structuredClone(base);
+  wide.entities.find((entity) => entity.id === red.id).routePlan = {
+    schemaVersion: "vector.route-plan.v1",
+    waypointAcceptanceRadiiM: [1, 4_000, 25],
+  };
+
+  const tightTs = runEngineBackend(tight, "typescript");
+  const tightRust = runEngineBackend(structuredClone(tight), "rust-wasm");
+  const wideTs = runEngineBackend(wide, "typescript");
+  const wideRust = runEngineBackend(structuredClone(wide), "rust-wasm");
+  const last = (run) => run.frames.at(-1).entities.find((entity) => entity.id === red.id);
+
+  for (const [name, typescript, rust] of [["tight", tightTs, tightRust], ["wide", wideTs, wideRust]]) {
+    const tsRed = last(typescript);
+    const rustRed = last(rust);
+    assert.equal(rustRed.aircraftControl.routePointIndex, tsRed.aircraftControl.routePointIndex, `${name} route index parity`);
+    for (const axis of ["x", "y", "z"]) {
+      close(rustRed.position[axis], tsRed.position[axis], 1e-6, `${name} ${axis} parity`);
+    }
+  }
+  assert.notDeepEqual(last(tightTs).position, last(wideTs).position, "declared capture radius changes recorded trajectory");
+  assert.notEqual(
+    last(tightTs).aircraftControl.routePointIndex,
+    last(wideTs).aircraftControl.routePointIndex,
+    "declared capture radius changes the next-leg transition",
+  );
+});
+
+test("both engines fail closed when an authored route has no matching fly-by plan", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const scenario = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const red = scenario.entities.find((entity) => entity.id === "red-object-1");
+  red.route = [
+    { ...red.initial.position },
+    { x: red.initial.position.x + 1_000, y: red.initial.position.y, z: red.initial.position.z },
+  ];
+  delete red.routePlan;
+
+  assert.throws(() => runEngineBackend(structuredClone(scenario), "typescript"), /Route plan.*missing or invalid/);
+  assert.throws(() => runEngineBackend(structuredClone(scenario), "rust-wasm"), /routePlan is required/);
 });
 
 test("both engines terminate an admitted weapon when its assigned target is unavailable", () => {

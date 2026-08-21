@@ -360,6 +360,7 @@ test("aircraft dynamics consume fuel and expose thrust, drag, mass, and maneuver
     { ...blue.initial.position },
     { x: 5000, y: 5000, z: 9000 },
   ];
+  blue.routePlan = { schemaVersion: "vector.route-plan.v1", waypointAcceptanceRadiiM: [1, 25] };
   const run = runEngine(scenario);
   const first = run.frames[0].entities.find((entity) => entity.id === "aircraft-blue");
   const last = run.frames.at(-1).entities.find((entity) => entity.id === "aircraft-blue");
@@ -392,6 +393,7 @@ test("aircraft follow authored three-dimensional routes with bounded recorded co
     { ...red.initial.position },
     { x: 10000, y: 9000, z: 10500 },
   ];
+  red.routePlan = { schemaVersion: "vector.route-plan.v1", waypointAcceptanceRadiiM: [1, 25] };
 
   const run = runEngine(scenario);
   const first = run.frames[0].entities.find((entity) => entity.id === red.id);
@@ -423,6 +425,7 @@ test("aircraft records the guidance request separately from its load-factor-limi
       z: red.initial.position.z,
     },
   ];
+  red.routePlan = { schemaVersion: "vector.route-plan.v1", waypointAcceptanceRadiiM: [1, 25] };
 
   const frame = runEngine(scenario).frames[0].entities.find(
     (entity) => entity.id === red.id,
@@ -455,6 +458,8 @@ test("changing one authored route changes the recorded aircraft trail", () => {
   const rightRed = rightScenario.entities.find((entity) => entity.id === "aircraft-red");
   leftRed.route = [{ ...leftRed.initial.position }, { x: 0, y: 9000, z: 8500 }];
   rightRed.route = [{ ...rightRed.initial.position }, { x: 0, y: -9000, z: 8500 }];
+  leftRed.routePlan = { schemaVersion: "vector.route-plan.v1", waypointAcceptanceRadiiM: [1, 25] };
+  rightRed.routePlan = { schemaVersion: "vector.route-plan.v1", waypointAcceptanceRadiiM: [1, 25] };
 
   const left = runEngine(leftScenario).frames.at(-1).entities.find((entity) => entity.id === "aircraft-red");
   const right = runEngine(rightScenario).frames.at(-1).entities.find((entity) => entity.id === "aircraft-red");

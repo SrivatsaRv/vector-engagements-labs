@@ -5361,9 +5361,10 @@ button:disabled,
 .route-coordinate-editor > header div { display: grid; gap: 2px; }
 .route-coordinate-editor > header span { color: #77828a; font-size: 9px; }
 .route-coordinate-editor > header strong { color: #26313a; font-size: 11px; }
+.route-coordinate-editor > header small { color: #68747d; font-size: 9px; line-height: 1.35; }
 .route-coordinate-editor button { min-height: 32px; padding: 0 10px; border: 1px solid #cbd2d6; background: #fff; color: #344b5e; font-size: 9px; font-weight: 750; }
 .route-coordinate-editor button:hover { border-color: #8f9ba4; background: #f1f4f6; }
-.route-coordinate-editor fieldset { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; }
+.route-coordinate-editor fieldset { grid-template-columns: repeat(4, minmax(0, 1fr)) auto; align-items: end; }
 .route-coordinate-editor fieldset .field-error { grid-column: 1 / -1; }
 .authoring-fields { display: grid; grid-template-columns: minmax(220px, 1fr); gap: 10px; }
 .authoring-fields label { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; color: #56636d; font-size: 10px; font-weight: 700; }
