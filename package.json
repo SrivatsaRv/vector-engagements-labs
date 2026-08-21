@@ -36,6 +36,7 @@
     "app:verify": "node scripts/verify-app.mjs",
     "observability:verify": "node scripts/verify-observability.mjs",
     "performance:verify": "tsx scripts/benchmark-engine.ts",
+    "capacity:baseline:verify": "tsx scripts/benchmark-capacity-baseline.ts",
     "models:generate": "tsx scripts/generate-model-pack-fixture.ts",
     "models:verify": "tsx scripts/generate-model-pack-fixture.ts --check",
     "reference-aircraft:verify": "node --import tsx scripts/verify-public-aircraft-reference.mjs",
