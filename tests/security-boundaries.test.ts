@@ -50,12 +50,29 @@ test("saved-run admission rejects a malformed authored fly-over transition", () 
     redSpeedMps: scenario.targetSpeed,
     crossingAngleDeg: scenario.aspect,
   });
-  scenario.spatialPlan.blue.routeWaypointTransitions[1] = "FLY_OVER";
+  scenario.spatialPlan.blue.routeWaypointTransitions![1] = "FLY_OVER";
   scenario.spatialPlan.blue.routeAcceptanceRadiiM[1] = 500;
   assert.throws(
     () => validateSavedScenario(scenario, DEFAULT_SCENARIO_DEFINITION),
     { code: "invalid_blue_route_plan" },
   );
+});
+
+test("saved-run admission preserves a persisted v1 all-fly-by route", () => {
+  const scenario = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
+  scenario.spatialPlan = createDefaultSpatialPlan({
+    studyArea: getStudyArea(scenario.studyAreaId),
+    rangeM: scenario.range,
+    blueAltitudeM: scenario.altitude,
+    redAltitudeM: scenario.altitude + scenario.targetDelta,
+    blueSpeedMps: scenario.launcherSpeed,
+    redSpeedMps: scenario.targetSpeed,
+    crossingAngleDeg: scenario.aspect,
+  });
+  delete scenario.spatialPlan.red.routeWaypointTransitions;
+
+  const admitted = validateSavedScenario(scenario, DEFAULT_SCENARIO_DEFINITION);
+  assert.equal(admitted.spatialPlan?.red.routeWaypointTransitions, undefined);
 });
 
 test("saved-run admission rejects retired tactical-decision controls instead of accepting a no-op", () => {

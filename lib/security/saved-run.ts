@@ -68,6 +68,32 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
       return radius;
     });
     const routeWaypointTransitions = placement.routeWaypointTransitions;
+    if (routeWaypointTransitions === undefined) {
+      // Persisted v1 route records had no transition array. Preserve their
+      // documented all-fly-by execution rather than inventing v2 state.
+      return {
+        position: {
+          longitude: finiteNumber(point.longitude, 60, 100, `${name}_longitude`),
+          latitude: finiteNumber(point.latitude, 0, 40, `${name}_latitude`),
+          altitudeM: finiteNumber(point.altitudeM, -500, 30_000, `${name}_altitude`),
+          verticalDatum: explicitMsl(point.verticalDatum, `${name}_vertical_datum`),
+        },
+        headingDeg: finiteNumber(placement.headingDeg, 0, 360, `${name}_heading`),
+        speedMps: finiteNumber(placement.speedMps, 0, 3_000, `${name}_speed`),
+        route: route.map((entry, index) => {
+          if (!entry || typeof entry !== "object") throw new PublicApiError(400, `invalid_${name}_route_${index}`);
+          const routePoint = entry as Record<string, unknown>;
+          return {
+            longitude: finiteNumber(routePoint.longitude, 60, 100, `${name}_route_longitude`),
+            latitude: finiteNumber(routePoint.latitude, 0, 40, `${name}_route_latitude`),
+            altitudeM: finiteNumber(routePoint.altitudeM, -500, 30_000, `${name}_route_altitude`),
+            verticalDatum: explicitMsl(routePoint.verticalDatum, `${name}_route_vertical_datum`),
+          };
+        }),
+        routeAcceptanceRadiiM: acceptedRadii,
+        originReference: installationOriginReference(placement.originReference, `${name}_origin_reference`),
+      };
+    }
     if (!Array.isArray(routeWaypointTransitions) || routeWaypointTransitions.length !== route.length) {
       throw new PublicApiError(400, `invalid_${name}_route_plan`);
     }

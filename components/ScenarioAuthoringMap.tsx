@@ -278,7 +278,8 @@ export function ScenarioAuthoringMap({
               DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M,
             ],
             routeWaypointTransitions: [
-              ...current[team].routeWaypointTransitions,
+              ...(current[team].routeWaypointTransitions ??
+                current[team].route.map((_, index) => index === 0 ? "START" : "FLY_BY")),
               "FLY_BY",
             ],
           },

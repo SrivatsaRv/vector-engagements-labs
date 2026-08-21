@@ -114,7 +114,7 @@ export function SpatialEntityEditor({
       waypointDraft(
         point,
         entity.routeAcceptanceRadiiM[index + 1] ?? DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M,
-        entity.routeWaypointTransitions[index + 1] === "FLY_OVER" ? "FLY_OVER" : "FLY_BY",
+        entity.routeWaypointTransitions?.[index + 1] === "FLY_OVER" ? "FLY_OVER" : "FLY_BY",
       ),
     ),
   );
@@ -169,7 +169,7 @@ export function SpatialEntityEditor({
         !close(Number(draft.latitude), point.latitude, 1e-6) ||
         !close(Number(draft.altitudeM), point.altitudeM, 1e-3) ||
         !close(Number(draft.acceptanceRadiusM), entity.routeAcceptanceRadiiM[index + 1], 1e-3) ||
-        draft.transition !== entity.routeWaypointTransitions[index + 1];
+        draft.transition !== (entity.routeWaypointTransitions?.[index + 1] ?? "FLY_BY");
     })
   );
 
@@ -199,7 +199,9 @@ export function SpatialEntityEditor({
     routeAcceptanceRadiiM[index + 1] = waypoints[index].transition === "FLY_OVER"
       ? 1
       : Number(waypoints[index].acceptanceRadiusM);
-    const routeWaypointTransitions = [...entity.routeWaypointTransitions];
+    // Editing any legacy v1 route upgrades it to explicit v2 transitions.
+    const routeWaypointTransitions = [...(entity.routeWaypointTransitions ??
+      entity.route.map((_, routeIndex) => routeIndex === 0 ? "START" : "FLY_BY"))];
     routeWaypointTransitions[index + 1] = waypoints[index].transition;
     onChange({ ...entity, route, routeAcceptanceRadiiM, routeWaypointTransitions });
   };
@@ -330,7 +332,11 @@ export function SpatialEntityEditor({
                 ...entity,
                 route: [...entity.route, toPoint(nextWaypoint)],
                 routeAcceptanceRadiiM: [...entity.routeAcceptanceRadiiM, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
-                routeWaypointTransitions: [...entity.routeWaypointTransitions, "FLY_BY"],
+                routeWaypointTransitions: [
+                  ...(entity.routeWaypointTransitions ??
+                    entity.route.map((_, routeIndex) => routeIndex === 0 ? "START" : "FLY_BY")),
+                  "FLY_BY",
+                ],
               });
             }}
           >
@@ -397,7 +403,9 @@ export function SpatialEntityEditor({
                   ...entity,
                   route: entity.route.filter((_, routeIndex) => routeIndex !== index + 1),
                   routeAcceptanceRadiiM: entity.routeAcceptanceRadiiM.filter((_, radiusIndex) => radiusIndex !== index + 1),
-                  routeWaypointTransitions: entity.routeWaypointTransitions.filter((_, transitionIndex) => transitionIndex !== index + 1),
+                  routeWaypointTransitions: (entity.routeWaypointTransitions ??
+                    entity.route.map((_, routeIndex) => routeIndex === 0 ? "START" : "FLY_BY")
+                  ).filter((_, transitionIndex) => transitionIndex !== index + 1),
                 });
               }}
             >

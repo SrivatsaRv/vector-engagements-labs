@@ -27,8 +27,11 @@ export type ScenarioSpatialEntity = {
   route: ScenarioSpatialPoint[];
   /** One explicit acceptance radius per route point; only waypoint radii are consumed. */
   routeAcceptanceRadiiM: number[];
-  /** One explicit transition mode per route point; index zero is always START. */
-  routeWaypointTransitions: RouteWaypointTransition[];
+  /**
+   * One explicit v2 transition mode per route point; index zero is START.
+   * Omission is reserved for replaying a persisted v1 all-fly-by route.
+   */
+  routeWaypointTransitions?: RouteWaypointTransition[];
   /** Present only when an admitted public installation was selected. */
   originReference?: InstallationOriginReference;
 };
@@ -59,7 +62,9 @@ export function withAirborneStart(
     position,
     route: entity.route.map((point, index) => (index === 0 ? position : point)),
     routeAcceptanceRadiiM: [...entity.routeAcceptanceRadiiM],
-    routeWaypointTransitions: [...entity.routeWaypointTransitions],
+    routeWaypointTransitions: entity.routeWaypointTransitions
+      ? [...entity.routeWaypointTransitions]
+      : undefined,
     originReference: movedHorizontally ? undefined : entity.originReference,
   };
 }
@@ -303,6 +308,9 @@ export function hasValidRouteAcceptanceRadii(entity: ScenarioSpatialEntity) {
 }
 
 export function hasValidRouteWaypointTransitions(entity: ScenarioSpatialEntity) {
+  // v1 did not serialize transition modes: its documented semantics are
+  // START followed by FLY_BY. New authoring always supplies the v2 array.
+  if (entity.routeWaypointTransitions === undefined) return true;
   return entity.routeWaypointTransitions.length === entity.route.length &&
     entity.routeWaypointTransitions.every((transition, index) =>
       index === 0

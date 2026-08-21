@@ -66,7 +66,9 @@ transition and recorded trajectory; neither is a display-only waypoint
 property. Missing, non-finite, out-of-range, length-mismatched, or invalid
 transition arrays block validation and compiled-engine admission. Existing
 `vector.route-plan.v1` records remain replayable under their documented
-all-fly-by semantics; new authoring always emits v2.
+all-fly-by semantics: an omitted transition array is compiled as `START` then
+`FLY_BY` for every remaining route point. New authoring always emits v2; a
+present but malformed v2 transition array is rejected rather than downgraded.
 
 The next expansion adds database-backed arbitrary entity collections, supporting sensor nodes, target/launch relationship authoring, and the complete blank-scenario path. Those capabilities must extend the same scenario contract; they must not introduce a second simulation-state format.
 
