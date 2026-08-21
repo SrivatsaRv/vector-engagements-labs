@@ -257,7 +257,7 @@ test("Rust/WASM and TypeScript preserve parity for a turning and climbing route"
   }
 });
 
-test("both engines record the same fly-by turn transition and radius contrast", () => {
+test("both engines record the same explicit fly-by/fly-over transition contrast", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
   const base = structuredClone(
     simulateWithCapabilitiesForVerification(
@@ -267,30 +267,34 @@ test("both engines record the same fly-by turn transition and radius contrast", 
   );
   base.durationSeconds = 12;
   const red = base.entities.find((entity) => entity.id === "red-object-1");
+  red.initial.velocity = { x: 250, y: 0, z: 0 };
+  red.initial.headingRad = 0;
   red.route = [
     { ...red.initial.position },
-    { x: red.initial.position.x + 5_000, y: red.initial.position.y, z: red.initial.position.z },
-    { x: red.initial.position.x + 5_000, y: red.initial.position.y + 8_000, z: red.initial.position.z + 1_000 },
+    { x: red.initial.position.x + 1_500, y: red.initial.position.y, z: red.initial.position.z },
+    { x: red.initial.position.x + 1_500, y: red.initial.position.y + 8_000, z: red.initial.position.z + 1_000 },
   ];
 
-  const tight = structuredClone(base);
-  tight.entities.find((entity) => entity.id === red.id).routePlan = {
-    schemaVersion: "vector.route-plan.v1",
-    waypointAcceptanceRadiiM: [1, 25, 25],
-  };
-  const wide = structuredClone(base);
-  wide.entities.find((entity) => entity.id === red.id).routePlan = {
-    schemaVersion: "vector.route-plan.v1",
+  const flyBy = structuredClone(base);
+  flyBy.entities.find((entity) => entity.id === red.id).routePlan = {
+    schemaVersion: "vector.route-plan.v2",
     waypointAcceptanceRadiiM: [1, 4_000, 25],
+    waypointTransitions: ["START", "FLY_BY", "FLY_BY"],
+  };
+  const flyOver = structuredClone(base);
+  flyOver.entities.find((entity) => entity.id === red.id).routePlan = {
+    schemaVersion: "vector.route-plan.v2",
+    waypointAcceptanceRadiiM: [1, 1, 25],
+    waypointTransitions: ["START", "FLY_OVER", "FLY_BY"],
   };
 
-  const tightTs = runEngineBackend(tight, "typescript");
-  const tightRust = runEngineBackend(structuredClone(tight), "rust-wasm");
-  const wideTs = runEngineBackend(wide, "typescript");
-  const wideRust = runEngineBackend(structuredClone(wide), "rust-wasm");
+  const flyByTs = runEngineBackend(flyBy, "typescript");
+  const flyByRust = runEngineBackend(structuredClone(flyBy), "rust-wasm");
+  const flyOverTs = runEngineBackend(flyOver, "typescript");
+  const flyOverRust = runEngineBackend(structuredClone(flyOver), "rust-wasm");
   const last = (run) => run.frames.at(-1).entities.find((entity) => entity.id === red.id);
 
-  for (const [name, typescript, rust] of [["tight", tightTs, tightRust], ["wide", wideTs, wideRust]]) {
+  for (const [name, typescript, rust] of [["fly-by", flyByTs, flyByRust], ["fly-over", flyOverTs, flyOverRust]]) {
     const tsRed = last(typescript);
     const rustRed = last(rust);
     assert.equal(rustRed.aircraftControl.routePointIndex, tsRed.aircraftControl.routePointIndex, `${name} route index parity`);
@@ -298,12 +302,54 @@ test("both engines record the same fly-by turn transition and radius contrast", 
       close(rustRed.position[axis], tsRed.position[axis], 1e-6, `${name} ${axis} parity`);
     }
   }
-  assert.notDeepEqual(last(tightTs).position, last(wideTs).position, "declared capture radius changes recorded trajectory");
-  assert.notEqual(
-    last(tightTs).aircraftControl.routePointIndex,
-    last(wideTs).aircraftControl.routePointIndex,
-    "declared capture radius changes the next-leg transition",
+  assert.notDeepEqual(last(flyByTs).position, last(flyOverTs).position, "declared transition changes recorded trajectory");
+  const firstTransitionFrame = (run) => run.frames.findIndex((frame) =>
+    frame.entities.find((entity) => entity.id === red.id)?.aircraftControl?.routePointIndex === 2,
   );
+  assert.ok(
+    firstTransitionFrame(flyByTs) < firstTransitionFrame(flyOverTs),
+    "fly-by advances the next leg before the corresponding fly-over",
+  );
+  const flyOverTransition = flyOverTs.frames.find((frame) =>
+    frame.entities.find((entity) => entity.id === red.id)?.aircraftControl?.routePointIndex === 2,
+  );
+  assert.ok(flyOverTransition, "fly-over must advance the next leg at a finite pass-through point");
+  const flyOverAtTransition = flyOverTransition.entities.find((entity) => entity.id === red.id);
+  const firstWaypoint = flyOver.entities.find((entity) => entity.id === red.id).route[1];
+  assert.ok(
+    Math.hypot(
+      flyOverAtTransition.position.x - firstWaypoint.x,
+      flyOverAtTransition.position.y - firstWaypoint.y,
+      flyOverAtTransition.position.z - firstWaypoint.z,
+    ) < 100,
+    "fly-over must not remain in an unbounded orbit around the waypoint",
+  );
+  assert.ok(
+    flyOverTs.frames.flatMap((frame) => frame.entities).every((entity) =>
+      [entity.position.x, entity.position.y, entity.position.z].every(Number.isFinite),
+    ),
+    "fly-over trajectory stays finite",
+  );
+});
+
+test("both engines reject an incomplete v2 route transition plan", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const scenario = structuredClone(
+    simulateWithCapabilitiesForVerification(SCENARIO_LIBRARY[0].scenario, capabilities).engineRun.scenario,
+  );
+  const red = scenario.entities.find((entity) => entity.id === "red-object-1");
+  red.route = [{ ...red.initial.position }, { x: red.initial.position.x + 1_000, y: red.initial.position.y, z: red.initial.position.z }];
+  red.routePlan = { schemaVersion: "vector.route-plan.v2", waypointAcceptanceRadiiM: [1, 25] };
+
+  assert.throws(() => runEngineBackend(structuredClone(scenario), "typescript"), /transitions.*missing or invalid/);
+  assert.throws(() => runEngineBackend(structuredClone(scenario), "rust-wasm"), /waypointTransitions is required/);
+  scenario.entities.find((entity) => entity.id === red.id).routePlan = {
+    schemaVersion: "vector.route-plan.v2",
+    waypointAcceptanceRadiiM: [1, 25],
+    waypointTransitions: ["START", "LOITER"],
+  };
+  assert.throws(() => runEngineBackend(structuredClone(scenario), "typescript"), /transitions.*missing or invalid/);
+  assert.throws(() => runEngineBackend(structuredClone(scenario), "rust-wasm"), /waypointTransitions\[1\] is invalid/);
 });
 
 test("both engines fail closed when an authored route has no matching fly-by plan", () => {

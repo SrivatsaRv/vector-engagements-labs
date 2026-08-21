@@ -7,6 +7,8 @@ import { POST as telemetryPost } from "../app/api/telemetry/route";
 import { readBoundedJson } from "../lib/security/public-api";
 import { buildVerifiedSavedRun, validateSavedScenario } from "../lib/security/saved-run";
 import { DEFAULT_SCENARIO_DEFINITION } from "../lib/scenarios";
+import { createDefaultSpatialPlan } from "../lib/scenario-spatial";
+import { getStudyArea } from "../lib/study-areas";
 
 test("bounded JSON admission rejects an oversized streamed body", async () => {
   const request = new Request("https://labs.reachdefence.com/api/telemetry", {
@@ -35,6 +37,42 @@ test("saved-run admission rejects a client-selected engine", () => {
     () => validateSavedScenario(input, DEFAULT_SCENARIO_DEFINITION),
     { code: "scenario_engine_forbidden" },
   );
+});
+
+test("saved-run admission rejects a malformed authored fly-over transition", () => {
+  const scenario = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
+  scenario.spatialPlan = createDefaultSpatialPlan({
+    studyArea: getStudyArea(scenario.studyAreaId),
+    rangeM: scenario.range,
+    blueAltitudeM: scenario.altitude,
+    redAltitudeM: scenario.altitude + scenario.targetDelta,
+    blueSpeedMps: scenario.launcherSpeed,
+    redSpeedMps: scenario.targetSpeed,
+    crossingAngleDeg: scenario.aspect,
+  });
+  scenario.spatialPlan.blue.routeWaypointTransitions![1] = "FLY_OVER";
+  scenario.spatialPlan.blue.routeAcceptanceRadiiM[1] = 500;
+  assert.throws(
+    () => validateSavedScenario(scenario, DEFAULT_SCENARIO_DEFINITION),
+    { code: "invalid_blue_route_plan" },
+  );
+});
+
+test("saved-run admission preserves a persisted v1 all-fly-by route", () => {
+  const scenario = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
+  scenario.spatialPlan = createDefaultSpatialPlan({
+    studyArea: getStudyArea(scenario.studyAreaId),
+    rangeM: scenario.range,
+    blueAltitudeM: scenario.altitude,
+    redAltitudeM: scenario.altitude + scenario.targetDelta,
+    blueSpeedMps: scenario.launcherSpeed,
+    redSpeedMps: scenario.targetSpeed,
+    crossingAngleDeg: scenario.aspect,
+  });
+  delete scenario.spatialPlan.red.routeWaypointTransitions;
+
+  const admitted = validateSavedScenario(scenario, DEFAULT_SCENARIO_DEFINITION);
+  assert.equal(admitted.spatialPlan?.red.routeWaypointTransitions, undefined);
 });
 
 test("saved-run admission rejects retired tactical-decision controls instead of accepting a no-op", () => {
@@ -87,6 +125,7 @@ test("saved-run admission rejects stale selected-installation and runway identit
       speedMps: 270,
       route: [],
       routeAcceptanceRadiiM: [],
+      routeWaypointTransitions: [],
       originReference: {
         schemaVersion: "vector.installation-origin.v1",
         installationId: "iaf-pathankot",
@@ -101,6 +140,7 @@ test("saved-run admission rejects stale selected-installation and runway identit
       speedMps: 250,
       route: [],
       routeAcceptanceRadiiM: [],
+      routeWaypointTransitions: [],
     },
   };
   assert.throws(

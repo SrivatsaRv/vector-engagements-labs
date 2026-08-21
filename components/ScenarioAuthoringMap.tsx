@@ -277,6 +277,11 @@ export function ScenarioAuthoringMap({
               ...current[team].routeAcceptanceRadiiM,
               DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M,
             ],
+            routeWaypointTransitions: [
+              ...(current[team].routeWaypointTransitions ??
+                current[team].route.map((_, index) => index === 0 ? "START" : "FLY_BY")),
+              "FLY_BY",
+            ],
           },
         });
         setMessage(`${team === "blue" ? "Blue" : "Red"} waypoint added.`);
@@ -665,7 +670,7 @@ export function ScenarioAuthoringMap({
                 ? `Click map for ${selected === "blue" ? "Blue" : "Red"} waypoint`
                 : `Add ${selected === "blue" ? "Blue" : "Red"} waypoint`}
             </button>
-            <button disabled={selectedEntity.route.length <= 1} onClick={() => updateEntity(selected, { route: [selectedEntity.position], routeAcceptanceRadiiM: [1] })}>Clear route</button>
+            <button disabled={selectedEntity.route.length <= 1} onClick={() => updateEntity(selected, { route: [selectedEntity.position], routeAcceptanceRadiiM: [1], routeWaypointTransitions: ["START"] })}>Clear route</button>
           </div>
         </div>
         <p className="authoring-selection-note">

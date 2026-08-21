@@ -133,8 +133,11 @@ export type WeaponAdmission = {
 
 /** A compiled flight-plan constraint; waypoint 0 is the aircraft start. */
 export type RoutePlan = {
-  schemaVersion: "vector.route-plan.v1";
+  /** v1 remains replayable with its documented all-fly-by semantics. */
+  schemaVersion: "vector.route-plan.v1" | "vector.route-plan.v2";
   waypointAcceptanceRadiiM: number[];
+  /** Required for v2. `START` occupies the initial route point. */
+  waypointTransitions?: ("START" | "FLY_BY" | "FLY_OVER")[];
 };
 
 export type EngineEntityDefinition = {

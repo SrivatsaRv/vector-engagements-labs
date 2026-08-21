@@ -157,6 +157,10 @@ test("an authored waypoint acceptance radius is compiled and changes the flown r
   widePlan.red.route = [widePlan.red.position, corner, exit];
   tightPlan.red.routeAcceptanceRadiiM = [1, 25, 25];
   widePlan.red.routeAcceptanceRadiiM = [1, 4_000, 25];
+  // A persisted v1 plan had radii only. Its all-fly-by semantics must remain
+  // executable after v2 introduces explicit transition modes.
+  delete tightPlan.red.routeWaypointTransitions;
+  delete widePlan.red.routeWaypointTransitions;
 
   const tight = simulate({ ...DEFAULT_SCENARIO, spatialPlan: tightPlan });
   const wide = simulate({ ...DEFAULT_SCENARIO, spatialPlan: widePlan });
@@ -165,6 +169,7 @@ test("an authored waypoint acceptance radius is compiled and changes the flown r
   assert.deepEqual(tightRed.routePlan, {
     schemaVersion: "vector.route-plan.v1",
     waypointAcceptanceRadiiM: [1, 25, 25],
+    waypointTransitions: undefined,
   });
   assert.deepEqual(wideRed.routePlan.waypointAcceptanceRadiiM, [1, 4_000, 25]);
   assert.notDeepEqual(

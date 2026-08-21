@@ -490,10 +490,16 @@ export function prepareSimulation(
           geographicToLocal(point, studyArea),
         ),
         blueRouteAcceptanceRadiiM: [...input.spatialPlan.blue.routeAcceptanceRadiiM],
+        blueRouteWaypointTransitions: input.spatialPlan.blue.routeWaypointTransitions
+          ? [...input.spatialPlan.blue.routeWaypointTransitions]
+          : undefined,
         redRoute: input.spatialPlan.red.route.map((point) =>
           geographicToLocal(point, studyArea),
         ),
         redRouteAcceptanceRadiiM: [...input.spatialPlan.red.routeAcceptanceRadiiM],
+        redRouteWaypointTransitions: input.spatialPlan.red.routeWaypointTransitions
+          ? [...input.spatialPlan.red.routeWaypointTransitions]
+          : undefined,
         blueOriginReference: input.spatialPlan.blue.originReference,
         redOriginReference: input.spatialPlan.red.originReference,
       }

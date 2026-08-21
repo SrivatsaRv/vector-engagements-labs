@@ -466,6 +466,8 @@ pub struct ObserverSensorAdmission {
 pub struct RoutePlan {
     pub schema_version: String,
     pub waypoint_acceptance_radii_m: Vec<f64>,
+    #[serde(default)]
+    pub waypoint_transitions: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -915,27 +917,33 @@ fn update_aircraft(
         return Ok(());
     };
     let speed = state.velocity.magnitude().max(1.0);
-    while state.route_point_index < state.definition.route.len().saturating_sub(1)
-        && state
-            .definition
-            .route
+    while state.route_point_index < state.definition.route.len().saturating_sub(1) {
+        let Some(point) = state.definition.route.get(state.route_point_index) else {
+            break;
+        };
+        let Some(plan) = state.definition.route_plan.as_ref() else {
+            return Err(EngineError::InvalidScenario(
+                "route plan is missing during aircraft route execution".to_string(),
+            ));
+        };
+        let Some(declared_radius) = plan
+            .waypoint_acceptance_radii_m
             .get(state.route_point_index)
-            .map(|point| {
-                let declared_radius = state
-                    .definition
-                    .route_plan
-                    .as_ref()
-                    .and_then(|plan| {
-                        plan.waypoint_acceptance_radii_m
-                            .get(state.route_point_index)
-                    })
-                    .copied()
-                    .unwrap_or(f64::NAN);
-                let capture_radius_m = (speed * dt * 2.0).max(declared_radius).max(1.0);
-                point.subtract(state.position).magnitude() <= capture_radius_m
-            })
-            .unwrap_or(false)
-    {
+            .copied()
+        else {
+            return Err(EngineError::InvalidScenario(
+                "route plan radius is missing during aircraft route execution".to_string(),
+            ));
+        };
+        let transition = route_transition(plan, state.route_point_index)?;
+        let capture_radius_m = if transition == "FLY_OVER" {
+            (speed * dt * 2.0).max(1.0)
+        } else {
+            (speed * dt * 2.0).max(declared_radius).max(1.0)
+        };
+        if point.subtract(state.position).magnitude() > capture_radius_m {
+            break;
+        }
         state.route_point_index += 1;
     }
     let route_point = state.definition.route.get(state.route_point_index).copied();
@@ -1047,6 +1055,27 @@ fn update_aircraft(
         },
     });
     Ok(())
+}
+
+/// v1 explicitly represented fly-by-only routing. v2 makes each transition explicit.
+fn route_transition(plan: &RoutePlan, index: usize) -> Result<&str, EngineError> {
+    if plan.schema_version == "vector.route-plan.v1" {
+        if index == 0 {
+            Ok("START")
+        } else {
+            Ok("FLY_BY")
+        }
+    } else {
+        plan.waypoint_transitions
+            .as_ref()
+            .and_then(|transitions| transitions.get(index))
+            .map(String::as_str)
+            .ok_or_else(|| {
+                EngineError::InvalidScenario(
+                    "route transition is missing during aircraft route execution".to_string(),
+                )
+            })
+    }
 }
 
 fn activate_weapons(states: &mut [RuntimeState], time: f64) {

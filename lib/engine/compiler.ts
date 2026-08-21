@@ -74,6 +74,10 @@ export type ScenarioCompilerInput = {
     redRoute: Vec3[];
     blueRouteAcceptanceRadiiM: number[];
     redRouteAcceptanceRadiiM: number[];
+    /** Omitted only when replaying a persisted v1 all-fly-by plan. */
+    blueRouteWaypointTransitions?: ("START" | "FLY_BY" | "FLY_OVER")[];
+    /** Omitted only when replaying a persisted v1 all-fly-by plan. */
+    redRouteWaypointTransitions?: ("START" | "FLY_BY" | "FLY_OVER")[];
     blueOriginReference?: InstallationOriginReference;
     redOriginReference?: InstallationOriginReference;
   };
@@ -355,10 +359,18 @@ export function compileScenario(
             },
         ],
       routePlan: {
-        schemaVersion: ROUTE_PLAN_SCHEMA_VERSION,
+        schemaVersion: input.placement?.blueRoute.length &&
+            input.placement.blueRouteWaypointTransitions === undefined
+          ? "vector.route-plan.v1"
+          : ROUTE_PLAN_SCHEMA_VERSION,
         waypointAcceptanceRadiiM: input.placement?.blueRoute.length
           ? [...input.placement.blueRouteAcceptanceRadiiM]
           : [1, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
+        waypointTransitions: input.placement?.blueRoute.length
+          ? input.placement.blueRouteWaypointTransitions === undefined
+            ? undefined
+            : [...input.placement.blueRouteWaypointTransitions]
+          : ["START", "FLY_BY"],
       },
       initial: {
         position: { ...blueStart },
@@ -409,10 +421,18 @@ export function compileScenario(
             },
         ],
       routePlan: {
-        schemaVersion: ROUTE_PLAN_SCHEMA_VERSION,
+        schemaVersion: input.placement?.redRoute.length &&
+            input.placement.redRouteWaypointTransitions === undefined
+          ? "vector.route-plan.v1"
+          : ROUTE_PLAN_SCHEMA_VERSION,
         waypointAcceptanceRadiiM: input.placement?.redRoute.length
           ? [...input.placement.redRouteAcceptanceRadiiM]
           : [1, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
+        waypointTransitions: input.placement?.redRoute.length
+          ? input.placement.redRouteWaypointTransitions === undefined
+            ? undefined
+            : [...input.placement.redRouteWaypointTransitions]
+          : ["START", "FLY_BY"],
       },
       initial: {
         position: { ...redStart },
