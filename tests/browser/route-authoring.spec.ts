@@ -126,6 +126,19 @@ test("a current deployment manifest drives the real Worker run after route recov
     await page.getByRole("button", { name: /Place & flight/i }).click();
   }
 
+  // A selected installation is a compiled identity, not a decorative marker.
+  // A numeric horizontal edit must visibly change the authoring contract to a
+  // manual airborne start before this real-Worker journey can run.
+  await page.getByRole("button", { name: "Pathankot AFS", exact: true }).click();
+  await expect(page.getByText(/installation origin selected/i)).toBeVisible();
+  const airborneStart = page.getByRole("group", { name: "Airborne start" });
+  const longitude = airborneStart.getByRole("textbox", { name: "Longitude" });
+  const selectedLongitude = Number(await longitude.inputValue());
+  await longitude.fill(String(selectedLongitude + 0.01));
+  await longitude.press("Enter");
+  await expect(page.getByText(/manual airborne start/i)).toBeVisible();
+  await expect(page.getByText(/no installation identity will be compiled/i)).toBeVisible();
+
   const speed = page.getByRole("textbox", { name: /true airspeed/i });
   await speed.fill("-1");
   await expect(speed).toHaveValue("-1");

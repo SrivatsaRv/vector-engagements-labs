@@ -5,7 +5,7 @@ import type {
   ScenarioSpatialEntity,
   ScenarioSpatialPoint,
 } from "@/lib/scenario-spatial";
-import { hasNonZeroRouteLegs } from "@/lib/scenario-spatial";
+import { hasNonZeroRouteLegs, withAirborneStart } from "@/lib/scenario-spatial";
 import type { StudyArea } from "@/lib/study-areas";
 
 type Props = {
@@ -137,11 +137,10 @@ export function SpatialEntityEditor({
   const commitStart = () => {
     if (startError) return;
     const position = toPoint(start);
-    onChange({
-      ...entity,
-      position,
-      route: entity.route.map((point, index) => (index === 0 ? position : point)),
-    });
+    // An installation reference identifies the geographic origin, not merely
+    // a suggested map label. A horizontal move must not carry the old identity
+    // into compilation.
+    onChange(withAirborneStart(entity, position));
   };
   const commitHeading = () => {
     if (headingError || headingValue === null) return;
@@ -173,6 +172,22 @@ export function SpatialEntityEditor({
         <strong>{designation}</strong>
         <small>Coordinates use WGS84. Altitudes use metres MSL.</small>
       </div>
+      <p className="origin-reference-state" role="status">
+        {entity.originReference ? (
+          <>
+            <strong>Installation origin selected</strong>
+            <span>
+              {entity.originReference.installationId} · source {entity.originReference.sourceId}
+            </span>
+            <small>Changing longitude or latitude switches this to a manual airborne start.</small>
+          </>
+        ) : (
+          <>
+            <strong>Manual airborne start</strong>
+            <small>No installation identity will be compiled for this aircraft.</small>
+          </>
+        )}
+      </p>
       <fieldset>
         <legend>Airborne start</legend>
         <label>

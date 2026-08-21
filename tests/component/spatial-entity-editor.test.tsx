@@ -20,8 +20,11 @@ const initialEntity = createDefaultSpatialPlan({
   crossingAngleDeg: 90,
 }).blue;
 
-function Harness({ onValidityChange }: { onValidityChange: (valid: boolean) => void }) {
-  const [entity, setEntity] = useState<ScenarioSpatialEntity>(initialEntity);
+function Harness({ onValidityChange, initial = initialEntity }: {
+  onValidityChange: (valid: boolean) => void;
+  initial?: ScenarioSpatialEntity;
+}) {
+  const [entity, setEntity] = useState<ScenarioSpatialEntity>(initial);
   return (
     <SpatialEntityEditor
       team="blue"
@@ -89,5 +92,35 @@ describe("SpatialEntityEditor", () => {
     await user.click(screen.getByRole("button", { name: /add by coordinates/i }));
     expect(route).toHaveTextContent(/each route leg must be longer than 1 m/i);
     await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
+  });
+
+  it("changes a selected installation origin into manual airborne placement when coordinates change", async () => {
+    const user = userEvent.setup();
+    const onValidityChange = vi.fn();
+    const installationEntity: ScenarioSpatialEntity = {
+      ...initialEntity,
+      originReference: {
+        schemaVersion: "vector.installation-origin.v1",
+        installationId: "pathankot-afs",
+        sourceId: "public-reference:iaf-installations-v1",
+        environment: {
+          studyAreaId: area.id,
+          weatherPresetId: area.defaultWeatherPresetId,
+        },
+      },
+    };
+    render(<Harness onValidityChange={onValidityChange} initial={installationEntity} />);
+
+    expect(screen.getByText(/installation origin selected/i)).toBeVisible();
+    expect(screen.getByText(/pathankot-afs/i)).toBeVisible();
+
+    const start = screen.getByRole("group", { name: "Airborne start" });
+    const longitude = within(start).getByRole("textbox", { name: "Longitude" });
+    await user.clear(longitude);
+    await user.type(longitude, String(installationEntity.position.longitude + 0.01));
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(screen.getByText(/manual airborne start/i)).toBeVisible());
+    expect(screen.getByText(/no installation identity will be compiled/i)).toBeVisible();
   });
 });
