@@ -144,6 +144,7 @@ export async function POST(request: Request) {
       const templatePackage = template.package;
 
       const admission = await admitSavedRun(request);
+      let snapshotPersisted = false;
       try {
 
         const simulationStarted = performance.now();
@@ -196,10 +197,11 @@ export async function POST(request: Request) {
            ${sql.json((engineRun.scenario.environment.studyArea ?? {}) as never)})
         RETURNING id, created_at
       `);
+      snapshotPersisted = true;
       incrementCounter("vector_reports_total", { domain: scenario.domain, outcome: "saved" });
         return Response.json(rows[0], { status: 201, headers: { "cache-control": "no-store" } });
       } finally {
-        await releaseSavedRunAdmission(admission);
+        await releaseSavedRunAdmission(admission, { persisted: snapshotPersisted });
       }
     } catch (error) {
       incrementCounter("vector_reports_total", { domain: "unknown", outcome: "failed" });

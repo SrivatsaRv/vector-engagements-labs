@@ -4,7 +4,21 @@ import { PublicApiError } from "./public-api";
 import { requestActorHash } from "./runtime";
 import { SAVED_RUN_LIFECYCLE_POLICY } from "./admission-policy";
 
-type SavedRunLease = { slot: number; leaseId: string };
+type SavedRunLease = {
+  slot: number;
+  leaseId: string;
+  actorHash: string;
+  usageDay: string;
+};
+
+type ReleaseSavedRunAdmissionOptions = {
+  /**
+   * Keep the quota reservation only after the immutable snapshot insert
+   * committed. Rejected or aborted recomputations release both capacity and
+   * their reservation in the same durable transaction.
+   */
+  persisted?: boolean;
+};
 
 function retryAfter(seconds: number) {
   return { "retry-after": String(Math.max(1, Math.ceil(seconds))) };
@@ -27,7 +41,7 @@ export async function admitSavedRun(request: Request): Promise<SavedRunLease> {
         ON CONFLICT (actor_hash, usage_day)
         DO UPDATE SET accepted_runs = anonymous_saved_run_usage.accepted_runs + 1
         WHERE anonymous_saved_run_usage.accepted_runs < ${SAVED_RUN_LIFECYCLE_POLICY.maxAnonymousRunsPerDay}
-        RETURNING accepted_runs
+        RETURNING usage_day::text AS usage_day
       `;
       if (!usage[0]) {
         throw new PublicApiError(429, "saved_run_quota_exceeded", "saved run quota exceeded", retryAfter(86_400));
@@ -52,7 +66,12 @@ export async function admitSavedRun(request: Request): Promise<SavedRunLease> {
       if (!slots[0]) {
         throw new PublicApiError(503, "saved_run_capacity_exhausted", "saved run capacity exhausted", retryAfter(1));
       }
-      return { slot: slots[0].slot as number, leaseId };
+      return {
+        slot: slots[0].slot as number,
+        leaseId,
+        actorHash,
+        usageDay: usage[0].usage_day as string,
+      };
     }));
     incrementCounter("vector_saved_run_admission_total", { outcome: "admitted" });
     return lease;
@@ -68,33 +87,65 @@ export async function admitSavedRun(request: Request): Promise<SavedRunLease> {
   }
 }
 
-export async function releaseSavedRunAdmission(lease: SavedRunLease) {
+export async function releaseSavedRunAdmission(
+  lease: SavedRunLease,
+  { persisted = false }: ReleaseSavedRunAdmissionOptions = {},
+) {
   try {
-    const removed = await withDatabase((sql) => sql`
-      WITH expired AS (
-        SELECT id
-        FROM saved_run_snapshots
-        WHERE created_at < now() - (${SAVED_RUN_LIFECYCLE_POLICY.retentionDays} * interval '1 day')
-        ORDER BY created_at
-        LIMIT ${SAVED_RUN_LIFECYCLE_POLICY.cleanupBatchSize}
-      ), deleted AS (
-        DELETE FROM saved_run_snapshots
-        WHERE id IN (SELECT id FROM expired)
-        RETURNING id
-      ), released AS (
-        UPDATE saved_run_admission_slots
-        SET lease_id = NULL, leased_until = NULL
-        WHERE slot = ${lease.slot} AND lease_id = ${lease.leaseId}::uuid
-        RETURNING slot
-      )
-      SELECT (SELECT count(*) FROM deleted)::int AS deleted_count,
-             (SELECT count(*) FROM released)::int AS released_count
-    `);
-    if (removed[0]?.released_count !== 1) {
-      throw new Error("saved-run admission lease was not held by this request");
-    }
+    const removed = await withDatabase((sql) => sql.begin(async (transaction) => {
+      const [released] = await transaction`
+        WITH expired AS (
+          SELECT id
+          FROM saved_run_snapshots
+          WHERE created_at < now() - (${SAVED_RUN_LIFECYCLE_POLICY.retentionDays} * interval '1 day')
+          ORDER BY created_at
+          LIMIT ${SAVED_RUN_LIFECYCLE_POLICY.cleanupBatchSize}
+        ), deleted AS (
+          DELETE FROM saved_run_snapshots
+          WHERE id IN (SELECT id FROM expired)
+          RETURNING id
+        ), released AS (
+          UPDATE saved_run_admission_slots
+          SET lease_id = NULL, leased_until = NULL
+          WHERE slot = ${lease.slot} AND lease_id = ${lease.leaseId}::uuid
+          RETURNING slot
+        )
+        SELECT (SELECT count(*) FROM deleted)::int AS deleted_count,
+               (SELECT count(*) FROM released)::int AS released_count
+      `;
+      if (released?.released_count !== 1) {
+        throw new Error("saved-run admission lease was not held by this request");
+      }
+      if (!persisted) {
+        const [reservation] = await transaction`
+          SELECT accepted_runs
+          FROM anonymous_saved_run_usage
+          WHERE actor_hash = ${lease.actorHash}
+            AND usage_day = ${lease.usageDay}::date
+          FOR UPDATE
+        `;
+        if (!reservation) {
+          throw new Error("saved-run admission quota reservation was not held by this request");
+        }
+        if (reservation.accepted_runs === 1) {
+          await transaction`
+            DELETE FROM anonymous_saved_run_usage
+            WHERE actor_hash = ${lease.actorHash}
+              AND usage_day = ${lease.usageDay}::date
+          `;
+        } else {
+          await transaction`
+            UPDATE anonymous_saved_run_usage
+            SET accepted_runs = accepted_runs - 1
+            WHERE actor_hash = ${lease.actorHash}
+              AND usage_day = ${lease.usageDay}::date
+          `;
+        }
+      }
+      return released;
+    }));
     incrementCounter("vector_saved_run_cleanup_total", {
-      outcome: (removed[0]?.deleted_count ?? 0) > 0 ? "expired_records_deleted" : "no_expired_records",
+      outcome: (removed?.deleted_count ?? 0) > 0 ? "expired_records_deleted" : "no_expired_records",
     });
   } catch {
     // A short lease bounds capacity even if the release path is interrupted.

@@ -36,8 +36,11 @@ multi-tenant identity solution.
 `saved-run-lifecycle.v1` separately caps anonymous saved-run recomputations,
 daily accepted writes, stored result bytes, and record retention. A Postgres-backed lease table
 enforces the global recomputation limit across Node processes; lease expiry
-prevents a crashed process retaining capacity. Release performs bounded expiry
-cleanup. Admission rejects use stable quota, capacity, or unavailable codes;
+prevents a crashed process retaining capacity. A quota entry is a durable
+reservation during recomputation. It becomes an accepted write only after the
+immutable snapshot insert succeeds; failed validation, computation, or storage
+refunds the reservation and releases capacity in the same transaction. Release
+performs bounded expiry cleanup. Admission rejects use stable quota, capacity, or unavailable codes;
 the `/api/health` readback identifies the active non-secret admission adapter.
 
 The Cloudflare application Worker that validates APIs and saved runs is not the
