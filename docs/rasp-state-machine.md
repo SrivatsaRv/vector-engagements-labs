@@ -20,6 +20,12 @@ positive-range `RADAR`, `INFRARED`, or `VISUAL` model. A
 `DECLARED_ENVELOPE`, zero range, missing evidence, invalid bounds, or digest
 mismatch cannot become a generic radar.
 
+The run binding also carries a compiler-produced projection of the compiled
+observer models. Both engines require every entity admission field to exactly
+match one member of that projection. An entity admission cannot manufacture a
+sensor, range, field of view, kind, version, or evidence list by reusing a
+valid model-pack digest. Transport of the binding itself remains STUB-13 work.
+
 On a due `SEARCH` scan, range and field-of-view checks may emit one `PLOT`.
 The PLOT is a non-positional measurement boundary: it has no observed entity
 identity, position, covariance, confidence, visible marker, datalink,
@@ -53,10 +59,10 @@ not make tactical decisions or weapon-support claims.
 
 ## Regression evidence
 
-`tests/sensor-model-admission.test.mjs` proves a due scan can produce a
-non-positional PLOT only from a complete versioned test admission; range, OFF,
-and digest mismatch fail closed; TypeScript/Rust agree; and VSR replay retains
-no world estimate. `tests/rasp-state-machine.test.mjs` continues to prove no
-80 km range, covariance, jammer-derived value, entity identity, or position
-survives. The production fixture remains unavailable, and component/selector
-tests continue to prevent Model Truth fallback.
+`tests/sensor-model-admission.test.mjs` proves that an entity admission cannot
+manufacture a PLOT beside a valid pack digest; range, mode, and digest mutation
+fail closed in TypeScript and Rust/WASM; and the production record remains
+unavailable without a world estimate. `tests/rasp-state-machine.test.mjs` continues to
+prove no 80 km range, covariance, jammer-derived value, entity identity, or
+position survives. The production fixture remains unavailable, and
+component/selector tests continue to prevent Model Truth fallback.

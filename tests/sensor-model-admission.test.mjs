@@ -9,7 +9,7 @@ import {
   serializeVectorRecord,
 } from "../lib/record/vector-record.ts";
 
-function admittedScenario({ mode = "SEARCH", rangeM = 120_000, digest } = {}) {
+function forgedScenario({ mode = "SEARCH", rangeM = 120_000, digest } = {}) {
   const capabilities = createVerificationDeploymentCapabilities("typescript");
   const prepared = prepareSimulation(DEFAULT_SCENARIO, DEFAULT_SCENARIO.profile, capabilities);
   const engineScenario = structuredClone(prepared.engineScenario);
@@ -31,29 +31,14 @@ function admittedScenario({ mode = "SEARCH", rangeM = 120_000, digest } = {}) {
   return { prepared: { ...prepared, engineScenario }, engineScenario };
 }
 
-function stateAtStart(run, perspective) {
-  return run.frames[0].observerStates.find((state) => state.perspective === perspective);
-}
-
-test("a positive, versioned sensor admission emits a non-positional plot only at a due scan", () => {
-  const { engineScenario } = admittedScenario();
-  const run = runEngineBackend(engineScenario, "typescript");
-  const iaf = stateAtStart(run, "IAF");
-  const paf = stateAtStart(run, "PAF");
-  assert.deepEqual(iaf, {
-    schemaVersion: "vector.observer-state.v2",
-    perspective: "IAF",
-    sensorState: "SEARCH",
-    observationCount: 1,
-    trackState: "PLOT",
-    visible: false,
-    availabilityReason: "OBSERVATION_ADMITTED",
-    effectScope: "AIR_PICTURE_ONLY",
-    stateExplanation: "One due scan satisfied the admitted range and field-of-view conditions. This plot has no position estimate or weapon-support authority.",
-    sensorModelId: "test-radar-model-v1",
-  });
-  assert.equal(paf.sensorState, "UNSUPPORTED");
-  assert.equal(paf.observationCount, 0);
+test("an entity admission cannot manufacture a sensor plot beside a valid pack digest", () => {
+  const { engineScenario } = forgedScenario();
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.throws(
+      () => runEngineBackend(engineScenario, backend),
+      /observer sensor blue-platform-1 is not bound to an admitted compiled sensor model/i,
+    );
+  }
 });
 
 test("the active reference scenario cannot promote its zero-range declared envelope into a radar", () => {
@@ -68,45 +53,35 @@ test("the active reference scenario cannot promote its zero-range declared envel
   );
 });
 
-test("the same admitted contract is TypeScript/Rust parity evidence", () => {
-  const { engineScenario } = admittedScenario();
-  const typescript = runEngineBackend(engineScenario, "typescript");
-  const rust = runEngineBackend(engineScenario, "rust-wasm");
-  assert.deepEqual(
-    rust.frames.map((frame) => frame.observerStates),
-    typescript.frames.map((frame) => frame.observerStates),
-  );
-});
-
 test("range, mode, and model-pack mismatch fail closed instead of manufacturing a track", () => {
-  const outOfRange = runEngineBackend(admittedScenario({ rangeM: 101 }).engineScenario, "typescript");
-  assert.equal(stateAtStart(outOfRange, "IAF").trackState, "NONE");
-  assert.equal(stateAtStart(outOfRange, "IAF").availabilityReason, "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME");
-  const off = runEngineBackend(admittedScenario({ mode: "OFF" }).engineScenario, "typescript");
-  assert.equal(stateAtStart(off, "IAF").trackState, "NONE");
-  assert.equal(stateAtStart(off, "IAF").availabilityReason, "SENSOR_OFF");
+  const outOfRange = forgedScenario({ rangeM: 101 }).engineScenario;
+  const off = forgedScenario({ mode: "OFF" }).engineScenario;
+  for (const scenario of [outOfRange, off]) {
+    for (const backend of ["typescript", "rust-wasm"]) {
+      assert.throws(
+        () => runEngineBackend(scenario, backend),
+        /observer sensor blue-platform-1 is not bound to an admitted compiled sensor model/i,
+      );
+    }
+  }
   assert.throws(
-    () => runEngineBackend(admittedScenario({ digest: "0".repeat(64) }).engineScenario, "typescript"),
-    /Observer sensor blue-platform-1 has no valid compiled admission/,
+    () => runEngineBackend(forgedScenario({ digest: "0".repeat(64) }).engineScenario, "typescript"),
+    /not bound to an admitted compiled sensor model/,
   );
   assert.throws(
-    () => runEngineBackend(admittedScenario({ digest: "0".repeat(64) }).engineScenario, "rust-wasm"),
+    () => runEngineBackend(forgedScenario({ digest: "0".repeat(64) }).engineScenario, "rust-wasm"),
     /observer sensor blue-platform-1 admission does not match scenario model pack/,
   );
 });
 
-test("VSR replay preserves the admitted plot without rebuilding an estimate from world frames", async () => {
-  const { prepared, engineScenario } = admittedScenario();
-  const run = runEngineBackend(engineScenario, "typescript");
+test("recorded default observer state remains unavailable without a compiled sensor model", async () => {
+  const prepared = prepareSimulation(DEFAULT_SCENARIO);
+  const run = runEngineBackend(prepared.engineScenario, "typescript");
   const result = buildSimulationResult(prepared, run);
   const record = await createVectorSimulationRecord(prepared, result, "2026-08-21T00:00:00.000Z");
   const serialized = serializeVectorRecord(record);
   const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
-  const plot = replay.pictures.find((picture) => picture.trackState === "PLOT");
-  assert.ok(plot);
-  assert.equal(plot.sensorModelId, "test-radar-model-v1");
-  assert.equal(plot.visible, false);
-  assert.equal("position" in plot, false);
-  assert.equal("observedEntityId" in plot, false);
-  assert.equal("truthPosition" in plot, false);
+  assert.ok(replay.pictures.every((picture) => picture.trackState === "UNSUPPORTED"));
+  assert.ok(replay.pictures.every((picture) => !("position" in picture)));
+  assert.ok(replay.pictures.every((picture) => !("observedEntityId" in picture)));
 });

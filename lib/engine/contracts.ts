@@ -219,6 +219,18 @@ export type EngineScenario = {
     version: string;
     digest: string;
     intendedUse: { id: string; version: string };
+    observerSensors: Array<{
+      modelId: string;
+      modelVersion: string;
+      evidenceRefIds: string[];
+      /** Includes DECLARED_ENVELOPE so the binding can prove it is not a radar. */
+      sensorKind: ObserverSensorKind | "DECLARED_ENVELOPE";
+      detectionRangeM: number;
+      minimumRangeM: number;
+      scanPeriodS: number;
+      azimuthFieldOfViewRad: number;
+      elevationFieldOfViewRad: number;
+    }>;
     scenarioPatches: ScenarioModelPatch[];
   };
   entities: EngineEntityDefinition[];

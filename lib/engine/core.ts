@@ -88,6 +88,41 @@ function unavailableObserverState(
   };
 }
 
+/**
+ * An observer admission is a projection of one sensor model already compiled
+ * into the compiler-produced run binding. A digest alone is not sufficient:
+ * entity-level input must not manufacture a radar by supplying a new range or
+ * field of view alongside an otherwise valid pack digest. The binding
+ * transport remains a separate governed concern.
+ */
+function assertObserverSensorBoundToModelPack(
+  entity: EngineEntityDefinition,
+  scenario: EngineScenario,
+) {
+  const admission = entity.observerSensor;
+  if (!admission) return;
+  const sensor = scenario.modelPack.observerSensors.find((candidate) =>
+    candidate.modelId === admission.modelId,
+  );
+  const sameEvidence = sensor !== undefined &&
+    sensor.evidenceRefIds.length === admission.evidenceRefIds.length &&
+    sensor.evidenceRefIds.every((id, index) => id === admission.evidenceRefIds[index]);
+  if (
+    !sensor ||
+    admission.modelPackDigest !== scenario.modelPack.digest ||
+    admission.modelVersion !== sensor.modelVersion ||
+    admission.sensorKind !== sensor.sensorKind ||
+    !sameEvidence ||
+    admission.detectionRangeM !== sensor.detectionRangeM ||
+    admission.minimumRangeM !== sensor.minimumRangeM ||
+    admission.scanPeriodS !== sensor.scanPeriodS ||
+    admission.azimuthFieldOfViewRad !== sensor.azimuthFieldOfViewRad ||
+    admission.elevationFieldOfViewRad !== sensor.elevationFieldOfViewRad
+  ) {
+    throw new Error(`Observer sensor ${entity.id} is not bound to an admitted compiled sensor model.`);
+  }
+}
+
 function observerStates(
   states: readonly RuntimeState[],
   scenario: EngineScenario,
@@ -796,6 +831,7 @@ export class EngineSession {
     for (const entity of scenario.entities) {
       const sensor = entity.observerSensor;
       if (!sensor) continue;
+      assertObserverSensorBoundToModelPack(entity, scenario);
       if (
         sensor.schemaVersion !== "vector.observer-sensor-admission.v1" ||
         sensor.modelPackDigest !== scenario.modelPack.digest ||

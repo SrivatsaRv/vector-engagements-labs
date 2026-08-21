@@ -591,6 +591,29 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
                 entity.id
             )));
         }
+        if let Some(admission) = &entity.observer_sensor {
+            let sensor = scenario
+                .model_pack
+                .observer_sensors
+                .iter()
+                .find(|sensor| sensor.model_id == admission.model_id);
+            let exact_match = sensor.is_some_and(|sensor| {
+                sensor.model_version == admission.model_version
+                    && sensor.evidence_ref_ids == admission.evidence_ref_ids
+                    && sensor.sensor_kind == admission.sensor_kind
+                    && sensor.detection_range_m == admission.detection_range_m
+                    && sensor.minimum_range_m == admission.minimum_range_m
+                    && sensor.scan_period_s == admission.scan_period_s
+                    && sensor.azimuth_field_of_view_rad == admission.azimuth_field_of_view_rad
+                    && sensor.elevation_field_of_view_rad == admission.elevation_field_of_view_rad
+            });
+            if !exact_match {
+                return Err(invalid(format!(
+                    "observer sensor {} is not bound to an admitted compiled sensor model",
+                    entity.id
+                )));
+            }
+        }
         if let Some(weapon) = &entity.weapon {
             if weapon.admission.model_pack_digest != scenario.model_pack.digest
                 || weapon.admission.model_pack_digest != entity.provenance.model_pack_digest
