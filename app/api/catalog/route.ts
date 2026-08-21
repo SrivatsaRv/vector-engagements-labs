@@ -4,6 +4,11 @@ import { withObservedRoute } from "@/lib/observability/server";
 import { publicApiError } from "@/lib/security/public-api";
 import { enforceRateLimit } from "@/lib/security/runtime";
 import { admitCatalogCredibility } from "@/lib/catalog-admission";
+import {
+  assertPublishedInstallationCatalogueRows,
+  INSTALLATION_CATALOGUE,
+  INSTALLATION_CATALOGUE_IDENTITY,
+} from "@/lib/installations";
 
 const CATALOG_TTL_MS = 5 * 60 * 1000;
 let catalogCache: { expiresAt: number; value: Record<string, unknown> } | undefined;
@@ -33,7 +38,21 @@ async function loadCatalog() {
       compiledModelPacks,
       credibilityManifests,
     });
-    return { platforms, weapons, subsystems, sources, compatibility, assertions, simulationModels, installations, studyAreas, scenarioTemplates, intendedUses, compiledModelPacks, credibilityManifests, credibilityAdmissions };
+    assertPublishedInstallationCatalogueRows(installations);
+    return {
+      platforms, weapons, subsystems, sources, compatibility, assertions,
+      simulationModels, installations, studyAreas, scenarioTemplates, intendedUses,
+      compiledModelPacks, credibilityManifests, credibilityAdmissions,
+      installationCatalogue: {
+        schemaVersion: INSTALLATION_CATALOGUE.schemaVersion,
+        ...INSTALLATION_CATALOGUE_IDENTITY,
+        intendedUse: INSTALLATION_CATALOGUE.intendedUse,
+        coverage: INSTALLATION_CATALOGUE.coverage,
+        validity: INSTALLATION_CATALOGUE.validity,
+        review: INSTALLATION_CATALOGUE.review,
+        records: INSTALLATION_CATALOGUE.records,
+      },
+    };
   }).then((value) => {
     catalogCache = { expiresAt: Date.now() + CATALOG_TTL_MS, value };
     return value;

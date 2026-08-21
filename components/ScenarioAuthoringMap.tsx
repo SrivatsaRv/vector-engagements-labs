@@ -588,9 +588,10 @@ export function ScenarioAuthoringMap({
           <span>MAP AUTHORING</span>
           <strong>Place the selected forces inside {studyArea.shortName}.</strong>
           <p>
-            Choose a public-reference base or drag either aircraft to its start
-            position. Altitude, heading, speed, and any planned route compile
-            into the same scenario state.
+            Choose a base available in this public-reference environment pack,
+            or drag either aircraft to a manual placement. This is not a
+            complete IAF or PAF catalogue. Altitude, heading, speed, and any
+            planned route compile into the same scenario state.
           </p>
         </div>
         <div className="origin-pickers" aria-label="Team origin selection">

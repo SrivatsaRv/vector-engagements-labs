@@ -136,9 +136,15 @@ atmosphere adapter; #64 will bind the admitted pack to ground and route
 admission and runtime sampling.
 
 Installation coverage is separately declared as
-`BOUNDED_PUBLIC_REFERENCE_FIXTURE`. The current 21 public-reference points are
-not all IAF or PAF bases. Runway evidence is text-only or absent; therefore no
-Phase A installation is eligible to prove a ground/runway start. A future
+`BOUNDED_PUBLIC_REFERENCE_FIXTURE` and binds
+`vector.installation-catalogue.v1` by ID/version/SHA-256 digest. The manifest
+contains record count, sources/license state, known gaps, validity/review state,
+and per-installation WGS84 datum, positional-uncertainty state, and provenance.
+The current 21 public-reference points are not all IAF or PAF bases. The API
+fails closed when published PostGIS geometry/source rows diverge from that
+manifest; the browser fails closed on a stale coverage identity. Runway evidence
+is text-only or absent; therefore no Phase A installation is eligible to prove a
+ground/runway start. A future
 runway record must include the required geometry, MSL elevation, datum,
 provenance, uncertainty, and mission-start evidence before it can be offered.
 An `vector.installation-origin.v1` airborne reference may identify a selected

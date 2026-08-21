@@ -1,39 +1,155 @@
-export type PublicInstallation = {
+import rawCatalogue from "../governance/installation-catalogue.v1.json" with { type: "json" };
+import { sha256Identity } from "./geospatial/digest.ts";
+import type { DatasetIdentity } from "./geospatial/contracts.ts";
+
+export type InstallationService = "IAF" | "PAF";
+export type InstallationType = "MAIN_OPERATING_BASE" | "FORWARD_OPERATING_BASE" | "AIR_STATION";
+
+export type InstallationCatalogueRecord = {
   id: string;
-  service: "IAF" | "PAF";
+  service: InstallationService;
   name: string;
   icaoCode?: string;
   longitude: number;
   latitude: number;
   elevationFt?: number;
   runwayInfo?: string;
-  type: "MAIN_OPERATING_BASE" | "FORWARD_OPERATING_BASE" | "AIR_STATION";
-  dataState: "PUBLIC_REFERENCE";
+  type: InstallationType;
   sourceId: "iaf-stations-wikipedia" | "shield-paf-orbat-2026-05-19";
+  coordinateDatum: "WGS84";
+  /** `null` means the source did not publish a reviewed positional uncertainty. */
+  positionalUncertaintyM: number | null;
+  provenance: "PUBLIC_REFERENCE";
+  reviewState: "UNVERIFIED";
 };
 
-export const PUBLIC_INSTALLATIONS: PublicInstallation[] = [
-  { id: "iaf-adampur", service: "IAF", name: "Adampur AFS", latitude: 31.434879, longitude: 75.757256, type: "AIR_STATION", dataState: "PUBLIC_REFERENCE", sourceId: "iaf-stations-wikipedia" },
-  { id: "iaf-ambala", service: "IAF", name: "Ambala AFS", latitude: 30.370556, longitude: 76.817778, type: "AIR_STATION", dataState: "PUBLIC_REFERENCE", sourceId: "iaf-stations-wikipedia" },
-  { id: "iaf-halwara", service: "IAF", name: "Halwara AFS", latitude: 30.748041, longitude: 75.633209, type: "AIR_STATION", dataState: "PUBLIC_REFERENCE", sourceId: "iaf-stations-wikipedia" },
-  { id: "iaf-pathankot", service: "IAF", name: "Pathankot AFS", latitude: 32.236929, longitude: 75.633227, type: "AIR_STATION", dataState: "PUBLIC_REFERENCE", sourceId: "iaf-stations-wikipedia" },
-  { id: "iaf-srinagar", service: "IAF", name: "Srinagar AFS", latitude: 33.994374, longitude: 74.765299, type: "AIR_STATION", dataState: "PUBLIC_REFERENCE", sourceId: "iaf-stations-wikipedia" },
-  { id: "iaf-jodhpur", service: "IAF", name: "Jodhpur AFS", latitude: 26.251389, longitude: 73.048056, type: "AIR_STATION", dataState: "PUBLIC_REFERENCE", sourceId: "iaf-stations-wikipedia" },
-  { id: "paf-nur-khan", service: "PAF", name: "PAF Base Nur Khan", icaoCode: "OPRN", latitude: 33.6167, longitude: 73.0992, elevationFt: 1668, runwayInfo: "RWY 09/27, 12/30", type: "MAIN_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-peshawar", service: "PAF", name: "PAF Base Peshawar", icaoCode: "OPPS", latitude: 33.9933, longitude: 71.5144, elevationFt: 1180, runwayInfo: "RWY 17/35", type: "MAIN_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-asghar-khan", service: "PAF", name: "PAF Academy Asghar Khan", icaoCode: "OPRS", latitude: 34.0811, longitude: 71.9725, type: "AIR_STATION", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-qadri", service: "PAF", name: "PAF Qadri", icaoCode: "OPSD", latitude: 35.3347, longitude: 75.5375, type: "FORWARD_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-mm-alam", service: "PAF", name: "PAF Base M.M. Alam", icaoCode: "OPMI", latitude: 32.5631, longitude: 71.5706, type: "MAIN_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-minhas", service: "PAF", name: "PAF Base Minhas", icaoCode: "OPMS", latitude: 33.8703, longitude: 72.4, type: "MAIN_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-mushaf", service: "PAF", name: "PAF Base Mushaf", icaoCode: "OPSR", latitude: 32.0486, longitude: 72.6653, type: "MAIN_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-murid", service: "PAF", name: "PAF Murid", icaoCode: "OPMU", latitude: 32.9094, longitude: 72.7756, type: "FORWARD_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-rafiqui", service: "PAF", name: "PAF Base Rafiqui", icaoCode: "OPRQ", latitude: 30.7581, longitude: 72.2824, type: "MAIN_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-shahbaz", service: "PAF", name: "PAF Base Shahbaz", icaoCode: "OPJA", latitude: 28.2842, longitude: 68.4497, type: "MAIN_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-masroor", service: "PAF", name: "PAF Base Masroor", icaoCode: "OPMR", latitude: 24.8936, longitude: 66.94, type: "MAIN_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-bholari", service: "PAF", name: "PAF Base Bholari", icaoCode: "OPBW", latitude: 25.2436, longitude: 68.0353, type: "MAIN_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-faisal", service: "PAF", name: "PAF Base Faisal", icaoCode: "OPSF", latitude: 24.8747, longitude: 67.1178, type: "MAIN_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-sukkur", service: "PAF", name: "PAF Sukkur", icaoCode: "OPSK", latitude: 27.7219, longitude: 68.7919, type: "FORWARD_OPERATING_BASE", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-  { id: "paf-korangi-creek", service: "PAF", name: "PAF Korangi Creek", icaoCode: "OPKC", latitude: 24.7822, longitude: 67.1364, type: "AIR_STATION", dataState: "PUBLIC_REFERENCE", sourceId: "shield-paf-orbat-2026-05-19" },
-];
+export type InstallationCatalogueContent = {
+  schemaVersion: "vector.installation-catalogue.v1";
+  id: "vector.public-reference-installations";
+  version: "1.0.0";
+  intendedUse: "PUBLIC_EDUCATIONAL";
+  coverage: {
+    declaredServiceCoverage: "BOUNDED_PUBLIC_REFERENCE_FIXTURE";
+    includedRecordCount: number;
+    geographicCoverage: string;
+    installationTypeCoverage: InstallationType[];
+    knownGaps: string[];
+  };
+  validity: { startsAt: "-infinity"; endsAt: "+infinity" };
+  review: { state: "PUBLIC_REFERENCE_FIXTURE"; verifiedAt: string };
+  sources: Array<{
+    id: InstallationCatalogueRecord["sourceId"];
+    title: string;
+    publisher: string;
+    url: string;
+    license: "SOURCE_LICENSE_NOT_VERIFIED" | "OPERATOR_SUPPLIED_PUBLIC_REFERENCE";
+  }>;
+  records: InstallationCatalogueRecord[];
+};
+
+export type InstallationCatalogue = InstallationCatalogueContent & {
+  identity: DatasetIdentity;
+};
+
+function assertInstallationCatalogueContent(value: InstallationCatalogueContent): void {
+  if (value.schemaVersion !== "vector.installation-catalogue.v1") {
+    throw new TypeError("Unsupported installation catalogue schema.");
+  }
+  if (value.coverage.declaredServiceCoverage !== "BOUNDED_PUBLIC_REFERENCE_FIXTURE") {
+    throw new TypeError("Installation catalogue must not claim complete IAF or PAF coverage.");
+  }
+  if (value.coverage.includedRecordCount !== value.records.length || value.records.length === 0) {
+    throw new TypeError("Installation catalogue count does not match its records.");
+  }
+  if (value.coverage.knownGaps.length === 0) {
+    throw new TypeError("Installation catalogue must state its known coverage gaps.");
+  }
+  const sourceIds = new Set(value.sources.map((source) => source.id));
+  const ids = new Set<string>();
+  for (const record of value.records) {
+    if (ids.has(record.id)) throw new TypeError(`Duplicate installation identity ${record.id}.`);
+    ids.add(record.id);
+    if (!sourceIds.has(record.sourceId)) throw new TypeError(`Installation ${record.id} has an unknown source.`);
+    if (record.coordinateDatum !== "WGS84" || !Number.isFinite(record.longitude) || !Number.isFinite(record.latitude)) {
+      throw new TypeError(`Installation ${record.id} requires finite WGS84 coordinates.`);
+    }
+    if (record.longitude < -180 || record.longitude > 180 || record.latitude < -90 || record.latitude > 90) {
+      throw new RangeError(`Installation ${record.id} is outside WGS84 bounds.`);
+    }
+    if (record.positionalUncertaintyM !== null && (!Number.isFinite(record.positionalUncertaintyM) || record.positionalUncertaintyM < 0)) {
+      throw new TypeError(`Installation ${record.id} has invalid positional uncertainty.`);
+    }
+  }
+}
+
+const content = rawCatalogue as InstallationCatalogueContent;
+assertInstallationCatalogueContent(content);
+
+/**
+ * Single immutable input for seed data, compilation, and coverage presentation.
+ * PostGIS is canonical for published geometry. This checked-in content is the
+ * reproducible seed/compiled-pack artifact, never a second hand-edited list.
+ */
+export const INSTALLATION_CATALOGUE: InstallationCatalogue = Object.freeze({
+  ...content,
+  identity: Object.freeze({
+    id: content.id,
+    version: content.version,
+    digest: sha256Identity(content),
+  }),
+});
+
+export const INSTALLATION_CATALOGUE_IDENTITY = INSTALLATION_CATALOGUE.identity;
+
+/** Compatibility projection for current seed, compiler, and test consumers. */
+export type PublicInstallation = Pick<InstallationCatalogueRecord,
+  "id" | "service" | "name" | "icaoCode" | "longitude" | "latitude" |
+  "elevationFt" | "runwayInfo" | "type" | "sourceId"
+> & { dataState: "PUBLIC_REFERENCE" };
+
+export const PUBLIC_INSTALLATIONS: readonly PublicInstallation[] = Object.freeze(
+  INSTALLATION_CATALOGUE.records.map((record) => Object.freeze({
+    id: record.id,
+    service: record.service,
+    name: record.name,
+    icaoCode: record.icaoCode,
+    longitude: record.longitude,
+    latitude: record.latitude,
+    elevationFt: record.elevationFt,
+    runwayInfo: record.runwayInfo,
+    type: record.type,
+    sourceId: record.sourceId,
+    dataState: "PUBLIC_REFERENCE" as const,
+  })),
+);
+
+export function findInstallationCatalogueRecord(id: string): InstallationCatalogueRecord | undefined {
+  return INSTALLATION_CATALOGUE.records.find((record) => record.id === id);
+}
+
+/**
+ * PostGIS remains the authority for published map geometry. The catalog route
+ * calls this boundary before exposing rows so a stale or partially seeded
+ * database cannot be presented as the immutable compiled-pack catalogue.
+ */
+export function assertPublishedInstallationCatalogueRows(rows: readonly Record<string, unknown>[]): void {
+  if (rows.length !== INSTALLATION_CATALOGUE.records.length) {
+    throw new TypeError("Published installation catalogue count does not match the declared coverage manifest.");
+  }
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const id = typeof row.id === "string" ? row.id : "";
+    const record = findInstallationCatalogueRecord(id);
+    if (!record || seen.has(id)) {
+      throw new TypeError(`Published installation ${id || "<missing>"} is not in the declared coverage manifest.`);
+    }
+    seen.add(id);
+    if (row.source_id !== record.sourceId
+      || Number(row.longitude) !== record.longitude
+      || Number(row.latitude) !== record.latitude) {
+      throw new TypeError(`Published installation ${id} does not match its declared source and WGS84 position.`);
+    }
+  }
+}
 
 export const DEFAULT_MAP_ORIGIN = { longitude: 74.2, latitude: 31.8 };

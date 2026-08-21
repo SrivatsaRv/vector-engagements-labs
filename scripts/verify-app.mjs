@@ -92,6 +92,13 @@ try {
     ),
   );
   assert.equal(catalog.installations.length, 21);
+  assert.equal(catalog.installationCatalogue.schemaVersion, "vector.installation-catalogue.v1");
+  assert.equal(catalog.installationCatalogue.id, "vector.public-reference-installations");
+  assert.equal(catalog.installationCatalogue.version, "1.0.0");
+  assert.match(catalog.installationCatalogue.digest, /^sha256:[0-9a-f]{64}$/);
+  assert.equal(catalog.installationCatalogue.coverage.declaredServiceCoverage, "BOUNDED_PUBLIC_REFERENCE_FIXTURE");
+  assert.equal(catalog.installationCatalogue.coverage.includedRecordCount, catalog.installations.length);
+  assert.ok(catalog.installationCatalogue.coverage.knownGaps.some((gap) => gap.includes("not a complete IAF or PAF")));
   assert.deepEqual(
     catalog.studyAreas.map((item) => item.id).sort(),
     [

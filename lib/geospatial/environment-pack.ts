@@ -1,6 +1,11 @@
 import { standardAtmosphere } from "../engine/atmosphere.ts";
 import type { PublicInstallation } from "../installations.ts";
-import { PUBLIC_INSTALLATIONS } from "../installations.ts";
+import {
+  findInstallationCatalogueRecord,
+  INSTALLATION_CATALOGUE,
+  INSTALLATION_CATALOGUE_IDENTITY,
+  PUBLIC_INSTALLATIONS,
+} from "../installations.ts";
 import type { StudyArea, WeatherPreset } from "../study-areas.ts";
 import { resolveEnvironmentSelection } from "../study-areas.ts";
 import { sha256Identity } from "./digest.ts";
@@ -60,6 +65,8 @@ export type EnvironmentPack = {
     declaredServiceCoverage: "BOUNDED_PUBLIC_REFERENCE_FIXTURE";
     knownGaps: readonly string[];
     runwayEvidence: "TEXT_ONLY_OR_ABSENT";
+    catalogue: DatasetIdentity;
+    sources: readonly string[];
   };
 };
 
@@ -82,7 +89,16 @@ export type EnvironmentPackContent = {
   bounds: StudyArea["bounds"];
   surfaceElevationM: number;
   weather: WeatherPreset;
-  installations: Array<{ id: string; sourceId: string; runwayInfo: string | null }>;
+  installationCatalogue: DatasetIdentity;
+  installations: Array<{
+    id: string;
+    sourceId: string;
+    runwayInfo: string | null;
+    coordinateDatum: "WGS84";
+    positionalUncertaintyM: number | null;
+    provenance: "PUBLIC_REFERENCE";
+    reviewState: "UNVERIFIED";
+  }>;
   installationGaps: readonly string[];
 };
 
@@ -117,16 +133,31 @@ function material(input: {
   installations: readonly PublicInstallation[];
 }): EnvironmentPackContent {
   const { studyArea, weatherPreset, installations } = input;
+  if (installations.length !== INSTALLATION_CATALOGUE.records.length
+    || installations.some((installation) => !findInstallationCatalogueRecord(installation.id))) {
+    throw new TypeError("Phase A environment packs require the complete declared installation catalogue.");
+  }
   return {
     studyAreaId: studyArea.id,
     bounds: [[...studyArea.bounds[0]], [...studyArea.bounds[1]]],
     surfaceElevationM: studyArea.surfaceElevationM,
     weather: weatherPreset,
-    installations: installations.map((installation) => ({
-      id: installation.id,
-      sourceId: installation.sourceId,
-      runwayInfo: installation.runwayInfo ?? null,
-    })),
+    installationCatalogue: INSTALLATION_CATALOGUE_IDENTITY,
+    installations: installations.map((installation) => {
+      const record = findInstallationCatalogueRecord(installation.id);
+      if (!record || record.sourceId !== installation.sourceId) {
+        throw new TypeError(`Installation ${installation.id} does not match the governed catalogue.`);
+      }
+      return {
+        id: installation.id,
+        sourceId: installation.sourceId,
+        runwayInfo: installation.runwayInfo ?? null,
+        coordinateDatum: record.coordinateDatum,
+        positionalUncertaintyM: record.positionalUncertaintyM,
+        provenance: record.provenance,
+        reviewState: record.reviewState,
+      };
+    }),
     installationGaps: [...PHASE_A_INSTALLATION_GAPS],
   };
 }
@@ -243,6 +274,8 @@ export function createPhaseAEnvironmentPack(input: {
       declaredServiceCoverage: "BOUNDED_PUBLIC_REFERENCE_FIXTURE",
       knownGaps: PHASE_A_INSTALLATION_GAPS,
       runwayEvidence: "TEXT_ONLY_OR_ABSENT",
+      catalogue: INSTALLATION_CATALOGUE_IDENTITY,
+      sources: INSTALLATION_CATALOGUE.sources.map((source) => source.id),
     },
   };
 }
@@ -261,6 +294,14 @@ export function assertPhaseAEnvironmentPack(pack: EnvironmentPack) {
   }
   if (pack.installationCoverage.declaredServiceCoverage !== "BOUNDED_PUBLIC_REFERENCE_FIXTURE") {
     throw new TypeError("Phase A installation coverage must not claim complete service coverage.");
+  }
+  if (pack.installationCoverage.catalogue.id !== INSTALLATION_CATALOGUE_IDENTITY.id
+    || pack.installationCoverage.catalogue.version !== INSTALLATION_CATALOGUE_IDENTITY.version
+    || pack.installationCoverage.catalogue.digest !== INSTALLATION_CATALOGUE_IDENTITY.digest
+    || pack.content.installationCatalogue.digest !== INSTALLATION_CATALOGUE_IDENTITY.digest
+    || pack.installationCoverage.includedRecordCount !== INSTALLATION_CATALOGUE.records.length
+    || pack.content.installations.length !== INSTALLATION_CATALOGUE.records.length) {
+    throw new TypeError("Environment-pack installation coverage does not match the governed catalogue.");
   }
 }
 
