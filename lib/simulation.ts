@@ -21,7 +21,6 @@ import type { RecordedGeographicPosition } from "./geospatial/contracts.ts";
 import type {
   EngagementDomain,
   Guidance,
-  Maneuver,
   ProfileId,
   Vec3,
 } from "./engine/primitives.ts";
@@ -40,7 +39,6 @@ export type { AtmosphereState } from "./engine/atmosphere.ts";
 export type {
   EngagementDomain,
   Guidance,
-  Maneuver,
   ProfileId,
   Vec3,
 } from "./engine/primitives.ts";
@@ -59,12 +57,6 @@ export type RaspAvailabilityReason =
   | "DATALINK_SOURCE_UNAVAILABLE"
   | "BEYOND_VISUAL_RANGE"
   | "SENSOR_UNSUPPORTED";
-export type TacticalDecision =
-  | "PRESS"
-  | "SUPPORT_WEAPON"
-  | "CRANK"
-  | "DEFEND"
-  | "DISENGAGE";
 
 export const RASP_SOURCE_CONTRACTS: Record<
   TrackSource,
@@ -86,7 +78,7 @@ export const RASP_SOURCE_CONTRACTS: Record<
     label: "Data link",
     requirement: "The observing side's tactical data link must be available.",
     pictureEffect: "Unavailable until an admitted sender-side observation and typed delivery message are present.",
-    physicsEffect: "RASP only. The separate Blue Team decision controls weapon-update cadence.",
+    physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
   },
   AIRBORNE_EARLY_WARNING: {
     label: "Airborne early warning",
@@ -100,37 +92,6 @@ export const RASP_SOURCE_CONTRACTS: Record<
     requirement: "The opposing aircraft must be inside the selected weather preset's visibility distance, capped at 18 km.",
     pictureEffect: "Creates visual observations inside the declared visibility boundary without requiring radar or data link.",
     physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
-  },
-};
-
-export const TACTICAL_DECISION_CONTRACTS: Record<
-  TacticalDecision,
-  { label: string; blueEffect: string; redEffect: string }
-> = {
-  PRESS: {
-    label: "Continue toward target",
-    blueEffect: "Blue holds its initial course and gives the weapon the most frequent modeled updates.",
-    redEffect: "Red holds a low maneuver demand while continuing its initial flight path.",
-  },
-  SUPPORT_WEAPON: {
-    label: "Support the weapon",
-    blueEffect: "Blue holds its initial course and maintains the baseline weapon-update cadence.",
-    redEffect: "Not offered to Red in this scenario configuration.",
-  },
-  CRANK: {
-    label: "Turn while supporting",
-    blueEffect: "Blue commands a 2.5 g turn and reduces the modeled weapon-update cadence.",
-    redEffect: "Red commands 70% of the selected target maneuver demand.",
-  },
-  DEFEND: {
-    label: "Defend",
-    blueEffect: "Blue commands a 5 g turn and substantially reduces the modeled weapon-update cadence.",
-    redEffect: "Red commands the full selected target maneuver demand.",
-  },
-  DISENGAGE: {
-    label: "Disengage",
-    blueEffect: "Blue turns away at the declared model demand and stops modeled mid-course updates.",
-    redEffect: "Red commands 55% of the selected target maneuver demand while turning away.",
   },
 };
 
@@ -156,8 +117,6 @@ export type Scenario = {
   redDatalink: boolean;
   blueJammer: boolean;
   redJammer: boolean;
-  blueDecision: TacticalDecision;
-  redDecision: TacticalDecision;
   profile: ProfileId;
   guidance: Guidance;
   altitude: number;
@@ -167,8 +126,6 @@ export type Scenario = {
   aspect: number;
   launcherSpeed: number;
   targetSpeed: number;
-  maneuver: Maneuver;
-  targetG: number;
   wind: number;
   windNorth: number;
   visibilityKm: number;
@@ -461,8 +418,6 @@ export const DEFAULT_SCENARIO: Scenario = {
   redDatalink: true,
   blueJammer: false,
   redJammer: false,
-  blueDecision: "SUPPORT_WEAPON",
-  redDecision: "DEFEND",
   profile: "medium",
   guidance: "loft",
   altitude: 8500,
@@ -472,8 +427,6 @@ export const DEFAULT_SCENARIO: Scenario = {
   aspect: 145,
   launcherSpeed: 270,
   targetSpeed: 250,
-  maneuver: "break",
-  targetG: 4,
   wind: -4,
   windNorth: 1,
   visibilityKm: 25,
@@ -584,12 +537,8 @@ export function prepareSimulation(
       aspect: input.aspect,
       launcherSpeed: input.launcherSpeed,
       targetSpeed: input.targetSpeed,
-      maneuver: input.maneuver,
-      targetG: input.targetG,
       blueFuelPercent: input.blueFuelPercent,
       redFuelPercent: input.redFuelPercent,
-      blueDecision: input.blueDecision,
-      redDecision: input.redDecision,
       windEastMps: input.wind,
       windNorthMps: input.windNorth,
       temperatureOffset: input.temperatureOffset,

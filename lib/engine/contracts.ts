@@ -1,7 +1,6 @@
 import type {
   EngagementDomain,
   Guidance,
-  Maneuver,
   Vec3,
 } from "./primitives.ts";
 import type { ScenarioModelPatch } from "../model-pack.ts";
@@ -93,11 +92,6 @@ export type EngineEntityDefinition = {
     headingRad: number;
     massKg: number;
     fuelKg: number;
-  };
-  behavior: {
-    maneuver: Maneuver;
-    commandedG: number;
-    decision: string;
   };
   weapon?: {
     launchPlatformId: string;

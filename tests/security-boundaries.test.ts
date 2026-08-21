@@ -37,6 +37,27 @@ test("saved-run admission rejects a client-selected engine", () => {
   );
 });
 
+test("saved-run admission rejects retired tactical-decision controls instead of accepting a no-op", () => {
+  for (const [field, value] of [
+    ["blueDecision", "DEFEND"],
+    ["redDecision", "DISENGAGE"],
+    ["maneuver", "weave"],
+    ["targetG", 9],
+  ]) {
+    const input = {
+      ...structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario),
+      [field]: value,
+    };
+    assert.throws(
+      () => validateSavedScenario(input, DEFAULT_SCENARIO_DEFINITION),
+      {
+        code: "SCENARIO_RETIRED_BEHAVIOR_CONTROL",
+        fieldPath: field,
+      },
+    );
+  }
+});
+
 test("saved-run admission does not invent missing environment identity", () => {
   const unknownArea = {
     ...structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario),

@@ -134,7 +134,6 @@ export function buildReportExport(
           coefficients: modelCoefficients,
         },
         guidance: data.scenario.guidance,
-        maneuver: data.scenario.maneuver,
         seed: data.scenario.seed,
         geometry: {
           launchRange: { value: data.scenario.range, unit: "m" },
@@ -149,7 +148,6 @@ export function buildReportExport(
         motion: {
           launcherSpeed: { value: data.scenario.launcherSpeed, unit: "m/s" },
           targetSpeed: { value: data.scenario.targetSpeed, unit: "m/s" },
-          targetDemand: { value: data.scenario.targetG, unit: "g" },
           eastWind: { value: data.scenario.wind, unit: "m/s" },
           northWind: { value: data.scenario.windNorth, unit: "m/s" },
         },
@@ -162,10 +160,6 @@ export function buildReportExport(
           redDatalink: data.scenario.redDatalink,
           blueJammer: data.scenario.blueJammer,
           redJammer: data.scenario.redJammer,
-        },
-        decisions: {
-          blue: data.scenario.blueDecision,
-          red: data.scenario.redDecision,
         },
         environment: {
           atmosphere: "NASA educational standard atmosphere",

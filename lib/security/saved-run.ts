@@ -24,10 +24,8 @@ import { SAVED_RUN_LIFECYCLE_POLICY } from "./admission-policy";
 const domains = new Set(["A2A", "A2G", "G2A", "G2G"]);
 const profiles = new Set(["short", "medium", "sustained"]);
 const guidance = new Set(["direct", "loft"]);
-const maneuvers = new Set(["steady", "break", "weave"]);
 const radarModes = new Set(["ACTIVE", "SILENT"]);
 const trackSources = new Set(["ONBOARD_RADAR", "DATALINK", "AIRBORNE_EARLY_WARNING", "VISUAL"]);
-const decisions = new Set(["PRESS", "SUPPORT_WEAPON", "CRANK", "DEFEND", "DISENGAGE"]);
 
 function enumValue(value: unknown, values: Set<string>, field: string) {
   if (typeof value !== "string" || !values.has(value)) {
@@ -143,6 +141,17 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
   if (Object.prototype.hasOwnProperty.call(input, "engineBackend")) {
     throw new PublicApiError(400, "scenario_engine_forbidden");
   }
+  for (const field of ["blueDecision", "redDecision", "maneuver", "targetG"] as const) {
+    if (Object.prototype.hasOwnProperty.call(input, field)) {
+      throw new PublicApiError(
+        400,
+        "SCENARIO_RETIRED_BEHAVIOR_CONTROL",
+        "Tactical decision and maneuver controls are unavailable until an admitted mission-policy runtime exists.",
+        undefined,
+        field,
+      );
+    }
+  }
   const scenario: Scenario = {
     domain: enumValue(input.domain, domains, "domain") as Scenario["domain"],
     name: shortString(input.name, 120, "name"),
@@ -165,8 +174,6 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
     redDatalink: bool(input.redDatalink, "red_datalink"),
     blueJammer: bool(input.blueJammer, "blue_jammer"),
     redJammer: bool(input.redJammer, "red_jammer"),
-    blueDecision: enumValue(input.blueDecision, decisions, "blue_decision") as Scenario["blueDecision"],
-    redDecision: enumValue(input.redDecision, decisions, "red_decision") as Scenario["redDecision"],
     profile: enumValue(input.profile, profiles, "profile") as Scenario["profile"],
     guidance: enumValue(input.guidance, guidance, "guidance") as Scenario["guidance"],
     altitude: finiteNumber(input.altitude, 0, 30_000, "altitude"),
@@ -176,8 +183,6 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
     aspect: finiteNumber(input.aspect, 0, 360, "aspect"),
     launcherSpeed: finiteNumber(input.launcherSpeed, 0, 3_000, "launcher_speed"),
     targetSpeed: finiteNumber(input.targetSpeed, 0, 3_000, "target_speed"),
-    maneuver: enumValue(input.maneuver, maneuvers, "maneuver") as Scenario["maneuver"],
-    targetG: finiteNumber(input.targetG, 0, 15, "target_g"),
     wind: finiteNumber(input.wind, -150, 150, "wind_east"),
     windNorth: finiteNumber(input.windNorth, -150, 150, "wind_north"),
     visibilityKm: finiteNumber(input.visibilityKm, 0.1, 300, "visibility"),

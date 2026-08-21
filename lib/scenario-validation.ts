@@ -47,9 +47,7 @@ export function validateScenario(
     scenario.domain !== "G2G" || scenario.cruiseAltitude >= 30;
   const targetStateFits =
     definition.targetMotion === "fixed"
-      ? scenario.targetSpeed === 0 &&
-        scenario.maneuver === "steady" &&
-        scenario.targetG === 0
+      ? scenario.targetSpeed === 0
       : scenario.targetSpeed > 0;
   const authoredPoints = scenario.spatialPlan
     ? [
@@ -154,7 +152,7 @@ export function validateScenario(
       detail:
         definition.targetMotion === "fixed"
           ? "Speed 0 m/s · no evasive maneuver"
-          : `Speed ${scenario.targetSpeed} m/s · ${scenario.maneuver} behavior`,
+          : `Speed ${scenario.targetSpeed} m/s · authored route`,
       state: targetStateFits ? "pass" : "error",
     },
     {
@@ -177,7 +175,7 @@ export function validateScenario(
           : "Scenario conditions are defined",
       detail:
         scenario.domain === "A2A"
-          ? `IAF ${scenario.blueTrackSource.replaceAll("_", " ").toLowerCase()} · PAF ${scenario.redTrackSource.replaceAll("_", " ").toLowerCase()} · Blue ${scenario.blueDecision.replaceAll("_", " ").toLowerCase()} · Red ${scenario.redDecision.replaceAll("_", " ").toLowerCase()}`
+          ? `IAF ${scenario.blueTrackSource.replaceAll("_", " ").toLowerCase()} · PAF ${scenario.redTrackSource.replaceAll("_", " ").toLowerCase()}`
           : `Target motion ${definition.targetMotion} · east–west wind ${scenario.wind} m/s`,
       state: "pass",
     },

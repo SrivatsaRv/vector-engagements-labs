@@ -181,10 +181,7 @@ export default function ReportPage() {
   );
   const studyArea = getStudyArea(scenario.studyAreaId);
   const weatherPreset = getWeatherPreset(studyArea, scenario.weatherPresetId);
-  const driver =
-    scenario.maneuver === "steady"
-      ? `${scenario.guidance} trajectory and initial range`
-      : `${scenario.maneuver} target behaviour and remaining energy`;
+  const driver = `${scenario.guidance} trajectory and initial range`;
 
   const printReport = () => {
     setPrintState("preparing");
@@ -422,10 +419,6 @@ export default function ReportPage() {
                   </dd>
                   <dt>Crossing angle</dt>
                   <dd>{scenario.aspect}°</dd>
-                  <dt>Red behaviour</dt>
-                  <dd>
-                    {scenario.maneuver} · {scenario.targetG} g
-                  </dd>
                 </dl>
               </ReportSection>
               {scenario.domain === "A2A" ? (
@@ -457,14 +450,6 @@ export default function ReportPage() {
                     <dd>
                       {scenario.blueJammer ? "on" : "off"} /{" "}
                       {scenario.redJammer ? "on" : "off"}
-                    </dd>
-                    <dt>Blue decision</dt>
-                    <dd>
-                      {scenario.blueDecision.replaceAll("_", " ").toLowerCase()}
-                    </dd>
-                    <dt>Red decision</dt>
-                    <dd>
-                      {scenario.redDecision.replaceAll("_", " ").toLowerCase()}
                     </dd>
                   </dl>
                 </ReportSection>
