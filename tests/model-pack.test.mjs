@@ -124,7 +124,7 @@ test("aircraft admission rejects a component or table that cannot cover its decl
   );
 });
 
-test("named-aircraft performance is unavailable until every capability has separate immutable source and validation evidence", async () => {
+test("named-aircraft performance is unavailable until every capability has separately governed source and validation evidence", async () => {
   const unsupported = await compileModelPack(cloneSource());
   assert.throws(
     () => requireNamedAircraftPerformanceAdmission(unsupported.pack, unsupported.pack.aircraft[0].catalogObjectId),
@@ -158,10 +158,9 @@ test("named-aircraft performance is unavailable until every capability has separ
       validationEvidenceRefIds: ["independent-aircraft-validation"],
     })),
   };
-  const admitted = await compileModelPack(source);
-  assert.equal(
-    requireNamedAircraftPerformanceAdmission(admitted.pack, admitted.pack.aircraft[0].catalogObjectId).state,
-    "ADMITTED",
+  await assert.rejects(
+    compileModelPack(source),
+    /unsupported by the governed evidence registry/,
   );
 
   const missingCapability = structuredClone(source);

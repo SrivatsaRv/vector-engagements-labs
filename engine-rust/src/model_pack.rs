@@ -7,6 +7,8 @@ use sha2::{Digest, Sha256};
 use crate::EngineError;
 
 const COMPILED_SCHEMA: &str = "vector.compiled-model-pack.v1";
+const AIRCRAFT_EVIDENCE_REGISTRY: &str =
+    include_str!("../../governance/aircraft-evidence-registry.v1.json");
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -375,6 +377,101 @@ fn validate_aircraft_performance_admission(
     Ok(())
 }
 
+fn registry_ids(value: &Value, field: &str) -> Result<Vec<String>, EngineError> {
+    let values = value.get(field).and_then(Value::as_array).ok_or_else(|| {
+        invalid(format!(
+            "governed evidence registry capability lacks {field}"
+        ))
+    })?;
+    values
+        .iter()
+        .map(|item| {
+            item.as_str().map(str::to_owned).ok_or_else(|| {
+                invalid(format!(
+                    "governed evidence registry {field} contains a non-string"
+                ))
+            })
+        })
+        .collect()
+}
+
+fn same_ids(left: &[String], mut right: Vec<String>) -> bool {
+    let mut left = left.to_vec();
+    left.sort();
+    right.sort();
+    left == right
+}
+
+/// The compiled pack can carry evidence rows, but it cannot self-admit a named
+/// platform. The repository-owned registry is a build-time, immutable policy
+/// artifact; it is loaded during pack admission, never in a simulation tick.
+fn validate_governed_aircraft_evidence_admission(
+    catalog_object_id: &str,
+    admission: &AircraftPerformanceAdmission,
+) -> Result<(), EngineError> {
+    if admission.state != "ADMITTED" {
+        return Ok(());
+    }
+    let registry: Value = serde_json::from_str(AIRCRAFT_EVIDENCE_REGISTRY).map_err(|error| {
+        invalid(format!(
+            "governed aircraft evidence registry is invalid: {error}"
+        ))
+    })?;
+    let claim = registry
+        .get("claims")
+        .and_then(Value::as_array)
+        .and_then(|claims| {
+            claims.iter().find(|item| {
+                item.get("catalogObjectId").and_then(Value::as_str) == Some(catalog_object_id)
+            })
+        })
+        .ok_or_else(|| {
+            invalid(format!(
+                "named aircraft {catalog_object_id} has no governed evidence-registry claim"
+            ))
+        })?;
+    if claim.get("state").and_then(Value::as_str) != Some("ADMITTED") {
+        return Err(invalid(format!(
+            "named aircraft {catalog_object_id} is unsupported by the governed evidence registry"
+        )));
+    }
+    let governed_capabilities = claim
+        .get("capabilities")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            invalid(format!(
+                "named aircraft {catalog_object_id} governed registry claim lacks capabilities"
+            ))
+        })?;
+    for capability in &admission.capabilities {
+        let governed = governed_capabilities
+            .iter()
+            .find(|item| {
+                item.get("capability").and_then(Value::as_str)
+                    == Some(capability.capability.as_str())
+            })
+            .ok_or_else(|| {
+                invalid(format!(
+                    "named aircraft {catalog_object_id} has ungoverned capability {}",
+                    capability.capability
+                ))
+            })?;
+        if !same_ids(
+            &capability.source_evidence_ref_ids,
+            registry_ids(governed, "sourceArtifactIds")?,
+        ) || !same_ids(
+            &capability.validation_evidence_ref_ids,
+            registry_ids(governed, "validationArtifactIds")?,
+        ) {
+            return Err(invalid(format!(
+                "named aircraft {catalog_object_id} {} evidence does not exactly match the governed registry",
+                capability.capability
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn unique_ids<'a>(
     path: &str,
     values: impl IntoIterator<Item = &'a str>,
@@ -586,6 +683,10 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
             &model.performance_admission,
             &pack.evidence,
         )?;
+        validate_governed_aircraft_evidence_admission(
+            &model.catalog_object_id,
+            &model.performance_admission,
+        )?;
         if model.aerodynamic_model_index >= pack.aerodynamics.len()
             || model.loadout_model_index >= pack.loadouts.len()
             || model
@@ -782,6 +883,48 @@ mod tests {
         assert!(error
             .to_string()
             .contains("does not cover every named-performance capability"));
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_forged_named_performance_evidence_not_in_the_governed_registry(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut value: Value = serde_json::from_str(&fixture_pack_json()?)?;
+        let evidence = value["evidence"]
+            .as_array_mut()
+            .ok_or("fixture must contain evidence array")?;
+        evidence.extend([
+            serde_json::json!({ "id": "forged-source", "kind": "SOURCE", "contentSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }),
+            serde_json::json!({ "id": "forged-validation", "kind": "VALIDATION", "contentSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }),
+        ]);
+        let capabilities: Vec<Value> = [
+            "AERODYNAMICS",
+            "PROPULSION",
+            "FLIGHT_CONTROLS",
+            "MASS_AND_STORES",
+            "SENSORS",
+        ]
+        .into_iter()
+        .map(|capability| {
+            serde_json::json!({
+                "capability": capability,
+                "sourceEvidenceRefIds": ["forged-source"],
+                "validationEvidenceRefIds": ["forged-validation"]
+            })
+        })
+        .collect();
+        value["aircraft"][0]["performanceAdmission"] = serde_json::json!({
+            "state": "ADMITTED",
+            "capabilities": capabilities
+        });
+        value["digest"] = Value::from(digest_payload(&value)?);
+        let error = match validate_model_pack_json(&serde_json::to_string(&value)?) {
+            Ok(_) => return Err("registry must reject forged named-performance evidence".into()),
+            Err(error) => error,
+        };
+        assert!(error
+            .to_string()
+            .contains("unsupported by the governed evidence registry"));
         Ok(())
     }
 }

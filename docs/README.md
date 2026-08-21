@@ -18,6 +18,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-
 - [`deployment-capabilities.md`](deployment-capabilities.md): deployment-owned domain, engine, model-pack and optional-capability admission.
 - [`physics-model.md`](physics-model.md): equations, atmosphere, guidance, termination, numerical limits, and declared assumptions.
 - [`public-aircraft-reference.md`](public-aircraft-reference.md): NASA NESC aircraft check-case evidence, SI-normalized trim propagation, tolerances, parity, measurements, and limits.
+- [`aircraft-evidence-registry.md`](aircraft-evidence-registry.md): governed public-artifact inventory, per-capability named-aircraft admission, and explicit evidence gaps.
 - [`scenario-builder.md`](scenario-builder.md): authoring journey, state ownership, map controls, and validation.
 - [`vector-simulation-record.md`](vector-simulation-record.md): portable replay and debriefing record.
 - [`catalog-and-sources.md`](catalog-and-sources.md): PostGIS ontology, source assertions, versions, and installation geometry.
@@ -34,6 +35,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-
 - [`product-language.md`](product-language.md): canonical workflow and human-readable military terminology.
 - [`repository-governance.md`](repository-governance.md): protected branches, CI/CD, releases, tags, ownership, and repository status.
 - [`../governance/runtime-stub-ledger.v1.json`](../governance/runtime-stub-ledger.v1.json): executable inventory of causal stubs, assumptions, fallbacks, evidence paths, and owning issues.
+- [`../governance/aircraft-evidence-registry.v1.json`](../governance/aircraft-evidence-registry.v1.json): immutable-artifact registry that blocks unsupported named-aircraft performance claims.
 - [`container-release.md`](container-release.md): authoritative Compose topology, immutable GHCR images, promotion, rollback, backup, and restore.
 - [`blog-publishing.md`](blog-publishing.md): markdown frontmatter, thumbnail assets, canonical metadata, and ops publishing flow.
 - [`security-boundaries.md`](security-boundaries.md): anonymous API admission, saved-run integrity, metrics protection, caching, and delivery trust.

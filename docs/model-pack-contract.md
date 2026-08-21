@@ -148,6 +148,14 @@ governed separately by the intended-use contract; it does not become a
 named-platform performance claim because a familiar catalog label appears in a
 scenario.
 
+Evidence rows also must exactly match a governed claim in the
+[`aircraft evidence registry`](aircraft-evidence-registry.md). The registry
+checks immutable artifact identity, capability coverage, source/validation
+separation, and the exact aircraft/variant subject. A pack cannot self-admit a
+named platform by adding arbitrary hashed rows. Current Su-30MKI and PAF F-16C
+Block 52 claims are deliberately unsupported; the NASA NESC F-16 trim asset is
+not an interchangeable F-16C Block 52 performance model.
+
 Catalog admission checks that every aircraft carries this boundary before the
 catalog API returns a validated template. The API exposes the state and reason
 as provenance for a future capability-specific surface; the current Lab and
