@@ -1,6 +1,8 @@
 import { standardAtmosphere } from "../engine/atmosphere.ts";
 import type { PublicInstallation } from "../installations.ts";
+import { PUBLIC_INSTALLATIONS } from "../installations.ts";
 import type { StudyArea, WeatherPreset } from "../study-areas.ts";
+import { resolveEnvironmentSelection } from "../study-areas.ts";
 import { sha256Identity } from "./digest.ts";
 import type { DatasetIdentity } from "./contracts.ts";
 import {
@@ -61,6 +63,20 @@ export type EnvironmentPack = {
   };
 };
 
+/**
+ * The compact identity copied into the executable engine contract. The full
+ * pack remains with the compiled geographic artifact so replay can verify its
+ * canonical material without a catalogue lookup.
+ */
+export type EnvironmentPackBinding = Pick<EnvironmentPack, "schemaVersion"> &
+  EnvironmentPack["identity"];
+
+export type AdmittedEnvironmentPack = {
+  studyArea: StudyArea;
+  weatherPreset: WeatherPreset;
+  pack: Readonly<EnvironmentPack>;
+};
+
 export type EnvironmentPackContent = {
   studyAreaId: StudyArea["id"];
   bounds: StudyArea["bounds"];
@@ -103,7 +119,7 @@ function material(input: {
   const { studyArea, weatherPreset, installations } = input;
   return {
     studyAreaId: studyArea.id,
-    bounds: studyArea.bounds,
+    bounds: [[...studyArea.bounds[0]], [...studyArea.bounds[1]]],
     surfaceElevationM: studyArea.surfaceElevationM,
     weather: weatherPreset,
     installations: installations.map((installation) => ({
@@ -111,7 +127,45 @@ function material(input: {
       sourceId: installation.sourceId,
       runwayInfo: installation.runwayInfo ?? null,
     })),
-    installationGaps: PHASE_A_INSTALLATION_GAPS,
+    installationGaps: [...PHASE_A_INSTALLATION_GAPS],
+  };
+}
+
+function immutable<T>(value: T): Readonly<T> {
+  if (!value || typeof value !== "object") return value;
+  for (const child of Object.values(value as Record<string, unknown>)) immutable(child);
+  return Object.freeze(value);
+}
+
+/**
+ * Resolve a governed selection exactly once at the admission boundary.
+ *
+ * Callers pass the returned immutable object through compilation and replay;
+ * tick code must not resolve an area or weather string against a catalogue.
+ */
+export function admitPhaseAEnvironmentPack(input: {
+  studyAreaId: string;
+  weatherPresetId: string;
+  effectiveWeather?: Pick<WeatherPreset, "temperatureOffsetC" | "windEastMps" | "windNorthMps">;
+}): AdmittedEnvironmentPack {
+  const { studyArea, weatherPreset } = resolveEnvironmentSelection(input);
+  const pack = immutable(createPhaseAEnvironmentPack({
+    studyArea,
+    weatherPreset,
+    installations: PUBLIC_INSTALLATIONS,
+    effectiveWeather: input.effectiveWeather,
+  }));
+  assertPhaseAEnvironmentPack(pack);
+  return { studyArea, weatherPreset, pack };
+}
+
+export function environmentPackBinding(pack: EnvironmentPack): EnvironmentPackBinding {
+  assertPhaseAEnvironmentPack(pack);
+  return {
+    schemaVersion: pack.schemaVersion,
+    id: pack.identity.id,
+    version: pack.identity.version,
+    digest: pack.identity.digest,
   };
 }
 
@@ -120,16 +174,22 @@ export function createPhaseAEnvironmentPack(input: {
   studyArea: StudyArea;
   weatherPreset: WeatherPreset;
   installations: readonly PublicInstallation[];
+  /** Explicit authoring adjustment frozen into this run's pack identity. */
+  effectiveWeather?: Pick<WeatherPreset, "temperatureOffsetC" | "windEastMps" | "windNorthMps">;
 }): EnvironmentPack {
   const { studyArea, weatherPreset, installations } = input;
   if (!studyArea.weatherPresets.some((preset) => preset.id === weatherPreset.id)) {
     throw new TypeError("Environment-pack weather preset does not belong to the selected study area.");
   }
-  const packMaterial = material(input);
+  const effectiveWeather: WeatherPreset = {
+    ...weatherPreset,
+    ...input.effectiveWeather,
+  };
+  const packMaterial = material({ studyArea, weatherPreset: effectiveWeather, installations });
   const [minimum, maximum] = studyArea.bounds;
   const terrainMaterial = {
     elevationMslM: studyArea.surfaceElevationM,
-    bounds: studyArea.bounds,
+    bounds: [[...studyArea.bounds[0]], [...studyArea.bounds[1]]],
     maximumSamplesPerRequest: 4096,
   };
   return {
@@ -162,20 +222,20 @@ export function createPhaseAEnvironmentPack(input: {
       maximumSamplesPerRequest: 4096,
     },
     atmosphere: {
-      ...identity("atmosphere:nasa-educational-standard", "1.0.0", { temperatureOffsetC: weatherPreset.temperatureOffsetC }),
+      ...identity("atmosphere:nasa-educational-standard", "1.0.0", { temperatureOffsetC: effectiveWeather.temperatureOffsetC }),
       kind: "NASA_EDUCATIONAL_STANDARD",
       verticalCoordinate: "SCENARIO_LOCAL_UP",
       originDatum: "ELLIPSOID",
       extrapolation: "CLAMP_0_TO_25000_M",
     },
     weather: {
-      ...identity(`weather:${weatherPreset.id}:phase-a`, "1.0.0", weatherPreset),
+      ...identity(`weather:${weatherPreset.id}:phase-a`, "1.0.0", effectiveWeather),
       frame: "ENU",
       sampleTime: "SCENARIO_START",
-      temperatureOffsetC: weatherPreset.temperatureOffsetC,
-      windEastMps: weatherPreset.windEastMps,
-      windNorthMps: weatherPreset.windNorthMps,
-      humidityPercent: weatherPreset.humidityPercent,
+      temperatureOffsetC: effectiveWeather.temperatureOffsetC,
+      windEastMps: effectiveWeather.windEastMps,
+      windNorthMps: effectiveWeather.windNorthMps,
+      humidityPercent: effectiveWeather.humidityPercent,
     },
     installationCoverage: {
       ...identity("installations:public-reference-fixture", "1.0.0", packMaterial.installations),

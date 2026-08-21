@@ -20,6 +20,7 @@ import {
   withSpatialRangeM,
 } from "../lib/scenario-spatial.ts";
 import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
+import { runEngine } from "../lib/engine/core.ts";
 
 const allDomainCapabilities = createVerificationDeploymentCapabilities(
   "rust-wasm",
@@ -59,6 +60,22 @@ test("simulation fails closed for unknown environment identities", () => {
       code: "ENVIRONMENT_WEATHER_PRESET_UNKNOWN",
       fieldPath: "weatherPresetId",
     },
+  );
+});
+
+test("engine rejects a stale or tampered environment pack instead of resolving a catalog default", () => {
+  const compiled = structuredClone(simulate(DEFAULT_SCENARIO).engineRun.scenario);
+  compiled.geospatial.environmentPack.content.weather.windEastMps += 1;
+  assert.throws(
+    () => runEngine(compiled),
+    /environment-pack digest does not match its canonical content/i,
+  );
+
+  const mismatchedBinding = structuredClone(simulate(DEFAULT_SCENARIO).engineRun.scenario);
+  mismatchedBinding.environment.environmentPack.digest = `sha256:${"0".repeat(64)}`;
+  assert.throws(
+    () => runEngine(mismatchedBinding),
+    /binding does not match the admitted pack/,
   );
 });
 

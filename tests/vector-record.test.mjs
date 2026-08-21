@@ -14,6 +14,10 @@ import {
 } from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
+import {
+  assertPhaseAEnvironmentPack,
+  environmentPackBinding,
+} from "../lib/geospatial/environment-pack.ts";
 
 const createdAt = "2026-08-06T00:00:00.000Z";
 
@@ -62,6 +66,13 @@ for (const backend of ["typescript", "rust-wasm"]) {
       "vector.deployment-capabilities.v1",
     );
     assert.equal(opened.result.engineRun.diagnostics.backend, backend);
+    const recordedPack = opened.result.engineRun.scenario.geospatial.environmentPack;
+    assertPhaseAEnvironmentPack(recordedPack);
+    assert.deepEqual(
+      opened.result.engineRun.scenario.environment.environmentPack,
+      environmentPackBinding(recordedPack),
+      "replay must retain the exact admitted environment-pack binding instead of re-resolving a catalog selection",
+    );
     assert.deepEqual(
       opened.result.engineRun.scenario.entities.find((entity) => entity.id === "red-object-1")?.routePlan,
       result.engineRun.scenario.entities.find((entity) => entity.id === "red-object-1")?.routePlan,

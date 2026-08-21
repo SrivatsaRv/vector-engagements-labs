@@ -487,6 +487,18 @@ pub struct StudyArea {
     pub weather_preset_id: String,
 }
 
+/// Immutable Phase A environment identity. The complete canonical pack is
+/// retained in the TypeScript/VSR geospatial artifact; Rust admits this exact
+/// compact binding and must not resolve study-area strings at runtime.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentPackBinding {
+    pub schema_version: String,
+    pub id: String,
+    pub version: String,
+    pub digest: String,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Environment {
@@ -494,6 +506,7 @@ pub struct Environment {
     pub temperature_offset_c: f64,
     pub wind_mps: Vec3,
     pub atmosphere: AtmosphereModel,
+    pub environment_pack: EnvironmentPackBinding,
     pub study_area: StudyArea,
 }
 
@@ -1718,6 +1731,12 @@ mod tests {
                 temperature_offset_c: 0.0,
                 wind_mps: Vec3::default(),
                 atmosphere: AtmosphereModel::NasaEducationalStandard,
+                environment_pack: EnvironmentPackBinding {
+                    schema_version: "vector.environment-pack.v1".to_string(),
+                    id: "environment-pack:test-area:test-weather".to_string(),
+                    version: "1.0.0".to_string(),
+                    digest: format!("sha256:{}", "a".repeat(64)),
+                },
                 study_area: StudyArea {
                     id: "test-area".to_string(),
                     name: "Test area".to_string(),
@@ -1931,6 +1950,25 @@ mod tests {
             validate_scenario(&input),
             Err(EngineError::InvalidScenario(message)) if message.contains("fixedStepSeconds")
         ));
+    }
+
+    #[test]
+    fn scenario_validation_rejects_missing_or_malformed_environment_pack_binding(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut missing = serde_json::to_value(scenario())?;
+        missing["environment"]
+            .as_object_mut()
+            .ok_or("environment missing")?
+            .remove("environmentPack");
+        assert!(serde_json::from_value::<EngineScenario>(missing).is_err());
+
+        let mut malformed = scenario();
+        malformed.environment.environment_pack.digest = "default-area".to_string();
+        assert!(matches!(
+            validate_scenario(&malformed),
+            Err(EngineError::InvalidScenario(message)) if message.contains("environment.environmentPack.digest")
+        ));
+        Ok(())
     }
 
     #[test]

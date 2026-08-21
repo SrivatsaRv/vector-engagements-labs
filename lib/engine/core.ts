@@ -20,6 +20,10 @@ import {
   subtract,
 } from "./vector.ts";
 import { localFrameToGeographic } from "../geospatial/geodesy.ts";
+import {
+  assertPhaseAEnvironmentPack,
+  environmentPackBinding,
+} from "../geospatial/environment-pack.ts";
 
 type RuntimeState = {
   definition: EngineEntityDefinition;
@@ -659,6 +663,35 @@ export class EngineSession {
 
   constructor(scenario: EngineScenario) {
     this.scenario = scenario;
+    const admittedPack = scenario.geospatial?.environmentPack;
+    const recordedBinding = scenario.environment.environmentPack;
+    // Core-only numerical fixtures have no geographic authority by design. A
+    // compiled product run must carry both halves; one without the other is a
+    // malformed attempted admission, never a catalogue default resolution.
+    if (Boolean(admittedPack) !== Boolean(recordedBinding)) {
+      throw new Error("Engine environment pack and binding must be supplied together.");
+    }
+    if (admittedPack && recordedBinding) {
+      assertPhaseAEnvironmentPack(admittedPack);
+      const environmentBinding = environmentPackBinding(admittedPack);
+      if (
+        recordedBinding.schemaVersion !== environmentBinding.schemaVersion ||
+        recordedBinding.id !== environmentBinding.id ||
+        recordedBinding.version !== environmentBinding.version ||
+        recordedBinding.digest !== environmentBinding.digest
+      ) {
+        throw new Error("Engine environment-pack binding does not match the admitted pack.");
+      }
+      if (
+        scenario.environment.temperatureOffsetC !== admittedPack.weather.temperatureOffsetC ||
+        scenario.environment.windMps.x !== admittedPack.weather.windEastMps ||
+        scenario.environment.windMps.y !== admittedPack.weather.windNorthMps ||
+        scenario.environment.studyArea.id !== admittedPack.content.studyAreaId ||
+        scenario.environment.studyArea.weatherPresetId !== admittedPack.content.weather.id
+      ) {
+        throw new Error("Engine environment values do not match the admitted environment pack.");
+      }
+    }
     for (const [index, event] of scenario.events.entries()) {
       const values = [
         event.startSeconds,

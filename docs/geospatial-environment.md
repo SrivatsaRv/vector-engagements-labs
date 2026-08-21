@@ -107,6 +107,17 @@ coverage geometry, MSL terrain datum, no-data policy, synthetic reference
 surface, educational standard-atmosphere policy, ENU weather vector, and an
 installation/runway-coverage identity.
 
+At admission, `(studyAreaId, weatherPresetId)` resolves once into this complete
+pack. The compiler freezes that exact content in `EngineScenario.geospatial`
+and copies only its `{ schemaVersion, id, version, digest }` binding into the
+TypeScript and Rust/WASM runtime contract. The runtime checks that the binding,
+pack digest, selected area, weather identity, and effective wind/temperature
+agree. VSR replay rechecks the archived pack and binding before exposing a run.
+It never re-resolves an environment ID against a current catalogue. Unknown,
+deleted, stale, cross-area, malformed, or digest-mismatched environment input
+therefore fails closed. This is an authority boundary, not a claim that the
+current static Phase A fixture is the final PostGIS/ingestion authority.
+
 The Phase A pack is deliberately `MODEL_ASSUMPTION` and
 `PUBLIC_EDUCATIONAL`. Its terrain is a deterministic constant MSL reference
 plane and its atmosphere is the documented NASA educational approximation. It

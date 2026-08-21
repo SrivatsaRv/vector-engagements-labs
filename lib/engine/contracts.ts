@@ -16,6 +16,7 @@ import type {
   ScenarioOrigin,
 } from "../geospatial/contracts.ts";
 import type { SyntheticEnvironmentManifest } from "../geospatial/synthetic-environment.ts";
+import type { EnvironmentPack, EnvironmentPackBinding } from "../geospatial/environment-pack.ts";
 import type { InstallationOriginReference } from "../mission-admission.ts";
 
 export type EntityKind =
@@ -223,6 +224,8 @@ export type EngineScenario = {
     origin: ScenarioOrigin;
     initialPositions: GeographicEntityState[];
     syntheticEnvironment: SyntheticEnvironmentManifest;
+    /** Full immutable admission artifact used to verify saved-run replay. */
+    environmentPack: Readonly<EnvironmentPack>;
     originReferences: Array<{
       entityId: string;
       reference: InstallationOriginReference;
@@ -233,6 +236,8 @@ export type EngineScenario = {
     temperatureOffsetC: number;
     windMps: Vec3;
     atmosphere: "NASA_EDUCATIONAL_STANDARD";
+    /** Rust/WASM validates this compact binding before it accepts the run. */
+    environmentPack: EnvironmentPackBinding;
     studyArea: {
       id: string;
       name: string;

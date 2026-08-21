@@ -39,6 +39,12 @@ and frozen report/frame agreement before returning replay data.
 and SHA-256 digest beside the selected engine identity. Replay rejects a record
 when the compiled capability identity and record manifest disagree.
 
+For Phase A geographic runs, `compiled.json` also preserves the complete
+immutable `vector.environment-pack.v1` plus the compact runtime
+`{ schemaVersion, id, version, digest }` binding. Opening a VSR verifies the
+pack content digest and binding equality. A replay does not substitute the
+current study-area catalogue, its default weather, or a newer pack version.
+
 Basemap tiles are referenced by provider and style revision, not silently embedded. A portable export may include explicitly licensed terrain or static assets. Missing optional assets must degrade to class silhouettes and a neutral terrain surface without changing telemetry.
 
 Each `pictures.jsonl` entry uses the required `vector.pictures.v3` schema and

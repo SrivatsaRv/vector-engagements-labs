@@ -14,6 +14,10 @@ import {
   type SimulationResult,
 } from "../simulation.ts";
 import { attachRecordedObserverStates } from "../information-state.ts";
+import {
+  assertPhaseAEnvironmentPack,
+  environmentPackBinding,
+} from "../geospatial/environment-pack.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v4" as const;
@@ -743,6 +747,22 @@ export async function openVectorSimulationRecord(
     PreparedSimulation,
     "scenario"
   >;
+  const environmentPack = compiled.engineScenario.geospatial?.environmentPack;
+  if (!environmentPack) {
+    throw new Error("VECTOR record has no admitted environment pack.");
+  }
+  assertPhaseAEnvironmentPack(environmentPack);
+  const environmentBinding = environmentPackBinding(environmentPack);
+  const recordedBinding = compiled.engineScenario.environment?.environmentPack;
+  if (
+    !recordedBinding ||
+    recordedBinding.schemaVersion !== environmentBinding.schemaVersion ||
+    recordedBinding.id !== environmentBinding.id ||
+    recordedBinding.version !== environmentBinding.version ||
+    recordedBinding.digest !== environmentBinding.digest
+  ) {
+    throw new Error("VECTOR record environment-pack binding is inconsistent.");
+  }
   const report = JSON.parse(decoder.decode(required("report.json"))) as RecordReport;
   if (report.schemaVersion !== "vector.report.v1") throw new Error("VECTOR report schema is unsupported.");
   const decodedFrames = decodeColumnarFrames(required("frames.arrow"));
