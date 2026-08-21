@@ -29,7 +29,7 @@ database access or unit parsing.
 
 ## TypeScript reference
 
-The TypeScript engine is retained as an independently executable reference implementation. It uses the same coordinate frames, atmosphere, entity lifecycle, aircraft state update, proportional-navigation guidance, coverage-envelope generation, termination rules, and sampling cadence.
+The TypeScript engine is retained as an independently executable reference implementation. It uses the same coordinate frames, atmosphere, entity lifecycle, identity-bearing aircraft table interpolation with fail-closed coverage, aircraft state update, proportional-navigation guidance, coverage-envelope generation, termination rules, and sampling cadence.
 
 It is not a separate product mode. Its purpose is controlled parity testing, diagnosis, and performance comparison while the Rust implementation matures.
 

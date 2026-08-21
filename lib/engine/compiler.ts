@@ -7,9 +7,6 @@ import type {
 } from "./primitives.ts";
 import { getCatalogObject } from "../object-catalog.ts";
 import {
-  findAircraftSimulationModel,
-} from "../simulation-models.ts";
-import {
   CURRENT_COMPILED_MODEL_PACK,
   resolveCompiledWeaponAdmission,
 } from "./weapon-admission.ts";
@@ -134,6 +131,41 @@ function compiledWeaponRuntime(weapon: (typeof CURRENT_COMPILED_MODEL_PACK.weapo
   };
 }
 
+function runtimeTable(
+  table: { id: string; axes: Array<{ semantic: string; values: number[] }>; values: number[] },
+  semantic: string,
+) {
+  const axis = table.axes.find((candidate) => candidate.semantic === semantic);
+  if (!axis || table.axes.length !== 1 || axis.values.length < 2 || axis.values.length !== table.values.length) {
+    throw new Error(`Compiled table ${table.id} is not an admitted one-axis ${semantic} table.`);
+  }
+  return { id: table.id, axis: [...axis.values], values: [...table.values] };
+}
+
+function compiledAircraftRuntime(catalogObjectId: string) {
+  const aircraft = CURRENT_COMPILED_MODEL_PACK.aircraft.find((item) => item.catalogObjectId === catalogObjectId);
+  if (!aircraft) throw new Error(`Missing compiled aircraft model for ${catalogObjectId}`);
+  const aerodynamic = CURRENT_COMPILED_MODEL_PACK.aerodynamics[aircraft.aerodynamicModelIndex];
+  const propulsion = CURRENT_COMPILED_MODEL_PACK.propulsion[aircraft.propulsionModelIndexes[0]];
+  if (!aerodynamic || !propulsion) throw new Error(`Compiled aircraft dependencies are incomplete for ${catalogObjectId}`);
+  const drag = aerodynamic.coefficientTables.find((table) => table.axes.some((axis) => axis.semantic === "MACH"));
+  const induced = aerodynamic.coefficientTables.find((table) => table.axes.some((axis) => axis.semantic === "ANGLE_OF_ATTACK"));
+  if (!drag || !induced) throw new Error(`Compiled aircraft aerodynamic tables are incomplete for ${catalogObjectId}`);
+  return {
+    id: aircraft.id,
+    version: aircraft.version,
+    valueState: "MODEL_ASSUMPTION" as const,
+    emptyMassKg: aircraft.emptyMassKg,
+    fuelCapacityKg: aircraft.fuelCapacityKg,
+    referenceAreaM2: aerodynamic.referenceAreaM2,
+    zeroLiftDragByMach: runtimeTable(drag, "MACH"),
+    inducedDragByAngleOfAttackRad: runtimeTable(induced, "ANGLE_OF_ATTACK"),
+    thrustByThrottle: runtimeTable(propulsion.thrustTable, "THROTTLE"),
+    fuelFlowByThrottle: runtimeTable(propulsion.fuelFlowTable, "THROTTLE"),
+    maximumCommandG: aircraft.maximumCommandLoadFactorG,
+  };
+}
+
 function withProvenance(
   input: Omit<EngineEntityDefinition, "provenance">,
   sourceObjectId: string,
@@ -191,15 +223,11 @@ export function compileScenario(
   const redHeadingRad = input.placement?.redHeadingRad ?? targetHeadingRad;
   const movingTarget = input.domain === "A2A" || input.domain === "G2A";
   const blueIsAircraft = blueObject.kind === "AIRCRAFT";
-  const blueAircraftModel = blueIsAircraft
-    ? findAircraftSimulationModel(blueObject.id)
-    : undefined;
+  const blueAircraftModel = blueIsAircraft ? compiledAircraftRuntime(blueObject.id) : undefined;
   if (blueIsAircraft && !blueAircraftModel) {
     throw new Error(`Missing aircraft model for ${blueObject.id}`);
   }
-  const redAircraftModel = redObject.kind === "AIRCRAFT"
-    ? findAircraftSimulationModel(redObject.id)
-    : undefined;
+  const redAircraftModel = redObject.kind === "AIRCRAFT" ? compiledAircraftRuntime(redObject.id) : undefined;
   if (movingTarget && !redAircraftModel) {
     throw new Error(`Missing aircraft model for moving target ${redObject.id}`);
   }
@@ -208,11 +236,10 @@ export function compileScenario(
         emptyMassKg: blueAircraftModel.emptyMassKg,
         fuelCapacityKg: blueAircraftModel.fuelCapacityKg,
         referenceAreaM2: blueAircraftModel.referenceAreaM2,
-        zeroLiftDragCoefficient: blueAircraftModel.zeroLiftDragCoefficient,
-        inducedDragFactor: blueAircraftModel.inducedDragFactor,
-        maximumThrustNewtons: blueAircraftModel.maximumThrustNewtons,
-        specificFuelConsumptionKgPerNewtonSecond:
-          blueAircraftModel.specificFuelConsumptionKgPerNewtonSecond,
+        zeroLiftDragByMach: blueAircraftModel.zeroLiftDragByMach,
+        inducedDragByAngleOfAttackRad: blueAircraftModel.inducedDragByAngleOfAttackRad,
+        thrustByThrottle: blueAircraftModel.thrustByThrottle,
+        fuelFlowByThrottle: blueAircraftModel.fuelFlowByThrottle,
         maximumCommandG: blueAircraftModel.maximumCommandG,
       }
     : undefined;
@@ -221,11 +248,10 @@ export function compileScenario(
         emptyMassKg: redAircraftModel.emptyMassKg,
         fuelCapacityKg: redAircraftModel.fuelCapacityKg,
         referenceAreaM2: redAircraftModel.referenceAreaM2,
-        zeroLiftDragCoefficient: redAircraftModel.zeroLiftDragCoefficient,
-        inducedDragFactor: redAircraftModel.inducedDragFactor,
-        maximumThrustNewtons: redAircraftModel.maximumThrustNewtons,
-        specificFuelConsumptionKgPerNewtonSecond:
-          redAircraftModel.specificFuelConsumptionKgPerNewtonSecond,
+        zeroLiftDragByMach: redAircraftModel.zeroLiftDragByMach,
+        inducedDragByAngleOfAttackRad: redAircraftModel.inducedDragByAngleOfAttackRad,
+        thrustByThrottle: redAircraftModel.thrustByThrottle,
+        fuelFlowByThrottle: redAircraftModel.fuelFlowByThrottle,
         maximumCommandG: redAircraftModel.maximumCommandG,
       }
     : undefined;

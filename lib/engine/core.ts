@@ -45,6 +45,28 @@ type RuntimeState = {
 
 const G0 = 9.80665;
 
+function interpolateTable(table: import("./contracts.ts").EngineTable1D, input: number) {
+  const { axis, values } = table;
+  if (axis.length < 2 || axis.length !== values.length || !Number.isFinite(input)) {
+    throw new Error(`Invalid admitted table ${table.id}.`);
+  }
+  if (input < axis[0] || input > axis.at(-1)!) {
+    throw new Error(`Input ${input} is outside admitted table ${table.id} coverage.`);
+  }
+  for (let index = 0; index < axis.length; index += 1) {
+    if (!Number.isFinite(axis[index]) || !Number.isFinite(values[index])) {
+      throw new Error(`Invalid admitted table ${table.id}.`);
+    }
+    if (index === 0) continue;
+    if (!(axis[index] > axis[index - 1])) throw new Error(`Invalid admitted table ${table.id}.`);
+    if (input <= axis[index]) {
+      const fraction = (input - axis[index - 1]) / (axis[index] - axis[index - 1]);
+      return values[index - 1] + (values[index] - values[index - 1]) * fraction;
+    }
+  }
+  return values.at(-1)!;
+}
+
 function unavailableObserverStates(scenario: EngineScenario): EngineObserverState[] {
   if (scenario.domain !== "A2A") return [];
   return ["IAF", "PAF"].map((perspective) => ({
@@ -182,17 +204,21 @@ function updateKinematicEntity(
     const liftCoefficient =
       (state.massKg * G0 * loadFactor) /
       (dynamicPressure * model.referenceAreaM2);
+    const mach = airspeed / atmosphere.speedOfSoundMps;
     const dragCoefficient =
-      model.zeroLiftDragCoefficient +
-      model.inducedDragFactor * liftCoefficient * liftCoefficient;
+      interpolateTable(model.zeroLiftDragByMach, mach) +
+      interpolateTable(model.inducedDragByAngleOfAttackRad, 0) * liftCoefficient * liftCoefficient;
     const drag = dynamicPressure * model.referenceAreaM2 * dragCoefficient;
-    const thrustDemand = Math.min(
-      model.maximumThrustNewtons,
-      drag * (steeringG === 0 ? 1.02 : 1.18),
-    );
+    const maximumThrust = interpolateTable(model.thrustByThrottle, 1);
+    if (!(maximumThrust > 0)) {
+      throw new Error(`Admitted table ${model.thrustByThrottle.id} has no positive full-throttle thrust.`);
+    }
+    const throttle = Math.min(1, (drag * (steeringG === 0 ? 1.02 : 1.18)) / maximumThrust);
+    const thrustDemand = interpolateTable(model.thrustByThrottle, throttle);
+    const specificFuelConsumption = interpolateTable(model.fuelFlowByThrottle, throttle);
     const fuelFlow =
       state.fuelKg > 0
-        ? thrustDemand * model.specificFuelConsumptionKgPerNewtonSecond
+        ? thrustDemand * specificFuelConsumption
         : 0;
     const consumed = Math.min(state.fuelKg, fuelFlow * dt);
     state.fuelKg -= consumed;
