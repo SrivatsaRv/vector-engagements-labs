@@ -42,9 +42,13 @@ Documentation, project-skill, and governance-only changes run the classifier,
 policy suite, and final gate without rebuilding the application, Rust engine,
 container, or PostGIS. Blog content and thumbnails build and test the rendered
 web product but do not invoke Rust or PostGIS. Frontend code adds lint,
-typecheck, CodeQL, and web contracts. Rust and shared engine contracts add
-Rust/WASM/parity checks; Cargo manifest changes also run the pinned RustSec
-audit. Database, migration, and API changes add PostGIS integration. Container,
+typecheck, CodeQL, and web contracts. Runtime, engine, and environment-Worker
+changes also select the browser-contract job: it builds the production Worker,
+executes component and viewport contracts, then verifies an actual browser
+Worker load/run/cancel/recycle exchange against the built assets. Rust and
+shared engine contracts add Rust/WASM/parity checks; Cargo manifest changes
+also run the pinned RustSec audit. Database, migration, and API changes add
+PostGIS integration. Container,
 Compose, runtime-binding, dependency, and workflow changes add an image rebuild
 and the integration gates. Unknown paths run everything until ownership is
 declared in `scripts/classify-ci-changes.mjs`.

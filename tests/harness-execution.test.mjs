@@ -69,3 +69,16 @@ test("the script-based Required PR Gate checks out the tested revision", async (
   assert.ok(verification > nodeSetup, "Required PR Gate runs before its source and runtime exist");
   assert.match(gate, /PR_REVIEW_KIND/);
 });
+
+test("selected browser contracts verify the built Worker artifact", async () => {
+  const workflow = await readFile(".github/workflows/ci.yml", "utf8");
+  const browser = workflow.split(/^  browser_tests:/m)[1]?.split(/^  rust_audit:/m)[0];
+  assert.ok(browser, "Browser Contract job is missing");
+  const browserContracts = browser.indexOf("npm run test:browser");
+  const workerVerification = browser.indexOf("npm run worker:verify");
+  assert.ok(browserContracts >= 0, "Browser Contract does not execute browser tests");
+  assert.ok(
+    workerVerification > browserContracts,
+    "Browser Contract does not verify the production-built Worker after browser tests",
+  );
+});

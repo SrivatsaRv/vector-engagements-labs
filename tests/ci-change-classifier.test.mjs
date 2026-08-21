@@ -54,6 +54,23 @@ test("Rust implementation changes receive parity tests without dependency audit"
   ]);
 });
 
+test("runtime and engine changes execute the built Worker browser verifier", () => {
+  for (const file of [
+    "lib/runtime/simulation.worker.ts",
+    "lib/runtime/protocol.ts",
+    "lib/runtime/browser-simulation-client.ts",
+    "lib/engine/compiler.ts",
+    "lib/engine/core.ts",
+    "lib/geospatial/environment-sampler.worker.ts",
+  ]) {
+    assert.equal(
+      selected([file]).includes("browser_tests"),
+      true,
+      `${file} must select the browser Worker contract`,
+    );
+  }
+});
+
 test("public aircraft evidence changes receive web and Rust parity gates", () => {
   assert.deepEqual(
     selected(["fixtures/public-reference/nasa-nesc-2015-f16-case11.json"]),
