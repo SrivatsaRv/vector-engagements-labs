@@ -489,9 +489,11 @@ export function prepareSimulation(
         blueRoute: input.spatialPlan.blue.route.map((point) =>
           geographicToLocal(point, studyArea),
         ),
+        blueRouteAcceptanceRadiiM: [...input.spatialPlan.blue.routeAcceptanceRadiiM],
         redRoute: input.spatialPlan.red.route.map((point) =>
           geographicToLocal(point, studyArea),
         ),
+        redRouteAcceptanceRadiiM: [...input.spatialPlan.red.routeAcceptanceRadiiM],
         blueOriginReference: input.spatialPlan.blue.originReference,
         redOriginReference: input.spatialPlan.red.originReference,
       }

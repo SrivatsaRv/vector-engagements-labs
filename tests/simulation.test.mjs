@@ -13,6 +13,8 @@ import { canConduct, validateScenario } from "../lib/scenario-validation.ts";
 import { getStudyArea, getWeatherPreset } from "../lib/study-areas.ts";
 import {
   createDefaultSpatialPlan,
+  geographicToLocal,
+  localToGeographic,
   spatialAspectDeg,
   spatialHorizontalSeparationM,
   withSpatialRangeM,
@@ -109,6 +111,50 @@ test("map-authored start positions, headings, speeds and routes compile into eng
   assert.equal(Math.round(Math.hypot(red.initial.velocity.x, red.initial.velocity.y)), DEFAULT_SCENARIO.targetSpeed);
   assert.ok(Math.abs(blue.initial.velocity.y) < 1e-9);
   assert.ok(red.initial.velocity.y > 0);
+});
+
+test("an authored waypoint acceptance radius is compiled and changes the flown route", () => {
+  const area = getStudyArea(DEFAULT_SCENARIO.studyAreaId);
+  const tightPlan = createDefaultSpatialPlan({
+    studyArea: area,
+    rangeM: DEFAULT_SCENARIO.range,
+    blueAltitudeM: DEFAULT_SCENARIO.altitude,
+    redAltitudeM: DEFAULT_SCENARIO.altitude + DEFAULT_SCENARIO.targetDelta,
+    blueSpeedMps: DEFAULT_SCENARIO.launcherSpeed,
+    redSpeedMps: DEFAULT_SCENARIO.targetSpeed,
+    crossingAngleDeg: DEFAULT_SCENARIO.aspect,
+  });
+  const widePlan = structuredClone(tightPlan);
+  const redStart = geographicToLocal(tightPlan.red.position, area);
+  const corner = localToGeographic({
+    x: redStart.x + 5_000,
+    y: redStart.y,
+    z: redStart.z,
+  }, area);
+  const exit = localToGeographic({
+    x: redStart.x + 5_000,
+    y: redStart.y + 8_000,
+    z: redStart.z + 1_000,
+  }, area);
+  tightPlan.red.route = [tightPlan.red.position, corner, exit];
+  widePlan.red.route = [widePlan.red.position, corner, exit];
+  tightPlan.red.routeAcceptanceRadiiM = [1, 25, 25];
+  widePlan.red.routeAcceptanceRadiiM = [1, 4_000, 25];
+
+  const tight = simulate({ ...DEFAULT_SCENARIO, spatialPlan: tightPlan });
+  const wide = simulate({ ...DEFAULT_SCENARIO, spatialPlan: widePlan });
+  const tightRed = tight.engineRun.scenario.entities.find((entity) => entity.id === "red-object-1");
+  const wideRed = wide.engineRun.scenario.entities.find((entity) => entity.id === "red-object-1");
+  assert.deepEqual(tightRed.routePlan, {
+    schemaVersion: "vector.route-plan.v1",
+    waypointAcceptanceRadiiM: [1, 25, 25],
+  });
+  assert.deepEqual(wideRed.routePlan.waypointAcceptanceRadiiM, [1, 4_000, 25]);
+  assert.notDeepEqual(
+    wide.frames.at(-1).entities.find((entity) => entity.id === "red-object-1").position,
+    tight.frames.at(-1).entities.find((entity) => entity.id === "red-object-1").position,
+    "a changed admitted acceptance radius must change achieved trajectory",
+  );
 });
 
 test("numeric distance edits and map placement share one spatial plan", () => {

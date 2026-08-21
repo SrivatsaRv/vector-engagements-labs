@@ -141,6 +141,40 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
     for (route_index, point) in entity.route.iter().copied().enumerate() {
         vector(&format!("{root}.route[{route_index}]"), point)?;
     }
+    if !entity.route.is_empty() {
+        let Some(route_plan) = entity.route_plan.as_ref() else {
+            return Err(invalid(format!(
+                "{root}.routePlan is required when route points exist"
+            )));
+        };
+        if route_plan.schema_version != "vector.route-plan.v1" {
+            return Err(invalid(format!(
+                "{root}.routePlan.schemaVersion is unsupported"
+            )));
+        }
+        if route_plan.waypoint_acceptance_radii_m.len() != entity.route.len() {
+            return Err(invalid(format!(
+                "{root}.routePlan.waypointAcceptanceRadiiM must match route length"
+            )));
+        }
+        for (index, radius) in route_plan
+            .waypoint_acceptance_radii_m
+            .iter()
+            .copied()
+            .enumerate()
+        {
+            if !radius.is_finite() || !(1.0..=25_000.0).contains(&radius) {
+                return Err(invalid(format!(
+                    "{root}.routePlan.waypointAcceptanceRadiiM[{index}] must be from 1 to 25000"
+                )));
+            }
+        }
+        if route_plan.waypoint_acceptance_radii_m[0] != 1.0 {
+            return Err(invalid(format!(
+                "{root}.routePlan.waypointAcceptanceRadiiM[0] must be 1"
+            )));
+        }
+    }
 
     if entity.kind == crate::EntityKind::Aircraft && entity.aircraft.is_none() {
         return Err(invalid(format!(

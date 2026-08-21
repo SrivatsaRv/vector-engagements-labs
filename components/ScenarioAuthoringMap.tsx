@@ -7,6 +7,7 @@ import type { MapInstallation } from "@/components/EngagementMap";
 import type { Scenario } from "@/lib/simulation";
 import {
   createDefaultSpatialPlan,
+  DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M,
   isPointInsideStudyArea,
   type ScenarioSpatialPlan,
 } from "@/lib/scenario-spatial";
@@ -271,6 +272,10 @@ export function ScenarioAuthoringMap({
           [team]: {
             ...current[team],
             route: [...current[team].route, nextPoint],
+            routeAcceptanceRadiiM: [
+              ...current[team].routeAcceptanceRadiiM,
+              DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M,
+            ],
           },
         });
         setMessage(`${team === "blue" ? "Blue" : "Red"} waypoint added.`);
@@ -637,7 +642,7 @@ export function ScenarioAuthoringMap({
                 ? `Click map for ${selected === "blue" ? "Blue" : "Red"} waypoint`
                 : `Add ${selected === "blue" ? "Blue" : "Red"} waypoint`}
             </button>
-            <button disabled={selectedEntity.route.length <= 1} onClick={() => updateEntity(selected, { route: [selectedEntity.position] })}>Clear route</button>
+            <button disabled={selectedEntity.route.length <= 1} onClick={() => updateEntity(selected, { route: [selectedEntity.position], routeAcceptanceRadiiM: [1] })}>Clear route</button>
           </div>
         </div>
         <p className="authoring-selection-note">

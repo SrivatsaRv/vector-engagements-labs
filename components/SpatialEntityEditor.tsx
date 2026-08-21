@@ -5,7 +5,12 @@ import type {
   ScenarioSpatialEntity,
   ScenarioSpatialPoint,
 } from "@/lib/scenario-spatial";
-import { hasNonZeroRouteLegs, withAirborneStart } from "@/lib/scenario-spatial";
+import {
+  DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M,
+  hasNonZeroRouteLegs,
+  ROUTE_PLAN_SCHEMA_VERSION,
+  withAirborneStart,
+} from "@/lib/scenario-spatial";
 import type { StudyArea } from "@/lib/study-areas";
 
 type Props = {
@@ -23,6 +28,8 @@ type PointDraft = {
   altitudeM: string;
 };
 
+type WaypointDraft = PointDraft & { acceptanceRadiusM: string };
+
 const formatCoordinate = (value: number) => String(Number(value.toFixed(6)));
 const formatScalar = (value: number) => String(Number(value.toFixed(3)));
 const parseFinite = (value: string) => {
@@ -39,6 +46,10 @@ function pointDraft(point: ScenarioSpatialPoint): PointDraft {
     latitude: formatCoordinate(point.latitude),
     altitudeM: formatScalar(point.altitudeM),
   };
+}
+
+function waypointDraft(point: ScenarioSpatialPoint, acceptanceRadiusM: number): WaypointDraft {
+  return { ...pointDraft(point), acceptanceRadiusM: formatScalar(acceptanceRadiusM) };
 }
 
 function pointError(draft: PointDraft, area: StudyArea) {
@@ -67,6 +78,13 @@ function toPoint(draft: PointDraft): ScenarioSpatialPoint {
   };
 }
 
+function acceptanceRadiusError(value: string) {
+  const radius = parseFinite(value);
+  return radius === null || radius < 1 || radius > 25_000
+    ? "Waypoint acceptance radius must be from 1 to 25,000 m."
+    : null;
+}
+
 export function SpatialEntityEditor({
   team,
   designation,
@@ -79,8 +97,10 @@ export function SpatialEntityEditor({
   const [start, setStart] = useState(() => pointDraft(entity.position));
   const [heading, setHeading] = useState(() => formatScalar(entity.headingDeg));
   const [speed, setSpeed] = useState(() => formatScalar(entity.speedMps));
-  const [waypoints, setWaypoints] = useState(() =>
-    entity.route.slice(1).map(pointDraft),
+  const [waypoints, setWaypoints] = useState<WaypointDraft[]>(() =>
+    entity.route.slice(1).map((point, index) =>
+      waypointDraft(point, entity.routeAcceptanceRadiiM[index + 1] ?? DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M),
+    ),
   );
 
   const startError = pointError(start, studyArea);
@@ -95,7 +115,7 @@ export function SpatialEntityEditor({
       ? "Speed must be from 0 to 1,500 m/s."
       : null;
   const waypointErrors = useMemo(
-    () => waypoints.map((draft) => pointError(draft, studyArea)),
+    () => waypoints.map((draft) => pointError(draft, studyArea) ?? acceptanceRadiusError(draft.acceptanceRadiusM)),
     [studyArea, waypoints],
   );
   const routeError =
@@ -128,7 +148,8 @@ export function SpatialEntityEditor({
       return !point ||
         !close(Number(draft.longitude), point.longitude, 1e-6) ||
         !close(Number(draft.latitude), point.latitude, 1e-6) ||
-        !close(Number(draft.altitudeM), point.altitudeM, 1e-3);
+        !close(Number(draft.altitudeM), point.altitudeM, 1e-3) ||
+        !close(Number(draft.acceptanceRadiusM), entity.routeAcceptanceRadiiM[index + 1], 1e-3);
     })
   );
 
@@ -154,13 +175,15 @@ export function SpatialEntityEditor({
     if (waypointErrors[index]) return;
     const route = [...entity.route];
     route[index + 1] = toPoint(waypoints[index]);
-    onChange({ ...entity, route });
+    const routeAcceptanceRadiiM = [...entity.routeAcceptanceRadiiM];
+    routeAcceptanceRadiiM[index + 1] = Number(waypoints[index].acceptanceRadiusM);
+    onChange({ ...entity, route, routeAcceptanceRadiiM });
   };
-  const updatePointDraft = (
-    current: PointDraft,
-    field: keyof PointDraft,
+  const updatePointDraft = <T extends PointDraft>(
+    current: T,
+    field: keyof T,
     value: string,
-  ) => ({ ...current, [field]: value });
+  ) => ({ ...current, [field]: value }) as T;
   const blurOnEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") event.currentTarget.blur();
   };
@@ -266,13 +289,23 @@ export function SpatialEntityEditor({
           <div>
             <span>Flight route</span>
             <strong>{waypoints.length} {waypoints.length === 1 ? "waypoint" : "waypoints"}</strong>
+            <small data-testid="compiled-route-plan-preview">
+              Will compile as {ROUTE_PLAN_SCHEMA_VERSION}. Each waypoint radius is a fly-by capture distance in metres.
+            </small>
           </div>
           <button
             type="button"
             onClick={() => {
-              const next = pointDraft(entity.route.at(-1) ?? entity.position);
-              setWaypoints((current) => [...current, next]);
-              onChange({ ...entity, route: [...entity.route, toPoint(next)] });
+              const nextWaypoint = waypointDraft(
+                entity.route.at(-1) ?? entity.position,
+                DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M,
+              );
+              setWaypoints((current) => [...current, nextWaypoint]);
+              onChange({
+                ...entity,
+                route: [...entity.route, toPoint(nextWaypoint)],
+                routeAcceptanceRadiiM: [...entity.routeAcceptanceRadiiM, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
+              });
             }}
           >
             Add by coordinates
@@ -281,10 +314,11 @@ export function SpatialEntityEditor({
         {waypoints.map((draft, index) => (
           <fieldset key={index}>
             <legend>Waypoint {index + 1}</legend>
-            {(["longitude", "latitude", "altitudeM"] as const).map((field) => (
+            {(["longitude", "latitude", "altitudeM", "acceptanceRadiusM"] as const).map((field) => (
               <label key={field}>
-                {field === "longitude" ? "Longitude" : field === "latitude" ? "Latitude" : "Altitude"}
+                {field === "longitude" ? "Longitude" : field === "latitude" ? "Latitude" : field === "altitudeM" ? "Altitude" : "Acceptance radius"}
                 {field === "altitudeM" && <span>m MSL</span>}
+                {field === "acceptanceRadiusM" && <span>m</span>}
                 <input
                   aria-invalid={Boolean(waypointErrors[index])}
                   aria-describedby={waypointErrors[index] ? `${id}-waypoint-${index}-error` : undefined}
@@ -311,6 +345,7 @@ export function SpatialEntityEditor({
                 onChange({
                   ...entity,
                   route: entity.route.filter((_, routeIndex) => routeIndex !== index + 1),
+                  routeAcceptanceRadiiM: entity.routeAcceptanceRadiiM.filter((_, radiusIndex) => radiusIndex !== index + 1),
                 });
               }}
             >

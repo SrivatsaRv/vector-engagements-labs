@@ -150,6 +150,15 @@ test("a current deployment manifest drives the real Worker run after route recov
 
   await speed.fill("275");
   await speed.press("Enter");
+  const routeEditor = page.getByRole("region", { name: /route coordinates/i }).first();
+  await expect(routeEditor.getByTestId("compiled-route-plan-preview")).toContainText("vector.route-plan.v1");
+  const acceptanceRadius = routeEditor.getByRole("textbox", { name: /acceptance radius/i });
+  await acceptanceRadius.fill("0");
+  await expect(acceptanceRadius).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByRole("button", { name: /Next: Admitted conditions/i })).toBeDisabled();
+  await acceptanceRadius.fill("4000");
+  await acceptanceRadius.press("Enter");
+  await expect(acceptanceRadius).toHaveAttribute("aria-invalid", "false");
   if (compact) {
     await page.getByRole("button", { name: /Next: Admitted conditions/i }).click();
     await expect(

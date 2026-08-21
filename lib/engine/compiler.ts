@@ -23,7 +23,11 @@ import {
   CURRENT_MODEL_PACK_VERSION,
 } from "../reference-model-pack.ts";
 import { localFrameToGeographic } from "../geospatial/geodesy.ts";
-import { scenarioOrigin } from "../scenario-spatial.ts";
+import {
+  DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M,
+  ROUTE_PLAN_SCHEMA_VERSION,
+  scenarioOrigin,
+} from "../scenario-spatial.ts";
 import { buildSyntheticEnvironmentManifest } from "../geospatial/synthetic-environment.ts";
 import {
   resolveInstallationOriginReference,
@@ -66,6 +70,8 @@ export type ScenarioCompilerInput = {
     redHeadingRad: number;
     blueRoute: Vec3[];
     redRoute: Vec3[];
+    blueRouteAcceptanceRadiiM: number[];
+    redRouteAcceptanceRadiiM: number[];
     blueOriginReference?: InstallationOriginReference;
     redOriginReference?: InstallationOriginReference;
   };
@@ -265,7 +271,13 @@ export function compileScenario(
                   140,
               z: blueStart.z,
             },
-          ],
+        ],
+      routePlan: {
+        schemaVersion: ROUTE_PLAN_SCHEMA_VERSION,
+        waypointAcceptanceRadiiM: input.placement?.blueRoute.length
+          ? [...input.placement.blueRouteAcceptanceRadiiM]
+          : [1, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
+      },
       initial: {
         position: { ...blueStart },
         velocity: velocity(blueIsAircraft ? input.launcherSpeed : 0, blueHeadingRad),
@@ -310,7 +322,13 @@ export function compileScenario(
                   140,
               z: redStart.z,
             },
-          ],
+        ],
+      routePlan: {
+        schemaVersion: ROUTE_PLAN_SCHEMA_VERSION,
+        waypointAcceptanceRadiiM: input.placement?.redRoute.length
+          ? [...input.placement.redRouteAcceptanceRadiiM]
+          : [1, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
+      },
       initial: {
         position: { ...redStart },
         velocity: velocity(movingTarget ? input.targetSpeed : 0, redHeadingRad),

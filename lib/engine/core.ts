@@ -114,7 +114,10 @@ function updateKinematicEntity(
   const speed = Math.max(1, magnitude(state.velocity));
   const route = state.definition.route ?? [];
   let routePoint = route[state.routePointIndex];
-  const captureRadiusM = Math.max(1, speed * dt * 2);
+  const declaredCaptureRadiusM = routePoint
+    ? state.definition.routePlan!.waypointAcceptanceRadiiM[state.routePointIndex]
+    : 0;
+  const captureRadiusM = Math.max(1, speed * dt * 2, declaredCaptureRadiusM);
   while (
     routePoint &&
     state.routePointIndex < route.length - 1 &&
@@ -559,6 +562,19 @@ export class EngineSession {
       throw new Error(
         `Aircraft ${unmodeledAircraft.id} has no admitted aircraft model.`,
       );
+    }
+    for (const entity of scenario.entities) {
+      if (!entity.route?.length) continue;
+      const radii = entity.routePlan?.waypointAcceptanceRadiiM;
+      if (
+        entity.routePlan?.schemaVersion !== "vector.route-plan.v1" ||
+        !radii ||
+        radii.length !== entity.route.length ||
+        radii[0] !== 1 ||
+        radii.some((radius) => !Number.isFinite(radius) || radius < 1 || radius > 25_000)
+      ) {
+        throw new Error(`Route plan for ${entity.id} is missing or invalid.`);
+      }
     }
     const admittedWeaponSeekerModes = new Set([
       "UNAVAILABLE",
