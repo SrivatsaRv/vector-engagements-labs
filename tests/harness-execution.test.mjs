@@ -90,3 +90,9 @@ test("selected browser contracts verify the built Worker artifact", async () => 
     "Browser Contract does not verify the production-built Worker after browser tests",
   );
 });
+
+test("the Worker verifier uses the pinned Playwright browser outside local overrides", async () => {
+  const verifier = await readFile("scripts/verify-browser-worker.ts", "utf8");
+  assert.match(verifier, /VECTOR_CHROME_PATH\s*\?\?\s*chromium\.executablePath\(\)/);
+  assert.doesNotMatch(verifier, /\/Applications\/Google Chrome\.app/);
+});
