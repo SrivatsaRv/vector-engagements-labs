@@ -244,7 +244,8 @@ contract migration and regression-continuity fixture, not a fidelity upgrade.
 4. Validate a pack once, instantiate it many times, and keep mutable state in a
    separate data structure.
 5. Never query Postgres/PostGIS or parse unit strings during a tick.
-6. Add new tables or coefficients to the source schema and compiler first, then
+6. Runtime aircraft execution consumes compiled table IDs and SI axis/value arrays, not source-row scalar values. It linearly interpolates only inside declared coverage and rejects extrapolation.
+7. Add new tables or coefficients to the source schema and compiler first, then
    update the shared fixture and Rust consumer in the same change.
 7. Do not add presentation-only properties to the physical model.
 8. Preserve the blocking named-performance limitation until representative

@@ -120,18 +120,30 @@ const testAircraftModel = {
   emptyMassKg: 14000,
   fuelCapacityKg: 5000,
   referenceAreaM2: 62,
-  zeroLiftDragCoefficient: 0.025,
-  inducedDragFactor: 0.055,
-  maximumThrustNewtons: 240000,
-  specificFuelConsumptionKgPerNewtonSecond: 0.000022,
+  zeroLiftDragByMach: { id: "test-zero-lift", axis: [0, 2], values: [0.025, 0.025] },
+  inducedDragByAngleOfAttackRad: { id: "test-induced", axis: [-0.2, 0.4], values: [0.055, 0.055] },
+  thrustByThrottle: { id: "test-thrust", axis: [0, 1], values: [0, 240000] },
+  fuelFlowByThrottle: { id: "test-fuel", axis: [0, 1], values: [0.00001, 0.000022] },
   maximumCommandG: 9,
 };
 
 function admitTestAircraft(scenario) {
   for (const entity of scenario.entities) {
-    if (entity.kind === "AIRCRAFT") entity.aircraft = { ...testAircraftModel };
+    if (entity.kind === "AIRCRAFT") entity.aircraft = structuredClone(testAircraftModel);
   }
   return scenario;
+}
+
+// Deliberately local: this oracle must not import the production evaluator.
+function linearInterpolationOracle(axis, values, input) {
+  if (input < axis[0] || input > axis.at(-1)) throw new RangeError("outside coverage");
+  for (let index = 1; index < axis.length; index += 1) {
+    if (input <= axis[index]) {
+      const fraction = (input - axis[index - 1]) / (axis[index] - axis[index - 1]);
+      return values[index - 1] + (values[index] - values[index - 1]) * fraction;
+    }
+  }
+  return values.at(-1);
 }
 
 test("generic engine updates every spawned entity deterministically", () => {
@@ -151,6 +163,37 @@ test("generic engine updates every spawned entity deterministically", () => {
   assert.ok(lastWeapon.massKg < firstWeapon.massKg);
   assert.equal(firstWeapon.weaponFlightState, "BOOST");
   assert.ok(first.closestApproachM < 10000);
+});
+
+test("nonconstant admitted aircraft tables change achieved thrust, fuel, drag, and trajectory", () => {
+  const baseline = runEngine(admitTestAircraft(testScenario()));
+  const contrastedScenario = admitTestAircraft(testScenario());
+  const blue = contrastedScenario.entities.find((entity) => entity.id === "aircraft-blue");
+  blue.aircraft = {
+    ...blue.aircraft,
+    zeroLiftDragByMach: { id: "contrast-drag", axis: [0, 2], values: [0.015, 0.06] },
+    inducedDragByAngleOfAttackRad: { id: "contrast-induced", axis: [-0.2, 0.4], values: [0.02, 0.11] },
+    thrustByThrottle: { id: "contrast-thrust", axis: [0, 0.5, 1], values: [0, 60000, 180000] },
+    fuelFlowByThrottle: { id: "contrast-fuel", axis: [0, 0.5, 1], values: [0.00001, 0.00002, 0.00004] },
+  };
+  const contrasted = runEngine(contrastedScenario);
+  const baselineBlue = baseline.frames.at(-1).entities.find((entity) => entity.id === "aircraft-blue");
+  const contrastedBlue = contrasted.frames.at(-1).entities.find((entity) => entity.id === "aircraft-blue");
+  assert.notEqual(contrastedBlue.thrustNewtons, baselineBlue.thrustNewtons);
+  assert.notEqual(contrastedBlue.dragNewtons, baselineBlue.dragNewtons);
+  assert.notEqual(contrastedBlue.fuelKg, baselineBlue.fuelKg);
+  assert.notDeepEqual(contrastedBlue.position, baselineBlue.position);
+  // Independent linear-interpolation oracle for declared table values; it does not import core.
+  assert.equal(linearInterpolationOracle([0, 0.5, 1], [0, 60000, 180000], 0.5), 60000);
+  assert.ok(Math.abs(linearInterpolationOracle([0, 0.5, 1], [0.00001, 0.00002, 0.00004], 0.75) - 0.00003) < 1e-12);
+  assert.throws(() => linearInterpolationOracle([0, 1], [0, 1], 1.01), RangeError);
+});
+
+test("aircraft execution rejects a state outside admitted table coverage instead of extrapolating", () => {
+  const scenario = admitTestAircraft(testScenario());
+  const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
+  blue.aircraft.zeroLiftDragByMach = { id: "narrow-drag", axis: [0, 0.1], values: [0.02, 0.03] };
+  assert.throws(() => runEngine(scenario), /outside admitted table narrow-drag coverage/);
 });
 
 test("TypeScript engine rejects an unknown weapon support declaration", () => {
@@ -302,7 +345,7 @@ test("fuel exhaustion preserves empty mass and all installed store mass", () => 
   weapon.weapon.launchTimeSeconds = scenario.durationSeconds + 1;
   blue.initial.fuelKg = 1;
   blue.initial.massKg = testAircraftModel.emptyMassKg + 1 + weapon.weapon.launchMassKg;
-  blue.aircraft.specificFuelConsumptionKgPerNewtonSecond = 1;
+  blue.aircraft.fuelFlowByThrottle.values = [1, 1];
 
   const run = runEngine(scenario);
   const finalAircraft = run.frames.at(-1).entities.find(

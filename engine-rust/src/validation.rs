@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{EngineError, EngineScenario, EntityDefinition, Vec3};
+use crate::{EngineError, EngineScenario, EntityDefinition, Table1d, Vec3};
 
 /// Maximum JSON payload accepted by the browser WASM ABI.
 pub const MAX_INPUT_BYTES: usize = 1_048_576;
@@ -49,6 +49,20 @@ fn positive(path: &str, value: f64) -> Result<(), EngineError> {
     } else {
         Err(invalid(format!("{path} must be greater than zero")))
     }
+}
+
+fn table(path: &str, value: &Table1d) -> Result<(), EngineError> {
+    if value.id.is_empty() || value.axis.len() < 2 || value.axis.len() != value.values.len() {
+        return Err(invalid(format!("{path} must be a non-empty aligned table")));
+    }
+    for index in 0..value.axis.len() {
+        finite(&format!("{path}.axis[{index}]"), value.axis[index])?;
+        non_negative(&format!("{path}.values[{index}]"), value.values[index])?;
+        if index > 0 && value.axis[index] <= value.axis[index - 1] {
+            return Err(invalid(format!("{path}.axis must be strictly increasing")));
+        }
+    }
+    Ok(())
 }
 
 fn identifier(path: &str, value: &str) -> Result<(), EngineError> {
@@ -194,21 +208,21 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
             &format!("{root}.aircraft.referenceAreaM2"),
             aircraft.reference_area_m2,
         )?;
-        non_negative(
-            &format!("{root}.aircraft.zeroLiftDragCoefficient"),
-            aircraft.zero_lift_drag_coefficient,
+        table(
+            &format!("{root}.aircraft.zeroLiftDragByMach"),
+            &aircraft.zero_lift_drag_by_mach,
         )?;
-        non_negative(
-            &format!("{root}.aircraft.inducedDragFactor"),
-            aircraft.induced_drag_factor,
+        table(
+            &format!("{root}.aircraft.inducedDragByAngleOfAttackRad"),
+            &aircraft.induced_drag_by_angle_of_attack_rad,
         )?;
-        non_negative(
-            &format!("{root}.aircraft.maximumThrustNewtons"),
-            aircraft.maximum_thrust_newtons,
+        table(
+            &format!("{root}.aircraft.thrustByThrottle"),
+            &aircraft.thrust_by_throttle,
         )?;
-        non_negative(
-            &format!("{root}.aircraft.specificFuelConsumptionKgPerNewtonSecond"),
-            aircraft.specific_fuel_consumption_kg_per_newton_second,
+        table(
+            &format!("{root}.aircraft.fuelFlowByThrottle"),
+            &aircraft.fuel_flow_by_throttle,
         )?;
         positive(
             &format!("{root}.aircraft.maximumCommandG"),

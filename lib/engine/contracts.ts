@@ -82,6 +82,13 @@ export type ModelValueState =
   | "USER_PROVIDED"
   | "UNKNOWN";
 
+/** Immutable one-axis SI table admitted before a simulation starts. */
+export type EngineTable1D = {
+  id: string;
+  axis: readonly number[];
+  values: readonly number[];
+};
+
 /** Immutable proof that a store was admitted from one compiled model pack. */
 export type WeaponAdmission = {
   modelPackDigest: string;
@@ -148,10 +155,10 @@ export type EngineEntityDefinition = {
     emptyMassKg: number;
     fuelCapacityKg: number;
     referenceAreaM2: number;
-    zeroLiftDragCoefficient: number;
-    inducedDragFactor: number;
-    maximumThrustNewtons: number;
-    specificFuelConsumptionKgPerNewtonSecond: number;
+    zeroLiftDragByMach: EngineTable1D;
+    inducedDragByAngleOfAttackRad: EngineTable1D;
+    thrustByThrottle: EngineTable1D;
+    fuelFlowByThrottle: EngineTable1D;
     maximumCommandG: number;
   };
   provenance: {

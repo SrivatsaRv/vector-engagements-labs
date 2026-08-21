@@ -311,11 +311,62 @@ pub struct AircraftModel {
     pub empty_mass_kg: f64,
     pub fuel_capacity_kg: f64,
     pub reference_area_m2: f64,
-    pub zero_lift_drag_coefficient: f64,
-    pub induced_drag_factor: f64,
-    pub maximum_thrust_newtons: f64,
-    pub specific_fuel_consumption_kg_per_newton_second: f64,
+    pub zero_lift_drag_by_mach: Table1d,
+    pub induced_drag_by_angle_of_attack_rad: Table1d,
+    pub thrust_by_throttle: Table1d,
+    pub fuel_flow_by_throttle: Table1d,
     pub maximum_command_g: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Table1d {
+    pub id: String,
+    pub axis: Vec<f64>,
+    pub values: Vec<f64>,
+}
+
+fn interpolate_table(table: &Table1d, input: f64) -> Result<f64, EngineError> {
+    if !input.is_finite() || table.axis.len() < 2 || table.axis.len() != table.values.len() {
+        return Err(EngineError::InvalidScenario(format!(
+            "invalid admitted table {}",
+            table.id
+        )));
+    }
+    let first_axis = table.axis[0];
+    let last_axis = table.axis[table.axis.len() - 1];
+    if input < first_axis || input > last_axis {
+        return Err(EngineError::InvalidScenario(format!(
+            "input {input} is outside admitted table {} coverage",
+            table.id
+        )));
+    }
+    for index in 0..table.axis.len() {
+        if !table.axis[index].is_finite() || !table.values[index].is_finite() {
+            return Err(EngineError::InvalidScenario(format!(
+                "invalid admitted table {}",
+                table.id
+            )));
+        }
+        if index == 0 {
+            continue;
+        }
+        if table.axis[index].partial_cmp(&table.axis[index - 1])
+            != Some(std::cmp::Ordering::Greater)
+        {
+            return Err(EngineError::InvalidScenario(format!(
+                "invalid admitted table {}",
+                table.id
+            )));
+        }
+        if input <= table.axis[index] {
+            let fraction =
+                (input - table.axis[index - 1]) / (table.axis[index] - table.axis[index - 1]);
+            return Ok(table.values[index - 1]
+                + (table.values[index] - table.values[index - 1]) * fraction);
+        }
+    }
+    Ok(table.values[table.values.len() - 1])
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -697,15 +748,20 @@ fn active_wind(scenario: &EngineScenario, time: f64) -> Vec3 {
         })
 }
 
-fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f64, dt: f64) {
+fn update_aircraft(
+    state: &mut RuntimeState,
+    scenario: &EngineScenario,
+    time: f64,
+    dt: f64,
+) -> Result<(), EngineError> {
     if state.lifecycle != EntityLifecycle::Active && state.lifecycle != EntityLifecycle::Tracking {
-        return;
+        return Ok(());
     }
     if state.definition.kind != EntityKind::Aircraft {
-        return;
+        return Ok(());
     }
     let Some(model) = state.definition.aircraft.as_ref() else {
-        return;
+        return Ok(());
     };
     let speed = state.velocity.magnitude().max(1.0);
     while state.route_point_index < state.definition.route.len().saturating_sub(1)
@@ -762,7 +818,8 @@ fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f6
     }
     let accepted_steering = requested_steering.clamp_magnitude(model.maximum_command_g * G0);
     let steering_limited = requested_steering.magnitude() > accepted_steering.magnitude() + 1e-9;
-    let (density, _) = atmosphere(state.position.z, scenario.environment.temperature_offset_c);
+    let (density, speed_of_sound) =
+        atmosphere(state.position.z, scenario.environment.temperature_offset_c);
     let airspeed = state
         .velocity
         .subtract(active_wind(scenario, time))
@@ -774,14 +831,25 @@ fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f6
         let load_factor = (1.0 + steering_g * steering_g).sqrt();
         let lift_coefficient =
             state.mass_kg * G0 * load_factor / (dynamic_pressure * model.reference_area_m2);
-        let drag_coefficient = model.zero_lift_drag_coefficient
-            + model.induced_drag_factor * lift_coefficient * lift_coefficient;
+        let mach = airspeed / speed_of_sound;
+        let drag_coefficient = interpolate_table(&model.zero_lift_drag_by_mach, mach)?
+            + interpolate_table(&model.induced_drag_by_angle_of_attack_rad, 0.0)?
+                * lift_coefficient
+                * lift_coefficient;
         let drag = dynamic_pressure * model.reference_area_m2 * drag_coefficient;
-        let thrust_demand = model
-            .maximum_thrust_newtons
-            .min(drag * if steering_g == 0.0 { 1.02 } else { 1.18 });
+        let maximum_thrust = interpolate_table(&model.thrust_by_throttle, 1.0)?;
+        if maximum_thrust <= 0.0 {
+            return Err(EngineError::InvalidScenario(format!(
+                "admitted table {} has no positive full-throttle thrust",
+                model.thrust_by_throttle.id
+            )));
+        }
+        let requested_thrust = drag * if steering_g == 0.0 { 1.02 } else { 1.18 };
+        let throttle = (requested_thrust / maximum_thrust).min(1.0);
+        let thrust_demand = interpolate_table(&model.thrust_by_throttle, throttle)?;
+        let specific_fuel_consumption = interpolate_table(&model.fuel_flow_by_throttle, throttle)?;
         let fuel_flow = if state.fuel_kg > 0.0 {
-            thrust_demand * model.specific_fuel_consumption_kg_per_newton_second
+            thrust_demand * specific_fuel_consumption
         } else {
             0.0
         };
@@ -827,6 +895,7 @@ fn update_aircraft(state: &mut RuntimeState, scenario: &EngineScenario, time: f6
             AircraftControlLimiter::None
         },
     });
+    Ok(())
 }
 
 fn activate_weapons(states: &mut [RuntimeState], time: f64) {
@@ -1186,7 +1255,7 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
     while time <= scenario.duration_seconds + 1e-9 {
         activate_weapons(&mut states, time);
         for state in states.iter_mut() {
-            update_aircraft(state, &scenario, time, scenario.fixed_step_seconds);
+            update_aircraft(state, &scenario, time, scenario.fixed_step_seconds)?;
         }
         for index in 0..states.len() {
             update_weapon(
@@ -1363,10 +1432,26 @@ mod tests {
                 empty_mass_kg: 8_000.0,
                 fuel_capacity_kg: 3_000.0,
                 reference_area_m2: 30.0,
-                zero_lift_drag_coefficient: 0.025,
-                induced_drag_factor: 0.08,
-                maximum_thrust_newtons: 120_000.0,
-                specific_fuel_consumption_kg_per_newton_second: 0.000025,
+                zero_lift_drag_by_mach: Table1d {
+                    id: "test-drag".into(),
+                    axis: vec![0.0, 2.0],
+                    values: vec![0.025, 0.025],
+                },
+                induced_drag_by_angle_of_attack_rad: Table1d {
+                    id: "test-induced".into(),
+                    axis: vec![-0.2, 0.4],
+                    values: vec![0.08, 0.08],
+                },
+                thrust_by_throttle: Table1d {
+                    id: "test-thrust".into(),
+                    axis: vec![0.0, 1.0],
+                    values: vec![0.0, 120_000.0],
+                },
+                fuel_flow_by_throttle: Table1d {
+                    id: "test-fuel".into(),
+                    axis: vec![0.0, 1.0],
+                    values: vec![0.000025, 0.000025],
+                },
                 maximum_command_g: 9.0,
             }),
             provenance: provenance(),
