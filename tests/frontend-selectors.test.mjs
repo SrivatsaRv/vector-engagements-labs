@@ -9,7 +9,6 @@ import {
 } from "../lib/frontend/selectors.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { simulate } from "../lib/simulation.ts";
-import { buildSidePictures } from "../lib/information-state.ts";
 
 const result = simulate(SCENARIO_LIBRARY[0].scenario);
 
@@ -19,10 +18,7 @@ test("display-time selection returns one canonical recorded frame identity", () 
   assert.equal(selected.frame, result.frames[selected.frameIndex]);
   assert.equal(selected.displayTimeSeconds, selected.frame.t);
   assert.ok(selected.frameIndex === 4 || selected.frameIndex === 5);
-  assert.throws(
-    () => selectDisplayFrame({ ...result, frames: [] }, 0),
-    /empty record/,
-  );
+  assert.throws(() => selectDisplayFrame({ ...result, frames: [] }, 0), /empty record/);
 });
 
 test("current geometry consumes one selected frame and keeps weapon values unavailable before launch", () => {
@@ -51,32 +47,17 @@ test("current geometry consumes one selected frame and keeps weapon values unava
   assert.notEqual(beforeLaunch.rangeMeters, 0);
 });
 
-test("observer-picture rendering hides an unavailable track instead of using world truth", () => {
-  const selected = selectDisplayFrame(result, result.frames[0].t);
-  const unavailablePictures = buildSidePictures(
-    { ...SCENARIO_LIBRARY[0].scenario, blueRadarMode: "SILENT" },
-    [selected.frame],
-  );
-  const unavailable = unavailablePictures.find((picture) => picture.perspective === "IAF");
+test("observer-picture presentation hides world entities while the selected side has no admitted sensor model", () => {
+  const unavailable = result.pictures.find((picture) => picture.perspective === "IAF");
   assert.ok(unavailable);
-  assert.deepEqual(
-    selectObserverEntityPresentation(unavailable, unavailable.observedEntityId),
-    { state: "HIDDEN" },
-  );
-  assert.deepEqual(
-    selectObserverEntityPresentation(unavailable, "blue-platform-1"),
-    { state: "MODEL_TRUTH" },
-  );
+  assert.deepEqual(selectObserverEntityPresentation(unavailable, "red-object-1"), { state: "HIDDEN" });
+  assert.deepEqual(selectObserverEntityPresentation(unavailable, "blue-platform-1"), { state: "HIDDEN" });
+  assert.deepEqual(selectObserverEntityPresentation(undefined, "blue-platform-1"), { state: "MODEL_TRUTH" });
 });
 
 test("entity metric series use gaps instead of invented zeroes", () => {
   const selected = selectDisplayFrame(result, 0);
-  const series = selectEntityMetricSeries(
-    result,
-    selected,
-    (entity) => entity.speedMps,
-    (entity) => entity.kind === "GUIDED_WEAPON",
-  );
+  const series = selectEntityMetricSeries(result, selected, (entity) => entity.speedMps, (entity) => entity.kind === "GUIDED_WEAPON");
   const redWeapon = series.find((item) => item.id === "red-weapon-1");
   assert.ok(redWeapon);
   assert.equal(redWeapon.current, null);
@@ -84,19 +65,12 @@ test("entity metric series use gaps instead of invented zeroes", () => {
   assert.ok(redWeapon.values.every((value) => value === null || Number.isFinite(value)));
 });
 
-test("recorded track selection uses the selected frame identity and fails explicit", () => {
+test("recorded track selection returns the exact unavailable tick state", () => {
   const selected = selectDisplayFrame(result, result.frames[3].t);
-  const pictures = buildSidePictures(SCENARIO_LIBRARY[0].scenario, result.frames);
-  const track = selectRecordedTrackState(pictures, selected, "IAF");
+  const track = selectRecordedTrackState(result.pictures, selected, "IAF");
   assert.equal(track.state, "AVAILABLE");
   assert.equal(track.track.modelTimeSeconds, selected.displayTimeSeconds);
-  assert.equal(track.track.perspective, "IAF");
-
+  assert.equal(track.track.availabilityReason, "SENSOR_MODEL_UNAVAILABLE");
   const missing = selectRecordedTrackState([], selected, "PAF");
-  assert.deepEqual(missing, {
-    state: "UNAVAILABLE",
-    perspective: "PAF",
-    displayTimeSeconds: selected.displayTimeSeconds,
-    reason: "PICTURE_NOT_RECORDED",
-  });
+  assert.deepEqual(missing, { state: "UNAVAILABLE", perspective: "PAF", displayTimeSeconds: selected.displayTimeSeconds, reason: "PICTURE_NOT_RECORDED" });
 });

@@ -1,110 +1,57 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  DEFAULT_SCENARIO,
-  getFrameAt,
-  simulate,
-} from "../lib/simulation.ts";
-import {
-  INFORMATION_MODEL,
-  buildSidePictures,
-  informationAvailability,
-} from "../lib/information-state.ts";
+import { DEFAULT_SCENARIO, simulate } from "../lib/simulation.ts";
+import { assertRecordedSidePictures, projectObserverStates } from "../lib/information-state.ts";
 
-const result = simulate(DEFAULT_SCENARIO);
-const frame = getFrameAt(result, 5);
-
-test("onboard observation admits only a declared scan and makes a confirmed track", () => {
-  const pictures = buildSidePictures(DEFAULT_SCENARIO, result.frames.filter((item) => item.t <= 3));
-  const iaf = pictures.filter((item) => item.perspective === "IAF");
-  assert.equal(iaf[0].trackState, "PLOT");
-  assert.equal(iaf.at(-1).trackState, "CONFIRMED");
-  assert.equal(iaf.at(-1).status, "TRACKING");
-  assert.equal(iaf.at(-1).identification, "UNKNOWN");
-  assert.equal(iaf.at(-1).trackId, "IAF-red-object-1-track-v1");
-  assert.ok(iaf.at(-1).uncertaintyMeters >= INFORMATION_MODEL.measurementFloorM);
-});
-
-test("radar state and model boundary change canonical track history", () => {
-  const baseline = informationAvailability(DEFAULT_SCENARIO, { ...frame, range: 80_000 }, "IAF");
-  const beyond = informationAvailability(DEFAULT_SCENARIO, { ...frame, range: 80_001 }, "IAF");
-  const silent = informationAvailability({ ...DEFAULT_SCENARIO, blueRadarMode: "SILENT" }, frame, "IAF");
-  assert.equal(baseline.available, true);
-  assert.equal(beyond.reason, "RADAR_OUT_OF_RANGE");
-  assert.equal(silent.reason, "RADAR_SILENT");
-});
-
-test("compatible EW reduces admitted radar range and increases measurement uncertainty", () => {
-  const closeFrame = { ...frame, range: 30_000 };
-  const nominal = buildSidePictures(DEFAULT_SCENARIO, [{ ...closeFrame, t: 0 }, { ...closeFrame, t: 1 }]).filter((item) => item.perspective === "IAF").at(-1);
-  const jammed = buildSidePictures({ ...DEFAULT_SCENARIO, redJammer: true }, [{ ...closeFrame, t: 0 }, { ...closeFrame, t: 1 }]).filter((item) => item.perspective === "IAF").at(-1);
-  assert.equal(nominal?.trackState, "CONFIRMED");
-  assert.equal(jammed?.trackState, "CONFIRMED");
-  assert.ok((jammed?.uncertaintyMeters ?? 0) > (nominal?.uncertaintyMeters ?? Infinity));
-  const blocked = buildSidePictures({ ...DEFAULT_SCENARIO, redJammer: true }, [{ ...frame, range: 60_000, t: 0 }]).filter((item) => item.perspective === "IAF").at(-1);
-  assert.equal(blocked?.trackState, "NONE");
-});
-
-test("loss coasts then expires without substituting model truth", () => {
-  const active = { ...frame, t: 0 };
-  const silentAt2 = { ...frame, t: 2 };
-  const silentAt6 = { ...frame, t: 6 };
-  const pictures = buildSidePictures(
-    { ...DEFAULT_SCENARIO, blueRadarMode: "SILENT" },
-    [active, silentAt2, silentAt6],
-  );
-  const iaf = pictures.filter((item) => item.perspective === "IAF");
-  assert.equal(iaf[0].trackState, "NONE");
-  assert.equal(iaf[1].trackState, "NONE");
-  assert.equal(iaf[2].visible, false);
-});
-
-test("an unavailable track has no synthetic position", () => {
-  const pictures = buildSidePictures(
-    { ...DEFAULT_SCENARIO, blueRadarMode: "SILENT" },
-    [{ ...frame, t: 0 }],
-  );
-  const unavailable = pictures.find((picture) => picture.perspective === "IAF");
-  assert.equal(unavailable?.visible, false);
-  assert.equal("position" in (unavailable ?? {}), false);
-});
-
-test("a lost track removes its stale estimate instead of retaining world-derived position", () => {
-  const pictures = buildSidePictures(
-    DEFAULT_SCENARIO,
-    [{ ...frame, range: 10_000, t: 0 }, { ...frame, range: 90_000, t: 5 }],
-  );
-  const lost = pictures.filter((picture) => picture.perspective === "IAF").at(-1);
-  assert.equal(lost?.trackState, "LOST");
-  assert.equal(lost?.visible, false);
-  assert.equal("position" in (lost ?? {}), false);
-});
-
-test("off-board sources fail closed until an admitted sender observation exists", () => {
-  for (const source of ["DATALINK", "AIRBORNE_EARLY_WARNING"]) {
-    const availability = informationAvailability(
-      { ...DEFAULT_SCENARIO, blueTrackSource: source, blueDatalink: true },
-      frame,
-      "IAF",
-    );
-    assert.equal(availability.reason, "DATALINK_SOURCE_UNAVAILABLE");
+test("every A2A tick emits an explicit fail-closed observer state", () => {
+  const result = simulate(DEFAULT_SCENARIO);
+  assert.ok(result.engineRun.frames.length > 0);
+  for (const frame of result.engineRun.frames) {
+    assert.deepEqual(frame.observerStates.map((state) => state.perspective), ["IAF", "PAF"]);
+    for (const state of frame.observerStates) {
+      assert.deepEqual(state, {
+        schemaVersion: "vector.observer-state.v1",
+        perspective: state.perspective,
+        sensorState: "UNSUPPORTED",
+        observationCount: 0,
+        trackState: "UNSUPPORTED",
+        visible: false,
+        availabilityReason: "SENSOR_MODEL_UNAVAILABLE",
+        effectScope: "AIR_PICTURE_ONLY",
+        stateExplanation: "No admitted sensor model pack is bound to this run.",
+      });
+    }
   }
 });
 
-test("pictures are deterministic and never expose a truth-position field", () => {
-  const first = buildSidePictures(DEFAULT_SCENARIO, result.frames.slice(0, 100));
-  const second = buildSidePictures(DEFAULT_SCENARIO, result.frames.slice(0, 100));
+test("observer projection is a deterministic tick projection without fabricated sensor values", () => {
+  const result = simulate(DEFAULT_SCENARIO);
+  const first = projectObserverStates(result.engineRun.frames);
+  const second = projectObserverStates(result.engineRun.frames);
   assert.deepEqual(first, second);
-  assert.ok(first.every((picture) => !("truthPosition" in picture)));
-  assert.ok(first.every((picture) => Number.isFinite(picture.uncertaintyMeters)));
+  assert.deepEqual(result.pictures, first);
+  assert.equal(first.length, result.engineRun.frames.length * 2);
+  assert.ok(first.every((picture) =>
+    picture.trackId === "UNAVAILABLE" &&
+    picture.observationCount === 0 &&
+    picture.confidence === 0 &&
+    picture.uncertaintyMeters === 0 &&
+    !("position" in picture) &&
+    !("observedEntityId" in picture) &&
+    !("truthPosition" in picture),
+  ));
+  assert.equal(JSON.stringify(first).includes("80000"), false);
+  assert.equal(JSON.stringify(first).toLowerCase().includes("jammer"), false);
 });
 
-test("a completed run owns its canonical observer pictures instead of making a presentation-time track", () => {
-  const completed = simulate(DEFAULT_SCENARIO);
-  assert.ok(Array.isArray(completed.pictures), "completed runs must carry their recorded observer pictures");
-  assert.deepEqual(
-    completed.pictures,
-    buildSidePictures(DEFAULT_SCENARIO, completed.frames),
-    "the information adapter must derive the picture once from canonical frames",
+test("saved picture admission rejects fabricated tracks and accepts only the tick state", () => {
+  const result = simulate(DEFAULT_SCENARIO);
+  assert.doesNotThrow(() => assertRecordedSidePictures(result.engineRun.frames, result.pictures));
+  const fabricated = result.pictures.map((picture, index) => index === 0
+    ? { ...picture, confidence: 1, position: { x: 0, y: 0, z: 0 } }
+    : picture);
+  assert.throws(
+    () => assertRecordedSidePictures(result.engineRun.frames, fabricated),
+    /prohibited track or truth data/,
   );
 });

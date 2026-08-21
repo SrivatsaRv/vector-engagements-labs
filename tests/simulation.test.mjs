@@ -202,21 +202,17 @@ test("validation blocks a zero-length authored route leg", () => {
   assert.equal(canConduct(checks), false);
 });
 
-test("visual acquisition obeys the declared visibility limit", () => {
+test("observer state is unavailable until an admitted sensor model is compiled", () => {
   const result = simulate(DEFAULT_SCENARIO);
-  const frame = result.frames.find((item) => item.range <= 15000) ?? result.frames.at(-1);
-  const visible = buildRaspTrack(
-    { ...DEFAULT_SCENARIO, blueTrackSource: "VISUAL", visibilityKm: 18 },
-    frame,
-    "IAF",
-  );
-  const obscured = buildRaspTrack(
-    { ...DEFAULT_SCENARIO, blueTrackSource: "VISUAL", visibilityKm: 2 },
-    frame,
-    "IAF",
-  );
-  assert.equal(visible.visible, true);
-  assert.equal(obscured.visible, false);
+  const frame = getFrameAt(result, 5);
+  for (const perspective of ["IAF", "PAF"]) {
+    const track = buildRaspTrack(DEFAULT_SCENARIO, frame, perspective);
+    assert.equal(track.visible, false);
+    assert.equal(track.trackState, "UNSUPPORTED");
+    assert.equal(track.availabilityReason, "SENSOR_MODEL_UNAVAILABLE");
+    assert.equal("position" in track, false);
+    assert.equal("observedEntityId" in track, false);
+  }
 });
 
 test("simulation is deterministic for an admitted authored route", () => {
@@ -242,94 +238,18 @@ test("compiled route-only entities carry no retired tactical behavior contract",
   assert.ok(aircraft.every((entity) => entity.route && entity.route.length >= 2));
 });
 
-test("RASP returns no visible track when its admitted sensor is unavailable", () => {
-  const result = simulate(DEFAULT_SCENARIO);
-  const frame = getFrameAt(result, 30);
-  const nominal = buildRaspTrack(DEFAULT_SCENARIO, frame, "IAF");
-  const degraded = buildRaspTrack(
-    {
-      ...DEFAULT_SCENARIO,
-      blueRadarMode: "SILENT",
-      blueDatalink: false,
-      redJammer: true,
-    },
-    frame,
-    "IAF",
-  );
-  assert.equal(nominal.status, "DEGRADED");
-  assert.equal(degraded.status, "NO_TRACK");
-  assert.equal(degraded.visible, false);
-  assert.ok(degraded.confidence < nominal.confidence);
-  assert.equal(degraded.trackState, "NONE");
-  assert.ok(!("truthPosition" in degraded));
-});
-
-test("RASP source controls have explicit availability behavior for both sides", () => {
+test("retired source, radar, data-link, EW, and visual scenario controls cannot fabricate a track", () => {
   const result = simulate(DEFAULT_SCENARIO);
   const farFrame = getFrameAt(result, 10);
-  const nearFrame = result.frames.find((item) => item.range <= 17000) ?? result.frames.at(-1);
-
   for (const perspective of ["IAF", "PAF"]) {
     const sourceKey = perspective === "IAF" ? "blueTrackSource" : "redTrackSource";
     const radarKey = perspective === "IAF" ? "blueRadarMode" : "redRadarMode";
     const linkKey = perspective === "IAF" ? "blueDatalink" : "redDatalink";
     const jammerKey = perspective === "IAF" ? "redJammer" : "blueJammer";
-
-    const radarTrack = buildRaspTrack(
-      { ...DEFAULT_SCENARIO, [sourceKey]: "ONBOARD_RADAR", [radarKey]: "ACTIVE" },
-      farFrame,
-      perspective,
-    );
-    const silentRadar = buildRaspTrack(
-      { ...DEFAULT_SCENARIO, [sourceKey]: "ONBOARD_RADAR", [radarKey]: "SILENT" },
-      farFrame,
-      perspective,
-    );
-    assert.equal(radarTrack.visible, true);
-    assert.equal(silentRadar.status, "NO_TRACK");
-
-    for (const source of ["DATALINK", "AIRBORNE_EARLY_WARNING"]) {
-      assert.equal(
-        buildRaspTrack(
-          { ...DEFAULT_SCENARIO, [sourceKey]: source, [linkKey]: true },
-          farFrame,
-          perspective,
-        ).availabilityReason,
-        "DATALINK_SOURCE_UNAVAILABLE",
-      );
-      assert.equal(
-        buildRaspTrack(
-          { ...DEFAULT_SCENARIO, [sourceKey]: source, [linkKey]: false },
-          farFrame,
-          perspective,
-        ).status,
-        "NO_TRACK",
-      );
-    }
-
-    assert.equal(
-      buildRaspTrack(
-        { ...DEFAULT_SCENARIO, [sourceKey]: "VISUAL" },
-        farFrame,
-        perspective,
-      ).status,
-      "NO_TRACK",
-    );
-    assert.equal(
-      buildRaspTrack(
-        { ...DEFAULT_SCENARIO, [sourceKey]: "VISUAL" },
-        nearFrame,
-        perspective,
-      ).visible,
-      true,
-    );
-
-    const jammed = buildRaspTrack(
-      { ...DEFAULT_SCENARIO, [sourceKey]: "ONBOARD_RADAR", [jammerKey]: true },
-      farFrame,
-      perspective,
-    );
-    assert.equal(jammed.trackState, "NONE");
+    const track = buildRaspTrack({ ...DEFAULT_SCENARIO, [sourceKey]: "VISUAL", [radarKey]: "SILENT", [linkKey]: false, [jammerKey]: true }, farFrame, perspective);
+    assert.equal(track.trackState, "UNSUPPORTED");
+    assert.equal(track.visible, false);
+    assert.equal(track.availabilityReason, "SENSOR_MODEL_UNAVAILABLE");
   }
 });
 

@@ -119,10 +119,7 @@ const CONFIGURE_STEPS = [
 ];
 
 function freezeRecordedPictures(pictures: RaspTrack[]): readonly RaspTrack[] {
-  return Object.freeze(pictures.map((picture) => Object.freeze({
-    ...picture,
-    ...(picture.position ? { position: Object.freeze({ ...picture.position }) } : {}),
-  })));
+  return Object.freeze(pictures.map((picture) => Object.freeze({ ...picture })));
 }
 
 function formatDistanceKm(distanceM: number) {

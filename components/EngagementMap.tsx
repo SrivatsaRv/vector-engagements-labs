@@ -412,10 +412,6 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           return score(right) - score(left) || left.id.localeCompare(right.id);
         })
         .reduce((priorities, entity, index) => priorities.set(entity.id, index), new Map<string, number>());
-      const hiddenObserverEntityId = raspTrack &&
-        selectObserverEntityPresentation(raspTrack, raspTrack.observedEntityId).state === "HIDDEN"
-        ? raspTrack.observedEntityId
-        : undefined;
       for (const entity of frame.entities) {
         const observerPresentation = selectObserverEntityPresentation(raspTrack, entity.id);
         if (observerPresentation.state === "HIDDEN") {
@@ -423,17 +419,13 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           markers.current.delete(entity.id);
           continue;
         }
-        const displayPosition = observerPresentation.state === "ESTIMATED"
-          ? observerPresentation.position
-          : entity.position;
-        const displayLngLat = observerPresentation.state === "ESTIMATED"
-          ? localToLngLat(displayPosition, origin)
-          : recordedLngLat(
-              frame.geographicPositions,
-              entity.id,
-              displayPosition,
-              origin,
-            );
+        const displayPosition = entity.position;
+        const displayLngLat = recordedLngLat(
+          frame.geographicPositions,
+          entity.id,
+          displayPosition,
+          origin,
+        );
         let marker = markers.current.get(entity.id);
         if (!marker) {
           const element = document.createElement("div");
@@ -460,25 +452,9 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
         marker.getElement().classList.toggle("is-stowed", entity.lifecycle === "STOWED");
         marker.getElement().dataset.labelPriority = String(labelPriority.get(entity.id) ?? 99);
       }
-      let uncertainty = markers.current.get("rasp-uncertainty");
-      if (raspTrack?.visible && raspTrack.position) {
-        if (!uncertainty) {
-          const element = document.createElement("div");
-          element.className = "map-rasp-uncertainty";
-          uncertainty = new maplibregl.Marker({ element, anchor: "center" })
-            .setLngLat(localToLngLat(raspTrack.position, origin))
-            .addTo(map);
-          markers.current.set("rasp-uncertainty", uncertainty);
-        }
-        uncertainty.setLngLat(localToLngLat(raspTrack.position, origin));
-        uncertainty.getElement().style.setProperty(
-          "--track-uncertainty",
-          `${Math.max(18, Math.min(82, raspTrack.uncertaintyMeters / 55))}px`,
-        );
-        uncertainty.getElement().hidden = false;
-      } else if (uncertainty) {
-        uncertainty.getElement().hidden = true;
-      }
+      // No uncertainty marker is shown until an admitted sensor model emits a
+      // side-owned position estimate.
+      markers.current.get("rasp-uncertainty")?.getElement().setAttribute("hidden", "");
       const source = map.getSource("entity-tracks") as import("maplibre-gl").GeoJSONSource | undefined;
       source?.setData({
         type: "FeatureCollection",
@@ -487,13 +463,13 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           frame,
           displayTimeSeconds,
           origin,
-          hiddenObserverEntityId,
+          undefined,
         ),
       });
       const vectors = map.getSource("direction-vectors") as import("maplibre-gl").GeoJSONSource | undefined;
       vectors?.setData({
         type: "FeatureCollection",
-        features: buildDirectionVectorFeatures(frame, origin, hiddenObserverEntityId),
+        features: buildDirectionVectorFeatures(frame, origin, undefined),
       });
       const coverage = map.getSource("coverage-envelopes") as import("maplibre-gl").GeoJSONSource | undefined;
       coverage?.setData({

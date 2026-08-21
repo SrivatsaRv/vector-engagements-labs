@@ -380,15 +380,12 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
           current.groundMarkers.get(entity.id)!.visible = false;
           continue;
         }
-        const position = observerPresentation.state === "ESTIMATED"
-          ? observerPresentation.position
-          : entity.position;
+        const position = entity.position;
         symbol.position.copy(point(position));
         const isWeapon = entity.id === result.engineRun.primaryWeaponId;
         const isTarget = entity.id === result.engineRun.primaryTargetId;
         symbol.visible =
-          (isWeapon ? layers.interceptor : isTarget ? layers.target : true) &&
-          !(raspTrack?.observedEntityId === entity.id && !raspTrack.visible);
+          isWeapon ? layers.interceptor : isTarget ? layers.target : true;
 
         const path = current.paths.get(entity.id)!;
         const points = result.frames
@@ -470,11 +467,7 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
         ]);
       }
       current.lineOfSight.visible = layers.lineOfSight && Boolean(primaryWeapon && primaryTarget);
-      current.uncertainty.visible = Boolean(raspTrack?.visible && raspTrack.position);
-      if (raspTrack?.visible && raspTrack.position) {
-        current.uncertainty.position.copy(point(raspTrack.position));
-        current.uncertainty.scale.setScalar(Math.max(350, raspTrack.uncertaintyMeters));
-      }
+      current.uncertainty.visible = false;
     });
   }, [layers, raspTrack, result, selected]);
 

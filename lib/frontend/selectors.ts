@@ -111,8 +111,7 @@ export function selectRecordedTrackState(
 
 export type ObserverEntityPresentation =
   | { state: "MODEL_TRUTH" }
-  | { state: "HIDDEN" }
-  | { state: "ESTIMATED"; position: NonNullable<RaspTrack["position"]> };
+  | { state: "HIDDEN" };
 
 /**
  * Decides whether an entity may appear in a side-owned observer picture.
@@ -123,9 +122,11 @@ export function selectObserverEntityPresentation(
   track: RaspTrack | undefined,
   entityId: string,
 ): ObserverEntityPresentation {
-  if (!track || track.observedEntityId !== entityId) return { state: "MODEL_TRUTH" };
-  if (!track.visible || !track.position) return { state: "HIDDEN" };
-  return { state: "ESTIMATED", position: track.position };
+  void entityId;
+  if (!track) return { state: "MODEL_TRUTH" };
+  // The only admitted observer state is explicitly unavailable. Do not use a
+  // selected air-picture surface as permission to show world-truth entities.
+  return { state: "HIDDEN" };
 }
 
 export type SelectedGeometry =

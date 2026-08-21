@@ -41,7 +41,7 @@ when the compiled capability identity and record manifest disagree.
 
 Basemap tiles are referenced by provider and style revision, not silently embedded. A portable export may include explicitly licensed terrain or static assets. Missing optional assets must degrade to class silhouettes and a neutral terrain surface without changing telemetry.
 
-Each `pictures.jsonl` entry uses the required `vector.pictures.v1` schema and
+Each `pictures.jsonl` entry uses the required `vector.pictures.v2` schema and
 its member hash is bound by `manifest.json`. It carries `modelTimeSeconds`, the model-clock identity
 of that observer-picture sample. Consumers select it by that exact frame time,
 not by array order, last-update time, or a rendered interpolation. A missing
@@ -104,7 +104,7 @@ read model is sufficient for the existing map, Three.js, telemetry, RASP,
 explanation, and report consumers.
 
 `frames.arrow` currently contains the versioned VECTOR columnar codec
-`vector.frames.columnar.v3`: string/lifecycle and installed-store identity
+`vector.frames.columnar.v4`: string/lifecycle and installed-store identity
 metadata is encoded once in a
 canonical header and all numerical entity fields are stored as contiguous f64
 columns, including total installed-store mass. The historical path is retained
@@ -113,10 +113,11 @@ implementation is not Apache Arrow IPC. An Arrow IPC adapter and downloadable
 ZIP container remain follow-up interoperability work; changing the frame codec
 requires a new member schema version and fixture migration.
 
-Version 3 adds the requested steering-acceleration vector. It is the recorded
-pre-limit route-controller demand, not an aerodynamic capability claim. A v2
-record is rejected with an explicit incomplete-command-evidence error; it must
-be regenerated from its immutable scenario with a v3-capable runtime. VECTOR
+Version 4 also records the canonical tick-owned observer state. The requested
+steering-acceleration vector remains a recorded pre-limit route-controller
+demand, not an aerodynamic capability claim. A prior record is rejected with
+an explicit incomplete-observer-state error; it must be regenerated from its
+immutable scenario with a v4-capable runtime. VECTOR
 does not synthesize a missing requested command during replay.
 
 Stable events are ordered by model timestamp, event-class rank, entity ID, and
