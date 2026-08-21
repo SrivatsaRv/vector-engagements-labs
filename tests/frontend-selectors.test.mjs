@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   selectDisplayFrame,
   selectEntityMetricSeries,
+  selectCurrentGeometry,
   selectObserverEntityPresentation,
   selectRecordedTrackState,
 } from "../lib/frontend/selectors.ts";
@@ -22,6 +23,32 @@ test("display-time selection returns one canonical recorded frame identity", () 
     () => selectDisplayFrame({ ...result, frames: [] }, 0),
     /empty record/,
   );
+});
+
+test("current geometry consumes one selected frame and keeps weapon values unavailable before launch", () => {
+  const selected = selectDisplayFrame(result, result.frames[4].t);
+  const geometry = selectCurrentGeometry(result, selected);
+  assert.equal(geometry.state, "AVAILABLE");
+  assert.equal(geometry.displayTimeSeconds, selected.displayTimeSeconds);
+  assert.equal(geometry.frameIndex, selected.frameIndex);
+  assert.equal(geometry.relationship, "WEAPON_TO_TARGET");
+  assert.equal(geometry.rangeMeters, selected.frame.range);
+  assert.equal(geometry.closureRateMps, selected.frame.closureRate);
+  assert.equal(geometry.lineOfSightRateRadS, selected.frame.losRate);
+  assert.equal(geometry.weapon.state, "AVAILABLE");
+
+  const prelaunch = {
+    ...result,
+    frames: result.frames.map((frame, index) => index !== selected.frameIndex
+      ? frame
+      : { ...frame, entities: frame.entities.filter((entity) => entity.id !== result.engineRun.primaryWeaponId) }),
+  };
+  const prelaunchSelected = selectDisplayFrame(prelaunch, selected.displayTimeSeconds);
+  const beforeLaunch = selectCurrentGeometry(prelaunch, prelaunchSelected);
+  assert.equal(beforeLaunch.state, "AVAILABLE");
+  assert.equal(beforeLaunch.relationship, "AIRCRAFT_TO_TARGET");
+  assert.deepEqual(beforeLaunch.weapon, { state: "UNAVAILABLE", reason: "NOT_LAUNCHED" });
+  assert.notEqual(beforeLaunch.rangeMeters, 0);
 });
 
 test("observer-picture rendering hides an unavailable track instead of using world truth", () => {

@@ -40,6 +40,17 @@ This matrix is the minimum proof required before a feature milestone is committe
   proves Map, playback controls, and telemetry share one display-time identity
   at all five required viewports.
 
+### Current geometry frame binding (#41 slice)
+
+- `tests/frontend-selectors.test.mjs` proves geometry uses the selected frame's
+  recorded weapon-to-target values and uses only selected aircraft states before
+  launch; weapon values never fall back to an aircraft.
+- `tests/component/current-geometry.test.tsx` proves the inspector exposes the
+  selected time/frame identity and marks pre-launch weapon values unavailable.
+- `tests/browser/route-authoring.spec.ts` proves keyboard scrubbing keeps Map,
+  3D, timeline, telemetry, and Current geometry on one display time and that
+  the retired relative-position placeholder is absent.
+
 1. `make ci-local`
 2. The applicable named target: `make worker-local`, `make frontend-local`,
    `make integration-local`, `make container-verify`,
