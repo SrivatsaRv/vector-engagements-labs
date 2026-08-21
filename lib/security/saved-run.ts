@@ -67,6 +67,19 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
       }
       return radius;
     });
+    const routeWaypointTransitions = placement.routeWaypointTransitions;
+    if (!Array.isArray(routeWaypointTransitions) || routeWaypointTransitions.length !== route.length) {
+      throw new PublicApiError(400, `invalid_${name}_route_plan`);
+    }
+    const acceptedTransitions = routeWaypointTransitions.map((entry, index) => {
+      const valid = index === 0
+        ? entry === "START"
+        : entry === "FLY_BY" || entry === "FLY_OVER";
+      if (!valid || (entry === "FLY_OVER" && acceptedRadii[index] !== 1)) {
+        throw new PublicApiError(400, `invalid_${name}_route_plan`);
+      }
+      return entry;
+    }) as ("START" | "FLY_BY" | "FLY_OVER")[];
     return {
       position: {
         longitude: finiteNumber(point.longitude, 60, 100, `${name}_longitude`),
@@ -90,6 +103,7 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
         };
       }),
       routeAcceptanceRadiiM: acceptedRadii,
+      routeWaypointTransitions: acceptedTransitions,
       originReference: installationOriginReference(
         placement.originReference,
         `${name}_origin_reference`,

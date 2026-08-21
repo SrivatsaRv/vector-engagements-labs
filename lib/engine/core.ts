@@ -238,10 +238,15 @@ function updateKinematicEntity(
   const speed = Math.max(1, magnitude(state.velocity));
   const route = state.definition.route ?? [];
   let routePoint = route[state.routePointIndex];
+  const transition = routePoint
+    ? routeTransition(state.definition.routePlan!, state.routePointIndex)
+    : undefined;
   const declaredCaptureRadiusM = routePoint
     ? state.definition.routePlan!.waypointAcceptanceRadiiM[state.routePointIndex]
     : 0;
-  const captureRadiusM = Math.max(1, speed * dt * 2, declaredCaptureRadiusM);
+  const captureRadiusM = transition === "FLY_OVER"
+    ? Math.max(1, speed * dt * 2)
+    : Math.max(1, speed * dt * 2, declaredCaptureRadiusM);
   while (
     routePoint &&
     state.routePointIndex < route.length - 1 &&
@@ -359,6 +364,15 @@ function updateKinematicEntity(
         : "NONE"
       : "ROUTE_COMPLETE",
   };
+}
+
+/** v1 explicitly meant all route waypoints were fly-by; v2 names each one. */
+function routeTransition(
+  plan: NonNullable<EngineEntityDefinition["routePlan"]>,
+  index: number,
+): "START" | "FLY_BY" | "FLY_OVER" {
+  if (plan.schemaVersion === "vector.route-plan.v1") return index === 0 ? "START" : "FLY_BY";
+  return plan.waypointTransitions![index]!;
 }
 
 function activateWeapon(
@@ -724,13 +738,27 @@ export class EngineSession {
       if (!entity.route?.length) continue;
       const radii = entity.routePlan?.waypointAcceptanceRadiiM;
       if (
-        entity.routePlan?.schemaVersion !== "vector.route-plan.v1" ||
+        (entity.routePlan?.schemaVersion !== "vector.route-plan.v1" &&
+          entity.routePlan?.schemaVersion !== "vector.route-plan.v2") ||
         !radii ||
         radii.length !== entity.route.length ||
         radii[0] !== 1 ||
         radii.some((radius) => !Number.isFinite(radius) || radius < 1 || radius > 25_000)
       ) {
         throw new Error(`Route plan for ${entity.id} is missing or invalid.`);
+      }
+      if (
+        entity.routePlan.schemaVersion === "vector.route-plan.v2" &&
+        (!entity.routePlan.waypointTransitions ||
+          entity.routePlan.waypointTransitions.length !== entity.route.length ||
+          entity.routePlan.waypointTransitions.some((transition, index) =>
+            index === 0
+              ? transition !== "START"
+              : (transition !== "FLY_BY" && transition !== "FLY_OVER") ||
+                (transition === "FLY_OVER" && radii[index] !== 1),
+          ))
+      ) {
+        throw new Error(`Route plan transitions for ${entity.id} are missing or invalid.`);
       }
     }
     const admittedWeaponSeekerModes = new Set([

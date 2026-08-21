@@ -177,7 +177,7 @@ test("a current deployment manifest drives the real Worker run after route recov
   await speed.fill("275");
   await speed.press("Enter");
   const routeEditor = page.getByRole("region", { name: /route coordinates/i }).first();
-  await expect(routeEditor.getByTestId("compiled-route-plan-preview")).toContainText("vector.route-plan.v1");
+  await expect(routeEditor.getByTestId("compiled-route-plan-preview")).toContainText("vector.route-plan.v2");
   const acceptanceRadius = routeEditor.getByRole("textbox", { name: /acceptance radius/i });
   await acceptanceRadius.fill("0");
   await expect(acceptanceRadius).toHaveAttribute("aria-invalid", "true");
@@ -185,6 +185,11 @@ test("a current deployment manifest drives the real Worker run after route recov
   await acceptanceRadius.fill("4000");
   await acceptanceRadius.press("Enter");
   await expect(acceptanceRadius).toHaveAttribute("aria-invalid", "false");
+  const transition = routeEditor.getByRole("combobox", { name: /transition/i });
+  await transition.selectOption("FLY_OVER");
+  await transition.press("Tab");
+  await expect(transition).toHaveValue("FLY_OVER");
+  await expect(acceptanceRadius).toBeDisabled();
   if (compact) {
     await page.getByRole("button", { name: /Next: Admitted conditions/i }).click();
     await expect(

@@ -20,8 +20,9 @@ const initialEntity = createDefaultSpatialPlan({
   crossingAngleDeg: 90,
 }).blue;
 
-function Harness({ onValidityChange, initial = initialEntity }: {
+function Harness({ onValidityChange, onEntityChange, initial = initialEntity }: {
   onValidityChange: (valid: boolean) => void;
+  onEntityChange?: (entity: ScenarioSpatialEntity) => void;
   initial?: ScenarioSpatialEntity;
 }) {
   const [entity, setEntity] = useState<ScenarioSpatialEntity>(initial);
@@ -31,7 +32,10 @@ function Harness({ onValidityChange, initial = initialEntity }: {
       designation="Test aircraft"
       entity={entity}
       studyArea={area}
-      onChange={setEntity}
+      onChange={(next) => {
+        setEntity(next);
+        onEntityChange?.(next);
+      }}
       onValidityChange={onValidityChange}
     />
   );
@@ -101,13 +105,27 @@ describe("SpatialEntityEditor", () => {
     const route = screen.getByRole("region", { name: /test aircraft route coordinates/i });
     const radius = within(route).getByRole("textbox", { name: /acceptance radius/i });
 
-    expect(screen.getByTestId("compiled-route-plan-preview")).toHaveTextContent("vector.route-plan.v1");
+    expect(screen.getByTestId("compiled-route-plan-preview")).toHaveTextContent("vector.route-plan.v2");
     await user.clear(radius);
     await user.type(radius, "0");
 
     expect(radius).toHaveAttribute("aria-invalid", "true");
     expect(route).toHaveTextContent(/acceptance radius must be from 1 to 25,000 m/i);
     await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
+  });
+
+  it("commits an explicit fly-over transition into the compiled route plan", async () => {
+    const user = userEvent.setup();
+    const onValidityChange = vi.fn();
+    const onEntityChange = vi.fn();
+    render(<Harness onValidityChange={onValidityChange} onEntityChange={onEntityChange} />);
+
+    const route = screen.getByRole("region", { name: /test aircraft route coordinates/i });
+    await user.selectOptions(within(route).getByRole("combobox", { name: /transition/i }), "FLY_OVER");
+    await user.tab();
+
+    await waitFor(() => expect(onEntityChange).toHaveBeenCalled());
+    expect(onEntityChange.mock.calls.at(-1)?.[0].routeWaypointTransitions).toEqual(["START", "FLY_OVER"]);
   });
 
   it("changes a selected installation origin into manual airborne placement when coordinates change", async () => {

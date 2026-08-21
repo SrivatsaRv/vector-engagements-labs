@@ -170,7 +170,9 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
                 "{root}.routePlan is required when route points exist"
             )));
         };
-        if route_plan.schema_version != "vector.route-plan.v1" {
+        if route_plan.schema_version != "vector.route-plan.v1"
+            && route_plan.schema_version != "vector.route-plan.v2"
+        {
             return Err(invalid(format!(
                 "{root}.routePlan.schemaVersion is unsupported"
             )));
@@ -196,6 +198,36 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
             return Err(invalid(format!(
                 "{root}.routePlan.waypointAcceptanceRadiiM[0] must be 1"
             )));
+        }
+        if route_plan.schema_version == "vector.route-plan.v2" {
+            let Some(transitions) = route_plan.waypoint_transitions.as_ref() else {
+                return Err(invalid(format!(
+                    "{root}.routePlan.waypointTransitions is required for v2"
+                )));
+            };
+            if transitions.len() != entity.route.len() {
+                return Err(invalid(format!(
+                    "{root}.routePlan.waypointTransitions must match route length"
+                )));
+            }
+            for (index, transition) in transitions.iter().enumerate() {
+                let valid = if index == 0 {
+                    transition == "START"
+                } else {
+                    transition == "FLY_BY" || transition == "FLY_OVER"
+                };
+                if !valid {
+                    return Err(invalid(format!(
+                        "{root}.routePlan.waypointTransitions[{index}] is invalid"
+                    )));
+                }
+                if transition == "FLY_OVER" && route_plan.waypoint_acceptance_radii_m[index] != 1.0
+                {
+                    return Err(invalid(format!(
+                        "{root}.routePlan.waypointAcceptanceRadiiM[{index}] must be 1 for FLY_OVER"
+                    )));
+                }
+            }
         }
     }
 

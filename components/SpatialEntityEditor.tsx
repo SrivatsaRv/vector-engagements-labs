@@ -11,6 +11,7 @@ import {
   ROUTE_PLAN_SCHEMA_VERSION,
   withAirborneStart,
 } from "@/lib/scenario-spatial";
+import type { RouteWaypointTransition } from "@/lib/scenario-spatial";
 import type { StudyArea } from "@/lib/study-areas";
 
 type Props = {
@@ -28,7 +29,10 @@ type PointDraft = {
   altitudeM: string;
 };
 
-type WaypointDraft = PointDraft & { acceptanceRadiusM: string };
+type WaypointDraft = PointDraft & {
+  acceptanceRadiusM: string;
+  transition: Extract<RouteWaypointTransition, "FLY_BY" | "FLY_OVER">;
+};
 
 const formatCoordinate = (value: number) => String(Number(value.toFixed(6)));
 const formatScalar = (value: number) => String(Number(value.toFixed(3)));
@@ -48,8 +52,16 @@ function pointDraft(point: ScenarioSpatialPoint): PointDraft {
   };
 }
 
-function waypointDraft(point: ScenarioSpatialPoint, acceptanceRadiusM: number): WaypointDraft {
-  return { ...pointDraft(point), acceptanceRadiusM: formatScalar(acceptanceRadiusM) };
+function waypointDraft(
+  point: ScenarioSpatialPoint,
+  acceptanceRadiusM: number,
+  transition: Extract<RouteWaypointTransition, "FLY_BY" | "FLY_OVER">,
+): WaypointDraft {
+  return {
+    ...pointDraft(point),
+    acceptanceRadiusM: formatScalar(transition === "FLY_OVER" ? 1 : acceptanceRadiusM),
+    transition,
+  };
 }
 
 function pointError(draft: PointDraft, area: StudyArea) {
@@ -99,7 +111,11 @@ export function SpatialEntityEditor({
   const [speed, setSpeed] = useState(() => formatScalar(entity.speedMps));
   const [waypoints, setWaypoints] = useState<WaypointDraft[]>(() =>
     entity.route.slice(1).map((point, index) =>
-      waypointDraft(point, entity.routeAcceptanceRadiiM[index + 1] ?? DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M),
+      waypointDraft(
+        point,
+        entity.routeAcceptanceRadiiM[index + 1] ?? DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M,
+        entity.routeWaypointTransitions[index + 1] === "FLY_OVER" ? "FLY_OVER" : "FLY_BY",
+      ),
     ),
   );
 
@@ -115,7 +131,10 @@ export function SpatialEntityEditor({
       ? "Speed must be from 0 to 1,500 m/s."
       : null;
   const waypointErrors = useMemo(
-    () => waypoints.map((draft) => pointError(draft, studyArea) ?? acceptanceRadiusError(draft.acceptanceRadiusM)),
+    () => waypoints.map((draft) =>
+      pointError(draft, studyArea) ??
+      (draft.transition === "FLY_OVER" ? null : acceptanceRadiusError(draft.acceptanceRadiusM)),
+    ),
     [studyArea, waypoints],
   );
   const routeError =
@@ -149,7 +168,8 @@ export function SpatialEntityEditor({
         !close(Number(draft.longitude), point.longitude, 1e-6) ||
         !close(Number(draft.latitude), point.latitude, 1e-6) ||
         !close(Number(draft.altitudeM), point.altitudeM, 1e-3) ||
-        !close(Number(draft.acceptanceRadiusM), entity.routeAcceptanceRadiiM[index + 1], 1e-3);
+        !close(Number(draft.acceptanceRadiusM), entity.routeAcceptanceRadiiM[index + 1], 1e-3) ||
+        draft.transition !== entity.routeWaypointTransitions[index + 1];
     })
   );
 
@@ -176,8 +196,12 @@ export function SpatialEntityEditor({
     const route = [...entity.route];
     route[index + 1] = toPoint(waypoints[index]);
     const routeAcceptanceRadiiM = [...entity.routeAcceptanceRadiiM];
-    routeAcceptanceRadiiM[index + 1] = Number(waypoints[index].acceptanceRadiusM);
-    onChange({ ...entity, route, routeAcceptanceRadiiM });
+    routeAcceptanceRadiiM[index + 1] = waypoints[index].transition === "FLY_OVER"
+      ? 1
+      : Number(waypoints[index].acceptanceRadiusM);
+    const routeWaypointTransitions = [...entity.routeWaypointTransitions];
+    routeWaypointTransitions[index + 1] = waypoints[index].transition;
+    onChange({ ...entity, route, routeAcceptanceRadiiM, routeWaypointTransitions });
   };
   const updatePointDraft = <T extends PointDraft>(
     current: T,
@@ -290,7 +314,7 @@ export function SpatialEntityEditor({
             <span>Flight route</span>
             <strong>{waypoints.length} {waypoints.length === 1 ? "waypoint" : "waypoints"}</strong>
             <small data-testid="compiled-route-plan-preview">
-              Will compile as {ROUTE_PLAN_SCHEMA_VERSION}. Each waypoint radius is a fly-by capture distance in metres.
+              Will compile as {ROUTE_PLAN_SCHEMA_VERSION}. Each waypoint is a fly-by or fly-over transition.
             </small>
           </div>
           <button
@@ -299,12 +323,14 @@ export function SpatialEntityEditor({
               const nextWaypoint = waypointDraft(
                 entity.route.at(-1) ?? entity.position,
                 DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M,
+                "FLY_BY",
               );
               setWaypoints((current) => [...current, nextWaypoint]);
               onChange({
                 ...entity,
                 route: [...entity.route, toPoint(nextWaypoint)],
                 routeAcceptanceRadiiM: [...entity.routeAcceptanceRadiiM, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
+                routeWaypointTransitions: [...entity.routeWaypointTransitions, "FLY_BY"],
               });
             }}
           >
@@ -324,6 +350,7 @@ export function SpatialEntityEditor({
                   aria-describedby={waypointErrors[index] ? `${id}-waypoint-${index}-error` : undefined}
                   inputMode="decimal"
                   value={draft[field]}
+                  disabled={field === "acceptanceRadiusM" && draft.transition === "FLY_OVER"}
                   onChange={(event) =>
                     setWaypoints((current) =>
                       current.map((point, pointIndex) =>
@@ -338,6 +365,30 @@ export function SpatialEntityEditor({
                 />
               </label>
             ))}
+            <label>
+              Transition
+              <select
+                value={draft.transition}
+                onChange={(event) =>
+                  setWaypoints((current) => current.map((point, pointIndex) =>
+                    pointIndex === index
+                      ? {
+                          ...point,
+                          transition: event.target.value as WaypointDraft["transition"],
+                          acceptanceRadiusM: event.target.value === "FLY_OVER" ? "1" : point.acceptanceRadiusM,
+                        }
+                      : point,
+                  ))
+                }
+                onBlur={() => commitWaypoint(index)}
+              >
+                <option value="FLY_BY">Fly-by</option>
+                <option value="FLY_OVER">Fly-over</option>
+              </select>
+            </label>
+            {draft.transition === "FLY_OVER" && (
+              <small>Fly-over uses the finite-step pass-through guard. Acceptance radius is fixed at 1 m.</small>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -346,6 +397,7 @@ export function SpatialEntityEditor({
                   ...entity,
                   route: entity.route.filter((_, routeIndex) => routeIndex !== index + 1),
                   routeAcceptanceRadiiM: entity.routeAcceptanceRadiiM.filter((_, radiusIndex) => radiusIndex !== index + 1),
+                  routeWaypointTransitions: entity.routeWaypointTransitions.filter((_, transitionIndex) => transitionIndex !== index + 1),
                 });
               }}
             >

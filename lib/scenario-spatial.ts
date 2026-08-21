@@ -17,6 +17,9 @@ export type ScenarioSpatialPoint = {
   verticalDatum: "MSL";
 };
 
+/** How the route controller may transition away from an authored waypoint. */
+export type RouteWaypointTransition = "START" | "FLY_BY" | "FLY_OVER";
+
 export type ScenarioSpatialEntity = {
   position: ScenarioSpatialPoint;
   headingDeg: number;
@@ -24,6 +27,8 @@ export type ScenarioSpatialEntity = {
   route: ScenarioSpatialPoint[];
   /** One explicit acceptance radius per route point; only waypoint radii are consumed. */
   routeAcceptanceRadiiM: number[];
+  /** One explicit transition mode per route point; index zero is always START. */
+  routeWaypointTransitions: RouteWaypointTransition[];
   /** Present only when an admitted public installation was selected. */
   originReference?: InstallationOriginReference;
 };
@@ -33,7 +38,7 @@ export type ScenarioSpatialPlan = {
   red: ScenarioSpatialEntity;
 };
 
-export const ROUTE_PLAN_SCHEMA_VERSION = "vector.route-plan.v1";
+export const ROUTE_PLAN_SCHEMA_VERSION = "vector.route-plan.v2";
 export const DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M = 500;
 
 /**
@@ -54,6 +59,7 @@ export function withAirborneStart(
     position,
     route: entity.route.map((point, index) => (index === 0 ? position : point)),
     routeAcceptanceRadiiM: [...entity.routeAcceptanceRadiiM],
+    routeWaypointTransitions: [...entity.routeWaypointTransitions],
     originReference: movedHorizontally ? undefined : entity.originReference,
   };
 }
@@ -144,6 +150,7 @@ export function createDefaultSpatialPlan(input: {
         ),
       ],
       routeAcceptanceRadiiM: [1, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
+      routeWaypointTransitions: ["START", "FLY_BY"],
     },
     red: {
       position: red,
@@ -168,6 +175,7 @@ export function createDefaultSpatialPlan(input: {
         ),
       ],
       routeAcceptanceRadiiM: [1, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
+      routeWaypointTransitions: ["START", "FLY_BY"],
     },
   };
 }
@@ -291,5 +299,15 @@ export function hasValidRouteAcceptanceRadii(entity: ScenarioSpatialEntity) {
     entity.routeAcceptanceRadiiM.every((radius, index) =>
       Number.isFinite(radius) && radius >= 1 && radius <= 25_000 &&
         (index > 0 || radius === 1),
+    );
+}
+
+export function hasValidRouteWaypointTransitions(entity: ScenarioSpatialEntity) {
+  return entity.routeWaypointTransitions.length === entity.route.length &&
+    entity.routeWaypointTransitions.every((transition, index) =>
+      index === 0
+        ? transition === "START"
+        : (transition === "FLY_BY" || transition === "FLY_OVER") &&
+          (transition !== "FLY_OVER" || entity.routeAcceptanceRadiiM[index] === 1),
     );
 }

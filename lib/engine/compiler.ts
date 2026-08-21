@@ -74,6 +74,8 @@ export type ScenarioCompilerInput = {
     redRoute: Vec3[];
     blueRouteAcceptanceRadiiM: number[];
     redRouteAcceptanceRadiiM: number[];
+    blueRouteWaypointTransitions: ("START" | "FLY_BY" | "FLY_OVER")[];
+    redRouteWaypointTransitions: ("START" | "FLY_BY" | "FLY_OVER")[];
     blueOriginReference?: InstallationOriginReference;
     redOriginReference?: InstallationOriginReference;
   };
@@ -359,6 +361,9 @@ export function compileScenario(
         waypointAcceptanceRadiiM: input.placement?.blueRoute.length
           ? [...input.placement.blueRouteAcceptanceRadiiM]
           : [1, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
+        waypointTransitions: input.placement?.blueRoute.length
+          ? [...input.placement.blueRouteWaypointTransitions]
+          : ["START", "FLY_BY"],
       },
       initial: {
         position: { ...blueStart },
@@ -413,6 +418,9 @@ export function compileScenario(
         waypointAcceptanceRadiiM: input.placement?.redRoute.length
           ? [...input.placement.redRouteAcceptanceRadiiM]
           : [1, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
+        waypointTransitions: input.placement?.redRoute.length
+          ? [...input.placement.redRouteWaypointTransitions]
+          : ["START", "FLY_BY"],
       },
       initial: {
         position: { ...redStart },
