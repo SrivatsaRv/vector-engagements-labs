@@ -106,6 +106,15 @@ fn sha256_digest(path: &str, value: &str) -> Result<(), EngineError> {
     Ok(())
 }
 
+fn content_addressed_sha256(path: &str, value: &str) -> Result<(), EngineError> {
+    let Some(digest) = value.strip_prefix("sha256:") else {
+        return Err(invalid(format!(
+            "{path} must use sha256: content addressing"
+        )));
+    };
+    sha256_digest(path, digest)
+}
+
 fn vector(path: &str, value: Vec3) -> Result<(), EngineError> {
     finite(&format!("{path}.x"), value.x)?;
     finite(&format!("{path}.y"), value.y)?;
@@ -487,6 +496,21 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         scenario.environment.temperature_offset_c,
     )?;
     vector("environment.windMps", scenario.environment.wind_mps)?;
+    let environment_pack = &scenario.environment.environment_pack;
+    if environment_pack.schema_version != "vector.environment-pack.v1" {
+        return Err(invalid(
+            "environment.environmentPack.schemaVersion is unsupported",
+        ));
+    }
+    identifier("environment.environmentPack.id", &environment_pack.id)?;
+    identifier(
+        "environment.environmentPack.version",
+        &environment_pack.version,
+    )?;
+    content_addressed_sha256(
+        "environment.environmentPack.digest",
+        &environment_pack.digest,
+    )?;
     finite(
         "environment.studyArea.surfaceElevationM",
         scenario.environment.study_area.surface_elevation_m,

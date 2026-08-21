@@ -30,9 +30,11 @@ import {
 } from "../lib/geospatial/synthetic-environment.ts";
 import {
   PHASE_A_INSTALLATION_GAPS,
+  admitPhaseAEnvironmentPack,
   assertPhaseAEnvironmentPack,
   createPhaseAEnvironmentPack,
   createPhaseAEnvironmentSampler,
+  environmentPackBinding,
 } from "../lib/geospatial/environment-pack.ts";
 import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import {
@@ -281,6 +283,36 @@ test("Phase A environment packs bind explicit synthetic terrain, datum, atmosphe
   );
 });
 
+test("environment admission resolves a frozen exact pack instead of retaining a lookupable area default", () => {
+  const admitted = admitPhaseAEnvironmentPack({
+    studyAreaId: "north-punjab",
+    weatherPresetId: "north-punjab-hot",
+    effectiveWeather: { windEastMps: 11, windNorthMps: -3, temperatureOffsetC: 9 },
+  });
+  const { pack } = admitted;
+  assert.equal(pack.content.studyAreaId, "north-punjab");
+  assert.equal(pack.content.weather.id, "north-punjab-hot");
+  assert.equal(pack.weather.windEastMps, 11);
+  assert.deepEqual(environmentPackBinding(pack), {
+    schemaVersion: "vector.environment-pack.v1",
+    id: "environment-pack:north-punjab:north-punjab-hot",
+    version: "1.0.0",
+    digest: pack.identity.digest,
+  });
+  assert.ok(Object.isFrozen(pack));
+  assert.throws(() => {
+    pack.content.weather.windEastMps = 0;
+  }, TypeError);
+  assert.throws(
+    () => admitPhaseAEnvironmentPack({ studyAreaId: "deleted-area", weatherPresetId: "north-punjab-hot" }),
+    { code: "ENVIRONMENT_STUDY_AREA_UNKNOWN", fieldPath: "studyAreaId" },
+  );
+  assert.throws(
+    () => admitPhaseAEnvironmentPack({ studyAreaId: "north-punjab", weatherPresetId: "stale-weather" }),
+    { code: "ENVIRONMENT_WEATHER_PRESET_UNKNOWN", fieldPath: "weatherPresetId" },
+  );
+});
+
 test("Phase A Worker-ready sampler is deterministic, bounded, cancellable and does not hide datum or terrain assumptions", () => {
   const area = getStudyArea("ladakh-high-altitude");
   const preset = getWeatherPreset(area, "ladakh-cold-clear");
@@ -386,6 +418,14 @@ test("compiled runs freeze environment identities and record equivalent map/Thre
   const result = simulate(DEFAULT_SCENARIO);
   const manifest = result.engineRun.scenario.geospatial.syntheticEnvironment;
   assert.equal(manifest.schemaVersion, "vector.synthetic-environment.v1");
+  const environmentPack = result.engineRun.scenario.geospatial.environmentPack;
+  assertPhaseAEnvironmentPack(environmentPack);
+  assert.deepEqual(
+    result.engineRun.scenario.environment.environmentPack,
+    environmentPackBinding(environmentPack),
+  );
+  assert.equal(result.engineRun.scenario.environment.windMps.x, environmentPack.weather.windEastMps);
+  assert.equal(result.engineRun.scenario.environment.windMps.y, environmentPack.weather.windNorthMps);
   assert.equal(manifest.geoid.noImplicitConversion, true);
   assert.equal(manifest.terrain.remoteTickRequests, false);
   assert.match(manifest.routes.digest, /^sha256:[0-9a-f]{64}$/);

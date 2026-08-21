@@ -10,7 +10,6 @@ import {
   CURRENT_COMPILED_MODEL_PACK,
   resolveCompiledWeaponAdmission,
 } from "./weapon-admission.ts";
-import { getStudyArea, getWeatherPreset } from "../study-areas.ts";
 import { COMPILED_MODEL_PACK_SCHEMA_VERSION } from "../model-pack.ts";
 import {
   CURRENT_INTENDED_USE_ID,
@@ -26,6 +25,10 @@ import {
   scenarioOrigin,
 } from "../scenario-spatial.ts";
 import { buildSyntheticEnvironmentManifest } from "../geospatial/synthetic-environment.ts";
+import {
+  admitPhaseAEnvironmentPack,
+  environmentPackBinding,
+} from "../geospatial/environment-pack.ts";
 import {
   resolveInstallationOriginReference,
   type InstallationOriginReference,
@@ -236,8 +239,19 @@ export function compileScenario(
   const redObject = getCatalogObject(input.redObjectId);
   const redSystem =
     input.domain === "A2A" ? getCatalogObject(input.redSystemId) : undefined;
-  const studyArea = getStudyArea(input.studyAreaId);
-  const weatherPreset = getWeatherPreset(studyArea, input.weatherPresetId);
+  // Admission resolves a single immutable environment package. The compiler,
+  // engine and replay record consume this object; none may re-look up the
+  // authored string IDs after this boundary.
+  const admittedEnvironment = admitPhaseAEnvironmentPack({
+    studyAreaId: input.studyAreaId,
+    weatherPresetId: input.weatherPresetId,
+    effectiveWeather: {
+      windEastMps: input.windEastMps,
+      windNorthMps: input.windNorthMps,
+      temperatureOffsetC: input.temperatureOffset,
+    },
+  });
+  const { studyArea, weatherPreset, pack: environmentPack } = admittedEnvironment;
   const admittedOriginReferences = [
     [input.placement?.blueOriginReference, "placement.blue.originReference"],
     [input.placement?.redOriginReference, "placement.red.originReference"],
@@ -544,7 +558,7 @@ export function compileScenario(
   ].filter((item): item is NonNullable<typeof item> => item !== undefined);
   const syntheticEnvironment = buildSyntheticEnvironmentManifest({
     studyArea,
-    weatherPreset,
+    weatherPreset: environmentPack.content.weather,
     origin,
     routes,
     originReferences: compiledOriginReferences,
@@ -583,13 +597,19 @@ export function compileScenario(
         position: localFrameToGeographic(entity.initial.position, origin),
       })),
       syntheticEnvironment,
+      environmentPack,
       originReferences: compiledOriginReferences,
     },
     environment: {
       gravityMps2: 9.80665,
-      temperatureOffsetC: input.temperatureOffset,
-      windMps: { x: input.windEastMps, y: input.windNorthMps, z: 0 },
+      temperatureOffsetC: environmentPack.weather.temperatureOffsetC,
+      windMps: {
+        x: environmentPack.weather.windEastMps,
+        y: environmentPack.weather.windNorthMps,
+        z: 0,
+      },
       atmosphere: "NASA_EDUCATIONAL_STANDARD",
+      environmentPack: environmentPackBinding(environmentPack),
       studyArea: {
         id: studyArea.id,
         name: studyArea.name,
