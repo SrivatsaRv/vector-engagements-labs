@@ -32,7 +32,12 @@ const WEB_SOURCE = [
 const BROWSER_SURFACE = [
   /^config\/deployment-capabilities\.json$/,
   /^(?:app|components)\//,
+  /^lib\/engine\//,
+  /^lib\/runtime\//,
+  /^lib\/geospatial\/environment-sampler\.worker\.ts$/,
   /^lib\/(?:runtime\/deployment-capabilities|scenarios)\.ts$/,
+  /^scripts\/(?:browser-worker-assets|build-runtime-bundles|verify-browser-worker)\.(?:c|m)?tsx?$/,
+  /^tests\/(?:browser-runtime|browser-worker-assets)\.test\.(?:c|m)?tsx?$/,
   /^tests\/(?:browser|component)\//,
   /^(?:playwright|vitest)\.config\.ts$/,
 ];

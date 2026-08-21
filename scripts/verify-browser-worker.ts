@@ -71,9 +71,7 @@ await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolve
 const address = server.address();
 if (!address || typeof address === "string") throw new Error("Worker test server failed.");
 const origin = `http://127.0.0.1:${address.port}`;
-const chromePath =
-  process.env.VECTOR_CHROME_PATH ??
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const chromePath = process.env.VECTOR_CHROME_PATH ?? chromium.executablePath();
 const browser = await chromium.launch({ executablePath: chromePath, headless: true });
 
 const scenario = SCENARIO_LIBRARY[0].scenario;

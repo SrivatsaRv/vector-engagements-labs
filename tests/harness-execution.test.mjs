@@ -46,6 +46,14 @@ test("every declared verification layer has a named Make target", async () => {
   }
 });
 
+test("the clean-clone gate executes the context slice and built Worker verifier", async () => {
+  const makefile = await readFile("Makefile", "utf8");
+  const cleanClone = makefile.split(/^clean-clone-local:/m)[1];
+  assert.ok(cleanClone, "clean-clone-local is not declared");
+  assert.match(cleanClone, /scripts\/context-slice\.sh release/);
+  assert.match(cleanClone, /make ci-local worker-local/);
+});
+
 test("the pull request template requires layer-specific evidence", async () => {
   const template = await readFile(".github/pull_request_template.md", "utf8");
   assert.match(template, /Owning issue/);
@@ -68,4 +76,23 @@ test("the script-based Required PR Gate checks out the tested revision", async (
   assert.ok(nodeSetup > checkout, "Required PR Gate does not pin Node after checkout");
   assert.ok(verification > nodeSetup, "Required PR Gate runs before its source and runtime exist");
   assert.match(gate, /PR_REVIEW_KIND/);
+});
+
+test("selected browser contracts verify the built Worker artifact", async () => {
+  const workflow = await readFile(".github/workflows/ci.yml", "utf8");
+  const browser = workflow.split(/^  browser_tests:/m)[1]?.split(/^  rust_audit:/m)[0];
+  assert.ok(browser, "Browser Contract job is missing");
+  const browserContracts = browser.indexOf("npm run test:browser");
+  const workerVerification = browser.indexOf("npm run worker:verify");
+  assert.ok(browserContracts >= 0, "Browser Contract does not execute browser tests");
+  assert.ok(
+    workerVerification > browserContracts,
+    "Browser Contract does not verify the production-built Worker after browser tests",
+  );
+});
+
+test("the Worker verifier uses the pinned Playwright browser outside local overrides", async () => {
+  const verifier = await readFile("scripts/verify-browser-worker.ts", "utf8");
+  assert.match(verifier, /VECTOR_CHROME_PATH\s*\?\?\s*chromium\.executablePath\(\)/);
+  assert.doesNotMatch(verifier, /\/Applications\/Google Chrome\.app/);
 });
