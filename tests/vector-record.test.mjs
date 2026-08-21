@@ -66,26 +66,20 @@ for (const backend of ["typescript", "rust-wasm"]) {
     assert.deepEqual(opened.result.envelopes, result.envelopes);
     assert.equal(opened.result.reason, result.reason);
     assert.ok(opened.events.length > 0);
-    assert.ok(opened.pictures.length > 0, "admitted sensor state must be recorded");
+    assert.ok(opened.pictures.length > 0, "tick-owned observer state must be recorded");
     assert.deepEqual(
       opened.result.pictures,
       opened.pictures,
       "replay must expose the immutable recorded observer pictures, not rebuild them",
     );
-    assert.ok(opened.pictures.every((picture) => picture.trackState));
+    assert.ok(opened.pictures.every((picture) => picture.trackState === "UNSUPPORTED"));
     assert.ok(
       opened.pictures.every((picture) =>
         opened.result.frames.some((frame) => frame.t === picture.modelTimeSeconds),
       ),
       "each observer-picture sample must identify its recorded frame",
     );
-    assert.ok(opened.pictures.every((picture) => !("truthPosition" in picture)));
-    assert.ok(
-      opened.pictures
-        .filter((picture) => !picture.visible)
-        .every((picture) => !("position" in picture)),
-      "an unavailable observer picture must not serialize a synthetic position",
-    );
+    assert.ok(opened.pictures.every((picture) => !("truthPosition" in picture) && !("position" in picture) && !("observedEntityId" in picture)));
     assert.match(opened.manifest.recordId, /^[a-f0-9]{64}$/);
   });
 }
@@ -145,7 +139,7 @@ test("VSR rejects an observer-picture member with an unadmitted schema", async (
     ...record,
     members: record.members.map((member) =>
       member.path === "pictures.jsonl"
-        ? { ...member, schemaVersion: "vector.pictures.v2" }
+        ? { ...member, schemaVersion: "vector.pictures.v3" }
         : member,
     ),
   };
@@ -159,7 +153,7 @@ test("VSR rejects an observer-picture member with an unadmitted schema", async (
 test("columnar frame decoder rejects an unsupported member schema", () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const bytes = encodeColumnarFrames(simulate(scenario).engineRun.frames);
-  const encodedSchema = new TextEncoder().encode("vector.frames.columnar.v3");
+  const encodedSchema = new TextEncoder().encode("vector.frames.columnar.v4");
   const offset = bytes.findIndex((_, index) =>
     encodedSchema.every((value, inner) => bytes[index + inner] === value),
   );
@@ -168,9 +162,9 @@ test("columnar frame decoder rejects an unsupported member schema", () => {
   assert.throws(() => decodeColumnarFrames(bytes), /schema is unsupported/);
 });
 
-test("columnar frame decoder rejects v2 records because their command evidence is incomplete", () => {
+test("columnar frame decoder rejects v3 records because canonical observer state is absent", () => {
   const bytes = encodeColumnarFrames(simulate(SCENARIO_LIBRARY[0].scenario).engineRun.frames);
-  const encodedSchema = new TextEncoder().encode("vector.frames.columnar.v3");
+  const encodedSchema = new TextEncoder().encode("vector.frames.columnar.v4");
   const offset = bytes.findIndex((_, index) =>
     encodedSchema.every((value, inner) => bytes[index + inner] === value),
   );
@@ -178,6 +172,6 @@ test("columnar frame decoder rejects v2 records because their command evidence i
   bytes[offset + encodedSchema.length - 1] = "2".charCodeAt(0);
   assert.throws(
     () => decodeColumnarFrames(bytes),
-    /v2 omits requested steering command evidence/,
+    /omits canonical observer state/,
   );
 });

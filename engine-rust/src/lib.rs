@@ -514,6 +514,41 @@ pub struct EngineFrame {
     pub separation_m: f64,
     pub closure_rate_mps: f64,
     pub line_of_sight_rate_rad_s: f64,
+    pub observer_states: Vec<ObserverState>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObserverState {
+    pub schema_version: &'static str,
+    pub perspective: &'static str,
+    pub sensor_state: &'static str,
+    pub observation_count: u8,
+    pub track_state: &'static str,
+    pub visible: bool,
+    pub availability_reason: &'static str,
+    pub effect_scope: &'static str,
+    pub state_explanation: &'static str,
+}
+
+fn unavailable_observer_states(domain: EngagementDomain) -> Vec<ObserverState> {
+    if domain != EngagementDomain::AirToAir {
+        return Vec::new();
+    }
+    ["IAF", "PAF"]
+        .into_iter()
+        .map(|perspective| ObserverState {
+            schema_version: "vector.observer-state.v1",
+            perspective,
+            sensor_state: "UNSUPPORTED",
+            observation_count: 0,
+            track_state: "UNSUPPORTED",
+            visible: false,
+            availability_reason: "SENSOR_MODEL_UNAVAILABLE",
+            effect_scope: "AIR_PICTURE_ONLY",
+            state_explanation: "No admitted sensor model pack is bound to this run.",
+        })
+        .collect()
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1191,6 +1226,7 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 separation_m: separation,
                 closure_rate_mps: closure,
                 line_of_sight_rate_rad_s: los_rate,
+                observer_states: unavailable_observer_states(scenario.domain),
             });
         }
         if states[weapon_index].weapon_flight_state == Some(WeaponFlightState::TargetUnavailable) {

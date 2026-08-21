@@ -1,267 +1,110 @@
-import type { Frame, RaspAvailabilityReason, RaspTrack, Scenario, TrackSource } from "./simulation.ts";
-import type { Vec3 } from "./engine/primitives.ts";
-import type { DeploymentCapabilityManifest } from "./runtime/deployment-capabilities.ts";
-import { isOptionalCapabilityEnabled } from "./runtime/deployment-capabilities.ts";
+import type { EngineFrame, EngineObserverState } from "./engine/contracts.ts";
+import type { RaspTrack } from "./simulation.ts";
+import { canonicalJson } from "./canonical-json.ts";
 
 /**
- * Versioned, public-educational information model. These are assumptions, not
- * claims about named equipment. The manifest gates their use in a deployment.
+ * Projects the observer state emitted by the simulation tick for display and
+ * recording. This boundary deliberately does not read entity positions, range,
+ * jammer state, or scenario controls: no admitted sensor model exists yet.
  */
-export const INFORMATION_MODEL = Object.freeze({
-  id: "vector.a2a-information-study.v1",
-  version: "1.0.0",
-  sensorDigest: "declared-envelope-sensor-study-v05",
-  scanPeriodSeconds: 1,
-  detectionRangeM: 80_000,
-  minimumRangeM: 1_000,
-  coastSeconds: 4,
-  confirmationObservations: 2,
-  datalinkLatencySeconds: 0.5,
-  jammerSignalScale: 0.55,
-  measurementFloorM: 150,
-  measurementRangeFraction: 0.0125,
-} as const);
+type ObserverStateFrame = Pick<EngineFrame, "t" | "observerStates">;
 
-export type SensorState = "OFF" | "STANDBY" | "SEARCH" | "ACQUIRE" | "TRACK" | "SUPPORT" | "DEGRADED" | "FAILED";
-export type TrackState = "NONE" | "PLOT" | "TENTATIVE" | "CONFIRMED" | "COASTING" | "LOST" | "UNSUPPORTED";
-export type ObservationCause = "RADAR_SCAN" | "VISUAL" | "DATALINK_RECEIPT" | "NO_SENSOR_MODEL" | "RADAR_SILENT" | "OUT_OF_RANGE" | "JAMMED" | "DATALINK_UNAVAILABLE";
-
-export type Observation = {
-  id: string;
-  owner: "IAF" | "PAF";
-  sensorState: SensorState;
-  source: TrackSource;
-  modelTimeSeconds: number;
-  position: Vec3;
-  covarianceMeters: number;
-  cause: ObservationCause;
-  sensorModelDigest: string;
-};
-
-export type DatalinkMessage = {
-  id: string;
-  sender: "IAF" | "PAF";
-  receiver: "IAF" | "PAF";
-  sentAtSeconds: number;
-  receivedAtSeconds: number;
-  lossCause: "NONE" | "DATALINK_UNAVAILABLE";
-  payloadVersion: "vector.datalink-track.v1";
-};
-
-type MutableTrack = {
-  observations: Observation[];
-  lastObservation?: Observation;
-  state: TrackState;
-};
-
-const sourceLabel: Record<TrackSource, string> = {
-  ONBOARD_RADAR: "Onboard radar",
-  DATALINK: "Tactical data link",
-  AIRBORNE_EARLY_WARNING: "Airborne early warning",
-  VISUAL: "Visual observation",
-};
-
-function sideConfiguration(scenario: Scenario, perspective: "IAF" | "PAF") {
-  const blue = perspective === "IAF";
-  return {
-    source: blue ? scenario.blueTrackSource : scenario.redTrackSource,
-    radar: blue ? scenario.blueRadarMode : scenario.redRadarMode,
-    datalink: blue ? scenario.blueDatalink : scenario.redDatalink,
-    opposingJammer: blue ? scenario.redJammer : scenario.blueJammer,
-    observedEntityId: blue ? "red-object-1" : "blue-platform-1",
-  } as const;
-}
-
-function unavailable(reason: RaspAvailabilityReason, explanation: string) {
-  return { available: false, reason, explanation } as const;
-}
-
-export function informationAvailability(
-  scenario: Scenario,
-  frame: Frame,
-  perspective: "IAF" | "PAF",
-  manifest?: DeploymentCapabilityManifest,
-) {
-  const config = sideConfiguration(scenario, perspective);
-  if (!frame.entities.some((entity) => entity.id === config.observedEntityId)) {
-    return unavailable("NO_OBSERVED_ENTITY", "The opposing aircraft is not present in this engine frame.");
-  }
-  if (manifest && !isOptionalCapabilityEnabled("sensors", manifest)) {
-    return unavailable("SENSOR_UNSUPPORTED", "The deployment does not admit the information-model sensor capability.");
-  }
-  if (config.source === "ONBOARD_RADAR" && config.radar !== "ACTIVE") {
-    return unavailable("RADAR_SILENT", "The observing radar is not active.");
-  }
-  if ((config.source === "DATALINK" || config.source === "AIRBORNE_EARLY_WARNING") &&
-      (!config.datalink || (manifest && !isOptionalCapabilityEnabled("datalink", manifest)))) {
-    return unavailable("DATALINK_UNAVAILABLE", "The required admitted data-link path is unavailable.");
-  }
-  if (config.source === "DATALINK" || config.source === "AIRBORNE_EARLY_WARNING") {
-    return unavailable("DATALINK_SOURCE_UNAVAILABLE", "No admitted sender-side observation source exists for this off-board track.");
-  }
-  const range = frame.range;
-  if (config.source === "VISUAL" && range > Math.min(scenario.visibilityKm * 1000, 18_000)) {
-    return unavailable("BEYOND_VISUAL_RANGE", "The opposing aircraft is outside the declared visual-acquisition range.");
-  }
-  if (config.source === "ONBOARD_RADAR" && (range < INFORMATION_MODEL.minimumRangeM || range > INFORMATION_MODEL.detectionRangeM)) {
-    return unavailable("RADAR_OUT_OF_RANGE", "The opposing aircraft is outside the admitted sensor-model range.");
-  }
-  return { available: true, reason: "AVAILABLE" as const, explanation: `${sourceLabel[config.source]} is admitted for this frame.` };
-}
-
-function observationFor(
-  scenario: Scenario,
-  frame: Frame,
-  perspective: "IAF" | "PAF",
-  manifest?: DeploymentCapabilityManifest,
-): Observation | undefined {
-  const config = sideConfiguration(scenario, perspective);
-  const availability = informationAvailability(scenario, frame, perspective, manifest);
-  if (!availability.available) return undefined;
-  const observed = frame.entities.find((entity) => entity.id === config.observedEntityId);
-  if (!observed) return undefined;
-  const source = config.source;
-  const isRadar = source === "ONBOARD_RADAR";
-  const ewEnabled = !manifest || isOptionalCapabilityEnabled("ew", manifest);
-  const effectiveRange = config.opposingJammer && isRadar && ewEnabled
-    ? INFORMATION_MODEL.detectionRangeM * INFORMATION_MODEL.jammerSignalScale
-    : INFORMATION_MODEL.detectionRangeM;
-  if (isRadar && frame.range > effectiveRange) return undefined;
-  const covarianceMeters = Math.max(
-    INFORMATION_MODEL.measurementFloorM,
-    frame.range * INFORMATION_MODEL.measurementRangeFraction * (config.opposingJammer && isRadar && ewEnabled ? 1 / INFORMATION_MODEL.jammerSignalScale : 1),
+export function projectObserverStates(frames: readonly ObserverStateFrame[]): RaspTrack[] {
+  return frames.flatMap((frame) =>
+    frame.observerStates.map((state) => ({
+      ...state,
+      modelTimeSeconds: frame.t,
+      trackId: "UNAVAILABLE" as const,
+      classification: "UNAVAILABLE" as const,
+      identification: "UNKNOWN" as const,
+      source: "No admitted sensor model",
+      lastUpdateSeconds: frame.t,
+      ageSeconds: 0,
+      confidence: 0,
+      uncertaintyMeters: 0,
+      status: "NO_TRACK" as const,
+    })),
   );
-  return {
-    id: `${perspective}-${source}-${frame.t.toFixed(2)}`,
-    owner: perspective,
-    sensorState: isRadar ? (config.opposingJammer && ewEnabled ? "DEGRADED" : "TRACK") : "ACQUIRE",
-    source,
-    modelTimeSeconds: frame.t,
-    position: { ...observed.position },
-    covarianceMeters,
-    cause: config.opposingJammer && isRadar && ewEnabled ? "JAMMED" : source === "VISUAL" ? "VISUAL" : source === "ONBOARD_RADAR" ? "RADAR_SCAN" : "DATALINK_RECEIPT",
-    sensorModelDigest: INFORMATION_MODEL.sensorDigest,
-  };
-}
-
-function status(state: TrackState): RaspTrack["status"] {
-  if (state === "CONFIRMED") return "TRACKING";
-  if (state === "PLOT" || state === "TENTATIVE") return "DEGRADED";
-  if (state === "COASTING") return "COASTING";
-  return "NO_TRACK";
-}
-
-function snapshot(
-  scenario: Scenario,
-  frame: Frame,
-  perspective: "IAF" | "PAF",
-  track: MutableTrack,
-  manifest?: DeploymentCapabilityManifest,
-): RaspTrack {
-  const config = sideConfiguration(scenario, perspective);
-  const last = track.lastObservation;
-  const age = last ? Math.max(0, frame.t - last.modelTimeSeconds) : 0;
-  const availability = informationAvailability(scenario, frame, perspective, manifest);
-  const visible = track.state !== "NONE" && track.state !== "LOST" && track.state !== "UNSUPPORTED" && Boolean(last);
-  return {
-    perspective,
-    modelTimeSeconds: frame.t,
-    trackId: `${perspective}-${config.observedEntityId}-track-v1`,
-    classification: "Unidentified airborne track",
-    identification: "UNKNOWN",
-    source: sourceLabel[config.source],
-    lastUpdateSeconds: last?.modelTimeSeconds ?? frame.t,
-    ageSeconds: age,
-    confidence: track.state === "CONFIRMED" ? 80 : track.state === "TENTATIVE" ? 55 : track.state === "PLOT" ? 35 : track.state === "COASTING" ? 20 : 0,
-    uncertaintyMeters: last ? Math.round(last.covarianceMeters + age * 250) : 0,
-    ...(last && visible ? { position: { ...last.position } } : {}),
-    observedEntityId: config.observedEntityId,
-    visible,
-    status: status(track.state),
-    trackState: track.state,
-    availabilityReason: availability.reason,
-    effectScope: "AIR_PICTURE_ONLY",
-    stateExplanation: last
-      ? `${sourceLabel[last.source]} updated this side-owned track at ${last.modelTimeSeconds.toFixed(2)} s.`
-      : availability.explanation,
-  };
-}
-
-/** Deterministic fixed-history derivation. Truth is read only to form a sensor-owned measurement. */
-export function buildSidePictures(
-  scenario: Scenario,
-  frames: readonly Frame[],
-  manifest?: DeploymentCapabilityManifest,
-): RaspTrack[] {
-  const tracks: Record<"IAF" | "PAF", MutableTrack> = {
-    IAF: { observations: [], state: "NONE" },
-    PAF: { observations: [], state: "NONE" },
-  };
-  const output: RaspTrack[] = [];
-  for (const frame of frames) {
-    for (const perspective of ["IAF", "PAF"] as const) {
-      const track = tracks[perspective];
-      const availability = informationAvailability(scenario, frame, perspective, manifest);
-      const scanDue = Math.abs((frame.t / INFORMATION_MODEL.scanPeriodSeconds) - Math.round(frame.t / INFORMATION_MODEL.scanPeriodSeconds)) < 1e-8;
-      const observation = scanDue ? observationFor(scenario, frame, perspective, manifest) : undefined;
-      if (!availability.available && availability.reason === "SENSOR_UNSUPPORTED") {
-        track.state = "UNSUPPORTED";
-      } else if (observation) {
-        track.observations.push(observation);
-        track.lastObservation = observation;
-        track.state = track.observations.length >= INFORMATION_MODEL.confirmationObservations ? "CONFIRMED" : track.observations.length === 1 ? "PLOT" : "TENTATIVE";
-      } else if (track.lastObservation) {
-        track.state = frame.t - track.lastObservation.modelTimeSeconds <= INFORMATION_MODEL.coastSeconds ? "COASTING" : "LOST";
-      } else if (!availability.available) {
-        track.state = "NONE";
-      }
-      output.push(snapshot(scenario, frame, perspective, track, manifest));
-    }
-  }
-  return output;
 }
 
 /**
- * Reject a replay picture set that cannot be tied to the immutable frame
- * sequence. This validates record shape only; it deliberately does not
- * regenerate observations from world state while a saved run is being opened.
+ * Reattaches the recorded tick-owned observer state to decoded replay frames.
+ * It does not derive an observation or track from world state. The saved
+ * pictures member is the immutable source during replay.
+ */
+export function attachRecordedObserverStates(
+  frames: readonly EngineFrame[],
+  pictures: readonly RaspTrack[],
+): EngineFrame[] {
+  const byFrame = new Map<number, EngineObserverState[]>();
+  for (const picture of pictures) {
+    const states = byFrame.get(picture.modelTimeSeconds) ?? [];
+    states.push(observerStateFromPicture(picture));
+    byFrame.set(picture.modelTimeSeconds, states);
+  }
+  return frames.map((frame) => ({
+    ...frame,
+    observerStates: byFrame.get(frame.t) ?? [],
+  }));
+}
+
+function observerStateFromPicture(picture: RaspTrack): EngineObserverState {
+  return {
+    schemaVersion: picture.schemaVersion,
+    perspective: picture.perspective,
+    sensorState: picture.sensorState,
+    observationCount: picture.observationCount,
+    trackState: picture.trackState,
+    visible: picture.visible,
+    availabilityReason: picture.availabilityReason,
+    effectScope: picture.effectScope,
+    stateExplanation: picture.stateExplanation,
+  };
+}
+
+/**
+ * Rejects a picture set that is not an exact projection of the tick-owned
+ * observer state. It intentionally accepts no estimated position, observed
+ * entity identity, range, covariance, or jammer-derived metadata.
  */
 export function assertRecordedSidePictures(
-  scenario: Scenario,
-  frames: readonly Frame[],
+  frames: readonly EngineFrame[],
   pictures: readonly RaspTrack[],
-  manifest?: DeploymentCapabilityManifest,
 ) {
-  const sensorsAdmitted = !manifest || isOptionalCapabilityEnabled("sensors", manifest);
-  const expectedCount = scenario.domain === "A2A" && sensorsAdmitted
-    ? frames.length * 2
-    : 0;
-  if (pictures.length !== expectedCount) {
-    throw new Error(`Recorded observer-picture count ${pictures.length} does not match the admitted frame boundary ${expectedCount}.`);
+  const expected = projectObserverStates(frames);
+  if (pictures.length !== expected.length) {
+    throw new Error(`Recorded observer-picture count ${pictures.length} does not match the canonical tick boundary ${expected.length}.`);
   }
-  const frameTimes = new Set(frames.map((frame) => frame.t));
-  const keys = new Set<string>();
+  const seen = new Set<string>();
   for (const picture of pictures) {
-    if (!frameTimes.has(picture.modelTimeSeconds)) {
-      throw new Error("Recorded observer picture does not identify a canonical frame.");
-    }
     const key = `${picture.perspective}:${picture.modelTimeSeconds}`;
-    if (keys.has(key)) throw new Error("Recorded observer picture has a duplicate side/frame identity.");
-    keys.add(key);
-    if ("truthPosition" in picture) {
-      throw new Error("Recorded observer picture exposes a prohibited truth position.");
+    if (seen.has(key)) throw new Error("Recorded observer picture has a duplicate side/frame identity.");
+    seen.add(key);
+    if ("position" in picture || "observedEntityId" in picture || "truthPosition" in picture) {
+      throw new Error("Recorded observer picture exposes prohibited track or truth data.");
     }
-    if (!Number.isFinite(picture.lastUpdateSeconds) ||
-      !Number.isFinite(picture.ageSeconds) || picture.ageSeconds < 0 ||
-      !Number.isFinite(picture.confidence) || !Number.isFinite(picture.uncertaintyMeters) ||
-      picture.uncertaintyMeters < 0) {
-      throw new Error("Recorded observer picture contains invalid track telemetry.");
+    if (
+      picture.schemaVersion !== "vector.observer-state.v1" ||
+      picture.sensorState !== "UNSUPPORTED" ||
+      picture.observationCount !== 0 ||
+      picture.trackState !== "UNSUPPORTED" ||
+      picture.visible ||
+      picture.availabilityReason !== "SENSOR_MODEL_UNAVAILABLE" ||
+      picture.effectScope !== "AIR_PICTURE_ONLY" ||
+      picture.trackId !== "UNAVAILABLE" ||
+      picture.status !== "NO_TRACK" ||
+      picture.confidence !== 0 ||
+      picture.uncertaintyMeters !== 0
+    ) {
+      throw new Error("Recorded observer picture is not the admitted fail-closed state.");
     }
-    if (!picture.visible && picture.position) {
-      throw new Error("An unavailable recorded observer picture must not carry a position.");
-    }
-    if (picture.position && ![picture.position.x, picture.position.y, picture.position.z].every(Number.isFinite)) {
-      throw new Error("Recorded observer picture contains a non-finite estimated position.");
+  }
+  for (const picture of expected) {
+    const actual = pictures.find((candidate) =>
+      candidate.perspective === picture.perspective && candidate.modelTimeSeconds === picture.modelTimeSeconds,
+    );
+    if (!actual || canonicalJson(actual) !== canonicalJson(picture)) {
+      throw new Error("Recorded observer picture does not match the canonical tick state.");
     }
   }
 }

@@ -76,7 +76,8 @@ for (const definition of SCENARIO_LIBRARY) {
     assert.equal(rust.outcome, typescript.outcome);
     assert.equal(rust.frames.length, typescript.frames.length);
     if (definition.scenario.domain === "A2A") {
-      assert.ok(typescript.pictures.length > 0, "the admitted information adapter must publish canonical pictures");
+      assert.ok(typescript.pictures.length > 0, "A2A ticks must publish canonical observer state");
+      assert.ok(typescript.pictures.every((picture) => picture.trackState === "UNSUPPORTED" && !picture.visible && !("position" in picture)));
     } else {
       assert.equal(typescript.pictures.length, 0, "non-A2A runs must not fabricate observer pictures");
     }

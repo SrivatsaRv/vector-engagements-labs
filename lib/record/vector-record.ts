@@ -13,11 +13,12 @@ import {
   type Scenario,
   type SimulationResult,
 } from "../simulation.ts";
+import { attachRecordedObserverStates } from "../information-state.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
-export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v3" as const;
+export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v4" as const;
 export const VECTOR_EVENT_SCHEMA = "vector.events.v1" as const;
-export const VECTOR_PICTURE_SCHEMA = "vector.pictures.v1" as const;
+export const VECTOR_PICTURE_SCHEMA = "vector.pictures.v2" as const;
 export const MAX_VECTOR_RECORD_BYTES = 64 * 1024 * 1024;
 
 const RECORD_MAGIC = new TextEncoder().encode("VECTOR1\0");
@@ -266,6 +267,7 @@ export function encodeColumnarFrames(frames: EngineFrame[]): Uint8Array {
         separationM: frame.separationM,
         closureRateMps: frame.closureRateMps,
         lineOfSightRateRadS: frame.lineOfSightRateRadS,
+        observerStates: frame.observerStates,
         geographicPositions: frame.geographicPositions,
         entityOffset,
         entityCount: frame.entities.length,
@@ -326,9 +328,9 @@ export function decodeColumnarFrames(bytes: Uint8Array): EngineFrame[] {
   const header = JSON.parse(
     decoder.decode(bytes.subarray(12, 12 + headerLength)),
   ) as FrameHeader;
-  if (header.schemaVersion === "vector.frames.columnar.v2") {
+  if (header.schemaVersion === "vector.frames.columnar.v2" || header.schemaVersion === "vector.frames.columnar.v3") {
     throw new Error(
-      "VECTOR frame schema v2 omits requested steering command evidence; regenerate the record with v3.",
+      "VECTOR frame schema omits canonical observer state; regenerate the record with v4.",
     );
   }
   if (
@@ -517,7 +519,7 @@ export async function createVectorSimulationRecord(
     },
     limitations: [
       "Educational deterministic point-mass model; not verified named-system prediction.",
-      "Observer pictures are recorded from the current RASP approximation.",
+      "Observer state is recorded from the canonical fail-closed tick boundary.",
     ],
   };
   const events = stableEvents(result);
@@ -743,9 +745,11 @@ export async function openVectorSimulationRecord(
   >;
   const report = JSON.parse(decoder.decode(required("report.json"))) as RecordReport;
   if (report.schemaVersion !== "vector.report.v1") throw new Error("VECTOR report schema is unsupported.");
+  const decodedFrames = decodeColumnarFrames(required("frames.arrow"));
+  const pictures = jsonLines<RaspTrack>(required("pictures.jsonl"));
   const engineRun: EngineRun = {
     scenario: compiled.engineScenario,
-    frames: decodeColumnarFrames(required("frames.arrow")),
+    frames: attachRecordedObserverStates(decodedFrames, pictures),
     ...report.engine,
   };
   if (
@@ -756,7 +760,6 @@ export async function openVectorSimulationRecord(
     throw new Error("VECTOR record backend provenance is inconsistent.");
   }
   const prepared: PreparedSimulation = { scenario, ...compiled };
-  const pictures = jsonLines<RaspTrack>(required("pictures.jsonl"));
   const result = buildSimulationResult(prepared, engineRun, pictures);
   if (
     result.termination !== report.result.termination ||

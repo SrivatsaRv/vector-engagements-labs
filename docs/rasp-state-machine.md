@@ -1,77 +1,47 @@
 # VECTOR information-state contract
 
-Status: first deterministic TypeScript information-state slice for #26. It is
-an educational measurement model, not a claim about a named radar, data link,
-or jammer.
+Status: #26 precondition slice. The current runtime has no admitted sensor
+model pack. It records a tick-owned, explicit unavailable state; it does not
+simulate radar, visual acquisition, data link, AEW, jamming, or a side-owned
+position estimate.
 
-## Authority and separation
+## Canonical boundary
 
-The engine records WorldTruth frames. `lib/information-state.ts` consumes a
-frame only to create a side-owned `Observation`; it then derives `TrackState`
-and an observer `RaspTrack`. The RASP read model contains no truth-position
-field. Rendering consumes only the recorded observer picture when that view is
-selected. A UI setting cannot create a track.
+Every A2A tick emits two `vector.observer-state.v1` values, one for `IAF` and
+one for `PAF`. Each has `sensorState: UNSUPPORTED`, `observationCount: 0`,
+`trackState: UNSUPPORTED`, `visible: false`, and
+`availabilityReason: SENSOR_MODEL_UNAVAILABLE`. No value contains an observed
+entity ID, position, range, covariance, sensor range, or jammer effect.
 
-## Admitted model
+`lib/engine/core.ts` and `engine-rust/src/lib.rs` emit this state. The browser
+projection in `lib/information-state.ts` is a pure conversion of that state to
+the displayed `RaspTrack`; it does not read world entities or scenario sensor
+controls. Model Truth remains a separately labelled view. An observer view
+hides entities while this state is selected.
 
-`vector.a2a-information-study.v1@1.0.0` schedules a scan each 1 s. Its
-declared public-educational assumptions are an 80 km maximum radar measurement
-range, a 1 km minimum range, a 4 s coast interval, two observations to confirm
-a track, a 150 m measurement floor, and range-proportional uncertainty. The
-model ID, units, limitations, and constants are exported from the information
-module and tests. They are not named-platform performance values.
+## Record and replay
 
-Compatible opposing jamming scales the admitted radar measurement range and
-increases covariance from the same model. It does not move a truth entity,
-write an icon-only state, or affect weapon guidance. Terrain, waveform,
-probability-of-detection, false targets, AEW entities and operational support
-remain outside this slice.
+`pictures.jsonl` uses `vector.pictures.v2`. It is the immutable projection of
+the tick boundary. During replay, the verified pictures member is reattached
+to decoded frames; replay never derives a track from stored world positions.
+The admission check rejects a picture with a position, observed entity ID,
+truth position, non-zero observation count, confidence, uncertainty, or any
+state other than the declared unavailable contract.
 
-## State transitions
+## Deferred contract
 
-```text
-OFF/STANDBY/SEARCH -> scan due -> Observation -> PLOT -> CONFIRMED
-no observation after a track -> COASTING -> LOST
-missing sensor capability -> UNSUPPORTED
-radar silent / outside range -> NONE (or COASTING while a previous observation is fresh)
-```
-
-`SensorState` values are `OFF`, `STANDBY`, `SEARCH`, `ACQUIRE`, `TRACK`,
-`SUPPORT`, `DEGRADED`, and `FAILED`. `TrackState` values are `NONE`, `PLOT`,
-`TENTATIVE`, `CONFIRMED`, `COASTING`, `LOST`, and `UNSUPPORTED`.
-
-Data-link and AEW selections fail closed as `DATALINK_SOURCE_UNAVAILABLE`
-until a sender-side observation and an admitted typed message path exist. A
-link checkbox never injects truth. Weapon support remains unavailable pending
-#28's versioned support interface.
-
-An unavailable observer picture has no `position` member. It does not serialize
-`{x:0,y:0,z:0}`, reuse the last world position, or request a renderer fallback.
-The map and 3D surface may show Model Truth only in their separately selected
-truth view; an observer-picture view hides the entity until it has an admitted
-side-owned estimate.
-
-## Record and parity boundary
-
-The completed `SimulationResult` owns one immutable `RaspTrack[]` sequence. It
-is derived once from canonical engine frames after admission, then the same
-sequence is consumed by live playback, report replay, and VSR
-`pictures.jsonl`. A VSR requires the hashed `vector.pictures.v1` member and
-checks that each sample has one unique side/frame identity, finite telemetry,
-and no hidden truth-position field. Replay reads that member; it does not derive
-a replacement picture from stored world frames.
-
-The information derivation is a TypeScript adapter over equivalent canonical
-frames. TypeScript/Rust parity evidence therefore proves equivalent-frame
-adapter output within the declared positional tolerance; it is not a Rust-native
-sensor-model implementation. #26 remains open for native Rust/Worker
-information state, typed datalink transport, terrain LOS, weapon-support
-interface, canonical RASP UX, and performance/browser evidence.
+An admitted sensor pack must later declare versioned sensing, observation,
+track-store, data-link, EW, uncertainty, validity-envelope, provenance, and
+TypeScript/Rust implementation data. Only then may a tick emit an observation
+or track and only that tick-owned state may support a later policy command.
+This slice does not make tactical decisions or weapon support claims. #26
+remains open for that work.
 
 ## Regression evidence
 
-`tests/rasp-state-machine.test.mjs` proves scan/confirmation, exact range
-boundary, radar-silent contrast, EW range/covariance contrast, deterministic
-output, absence of truth-position leakage, and fail-closed off-board sources.
-`tests/vector-record.test.mjs` proves admitted observer pictures survive VSR
-round-trip without a physics rerun.
+`tests/rasp-state-machine.test.mjs` proves no 80 km range, covariance,
+jammer-derived value, entity identity, or position survives. It also proves
+the saved record rejects fabricated observer content. `tests/engine-backends.test.mjs`
+proves TypeScript/Rust parity. `tests/vector-record.test.mjs` proves VSR replay
+uses the immutable member. Component and selector tests prove unavailable UI
+state does not fall back to Model Truth.

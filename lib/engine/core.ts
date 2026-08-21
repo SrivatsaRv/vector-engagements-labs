@@ -3,6 +3,7 @@ import type {
   CoverageEnvelope,
   EngineEntityDefinition,
   EngineEntityFrame,
+  EngineObserverState,
   EngineRun,
   EngineScenario,
   WeaponFlightState,
@@ -43,6 +44,21 @@ type RuntimeState = {
 };
 
 const G0 = 9.80665;
+
+function unavailableObserverStates(scenario: EngineScenario): EngineObserverState[] {
+  if (scenario.domain !== "A2A") return [];
+  return ["IAF", "PAF"].map((perspective) => ({
+    schemaVersion: "vector.observer-state.v1",
+    perspective: perspective as EngineObserverState["perspective"],
+    sensorState: "UNSUPPORTED",
+    observationCount: 0,
+    trackState: "UNSUPPORTED",
+    visible: false,
+    availabilityReason: "SENSOR_MODEL_UNAVAILABLE",
+    effectScope: "AIR_PICTURE_ONLY",
+    stateExplanation: "No admitted sensor model pack is bound to this run.",
+  }));
+}
 
 function initialState(definition: EngineEntityDefinition): RuntimeState {
   const firstRoutePoint = definition.route?.[0];
@@ -714,6 +730,7 @@ export class EngineSession {
           separationM,
           closureRateMps,
           lineOfSightRateRadS,
+          observerStates: unavailableObserverStates(scenario),
         });
       }
 

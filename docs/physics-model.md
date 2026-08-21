@@ -76,13 +76,12 @@ synthetic fixtures now exist, but the current engine does not feed LOS into
 sensor state or infer radii from transmitter power, radar cross-section,
 terrain, propagation, or electronic attack.
 
-The admitted #26 information adapter consumes recorded truth frames to make
-side-owned measurements at its declared scan cadence. It derives observations,
-track confirmation/coasting/loss, covariance and a bounded compatible-jamming
-effect without exposing a truth position in the observer record. It is an
-educational measurement model with explicit constants, not named-system sensor
-performance. Datalink/AEW and weapon support fail closed until their typed
-sender/message and #28 interfaces are implemented.
+The #26 observer boundary is tick-owned and fail closed. In the absence of an
+admitted versioned sensor pack, each side records `UNSUPPORTED` with zero
+observations and no track or position. It does not derive measurements,
+covariance, radar range, or jamming effects from truth frames. Datalink, AEW,
+and weapon support remain unavailable until their typed interfaces and admitted
+model data exist.
 
 ## Presentation truth
 

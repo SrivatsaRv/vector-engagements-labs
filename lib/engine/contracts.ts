@@ -44,6 +44,23 @@ export type TacticalSymbolRole =
 
 export type Affiliation = "BLUE" | "RED" | "NEUTRAL";
 export type EngineBackendId = "typescript" | "rust-wasm";
+export type ObserverPerspective = "IAF" | "PAF";
+
+/**
+ * Tick-owned information state. The current deployment has no admitted sensor
+ * model pack, so it can only emit this explicit fail-closed state.
+ */
+export type EngineObserverState = {
+  schemaVersion: "vector.observer-state.v1";
+  perspective: ObserverPerspective;
+  sensorState: "UNSUPPORTED";
+  observationCount: 0;
+  trackState: "UNSUPPORTED";
+  visible: false;
+  availabilityReason: "SENSOR_MODEL_UNAVAILABLE";
+  effectScope: "AIR_PICTURE_ONLY";
+  stateExplanation: string;
+};
 export type EntityLifecycle =
   | "STOWED"
   | "ACTIVE"
@@ -252,6 +269,8 @@ export type EngineFrame = {
   separationM: number;
   closureRateMps: number;
   lineOfSightRateRadS: number;
+  /** Canonical side-owned information state at this exact model tick. */
+  observerStates: EngineObserverState[];
 };
 
 export type EngineRun = {

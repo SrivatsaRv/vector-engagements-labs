@@ -7,6 +7,7 @@ import type {
   CoverageEnvelope,
   EngineEntityDefinition,
   EngineEntityFrame,
+  EngineObserverState,
   EngineRun,
   EngineScenario,
 } from "./engine/contracts.ts";
@@ -14,7 +15,6 @@ import {
   admitScenarioCapabilities,
   createVerificationDeploymentCapabilities,
   DEPLOYMENT_CAPABILITIES,
-  isOptionalCapabilityEnabled,
   type DeploymentCapabilityManifest,
 } from "./runtime/deployment-capabilities.ts";
 import type { RecordedGeographicPosition } from "./geospatial/contracts.ts";
@@ -28,10 +28,8 @@ import type { ScenarioSpatialPlan } from "./scenario-spatial.ts";
 import { geographicToLocal } from "./scenario-spatial.ts";
 import { getStudyArea } from "./study-areas.ts";
 import {
-  buildSidePictures,
   assertRecordedSidePictures,
-  informationAvailability,
-  type TrackState,
+  projectObserverStates,
 } from "./information-state.ts";
 
 export { standardAtmosphere } from "./engine/atmosphere.ts";
@@ -48,15 +46,7 @@ export type TrackSource =
   | "DATALINK"
   | "AIRBORNE_EARLY_WARNING"
   | "VISUAL";
-export type RaspAvailabilityReason =
-  | "AVAILABLE"
-  | "NO_OBSERVED_ENTITY"
-  | "RADAR_SILENT"
-  | "RADAR_OUT_OF_RANGE"
-  | "DATALINK_UNAVAILABLE"
-  | "DATALINK_SOURCE_UNAVAILABLE"
-  | "BEYOND_VISUAL_RANGE"
-  | "SENSOR_UNSUPPORTED";
+export type RaspAvailabilityReason = EngineObserverState["availabilityReason"];
 
 export const RASP_SOURCE_CONTRACTS: Record<
   TrackSource,
@@ -158,32 +148,22 @@ export type Frame = {
   availableG: number;
   thrustNewtons: number;
   dragNewtons: number;
+  observerStates: EngineObserverState[];
 };
 
-export type RaspTrack = {
+export type RaspTrack = EngineObserverState & {
   perspective: "IAF" | "PAF";
   /** Model-clock identity of this observer-picture sample. */
   modelTimeSeconds: number;
-  trackId: string;
-  classification: string;
-  identification: "FRIEND" | "HOSTILE" | "SUSPECT" | "UNKNOWN";
+  trackId: "UNAVAILABLE";
+  classification: "UNAVAILABLE";
+  identification: "UNKNOWN";
   source: string;
   lastUpdateSeconds: number;
   ageSeconds: number;
   confidence: number;
   uncertaintyMeters: number;
-  /**
-   * Side-owned position estimate. It is absent when this observer has no
-   * admitted track; consumers must not substitute a zero or world-truth value.
-   */
-  position?: Vec3;
-  observedEntityId: string;
-  visible: boolean;
-  status: "TRACKING" | "DEGRADED" | "COASTING" | "NO_TRACK";
-  trackState: TrackState;
-  availabilityReason: RaspAvailabilityReason;
-  effectScope: "AIR_PICTURE_ONLY" | "AIR_PICTURE_AND_GUIDANCE_EVENT";
-  stateExplanation: string;
+  status: "NO_TRACK";
 };
 
 export type TerminationCode =
@@ -600,6 +580,7 @@ export function buildSimulationResult(
       availableG: weapon.availableG,
       thrustNewtons: weapon.thrustNewtons,
       dragNewtons: weapon.dragNewtons,
+      observerStates: engineFrame.observerStates,
     };
   });
   const successful = engineRun.termination === "threshold_reached";
@@ -625,12 +606,8 @@ export function buildSimulationResult(
         ? "The scenario did not contain an active guided vehicle and a valid assigned objective."
         : `The run reached ${engineScenario.durationSeconds} model seconds before the completion distance.`;
   const last = frames.at(-1);
-  const pictures = recordedPictures ?? (
-    input.domain === "A2A" && isOptionalCapabilityEnabled("sensors", prepared.capabilityManifest)
-      ? buildSidePictures(input, frames, prepared.capabilityManifest)
-      : []
-  );
-  assertRecordedSidePictures(input, frames, pictures, prepared.capabilityManifest);
+  const pictures = recordedPictures ?? projectObserverStates(engineRun.frames);
+  assertRecordedSidePictures(engineRun.frames, pictures);
   return {
     frames,
     outcome,
@@ -700,20 +677,24 @@ export function explainResult(scenario: Scenario, result: SimulationResult) {
 }
 
 export function evaluateRaspSourceAvailability(
-  scenario: Scenario,
+  _scenario: Scenario,
   frame: Frame,
   perspective: "IAF" | "PAF",
 ): { available: boolean; reason: RaspAvailabilityReason; explanation: string } {
-  return informationAvailability(scenario, frame, perspective);
+  const state = frame.observerStates.find((item) => item.perspective === perspective);
+  return state
+    ? { available: false, reason: state.availabilityReason, explanation: state.stateExplanation }
+    : { available: false, reason: "SENSOR_MODEL_UNAVAILABLE", explanation: "No observer state was recorded for this frame." };
 }
 
 export function buildRaspTrack(
-  scenario: Scenario,
+  _scenario: Scenario,
   frame: Frame,
   perspective: "IAF" | "PAF",
 ): RaspTrack {
-  return buildSidePictures(scenario, [frame])
-    .find((picture) => picture.perspective === perspective)!;
+  const state = frame.observerStates.find((item) => item.perspective === perspective);
+  if (!state) throw new Error("No observer state was recorded for this perspective.");
+  return projectObserverStates([{ ...frame, observerStates: [state] } as Frame])[0];
 }
 
 export function getFrameAt(result: SimulationResult, time: number) {
