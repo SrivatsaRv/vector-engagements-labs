@@ -4,7 +4,6 @@ import { runEngine } from "../lib/engine/core.ts";
 
 const baseEntity = {
   lifecycle: "ACTIVE",
-  behavior: { maneuver: "steady", commandedG: 0, decision: "PRESS" },
   provenance: {
     sourceObjectId: "test",
     modelId: "test-model",

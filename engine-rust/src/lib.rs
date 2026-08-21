@@ -189,28 +189,6 @@ pub enum WeaponLaunchAuthorization {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Maneuver {
-    Steady,
-    Break,
-    Weave,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub enum TacticalDecision {
-    #[serde(rename = "PRESS")]
-    Press,
-    #[serde(rename = "SUPPORT_WEAPON")]
-    SupportWeapon,
-    #[serde(rename = "CRANK")]
-    Crank,
-    #[serde(rename = "DEFEND")]
-    Defend,
-    #[serde(rename = "DISENGAGE")]
-    Disengage,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "lowercase")]
 pub enum Guidance {
     Direct,
     Loft,
@@ -280,14 +258,6 @@ pub struct InitialState {
     pub heading_rad: f64,
     pub mass_kg: f64,
     pub fuel_kg: f64,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Behavior {
-    pub maneuver: Maneuver,
-    pub commanded_g: f64,
-    pub decision: TacticalDecision,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -413,7 +383,6 @@ pub struct EntityDefinition {
     #[serde(default)]
     pub route: Vec<Vec3>,
     pub initial: InitialState,
-    pub behavior: Behavior,
     pub weapon: Option<WeaponModel>,
     pub sensor: Option<SensorModel>,
     pub aircraft: Option<AircraftModel>,
@@ -1330,11 +1299,6 @@ mod tests {
                 mass_kg: 10_000.0,
                 fuel_kg: 2_000.0,
             },
-            behavior: Behavior {
-                maneuver: Maneuver::Steady,
-                commanded_g: 0.0,
-                decision: TacticalDecision::Press,
-            },
             weapon: None,
             sensor: None,
             aircraft: Some(AircraftModel {
@@ -1405,11 +1369,6 @@ mod tests {
                 heading_rad: 0.0,
                 mass_kg: 180.0,
                 fuel_kg: 70.0,
-            },
-            behavior: Behavior {
-                maneuver: Maneuver::Steady,
-                commanded_g: 0.0,
-                decision: TacticalDecision::SupportWeapon,
             },
             weapon: Some(WeaponModel {
                 launch_platform_id: "blue-aircraft".to_string(),
@@ -1750,12 +1709,6 @@ mod tests {
                 .get_mut(1)
                 .ok_or("scenario fixture has no target")?;
             target.initial.position.x += f64::from(case) * 250.0;
-            target.behavior.maneuver = if case % 2 == 0 {
-                Maneuver::Break
-            } else {
-                Maneuver::Weave
-            };
-            target.behavior.commanded_g = f64::from(case % 8);
             let run = try_run_engine(input)?;
             assert!(!run.frames.is_empty());
             assert_eq!(run.diagnostics.non_finite_state_count, 0);

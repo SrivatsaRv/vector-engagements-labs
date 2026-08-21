@@ -154,3 +154,7 @@ reference, or map anchor.
   g-demand, and tactical-decision controls are unavailable until their owning
   runtime contracts are admitted. They cannot alter an authored run by a hidden
   default or label-only setting.
+- Saved-run admission rejects retired `maneuver`, `targetG`, `blueDecision`, and
+  `redDecision` fields rather than silently accepting a historic no-op. A future
+  mission-policy artifact must replace them as one versioned, compiled contract;
+  it cannot restore UI strings independently of runtime command consumption.

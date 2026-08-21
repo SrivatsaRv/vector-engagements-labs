@@ -250,8 +250,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       guidance: "direct",
       range: 19000,
       aspect: 120,
-      maneuver: "break",
-      targetG: 7,
     }),
   },
   {
@@ -300,8 +298,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       aspect: 180,
       launcherSpeed: 250,
       targetSpeed: 0,
-      maneuver: "steady",
-      targetG: 0,
     }),
   },
   {
@@ -351,8 +347,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       aspect: 180,
       launcherSpeed: 265,
       targetSpeed: 0,
-      maneuver: "steady",
-      targetG: 0,
     }),
   },
   {
@@ -401,8 +395,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       aspect: 135,
       launcherSpeed: 0,
       targetSpeed: 245,
-      maneuver: "weave",
-      targetG: 3,
     }),
   },
   {
@@ -451,8 +443,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       aspect: 155,
       launcherSpeed: 0,
       targetSpeed: 305,
-      maneuver: "weave",
-      targetG: 4,
     }),
   },
   {
@@ -502,8 +492,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       aspect: 180,
       launcherSpeed: 0,
       targetSpeed: 0,
-      maneuver: "steady",
-      targetG: 0,
     }),
   },
   {
@@ -554,8 +542,6 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       aspect: 180,
       launcherSpeed: 0,
       targetSpeed: 0,
-      maneuver: "steady",
-      targetG: 0,
       wind: 22,
     }),
   },

@@ -133,10 +133,6 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
             "{root}.initial.fuelKg must not exceed initial mass"
         )));
     }
-    finite(
-        &format!("{root}.behavior.commandedG"),
-        entity.behavior.commanded_g,
-    )?;
     if entity.route.len() > MAX_ROUTE_POINTS_PER_ENTITY {
         return Err(invalid(format!(
             "{root}.route exceeds {MAX_ROUTE_POINTS_PER_ENTITY} points"

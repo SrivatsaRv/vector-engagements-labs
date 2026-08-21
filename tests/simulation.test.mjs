@@ -219,19 +219,27 @@ test("visual acquisition obeys the declared visibility limit", () => {
   assert.equal(obscured.visible, false);
 });
 
-test("simulation is deterministic and intent labels do not invent aircraft motion", () => {
+test("simulation is deterministic for an admitted authored route", () => {
   const first = simulate(DEFAULT_SCENARIO);
   const second = simulate(DEFAULT_SCENARIO);
   assert.equal(first.outcome, second.outcome);
   assert.equal(first.closestApproach, second.closestApproach);
   assert.deepEqual(first.frames, second.frames);
+});
 
-  const press = simulate({ ...DEFAULT_SCENARIO, redDecision: "PRESS" });
-  const redTrail = (result) =>
-    result.frames.map(
-      (frame) => frame.entities.find((entity) => entity.id === "red-object-1").position,
+test("compiled route-only entities carry no retired tactical behavior contract", () => {
+  const result = simulate(DEFAULT_SCENARIO);
+  for (const entity of result.engineRun.scenario.entities) {
+    assert.equal(
+      "behavior" in entity,
+      false,
+      `${entity.id} must not carry a tactical label that the runtime cannot consume`,
     );
-  assert.deepEqual(redTrail(press), redTrail(first));
+  }
+  const aircraft = result.engineRun.scenario.entities.filter(
+    (entity) => entity.kind === "AIRCRAFT",
+  );
+  assert.ok(aircraft.every((entity) => entity.route && entity.route.length >= 2));
 });
 
 test("RASP returns no visible track when its admitted sensor is unavailable", () => {
@@ -323,39 +331,6 @@ test("RASP source controls have explicit availability behavior for both sides", 
     );
     assert.equal(jammed.trackState, "NONE");
   }
-});
-
-test("Blue Team intent labels do not bypass the authored route controller", () => {
-  const support = simulate({ ...DEFAULT_SCENARIO, blueDecision: "SUPPORT_WEAPON" });
-  const crank = simulate({ ...DEFAULT_SCENARIO, blueDecision: "CRANK" });
-  const defend = simulate({ ...DEFAULT_SCENARIO, blueDecision: "DEFEND" });
-  const disengage = simulate({ ...DEFAULT_SCENARIO, blueDecision: "DISENGAGE" });
-  const bluePlatform = (result) =>
-    result.frames.at(-1).entities.find((item) => item.id === "blue-platform-1");
-
-  assert.deepEqual(bluePlatform(crank).position, bluePlatform(support).position);
-  assert.deepEqual(bluePlatform(defend).position, bluePlatform(support).position);
-  assert.deepEqual(bluePlatform(disengage).position, bluePlatform(support).position);
-  assert.equal(bluePlatform(support).phase, "Following route");
-  assert.ok(bluePlatform(support).aircraftControl);
-});
-
-test("Red Team intent labels do not create fixed maneuver demands", () => {
-  const runs = Object.fromEntries(
-    ["PRESS", "CRANK", "DEFEND", "DISENGAGE"].map((decision) => [
-      decision,
-      simulate({ ...DEFAULT_SCENARIO, redDecision: decision }),
-    ]),
-  );
-  const targetAt = (decision) =>
-    runs[decision].frames
-      .at(-1)
-      .entities.find((entity) => entity.id === "red-object-1");
-
-  assert.deepEqual(targetAt("PRESS").position, targetAt("CRANK").position);
-  assert.deepEqual(targetAt("PRESS").position, targetAt("DEFEND").position);
-  assert.deepEqual(targetAt("PRESS").position, targetAt("DISENGAGE").position);
-  assert.ok(targetAt("PRESS").aircraftControl);
 });
 
 test("runtime does not terminate on the legacy profile-distance allowance", () => {
@@ -454,7 +429,6 @@ test("extreme declared conditions remain finite and deterministic", () => {
     ...DEFAULT_SCENARIO,
     wind: 60,
     temperatureOffset: 25,
-    targetG: 9,
     seed: 999,
   };
   const first = simulate(scenario);

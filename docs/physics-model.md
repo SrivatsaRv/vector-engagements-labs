@@ -59,6 +59,15 @@ The runtime accepts only the governed wind-shift event. The removed guidance-hol
 experiment cannot enter TypeScript, Rust/WASM, saved-run, RASP, report, or browser
 state. Information loss will return only through the typed #26/#28 support path.
 
+The legacy `maneuver`, `targetG`, and side tactical-decision controls are retired.
+They were admitted and presented even though compilation discarded them and neither
+engine could consume them. Saved-run admission now rejects a record that carries
+one of these fields with `SCENARIO_RETIRED_BEHAVIOR_CONTROL` and its exact field
+path. The compiled TypeScript/Rust entity contract contains no unused `behavior`
+wire. Aircraft therefore continue only through their admitted authored routes until
+#38 has a versioned policy pack, an in-tick side-picture interface, inventory and
+achieved-state guards, and a bounded-command consumer.
+
 Sensor and air-defence envelopes are scenario-declared volumes and are explicitly
 labeled `DECLARED`. Detection, tracking, engagement, and minimum-range rings
 remain separate, carry their own altitude bounds and value state, and follow

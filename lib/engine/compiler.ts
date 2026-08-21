@@ -2,7 +2,6 @@ import type { EngineEntityDefinition, EngineScenario } from "./contracts.ts";
 import type {
   EngagementDomain,
   Guidance,
-  Maneuver,
   ProfileId,
   Vec3,
 } from "./primitives.ts";
@@ -51,12 +50,8 @@ export type ScenarioCompilerInput = {
   aspect: number;
   launcherSpeed: number;
   targetSpeed: number;
-  maneuver: Maneuver;
-  targetG: number;
   blueFuelPercent: number;
   redFuelPercent: number;
-  blueDecision: string;
-  redDecision: string;
   windEastMps: number;
   windNorthMps: number;
   temperatureOffset: number;
@@ -280,13 +275,6 @@ export function compileScenario(
           : 12000,
         fuelKg: blueFuelKg,
       },
-      behavior: {
-        maneuver: "steady",
-        commandedG: 0,
-        // Tactical policy is not admitted yet. Aircraft movement follows its
-        // authored route; weapon guidance uses its declared model-pack rate.
-        decision: "PRESS",
-      },
       aircraft: blueAircraft,
     },
     blueObject.id,
@@ -334,11 +322,6 @@ export function compileScenario(
           : 10000,
         fuelKg: redFuelKg,
       },
-      behavior: {
-        maneuver: "steady",
-        commandedG: 0,
-        decision: "PRESS",
-      },
       aircraft: redAircraft,
     },
     redObject.id,
@@ -363,11 +346,6 @@ export function compileScenario(
         headingRad: 0,
         massKg: assumptions.launchMassKg,
         fuelKg: assumptions.launchMassKg - assumptions.dryMassKg,
-      },
-      behavior: {
-        maneuver: "steady",
-        commandedG: 0,
-        decision: "PRESS",
       },
       weapon: {
         launchPlatformId: bluePlatform.id,
@@ -413,11 +391,6 @@ export function compileScenario(
             headingRad: targetHeadingRad,
             massKg: redAssumptions.launchMassKg,
             fuelKg: redAssumptions.launchMassKg - redAssumptions.dryMassKg,
-          },
-          behavior: {
-            maneuver: "steady",
-            commandedG: 0,
-            decision: "PRESS",
           },
           weapon: {
             launchPlatformId: redTarget.id,
