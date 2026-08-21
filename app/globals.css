@@ -5194,6 +5194,15 @@ button:disabled,
 .tactical-symbol-stowed .tactical-frame { stroke-dasharray: 4 3; opacity: .62; }
 .tactical-symbol-terminated { color: #8c9297; opacity: .56; }
 .tactical-symbol-terminated .tactical-frame { stroke-dasharray: 2 3; }
+.tactical-symbol-selected .tactical-frame { stroke-width: 3.25; filter: drop-shadow(0 0 2px rgba(38,54,66,.42)); }
+.tactical-symbol[data-value-state="OBSERVED_TRACK"] .tactical-frame { stroke-dasharray: 3 2; }
+.tactical-symbol[data-value-state="ESTIMATED"] { opacity: .72; }
+.tactical-symbol[data-value-state="ESTIMATED"] .tactical-frame { stroke-dasharray: 1.5 2.5; }
+.tactical-symbol-unavailable { color: #8e6a35; }
+.tactical-unavailable-mark { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.tactical-symbol-legend { margin: 0; padding: 0; list-style: none; }
+.tactical-symbol-legend li { display: inline-flex; align-items: center; gap: 5px; }
+.tactical-symbol-legend small { color: #8e6a35; font-size: 8px; font-weight: 700; text-transform: uppercase; }
 .symbols-page { min-height: 100vh; background: #f7f7f5; color: #202a32; }
 .symbols-hero { width: min(1180px, calc(100% - clamp(32px, 7vw, 120px))); margin: 0 auto; padding: clamp(48px, 7vw, 92px) 0 38px; border-bottom: 1px solid #d6dadd; }
 .symbols-hero > span, .symbol-section header > span { color: #2f6fb5; font-size: 11px; font-weight: 700; letter-spacing: .15em; }
@@ -5260,9 +5269,8 @@ button:disabled,
   transition: transform 80ms linear;
 }
 .map-tactical-marker > span { position: absolute; top: 39px; left: 50%; width: max-content; max-width: 150px; transform: translateX(-50%); padding: 3px 5px; border: 1px solid rgba(203,209,213,.9); background: rgba(255,255,255,.94); color: #27333c; font-size: 8px; font-weight: 750; line-height: 1.2; letter-spacing: .035em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.map-tactical-marker[data-label-priority="1"] > span { transform: translateX(14px) translateY(-25px); }
-.map-tactical-marker[data-label-priority="2"] > span { transform: translateX(calc(-100% - 14px)) translateY(-5px); }
-.map-tactical-marker[data-label-priority]:not([data-label-priority="0"]):not([data-label-priority="1"]):not([data-label-priority="2"]) > span { display: none; }
+.map-tactical-marker[data-label-visibility="COMPACT"] > span { transform: translateX(14px) translateY(-25px); max-width: 116px; }
+.map-tactical-marker[data-label-visibility="HIDDEN"] > span { display: none; }
 .map-installation-marker { width: 32px; height: 32px; opacity: .86; }
 .map-installation-marker > span { top: 30px; max-width: 120px; font-size: 7px; font-weight: 680; }
 .map-tactical-marker.is-stowed { width: 30px; height: 30px; opacity: .75; }

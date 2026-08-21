@@ -137,6 +137,8 @@ test("a current deployment manifest drives the real Worker run after route recov
   const originState = page.locator(".origin-reference-state");
   await expect(originState).toContainText("Installation origin selected");
   await expect(originState).toContainText("iaf-pathankot · source iaf-stations-wikipedia");
+  await expect(page.locator(".authoring-entity-marker.selected svg[data-selected=\"true\"]")).toHaveCount(1);
+  await expect(page.locator(".authoring-entity-marker svg[data-availability=\"AVAILABLE\"]")).toHaveCount(2);
   const airborneStart = page.getByRole("group", { name: "Airborne start" });
   const longitude = airborneStart.getByRole("textbox", { name: "Longitude" });
   const latitude = airborneStart.getByRole("textbox", { name: "Latitude" });
@@ -204,6 +206,9 @@ test("a current deployment manifest drives the real Worker run after route recov
   await expect(
     page.locator('.catalog-state[data-runtime-state="completed"]'),
   ).toHaveText("Worker · completed");
+  await expect(page.getByRole("list", { name: "Recorded entities" })).toBeVisible();
+  await expect(page.locator(".map-tactical-marker svg[data-availability=\"AVAILABLE\"]").first()).toBeVisible();
+  await expect(page.locator(".map-tactical-marker [data-availability=\"UNAVAILABLE\"]")).toHaveCount(0);
   await expect(page.getByText("Condition injection", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Track-information interruption", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /IAF RASP/i })).toHaveCount(0);

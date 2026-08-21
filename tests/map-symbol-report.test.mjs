@@ -12,6 +12,7 @@ import {
   localToLngLat,
 } from "../lib/map-layer-contracts.ts";
 import { tacticalSymbolMarkup } from "../lib/tactical-symbol-markup.ts";
+import { presentTacticalSymbol } from "../lib/tactical-symbol-contract.ts";
 import {
   TACTICAL_SYMBOL_LIBRARY,
   TACTICAL_SYMBOL_ROLES,
@@ -137,7 +138,16 @@ test("every tactical kind has stable affiliation and lifecycle markup", () => {
   for (const kind of kinds) {
     for (const affiliation of affiliations) {
       for (const lifecycle of lifecycles) {
-        const markup = tacticalSymbolMarkup(kind, affiliation, lifecycle);
+        const markup = tacticalSymbolMarkup(presentTacticalSymbol({
+          id: `${kind}-${affiliation}-${lifecycle}`,
+          designation: `${kind} fixture`,
+          kind,
+          affiliation,
+          lifecycle,
+          headingRad: kind === "AIRCRAFT" || kind === "GUIDED_WEAPON" ? 0 : undefined,
+          headingRequired: kind === "AIRCRAFT" || kind === "GUIDED_WEAPON",
+          valueState: "WORLD",
+        }));
         assert.match(markup, new RegExp(`data-kind="${kind}"`));
         assert.match(markup, new RegExp(`tactical-symbol-${affiliation.toLowerCase()}`));
         assert.match(markup, new RegExp(`tactical-symbol-${lifecycle.toLowerCase()}`));
@@ -166,7 +176,17 @@ test("approved tactical roles render distinct, attributed silhouettes", () => {
               : role === "FIXED_OBJECTIVE"
                 ? "FIXED_OBJECTIVE"
                 : "AIRCRAFT";
-    const markup = tacticalSymbolMarkup(kind, "BLUE", "ACTIVE", role);
+    const markup = tacticalSymbolMarkup(presentTacticalSymbol({
+      id: role,
+      designation: role,
+      kind,
+      affiliation: "BLUE",
+      lifecycle: "ACTIVE",
+      symbolRole: role,
+      headingRad: kind === "AIRCRAFT" ? 0 : undefined,
+      headingRequired: kind === "AIRCRAFT",
+      valueState: "WORLD",
+    }));
     assert.match(markup, new RegExp(`data-symbol-role="${role}"`));
     assert.match(markup, /tactical-heading-layer/);
     assert.ok(definition.author.length > 0);

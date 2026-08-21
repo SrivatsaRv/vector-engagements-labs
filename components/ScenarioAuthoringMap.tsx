@@ -13,6 +13,7 @@ import {
 } from "@/lib/scenario-spatial";
 import type { StudyArea } from "@/lib/study-areas";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
+import { presentTacticalSymbol } from "@/lib/tactical-symbol-contract";
 import { VectorMapControls, type MapCameraTelemetry } from "@/components/VectorMapControls";
 import { SpatialEntityEditor } from "@/components/SpatialEntityEditor";
 import {
@@ -317,7 +318,15 @@ export function ScenarioAuthoringMap({
           const element = document.createElement("button");
           element.type = "button";
           element.className = `authoring-installation-marker ${installation.service === "IAF" ? "blue" : "red"}`;
-          element.innerHTML = `${tacticalSymbolMarkup("BASE", installation.service === "IAF" ? "BLUE" : "RED", "ACTIVE", "AIR_BASE")}<span>${installation.name}${installation.icao_code ? ` · ${installation.icao_code}` : ""}</span>`;
+          element.innerHTML = `${tacticalSymbolMarkup(presentTacticalSymbol({
+            id: installation.id,
+            designation: installation.name,
+            kind: "BASE",
+            affiliation: installation.service === "IAF" ? "BLUE" : "RED",
+            lifecycle: "ACTIVE",
+            symbolRole: "AIR_BASE",
+            valueState: "WORLD",
+          }))}<span>${installation.name}${installation.icao_code ? ` · ${installation.icao_code}` : ""}</span>`;
           element.title = `Use ${installation.name} as ${installation.service === "IAF" ? "Blue" : "Red"} origin`;
           element.addEventListener("click", (event) => {
             event.stopPropagation();
@@ -357,6 +366,18 @@ export function ScenarioAuthoringMap({
         const entity = plan[team];
         const object = objects[team];
         const affiliation = team === "blue" ? "BLUE" : "RED";
+        const presentation = presentTacticalSymbol({
+          id: `${team}:${object.id}`,
+          designation: object.designation,
+          kind: object.kind === "FIXED_SITE" ? "FIXED_OBJECTIVE" : object.kind,
+          affiliation,
+          lifecycle: "ACTIVE",
+          symbolRole: object.symbolRole,
+          headingRad: (entity.headingDeg * Math.PI) / 180,
+          headingRequired: true,
+          selected: selected === team,
+          valueState: "WORLD",
+        });
         const key = `entity:${team}`;
         activeKeys.add(key);
         let marker = markers.current.get(key);
@@ -364,12 +385,7 @@ export function ScenarioAuthoringMap({
           const element = document.createElement("button");
           element.type = "button";
           element.className = `authoring-entity-marker ${team}`;
-          element.innerHTML = `${tacticalSymbolMarkup(
-            object.kind === "FIXED_SITE" ? "FIXED_OBJECTIVE" : object.kind,
-            affiliation,
-            "ACTIVE",
-            object.symbolRole,
-          )}<span>${object.designation}</span>`;
+          element.innerHTML = `${tacticalSymbolMarkup(presentation)}<span>${object.designation}</span>`;
           element.addEventListener("click", (event) => {
             event.stopPropagation();
             setSelected(team);
@@ -418,6 +434,13 @@ export function ScenarioAuthoringMap({
         }
         marker.setLngLat([entity.position.longitude, entity.position.latitude]);
         marker.getElement().classList.toggle("selected", selected === team);
+        const symbol = marker.getElement().querySelector("svg");
+        if (
+          symbol?.getAttribute("data-selected") !== String(presentation.availability === "AVAILABLE" && presentation.selected)
+          || symbol.getAttribute("data-availability") !== presentation.availability
+        ) {
+          marker.getElement().innerHTML = `${tacticalSymbolMarkup(presentation)}<span>${presentation.label.text}</span>`;
+        }
         marker.getElement().style.setProperty(
           "--entity-heading",
           `${entity.headingDeg}deg`,

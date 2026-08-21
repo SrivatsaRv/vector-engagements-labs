@@ -38,6 +38,28 @@ engagement envelope. These meanings are governed by scenario and engine state.
 
 Blue uses blue and a round frame; Red uses red and a diamond frame; neutral or unknown uses grey and a square frame. The inner silhouette communicates object kind. A label always carries callsign or designation, so color is never the only identity channel.
 
+## Typed presentation grammar
+
+The shared `tactical-symbol-contract.ts` grammar is the presentation adapter
+used by the engagement map, scenario-authoring map, entity legend and
+3D-adjacent legend. It accepts an already canonical entity/frame value and
+emits either an available display mark or an explicit unavailable mark. It
+never accepts raw map coordinates, creates an entity, creates a track, or
+derives an outcome.
+
+The grammar carries affiliation, supported kind/role pair, lifecycle, optional
+recorded heading, selection and one source state: `WORLD`, `OBSERVED_TRACK`,
+`ESTIMATED`, or `UNSUPPORTED`. Unsupported source state, an incompatible
+kind/role, an absent required orientation, and an absent designation each yield
+an unavailable mark with a machine-readable reason. Stowed inventory remains
+explicit but is not renderable as a world marker.
+
+Label decluttering is deterministic and presentation-only: selected entity,
+then engaging entity, then guided weapon, then aircraft, with stable entity ID
+as the tie-breaker. The first label is visible, the next two are compact, and
+the remainder are hidden until selection. This policy changes DOM visibility
+only; it does not alter a frame, record, entity lifecycle or playback state.
+
 ## Lifecycle
 
 - **Stowed** is inventory and is not placed in the world.
