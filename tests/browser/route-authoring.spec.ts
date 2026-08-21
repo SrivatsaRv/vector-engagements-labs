@@ -127,12 +127,24 @@ test("a current deployment manifest drives the real Worker run after route recov
   }
 
   // A selected installation is a compiled identity, not a decorative marker.
-  // A numeric horizontal edit must visibly change the authoring contract to a
-  // manual airborne start before this real-Worker journey can run.
-  await page.getByRole("button", { name: "Pathankot AFS", exact: true }).click();
-  await expect(page.getByText(/installation origin selected/i)).toBeVisible();
+  // The native disclosure is the accessible interaction that exposes the
+  // affiliation-scoped choices; the option is intentionally absent while it
+  // remains closed.
+  const blueOriginPicker = page.locator(".origin-pickers details.blue");
+  await blueOriginPicker.getByText("Blue origin", { exact: true }).click();
+  await expect(blueOriginPicker).toHaveAttribute("open", "");
+  await blueOriginPicker.getByRole("button", { name: "Pathankot AFS", exact: true }).click();
+  const originState = page.locator(".origin-reference-state");
+  await expect(originState).toContainText("Installation origin selected");
+  await expect(originState).toContainText("iaf-pathankot · source iaf-stations-wikipedia");
   const airborneStart = page.getByRole("group", { name: "Airborne start" });
   const longitude = airborneStart.getByRole("textbox", { name: "Longitude" });
+  const latitude = airborneStart.getByRole("textbox", { name: "Latitude" });
+  await expect(longitude).toHaveValue("75.633227");
+  await expect(latitude).toHaveValue("32.236929");
+
+  // A numeric horizontal edit must visibly change the authoring contract to a
+  // manual airborne start before this real-Worker journey can run.
   const selectedLongitude = Number(await longitude.inputValue());
   await longitude.fill(String(selectedLongitude + 0.01));
   await longitude.press("Enter");
