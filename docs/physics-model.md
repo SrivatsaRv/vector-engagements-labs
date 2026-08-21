@@ -96,6 +96,12 @@ transport itself remains governed by STUB-13. This is a mechanism test, not sens
 AEW, EW, track estimation and weapon support remain unavailable until their
 typed interfaces and admitted model data exist.
 
+Positive sensor compilation now also requires a separate source/independent-
+validation artifact pair and explicit validation of every runtime bound,
+uncertainty, and target applicability field. It is intentionally stricter than
+the current PLOT mechanism: incomplete research data is represented as
+unavailable, not converted into a range-only detector.
+
 ## Presentation truth
 
 Every movement trail is reconstructed only from recorded engine frames. The 3D surface adds a ground projection, vertical altitude stem, and translucent altitude curtain; these are views of the same position samples, not newly generated trajectories. A weapon does not appear before its launch lifecycle event.

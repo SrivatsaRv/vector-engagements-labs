@@ -8,6 +8,7 @@ export const COMPILED_MODEL_PACK_SCHEMA_VERSION = "vector.compiled-model-pack.v1
 export const CREDIBILITY_MANIFEST_SCHEMA_VERSION = "vector.credibility-manifest.v1";
 export const INTENDED_USE_SCHEMA_VERSION = "vector.intended-use.v1";
 export const MODEL_PATCH_SCHEMA_VERSION = "vector.model-patch.v1";
+export const SENSOR_EVIDENCE_ADMISSION_SCHEMA_VERSION = "vector.sensor-evidence-admission.v1";
 
 export type IntendedUseId =
   | "vector.intended-use.geometry-teaching"
@@ -201,11 +202,43 @@ export type PropulsionModelSource = ModelSourceBase & {
 export type SensorModelSource = ModelSourceBase & {
   kind: "SENSOR";
   sensorKind: "DECLARED_ENVELOPE" | "RADAR" | "INFRARED" | "VISUAL";
+  /**
+   * Required for a positive sensor. This makes evidence incompleteness an
+   * explicit source artifact rather than an excuse to promote a range value.
+   */
+  evidenceAdmission?: SensorEvidenceAdmissionSource;
   detectionRange: Quantity;
   minimumRange: Quantity;
   scanPeriod: Quantity;
   azimuthFieldOfView: Quantity;
   elevationFieldOfView: Quantity;
+};
+
+export type SensorEvidenceCoverage = {
+  detectionRange: "VALIDATED" | "UNKNOWN";
+  minimumRange: "VALIDATED" | "UNKNOWN";
+  scanPeriod: "VALIDATED" | "UNKNOWN";
+  azimuthFieldOfView: "VALIDATED" | "UNKNOWN";
+  elevationFieldOfView: "VALIDATED" | "UNKNOWN";
+  measurementUncertainty: "VALIDATED" | "UNKNOWN";
+  targetApplicability: "VALIDATED" | "UNKNOWN";
+};
+
+const SENSOR_EVIDENCE_COVERAGE_FIELDS = [
+  "detectionRange",
+  "minimumRange",
+  "scanPeriod",
+  "azimuthFieldOfView",
+  "elevationFieldOfView",
+  "measurementUncertainty",
+  "targetApplicability",
+] as const satisfies ReadonlyArray<keyof SensorEvidenceCoverage>;
+
+export type SensorEvidenceAdmissionSource = {
+  schemaVersion: typeof SENSOR_EVIDENCE_ADMISSION_SCHEMA_VERSION;
+  sourceEvidenceRefIds: string[];
+  validationEvidenceRefIds: string[];
+  coverage: SensorEvidenceCoverage;
 };
 
 export type AircraftModelSource = ModelSourceBase & {
@@ -364,6 +397,7 @@ export type CompiledPropulsionModel = CompiledModelBase & {
 
 export type CompiledSensorModel = CompiledModelBase & {
   sensorKind: SensorModelSource["sensorKind"];
+  evidenceAdmission?: SensorEvidenceAdmissionSource;
   detectionRangeM: number;
   minimumRangeM: number;
   scanPeriodS: number;
@@ -641,6 +675,54 @@ function validateAircraftPerformanceAdmission(
   for (const capability of AIRCRAFT_PERFORMANCE_CAPABILITIES) {
     if (!seenCapabilities.has(capability)) {
       issues.push(`${path}.capabilities is missing ${capability}`);
+    }
+  }
+}
+
+function validateSensorEvidenceAdmission(
+  issues: string[],
+  path: string,
+  sensor: SensorModelSource,
+  evidenceById: Map<string, EvidenceReference>,
+) {
+  if (sensor.sensorKind === "DECLARED_ENVELOPE") return;
+
+  const admission = sensor.evidenceAdmission;
+  if (!admission) {
+    issues.push(`${path}.evidenceAdmission is required for a positive ${sensor.sensorKind} sensor`);
+    return;
+  }
+  if (admission.schemaVersion !== SENSOR_EVIDENCE_ADMISSION_SCHEMA_VERSION) {
+    issues.push(`${path}.evidenceAdmission.schemaVersion must be ${SENSOR_EVIDENCE_ADMISSION_SCHEMA_VERSION}`);
+  }
+  const validateArtifacts = (
+    ids: string[],
+    kind: EvidenceReference["kind"],
+    field: "sourceEvidenceRefIds" | "validationEvidenceRefIds",
+  ) => {
+    if (ids.length === 0) issues.push(`${path}.evidenceAdmission.${field} must not be empty`);
+    for (const id of ids) {
+      const evidence = evidenceById.get(id);
+      if (!evidence) {
+        issues.push(`${path}.evidenceAdmission.${field} references missing evidence ${id}`);
+      } else if (evidence.kind !== kind) {
+        issues.push(`${path}.evidenceAdmission.${field} evidence ${id} must be ${kind}`);
+      } else if (!evidence.contentSha256 || !DIGEST_PATTERN.test(evidence.contentSha256)) {
+        issues.push(`${path}.evidenceAdmission.${field} evidence ${id} must carry an immutable SHA-256 artifact digest`);
+      } else if (!sensor.evidenceRefIds.includes(id)) {
+        issues.push(`${path}.evidenceRefIds must include admitted evidence ${id}`);
+      }
+    }
+  };
+  validateArtifacts(admission.sourceEvidenceRefIds, "SOURCE", "sourceEvidenceRefIds");
+  validateArtifacts(admission.validationEvidenceRefIds, "VALIDATION", "validationEvidenceRefIds");
+  if (admission.sourceEvidenceRefIds.some((id) => admission.validationEvidenceRefIds.includes(id))) {
+    issues.push(`${path}.evidenceAdmission must not use one artifact as both source and independent validation`);
+  }
+  for (const field of SENSOR_EVIDENCE_COVERAGE_FIELDS) {
+    const state = admission.coverage?.[field];
+    if (state !== "VALIDATED") {
+      issues.push(`${path}.evidenceAdmission.coverage.${field} must be VALIDATED for a positive sensor`);
     }
   }
 }
@@ -961,6 +1043,9 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
     validityDomain: normalizeValidityDomain(issues, `sensors[${index}].validityDomain`, item.validityDomain),
     limitationIds: [...item.limitationIds],
     sensorKind: item.sensorKind,
+    ...(item.evidenceAdmission
+      ? { evidenceAdmission: structuredClone(item.evidenceAdmission) }
+      : {}),
     detectionRangeM: normalizeQuantity(issues, `sensors[${index}].detectionRange`, item.detectionRange, "m", evidenceIds),
     minimumRangeM: normalizeQuantity(issues, `sensors[${index}].minimumRange`, item.minimumRange, "m", evidenceIds),
     scanPeriodS: normalizeQuantity(issues, `sensors[${index}].scanPeriod`, item.scanPeriod, "s", evidenceIds),
@@ -974,6 +1059,9 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
     if (item.minimumRangeM > item.detectionRangeM && item.detectionRangeM > 0) {
       issues.push(`sensors[${index}].minimumRange must not exceed detectionRange`);
     }
+  });
+  source.sensors.forEach((item, index) => {
+    validateSensorEvidenceAdmission(issues, `sensors[${index}]`, item, evidenceById);
   });
 
   const aircraft = source.aircraft.map((item, index): CompiledAircraftModel => {

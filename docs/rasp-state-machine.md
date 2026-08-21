@@ -20,6 +20,14 @@ positive-range `RADAR`, `INFRARED`, or `VISUAL` model. A
 `DECLARED_ENVELOPE`, zero range, missing evidence, invalid bounds, or digest
 mismatch cannot become a generic radar.
 
+Positive sensors must additionally compile `vector.sensor-evidence-admission.v1`.
+It binds distinct immutable `SOURCE` and `VALIDATION` artifacts and requires a
+validated detection range, minimum range, scan period, azimuth/elevation FOV,
+measurement uncertainty, and target applicability. An `UNKNOWN` field blocks
+compilation; it is never represented by a numerical zero. This is an admission
+gate only. It does not create a measurement, track, renderer-visible estimate,
+data link, EW effect, or weapon support.
+
 The run binding also carries a compiler-produced projection of the compiled
 observer models. Both engines require every entity admission field to exactly
 match one member of that projection. An entity admission cannot manufacture a
