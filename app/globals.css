@@ -823,6 +823,32 @@ a {
   color: var(--muted);
   padding: 4px;
 }
+.route-transition-inspector {
+  border-top: 1px solid var(--line);
+  background: #fff;
+}
+.route-transition-inspector > header {
+  min-height: 32px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.route-transition-inspector > header span { font-size: 9px; font-weight: 750; color: #344b5e; }
+.route-transition-inspector > header small { margin-left: auto; font-size: 7px; color: var(--muted); }
+.route-transition-inspector article,
+.route-transition-unavailable { display: grid; gap: 3px; margin: 0; padding: 9px 10px; border-bottom: 1px solid var(--line2); }
+.route-transition-inspector article:last-child { border-bottom: 0; }
+.route-transition-inspector article > strong { font-size: 10px; }
+.route-transition-inspector article > span { font-size: 8px; color: var(--muted); }
+.route-transition-inspector article > b { font-size: 10px; color: var(--blue); }
+.route-transition-inspector article > p,
+.route-transition-inspector article > em { margin: 0; font-size: 8px; line-height: 1.4; color: var(--muted); font-style: normal; }
+.route-transition-inspector article > em { color: #745616; }
+.route-transition-unavailable { color: var(--muted); font-size: 9px; }
 .playback {
   height: 40px;
   background: #fff;

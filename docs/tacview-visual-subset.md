@@ -97,6 +97,15 @@ All playback surfaces consume the same selected recorded-frame identity; an
 in-between scrub request cannot make the Map, 3D surface, telemetry, or visible
 model time disagree about the displayed state.
 
+The **Route transition** inspector consumes the immutable compiled route plan
+and the selected aircraft frame's recorded `routePointIndex`. It shows the
+active waypoint and its `FLY_BY` or `FLY_OVER` declaration, without advancing a
+route or estimating a turn. A fly-by shows only its compiled capture radius. A
+fly-over shows its pass-through semantics rather than an invented radius. A
+persisted `vector.route-plan.v1` record explicitly states its all-fly-by legacy
+semantics. Missing compiled route, control, point, or transition data is
+unavailable; the presentation does not silently guess from positions.
+
 The **Current geometry** inspector carries that same frame identity. When the
 selected frame contains the launched primary weapon, its range, closure,
 line-of-sight rate, speed, Mach, and flight state are the engine-recorded
