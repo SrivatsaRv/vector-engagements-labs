@@ -61,6 +61,21 @@ claims. See [`aircraft-evidence-registry.md`](aircraft-evidence-registry.md).
 
 Aircraft motion uses the same standard atmosphere and wind field as a launched vehicle. Each fixed step consumes identity-bearing, compiled one-dimensional tables for zero-lift drag by Mach, induced drag at the admitted reference angle of attack, thrust by throttle, and fuel-flow coefficient by throttle. The TypeScript and Rust engines linearly interpolate only within an ordered table's declared coverage; an invalid table, missing full-throttle value, or an out-of-coverage input rejects the run instead of extrapolating or falling back to a compiler scalar. The present tables are still versioned model assumptions, not named-aircraft fidelity data. The engine resolves dynamic pressure, load-factor lift demand, drag, available thrust, fuel flow, mass, and the steering limit on every fixed step. Aircraft admission requires initial mass to equal admitted empty mass, initial fuel, and the launch mass of every linked stowed store. Fuel burn cannot reduce mass below empty mass plus installed-store mass. Release removes the store identity and its declared launch mass once, and the weapon inherits launcher position, velocity, and heading. The engine steers the velocity vector towards the next authored three-dimensional route point. `vector.route-plan.v1` supplies a typed fly-by acceptance radius in metres for each waypoint after the start. The route controller changes to the next leg only after entering that declared capture distance (or the fixed-step travel guard); this transition is executed by both engines and is visible in the recorded route-point index and trajectory. It records the requested velocity and steering acceleration, controller-accepted steering acceleration, achieved velocity, active route-point index, load-factor limiter state, store mass, and installed-store identities. The requested steering acceleration is the controller's instantaneous route-change demand before limiting; it is not an aerodynamic capability, pilot input, or named-aircraft performance claim. It does not use the scenario intent label to invent a turn or a permanent circular path. An aircraft without an admitted aircraft model is rejected. This is an educational point-mass route executor, not a flight-manual or manufacturer engine deck.
 
+## Generic configuration-contrast evidence
+
+`tests/aircraft-configuration-contrast.test.mjs` executes one identical
+three-dimensional route and controller request with three deliberately distinct,
+compatible generic aircraft configurations. It independently checks the declared
+table points, then requires recorded turn trajectory, climb, acceleration, and
+fuel-burn differences in TypeScript. Rust/WASM must reproduce every reported
+metric and final position within the declared parity tolerance. The configurations
+are test-only model assumptions; they are not source packs, do not identify an
+aircraft, and do not establish a named-aircraft performance claim. This proves
+that the current table/control boundary is materially consumed rather than only
+labelled. It does not replace the #64 external-reference, nonlinear-table,
+ground-lifecycle, store-aerodynamic, Worker, browser, or independent-validation
+requirements.
+
 The runtime accepts only the governed wind-shift event. The removed guidance-hold
 experiment cannot enter TypeScript, Rust/WASM, saved-run, RASP, report, or browser
 state. Information loss will return only through the typed #26/#28 support path.
