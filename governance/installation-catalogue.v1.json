@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "vector.installation-catalogue.v1",
+  "id": "vector.public-reference-installations",
+  "version": "1.0.0",
+  "intendedUse": "PUBLIC_EDUCATIONAL",
+  "coverage": {
+    "declaredServiceCoverage": "BOUNDED_PUBLIC_REFERENCE_FIXTURE",
+    "includedRecordCount": 21,
+    "geographicCoverage": "Selected public-reference points only; this is not a geographic completeness claim.",
+    "installationTypeCoverage": ["MAIN_OPERATING_BASE", "FORWARD_OPERATING_BASE", "AIR_STATION"],
+    "knownGaps": [
+      "This fixture is not a complete IAF or PAF installation catalogue.",
+      "It does not state current occupancy, readiness, squadron assignment, or operational status.",
+      "Runway threshold, centreline, true heading, dimensions, surface, elevation datum, and uncertainty are text-only or absent.",
+      "No record supports a ground or runway start."
+    ]
+  },
+  "validity": { "startsAt": "-infinity", "endsAt": "+infinity" },
+  "review": { "state": "PUBLIC_REFERENCE_FIXTURE", "verifiedAt": "2026-08-21" },
+  "sources": [
+    {
+      "id": "iaf-stations-wikipedia",
+      "title": "Indian Air Force stations public-reference fixture",
+      "publisher": "Wikipedia contributors",
+      "url": "https://en.wikipedia.org/wiki/Indian_Air_Force",
+      "license": "SOURCE_LICENSE_NOT_VERIFIED"
+    },
+    {
+      "id": "shield-paf-orbat-2026-05-19",
+      "title": "SHIELD Pakistan Air Force ORBAT seed",
+      "publisher": "Reach Defence SHIELD",
+      "url": "urn:shield:data:paf_orbat.json",
+      "license": "OPERATOR_SUPPLIED_PUBLIC_REFERENCE"
+    }
+  ],
+  "records": [
+    { "id": "iaf-adampur", "service": "IAF", "name": "Adampur AFS", "longitude": 75.757256, "latitude": 31.434879, "type": "AIR_STATION", "sourceId": "iaf-stations-wikipedia", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "iaf-ambala", "service": "IAF", "name": "Ambala AFS", "longitude": 76.817778, "latitude": 30.370556, "type": "AIR_STATION", "sourceId": "iaf-stations-wikipedia", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "iaf-halwara", "service": "IAF", "name": "Halwara AFS", "longitude": 75.633209, "latitude": 30.748041, "type": "AIR_STATION", "sourceId": "iaf-stations-wikipedia", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "iaf-pathankot", "service": "IAF", "name": "Pathankot AFS", "longitude": 75.633227, "latitude": 32.236929, "type": "AIR_STATION", "sourceId": "iaf-stations-wikipedia", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "iaf-srinagar", "service": "IAF", "name": "Srinagar AFS", "longitude": 74.765299, "latitude": 33.994374, "type": "AIR_STATION", "sourceId": "iaf-stations-wikipedia", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "iaf-jodhpur", "service": "IAF", "name": "Jodhpur AFS", "longitude": 73.048056, "latitude": 26.251389, "type": "AIR_STATION", "sourceId": "iaf-stations-wikipedia", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-nur-khan", "service": "PAF", "name": "PAF Base Nur Khan", "icaoCode": "OPRN", "longitude": 73.0992, "latitude": 33.6167, "elevationFt": 1668, "runwayInfo": "RWY 09/27, 12/30", "type": "MAIN_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-peshawar", "service": "PAF", "name": "PAF Base Peshawar", "icaoCode": "OPPS", "longitude": 71.5144, "latitude": 33.9933, "elevationFt": 1180, "runwayInfo": "RWY 17/35", "type": "MAIN_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-asghar-khan", "service": "PAF", "name": "PAF Academy Asghar Khan", "icaoCode": "OPRS", "longitude": 71.9725, "latitude": 34.0811, "type": "AIR_STATION", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-qadri", "service": "PAF", "name": "PAF Qadri", "icaoCode": "OPSD", "longitude": 75.5375, "latitude": 35.3347, "type": "FORWARD_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-mm-alam", "service": "PAF", "name": "PAF Base M.M. Alam", "icaoCode": "OPMI", "longitude": 71.5706, "latitude": 32.5631, "type": "MAIN_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-minhas", "service": "PAF", "name": "PAF Base Minhas", "icaoCode": "OPMS", "longitude": 72.4, "latitude": 33.8703, "type": "MAIN_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-mushaf", "service": "PAF", "name": "PAF Base Mushaf", "icaoCode": "OPSR", "longitude": 72.6653, "latitude": 32.0486, "type": "MAIN_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-murid", "service": "PAF", "name": "PAF Murid", "icaoCode": "OPMU", "longitude": 72.7756, "latitude": 32.9094, "type": "FORWARD_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-rafiqui", "service": "PAF", "name": "PAF Base Rafiqui", "icaoCode": "OPRQ", "longitude": 72.2824, "latitude": 30.7581, "type": "MAIN_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-shahbaz", "service": "PAF", "name": "PAF Base Shahbaz", "icaoCode": "OPJA", "longitude": 68.4497, "latitude": 28.2842, "type": "MAIN_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-masroor", "service": "PAF", "name": "PAF Base Masroor", "icaoCode": "OPMR", "longitude": 66.94, "latitude": 24.8936, "type": "MAIN_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-bholari", "service": "PAF", "name": "PAF Base Bholari", "icaoCode": "OPBW", "longitude": 68.0353, "latitude": 25.2436, "type": "MAIN_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-faisal", "service": "PAF", "name": "PAF Base Faisal", "icaoCode": "OPSF", "longitude": 67.1178, "latitude": 24.8747, "type": "MAIN_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-sukkur", "service": "PAF", "name": "PAF Sukkur", "icaoCode": "OPSK", "longitude": 68.7919, "latitude": 27.7219, "type": "FORWARD_OPERATING_BASE", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" },
+    { "id": "paf-korangi-creek", "service": "PAF", "name": "PAF Korangi Creek", "icaoCode": "OPKC", "longitude": 67.1364, "latitude": 24.7822, "type": "AIR_STATION", "sourceId": "shield-paf-orbat-2026-05-19", "coordinateDatum": "WGS84", "positionalUncertaintyM": null, "provenance": "PUBLIC_REFERENCE", "reviewState": "UNVERIFIED" }
+  ]
+}

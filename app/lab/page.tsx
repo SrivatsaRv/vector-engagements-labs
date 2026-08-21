@@ -73,6 +73,7 @@ import {
 import type { BrowserRuntimeState } from "@/lib/runtime/protocol";
 import type { StudyArea } from "@/lib/study-areas";
 import type { CatalogCredibilityAdmission } from "@/lib/catalog-admission";
+import { INSTALLATION_CATALOGUE_IDENTITY } from "@/lib/installations";
 import {
   spatialAspectDeg,
   spatialHorizontalSeparationM,
@@ -291,6 +292,14 @@ function LabWorkbench({
           simulationModels?: Parameters<typeof registerDatabaseSimulationModels>[0];
           scenarioTemplates?: StoredScenarioPackage[];
           credibilityAdmissions?: CatalogCredibilityAdmission[];
+          installationCatalogue?: {
+            schemaVersion: "vector.installation-catalogue.v1";
+            id: string;
+            version: string;
+            digest: string;
+            coverage: { declaredServiceCoverage: string; includedRecordCount: number };
+            records: Array<{ id: string; sourceId: string; longitude: number; latitude: number }>;
+          };
           studyAreas?: Array<{
             id: StudyArea["id"];
             name: string;
@@ -328,6 +337,21 @@ function LabWorkbench({
             template.engine_version !== ENGINE_VERSION ||
             !isScenarioDefinition(template.package) ||
             !payload.simulationModels?.length ||
+            !payload.installationCatalogue ||
+            payload.installationCatalogue.schemaVersion !== "vector.installation-catalogue.v1" ||
+            payload.installationCatalogue.id !== INSTALLATION_CATALOGUE_IDENTITY.id ||
+            payload.installationCatalogue.version !== INSTALLATION_CATALOGUE_IDENTITY.version ||
+            payload.installationCatalogue.digest !== INSTALLATION_CATALOGUE_IDENTITY.digest ||
+            payload.installationCatalogue.coverage.declaredServiceCoverage !== "BOUNDED_PUBLIC_REFERENCE_FIXTURE" ||
+            payload.installationCatalogue.coverage.includedRecordCount !== payload.installations?.length ||
+            payload.installationCatalogue.records.length !== payload.installations?.length ||
+            payload.installations?.some((installation) => {
+              const record = payload.installationCatalogue?.records.find((candidate) => candidate.id === installation.id);
+              return !record
+                || record.sourceId !== installation.source_id
+                || record.longitude !== Number(installation.longitude)
+                || record.latitude !== Number(installation.latitude);
+            }) ||
             !payload.studyAreas?.length ||
             !credibility
           ) {

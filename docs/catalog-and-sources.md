@@ -23,11 +23,30 @@ delete; changes publish a new version. The catalog API then binds every
 validated scenario template to its exact SI pack and manifest before returning
 an admitted response.
 
-The TypeScript arrays are idempotent local seed fixtures and deterministic test fallbacks. `/api/catalog` reads the database; the client validates that the selected template/version and coefficient set exist before Conduct. Runtime requests never bootstrap schema or authoritative records.
+`governance/installation-catalogue.v1.json` is the one versioned, machine-readable
+input for the bounded public-reference installation fixture. It declares source
+identity/license state, SHA-256 content identity, coverage/count, known gaps,
+validity/review state, and WGS84/provenance/uncertainty for every record.
+`scripts/seed-db.ts` derives the PostGIS seed from this manifest. PostGIS remains
+the authority for published map geometry: `/api/catalog` compares every returned
+row to the manifest and fails closed on a missing, extra, duplicate, source, or
+coordinate mismatch. The browser rejects a stale catalogue identity rather than
+quietly rendering a local substitute. Runtime ticks consume only the compiled,
+frozen environment-pack binding and never query either source.
 
 ## Fixed development fixture
 
-This slice deliberately remains **3 platforms, 8 weapons, 8 model sets, 21 public-reference installations, and 8 scenario templates**. The installation catalog contains six IAF context points and all 15 PAF points present in SHIELD's `apps/backend/data/paf_orbat.json` seed. PAF coordinates are ingest-authored public-reference data, identified by `shield-paf-orbat-2026-05-19`; they are not RDDF-derived and do not represent current force disposition. The database verifier fails if the catalog count, ICAO coverage, SRID, provenance, or the Nur Khan coordinate regression drifts.
+This slice deliberately remains **3 platforms, 8 weapons, 8 model sets, 21
+public-reference installations, and 8 scenario templates**. The installation
+catalogue contains six IAF context points and all 15 PAF points present in
+SHIELD's `apps/backend/data/paf_orbat.json` seed. It is explicitly
+`BOUNDED_PUBLIC_REFERENCE_FIXTURE`, never a complete IAF/PAF order of battle.
+PAF coordinates are ingest-authored public-reference data, identified by
+`shield-paf-orbat-2026-05-19`; they are not RDDF-derived and do not represent
+current force disposition. Positional uncertainty is `null` where the source
+has not published a reviewed value. The database verifier fails if the catalog
+count, ICAO coverage, SRID, provenance, or the Nur Khan coordinate regression
+drifts.
 
 PostGIS is canonical for installation geometry. Map markers, study-area origin selectors, and future KML/GeoJSON exports derive from `installations.location`; VECTOR does not maintain an independent hand-edited KML truth file. Coordinate order is longitude, latitude in EPSG:4326.
 
@@ -66,10 +85,11 @@ new content identities rather than mutating a saved run.
 
 ## Environment-pack installation coverage
 
-Phase A publishes `vector.environment-pack.v1` with an explicit
-`BOUNDED_PUBLIC_REFERENCE_FIXTURE` installation coverage identity. Its included
-record count is the maintained fixture count, with known gaps and an explicit
-`TEXT_ONLY_OR_ABSENT` runway-evidence state. It must never be rendered or
-validated as a complete IAF/PAF base catalogue. PostGIS remains the canonical
-geometry source for the existing points; the Phase A pack only binds the exact
-coverage identity required by future ground-start admission.
+Phase A publishes `vector.environment-pack.v1` with the exact
+`vector.installation-catalogue.v1` ID/version/digest, the per-record source and
+WGS84 provenance, and an explicit `BOUNDED_PUBLIC_REFERENCE_FIXTURE` coverage
+identity. Its included record count is the maintained fixture count, with known
+gaps and an explicit `TEXT_ONLY_OR_ABSENT` runway-evidence state. It must never
+be rendered or validated as a complete IAF/PAF base catalogue. PostGIS remains
+the canonical geometry source for published points; the Phase A pack binds the
+same immutable coverage identity required by future ground-start admission.

@@ -36,7 +36,7 @@ import {
   createPhaseAEnvironmentSampler,
   environmentPackBinding,
 } from "../lib/geospatial/environment-pack.ts";
-import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
+import { INSTALLATION_CATALOGUE_IDENTITY, PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import {
   geographicToLocal,
   localToGeographic,
@@ -265,6 +265,9 @@ test("Phase A environment packs bind explicit synthetic terrain, datum, atmosphe
   assert.equal(pack.terrain.referenceElevationMslM, area.surfaceElevationM);
   assert.equal(pack.installationCoverage.includedRecordCount, PUBLIC_INSTALLATIONS.length);
   assert.equal(pack.installationCoverage.declaredServiceCoverage, "BOUNDED_PUBLIC_REFERENCE_FIXTURE");
+  assert.deepEqual(pack.installationCoverage.catalogue, INSTALLATION_CATALOGUE_IDENTITY);
+  assert.deepEqual(pack.content.installationCatalogue, INSTALLATION_CATALOGUE_IDENTITY);
+  assert.ok(pack.content.installations.every((installation) => installation.coordinateDatum === "WGS84"));
   assert.deepEqual(pack.installationCoverage.knownGaps, PHASE_A_INSTALLATION_GAPS);
   assert.match(pack.identity.digest, /^sha256:[0-9a-f]{64}$/);
   assert.throws(
@@ -280,6 +283,16 @@ test("Phase A environment packs bind explicit synthetic terrain, datum, atmosphe
       identity: { ...pack.identity, digest: `sha256:${"f".repeat(64)}` },
     }),
     /does not match its canonical content/,
+  );
+  assert.throws(
+    () => assertPhaseAEnvironmentPack({
+      ...pack,
+      installationCoverage: {
+        ...pack.installationCoverage,
+        catalogue: { ...pack.installationCoverage.catalogue, digest: `sha256:${"e".repeat(64)}` },
+      },
+    }),
+    /does not match the governed catalogue/,
   );
 });
 
@@ -420,6 +433,8 @@ test("compiled runs freeze environment identities and record equivalent map/Thre
   assert.equal(manifest.schemaVersion, "vector.synthetic-environment.v1");
   const environmentPack = result.engineRun.scenario.geospatial.environmentPack;
   assertPhaseAEnvironmentPack(environmentPack);
+  assert.deepEqual(environmentPack.content.installationCatalogue, INSTALLATION_CATALOGUE_IDENTITY);
+  assert.deepEqual(environmentPack.installationCoverage.catalogue, INSTALLATION_CATALOGUE_IDENTITY);
   assert.deepEqual(
     result.engineRun.scenario.environment.environmentPack,
     environmentPackBinding(environmentPack),

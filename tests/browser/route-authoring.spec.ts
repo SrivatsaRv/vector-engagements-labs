@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { sha256Hex } from "../../lib/canonical-json";
 import { ENGINE_VERSION } from "../../lib/engine/version";
-import { PUBLIC_INSTALLATIONS } from "../../lib/installations";
+import { INSTALLATION_CATALOGUE, INSTALLATION_CATALOGUE_IDENTITY, PUBLIC_INSTALLATIONS } from "../../lib/installations";
 import { SCENARIO_PACKAGE_SCHEMA_VERSION } from "../../lib/scenario-package";
 import { SCENARIO_LIBRARY } from "../../lib/scenarios";
 import { STUDY_AREAS } from "../../lib/study-areas";
@@ -29,6 +29,15 @@ async function catalogFixture() {
   };
   return {
     state: "POSTGIS",
+    installationCatalogue: {
+      schemaVersion: INSTALLATION_CATALOGUE.schemaVersion,
+      ...INSTALLATION_CATALOGUE_IDENTITY,
+      intendedUse: INSTALLATION_CATALOGUE.intendedUse,
+      coverage: INSTALLATION_CATALOGUE.coverage,
+      validity: INSTALLATION_CATALOGUE.validity,
+      review: INSTALLATION_CATALOGUE.review,
+      records: INSTALLATION_CATALOGUE.records,
+    },
     installations: PUBLIC_INSTALLATIONS.map((item) => ({
       id: item.id,
       service: item.service,
@@ -131,6 +140,8 @@ test("a current deployment manifest drives the real Worker run after route recov
   // affiliation-scoped choices; the option is intentionally absent while it
   // remains closed.
   const blueOriginPicker = page.locator(".origin-pickers details.blue");
+  await expect(page.getByText(/base available in this public-reference environment pack/i)).toBeVisible();
+  await expect(page.getByText(/not a complete IAF or PAF catalogue/i)).toBeVisible();
   await blueOriginPicker.getByText("Blue origin", { exact: true }).click();
   await expect(blueOriginPicker).toHaveAttribute("open", "");
   await blueOriginPicker.getByRole("button", { name: "Pathankot AFS", exact: true }).click();
