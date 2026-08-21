@@ -30,10 +30,11 @@ import { ObjectPicker } from "@/components/ObjectPicker";
 import { EngagementMap, type MapInstallation } from "@/components/EngagementMap";
 import { ScenarioAuthoringMap } from "@/components/ScenarioAuthoringMap";
 import { SimulationScene } from "@/components/SimulationScene";
-import { TacticalSymbol } from "@/components/TacticalSymbol";
+import { TacticalSymbolLegend } from "@/components/TacticalSymbolLegend";
 import { ViewportTelemetry } from "@/components/ViewportTelemetry";
 import { TrackStateInspector } from "@/components/TrackStateInspector";
 import { CurrentGeometry } from "@/components/CurrentGeometry";
+import { applyTacticalLabelPolicy, presentTacticalSymbol } from "@/lib/tactical-symbol-contract";
 import {
   canConduct,
   validateScenario,
@@ -839,20 +840,20 @@ function LabWorkbench({
                   layoutRevision={telemetryExpanded ? 1 : 0}
                 />
               )}
-              <div className="symbol-key">
-                {frame.entities.map((entity) => (
-                  <span key={entity.id}>
-                    <TacticalSymbol
-                      kind={entity.kind}
-                      symbolRole={entity.symbolRole}
-                      affiliation={entity.affiliation}
-                      lifecycle={entity.lifecycle}
-                      size={22}
-                    />
-                    {entity.designation} · {entity.lifecycle.toLowerCase()}
-                  </span>
-                ))}
-              </div>
+              <TacticalSymbolLegend
+                symbols={applyTacticalLabelPolicy(frame.entities.map((entity) => presentTacticalSymbol({
+                  id: entity.id,
+                  designation: entity.designation,
+                  kind: entity.kind,
+                  affiliation: entity.affiliation,
+                  lifecycle: entity.lifecycle,
+                  symbolRole: entity.symbolRole,
+                  headingRad: entity.headingRad,
+                  headingRequired: true,
+                  valueState: "WORLD",
+                })))}
+                label="Recorded entities"
+              />
               <div className="view-note">
                 Computed model state · {playbackSurface === "MAP" ? "pan or zoom the geographic surface" : "drag to orbit · scroll to zoom"}
               </div>

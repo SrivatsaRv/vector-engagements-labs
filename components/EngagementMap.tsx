@@ -6,6 +6,10 @@ import { CircleHelp, Layers3 } from "lucide-react";
 import { VectorMapControls, type MapCameraTelemetry } from "@/components/VectorMapControls";
 import type { RaspTrack, SimulationResult } from "@/lib/simulation";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
+import {
+  applyTacticalLabelPolicy,
+  presentTacticalSymbol,
+} from "@/lib/tactical-symbol-contract";
 import { emitBrowserTelemetry } from "@/lib/observability/client";
 import {
   selectObserverEntityPresentation,
@@ -173,7 +177,15 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           const element = document.createElement("div");
           element.className = "map-tactical-marker map-installation-marker";
           const affiliation = installation.service === "IAF" ? "BLUE" : "RED";
-          element.innerHTML = `${tacticalSymbolMarkup("BASE", affiliation, "ACTIVE", "AIR_BASE")}<span></span>`;
+          element.innerHTML = `${tacticalSymbolMarkup(presentTacticalSymbol({
+            id: installation.id,
+            designation: installation.name,
+            kind: "BASE",
+            affiliation,
+            lifecycle: "ACTIVE",
+            symbolRole: "AIR_BASE",
+            valueState: "WORLD",
+          }))}<span></span>`;
           const label = element.querySelector("span");
           if (label) label.textContent = installation.icao_code
             ? `${installation.name} · ${installation.icao_code}`
@@ -403,18 +415,27 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
         marker.remove();
         markers.current.delete(id);
       }
-      const labelPriority = [...frame.entities]
-        .sort((left, right) => {
-          const score = (entity: typeof left) =>
-            (entity.lifecycle === "ENGAGING" ? 40 : 0) +
-            (entity.kind === "GUIDED_WEAPON" ? 20 : 0) +
-            (entity.kind === "AIRCRAFT" ? 10 : 0);
-          return score(right) - score(left) || left.id.localeCompare(right.id);
-        })
-        .reduce((priorities, entity, index) => priorities.set(entity.id, index), new Map<string, number>());
+      const presentations = applyTacticalLabelPolicy(frame.entities.map((entity) => presentTacticalSymbol({
+        id: entity.id,
+        designation: entity.designation,
+        kind: entity.kind,
+        affiliation: entity.affiliation,
+        lifecycle: entity.lifecycle,
+        symbolRole: entity.symbolRole,
+        headingRad: entity.headingRad,
+        headingRequired: true,
+        valueState: "WORLD",
+      })));
+      const presentationById = new Map(presentations.map((presentation) => [presentation.id, presentation]));
       for (const entity of frame.entities) {
         const observerPresentation = selectObserverEntityPresentation(raspTrack, entity.id);
         if (observerPresentation.state === "HIDDEN") {
+          markers.current.get(entity.id)?.remove();
+          markers.current.delete(entity.id);
+          continue;
+        }
+        const presentation = presentationById.get(entity.id);
+        if (!presentation || (presentation.availability === "AVAILABLE" && !presentation.renderable)) {
           markers.current.get(entity.id)?.remove();
           markers.current.delete(entity.id);
           continue;
@@ -430,27 +451,39 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
         if (!marker) {
           const element = document.createElement("div");
           element.className = "map-tactical-marker";
-          element.innerHTML = `${tacticalSymbolMarkup(entity.kind, entity.affiliation, entity.lifecycle, entity.symbolRole)}<span></span>`;
+          element.innerHTML = `${tacticalSymbolMarkup(presentation)}<span></span>`;
           const label = element.querySelector("span");
           // Generated engine callsigns preserve replay identity but are not
           // useful operator labels. Default map presentation names the actual
           // catalog object; a later presentation setting may deliberately
           // switch to a declared scenario callsign.
           if (label) label.textContent = entity.designation;
-          element.dataset.labelPriority = String(labelPriority.get(entity.id) ?? 99);
-          element.title = `${entity.designation} · ${entity.lifecycle.toLowerCase()}`;
+          element.dataset.labelVisibility = presentation.label.visibility;
+          element.title = presentation.availability === "AVAILABLE"
+            ? `${presentation.designation} · ${presentation.lifecycle.toLowerCase()}`
+            : presentation.label.text;
           const createdMarker = new maplibregl.Marker({ element, anchor: "center" });
           createdMarker.setLngLat(displayLngLat).addTo(map);
           markers.current.set(entity.id, createdMarker);
           marker = createdMarker;
         }
+        const label = marker.getElement().querySelector("span");
+        if (label) label.textContent = presentation.label.text;
+        const svg = marker.getElement().querySelector("svg");
+        if (
+          svg?.getAttribute("data-availability") !== presentation.availability
+          || (presentation.availability === "AVAILABLE" && (
+            svg.getAttribute("data-lifecycle") !== presentation.lifecycle
+            || svg.getAttribute("data-symbol-role") !== presentation.symbolRole
+          ))
+        ) {
+          marker.getElement().innerHTML = `${tacticalSymbolMarkup(presentation)}<span>${presentation.label.text}</span>`;
+        }
         marker.setLngLat(displayLngLat);
-        marker.getElement().style.setProperty(
-          "--entity-heading",
-          `${90 - (entity.headingRad * 180) / Math.PI}deg`,
-        );
-        marker.getElement().classList.toggle("is-stowed", entity.lifecycle === "STOWED");
-        marker.getElement().dataset.labelPriority = String(labelPriority.get(entity.id) ?? 99);
+        if (presentation.availability === "AVAILABLE" && presentation.headingDeg !== undefined) {
+          marker.getElement().style.setProperty("--entity-heading", `${presentation.headingDeg}deg`);
+        }
+        marker.getElement().dataset.labelVisibility = presentation.label.visibility;
       }
       // No uncertainty marker is shown until an admitted sensor model emits a
       // side-owned position estimate.
