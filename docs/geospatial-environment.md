@@ -156,6 +156,35 @@ references are stored in the compiled engine scenario and contribute to the
 `missionOrigins` dataset digest in the frozen synthetic-environment manifest,
 which is retained in the VSR and report provenance.
 
+## Phase B source-ingestion admission boundary
+
+The first Phase B slice commits a small, lawful offline source artifact under
+[`governance/environment-sources/nasa-power-hourly-20200115`](../governance/environment-sources/nasa-power-hourly-20200115).
+It contains two exact NASA POWER Hourly Point API responses for the governed
+North Punjab and Ladakh anchors, for 2020-01-15 UTC. NASA Earthdata's data-use
+policy says NASA-led mission data are CC0 unless the individual data carry a
+restrictive notice or licence; these responses carry no such notice. The
+manifest records that licence decision, source/citation URLs, retrieval date,
+provider/API version, exact request, WGS84 horizontal datum, explicitly
+undeclared vertical datum, raw-byte SHA-256 for each response, field units,
+time coverage, and limitations.
+
+`ingestSourcedPointAtmosphere` calculates the raw UTF-8 SHA-256 before it
+parses the response. It rejects a changed byte, source/API/time/coordinate/unit
+mismatch, no-data fill value, invalid datum declaration, and incomplete hourly
+parameter series. The committed verifier runs in `make ci-local`; sampling
+and verification use no network, database, map tile, or simulation tick path.
+
+This is an ingestion and integrity proof only. The source is explicitly
+`POINT_ONLY` and `INELIGIBLE` for area-environment admission. It is not
+connected to the current Phase A pack or its runtime sampler. It supplies no
+terrain, geoid, runway, atmospheric profile, area weather field, ground start,
+terrain collision, or terrain masking. An attempted area-pack use throws
+rather than interpolating or promoting two anchor observations to regional
+truth. A later immutable source version must add licensed, bounded
+area-covering datasets and the required datum/uncertainty evidence before it
+can replace any Phase A assumption.
+
 ## Terrain and geometric line of sight
 
 `TerrainSampler` is a local interface with content identity, declared rectangular

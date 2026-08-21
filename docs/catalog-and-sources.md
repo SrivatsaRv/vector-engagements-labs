@@ -83,6 +83,14 @@ fixtures are `MODEL_ASSUMPTION`; they do not upgrade PostGIS installation points
 or public-source assertions. A future production terrain/geoid ingest publishes
 new content identities rather than mutating a saved run.
 
+The committed NASA POWER point snapshots in
+`governance/environment-sources/nasa-power-hourly-20200115` are separately
+verified source artifacts. They prove raw source handling only: each artifact
+has a reviewed CC0 licence decision, source citation, request identity,
+WGS84/vertical-datum declaration, coverage limitation, raw-byte checksum, and
+fail-closed parser. They are deliberately point-only and cannot be selected,
+compiled, or replayed as an area environment pack.
+
 ## Environment-pack installation coverage
 
 Phase A publishes `vector.environment-pack.v1` with the exact
