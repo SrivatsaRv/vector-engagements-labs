@@ -511,7 +511,7 @@ function LabWorkbench({
       const target = event.target as HTMLElement | null;
       if (
         target?.matches(
-          "input, textarea, button, select, [contenteditable='true']",
+          "input, textarea, button, select, [role='button'], [contenteditable='true']",
         )
       )
         return;

@@ -18,6 +18,16 @@ export type TacticalValueState =
 
 export type TacticalLabelVisibility = "VISIBLE" | "COMPACT" | "HIDDEN";
 
+/**
+ * A map-projected marker anchor supplied by a rendering surface. Coordinates
+ * are CSS pixels in that surface only; they are not simulation coordinates.
+ */
+export type TacticalLabelScreenAnchor = {
+  id: string;
+  x: number;
+  y: number;
+};
+
 export type TacticalSymbolInput = {
   id: string;
   designation: string;
@@ -167,6 +177,93 @@ export function applyTacticalLabelPolicy(
           ...symbol.label,
           visibility: symbol.renderable
             ? visibilityById.get(symbol.id) ?? "HIDDEN"
+            : "HIDDEN",
+        },
+      });
+}
+
+type LabelBox = { left: number; top: number; right: number; bottom: number };
+
+const FULL_LABEL_WIDTH = 150;
+const COMPACT_LABEL_WIDTH = 116;
+const LABEL_HEIGHT = 20;
+
+function labelBox(anchor: TacticalLabelScreenAnchor, visibility: Exclude<TacticalLabelVisibility, "HIDDEN">): LabelBox {
+  if (visibility === "COMPACT") {
+    return {
+      left: anchor.x + 14,
+      top: anchor.y - 46,
+      right: anchor.x + 14 + COMPACT_LABEL_WIDTH,
+      bottom: anchor.y - 46 + LABEL_HEIGHT,
+    };
+  }
+  return {
+    left: anchor.x - FULL_LABEL_WIDTH / 2,
+    top: anchor.y + 18,
+    right: anchor.x + FULL_LABEL_WIDTH / 2,
+    bottom: anchor.y + 18 + LABEL_HEIGHT,
+  };
+}
+
+function overlaps(left: LabelBox, right: LabelBox) {
+  return left.left < right.right
+    && left.right > right.left
+    && left.top < right.bottom
+    && left.bottom > right.top;
+}
+
+/**
+ * Resolves label collision after a map projects canonical positions into its
+ * own CSS-pixel coordinate space. It changes only presentation visibility.
+ * A selected entity retains its full label; lower priority colliding labels
+ * are hidden and remain available through marker focus/selection.
+ */
+export function applyTacticalLabelCollisionPolicy(
+  symbols: readonly TacticalSymbol[],
+  anchors: readonly TacticalLabelScreenAnchor[],
+): TacticalSymbol[] {
+  const initial = applyTacticalLabelPolicy(symbols);
+  const anchorById = new Map(
+    anchors
+      .filter((anchor) => Number.isFinite(anchor.x) && Number.isFinite(anchor.y))
+      .map((anchor) => [anchor.id, anchor]),
+  );
+  const ordered = initial
+    .filter((symbol): symbol is TacticalSymbolPresentation => (
+      symbol.availability === "AVAILABLE" && symbol.renderable && symbol.label.visibility !== "HIDDEN"
+    ))
+    .sort((left, right) => labelScore(right) - labelScore(left) || left.id.localeCompare(right.id));
+  const accepted: LabelBox[] = [];
+  const visibilityById = new Map<string, TacticalLabelVisibility>();
+
+  for (const symbol of ordered) {
+    const anchor = anchorById.get(symbol.id);
+    if (!anchor) {
+      visibilityById.set(symbol.id, symbol.label.visibility);
+      continue;
+    }
+    const preferred: Exclude<TacticalLabelVisibility, "HIDDEN"> = symbol.selected
+      ? "VISIBLE"
+      : symbol.label.visibility === "COMPACT"
+        ? "COMPACT"
+        : "VISIBLE";
+    const proposed = labelBox(anchor, preferred);
+    if (symbol.selected || !accepted.some((box) => overlaps(box, proposed))) {
+      accepted.push(proposed);
+      visibilityById.set(symbol.id, preferred);
+      continue;
+    }
+    visibilityById.set(symbol.id, "HIDDEN");
+  }
+
+  return initial.map((symbol) => symbol.availability === "UNAVAILABLE"
+    ? symbol
+    : {
+        ...symbol,
+        label: {
+          ...symbol.label,
+          visibility: symbol.renderable
+            ? visibilityById.get(symbol.id) ?? symbol.label.visibility
             : "HIDDEN",
         },
       });

@@ -57,8 +57,11 @@ explicit but is not renderable as a world marker.
 Label decluttering is deterministic and presentation-only: selected entity,
 then engaging entity, then guided weapon, then aircraft, with stable entity ID
 as the tie-breaker. The first label is visible, the next two are compact, and
-the remainder are hidden until selection. This policy changes DOM visibility
-only; it does not alter a frame, record, entity lifecycle or playback state.
+the remainder are hidden until selection. The map then compares those label
+boxes in its projected CSS-pixel surface: a lower-priority collision is hidden;
+the selected marker keeps a full label and keyboard focus can select it. The
+projection is a render-only input. This policy changes DOM visibility only; it
+does not alter a frame, record, entity lifecycle or playback state.
 
 MapLibre marks are created only after the map style is ready. If the basemap
 transport is loading or unavailable, the surface reports that state and does
