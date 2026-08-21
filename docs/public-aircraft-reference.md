@@ -59,3 +59,8 @@ validity domain of a scenario aircraft or satisfy an aircraft model-pack
 component that has incomplete coverage. Compiled-pack admission checks those
 domains independently in TypeScript and Rust/WASM, and rejects a gap rather
 than borrowing values from this trim fixture or a scalar regression model.
+
+It also cannot admit named-aircraft performance. A future named aircraft pack
+must bind every required capability class to immutable source evidence and a
+separate independent validation artifact. Until then, its compiled admission
+state is `UNSUPPORTED`, and any named-performance consumer must fail closed.

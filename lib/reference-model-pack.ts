@@ -15,12 +15,12 @@ import {
 } from "./model-pack.ts";
 
 export const CURRENT_MODEL_PACK_ID = "vector-scalar-study-models";
-export const CURRENT_MODEL_PACK_VERSION = "0.7.0";
-export const CURRENT_MODEL_PACK_DIGEST = "a27f1060f523c8b9552dec67f26eabdb5bc8b0528d1f389fe5a79ae256f993c2";
+export const CURRENT_MODEL_PACK_VERSION = "0.8.0";
+export const CURRENT_MODEL_PACK_DIGEST = "4081605000d0e06e24b2a0bed1c2585de6d953f6f3688b5849052452d32e321a";
 export const CURRENT_INTENDED_USE_ID = "vector.intended-use.geometry-teaching";
 export const CURRENT_INTENDED_USE_VERSION = "1.0.0";
 export const CURRENT_CREDIBILITY_MANIFEST_ID = "vector-scalar-study-credibility";
-export const CURRENT_CREDIBILITY_MANIFEST_VERSION = "1.1.0";
+export const CURRENT_CREDIBILITY_MANIFEST_VERSION = "1.2.0";
 
 const ASSUMPTION_EVIDENCE_ID = "current-scalar-model-assumptions";
 const CONTRACT_EVIDENCE_ID = "model-pack-contract-tests";
@@ -251,6 +251,11 @@ export function createCurrentModelPackSource(): ModelPackSource {
     emptyMass: quantity(item.emptyMassKg, "kg"),
     fuelCapacity: quantity(item.fuelCapacityKg, "kg"),
     maximumCommandLoadFactor: quantity(item.maximumCommandG, "g0"),
+    performanceAdmission: {
+      state: "UNSUPPORTED" as const,
+      limitationId: LIMITATION_ID,
+      reason: "The current compiled tables are scalar regression assumptions. They have no independently validated, source-bound named-platform performance evidence.",
+    },
   }));
 
   const weapons = WEAPON_SIMULATION_MODELS.map((item) => ({

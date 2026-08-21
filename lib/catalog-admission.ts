@@ -52,6 +52,11 @@ export type CatalogCredibilityAdmission = {
       statement: string;
     }>;
   };
+  namedAircraftPerformance: Array<{
+    catalogObjectId: string;
+    state: "UNSUPPORTED" | "ADMITTED";
+    reason: string | null;
+  }>;
   scenarioTemplateIds: string[];
 };
 
@@ -84,6 +89,28 @@ function limitationsFrom(manifest: Record<string, unknown>) {
       statement: limitation.statement,
     };
   });
+}
+
+function namedAircraftPerformanceFrom(pack: Record<string, unknown>) {
+  requireValue(Array.isArray(pack.aircraft), "compiled pack aircraft are missing");
+  return pack.aircraft.map((value, index) => {
+    const aircraft = object(value);
+    requireValue(typeof aircraft.catalogObjectId === "string", `aircraft[${index}] catalog identity is missing`);
+    const admission = object(aircraft.performanceAdmission);
+    requireValue(
+      admission.state === "UNSUPPORTED" || admission.state === "ADMITTED",
+      `aircraft[${index}] named-performance admission state is invalid`,
+    );
+    if (admission.state === "UNSUPPORTED") {
+      requireValue(typeof admission.reason === "string" && admission.reason.trim().length > 0,
+        `aircraft[${index}] unsupported named-performance admission lacks a reason`);
+    }
+    return {
+      catalogObjectId: aircraft.catalogObjectId,
+      state: admission.state,
+      reason: admission.state === "UNSUPPORTED" ? admission.reason : null,
+    };
+  }) as CatalogCredibilityAdmission["namedAircraftPerformance"];
 }
 
 export function admitCatalogCredibility(
@@ -166,6 +193,7 @@ export function admitCatalogCredibility(
     requireValue(manifestSubject.id === pack.id, "credibility payload subject id mismatch");
     requireValue(manifestSubject.digest === pack.digest, "credibility payload subject digest mismatch");
     const limitations = limitationsFrom(manifest.manifest);
+    const namedAircraftPerformance = namedAircraftPerformanceFrom(pack.payload);
     requireValue(
       manifest.approval_state === "APPROVED_FOR_DECLARED_USE" || limitations.length > 0,
       "an unapproved pack must carry explicit limitations",
@@ -185,6 +213,7 @@ export function admitCatalogCredibility(
         approvalState: manifest.approval_state,
         limitations,
       },
+      namedAircraftPerformance,
       scenarioTemplateIds: group.map((item) => item.id).sort(),
     } satisfies CatalogCredibilityAdmission;
   });

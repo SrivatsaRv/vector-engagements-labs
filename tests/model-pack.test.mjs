@@ -3,9 +3,11 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   COMPILED_MODEL_PACK_SCHEMA_VERSION,
+  AircraftPerformanceAdmissionError,
   MODEL_PATCH_SCHEMA_VERSION,
   ModelPackValidationError,
   compileModelPack,
+  requireNamedAircraftPerformanceAdmission,
   validateScenarioModelInstance,
   validateScenarioModelPatch,
   verifyCompiledModelPackDigest,
@@ -18,7 +20,7 @@ import { resolveCompiledWeaponAdmission } from "../lib/engine/weapon-admission.t
 
 const fixture = JSON.parse(
   await readFile(
-    new URL("../fixtures/model-packs/vector-scalar-study-v0.7.compiled.json", import.meta.url),
+    new URL("../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json", import.meta.url),
     "utf8",
   ),
 );
@@ -41,6 +43,7 @@ test("model source compiles deterministically to the committed immutable SI fixt
   assert.equal(first.pack.weapons[0].seekerMode, "UNAVAILABLE");
   assert.equal(first.pack.weapons[0].supportRequirement, "UNAVAILABLE");
   assert.equal(first.pack.weapons[0].launchAuthorization, "SCHEDULED_TEST_ONLY");
+  assert.ok(first.pack.aircraft.every((aircraft) => aircraft.performanceAdmission.state === "UNSUPPORTED"));
 });
 
 test("one physical value changes the digest and invalidates approved evidence", async () => {
@@ -118,6 +121,68 @@ test("aircraft admission rejects a component or table that cannot cover its decl
   await assert.rejects(
     compileModelPack(insufficientTableEnvironment),
     /thrustTable\.validityDomain does not cover its admitted aircraft validity domain/,
+  );
+});
+
+test("named-aircraft performance is unavailable until every capability has separate immutable source and validation evidence", async () => {
+  const unsupported = await compileModelPack(cloneSource());
+  assert.throws(
+    () => requireNamedAircraftPerformanceAdmission(unsupported.pack, unsupported.pack.aircraft[0].catalogObjectId),
+    (error) => error instanceof AircraftPerformanceAdmissionError && /scalar regression assumptions/.test(error.message),
+  );
+
+  const source = cloneSource();
+  source.evidence.push(
+    {
+      id: "public-aircraft-source",
+      kind: "SOURCE",
+      title: "Immutable public aircraft evidence fixture",
+      uri: "urn:vector:test:public-aircraft-source",
+      contentSha256: "a".repeat(64),
+      accessedAt: "2026-08-21",
+    },
+    {
+      id: "independent-aircraft-validation",
+      kind: "VALIDATION",
+      title: "Independent public aircraft validation fixture",
+      uri: "urn:vector:test:independent-aircraft-validation",
+      contentSha256: "b".repeat(64),
+      accessedAt: "2026-08-21",
+    },
+  );
+  source.aircraft[0].performanceAdmission = {
+    state: "ADMITTED",
+    capabilities: ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS", "MASS_AND_STORES", "SENSORS"].map((capability) => ({
+      capability,
+      sourceEvidenceRefIds: ["public-aircraft-source"],
+      validationEvidenceRefIds: ["independent-aircraft-validation"],
+    })),
+  };
+  const admitted = await compileModelPack(source);
+  assert.equal(
+    requireNamedAircraftPerformanceAdmission(admitted.pack, admitted.pack.aircraft[0].catalogObjectId).state,
+    "ADMITTED",
+  );
+
+  const missingCapability = structuredClone(source);
+  missingCapability.aircraft[0].performanceAdmission.capabilities.pop();
+  await assert.rejects(
+    compileModelPack(missingCapability),
+    /performanceAdmission\.capabilities is missing SENSORS/,
+  );
+  const assumptionAsSource = structuredClone(source);
+  assumptionAsSource.aircraft[0].performanceAdmission.capabilities[0].sourceEvidenceRefIds = [
+    "current-scalar-model-assumptions",
+  ];
+  await assert.rejects(
+    compileModelPack(assumptionAsSource),
+    /must be SOURCE/,
+  );
+  const unhashedValidation = structuredClone(source);
+  delete unhashedValidation.evidence.find((item) => item.id === "independent-aircraft-validation").contentSha256;
+  await assert.rejects(
+    compileModelPack(unhashedValidation),
+    /must carry an immutable SHA-256 artifact digest/,
   );
 });
 

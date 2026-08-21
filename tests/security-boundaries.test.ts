@@ -128,6 +128,12 @@ test("saved reports are recomputed from admitted scenario inputs", async () => {
   assert.ok(
     verified.report.packageProvenance?.credibilityManifest?.limitations.length,
   );
+  assert.ok(
+    verified.report.packageProvenance?.credibilityManifest?.limitations.some(
+      (limitation) => /named-aircraft/.test(limitation.statement),
+    ),
+    "a saved report must retain the blocking named-aircraft limitation",
+  );
 });
 
 test("public metrics are concealed without their bearer secret", async () => {

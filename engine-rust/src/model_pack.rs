@@ -12,6 +12,8 @@ const COMPILED_SCHEMA: &str = "vector.compiled-model-pack.v1";
 #[serde(rename_all = "camelCase")]
 pub struct EvidenceReference {
     pub id: String,
+    pub kind: String,
+    pub content_sha256: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -119,6 +121,25 @@ pub struct AircraftModel {
     pub loadout_model_index: usize,
     pub maximum_command_load_factor_g: f64,
     pub validity_domain: ValidityDomain,
+    pub performance_admission: AircraftPerformanceAdmission,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AircraftPerformanceAdmission {
+    pub state: String,
+    pub limitation_id: Option<String>,
+    pub reason: Option<String>,
+    #[serde(default)]
+    pub capabilities: Vec<AircraftPerformanceCapabilityEvidence>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AircraftPerformanceCapabilityEvidence {
+    pub capability: String,
+    pub source_evidence_ref_ids: Vec<String>,
+    pub validation_evidence_ref_ids: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -262,6 +283,98 @@ fn require_validity_domain_coverage(
     }
 }
 
+fn sha256_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+fn validate_aircraft_performance_admission(
+    aircraft_id: &str,
+    admission: &AircraftPerformanceAdmission,
+    evidence: &[EvidenceReference],
+) -> Result<(), EngineError> {
+    const REQUIRED: [&str; 5] = [
+        "AERODYNAMICS",
+        "PROPULSION",
+        "FLIGHT_CONTROLS",
+        "MASS_AND_STORES",
+        "SENSORS",
+    ];
+    match admission.state.as_str() {
+        "UNSUPPORTED" => {
+            if admission.limitation_id.as_deref().is_none_or(str::is_empty)
+                || admission.reason.as_deref().is_none_or(str::is_empty)
+                || !admission.capabilities.is_empty()
+            {
+                return Err(invalid(format!(
+                    "aircraft model {aircraft_id} has an invalid unsupported named-performance admission"
+                )));
+            }
+        }
+        "ADMITTED" => {
+            if admission.limitation_id.is_some() || admission.reason.is_some() {
+                return Err(invalid(format!(
+                    "aircraft model {aircraft_id} admitted named-performance evidence cannot carry an unsupported limitation"
+                )));
+            }
+            let mut capabilities = HashSet::new();
+            for capability in &admission.capabilities {
+                if !REQUIRED.contains(&capability.capability.as_str())
+                    || !capabilities.insert(capability.capability.as_str())
+                    || capability.source_evidence_ref_ids.is_empty()
+                    || capability.validation_evidence_ref_ids.is_empty()
+                {
+                    return Err(invalid(format!(
+                        "aircraft model {aircraft_id} has invalid named-performance evidence capability"
+                    )));
+                }
+                for source_id in &capability.source_evidence_ref_ids {
+                    let Some(item) = evidence.iter().find(|item| item.id == *source_id) else {
+                        return Err(invalid(format!("aircraft model {aircraft_id} references missing source evidence {source_id}")));
+                    };
+                    if item.kind != "SOURCE"
+                        || !item.content_sha256.as_deref().is_some_and(sha256_digest)
+                    {
+                        return Err(invalid(format!("aircraft model {aircraft_id} source evidence {source_id} is not immutable SOURCE evidence")));
+                    }
+                }
+                for validation_id in &capability.validation_evidence_ref_ids {
+                    let Some(item) = evidence.iter().find(|item| item.id == *validation_id) else {
+                        return Err(invalid(format!("aircraft model {aircraft_id} references missing validation evidence {validation_id}")));
+                    };
+                    if item.kind != "VALIDATION"
+                        || !item.content_sha256.as_deref().is_some_and(sha256_digest)
+                    {
+                        return Err(invalid(format!("aircraft model {aircraft_id} validation evidence {validation_id} is not immutable VALIDATION evidence")));
+                    }
+                }
+                if capability
+                    .source_evidence_ref_ids
+                    .iter()
+                    .any(|id| capability.validation_evidence_ref_ids.contains(id))
+                {
+                    return Err(invalid(format!("aircraft model {aircraft_id} reuses one artifact as source and independent validation evidence")));
+                }
+            }
+            if capabilities.len() != REQUIRED.len()
+                || !REQUIRED.iter().all(|item| capabilities.contains(item))
+            {
+                return Err(invalid(format!(
+                    "aircraft model {aircraft_id} does not cover every named-performance capability"
+                )));
+            }
+        }
+        _ => {
+            return Err(invalid(format!(
+                "aircraft model {aircraft_id} has unknown named-performance admission state"
+            )))
+        }
+    }
+    Ok(())
+}
+
 fn unique_ids<'a>(
     path: &str,
     values: impl IntoIterator<Item = &'a str>,
@@ -373,6 +486,15 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
         "evidence",
         pack.evidence.iter().map(|item| item.id.as_str()),
     )?;
+    if pack.evidence.iter().any(|item| {
+        item.content_sha256
+            .as_deref()
+            .is_some_and(|digest| !sha256_digest(digest))
+    }) {
+        return Err(invalid(
+            "compiled model-pack evidence contentSha256 must be lowercase SHA-256 when supplied",
+        ));
+    }
     unique_ids(
         "catalogIdentities",
         pack.catalog_identities
@@ -459,6 +581,11 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
         )?;
         finite_non_negative("aircraft empty mass", model.empty_mass_kg)?;
         finite_non_negative("aircraft fuel capacity", model.fuel_capacity_kg)?;
+        validate_aircraft_performance_admission(
+            &model.id,
+            &model.performance_admission,
+            &pack.evidence,
+        )?;
         if model.aerodynamic_model_index >= pack.aerodynamics.len()
             || model.loadout_model_index >= pack.loadouts.len()
             || model
@@ -598,7 +725,7 @@ mod tests {
 
     fn fixture_pack_json() -> Result<String, Box<dyn std::error::Error>> {
         let bundle: Value = serde_json::from_str(include_str!(
-            "../../fixtures/model-packs/vector-scalar-study-v0.7.compiled.json"
+            "../../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json"
         ))?;
         Ok(serde_json::to_string(&bundle["pack"])?)
     }
@@ -636,6 +763,25 @@ mod tests {
         assert!(error
             .to_string()
             .contains("does not cover its admitted aircraft validity domain"));
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_named_performance_claims_without_source_bound_validation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut value: Value = serde_json::from_str(&fixture_pack_json()?)?;
+        value["aircraft"][0]["performanceAdmission"] = serde_json::json!({
+            "state": "ADMITTED",
+            "capabilities": []
+        });
+        value["digest"] = Value::from(digest_payload(&value)?);
+        let error = match validate_model_pack_json(&serde_json::to_string(&value)?) {
+            Ok(_) => return Err("an empty named-performance claim must fail closed".into()),
+            Err(error) => error,
+        };
+        assert!(error
+            .to_string()
+            .contains("does not cover every named-performance capability"));
         Ok(())
     }
 }

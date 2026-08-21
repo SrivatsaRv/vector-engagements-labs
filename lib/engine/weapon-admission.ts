@@ -1,4 +1,4 @@
-import currentBundle from "../../fixtures/model-packs/vector-scalar-study-v0.7.compiled.json" with { type: "json" };
+import currentBundle from "../../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json" with { type: "json" };
 import type { CompiledModelPack } from "../model-pack.ts";
 import type { WeaponAdmission } from "./contracts.ts";
 

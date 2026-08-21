@@ -38,7 +38,7 @@ The source of truth is [`lib/model-pack.ts`](../lib/model-pack.ts). Rust consume
 the same compiled JSON contract in
 [`engine-rust/src/model_pack.rs`](../engine-rust/src/model_pack.rs). The committed
 cross-language fixture is
-[`fixtures/model-packs/vector-scalar-study-v0.7.compiled.json`](../fixtures/model-packs/vector-scalar-study-v0.7.compiled.json).
+[`fixtures/model-packs/vector-scalar-study-v0.8.compiled.json`](../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json).
 
 ## Source definition
 
@@ -124,6 +124,36 @@ The current pack and engine manifests are intentionally `DRAFT`. Their blocking
 limitation states that the v0.5 scalar assumptions cannot be interpreted as
 named-system performance. Reports load this limitation from the manifest; they
 do not maintain independent technical wording.
+
+### Named-aircraft performance admission
+
+An aircraft's catalog identity is not performance evidence. Every compiled
+aircraft therefore carries a `performanceAdmission` value with one of two
+states:
+
+- `UNSUPPORTED` gives a blocking limitation ID and a concise reason. A consumer
+  requesting a named-platform performance interpretation must fail closed with
+  that reason.
+- `ADMITTED` is allowed only when the pack supplies all five capability classes:
+  aerodynamics, propulsion, flight controls, mass/stores, and sensors. Each
+  class requires at least one immutable `SOURCE` artifact and one different,
+  immutable `VALIDATION` artifact. Both records carry a SHA-256 content digest.
+
+`ASSUMPTION`, requirement, or self-verification records never qualify as either
+kind of evidence. The compiler rejects missing capability classes, duplicate
+classes, absent/digest-less artifacts, the wrong evidence kind, or one artifact
+used as both source and independent validation. Rust/WASM performs the same
+validation while loading the compiled pack. Geometry-teaching execution is
+governed separately by the intended-use contract; it does not become a
+named-platform performance claim because a familiar catalog label appears in a
+scenario.
+
+Catalog admission checks that every aircraft carries this boundary before the
+catalog API returns a validated template. The API exposes the state and reason
+as provenance for a future capability-specific surface; the current Lab and
+report instead retain the pack's blocking limitation verbatim. Neither surface
+may upgrade a geometry-teaching fixture into an `ADMITTED` named-performance
+claim.
 
 ## Scenario binding and patches
 
@@ -225,8 +255,8 @@ deployments continue to apply the forward-only numbered migrations in
 
 ```text
 id:      vector-scalar-study-models
-version: 0.7.0
-digest:  a27f1060f523c8b9552dec67f26eabdb5bc8b0528d1f389fe5a79ae256f993c2
+version: 0.8.0
+digest:  4081605000d0e06e24b2a0bed1c2585de6d953f6f3688b5849052452d32e321a
 state:   DRAFT
 ```
 
@@ -234,6 +264,9 @@ It contains the existing four aircraft scalar assumption records, eight weapon
 scalar assumption records, explicit aerodynamic/propulsion/sensor/loadout
 components, and the eight configured compatibility relationships. This is a
 contract migration and regression-continuity fixture, not a fidelity upgrade.
+Every aircraft in this pack has `performanceAdmission: UNSUPPORTED`; requests
+for named aircraft performance fail closed. The preserved v0.7 fixture remains
+an immutable historical artifact; v0.8 publishes this new admission boundary.
 
 ## Consumption rules for dependent workstreams
 
