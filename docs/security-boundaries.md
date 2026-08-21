@@ -107,3 +107,23 @@ claim to prevent inline-script injection. Repository content must continue to
 use structural rendering and text nodes. A later #70 slice must inventory the
 approved payloads and replace these allowances with a tested nonce/hash CSP
 before future operator-authored content is admitted.
+
+## Trusted published content
+
+`trusted-content-rendering.v1` treats Markdown as content rather than an HTML
+template language. Blog Markdown is lexed and rendered with structural React
+nodes. Raw HTML is shown as text. Only `https`, `http`, `mailto`, same-origin
+absolute paths, relative paths, and fragment links can produce an anchor;
+other URL schemes produce inert link text. This rule applies to headings,
+paragraphs, lists, and table cells.
+
+Mermaid input is also content. The browser renderer uses Mermaid strict mode;
+it does not admit loose HTML labels or callback links. The SVG insertion is a
+library rendering boundary and must retain its strict-mode regression test.
+
+Repository Markdown is reviewed source content, but it does not receive
+executable trust. Future database or operator-authored content must use this
+same structural renderer or a separately versioned, tested sanitization policy.
+This slice does not provide a nonce/hash CSP, comment moderation, operator
+identity, retention, or a production CSP report endpoint; those remain open
+items in #70.

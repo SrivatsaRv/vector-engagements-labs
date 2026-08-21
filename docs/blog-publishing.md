@@ -52,9 +52,21 @@ global blog image.
 5. Run `npm run blog:visual:verify` when the article includes editorial diagrams
    or visual assets that changed.
 
+## Content safety
+
+Markdown is not an HTML template language. Raw HTML is displayed as text.
+Use standard Markdown for headings, emphasis, lists, tables, code, and links.
+Links may use `https`, `http`, `mailto`, a same-origin path, a relative path,
+or a fragment. Other schemes, including `javascript:` and `data:`, render as
+inert text. Mermaid diagrams use strict mode; do not use HTML labels or
+callback links in diagram code.
+
 ## Notes
 
 - Comments remain persisted through the blog comments API and are independent
   of article content.
+- Comments are still anonymous and public on submission. Moderation, operator
+  identity, abuse reporting, and retention are not delivered by this publishing
+  contract; #70 owns those remaining security requirements.
 - The blog does not require a code change for a new post as long as the file
   is valid and the asset path exists.

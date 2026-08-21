@@ -74,8 +74,7 @@
       { "path": "app/lab/page.tsx", "indicator": "fallback", "expectedLines": 1, "classification": "fail-closed-assertion", "rationale": "This comment states that engine selection does not silently fall through.", "owners": ["#66"] },
       { "path": "app/math/page.tsx", "indicator": "fallback", "expectedLines": 1, "classification": "operator-disclosure", "rationale": "The page labels calculated display values; it does not supply runtime truth.", "owners": ["#66"] },
       { "path": "lib/security/public-api.ts", "indicator": "fallback", "expectedLines": 2, "classification": "error-default", "rationale": "The HTTP error helper requires an explicit status default and does not supply causal state.", "owners": ["#66"] },
-      { "path": "lib/blog.server.ts", "indicator": "fallback", "expectedLines": 3, "classification": "content-default", "rationale": "Reading-time presentation defaults do not enter simulation state.", "owners": ["#66"] },
-      { "path": "app/blogs/posts/[slug]/page.tsx", "indicator": "fallback", "expectedLines": 2, "classification": "content-default", "rationale": "Markdown rendering defaults do not enter simulation state.", "owners": ["#66"] }
+      { "path": "lib/blog.server.ts", "indicator": "fallback", "expectedLines": 3, "classification": "content-default", "rationale": "Reading-time presentation defaults do not enter simulation state.", "owners": ["#66"] }
       ,{ "path": "scripts/classify-ci-changes.mjs", "indicator": "unfinished-marker", "expectedLines": 3, "classification": "policy-path-name", "rationale": "These expressions select the runtime-stub policy files; they do not mark unfinished production behavior.", "owners": ["#66"] }
     ]
   },

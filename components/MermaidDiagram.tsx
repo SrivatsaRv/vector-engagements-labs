@@ -13,7 +13,10 @@ export function MermaidDiagram({ code }: { code: string }) {
         mermaid.default.initialize({
           startOnLoad: false,
           theme: 'dark',
-          securityLevel: 'loose',
+          // Markdown code blocks are content, not trusted executable templates.
+          // Mermaid strict mode prevents HTML labels and callback links from
+          // becoming active DOM within the client-side SVG result.
+          securityLevel: 'strict',
           fontFamily: 'Inter, system-ui, sans-serif',
           themeVariables: {
             darkMode: true,

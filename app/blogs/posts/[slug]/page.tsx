@@ -10,6 +10,7 @@ import { BlogShareAndComments } from "@/components/BlogShareAndComments";
 import { MermaidDiagram } from "@/components/MermaidDiagram";
 import { ProductHeader } from "@/components/ProductHeader";
 import { formatBlogDate } from "@/lib/blog";
+import { renderBlogMarkdown } from "@/lib/blog-markdown";
 import {
   blogAbsoluteUrl,
   blogCanonicalUrl,
@@ -24,25 +25,6 @@ type PageProps = {
 function absoluteAssetUrl(path: string) {
   return new URL(path, process.env.SITE_URL || "https://labs.reachdefence.com").toString();
 }
-
-function renderInline(tokens: Tokens.Generic[] | undefined, fallback = "") {
-  const source = tokens?.map((token) => token.raw).join("") ?? fallback;
-  return { __html: marked.parseInline(source) };
-}
-
-function renderTableCell(cell: { text?: string; tokens?: Tokens.Generic[] }, key: string) {
-  return <span key={key} dangerouslySetInnerHTML={renderInline(cell.tokens, cell.text ?? "")} />;
-}
-
-type ListItemToken = {
-  text: string;
-  tokens?: Tokens.Generic[];
-};
-
-type TableCellToken = {
-  text?: string;
-  tokens?: Tokens.Generic[];
-};
 
 const EDITORIAL_DIAGRAMS = {
   "causal-simulation-loop": {
@@ -66,81 +48,6 @@ type EditorialDiagramId = keyof typeof EDITORIAL_DIAGRAMS;
 function renderMarkdown(tokens: Tokens.Generic[]): ReactNode[] {
   return tokens.flatMap((token, index) => {
     switch (token.type) {
-      case "space":
-        return [];
-      case "hr":
-        return [<hr key={`hr-${index}`} />];
-      case "heading": {
-        if (token.depth === 1) return [];
-        if (token.depth === 2) {
-          return [
-            <h2 key={`h2-${index}`} dangerouslySetInnerHTML={renderInline(token.tokens, token.text)} />,
-          ];
-        }
-        return [
-          <h3 key={`h3-${index}`} dangerouslySetInnerHTML={renderInline(token.tokens, token.text)} />,
-        ];
-      }
-      case "paragraph":
-        return [
-          <p key={`p-${index}`} dangerouslySetInnerHTML={renderInline(token.tokens, token.text)} />,
-        ];
-      case "list":
-        if (token.ordered) {
-          return [
-            <ol key={`ol-${index}`}>
-              {token.items.map((item: ListItemToken, itemIndex: number) => (
-                <li key={`oli-${index}-${itemIndex}`}>
-                  <span
-                    dangerouslySetInnerHTML={renderInline(
-                      item.tokens as Tokens.Generic[] | undefined,
-                      item.text,
-                    )}
-                  />
-                </li>
-              ))}
-            </ol>,
-          ];
-        }
-        return [
-          <ul key={`ul-${index}`}>
-            {token.items.map((item: ListItemToken, itemIndex: number) => (
-              <li key={`uli-${index}-${itemIndex}`}>
-                <span
-                  dangerouslySetInnerHTML={renderInline(
-                    item.tokens as Tokens.Generic[] | undefined,
-                    item.text,
-                  )}
-                />
-              </li>
-            ))}
-          </ul>,
-        ];
-      case "table":
-        return [
-          <div key={`table-wrap-${index}`} className="blog-post-table-wrap">
-            <table className="blog-post-table">
-              <thead>
-                <tr>
-                  {token.header.map((cell: TableCellToken, cellIndex: number) => (
-                    <th key={`th-${index}-${cellIndex}`}>{renderTableCell(cell, `thc-${cellIndex}`)}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {token.rows.map((row: TableCellToken[], rowIndex: number) => (
-                  <tr key={`row-${index}-${rowIndex}`}>
-                    {row.map((cell: TableCellToken, cellIndex: number) => (
-                      <td key={`td-${index}-${rowIndex}-${cellIndex}`}>
-                        {renderTableCell(cell, `tdc-${rowIndex}-${cellIndex}`)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>,
-        ];
       case "code":
         if (token.lang === "editorial-diagram") {
           const diagramId = token.text.trim() as EditorialDiagramId;
@@ -162,12 +69,8 @@ function renderMarkdown(tokens: Tokens.Generic[]): ReactNode[] {
             <code>{token.text}</code>
           </pre>,
         ];
-      case "text":
-        return [
-          <p key={`text-${index}`} dangerouslySetInnerHTML={renderInline(token.tokens, token.text)} />,
-        ];
       default:
-        return [];
+        return renderBlogMarkdown([token]);
     }
   });
 }
