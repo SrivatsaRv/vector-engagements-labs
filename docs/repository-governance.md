@@ -53,6 +53,11 @@ Compose, runtime-binding, dependency, and workflow changes add an image rebuild
 and the integration gates. Unknown paths run everything until ownership is
 declared in `scripts/classify-ci-changes.mjs`.
 
+`make clean-clone-local` proves the documented release context slice resolves
+from a new clone, installs the locked dependencies, then runs the deterministic
+baseline and `worker-local`. It therefore verifies the production-built Worker
+without relying on stale assets in the source checkout.
+
 The gate implementation is a tracked, unit-tested script rather than inline
 workflow shell. It accepts only explicit `true` or `false` selections, requires
 success for every selected job, requires `skipped` for every unselected job,

@@ -82,7 +82,7 @@ clean-clone-local:
 		cd "$$temporary_root/repository"; \
 		scripts/context-slice.sh release >/dev/null; \
 		npm ci; \
-		make ci-local
+		make ci-local worker-local
 
 ci-quality:
 	npm run policy:runtime-stubs:verify

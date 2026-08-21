@@ -46,6 +46,14 @@ test("every declared verification layer has a named Make target", async () => {
   }
 });
 
+test("the clean-clone gate executes the context slice and built Worker verifier", async () => {
+  const makefile = await readFile("Makefile", "utf8");
+  const cleanClone = makefile.split(/^clean-clone-local:/m)[1];
+  assert.ok(cleanClone, "clean-clone-local is not declared");
+  assert.match(cleanClone, /scripts\/context-slice\.sh release/);
+  assert.match(cleanClone, /make ci-local worker-local/);
+});
+
 test("the pull request template requires layer-specific evidence", async () => {
   const template = await readFile(".github/pull_request_template.md", "utf8");
   assert.match(template, /Owning issue/);
