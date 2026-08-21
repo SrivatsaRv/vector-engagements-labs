@@ -144,7 +144,7 @@ test("VSR rejects an observer-picture member with an unadmitted schema", async (
     ...record,
     members: record.members.map((member) =>
       member.path === "pictures.jsonl"
-        ? { ...member, schemaVersion: "vector.pictures.v3" }
+        ? { ...member, schemaVersion: "vector.pictures.v4" }
         : member,
     ),
   };

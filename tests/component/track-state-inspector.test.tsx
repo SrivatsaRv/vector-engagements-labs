@@ -8,7 +8,7 @@ const selected: SelectedTrackState = {
   state: "AVAILABLE",
   displayTimeSeconds: 12,
   track: {
-    schemaVersion: "vector.observer-state.v1",
+    schemaVersion: "vector.observer-state.v2",
     perspective: "IAF",
     sensorState: "UNSUPPORTED",
     observationCount: 0,

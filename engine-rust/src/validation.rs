@@ -229,6 +229,56 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
             aircraft.maximum_command_g,
         )?;
     }
+    if let Some(sensor) = &entity.observer_sensor {
+        if sensor.schema_version != "vector.observer-sensor-admission.v1" {
+            return Err(invalid(format!(
+                "{root}.observerSensor.schemaVersion is unsupported"
+            )));
+        }
+        sha256_digest(
+            &format!("{root}.observerSensor.modelPackDigest"),
+            &sensor.model_pack_digest,
+        )?;
+        identifier(&format!("{root}.observerSensor.modelId"), &sensor.model_id)?;
+        identifier(
+            &format!("{root}.observerSensor.modelVersion"),
+            &sensor.model_version,
+        )?;
+        if sensor.evidence_ref_ids.is_empty()
+            || !matches!(sensor.sensor_kind.as_str(), "RADAR" | "INFRARED" | "VISUAL")
+            || !matches!(sensor.mode.as_str(), "OFF" | "SEARCH")
+        {
+            return Err(invalid(format!(
+                "{root}.observerSensor requires a typed kind, mode, and evidence"
+            )));
+        }
+        positive(
+            &format!("{root}.observerSensor.detectionRangeM"),
+            sensor.detection_range_m,
+        )?;
+        non_negative(
+            &format!("{root}.observerSensor.minimumRangeM"),
+            sensor.minimum_range_m,
+        )?;
+        positive(
+            &format!("{root}.observerSensor.scanPeriodS"),
+            sensor.scan_period_s,
+        )?;
+        positive(
+            &format!("{root}.observerSensor.azimuthFieldOfViewRad"),
+            sensor.azimuth_field_of_view_rad,
+        )?;
+        positive(
+            &format!("{root}.observerSensor.elevationFieldOfViewRad"),
+            sensor.elevation_field_of_view_rad,
+        )?;
+        if sensor.minimum_range_m > sensor.detection_range_m
+            || sensor.azimuth_field_of_view_rad > std::f64::consts::TAU
+            || sensor.elevation_field_of_view_rad > std::f64::consts::PI
+        {
+            return Err(invalid(format!("{root}.observerSensor bounds are invalid")));
+        }
+    }
 
     if let Some(sensor) = &entity.sensor {
         non_negative(
@@ -472,6 +522,16 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         if entity.provenance.model_pack_digest != scenario.model_pack.digest {
             return Err(invalid(format!(
                 "entity {} model-pack digest does not match scenario",
+                entity.id
+            )));
+        }
+        if entity
+            .observer_sensor
+            .as_ref()
+            .is_some_and(|sensor| sensor.model_pack_digest != scenario.model_pack.digest)
+        {
+            return Err(invalid(format!(
+                "observer sensor {} admission does not match scenario model pack",
                 entity.id
             )));
         }

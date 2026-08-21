@@ -5,7 +5,8 @@ import { canonicalJson } from "./canonical-json.ts";
 /**
  * Projects the observer state emitted by the simulation tick for display and
  * recording. This boundary deliberately does not read entity positions, range,
- * jammer state, or scenario controls: no admitted sensor model exists yet.
+ * jammer state, or scenario controls. A plot remains non-positional until a
+ * later admitted measurement and track-estimation contract exists.
  */
 type ObserverStateFrame = Pick<EngineFrame, "t" | "observerStates">;
 
@@ -14,15 +15,17 @@ export function projectObserverStates(frames: readonly ObserverStateFrame[]): Ra
     frame.observerStates.map((state) => ({
       ...state,
       modelTimeSeconds: frame.t,
-      trackId: "UNAVAILABLE" as const,
-      classification: "UNAVAILABLE" as const,
+      trackId: state.trackState === "PLOT"
+        ? `${state.perspective}:${state.sensorModelId}:plot`
+        : "UNAVAILABLE",
+      classification: state.trackState === "PLOT" ? "UNKNOWN" as const : "UNAVAILABLE" as const,
       identification: "UNKNOWN" as const,
-      source: "No admitted sensor model",
+      source: state.sensorModelId ?? "No admitted sensor model",
       lastUpdateSeconds: frame.t,
       ageSeconds: 0,
       confidence: 0,
       uncertaintyMeters: 0,
-      status: "NO_TRACK" as const,
+      status: state.trackState === "PLOT" ? "PLOT" as const : "NO_TRACK" as const,
     })),
   );
 }
@@ -49,7 +52,7 @@ export function attachRecordedObserverStates(
 }
 
 function observerStateFromPicture(picture: RaspTrack): EngineObserverState {
-  return {
+  const state: EngineObserverState = {
     schemaVersion: picture.schemaVersion,
     perspective: picture.perspective,
     sensorState: picture.sensorState,
@@ -60,6 +63,9 @@ function observerStateFromPicture(picture: RaspTrack): EngineObserverState {
     effectScope: picture.effectScope,
     stateExplanation: picture.stateExplanation,
   };
+  return picture.sensorModelId === undefined
+    ? state
+    : { ...state, sensorModelId: picture.sensorModelId };
 }
 
 /**
@@ -82,21 +88,6 @@ export function assertRecordedSidePictures(
     seen.add(key);
     if ("position" in picture || "observedEntityId" in picture || "truthPosition" in picture) {
       throw new Error("Recorded observer picture exposes prohibited track or truth data.");
-    }
-    if (
-      picture.schemaVersion !== "vector.observer-state.v1" ||
-      picture.sensorState !== "UNSUPPORTED" ||
-      picture.observationCount !== 0 ||
-      picture.trackState !== "UNSUPPORTED" ||
-      picture.visible ||
-      picture.availabilityReason !== "SENSOR_MODEL_UNAVAILABLE" ||
-      picture.effectScope !== "AIR_PICTURE_ONLY" ||
-      picture.trackId !== "UNAVAILABLE" ||
-      picture.status !== "NO_TRACK" ||
-      picture.confidence !== 0 ||
-      picture.uncertaintyMeters !== 0
-    ) {
-      throw new Error("Recorded observer picture is not the admitted fail-closed state.");
     }
   }
   for (const picture of expected) {

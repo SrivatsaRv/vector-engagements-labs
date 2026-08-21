@@ -10,7 +10,7 @@ test("every A2A tick emits an explicit fail-closed observer state", () => {
     assert.deepEqual(frame.observerStates.map((state) => state.perspective), ["IAF", "PAF"]);
     for (const state of frame.observerStates) {
       assert.deepEqual(state, {
-        schemaVersion: "vector.observer-state.v1",
+        schemaVersion: "vector.observer-state.v2",
         perspective: state.perspective,
         sensorState: "UNSUPPORTED",
         observationCount: 0,

@@ -41,7 +41,7 @@ when the compiled capability identity and record manifest disagree.
 
 Basemap tiles are referenced by provider and style revision, not silently embedded. A portable export may include explicitly licensed terrain or static assets. Missing optional assets must degrade to class silhouettes and a neutral terrain surface without changing telemetry.
 
-Each `pictures.jsonl` entry uses the required `vector.pictures.v2` schema and
+Each `pictures.jsonl` entry uses the required `vector.pictures.v3` schema and
 its member hash is bound by `manifest.json`. It carries `modelTimeSeconds`, the model-clock identity
 of that observer-picture sample. Consumers select it by that exact frame time,
 not by array order, last-update time, or a rendered interpolation. A missing
@@ -113,7 +113,10 @@ implementation is not Apache Arrow IPC. An Arrow IPC adapter and downloadable
 ZIP container remain follow-up interoperability work; changing the frame codec
 requires a new member schema version and fixture migration.
 
-Version 4 also records the canonical tick-owned observer state. The requested
+Version 4 also records the canonical tick-owned observer state. Its
+`pictures.jsonl` member is currently `vector.pictures.v3`, which can preserve
+an admitted non-positional sensor PLOT but rejects any reconstructed position,
+observed world identity, or truth position during replay. The requested
 steering-acceleration vector remains a recorded pre-limit route-controller
 demand, not an aerodynamic capability claim. A prior record is rejected with
 an explicit incomplete-observer-state error; it must be regenerated from its

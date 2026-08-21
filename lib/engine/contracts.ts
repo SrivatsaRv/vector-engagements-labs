@@ -50,16 +50,46 @@ export type ObserverPerspective = "IAF" | "PAF";
  * Tick-owned information state. The current deployment has no admitted sensor
  * model pack, so it can only emit this explicit fail-closed state.
  */
+export type ObserverSensorMode = "OFF" | "SEARCH";
+export type ObserverSensorKind = "RADAR" | "INFRARED" | "VISUAL";
+
+/**
+ * Immutable sensor inputs copied from the selected compiled model pack. The
+ * engine has no access to the catalog during a tick, so this is the complete
+ * admitted measurement boundary rather than a UI preference or a range
+ * substitute.
+ */
+export type ObserverSensorAdmission = {
+  schemaVersion: "vector.observer-sensor-admission.v1";
+  modelPackDigest: string;
+  modelId: string;
+  modelVersion: string;
+  evidenceRefIds: string[];
+  sensorKind: ObserverSensorKind;
+  mode: ObserverSensorMode;
+  detectionRangeM: number;
+  minimumRangeM: number;
+  scanPeriodS: number;
+  azimuthFieldOfViewRad: number;
+  elevationFieldOfViewRad: number;
+};
+
 export type EngineObserverState = {
-  schemaVersion: "vector.observer-state.v1";
+  schemaVersion: "vector.observer-state.v2";
   perspective: ObserverPerspective;
-  sensorState: "UNSUPPORTED";
-  observationCount: 0;
-  trackState: "UNSUPPORTED";
+  sensorState: "UNSUPPORTED" | "OFF" | "SEARCH";
+  observationCount: number;
+  trackState: "UNSUPPORTED" | "NONE" | "PLOT";
   visible: false;
-  availabilityReason: "SENSOR_MODEL_UNAVAILABLE";
+  availabilityReason:
+    | "SENSOR_MODEL_UNAVAILABLE"
+    | "SENSOR_OFF"
+    | "SCAN_NOT_DUE"
+    | "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME"
+    | "OBSERVATION_ADMITTED";
   effectScope: "AIR_PICTURE_ONLY";
   stateExplanation: string;
+  sensorModelId?: string;
 };
 export type EntityLifecycle =
   | "STOWED"
@@ -151,6 +181,7 @@ export type EngineEntityDefinition = {
     minimumAltitudeM: number;
     maximumAltitudeM: number;
   };
+  observerSensor?: ObserverSensorAdmission;
   aircraft?: {
     emptyMassKg: number;
     fuelCapacityKg: number;

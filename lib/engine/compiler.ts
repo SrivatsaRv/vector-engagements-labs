@@ -53,6 +53,8 @@ export type ScenarioCompilerInput = {
   targetSpeed: number;
   blueFuelPercent: number;
   redFuelPercent: number;
+  blueRadarMode?: "ACTIVE" | "SILENT";
+  redRadarMode?: "ACTIVE" | "SILENT";
   windEastMps: number;
   windNorthMps: number;
   temperatureOffset: number;
@@ -163,6 +165,46 @@ function compiledAircraftRuntime(catalogObjectId: string) {
     thrustByThrottle: runtimeTable(propulsion.thrustTable, "THROTTLE"),
     fuelFlowByThrottle: runtimeTable(propulsion.fuelFlowTable, "THROTTLE"),
     maximumCommandG: aircraft.maximumCommandLoadFactorG,
+  };
+}
+
+function compiledObserverSensorRuntime(
+  catalogObjectId: string,
+  mode: "ACTIVE" | "SILENT",
+) {
+  const aircraft = CURRENT_COMPILED_MODEL_PACK.aircraft.find((item) => item.catalogObjectId === catalogObjectId);
+  if (!aircraft) throw new Error(`Missing compiled aircraft model for ${catalogObjectId}`);
+  const sensor = aircraft.sensorModelIndexes
+    .map((index) => CURRENT_COMPILED_MODEL_PACK.sensors[index])
+    .find((candidate) => candidate?.sensorKind !== "DECLARED_ENVELOPE");
+  // A declared envelope is not a measurement model. It must never become a
+  // hidden generic radar when the operator selects an emission state.
+  if (!sensor || sensor.sensorKind === "DECLARED_ENVELOPE") return undefined;
+  if (
+    !["RADAR", "INFRARED", "VISUAL"].includes(sensor.sensorKind) ||
+    sensor.detectionRangeM <= 0 ||
+    sensor.minimumRangeM < 0 ||
+    sensor.minimumRangeM > sensor.detectionRangeM ||
+    sensor.scanPeriodS <= 0 ||
+    sensor.azimuthFieldOfViewRad <= 0 || sensor.azimuthFieldOfViewRad > Math.PI * 2 ||
+    sensor.elevationFieldOfViewRad <= 0 || sensor.elevationFieldOfViewRad > Math.PI ||
+    !sensor.evidenceRefIds.length
+  ) {
+    throw new Error(`Compiled observer sensor ${sensor.id} is incomplete for ${catalogObjectId}`);
+  }
+  return {
+    schemaVersion: "vector.observer-sensor-admission.v1" as const,
+    modelPackDigest: CURRENT_MODEL_PACK_DIGEST,
+    modelId: sensor.id,
+    modelVersion: sensor.version,
+    evidenceRefIds: [...sensor.evidenceRefIds],
+    sensorKind: sensor.sensorKind,
+    mode: mode === "ACTIVE" ? "SEARCH" as const : "OFF" as const,
+    detectionRangeM: sensor.detectionRangeM,
+    minimumRangeM: sensor.minimumRangeM,
+    scanPeriodS: sensor.scanPeriodS,
+    azimuthFieldOfViewRad: sensor.azimuthFieldOfViewRad,
+    elevationFieldOfViewRad: sensor.elevationFieldOfViewRad,
   };
 }
 
@@ -314,6 +356,9 @@ export function compileScenario(
         fuelKg: blueFuelKg,
       },
       aircraft: blueAircraft,
+      observerSensor: blueIsAircraft
+        ? compiledObserverSensorRuntime(blueObject.id, input.blueRadarMode ?? "SILENT")
+        : undefined,
     },
     blueObject.id,
     blueAircraftModel?.id ?? `${blueObject.id}-static-study-v1`,
@@ -367,6 +412,9 @@ export function compileScenario(
         fuelKg: redFuelKg,
       },
       aircraft: redAircraft,
+      observerSensor: movingTarget && redObject.kind === "AIRCRAFT"
+        ? compiledObserverSensorRuntime(redObject.id, input.redRadarMode ?? "SILENT")
+        : undefined,
     },
     redObject.id,
     redAircraftModel?.id ?? `${redObject.id}-static-study-v1`,

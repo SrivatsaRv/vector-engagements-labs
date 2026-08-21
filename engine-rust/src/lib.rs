@@ -438,8 +438,27 @@ pub struct EntityDefinition {
     pub initial: InitialState,
     pub weapon: Option<WeaponModel>,
     pub sensor: Option<SensorModel>,
+    #[serde(default)]
+    pub observer_sensor: Option<ObserverSensorAdmission>,
     pub aircraft: Option<AircraftModel>,
     pub provenance: Provenance,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObserverSensorAdmission {
+    pub schema_version: String,
+    pub model_pack_digest: String,
+    pub model_id: String,
+    pub model_version: String,
+    pub evidence_ref_ids: Vec<String>,
+    pub sensor_kind: String,
+    pub mode: String,
+    pub detection_range_m: f64,
+    pub minimum_range_m: f64,
+    pub scan_period_s: f64,
+    pub azimuth_field_of_view_rad: f64,
+    pub elevation_field_of_view_rad: f64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -589,24 +608,143 @@ pub struct ObserverState {
     pub availability_reason: &'static str,
     pub effect_scope: &'static str,
     pub state_explanation: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sensor_model_id: Option<String>,
 }
 
-fn unavailable_observer_states(domain: EngagementDomain) -> Vec<ObserverState> {
-    if domain != EngagementDomain::AirToAir {
+fn unavailable_observer_state(
+    perspective: &'static str,
+    explanation: &'static str,
+) -> ObserverState {
+    ObserverState {
+        schema_version: "vector.observer-state.v2",
+        perspective,
+        sensor_state: "UNSUPPORTED",
+        observation_count: 0,
+        track_state: "UNSUPPORTED",
+        visible: false,
+        availability_reason: "SENSOR_MODEL_UNAVAILABLE",
+        effect_scope: "AIR_PICTURE_ONLY",
+        state_explanation: explanation,
+        sensor_model_id: None,
+    }
+}
+
+fn observer_states(
+    states: &[RuntimeState],
+    scenario: &EngineScenario,
+    time: f64,
+    dt: f64,
+) -> Vec<ObserverState> {
+    if scenario.domain != EngagementDomain::AirToAir {
         return Vec::new();
     }
-    ["IAF", "PAF"]
+    [("IAF", Affiliation::Blue), ("PAF", Affiliation::Red)]
         .into_iter()
-        .map(|perspective| ObserverState {
-            schema_version: "vector.observer-state.v1",
-            perspective,
-            sensor_state: "UNSUPPORTED",
-            observation_count: 0,
-            track_state: "UNSUPPORTED",
-            visible: false,
-            availability_reason: "SENSOR_MODEL_UNAVAILABLE",
-            effect_scope: "AIR_PICTURE_ONLY",
-            state_explanation: "No admitted sensor model pack is bound to this run.",
+        .map(|(perspective, affiliation)| {
+            let observer = states.iter().find(|state| {
+                state.definition.affiliation == affiliation
+                    && state.definition.kind == EntityKind::Aircraft
+                    && state.lifecycle == EntityLifecycle::Active
+            });
+            let target = states.iter().find(|state| {
+                state.definition.affiliation != affiliation
+                    && state.definition.kind == EntityKind::Aircraft
+                    && state.lifecycle == EntityLifecycle::Active
+            });
+            let Some(observer) = observer else {
+                return unavailable_observer_state(perspective, "No admitted sensor model pack is bound to this run.");
+            };
+            let Some(target) = target else {
+                return unavailable_observer_state(perspective, "No admitted sensor model pack is bound to this run.");
+            };
+            let Some(sensor) = observer.definition.observer_sensor.as_ref() else {
+                return unavailable_observer_state(perspective, "No admitted sensor model pack is bound to this run.");
+            };
+            let valid = sensor.schema_version == "vector.observer-sensor-admission.v1"
+                && sensor.model_pack_digest == scenario.model_pack.digest
+                && !sensor.model_id.is_empty()
+                && !sensor.model_version.is_empty()
+                && !sensor.evidence_ref_ids.is_empty()
+                && matches!(sensor.sensor_kind.as_str(), "RADAR" | "INFRARED" | "VISUAL")
+                && matches!(sensor.mode.as_str(), "OFF" | "SEARCH")
+                && sensor.detection_range_m.is_finite() && sensor.detection_range_m > 0.0
+                && sensor.minimum_range_m.is_finite() && sensor.minimum_range_m >= 0.0
+                && sensor.minimum_range_m <= sensor.detection_range_m
+                && sensor.scan_period_s.is_finite() && sensor.scan_period_s > 0.0
+                && sensor.azimuth_field_of_view_rad.is_finite() && sensor.azimuth_field_of_view_rad > 0.0 && sensor.azimuth_field_of_view_rad <= std::f64::consts::TAU
+                && sensor.elevation_field_of_view_rad.is_finite() && sensor.elevation_field_of_view_rad > 0.0 && sensor.elevation_field_of_view_rad <= std::f64::consts::PI;
+            if !valid {
+                return unavailable_observer_state(perspective, "The admitted sensor inputs are incomplete or inconsistent with the compiled model pack.");
+            }
+            let sensor_model_id = Some(sensor.model_id.clone());
+            if sensor.mode == "OFF" {
+                return ObserverState {
+                    schema_version: "vector.observer-state.v2",
+                    perspective,
+                    sensor_state: "OFF",
+                    observation_count: 0,
+                    track_state: "NONE",
+                    visible: false,
+                    availability_reason: "SENSOR_OFF",
+                    effect_scope: "AIR_PICTURE_ONLY",
+                    state_explanation: "The admitted sensor is off. No observation or track is emitted.",
+                    sensor_model_id,
+                };
+            }
+            let due = (time / sensor.scan_period_s - (time / sensor.scan_period_s).round()).abs()
+                <= dt / sensor.scan_period_s / 2.0 + 1e-9;
+            if !due {
+                return ObserverState {
+                    schema_version: "vector.observer-state.v2",
+                    perspective,
+                    sensor_state: "SEARCH",
+                    observation_count: 0,
+                    track_state: "NONE",
+                    visible: false,
+                    availability_reason: "SCAN_NOT_DUE",
+                    effect_scope: "AIR_PICTURE_ONLY",
+                    state_explanation: "No admitted scan is due at this model time.",
+                    sensor_model_id,
+                };
+            }
+            let relative = target.position.subtract(observer.position);
+            let range = relative.magnitude();
+            let horizontal = (relative.x * relative.x + relative.y * relative.y).sqrt();
+            let forward = Vec3 { x: observer.heading_rad.cos(), y: observer.heading_rad.sin(), z: 0.0 };
+            let azimuth = if horizontal > 0.0 {
+                ((relative.x * forward.x + relative.y * forward.y) / horizontal).clamp(-1.0, 1.0).acos()
+            } else { 0.0 };
+            let elevation = if range > 0.0 { (relative.z / range).clamp(-1.0, 1.0).asin() } else { 0.0 };
+            let detected = range >= sensor.minimum_range_m && range <= sensor.detection_range_m
+                && azimuth <= sensor.azimuth_field_of_view_rad / 2.0
+                && elevation.abs() <= sensor.elevation_field_of_view_rad / 2.0;
+            if !detected {
+                return ObserverState {
+                    schema_version: "vector.observer-state.v2",
+                    perspective,
+                    sensor_state: "SEARCH",
+                    observation_count: 0,
+                    track_state: "NONE",
+                    visible: false,
+                    availability_reason: "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME",
+                    effect_scope: "AIR_PICTURE_ONLY",
+                    state_explanation: "The opposing aircraft is outside the admitted range or field of view at the due scan.",
+                    sensor_model_id,
+                };
+            }
+            ObserverState {
+                schema_version: "vector.observer-state.v2",
+                perspective,
+                sensor_state: "SEARCH",
+                observation_count: 1,
+                track_state: "PLOT",
+                visible: false,
+                availability_reason: "OBSERVATION_ADMITTED",
+                effect_scope: "AIR_PICTURE_ONLY",
+                state_explanation: "One due scan satisfied the admitted range and field-of-view conditions. This plot has no position estimate or weapon-support authority.",
+                sensor_model_id,
+            }
         })
         .collect()
 }
@@ -1316,7 +1454,12 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 separation_m: separation,
                 closure_rate_mps: closure,
                 line_of_sight_rate_rad_s: los_rate,
-                observer_states: unavailable_observer_states(scenario.domain),
+                observer_states: observer_states(
+                    &states,
+                    &scenario,
+                    time,
+                    scenario.fixed_step_seconds,
+                ),
             });
         }
         if states[weapon_index].weapon_flight_state == Some(WeaponFlightState::TargetUnavailable) {
@@ -1428,6 +1571,7 @@ mod tests {
             },
             weapon: None,
             sensor: None,
+            observer_sensor: None,
             aircraft: Some(AircraftModel {
                 empty_mass_kg: 8_000.0,
                 fuel_capacity_kg: 3_000.0,
@@ -1544,6 +1688,7 @@ mod tests {
                 },
             }),
             sensor: None,
+            observer_sensor: None,
             aircraft: None,
             provenance: provenance(),
         };
