@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import { simulate, DEFAULT_SCENARIO } from "../lib/simulation.ts";
-import { createDefaultSpatialPlan } from "../lib/scenario-spatial.ts";
+import { createDefaultSpatialPlan, withAirborneStart } from "../lib/scenario-spatial.ts";
 import { getStudyArea } from "../lib/study-areas.ts";
 
 function planWithBlueOrigin(reference) {
@@ -64,6 +64,18 @@ test("manual airborne placement remains runnable without an installation referen
     ...DEFAULT_SCENARIO,
     spatialPlan: planWithBlueOrigin(undefined),
   });
+  assert.deepEqual(result.engineRun.scenario.geospatial.originReferences, []);
+});
+
+test("a numeric horizontal start edit clears installation identity before compilation", () => {
+  const plan = planWithBlueOrigin(validOrigin());
+  plan.blue = withAirborneStart(plan.blue, {
+    ...plan.blue.position,
+    longitude: plan.blue.position.longitude + 0.01,
+  });
+
+  assert.equal(plan.blue.originReference, undefined);
+  const result = simulate({ ...DEFAULT_SCENARIO, spatialPlan: plan });
   assert.deepEqual(result.engineRun.scenario.geospatial.originReferences, []);
 });
 

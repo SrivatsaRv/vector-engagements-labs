@@ -31,6 +31,27 @@ export type ScenarioSpatialPlan = {
   red: ScenarioSpatialEntity;
 };
 
+/**
+ * Apply an airborne start edit without allowing an installation reference to
+ * become a misleading coordinate label. Altitude remains an aircraft flight
+ * input at the selected installation; a horizontal move is an explicit manual
+ * placement and therefore removes the installation identity before compile.
+ */
+export function withAirborneStart(
+  entity: ScenarioSpatialEntity,
+  position: ScenarioSpatialPoint,
+): ScenarioSpatialEntity {
+  const movedHorizontally =
+    Math.abs(entity.position.longitude - position.longitude) > 1e-6 ||
+    Math.abs(entity.position.latitude - position.latitude) > 1e-6;
+  return {
+    ...entity,
+    position,
+    route: entity.route.map((point, index) => (index === 0 ? position : point)),
+    originReference: movedHorizontally ? undefined : entity.originReference,
+  };
+}
+
 export function normalizeHeading(headingDeg: number) {
   return ((headingDeg % 360) + 360) % 360;
 }

@@ -143,7 +143,11 @@ reference, or map anchor.
 - Place & flight exposes the six governed regional presets immediately and may collapse them only after they have been shown. A missing/incomplete PostGIS catalog produces an actionable blocked state rather than a runnable static fallback.
 - Blue and Red each have an affiliation-scoped origin picker populated from public-reference installations inside the selected study area. Choosing an origin moves that team's aircraft to the installation; manual drag remains available when no catalog origin is appropriate.
 - Selecting an origin retains `vector.installation-origin.v1` with its installation ID, source ID, selected study-area ID and weather-preset ID. The compiler re-resolves all four values before producing an engine scenario. A missing/deleted installation, stale source, cross-environment reference, or runway ID blocks compilation with a stable field-path error; it never becomes a coordinate-only origin. Manual drag explicitly clears that optional airborne-origin reference. Ground/runway starts remain unavailable because the current catalog has only point locations and text runway notes, not admitted runway geometry or start evidence.
-- Blue and Red start markers and waypoints are draggable.
+- Blue and Red start markers and waypoints are draggable. A numeric longitude or
+  latitude edit has the same meaning as dragging a start: it explicitly changes
+  the aircraft to a manual airborne placement and clears any installation-origin
+  identity before compilation. Altitude-only edits retain the selected
+  installation identity because they do not move its geographic origin.
 - Waypoint creation is scoped to the currently selected team and lives in that team's route inspector. The map never offers an unowned generic waypoint action.
 - The selected entity inspector edits WGS84 start coordinates, explicit MSL altitude, true heading, true airspeed, and each waypoint's WGS84 coordinates and MSL altitude. This provides a keyboard-accessible alternative to map placement.
 - Numeric editors retain intermediate text. Empty, non-finite, out-of-area, negative, over-limit, and uncommitted values keep the operator in Place & flight and block validation instead of being discarded, normalized, or clamped into a different scenario.

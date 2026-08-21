@@ -5353,6 +5353,10 @@ button:disabled,
 .field-error, .spatial-editor-status { margin: 0; color: #94453d; font-size: 9px; line-height: 1.4; }
 .spatial-editor-status { padding: 7px 9px; border-left: 2px solid #a94f45; background: #fff9f8; }
 .route-coordinate-editor { display: grid; gap: 8px; }
+.origin-reference-state { display: grid; gap: 2px; margin: 0 0 10px; padding: 8px 10px; border-left: 2px solid #647785; background: #f4f6f7; color: #56636d; font-size: 10px; line-height: 1.4; }
+.origin-reference-state strong { color: #26313a; font-size: 10px; letter-spacing: .03em; text-transform: uppercase; }
+.origin-reference-state span { color: #344b5e; font-variant-numeric: tabular-nums; }
+.origin-reference-state small { color: #68747d; font-size: 10px; }
 .route-coordinate-editor > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .route-coordinate-editor > header div { display: grid; gap: 2px; }
 .route-coordinate-editor > header span { color: #77828a; font-size: 9px; }
