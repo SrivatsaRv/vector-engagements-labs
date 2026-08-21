@@ -1,17 +1,31 @@
 # VECTOR information-state contract
 
-Status: #26 precondition slice. The current runtime has no admitted sensor
-model pack. It records a tick-owned, explicit unavailable state; it does not
-simulate radar, visual acquisition, data link, AEW, jamming, or a side-owned
-position estimate.
+Status: #26 sensor-admission slice. The deployed reference pack has no
+positive-range `RADAR`, `INFRARED`, or `VISUAL` model, so normal runs remain
+explicitly unavailable. The engine can now execute an immutable, versioned
+sensor admission only when its inputs were compiled from a pack.
 
 ## Canonical boundary
 
-Every A2A tick emits two `vector.observer-state.v1` values, one for `IAF` and
-one for `PAF`. Each has `sensorState: UNSUPPORTED`, `observationCount: 0`,
-`trackState: UNSUPPORTED`, `visible: false`, and
-`availabilityReason: SENSOR_MODEL_UNAVAILABLE`. No value contains an observed
-entity ID, position, range, covariance, sensor range, or jammer effect.
+Every A2A tick emits two `vector.observer-state.v2` values, one for `IAF` and
+one for `PAF`. Without a compiled admission each has
+`sensorState: UNSUPPORTED`, `observationCount: 0`, `trackState: UNSUPPORTED`,
+`visible: false`, and `availabilityReason: SENSOR_MODEL_UNAVAILABLE`.
+
+`vector.observer-sensor-admission.v1` is the complete tick input: model-pack
+digest, sensor identity/version, evidence references, kind, mode, positive
+detection/minimum range, scan period, and azimuth/elevation field of view.
+The TypeScript compiler may bind it only from an aircraft's compiled
+positive-range `RADAR`, `INFRARED`, or `VISUAL` model. A
+`DECLARED_ENVELOPE`, zero range, missing evidence, invalid bounds, or digest
+mismatch cannot become a generic radar.
+
+On a due `SEARCH` scan, range and field-of-view checks may emit one `PLOT`.
+The PLOT is a non-positional measurement boundary: it has no observed entity
+identity, position, covariance, confidence, visible marker, datalink,
+electronic-warfare effect, or weapon-support authority. `OFF`, an out-of-volume
+target, a non-due scan, or an invalid admission emits zero observations and no
+track. This is not a radar equation or named-system claim.
 
 `lib/engine/core.ts` and `engine-rust/src/lib.rs` emit this state. The browser
 projection in `lib/information-state.ts` is a pure conversion of that state to
@@ -21,27 +35,28 @@ hides entities while this state is selected.
 
 ## Record and replay
 
-`pictures.jsonl` uses `vector.pictures.v2`. It is the immutable projection of
+`pictures.jsonl` uses `vector.pictures.v3`. It is the immutable projection of
 the tick boundary. During replay, the verified pictures member is reattached
 to decoded frames; replay never derives a track from stored world positions.
-The admission check rejects a picture with a position, observed entity ID,
-truth position, non-zero observation count, confidence, uncertainty, or any
-state other than the declared unavailable contract.
+The admission check rejects a picture with a position, observed entity ID, or
+truth position. It verifies byte-for-byte equivalence to the tick projection;
+therefore a PLOT cannot be promoted by replay into an estimate or a renderable
+target.
 
 ## Deferred contract
 
-An admitted sensor pack must later declare versioned sensing, observation,
-track-store, data-link, EW, uncertainty, validity-envelope, provenance, and
-TypeScript/Rust implementation data. Only then may a tick emit an observation
-or track and only that tick-owned state may support a later policy command.
-This slice does not make tactical decisions or weapon support claims. #26
-remains open for that work.
+The next #26 slice must add a sourced measurement/uncertainty model and a
+track-store with confirmation, coasting, loss, association and freshness. It
+must then add typed data-link/AEW, EW and terrain LOS inputs. Only a later
+versioned #26/#28 support interface may consume track quality. This slice does
+not make tactical decisions or weapon-support claims.
 
 ## Regression evidence
 
-`tests/rasp-state-machine.test.mjs` proves no 80 km range, covariance,
-jammer-derived value, entity identity, or position survives. It also proves
-the saved record rejects fabricated observer content. `tests/engine-backends.test.mjs`
-proves TypeScript/Rust parity. `tests/vector-record.test.mjs` proves VSR replay
-uses the immutable member. Component and selector tests prove unavailable UI
-state does not fall back to Model Truth.
+`tests/sensor-model-admission.test.mjs` proves a due scan can produce a
+non-positional PLOT only from a complete versioned test admission; range, OFF,
+and digest mismatch fail closed; TypeScript/Rust agree; and VSR replay retains
+no world estimate. `tests/rasp-state-machine.test.mjs` continues to prove no
+80 km range, covariance, jammer-derived value, entity identity, or position
+survives. The production fixture remains unavailable, and component/selector
+tests continue to prevent Model Truth fallback.

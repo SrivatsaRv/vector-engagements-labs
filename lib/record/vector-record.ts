@@ -18,7 +18,7 @@ import { attachRecordedObserverStates } from "../information-state.ts";
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v4" as const;
 export const VECTOR_EVENT_SCHEMA = "vector.events.v1" as const;
-export const VECTOR_PICTURE_SCHEMA = "vector.pictures.v2" as const;
+export const VECTOR_PICTURE_SCHEMA = "vector.pictures.v3" as const;
 export const MAX_VECTOR_RECORD_BYTES = 64 * 1024 * 1024;
 
 const RECORD_MAGIC = new TextEncoder().encode("VECTOR1\0");

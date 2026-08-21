@@ -76,18 +76,27 @@ synthetic fixtures now exist, but the current engine does not feed LOS into
 sensor state or infer radii from transmitter power, radar cross-section,
 terrain, propagation, or electronic attack.
 
-The #26 observer boundary is tick-owned and fail closed. In the absence of an
-admitted versioned sensor pack, each side records `UNSUPPORTED` with zero
-observations and no track or position. It does not derive measurements,
-covariance, radar range, or jamming effects from truth frames. Datalink, AEW,
-and weapon support remain unavailable until their typed interfaces and admitted
-model data exist.
+The #26 observer boundary is tick-owned and fail closed. The deployed
+reference pack contains only a zero-range `DECLARED_ENVELOPE`, so each side
+records `UNSUPPORTED` with zero observations and no track or position. It does
+not derive measurements, covariance, radar range, or jamming effects from
+truth frames. The engine now has a bounded `vector.observer-sensor-admission.v1`
+path for a future compiled positive-range `RADAR`, `INFRARED`, or `VISUAL`
+model: it uses only the declared scan/range/FOV inputs and produces a
+non-positional PLOT. This is a mechanism test, not sensor fidelity. Datalink,
+AEW, EW, track estimation and weapon support remain unavailable until their
+typed interfaces and admitted model data exist.
 
 ## Presentation truth
 
 Every movement trail is reconstructed only from recorded engine frames. The 3D surface adds a ground projection, vertical altitude stem, and translucent altitude curtain; these are views of the same position samples, not newly generated trajectories. A weapon does not appear before its launch lifecycle event.
 
-Model Truth remains separate from IAF and PAF RASP estimates. IAF RASP estimates the selected Red aircraft track; PAF RASP estimates the selected Blue aircraft track. Onboard radar requires an active own-side radar and the declared model range; data-link and airborne-early-warning sources require an available own-side link; visual source requires the model visual range. Opposing jamming, range, and track age degrade confidence and increase uncertainty. An unavailable path yields `NO_TRACK` and removes the opposing marker instead of falling back to truth. This is not a verified radar equation or operational C2 model.
+Model Truth remains separate from IAF and PAF RASP state. Today both RASP
+views are `UNSUPPORTED` because the deployed pack has no admitted measurement
+model. A later positive-range sensor admission can show only a non-positional
+PLOT; it does not yet estimate the selected opposing aircraft, classify it,
+apply jamming, link it, or support a weapon. An unavailable path yields
+`NO_TRACK` and removes the opposing marker instead of falling back to truth.
 
 ## Still outside the fidelity claim
 

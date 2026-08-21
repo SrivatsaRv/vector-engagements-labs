@@ -60,9 +60,9 @@ export const RASP_SOURCE_CONTRACTS: Record<
 > = {
   ONBOARD_RADAR: {
     label: "Onboard radar",
-    requirement: "The observing radar must be active, a scan must be due, and geometry must fall inside the admitted public-educational sensor model.",
-    pictureEffect: "Creates observations which confirm, coast, or lose a side-owned opposing-aircraft track.",
-    physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
+    requirement: "A selected aircraft must have a compiled positive-range RADAR model with evidence, an admitted mode, and a due scan inside its declared field of view.",
+    pictureEffect: "The deployed reference pack has no such model. A future admitted scan can create only a non-positional plot in this slice.",
+    physicsEffect: "RASP only. It does not change weapon guidance or aircraft motion.",
   },
   DATALINK: {
     label: "Data link",
@@ -79,9 +79,9 @@ export const RASP_SOURCE_CONTRACTS: Record<
   },
   VISUAL: {
     label: "Visual contact",
-    requirement: "The opposing aircraft must be inside the selected weather preset's visibility distance, capped at 18 km.",
-    pictureEffect: "Creates visual observations inside the declared visibility boundary without requiring radar or data link.",
-    physicsEffect: "RASP only. It does not currently change weapon guidance or aircraft motion.",
+    requirement: "A selected aircraft must have a compiled positive-range VISUAL model with evidence and a due scan inside its declared field of view.",
+    pictureEffect: "Unavailable until that model and a visibility/measurement contract are admitted.",
+    physicsEffect: "RASP only. It does not change weapon guidance or aircraft motion.",
   },
 };
 
@@ -155,15 +155,15 @@ export type RaspTrack = EngineObserverState & {
   perspective: "IAF" | "PAF";
   /** Model-clock identity of this observer-picture sample. */
   modelTimeSeconds: number;
-  trackId: "UNAVAILABLE";
-  classification: "UNAVAILABLE";
+  trackId: string;
+  classification: "UNAVAILABLE" | "UNKNOWN";
   identification: "UNKNOWN";
   source: string;
   lastUpdateSeconds: number;
   ageSeconds: number;
   confidence: number;
   uncertaintyMeters: number;
-  status: "NO_TRACK";
+  status: "NO_TRACK" | "PLOT";
 };
 
 export type TerminationCode =
@@ -521,6 +521,8 @@ export function prepareSimulation(
       targetSpeed: input.targetSpeed,
       blueFuelPercent: input.blueFuelPercent,
       redFuelPercent: input.redFuelPercent,
+      blueRadarMode: input.blueRadarMode,
+      redRadarMode: input.redRadarMode,
       windEastMps: input.wind,
       windNorthMps: input.windNorth,
       temperatureOffset: input.temperatureOffset,
