@@ -1,4 +1,5 @@
 import { sha256Hex } from "./canonical-json.ts";
+import { assertGovernedAircraftEvidenceAdmission } from "./aircraft-evidence-registry.ts";
 import type { EntityLifecycle } from "./engine/contracts.ts";
 import type { Vec3 } from "./engine/primitives.ts";
 
@@ -999,6 +1000,11 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
       evidenceById,
       limitationsById,
     );
+    try {
+      assertGovernedAircraftEvidenceAdmission(item.catalogObjectId, item.performanceAdmission);
+    } catch (error) {
+      issues.push(`aircraft[${index}].performanceAdmission ${error instanceof Error ? error.message : String(error)}`);
+    }
     return {
       id: item.id,
       version: item.version,

@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "vector.aircraft-evidence-registry.v1",
+  "version": "1.0.0",
+  "programmeGate": "#66",
+  "ownerIssue": "#64",
+  "policy": {
+    "admission": "A named-aircraft performance admission needs one exact registry claim for each required capability. Each claim needs distinct primary-source and independent-validation artifacts with immutable hashes. A familiar designation, a catalog source assertion, a URL, or a model-pack evidence row does not qualify.",
+    "remoteArtifact": "A remote artifact hash records a retrievable identity. It does not prove that VECTOR has ingested the artifact or extracted any coefficient.",
+    "localArtifact": "A committed derivative fixture must hash to the registry value. A changed fixture needs a new registry version and a new review."
+  },
+  "artifacts": [
+    {
+      "id": "nasa-nesc-2015-f16-daveml-source",
+      "kind": "SOURCE",
+      "authority": "NASA NESC",
+      "uri": "https://nescacademy.nasa.gov/workshop/FlightSim/2015/models/F16_package.zip",
+      "sha256": "20c60f615ae8e87d81c9d98b54fff45a2832840201499cbcfe3f45a60ef3e5b2",
+      "retrievalState": "DECLARED_REMOTE",
+      "scope": "NASA NESC F-16 DAVE-ML verification model; not a PAF F-16C Block 52 model."
+    },
+    {
+      "id": "nasa-nesc-2015-atmos11-sim04-validation",
+      "kind": "VALIDATION",
+      "authority": "NASA NESC",
+      "uri": "https://nescacademy.nasa.gov/workshop/FlightSim/2015/atmos_scn_11/Atmos_11_sim_04.csv",
+      "sha256": "c6b8c1210c31fa440d271297ad219b5ad89264f4bb8a25f636c14f53d9b04a07",
+      "retrievalState": "DECLARED_REMOTE",
+      "scope": "One 180-second subsonic wings-level trim trajectory; not a manoeuvre, sensor, store, or operational validation corpus."
+    },
+    {
+      "id": "vector-nesc-case11-derived-fixture",
+      "kind": "DERIVED_FIXTURE",
+      "authority": "VECTOR",
+      "uri": "fixtures/public-reference/nasa-nesc-2015-f16-case11.json",
+      "sha256": "85f14b1d28e0d839f6f75cc03e1ff7d577c181809f38d1b30a2f5f83e3bd3602",
+      "localPath": "fixtures/public-reference/nasa-nesc-2015-f16-case11.json",
+      "retrievalState": "COMMITTED_DERIVATIVE",
+      "derivedFromArtifactIds": [
+        "nasa-nesc-2015-f16-daveml-source",
+        "nasa-nesc-2015-atmos11-sim04-validation"
+      ],
+      "scope": "SI-normalized NESC Case 11 checkpoints used only by the isolated public-reference verifier."
+    }
+  ],
+  "claims": [
+    {
+      "id": "su-30mki-performance",
+      "catalogObjectId": "su-30mki",
+      "state": "UNSUPPORTED",
+      "reason": "No immutable public source and independent validation artifacts have been admitted for the required Su-30MKI capability classes.",
+      "capabilities": [
+        { "capability": "AERODYNAMICS", "missingReason": "No admitted Su-30MKI aerodynamic source and independent validation artifact." },
+        { "capability": "PROPULSION", "missingReason": "No admitted Su-30MKI propulsion source and independent validation artifact." },
+        { "capability": "FLIGHT_CONTROLS", "missingReason": "No admitted Su-30MKI flight-control source and independent validation artifact." },
+        { "capability": "MASS_AND_STORES", "missingReason": "No admitted Su-30MKI mass-and-stores source and independent validation artifact." },
+        { "capability": "SENSORS", "missingReason": "No admitted Su-30MKI sensor source and independent validation artifact." }
+      ]
+    },
+    {
+      "id": "f-16c-block52-paf-performance",
+      "catalogObjectId": "f-16c-block52-paf",
+      "state": "UNSUPPORTED",
+      "reason": "The NASA NESC F-16 verification asset is not a PAF F-16C Block 52 model and cannot admit this platform.",
+      "capabilities": [
+        { "capability": "AERODYNAMICS", "missingReason": "No admitted PAF F-16C Block 52 aerodynamic source and independent validation artifact." },
+        { "capability": "PROPULSION", "missingReason": "No admitted PAF F-16C Block 52 propulsion source and independent validation artifact." },
+        { "capability": "FLIGHT_CONTROLS", "missingReason": "No admitted PAF F-16C Block 52 flight-control source and independent validation artifact." },
+        { "capability": "MASS_AND_STORES", "missingReason": "No admitted PAF F-16C Block 52 mass-and-stores source and independent validation artifact." },
+        { "capability": "SENSORS", "missingReason": "No admitted PAF F-16C Block 52 sensor source and independent validation artifact." }
+      ]
+    }
+  ]
+}
