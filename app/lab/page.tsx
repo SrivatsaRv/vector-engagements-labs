@@ -33,6 +33,7 @@ import { SimulationScene } from "@/components/SimulationScene";
 import { TacticalSymbol } from "@/components/TacticalSymbol";
 import { ViewportTelemetry } from "@/components/ViewportTelemetry";
 import { TrackStateInspector } from "@/components/TrackStateInspector";
+import { CurrentGeometry } from "@/components/CurrentGeometry";
 import {
   canConduct,
   validateScenario,
@@ -88,7 +89,6 @@ import {
 import {
   createReferencePreview,
   explainResult,
-  getFrameAt,
   standardAtmosphere,
   type ProfileId,
   type RaspTrack,
@@ -96,6 +96,7 @@ import {
   type SimulationResult,
 } from "@/lib/simulation";
 import {
+  selectCurrentGeometry,
   selectDisplayFrame,
   selectRecordedTrackState,
 } from "@/lib/frontend/selectors";
@@ -517,6 +518,10 @@ function LabWorkbench({
     () => selectRecordedTrackState(recordedPictures, selectedDisplayFrame, trackPerspective),
     [recordedPictures, selectedDisplayFrame, trackPerspective],
   );
+  const selectedGeometry = useMemo(
+    () => selectCurrentGeometry(result, selectedDisplayFrame),
+    [result, selectedDisplayFrame],
+  );
   const addObservation = () =>
     setEvents((items) => [
       ...items,
@@ -799,14 +804,23 @@ function LabWorkbench({
               <div className="live-metrics">
                 <Metric label="Time" value={`${selectedDisplayFrame.displayTimeSeconds.toFixed(1)} s`} />
                 <Metric
-                  label="3D separation"
-                  value={`${(frame.range / 1000).toFixed(1)} km`}
+                  label="Range"
+                  value={selectedGeometry.state === "AVAILABLE"
+                    ? `${(selectedGeometry.rangeMeters / 1000).toFixed(1)} km`
+                    : "Unavailable"}
                 />
                 <Metric
-                  label="Weapon speed"
-                  value={`${Math.round(frame.speed)} m/s`}
+                  label="Closure"
+                  value={selectedGeometry.state === "AVAILABLE"
+                    ? `${Math.round(selectedGeometry.closureRateMps)} m/s`
+                    : "Unavailable"}
                 />
-                <Metric label="Mach" value={frame.mach.toFixed(2)} />
+                <Metric
+                  label="Weapon state"
+                  value={selectedGeometry.weapon.state === "AVAILABLE"
+                    ? selectedGeometry.weapon.flightState.replaceAll("_", " ")
+                    : "Not launched"}
+                />
               </div>
             </div>
             <div
@@ -880,7 +894,7 @@ function LabWorkbench({
             {comparison ? (
               <Comparison scenario={scenario} data={comparison} />
             ) : (
-              <Geometry frame={frame} />
+              <CurrentGeometry geometry={selectedGeometry} />
             )}
             <section className="right-card">
               <div className="right-title">
@@ -2205,35 +2219,6 @@ function Outcome({ result }: { result: SimulationResult }) {
           value={`${result.peakDemand.toFixed(1)} g`}
         />
       </div>
-    </section>
-  );
-}
-function Geometry({ frame }: { frame: ReturnType<typeof getFrameAt> }) {
-  return (
-    <section className="right-card">
-      <div className="right-title">
-        <Target size={15} />
-        <strong>Current geometry</strong>
-        <span>{frame.phase}</span>
-      </div>
-      <div className="scope">
-        <i />
-        <b />
-        <small>Relative-position diagram</small>
-      </div>
-      <div className="geometry-data">
-        <Metric label="LOS rate" value={`${frame.losRate.toFixed(3)} rad/s`} />
-        <Metric
-          label="3D separation"
-          value={`${(frame.range / 1000).toFixed(1)} km`}
-        />
-        <Metric label="Weapon speed" value={`${Math.round(frame.speed)} m/s`} />
-        <Metric label="Mach" value={frame.mach.toFixed(2)} />
-      </div>
-      <p className="derived-note">
-        Calculated from the current point-mass frame and the atmosphere at the
-        weapon altitude. It is not a measured value from a real engagement.
-      </p>
     </section>
   );
 }

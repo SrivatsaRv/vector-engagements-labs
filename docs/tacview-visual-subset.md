@@ -68,6 +68,16 @@ All playback surfaces consume the same selected recorded-frame identity; an
 in-between scrub request cannot make the Map, 3D surface, telemetry, or visible
 model time disagree about the displayed state.
 
+The **Current geometry** inspector carries that same frame identity. When the
+selected frame contains the launched primary weapon, its range, closure,
+line-of-sight rate, speed, Mach, and flight state are the engine-recorded
+weapon-to-target values. Before launch, it instead derives only the
+aircraft-to-target range, closure, and line-of-sight rate from the
+selected recorded aircraft states. Weapon speed, Mach, and flight state then
+show **Not launched**; a missing target, launcher, or non-finite recorded value
+shows an explicit unavailable state. The presentation layer never substitutes a
+weapon aggregate, zero value, or decorative relative-position diagram.
+
 ## Information views
 
 Model Truth uses the recorded engine position. IAF and PAF air-picture views replace only the observed opposing track with the selected side’s sensor-derived position and uncertainty. The truth state remains available as a separate view and is never blended into a RASP label.

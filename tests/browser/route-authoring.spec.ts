@@ -194,6 +194,8 @@ test("a current deployment manifest drives the real Worker run after route recov
   expect(mapDisplayTime).not.toBeNull();
   await expect(page.locator(".playback [data-display-time]")).toHaveAttribute("data-display-time", mapDisplayTime!);
   await expect(page.locator(".telemetry-title [data-display-time]")).toHaveAttribute("data-display-time", mapDisplayTime!);
+  await expect(page.locator(".current-geometry")).toHaveAttribute("data-display-time", mapDisplayTime!);
+  await expect(page.locator(".current-geometry")).not.toContainText("Relative-position diagram");
   await expect(page.locator(".telemetry.is-collapsed")).toBeVisible();
   const telemetryToggle = page.getByRole("button", { name: /expand telemetry/i });
   await expect(telemetryToggle).toHaveAttribute("aria-expanded", "false");
@@ -234,5 +236,8 @@ test("a current deployment manifest drives the real Worker run after route recov
     expect(expanded.time).toBe(collapsed.time);
   }
   expect(collapsed.attribution).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "3D", exact: true }).click();
+  await expect(page.locator(".simulation-scene")).toHaveAttribute("data-display-time", mapDisplayTime!);
+  await expect(page.locator(".current-geometry")).toHaveAttribute("data-display-time", mapDisplayTime!);
   expect(runtimeErrors).toEqual([]);
 });
