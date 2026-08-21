@@ -54,6 +54,7 @@ test("saved-run admission bounds global leases and releases capacity", { skip: !
   process.env.VECTOR_RUNTIME = "node";
   const request = new Request("https://labs.reachdefence.com/api/runs", { method: "POST" });
   try {
+    const actorHash = await requestActorHash(request);
     await withDatabase((sql) => sql`UPDATE saved_run_admission_slots SET lease_id = NULL, leased_until = NULL`);
     await withDatabase((sql) => sql`DELETE FROM anonymous_saved_run_usage WHERE usage_day = CURRENT_DATE`);
     const first = await admitSavedRun(request);
@@ -62,10 +63,46 @@ test("saved-run admission bounds global leases and releases capacity", { skip: !
       () => admitSavedRun(request),
       { code: "saved_run_capacity_exhausted" },
     );
+    const [usage] = await withDatabase((sql) => sql`
+      SELECT accepted_runs
+      FROM anonymous_saved_run_usage
+      WHERE actor_hash = ${actorHash}
+        AND usage_day = CURRENT_DATE
+    `);
+    assert.equal(
+      usage?.accepted_runs,
+      2,
+      "a capacity-rejected request must not spend the durable write quota",
+    );
     await releaseSavedRunAdmission(first);
     const replacement = await admitSavedRun(request);
     await releaseSavedRunAdmission(second);
     await releaseSavedRunAdmission(replacement);
+  } finally {
+    await withDatabase((sql) => sql`UPDATE saved_run_admission_slots SET lease_id = NULL, leased_until = NULL`);
+    await withDatabase((sql) => sql`DELETE FROM anonymous_saved_run_usage WHERE usage_day = CURRENT_DATE`);
+    if (previousRuntime === undefined) delete process.env.VECTOR_RUNTIME;
+    else process.env.VECTOR_RUNTIME = previousRuntime;
+  }
+});
+
+test("failed saved-run work refunds its durable quota reservation", { skip: !hasDatabase }, async () => {
+  const previousRuntime = process.env.VECTOR_RUNTIME;
+  process.env.VECTOR_RUNTIME = "node";
+  const request = new Request("https://labs.reachdefence.com/api/runs", { method: "POST" });
+  try {
+    const actorHash = await requestActorHash(request);
+    await withDatabase((sql) => sql`UPDATE saved_run_admission_slots SET lease_id = NULL, leased_until = NULL`);
+    await withDatabase((sql) => sql`DELETE FROM anonymous_saved_run_usage WHERE usage_day = CURRENT_DATE`);
+    const lease = await admitSavedRun(request);
+    await releaseSavedRunAdmission(lease);
+    const [usage] = await withDatabase((sql) => sql`
+      SELECT accepted_runs
+      FROM anonymous_saved_run_usage
+      WHERE actor_hash = ${actorHash}
+        AND usage_day = CURRENT_DATE
+    `);
+    assert.equal(usage, undefined);
   } finally {
     await withDatabase((sql) => sql`UPDATE saved_run_admission_slots SET lease_id = NULL, leased_until = NULL`);
     await withDatabase((sql) => sql`DELETE FROM anonymous_saved_run_usage WHERE usage_day = CURRENT_DATE`);
@@ -88,7 +125,7 @@ test("saved-run admission enforces the durable daily anonymous write quota", { s
       DO UPDATE SET accepted_runs = EXCLUDED.accepted_runs
     `);
     const finalAllowed = await admitSavedRun(request);
-    await releaseSavedRunAdmission(finalAllowed);
+    await releaseSavedRunAdmission(finalAllowed, { persisted: true });
     await assert.rejects(() => admitSavedRun(request), { code: "saved_run_quota_exceeded" });
   } finally {
     await withDatabase((sql) => sql`UPDATE saved_run_admission_slots SET lease_id = NULL, leased_until = NULL`);
