@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "vector.environment-source-manifest.v1",
+  "id": "nasa-power-hourly-point-20200115",
+  "version": "1.0.0",
+  "publisher": "NASA POWER",
+  "provider": "NASA Langley Research Center",
+  "sourceDataState": "SOURCED_DATASET",
+  "license": {
+    "spdx": "CC0-1.0",
+    "decisionUrl": "https://www.earthdata.nasa.gov/engage/open-data-services-software/data-use-policy",
+    "sourceReferenceUrl": "https://power.larc.nasa.gov/docs/referencing/",
+    "decision": "NASA Earthdata states that NASA-led mission data are CC0 unless marked with a restrictive notice or licence. The committed POWER response has no restrictive notice. Cite NASA POWER and this access date."
+  },
+  "retrievedDate": "2026-08-21",
+  "request": {
+    "service": "NASA POWER Hourly Point API",
+    "apiVersion": "v2.9.9",
+    "timeStandard": "UTC",
+    "start": "20200115",
+    "end": "20200115",
+    "parameters": ["T2M", "PS", "RH2M", "WS10M", "WD10M"]
+  },
+  "horizontalDatum": "WGS84",
+  "verticalDatum": "UNDECLARED",
+  "coverage": {
+    "kind": "POINT_ONLY",
+    "areaAdmission": "INELIGIBLE",
+    "reason": "Two point observations cannot provide a terrain or regional atmospheric field."
+  },
+  "artifacts": [
+    {
+      "id": "north-punjab-anchor",
+      "path": "punjab-anchor.raw.json",
+      "sha256": "c8cca6273f6861cd40e4ef7d099f6e7b206a8e420bdc9192f381dee74bc1b24a",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M,PS,RH2M,WS10M,WD10M&community=RE&longitude=74.2&latitude=31.8&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "longitudeDeg": 74.2,
+      "latitudeDeg": 31.8
+    },
+    {
+      "id": "ladakh-anchor",
+      "path": "ladakh-anchor.raw.json",
+      "sha256": "e73fc0f57926c748d6386918eb36c0f69649a5050ee07803486b1a7b65899cea",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M,PS,RH2M,WS10M,WD10M&community=RE&longitude=77.3&latitude=34.1&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "longitudeDeg": 77.3,
+      "latitudeDeg": 34.1
+    }
+  ],
+  "fieldProvenance": {
+    "T2M": { "unit": "C", "height": "2 m", "state": "SOURCED_DATASET" },
+    "PS": { "unit": "kPa", "height": "surface", "state": "SOURCED_DATASET" },
+    "RH2M": { "unit": "%", "height": "2 m", "state": "SOURCED_DATASET" },
+    "WS10M": { "unit": "m/s", "height": "10 m", "state": "SOURCED_DATASET" },
+    "WD10M": { "unit": "Degrees", "height": "10 m", "state": "SOURCED_DATASET" }
+  },
+  "limitations": [
+    "Not an area-covering meteorology product.",
+    "Not an atmosphere-aloft profile.",
+    "Not terrain, geoid, runway, ground-start, collision, terrain-masking, or operational-weather evidence.",
+    "The returned geometry elevation has no declared vertical datum and is not consumed."
+  ]
+}

@@ -36,6 +36,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-
 - [`repository-governance.md`](repository-governance.md): protected branches, CI/CD, releases, tags, ownership, and repository status.
 - [`../governance/runtime-stub-ledger.v1.json`](../governance/runtime-stub-ledger.v1.json): executable inventory of causal stubs, assumptions, fallbacks, evidence paths, and owning issues.
 - [`../governance/aircraft-evidence-registry.v1.json`](../governance/aircraft-evidence-registry.v1.json): immutable-artifact registry that blocks unsupported named-aircraft performance claims.
+- [`../governance/environment-sources/`](../governance/environment-sources): immutable, checksum-verified offline source artifacts. Point-only source snapshots are ingestion evidence, not runtime regional environment packs.
 - [`container-release.md`](container-release.md): authoritative Compose topology, immutable GHCR images, promotion, rollback, backup, and restore.
 - [`blog-publishing.md`](blog-publishing.md): markdown frontmatter, thumbnail assets, canonical metadata, and ops publishing flow.
 - [`security-boundaries.md`](security-boundaries.md): anonymous API admission, saved-run integrity, metrics protection, caching, and delivery trust.

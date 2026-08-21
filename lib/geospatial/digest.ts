@@ -8,8 +8,7 @@ const rotateRight = (value: number, bits: number) =>
  * Crypto is asynchronous, while scenario compilation is deliberately pure and
  * synchronous. This implementation hashes UTF-8 canonical JSON only.
  */
-export function sha256HexSync(value: unknown) {
-  const bytes = new TextEncoder().encode(canonicalJson(value));
+export function sha256HexBytesSync(bytes: Uint8Array) {
   const bitLength = bytes.length * 8;
   const paddedLength = Math.ceil((bytes.length + 9) / 64) * 64;
   const padded = new Uint8Array(paddedLength);
@@ -86,6 +85,15 @@ export function sha256HexSync(value: unknown) {
   }
 
   return [...hash].map((word) => word.toString(16).padStart(8, "0")).join("");
+}
+
+/** SHA-256 over exact UTF-8 source bytes; no JSON canonicalization is applied. */
+export function sha256Utf8HexSync(value: string) {
+  return sha256HexBytesSync(new TextEncoder().encode(value));
+}
+
+export function sha256HexSync(value: unknown) {
+  return sha256HexBytesSync(new TextEncoder().encode(canonicalJson(value)));
 }
 
 export function sha256Identity(value: unknown): `sha256:${string}` {
