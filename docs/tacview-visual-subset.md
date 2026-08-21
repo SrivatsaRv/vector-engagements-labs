@@ -60,6 +60,13 @@ as the tie-breaker. The first label is visible, the next two are compact, and
 the remainder are hidden until selection. This policy changes DOM visibility
 only; it does not alter a frame, record, entity lifecycle or playback state.
 
+MapLibre marks are created only after the map style is ready. If the basemap
+transport is loading or unavailable, the surface reports that state and does
+not claim that a map marker is present. The selection and unavailable grammar
+remains independently testable in the entity legend and component contract;
+tests must not require a MapLibre marker from a fixture that deliberately
+aborts the tile transport.
+
 ## Lifecycle
 
 - **Stowed** is inventory and is not placed in the world.
