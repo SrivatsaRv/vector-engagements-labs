@@ -417,7 +417,23 @@ pub struct ModelPackBinding {
     pub version: String,
     pub digest: String,
     pub intended_use: IntendedUseRef,
+    #[serde(default)]
+    pub observer_sensors: Vec<ObserverSensorBinding>,
     pub scenario_patches: Vec<ScenarioModelPatch>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObserverSensorBinding {
+    pub model_id: String,
+    pub model_version: String,
+    pub evidence_ref_ids: Vec<String>,
+    pub sensor_kind: String,
+    pub detection_range_m: f64,
+    pub minimum_range_m: f64,
+    pub scan_period_s: f64,
+    pub azimuth_field_of_view_rad: f64,
+    pub elevation_field_of_view_rad: f64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -1752,6 +1768,7 @@ mod tests {
                     id: "vector.intended-use.geometry-teaching".to_string(),
                     version: "1.0.0".to_string(),
                 },
+                observer_sensors: Vec::new(),
                 scenario_patches: Vec::new(),
             },
             entities: vec![blue, red, weapon],

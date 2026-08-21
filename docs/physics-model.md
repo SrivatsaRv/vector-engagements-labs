@@ -82,8 +82,11 @@ records `UNSUPPORTED` with zero observations and no track or position. It does
 not derive measurements, covariance, radar range, or jamming effects from
 truth frames. The engine now has a bounded `vector.observer-sensor-admission.v1`
 path for a future compiled positive-range `RADAR`, `INFRARED`, or `VISUAL`
-model: it uses only the declared scan/range/FOV inputs and produces a
-non-positional PLOT. This is a mechanism test, not sensor fidelity. Datalink,
+model: it binds every admission field exactly to the compiler-produced
+observer-sensor projection carried in the run binding, then uses only the
+declared scan/range/FOV inputs and produces a non-positional PLOT. An
+entity-level caller cannot add a sensor beside a valid pack digest. The binding
+transport itself remains governed by STUB-13. This is a mechanism test, not sensor fidelity. Datalink,
 AEW, EW, track estimation and weapon support remain unavailable until their
 typed interfaces and admitted model data exist.
 
