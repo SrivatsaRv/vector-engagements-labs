@@ -151,6 +151,42 @@ buffer before reuse, and a returned VSR begins with the expected archive identit
 responsiveness evidence for the current small scenario, not yet the required
 100-entity, long-task, allocation-profile, or 60-minute soak proof.
 
+## 100-entity admitted-capability baseline
+
+`npm run capacity:baseline:verify` defines a deterministic 100-entity Air
+workload in `vector.air-capacity-baseline.v1`. `make capacity-baseline-local`
+runs it alone; `make performance-local` runs it alongside the existing engine
+microbenchmark. The command writes a JSON evidence record to stdout containing
+the full workload manifest, Node/runtime and hardware context, p50/p95/p99 and
+maximum wall time, per-run heap delta, repeat digest, fixed-step count and
+sampled-frame count for TypeScript and Rust/WASM.
+
+The workload has 98 active aircraft on admitted authored 3D routes, one
+launched guided vehicle, and one stowed guided vehicle. Each active aircraft
+must move; inert placeholder entities do not satisfy the benchmark. It tests
+only admitted route execution and guided-vehicle flight. It explicitly reports
+sensor/track state, weapon support, virtual-pilot behaviour, arbitrary browser
+scenario injection, and Rust/WASM cooperative cancellation as unavailable.
+Those states are not converted to synthetic sensors, weapons, decisions, or
+cancellation results.
+
+The default automated regression ceilings are p95 below 1,000 ms per complete
+five-second workload and heap growth below 256 MiB on the local process. They
+are deliberately broad regression guards, not the 8 ms tick target, browser
+responsiveness proof, x86-64 capacity result, or production admission. Override
+them only for controlled investigation with
+`VECTOR_CAPACITY_BASELINE_MAX_P95_MS` and
+`VECTOR_CAPACITY_BASELINE_MAX_HEAP_DELTA_BYTES`; record any override with the
+evidence artifact. `VECTOR_CAPACITY_BASELINE_RUNS` controls repeat count and
+must remain at least two so the digest check can detect nondeterminism.
+
+The direct TypeScript session is cancellable only by stopping at a batch
+boundary in its browser Worker path. This benchmark measures neither a
+100-entity Worker cancellation latency nor Rust/WASM in-run cancellation,
+because the current Worker protocol cannot inject an arbitrary scenario and the
+Rust/WASM ABI is whole-run. Existing Worker cancellation tests remain separate.
+Both omissions are acceptance work for #25, not successful measurements.
+
 ## Required performance test matrix
 
 | Test | Purpose |
