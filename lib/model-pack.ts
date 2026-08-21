@@ -31,6 +31,8 @@ export type EvidenceReference = {
   title: string;
   uri: string;
   locator?: string;
+  /** SHA-256 of the retrieved public artifact, when a claim depends on it. */
+  contentSha256?: string;
   accessedAt: string;
 };
 
@@ -215,7 +217,37 @@ export type AircraftModelSource = ModelSourceBase & {
   sensorModelIds: string[];
   loadoutModelId: string;
   maximumCommandLoadFactor: Quantity;
+  performanceAdmission: AircraftPerformanceAdmissionSource;
 };
+
+/**
+ * A named catalog identity is not evidence that its performance model is
+ * credible. This explicit state prevents an assumption-backed fixture from
+ * becoming a named-platform claim merely because its label is familiar.
+ */
+export type AircraftPerformanceCapability =
+  | "AERODYNAMICS"
+  | "PROPULSION"
+  | "FLIGHT_CONTROLS"
+  | "MASS_AND_STORES"
+  | "SENSORS";
+
+export type AircraftPerformanceAdmissionSource =
+  | {
+      state: "UNSUPPORTED";
+      limitationId: string;
+      reason: string;
+    }
+  | {
+      state: "ADMITTED";
+      capabilities: Array<{
+        capability: AircraftPerformanceCapability;
+        sourceEvidenceRefIds: string[];
+        validationEvidenceRefIds: string[];
+      }>;
+    };
+
+export type CompiledAircraftPerformanceAdmission = AircraftPerformanceAdmissionSource;
 
 export type WeaponModelSource = ModelSourceBase & {
   kind: "WEAPON";
@@ -347,6 +379,7 @@ export type CompiledAircraftModel = CompiledModelBase & {
   sensorModelIndexes: number[];
   loadoutModelIndex: number;
   maximumCommandLoadFactorG: number;
+  performanceAdmission: CompiledAircraftPerformanceAdmission;
 };
 
 export type CompiledWeaponModel = CompiledModelBase & {
@@ -455,12 +488,35 @@ export class ModelPackValidationError extends Error {
   }
 }
 
+/** Raised when an API or future mission mode asks for a named-performance claim that the pack cannot support. */
+export class AircraftPerformanceAdmissionError extends Error {
+  readonly catalogObjectId: string;
+  readonly reason: string;
+
+  constructor(
+    catalogObjectId: string,
+    reason: string,
+  ) {
+    super(`Named aircraft performance is unavailable for ${catalogObjectId}: ${reason}`);
+    this.name = "AircraftPerformanceAdmissionError";
+    this.catalogObjectId = catalogObjectId;
+    this.reason = reason;
+  }
+}
+
 const ID_PATTERN = /^[a-z0-9]+(?:[._:/-][a-z0-9]+)*$/;
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const DIGEST_PATTERN = /^[0-9a-f]{64}$/;
 const WEAPON_SEEKER_MODES: WeaponSeekerMode[] = ["UNAVAILABLE", "ACTIVE_RADAR", "INFRARED", "PASSIVE_RADIATION"];
 const WEAPON_SUPPORT_REQUIREMENTS: WeaponSupportRequirement[] = ["UNAVAILABLE", "NONE", "TRACK_UPDATE"];
 const WEAPON_LAUNCH_AUTHORIZATIONS: WeaponLaunchAuthorization[] = ["SCHEDULED_TEST_ONLY", "TRACK_REQUIRED"];
+const AIRCRAFT_PERFORMANCE_CAPABILITIES: AircraftPerformanceCapability[] = [
+  "AERODYNAMICS",
+  "PROPULSION",
+  "FLIGHT_CONTROLS",
+  "MASS_AND_STORES",
+  "SENSORS",
+];
 
 const UNIT_CONVERSIONS: Record<SourceUnit, { unit: SiUnit; scale: number }> = {
   "1": { unit: "1", scale: 1 },
@@ -528,6 +584,63 @@ function validateEvidenceRefs(
   if (values.length === 0) issues.push(`${path} must contain at least one evidence reference`);
   for (const value of values) {
     if (!evidenceIds.has(value)) issues.push(`${path} references missing evidence ${value}`);
+  }
+}
+
+function validateAircraftPerformanceAdmission(
+  issues: string[],
+  path: string,
+  admission: AircraftPerformanceAdmissionSource,
+  evidenceById: Map<string, EvidenceReference>,
+  limitations: Map<string, ModelLimitation>,
+) {
+  if (admission?.state === "UNSUPPORTED") {
+    if (!admission.reason?.trim()) issues.push(`${path}.reason must explain the unavailable named-platform claim`);
+    const limitation = limitations.get(admission.limitationId);
+    if (!limitation) {
+      issues.push(`${path}.limitationId references a missing limitation`);
+    } else if (limitation.severity !== "BLOCKING") {
+      issues.push(`${path}.limitationId must be BLOCKING when named-platform performance is unavailable`);
+    }
+    return;
+  }
+  if (admission?.state !== "ADMITTED") {
+    issues.push(`${path}.state must be UNSUPPORTED or ADMITTED`);
+    return;
+  }
+  const seenCapabilities = new Set<AircraftPerformanceCapability>();
+  for (const [index, capability] of admission.capabilities.entries()) {
+    const capabilityPath = `${path}.capabilities[${index}]`;
+    if (!AIRCRAFT_PERFORMANCE_CAPABILITIES.includes(capability.capability)) {
+      issues.push(`${capabilityPath}.capability is unsupported`);
+    }
+    if (seenCapabilities.has(capability.capability)) {
+      issues.push(`${path}.capabilities contains duplicate ${capability.capability}`);
+    }
+    seenCapabilities.add(capability.capability);
+    const validateBoundEvidence = (ids: string[], evidenceKind: EvidenceReference["kind"], field: string) => {
+      if (ids.length === 0) issues.push(`${capabilityPath}.${field} must not be empty`);
+      for (const id of ids) {
+        const evidence = evidenceById.get(id);
+        if (!evidence) {
+          issues.push(`${capabilityPath}.${field} references missing evidence ${id}`);
+        } else if (evidence.kind !== evidenceKind) {
+          issues.push(`${capabilityPath}.${field} evidence ${id} must be ${evidenceKind}`);
+        } else if (!evidence.contentSha256 || !DIGEST_PATTERN.test(evidence.contentSha256)) {
+          issues.push(`${capabilityPath}.${field} evidence ${id} must carry an immutable SHA-256 artifact digest`);
+        }
+      }
+    };
+    validateBoundEvidence(capability.sourceEvidenceRefIds, "SOURCE", "sourceEvidenceRefIds");
+    validateBoundEvidence(capability.validationEvidenceRefIds, "VALIDATION", "validationEvidenceRefIds");
+    if (capability.sourceEvidenceRefIds.some((id) => capability.validationEvidenceRefIds.includes(id))) {
+      issues.push(`${capabilityPath} must not use one evidence artifact as both source and independent validation`);
+    }
+  }
+  for (const capability of AIRCRAFT_PERFORMANCE_CAPABILITIES) {
+    if (!seenCapabilities.has(capability)) {
+      issues.push(`${path}.capabilities is missing ${capability}`);
+    }
   }
 }
 
@@ -761,7 +874,14 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
   uniqueIds(issues, "compatibility", source.compatibility);
 
   const evidenceIds = new Set(source.evidence.map((item) => item.id));
+  const evidenceById = new Map(source.evidence.map((item) => [item.id, item]));
   const limitationIds = new Set(source.credibility.limitations.map((item) => item.id));
+  const limitationsById = new Map(source.credibility.limitations.map((item) => [item.id, item]));
+  source.evidence.forEach((item, index) => {
+    if (item.contentSha256 !== undefined && !DIGEST_PATTERN.test(item.contentSha256)) {
+      issues.push(`evidence[${index}].contentSha256 must be a SHA-256 digest when supplied`);
+    }
+  });
   const definitionGroups = [
     ...source.aerodynamics,
     ...source.propulsion,
@@ -872,6 +992,13 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
       if (value === undefined) issues.push(`aircraft[${index}] references missing sensor model ${id}`);
       return value ?? -1;
     });
+    validateAircraftPerformanceAdmission(
+      issues,
+      `aircraft[${index}].performanceAdmission`,
+      item.performanceAdmission,
+      evidenceById,
+      limitationsById,
+    );
     return {
       id: item.id,
       version: item.version,
@@ -886,6 +1013,7 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
       sensorModelIndexes,
       loadoutModelIndex: loadoutModelIndex ?? -1,
       maximumCommandLoadFactorG: normalizeQuantity(issues, `aircraft[${index}].maximumCommandLoadFactor`, item.maximumCommandLoadFactor, "g0", evidenceIds),
+      performanceAdmission: structuredClone(item.performanceAdmission),
     };
   });
   aircraft.forEach((item, index) => {
@@ -1157,6 +1285,25 @@ export async function verifyCompiledModelPackDigest(pack: CompiledModelPack) {
     Object.entries(pack).filter(([key]) => key !== "digest"),
   ) as Omit<CompiledModelPack, "digest">;
   return (await modelPayloadDigest(payload)) === pack.digest;
+}
+
+/**
+ * Admission boundary for consumers that need a named-aircraft performance
+ * interpretation. Geometry-teaching execution does not call this boundary and
+ * remains governed by the pack's intended-use contract instead.
+ */
+export function requireNamedAircraftPerformanceAdmission(
+  pack: CompiledModelPack,
+  catalogObjectId: string,
+) {
+  const aircraft = pack.aircraft.find((item) => item.catalogObjectId === catalogObjectId);
+  if (!aircraft) {
+    throw new AircraftPerformanceAdmissionError(catalogObjectId, "no compiled aircraft model exists");
+  }
+  if (aircraft.performanceAdmission.state !== "ADMITTED") {
+    throw new AircraftPerformanceAdmissionError(catalogObjectId, aircraft.performanceAdmission.reason);
+  }
+  return aircraft.performanceAdmission;
 }
 
 function resolvePatchTarget(pack: CompiledModelPack, modelId: string, fieldPath: string) {

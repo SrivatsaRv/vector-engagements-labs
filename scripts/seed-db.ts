@@ -25,7 +25,7 @@ const modelPackSourceHash = createHash("sha256")
 const engineCredibilityManifest = {
   ...modelPackBundle.credibilityManifest,
   id: "browser-point-mass-engine-credibility",
-  version: "0.6.0",
+  version: "0.7.0",
   subject: {
     kind: "ENGINE" as const,
     id: ENGINE_VERSION,

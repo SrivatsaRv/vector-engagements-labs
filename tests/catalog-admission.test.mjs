@@ -14,7 +14,7 @@ import { ENGINE_VERSION } from "../lib/engine/version.ts";
 const bundle = JSON.parse(
   await readFile(
     new URL(
-      "../fixtures/model-packs/vector-scalar-study-v0.7.compiled.json",
+      "../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json",
       import.meta.url,
     ),
     "utf8",
@@ -79,6 +79,8 @@ test("catalog admission binds every scenario to one intended use, SI pack, manif
   assert.equal(admission.modelPack.digest, bundle.pack.digest);
   assert.equal(admission.credibilityManifest.approvalState, "DRAFT");
   assert.equal(admission.credibilityManifest.limitations[0].severity, "BLOCKING");
+  assert.ok(admission.namedAircraftPerformance.every((item) => item.state === "UNSUPPORTED"));
+  assert.ok(admission.namedAircraftPerformance.every((item) => item.reason));
   assert.deepEqual(
     admission.scenarioTemplateIds,
     SCENARIO_LIBRARY.map((item) => item.id).sort(),
@@ -113,5 +115,12 @@ test("catalog admission fails closed for missing or mismatched credibility recor
   assert.throws(
     () => admitCatalogCredibility(mismatchedApproval),
     /approval state mismatch/,
+  );
+
+  const missingNamedPerformanceBoundary = rows();
+  delete missingNamedPerformanceBoundary.compiledModelPacks[0].payload.aircraft[0].performanceAdmission;
+  assert.throws(
+    () => admitCatalogCredibility(missingNamedPerformanceBoundary),
+    /expected an object/,
   );
 });
