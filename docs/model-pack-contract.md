@@ -75,6 +75,22 @@ level as the declared vertical reference. A future model may select ellipsoid
 height only by publishing a new pack and resolving the scenario conversion
 before simulation.
 
+### Positive sensor evidence admission
+
+A `DECLARED_ENVELOPE` is presentation-only and cannot enter the observer
+runtime. A positive `RADAR`, `INFRARED`, or `VISUAL` sensor must instead carry
+`vector.sensor-evidence-admission.v1`. It separates immutable `SOURCE` and
+independent `VALIDATION` artifacts, each with a SHA-256 digest, and requires
+the source model to name both artifacts in its normal provenance list.
+
+The admission also marks detection range, minimum range, scan period,
+azimuth/elevation field of view, measurement uncertainty, and target
+applicability as `VALIDATED` or `UNKNOWN`. Compilation rejects a positive
+sensor unless every one is `VALIDATED`; a numeric zero is not an “unknown”
+minimum range. This contract does not add a positive sensor to the deployed
+pack or make a track. It prevents incomplete public research evidence from
+becoming a generic radar by accident.
+
 ## Compilation and digest
 
 `compileModelPack(source)` performs all work before the engine starts:

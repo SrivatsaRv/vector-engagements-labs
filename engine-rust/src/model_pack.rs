@@ -102,12 +102,37 @@ pub struct PropulsionModel {
 #[serde(rename_all = "camelCase")]
 pub struct SensorModel {
     pub id: String,
+    pub sensor_kind: String,
+    pub evidence_ref_ids: Vec<String>,
+    #[serde(default)]
+    pub evidence_admission: Option<SensorEvidenceAdmission>,
     pub detection_range_m: f64,
     pub minimum_range_m: f64,
     pub scan_period_s: f64,
     pub azimuth_field_of_view_rad: f64,
     pub elevation_field_of_view_rad: f64,
     pub validity_domain: ValidityDomain,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SensorEvidenceAdmission {
+    pub schema_version: String,
+    pub source_evidence_ref_ids: Vec<String>,
+    pub validation_evidence_ref_ids: Vec<String>,
+    pub coverage: SensorEvidenceCoverage,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SensorEvidenceCoverage {
+    pub detection_range: String,
+    pub minimum_range: String,
+    pub scan_period: String,
+    pub azimuth_field_of_view: String,
+    pub elevation_field_of_view: String,
+    pub measurement_uncertainty: String,
+    pub target_applicability: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -472,6 +497,98 @@ fn validate_governed_aircraft_evidence_admission(
     Ok(())
 }
 
+fn validate_sensor_evidence_admission(
+    sensor: &SensorModel,
+    evidence: &[EvidenceReference],
+) -> Result<(), EngineError> {
+    if sensor.sensor_kind == "DECLARED_ENVELOPE" {
+        return Ok(());
+    }
+    if !matches!(sensor.sensor_kind.as_str(), "RADAR" | "INFRARED" | "VISUAL") {
+        return Err(invalid(format!(
+            "sensor model {} has an unknown sensor kind",
+            sensor.id
+        )));
+    }
+    let admission = sensor.evidence_admission.as_ref().ok_or_else(|| {
+        invalid(format!(
+            "sensor model {} requires evidence admission for a positive sensor",
+            sensor.id
+        ))
+    })?;
+    if admission.schema_version != "vector.sensor-evidence-admission.v1" {
+        return Err(invalid(format!(
+            "sensor model {} has an unsupported sensor evidence admission schema",
+            sensor.id
+        )));
+    }
+    let validate_artifacts = |ids: &[String], kind: &str, field: &str| -> Result<(), EngineError> {
+        if ids.is_empty() {
+            return Err(invalid(format!(
+                "sensor model {} has no {field}",
+                sensor.id
+            )));
+        }
+        for id in ids {
+            let item = evidence.iter().find(|item| item.id == *id).ok_or_else(|| {
+                invalid(format!(
+                    "sensor model {} references missing {field} {id}",
+                    sensor.id
+                ))
+            })?;
+            if item.kind != kind
+                || !item.content_sha256.as_deref().is_some_and(sha256_digest)
+                || !sensor.evidence_ref_ids.contains(id)
+            {
+                return Err(invalid(format!(
+                    "sensor model {} has invalid immutable {field} {id}",
+                    sensor.id
+                )));
+            }
+        }
+        Ok(())
+    };
+    validate_artifacts(
+        &admission.source_evidence_ref_ids,
+        "SOURCE",
+        "source evidence",
+    )?;
+    validate_artifacts(
+        &admission.validation_evidence_ref_ids,
+        "VALIDATION",
+        "validation evidence",
+    )?;
+    if admission
+        .source_evidence_ref_ids
+        .iter()
+        .any(|id| admission.validation_evidence_ref_ids.contains(id))
+    {
+        return Err(invalid(format!(
+            "sensor model {} reuses one artifact as source and independent validation evidence",
+            sensor.id
+        )));
+    }
+    let coverage = &admission.coverage;
+    if ![
+        &coverage.detection_range,
+        &coverage.minimum_range,
+        &coverage.scan_period,
+        &coverage.azimuth_field_of_view,
+        &coverage.elevation_field_of_view,
+        &coverage.measurement_uncertainty,
+        &coverage.target_applicability,
+    ]
+    .into_iter()
+    .all(|value| value == "VALIDATED")
+    {
+        return Err(invalid(format!(
+            "sensor model {} has unknown or unvalidated positive-sensor evidence coverage",
+            sensor.id
+        )));
+    }
+    Ok(())
+}
+
 fn unique_ids<'a>(
     path: &str,
     values: impl IntoIterator<Item = &'a str>,
@@ -670,6 +787,7 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
             "sensor elevation field of view",
             model.elevation_field_of_view_rad,
         )?;
+        validate_sensor_evidence_admission(model, &pack.evidence)?;
     }
     for model in &pack.aircraft {
         validate_validity_domain(
@@ -925,6 +1043,58 @@ mod tests {
         assert!(error
             .to_string()
             .contains("unsupported by the governed evidence registry"));
+        Ok(())
+    }
+
+    #[test]
+    fn positive_sensor_requires_complete_separate_immutable_evidence(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut value: Value = serde_json::from_str(&fixture_pack_json()?)?;
+        let evidence = value["evidence"]
+            .as_array_mut()
+            .ok_or("fixture must contain an evidence array")?;
+        evidence.extend([
+            serde_json::json!({
+                "id": "sensor-source-artifact",
+                "kind": "SOURCE",
+                "contentSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }),
+            serde_json::json!({
+                "id": "sensor-validation-artifact",
+                "kind": "VALIDATION",
+                "contentSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            }),
+        ]);
+        value["sensors"][0]["sensorKind"] = Value::from("RADAR");
+        value["sensors"][0]["evidenceRefIds"] =
+            serde_json::json!(["sensor-source-artifact", "sensor-validation-artifact"]);
+        value["sensors"][0]["evidenceAdmission"] = serde_json::json!({
+            "schemaVersion": "vector.sensor-evidence-admission.v1",
+            "sourceEvidenceRefIds": ["sensor-source-artifact"],
+            "validationEvidenceRefIds": ["sensor-validation-artifact"],
+            "coverage": {
+                "detectionRange": "VALIDATED",
+                "minimumRange": "VALIDATED",
+                "scanPeriod": "VALIDATED",
+                "azimuthFieldOfView": "VALIDATED",
+                "elevationFieldOfView": "VALIDATED",
+                "measurementUncertainty": "VALIDATED",
+                "targetApplicability": "VALIDATED"
+            }
+        });
+        value["digest"] = Value::from(digest_payload(&value)?);
+        assert!(validate_model_pack_json(&serde_json::to_string(&value)?).is_ok());
+
+        value["sensors"][0]["evidenceAdmission"]["coverage"]["minimumRange"] =
+            Value::from("UNKNOWN");
+        value["digest"] = Value::from(digest_payload(&value)?);
+        let error = match validate_model_pack_json(&serde_json::to_string(&value)?) {
+            Ok(_) => return Err("unknown sensor lower bound must fail closed".into()),
+            Err(error) => error,
+        };
+        assert!(error
+            .to_string()
+            .contains("unknown or unvalidated positive-sensor evidence coverage"));
         Ok(())
     }
 }

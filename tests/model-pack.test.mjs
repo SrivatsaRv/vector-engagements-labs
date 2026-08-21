@@ -108,6 +108,70 @@ test("source validation rejects missing units, coefficients, evidence, reference
   }
 });
 
+test("positive sensor admission requires separate immutable evidence and every declared measurement bound", async () => {
+  const source = cloneSource();
+  source.evidence.push(
+    {
+      id: "sensor-source-artifact",
+      kind: "SOURCE",
+      title: "Synthetic source artifact used only to exercise sensor-admission validation",
+      uri: "urn:vector:test:sensor-source-artifact",
+      contentSha256: "c".repeat(64),
+      accessedAt: "2026-08-21",
+    },
+    {
+      id: "sensor-validation-artifact",
+      kind: "VALIDATION",
+      title: "Synthetic independent validation artifact used only to exercise sensor-admission validation",
+      uri: "urn:vector:test:sensor-validation-artifact",
+      contentSha256: "d".repeat(64),
+      accessedAt: "2026-08-21",
+    },
+  );
+  const sensor = source.sensors[0];
+  sensor.sensorKind = "RADAR";
+  sensor.evidenceRefIds = ["sensor-source-artifact", "sensor-validation-artifact"];
+  sensor.evidenceAdmission = {
+    schemaVersion: "vector.sensor-evidence-admission.v1",
+    sourceEvidenceRefIds: ["sensor-source-artifact"],
+    validationEvidenceRefIds: ["sensor-validation-artifact"],
+    coverage: {
+      detectionRange: "VALIDATED",
+      minimumRange: "VALIDATED",
+      scanPeriod: "VALIDATED",
+      azimuthFieldOfView: "VALIDATED",
+      elevationFieldOfView: "VALIDATED",
+      measurementUncertainty: "VALIDATED",
+      targetApplicability: "VALIDATED",
+    },
+  };
+  const admitted = await compileModelPack(source);
+  assert.equal(admitted.pack.sensors[0].evidenceAdmission.coverage.minimumRange, "VALIDATED");
+
+  const unknownMinimum = structuredClone(source);
+  unknownMinimum.sensors[0].evidenceAdmission.coverage.minimumRange = "UNKNOWN";
+  await assert.rejects(
+    compileModelPack(unknownMinimum),
+    /evidenceAdmission\.coverage\.minimumRange must be VALIDATED for a positive sensor/,
+  );
+  const oneArtifact = structuredClone(source);
+  oneArtifact.sensors[0].evidenceAdmission.validationEvidenceRefIds = ["sensor-source-artifact"];
+  await assert.rejects(
+    compileModelPack(oneArtifact),
+    /validationEvidenceRefIds evidence sensor-source-artifact must be VALIDATION|must not use one artifact/,
+  );
+  const unhashed = structuredClone(source);
+  delete unhashed.evidence.find((item) => item.id === "sensor-validation-artifact").contentSha256;
+  await assert.rejects(
+    compileModelPack(unhashed),
+    /validationEvidenceRefIds evidence sensor-validation-artifact must carry an immutable SHA-256 artifact digest/,
+  );
+
+  const production = await compileModelPack(cloneSource());
+  assert.equal(production.pack.sensors[0].sensorKind, "DECLARED_ENVELOPE");
+  assert.equal(production.pack.sensors[0].evidenceAdmission, undefined);
+});
+
 test("aircraft admission rejects a component or table that cannot cover its declared validity envelope", async () => {
   const insufficientAerodynamicEnvelope = cloneSource();
   insufficientAerodynamicEnvelope.aerodynamics[0].validityDomain.mach.maximum = 0.8;
