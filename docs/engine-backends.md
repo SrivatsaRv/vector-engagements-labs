@@ -104,3 +104,9 @@ scale-normalized Cholesky factor with an exactly representable `2^-32` relative
 pivot threshold and governed minimum mass/inertia scale. Rust/WASM does not
 accept a broader finite-input domain than TypeScript, and neither adapter emits
 conservation drift for a nonzero applied wrench.
+The JSON ABI uses correctly rounded binary64 decoding and verifies authored
+frame-zero values plus scalar, angular, and conditioned-inertia ULP boundaries
+against the TypeScript adapter before a release artifact is admitted.
+The release profile uses size-first `opt-level = "z"`; the committed artifact
+must remain below the existing 500,000-byte regression limit while still
+passing the numerical and throughput gates.

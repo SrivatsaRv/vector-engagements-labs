@@ -88,8 +88,26 @@ function adjacentFloat(value, ulps) {
   const bytes = new ArrayBuffer(8);
   const view = new DataView(bytes);
   view.setFloat64(0, value);
-  view.setBigUint64(0, view.getBigUint64(0) + BigInt(ulps));
+  const direction = value < 0 ? -BigInt(ulps) : BigInt(ulps);
+  view.setBigUint64(0, view.getBigUint64(0) + direction);
   return view.getFloat64(0);
+}
+
+function admissionState(run, input) {
+  try {
+    run(input);
+    return "ACCEPTED";
+  } catch {
+    return "REJECTED";
+  }
+}
+
+function assertMatchingAdmission(input, context) {
+  assert.equal(
+    admissionState(runRustWasmSixDofVerification, input),
+    admissionState(runSixDofVerification, input),
+    context,
+  );
 }
 
 function canonicalAngularIncrementIsAdmitted(rate, stepSeconds) {
@@ -360,6 +378,152 @@ test("angular admission uses one ordered squared representation at every boundar
       }
     }
   }
+});
+
+test("the embedded WASM ABI round-trips authored binary64 values before admission", () => {
+  const preserved = 0.9999999999999999;
+  const input = caseInput({
+    tickCount: 0,
+    initialState: {
+      ...caseInput().initialState,
+      positionWorldM: { x: preserved, y: 0, z: 0 },
+    },
+  });
+  assert.equal(runSixDofVerification(input).frames[0].state.positionWorldM.x, preserved);
+  assert.equal(runRustWasmSixDofVerification(input).frames[0].state.positionWorldM.x, preserved);
+
+  for (const outside of [
+    caseInput({
+      tickCount: 0,
+      massProperties: { ...caseInput().massProperties, massKg: adjacentFloat(1, -1) },
+    }),
+    caseInput({
+      tickCount: 0,
+      massProperties: {
+        ...caseInput().massProperties,
+        massKg: adjacentFloat(SIX_DOF_VERIFICATION_LIMITS.maximumMassKg, 1),
+      },
+    }),
+    caseInput({
+      tickCount: 0,
+      massProperties: {
+        ...caseInput().massProperties,
+        inertiaKgM2: {
+          xx: adjacentFloat(SIX_DOF_VERIFICATION_LIMITS.maximumInertiaKgM2, 1),
+          xy: 0, xz: 0,
+          yx: 0, yy: adjacentFloat(SIX_DOF_VERIFICATION_LIMITS.maximumInertiaKgM2, 1), yz: 0,
+          zx: 0, zy: 0, zz: adjacentFloat(SIX_DOF_VERIFICATION_LIMITS.maximumInertiaKgM2, 1),
+        },
+      },
+    }),
+    caseInput({
+      tickCount: 0,
+      initialState: {
+        ...caseInput().initialState,
+        bodyToWorldQuaternion: { w: adjacentFloat(1e6, 1), x: 0, y: 0, z: 0 },
+      },
+    }),
+  ]) assertBothReject(outside, /massKg|inertia|quaternion/i);
+});
+
+test("the embedded WASM ABI preserves angular and full-cross Cholesky admission over a deterministic ULP sweep", () => {
+  const previouslyDivergentRate = {
+    x: -3.6206049912700933,
+    y: -23.983878218246478,
+    z: 6.055146993220906,
+  };
+  const previouslyDivergentAngularInput = caseInput({
+    tickCount: 0,
+    initialState: {
+      ...caseInput().initialState,
+      angularRateBodyRadS: previouslyDivergentRate,
+    },
+  });
+  assert.equal(admissionState(runSixDofVerification, previouslyDivergentAngularInput), "ACCEPTED");
+  assertMatchingAdmission(previouslyDivergentAngularInput, "previously divergent angular ABI value");
+
+  const previouslyDivergentInertia = {
+    xx: 0.000001,
+    xy: 2e-7,
+    xz: -2.5e-7,
+    yx: 2e-7,
+    yy: 4.000000023283065e-8,
+    yz: -4.999618530273437e-8,
+    zx: -2.5e-7,
+    zy: -4.999618530273437e-8,
+    zz: 1.2500000023283064e-7,
+  };
+  const previouslyDivergentCholeskyInput = caseInput({
+    tickCount: 0,
+    massProperties: {
+      ...caseInput().massProperties,
+      inertiaKgM2: previouslyDivergentInertia,
+    },
+  });
+  assert.equal(admissionState(runSixDofVerification, previouslyDivergentCholeskyInput), "REJECTED");
+  assertMatchingAdmission(previouslyDivergentCholeskyInput, "previously divergent full-cross Cholesky ABI value");
+
+  let generatorState = 0x6d2b79f5;
+  const nextSignedInteger = () => {
+    generatorState = (Math.imul(generatorState, 1664525) + 1013904223) >>> 0;
+    return (generatorState % 2_000_001) - 1_000_000;
+  };
+  let cases = 0;
+  for (let index = 0; index < 300; index += 1) {
+    const raw = { x: nextSignedInteger(), y: nextSignedInteger(), z: nextSignedInteger() };
+    const magnitude = Math.sqrt(raw.x * raw.x + raw.y * raw.y + raw.z * raw.z);
+    const rate = {
+      x: 25 * raw.x / magnitude,
+      y: 25 * raw.y / magnitude,
+      z: 25 * raw.z / magnitude,
+    };
+    for (const ulps of [-4, -2, -1, 0, 1, 2, 4]) {
+      const varied = { ...rate, z: adjacentFloat(rate.z, ulps) };
+      assertMatchingAdmission(caseInput({
+        tickCount: 0,
+        initialState: { ...caseInput().initialState, angularRateBodyRadS: varied },
+      }), `angular sweep case ${index}/${ulps}`);
+      cases += 1;
+    }
+  }
+
+  const minimumPivot = SIX_DOF_VERIFICATION_LIMITS.minimumRelativeCholeskyPivot;
+  for (const scale of [1e-6, 0.01, 1, 1e12, 1e15]) {
+    for (const lower21 of [0.2, -0.3, 0.7071067811865475]) {
+      for (const lower31 of [-0.25, 0.125]) {
+        for (const lower32 of [0.25, -0.4]) {
+          const lower22 = Math.sqrt(minimumPivot);
+          const lower33 = Math.sqrt(minimumPivot);
+          const normalized = {
+            xx: 1,
+            xy: lower21,
+            xz: lower31,
+            yx: lower21,
+            yy: lower21 * lower21 + lower22 * lower22,
+            yz: lower31 * lower21 + lower32 * lower22,
+            zx: lower31,
+            zy: lower31 * lower21 + lower32 * lower22,
+            zz: lower31 * lower31 + lower32 * lower32 + lower33 * lower33,
+          };
+          for (const field of ["yy", "yz", "zz"]) {
+            for (const ulps of [-4, -2, -1, 0, 1, 2, 4]) {
+              const varied = { ...normalized, [field]: adjacentFloat(normalized[field], ulps) };
+              if (field === "yz") varied.zy = varied.yz;
+              const inertiaKgM2 = Object.fromEntries(
+                Object.entries(varied).map(([key, value]) => [key, value * scale]),
+              );
+              assertMatchingAdmission(caseInput({
+                tickCount: 0,
+                massProperties: { ...caseInput().massProperties, inertiaKgM2 },
+              }), `Cholesky sweep ${scale}/${lower21}/${lower31}/${lower32}/${field}/${ulps}`);
+              cases += 1;
+            }
+          }
+        }
+      }
+    }
+  }
+  assert.equal(cases, 3_360);
 });
 
 test("both backends use a scale-aware Cholesky conditioning gate", () => {

@@ -40,6 +40,13 @@ quaternion norm, excessive angular increment, invalid RK4 stage quaternion, and
 out-of-bound state or wrench values. There is no clamp, extrapolation, default,
 or fallback.
 
+The Rust/WASM JSON ABI enables `serde_json`'s correctly rounded binary64
+decoder. A finite JavaScript number therefore reaches Rust as the same IEEE-754
+value encoded by `JSON.stringify`; admission is never evaluated against a
+one-ULP-rounded neighbour. Verification retains the authored value at frame
+zero and sweeps scalar, angular-increment, and full-cross Cholesky boundaries
+through the actual embedded WASM transport.
+
 Positive definiteness and the solve use the same scale-normalized Cholesky
 decomposition in TypeScript and Rust. Every normalized diagonal pivot must be at
 least the exact binary fraction `2^-32` of the largest tensor diagonal. This is
@@ -109,6 +116,8 @@ falsification cases:
   rejection of `Number.MIN_VALUE` mass and `diag(1e-108)` inertia, and one finite
   zero-wrench tick at every minimum/maximum mass and conditioned-inertia scale
   combination;
+- actual embedded-WASM preservation of authored binary64 values plus a
+  deterministic 3,360-case angular and full-cross Cholesky admission sweep;
 - conservation diagnostic applicability for zero versus nonzero wrench;
 - TypeScript and independent Rust/WASM fail-closed admission cases.
 
