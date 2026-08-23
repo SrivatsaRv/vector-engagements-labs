@@ -137,8 +137,9 @@ transition's `from` value must equal the prior canonical lifecycle. The replayed
 history must reach the lifecycle in the final retained frame. A syntactically
 valid enum cannot therefore falsify the recorded transition history.
 
-World entry for a scheduled stowed weapon is bound to its declared launch time
-and the first retained frame containing that entity. A later lifecycle event is
+World entry for a scheduled stowed weapon is bound to the first fixed-step
+integration boundary at or after its declared launch time and the first retained
+frame containing that entity. A later lifecycle event is
 bound to the first retained frame that changes from its prior canonical state,
 and `RUN_COMPLETED` is bound to the final retained frame. Referencing any other
 frame fails even when that frame contains the same lifecycle value.

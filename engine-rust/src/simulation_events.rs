@@ -474,15 +474,22 @@ impl SimulationEventJournal {
             ));
         }
         normalize_participants(&mut event.participants);
-        let unique_causes = event
-            .causes
-            .iter()
-            .map(|cause| format!("{cause:?}"))
-            .collect::<HashSet<_>>();
-        if unique_causes.len() != event.causes.len() {
-            return Err(EngineError::InvalidScenario(
-                "simulation event causal references must be unique".to_string(),
-            ));
+        let mut unique_causes = HashSet::new();
+        for cause in &event.causes {
+            match cause {
+                SimulationEventCauseReference::EventReceipt(receipt) => {
+                    if receipt.local_key.trim().is_empty() {
+                        return Err(EngineError::InvalidScenario(
+                            "simulation event receipt local key must not be empty".to_string(),
+                        ));
+                    }
+                    if !unique_causes.insert((receipt.tick, receipt.local_key.clone())) {
+                        return Err(EngineError::InvalidScenario(
+                            "simulation event causal references must be unique".to_string(),
+                        ));
+                    }
+                }
+            }
         }
         let receipt = SimulationEventReceipt {
             tick: event.tick,
@@ -718,6 +725,69 @@ mod tests {
             ));
         journal.emit(completed)?;
         assert!(journal.commit_tick(0, 0.0, 0).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_causal_receipts_fail_closed_before_journal_admission() {
+        let mut journal = SimulationEventJournal::default();
+        let receipt = SimulationEventReceipt {
+            tick: 0,
+            local_key: "run-started".to_string(),
+        };
+        let mut completed = SimulationEventDraft::run_completed(0, 0.0, Termination::TimeLimit);
+        completed
+            .causes
+            .push(SimulationEventCauseReference::EventReceipt(receipt.clone()));
+        completed
+            .causes
+            .push(SimulationEventCauseReference::EventReceipt(receipt));
+
+        assert!(matches!(
+            journal.emit(completed),
+            Err(EngineError::InvalidScenario(message))
+                if message.contains("causal references must be unique")
+        ));
+    }
+
+    #[test]
+    fn empty_causal_receipt_local_keys_fail_closed_before_journal_admission() {
+        let mut journal = SimulationEventJournal::default();
+        let mut completed = SimulationEventDraft::run_completed(0, 0.0, Termination::TimeLimit);
+        completed
+            .causes
+            .push(SimulationEventCauseReference::EventReceipt(
+                SimulationEventReceipt {
+                    tick: 0,
+                    local_key: " ".to_string(),
+                },
+            ));
+
+        assert!(matches!(
+            journal.emit(completed),
+            Err(EngineError::InvalidScenario(message))
+                if message.contains("receipt local key must not be empty")
+        ));
+    }
+
+    #[test]
+    fn causal_receipts_from_a_future_tick_fail_closed_at_commit() -> Result<(), EngineError> {
+        let mut journal = SimulationEventJournal::default();
+        let mut start = SimulationEventDraft::run_started(0, 0.0, "scenario", "1");
+        start
+            .causes
+            .push(SimulationEventCauseReference::EventReceipt(
+                SimulationEventReceipt {
+                    tick: 1,
+                    local_key: "future-event".to_string(),
+                },
+            ));
+        journal.emit(start)?;
+
+        assert!(matches!(
+            journal.commit_tick(0, 0.0, 0),
+            Err(EngineError::InvalidScenario(message)) if message.contains("future or cyclic")
+        ));
         Ok(())
     }
 

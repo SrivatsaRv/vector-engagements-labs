@@ -2026,6 +2026,41 @@ mod tests {
     }
 
     #[test]
+    fn off_grid_launch_uses_the_first_fixed_step_boundary() -> Result<(), Box<dyn std::error::Error>>
+    {
+        for (launch_time, expected_tick, expected_time) in
+            [(2.03, 41, 2.05), (2.050_000_000_001, 42, 2.1)]
+        {
+            let mut input = scenario();
+            let weapon = input
+                .entities
+                .iter_mut()
+                .find(|entity| entity.id == "blue-weapon")
+                .and_then(|entity| entity.weapon.as_mut())
+                .ok_or("scenario has no scheduled weapon")?;
+            weapon.launch_time_seconds = Some(launch_time);
+
+            let run = try_run_engine(input)?;
+            let entry = run
+                .events
+                .items
+                .iter()
+                .find(|event| {
+                    event.producer.entity_id.as_deref() == Some("blue-weapon")
+                        && matches!(
+                            &event.payload,
+                            simulation_events::SimulationEventPayload::EntityEnteredWorld { .. }
+                        )
+                })
+                .ok_or("run has no weapon world-entry event")?;
+            assert_eq!(entry.tick, expected_tick);
+            assert_eq!(entry.model_time_seconds, expected_time);
+            assert_eq!(run.frames[entry.frame_index].t, expected_time);
+        }
+        Ok(())
+    }
+
+    #[test]
     fn unavailable_assigned_target_terminates_the_weapon_without_continuation(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut unavailable_target = scenario();

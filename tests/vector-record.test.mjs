@@ -160,6 +160,30 @@ for (const backend of ["typescript", "rust-wasm"]) {
   });
 }
 
+test("VSR admits an off-grid scheduled launch at its first fixed-step boundary", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const prepared = prepareSimulation(scenario);
+  const weapon = prepared.engineScenario.entities.find((entity) =>
+    entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds === null
+  );
+  assert.ok(weapon?.weapon);
+  weapon.weapon.launchTimeSeconds = 2.03;
+  prepared.engineScenario.durationSeconds = 3;
+  const engineRun = runEngineBackend(prepared.engineScenario, "typescript");
+  const result = buildSimulationResult(prepared, engineRun);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const serialized = serializeVectorRecord(record);
+  const opened = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+  assert.equal(opened.events.state, "AVAILABLE");
+  const entry = opened.events.items.find((event) =>
+    event.payload.kind === "ENTITY_ENTERED_WORLD" && event.producer.entityId === weapon.id
+  );
+  assert.ok(entry);
+  assert.equal(entry.tick, 41);
+  assert.equal(entry.modelTimeSeconds, 2.05);
+  assert.equal(opened.result.engineRun.frames[entry.frameIndex].t, 2.05);
+});
+
 test("VSR content identity and stable event ordering are deterministic", async () => {
   const scenario = SCENARIO_LIBRARY[1].scenario;
   const prepared = prepareSimulation(scenario);
@@ -310,6 +334,22 @@ test("VSR rejects unsupported, reordered, and causally corrupt v2 event streams"
   await assert.rejects(
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
     /missing or future causal reference/,
+  );
+
+  const inventedBackwardCauseItems = structuredClone(result.engineRun.events.items);
+  const completed = inventedBackwardCauseItems.at(-1);
+  assert.equal(completed?.payload.kind, "RUN_COMPLETED");
+  completed.causeEventIds = [inventedBackwardCauseItems[0].id];
+  const inventedBackwardCause = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    encodeEvents(inventedBackwardCauseItems),
+  );
+  serialized = serializeVectorRecord(inventedBackwardCause);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /payload family does not admit causal references/,
   );
 
   const unknownPayloadItems = structuredClone(result.engineRun.events.items);

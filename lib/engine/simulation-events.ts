@@ -115,6 +115,10 @@ function receiptKey(receipt: SimulationEventReceipt) {
   return `${receipt.tick}\u0000${receipt.localKey}`;
 }
 
+function firstFixedStepTickAtOrAfter(modelTimeSeconds: number, fixedStepSeconds: number) {
+  return Math.ceil(modelTimeSeconds / fixedStepSeconds);
+}
+
 function normalizeParticipants(
   participants: readonly SimulationEventParticipant[],
 ): SimulationEventParticipant[] {
@@ -221,6 +225,16 @@ function assertDraftShape(event: SimulationEventDraft) {
   if (!Number.isSafeInteger(event.tick) || event.tick < 0) throw new Error("Simulation event tick must be a non-negative safe integer.");
   if (!Number.isFinite(event.modelTimeSeconds) || event.modelTimeSeconds < 0) throw new Error("Simulation event model time must be finite and non-negative.");
   nonEmptyString(event.localKey, "Simulation event local key");
+  if (!Array.isArray(event.causes)) throw new Error("Simulation event causes must be an array.");
+  for (const [index, cause] of event.causes.entries()) {
+    if (!isRecord(cause)) throw new Error(`Simulation event cause ${index} must be an object.`);
+    exactKeys(cause, ["kind", "receipt"], [], `Simulation event cause ${index}`);
+    member(cause.kind, ["EVENT_RECEIPT"], `Simulation event cause ${index} kind`);
+    if (!isRecord(cause.receipt)) throw new Error(`Simulation event cause ${index} receipt must be an object.`);
+    exactKeys(cause.receipt, ["tick", "localKey"], [], `Simulation event cause ${index} receipt`);
+    if (!Number.isSafeInteger(cause.receipt.tick) || (cause.receipt.tick as number) < 0) throw new Error(`Simulation event cause ${index} receipt tick must be a non-negative safe integer.`);
+    nonEmptyString(cause.receipt.localKey, `Simulation event cause ${index} receipt local key`);
+  }
   if (new Set(event.causes.map((cause) => canonicalJson(cause))).size !== event.causes.length) throw new Error("Simulation event causal references must be unique.");
   event.participants = normalizeParticipants(event.participants);
 }
@@ -394,6 +408,7 @@ export function assertSimulationEventStream(
     });
     if (causeSequences.some((value, causeIndex) => causeIndex > 0 && value <= causeSequences[causeIndex - 1]!)) throw new Error(`Simulation event ${raw.id} causal references are not canonical.`);
     assertPayload(raw.payload, index);
+    if (causeEventIds.length !== 0) throw new Error(`Simulation event ${raw.id} payload family does not admit causal references.`);
     const event = raw as unknown as SimulationEventV2;
     const tickLocalKeys = seenLocalKeysByTick.get(event.tick) ?? new Set<string>();
     if (tickLocalKeys.has(event.localKey)) {
@@ -425,10 +440,12 @@ export function assertSimulationEventStream(
         const priorLifecycle = lifecycleByEntity.get(entityId!);
         if (priorLifecycle === "STOWED") {
           const launchTimeSeconds = entity.weapon?.launchTimeSeconds;
+          const expectedLaunchTick = launchTimeSeconds === null || launchTimeSeconds === undefined
+            ? undefined
+            : firstFixedStepTickAtOrAfter(launchTimeSeconds, scenario.fixedStepSeconds);
           if (
-            launchTimeSeconds === null ||
-            launchTimeSeconds === undefined ||
-            event.modelTimeSeconds !== Number(launchTimeSeconds.toFixed(6)) ||
+            expectedLaunchTick === undefined ||
+            event.tick !== expectedLaunchTick ||
             event.frameIndex !== firstFrameIndexByEntity.get(entityId!)
           ) {
             throw new Error(`Simulation event ${event.id} does not match the declared launch boundary.`);

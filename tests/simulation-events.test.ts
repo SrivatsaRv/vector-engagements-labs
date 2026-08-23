@@ -105,6 +105,54 @@ test("same-tick references resolve after deterministic ordering and reject futur
   assert.throws(() => cyclic.commitTick(0, 0, 0), /future or cyclic/);
 });
 
+test("duplicate causal receipts fail closed before journal admission", () => {
+  const journal = new SimulationEventJournal();
+  const receipt = { tick: 0, localKey: "run-started" };
+  assert.throws(
+    () => journal.emit(runStartedDraft({
+      localKey: "run-completed",
+      causes: [
+        { kind: "EVENT_RECEIPT", receipt },
+        { kind: "EVENT_RECEIPT", receipt: { ...receipt } },
+      ],
+      payload: {
+        kind: "RUN_COMPLETED",
+        schemaVersion: SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_COMPLETED,
+        termination: "time_limit",
+      },
+    })),
+    /causal references must be unique/,
+  );
+});
+
+test("malformed causal receipts fail closed before sorting or resolution", () => {
+  const corruptions: unknown[] = [
+    { kind: "TYPO", receipt: { tick: Number.NaN, localKey: "event" } },
+    { kind: "EVENT_RECEIPT", receipt: { tick: Number.NaN, localKey: "event" } },
+    { kind: "EVENT_RECEIPT", receipt: { tick: -1, localKey: "event" } },
+    { kind: "EVENT_RECEIPT", receipt: { tick: 0, localKey: " " } },
+    { kind: "EVENT_RECEIPT", receipt: { tick: 0, localKey: "event", extra: true } },
+    { kind: "EVENT_RECEIPT", receipt: { tick: 0, localKey: "event" }, extra: true },
+  ];
+  for (const cause of corruptions) {
+    const journal = new SimulationEventJournal();
+    assert.throws(() => journal.emit(runStartedDraft({
+      causes: [cause] as SimulationEventDraft["causes"],
+    })));
+  }
+});
+
+test("causal receipts from a future tick fail closed at commit", () => {
+  const journal = new SimulationEventJournal();
+  journal.emit(runStartedDraft({
+    causes: [{
+      kind: "EVENT_RECEIPT",
+      receipt: { tick: 1, localKey: "future-event" },
+    }],
+  }));
+  assert.throws(() => journal.commitTick(0, 0, 0), /future or cyclic/);
+});
+
 test("a journal receipt carries causality across ticks without an inferred event ID", () => {
   const journal = new SimulationEventJournal();
   const receipt = journal.emit(runStartedDraft());
@@ -168,11 +216,11 @@ test("participant input order and duplicates cannot alter committed bytes", () =
   ]);
 });
 
-test("a lifecycle transition forces an exact event frame outside regular sampling cadence", () => {
+test("an off-grid launch activates on its first fixed-step boundary in both engines", () => {
   const scenario = admittedScenario();
   scenario.durationSeconds = 3;
   const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
-  weapon.weapon!.launchTimeSeconds = 2.05;
+  weapon.weapon!.launchTimeSeconds = 2.03;
 
   for (const backend of ["typescript", "rust-wasm"] as const) {
     const run = runEngineBackend(structuredClone(scenario), backend);
@@ -190,6 +238,7 @@ test("a lifecycle transition forces an exact event frame outside regular samplin
         event.producer.entityId === weapon.id,
     );
     assert.ok(release, `${backend} must record the store world-entry transition`);
+    assert.equal(release.tick, 41);
     assert.equal(release.modelTimeSeconds, 2.05);
     assert.equal(run.frames[release.frameIndex]?.t, release.modelTimeSeconds);
     assert.ok(
@@ -206,6 +255,33 @@ test("a lifecycle transition forces an exact event frame outside regular samplin
       launcher.position,
       `${backend} world-entry frame must be the committed launch snapshot before fly-out`,
     );
+    assertSimulationEventStream(
+      run.events.items,
+      run.frames,
+      run.scenario,
+      run.termination,
+    );
+  }
+});
+
+test("a launch just after a grid boundary is not rounded back to the prior tick", () => {
+  const scenario = admittedScenario();
+  scenario.durationSeconds = 3;
+  const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
+  weapon.weapon!.launchTimeSeconds = 2.050000000001;
+
+  for (const backend of ["typescript", "rust-wasm"] as const) {
+    const run = runEngineBackend(structuredClone(scenario), backend);
+    assert.equal(run.events.state, "AVAILABLE");
+    const release = run.events.items.find(
+      (event) =>
+        event.payload.kind === "ENTITY_ENTERED_WORLD" &&
+        event.producer.entityId === weapon.id,
+    );
+    assert.ok(release, `${backend} must record the near-grid store release`);
+    assert.equal(release.tick, 42);
+    assert.equal(release.modelTimeSeconds, 2.1);
+    assert.equal(run.frames[release.frameIndex]?.t, 2.1);
     assertSimulationEventStream(
       run.events.items,
       run.frames,
@@ -255,6 +331,21 @@ test("runtime decoding rejects duplicate producer-local keys within one tick", (
   assert.throws(
     () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination),
     /repeats local key/,
+  );
+});
+
+test("delivered cause-free payload families reject invented backward causal edges", () => {
+  const scenario = admittedScenario();
+  scenario.durationSeconds = 1;
+  const run = runEngineBackend(scenario, "typescript");
+  assert.equal(run.events.state, "AVAILABLE");
+  const events = structuredClone(run.events.items);
+  const completed = events.at(-1)!;
+  assert.equal(completed.payload.kind, "RUN_COMPLETED");
+  completed.causeEventIds = [events[0]!.id];
+  assert.throws(
+    () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination),
+    /payload family does not admit causal references/,
   );
 });
 
