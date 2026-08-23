@@ -1,11 +1,10 @@
-import { createHash } from "node:crypto";
-
-import corpus from "../../governance/nasa-tm-109057-generic-aam-verification-corpus.v1.json" with { type: "json" };
+import corpus from "../../governance/nasa-tm-109057-generic-aam-verification-corpus.v2.json" with { type: "json" };
+import { sha256HexBytesSync, sha256Utf8HexSync } from "../geospatial/digest.ts";
 
 type Vec3 = { x: number; y: number; z: number };
 
 export type GenericAamVerificationInput = {
-  schemaVersion: "vector.generic-aam-verification-input.v1";
+  schemaVersion: "vector.generic-aam-verification-input.v2";
   subjectId: "NASA_TM_109057_GENERIC_AAM_REFERENCE";
   intendedUse: "ENGINE_VERIFICATION_ONLY";
   semantics: "TM_109057_PRINTED_LISTING_BINARY64_V1";
@@ -18,6 +17,7 @@ export type GenericAamVerificationInput = {
   tickRateHz: 32 | 64 | 128 | 256;
   maxTicks: number;
   seekerHalfAngleDeg: 15 | 20 | 30;
+  seekerHalfAngleRad: 0.261798 | 0.349064 | 0.523596;
   missile: {
     speedMps: number;
     pitchRateRadS: number;
@@ -57,6 +57,7 @@ export type GenericAamTerminalState =
   | "MISS_SEEKER_LIMIT"
   | "MISS_OPENING_AFTER_BURN"
   | "MISS_GROUND_OR_ZERO_SPEED"
+  | "MISS_ZERO_RELATIVE_SPEED"
   | "TIME_LIMIT";
 
 export type GenericAamVerificationFrame = {
@@ -87,7 +88,7 @@ export type GenericAamVerificationFrame = {
 };
 
 export type GenericAamVerificationRun = {
-  schemaVersion: "vector.generic-aam-verification-run.v1";
+  schemaVersion: "vector.generic-aam-verification-run.v2";
   subjectId: "NASA_TM_109057_GENERIC_AAM_REFERENCE";
   intendedUse: "ENGINE_VERIFICATION_ONLY";
   semantics: "TM_109057_PRINTED_LISTING_BINARY64_V1";
@@ -107,13 +108,15 @@ const SUBJECT_KEYS = ["id", "intendedUse", "capabilities", "prohibitedBindings"]
 const ARTIFACT_KEYS = ["id", "authority", "citationId", "reportNumber", "title", "publicationDate", "recordModifiedAt", "pageCount", "recordUri", "pdfUri", "localPath", "byteLength", "sha256", "documentState", "dissemination", "curationState", "copyrightDecision", "exportControl", "ear", "itar"];
 const CLAIM_KEYS = ["id", "role", "pages", "ancestry", "permits", "prohibits"];
 const DECISION_KEYS = ["id", "sourceConflict", "decision", "executableValue", "limitation"];
-const EVALUATOR_KEYS = ["semantics", "axisConvention", "units", "reportTickRatesHz", "convergenceTickRatesHz", "seekerHalfAnglesDeg", "caseRoles", "maximumTicks", "terminalPrecedence"];
+const EVALUATOR_KEYS = ["semantics", "axisConvention", "units", "reportTickRatesHz", "convergenceTickRatesHz", "seekerHalfAngles", "caseRoles", "maximumTicks", "maximumEstimatedScalarOperations", "safeInputBounds", "terminalPrecedence"];
+const SEEKER_ANGLE_KEYS = ["degrees", "printedRadians"];
+const SAFE_BOUND_KEYS = ["missilePositionAbsMaxM", "missileSpeedMinMps", "missileSpeedMaxMps", "angularRateAbsMaxRadS", "controlSignalAbsMaxMps2", "pitchAbsMaxRad", "yawAbsMaxRad", "dynamicScalarAbsMax", "estimatedScalarOperationsPerTick"];
 const POLICY_KEYS = ["eligibleAuthorities", "ineligibleKinds"];
 const DERIVED_FIXTURE_KEYS = ["id", "path", "sha256", "byteLength", "role", "evidenceRole"];
 const PROMOTION_KEYS = ["runtimeAuthority", "prohibitedSurfaces"];
 const WORKLOAD_KEYS = ["schemaVersion", "id", "sourceSha256", "caseCount", "cases", "expectedBatchSha256"];
-const WORKLOAD_CASE_KEYS = ["id", "tickRateHz", "seekerHalfAngleDeg", "maxTicks", "targetPositionM", "expectedTerminal", "expectedTick", "typescriptRunSha256", "rustWasmRunSha256"];
-const INPUT_KEYS = ["schemaVersion", "subjectId", "intendedUse", "semantics", "sourceSha256", "corpusSha256", "decisionSha256", "caseRole", "axisConvention", "units", "tickRateHz", "maxTicks", "seekerHalfAngleDeg", "missile", "target", "constants"];
+const WORKLOAD_CASE_KEYS = ["id", "tickRateHz", "seekerHalfAngleDeg", "seekerHalfAngleRad", "maxTicks", "targetPositionM", "expectedTerminal", "expectedTick", "typescriptRunSha256", "rustWasmRunSha256"];
+const INPUT_KEYS = ["schemaVersion", "subjectId", "intendedUse", "semantics", "sourceSha256", "corpusSha256", "decisionSha256", "caseRole", "axisConvention", "units", "tickRateHz", "maxTicks", "seekerHalfAngleDeg", "seekerHalfAngleRad", "missile", "target", "constants"];
 const MISSILE_KEYS = ["speedMps", "pitchRateRadS", "pitchSignalMps2", "yawRateRadS", "yawSignalMps2", "pitchRad", "yawRad", "positionM", "massKg"];
 const TARGET_KEYS = ["previousPositionM", "positionM", "velocityMps"];
 const CONSTANT_KEYS = ["navigationConstant", "gravityMps2", "maximumPitchG", "maximumYawG", "hitRangeM", "operationalSpeedMps", "motorThrustN", "coastThrustN", "burnSeconds", "launchMassKg", "burnoutMassKg", "dragK1", "dragK2", "controlTimeConstantS"];
@@ -121,13 +124,20 @@ const VEC_KEYS = ["x", "y", "z"];
 const RUN_KEYS = ["schemaVersion", "subjectId", "intendedUse", "semantics", "backend", "sourceSha256", "corpusSha256", "decisionSha256", "inputSha256", "caseRole", "frames", "terminal", "limitations"];
 const FRAME_KEYS = ["tick", "timeSeconds", "missilePositionM", "targetPositionM", "speedMps", "pitchRad", "yawRad", "pitchRateRadS", "yawRateRadS", "pitchSignalMps2", "yawSignalMps2", "massKg", "thrustN", "dragN", "relativePositionM", "rangeM", "seekerAngleRad", "losRateRadS", "closingVelocityMps", "pitchCommandMps2", "yawCommandMps2", "closestApproachTimeS", "closestApproachDistanceM", "state"];
 const TERMINAL_KEYS = ["state", "tick", "cause"];
+const FRAME_NUMERIC_KEYS = FRAME_KEYS.filter((key) => !["missilePositionM", "targetPositionM", "relativePositionM", "losRateRadS", "state"].includes(key));
+const TERMINAL_CAUSES: Record<GenericAamTerminalState, readonly string[]> = {
+  HIT: ["EXACT_ZERO_RANGE", "CPA_HIT", "SEEKER_HIT", "OPENING_HIT"],
+  MISS_SEEKER_LIMIT: ["SEEKER_LIMIT"],
+  MISS_OPENING_AFTER_BURN: ["POST_BURN_OPEN"],
+  MISS_GROUND_OR_ZERO_SPEED: ["GROUND_ZERO"],
+  MISS_ZERO_RELATIVE_SPEED: ["EXACT_ZERO_RELATIVE_SPEED"],
+  TIME_LIMIT: ["TIME_LIMIT"],
+};
 const LIMITATIONS = ["GENERIC_VERIFICATION_ONLY", "LITERAL_PITCH_AMBIGUITY", "FIGURES_NOT_VALIDATION", "NOT_FORTRAN_BIT_REPRODUCTION"];
 
 function exactKeys(value: unknown, keys: string[], label: string): asserts value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object.`);
-  const actual = Object.keys(value).sort();
-  const expected = [...keys].sort();
-  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
+  if (Object.keys(value).length !== keys.length || keys.some((key) => !Object.hasOwn(value, key))) {
     throw new Error(`${label} has missing or unknown fields.`);
   }
 }
@@ -141,7 +151,7 @@ function canonical(value: unknown): string {
 }
 
 function sha256(value: string | Uint8Array) {
-  return createHash("sha256").update(value).digest("hex");
+  return typeof value === "string" ? sha256Utf8HexSync(value) : sha256HexBytesSync(value);
 }
 
 export const GENERIC_AAM_CORPUS = corpus;
@@ -153,6 +163,9 @@ export function verifyGenericAamCorpus(candidate: unknown, sourceBytes: Uint8Arr
   exactKeys(candidate.subject, SUBJECT_KEYS, "subject");
   exactKeys(candidate.artifact, ARTIFACT_KEYS, "artifact");
   exactKeys(candidate.evaluator, EVALUATOR_KEYS, "evaluator");
+  if (!Array.isArray(candidate.evaluator.seekerHalfAngles)) throw new Error("Seeker literal bindings must be an array.");
+  for (const binding of candidate.evaluator.seekerHalfAngles) exactKeys(binding, SEEKER_ANGLE_KEYS, "seekerHalfAngle");
+  exactKeys(candidate.evaluator.safeInputBounds, SAFE_BOUND_KEYS, "safeInputBounds");
   exactKeys(candidate.evidencePolicy, POLICY_KEYS, "evidencePolicy");
   if (!Array.isArray(candidate.derivedFixtures)) throw new Error("Derived fixtures must be an array.");
   for (const fixture of candidate.derivedFixtures) exactKeys(fixture, DERIVED_FIXTURE_KEYS, "derivedFixture");
@@ -181,16 +194,17 @@ export function verifyGenericAamWorkload(candidate: unknown, workloadBytes: Uint
   exactKeys(candidate, WORKLOAD_KEYS, "workload");
   const workload = candidate as unknown as {
     schemaVersion: string; id: string; sourceSha256: string; caseCount: number; expectedBatchSha256: string;
-    cases: Array<{ id: string; tickRateHz: number; seekerHalfAngleDeg: number; maxTicks: number; caseRole?: string; targetPositionM: Vec3; expectedTerminal: string; expectedTick: number; typescriptRunSha256: string; rustWasmRunSha256: string }>;
+    cases: Array<{ id: string; tickRateHz: number; seekerHalfAngleDeg: number; seekerHalfAngleRad: number; maxTicks: number; caseRole?: string; targetPositionM: Vec3; expectedTerminal: string; expectedTick: number; typescriptRunSha256: string; rustWasmRunSha256: string }>;
   };
   if (!Array.isArray(workload.cases)) throw new Error("Workload cases must be an array.");
   for (const entry of workload.cases) {
     const keys = "caseRole" in entry ? [...WORKLOAD_CASE_KEYS, "caseRole"] : WORKLOAD_CASE_KEYS;
     exactKeys(entry, keys, "workloadCase");
     exactKeys(entry.targetPositionM, VEC_KEYS, "workloadTarget");
-    if (![32, 64, 128].includes(entry.tickRateHz) || ![15, 20, 30].includes(entry.seekerHalfAngleDeg) || entry.maxTicks !== entry.tickRateHz * 30 || !["HIT", "MISS_SEEKER_LIMIT", "MISS_OPENING_AFTER_BURN", "MISS_GROUND_OR_ZERO_SPEED", "TIME_LIMIT"].includes(entry.expectedTerminal) || !Number.isInteger(entry.expectedTick) || entry.expectedTick <= 0 || entry.expectedTick > entry.maxTicks || !/^[a-f0-9]{64}$/.test(entry.typescriptRunSha256) || !/^[a-f0-9]{64}$/.test(entry.rustWasmRunSha256)) throw new Error("Workload case bounds or expected result are invalid.");
+    const literal = seekerLiteral(entry.seekerHalfAngleDeg);
+    if (![32, 64, 128].includes(entry.tickRateHz) || entry.seekerHalfAngleRad !== literal || entry.maxTicks !== entry.tickRateHz * 30 || !Object.keys(TERMINAL_CAUSES).includes(entry.expectedTerminal) || !Number.isInteger(entry.expectedTick) || entry.expectedTick <= 0 || entry.expectedTick > entry.maxTicks || !/^[a-f0-9]{64}$/.test(entry.typescriptRunSha256) || !/^[a-f0-9]{64}$/.test(entry.rustWasmRunSha256)) throw new Error("Workload case bounds or expected result are invalid.");
   }
-  if (workload.schemaVersion !== "vector.generic-aam-verification-workload.v1" || workload.id !== "nasa-tm-109057-appendix-b-bounded-sweep.v1" || workload.sourceSha256 !== corpus.artifact.sha256 || workload.caseCount !== 15 || workload.cases.length !== workload.caseCount || !/^[a-f0-9]{64}$/.test(workload.expectedBatchSha256)) throw new Error("Workload identity or count is invalid.");
+  if (workload.schemaVersion !== "vector.generic-aam-verification-workload.v2" || workload.id !== "nasa-tm-109057-appendix-b-bounded-sweep.v2" || workload.sourceSha256 !== corpus.artifact.sha256 || workload.caseCount !== 15 || workload.cases.length !== workload.caseCount || !/^[a-f0-9]{64}$/.test(workload.expectedBatchSha256)) throw new Error("Workload identity or count is invalid.");
   const decoded = JSON.parse(new TextDecoder().decode(workloadBytes));
   if (canonical(candidate) !== canonical(decoded)) throw new Error("Workload object does not match supplied bytes.");
   const governed = corpus.derivedFixtures[0];
@@ -222,11 +236,17 @@ const PRINTED_CONSTANTS: GenericAamVerificationInput["constants"] = {
   controlTimeConstantS: 0.25,
 };
 
+function seekerLiteral(degrees: number): GenericAamVerificationInput["seekerHalfAngleRad"] {
+  const binding = corpus.evaluator.seekerHalfAngles.find((entry) => entry.degrees === degrees);
+  if (!binding) throw new Error("Generic AAM seeker case is not bound to a printed radian literal.");
+  return binding.printedRadians as GenericAamVerificationInput["seekerHalfAngleRad"];
+}
+
 export function genericAamVerificationInput(
   overrides: Partial<GenericAamVerificationInput> = {},
 ): GenericAamVerificationInput {
   const initial: GenericAamVerificationInput = {
-    schemaVersion: "vector.generic-aam-verification-input.v1",
+    schemaVersion: "vector.generic-aam-verification-input.v2",
     subjectId: "NASA_TM_109057_GENERIC_AAM_REFERENCE",
     intendedUse: "ENGINE_VERIFICATION_ONLY",
     semantics: "TM_109057_PRINTED_LISTING_BINARY64_V1",
@@ -239,6 +259,7 @@ export function genericAamVerificationInput(
     tickRateHz: 128,
     maxTicks: 30 * 128,
     seekerHalfAngleDeg: 30,
+    seekerHalfAngleRad: 0.523596,
     missile: {
       speedMps: 200,
       pitchRateRadS: 0,
@@ -257,9 +278,12 @@ export function genericAamVerificationInput(
     },
     constants: { ...PRINTED_CONSTANTS },
   };
+  const selectedDegrees = overrides.seekerHalfAngleDeg ?? initial.seekerHalfAngleDeg;
   return {
     ...initial,
     ...overrides,
+    seekerHalfAngleDeg: selectedDegrees,
+    seekerHalfAngleRad: overrides.seekerHalfAngleRad ?? seekerLiteral(selectedDegrees),
     missile: overrides.missile ?? initial.missile,
     target: overrides.target ?? initial.target,
     constants: overrides.constants ?? initial.constants,
@@ -268,6 +292,13 @@ export function genericAamVerificationInput(
 
 function finiteRecord(value: Record<string, unknown>) {
   return Object.values(value).every((field) => typeof field === "number" && Number.isFinite(field));
+}
+
+function exactFiniteVec(value: unknown, label: string): value is Vec3 {
+  exactKeys(value, VEC_KEYS, label);
+  return typeof value.x === "number" && Number.isFinite(value.x)
+    && typeof value.y === "number" && Number.isFinite(value.y)
+    && typeof value.z === "number" && Number.isFinite(value.z);
 }
 
 function validateInput(input: GenericAamVerificationInput) {
@@ -279,19 +310,37 @@ function validateInput(input: GenericAamVerificationInput) {
   exactKeys(input.target.previousPositionM, VEC_KEYS, "target.previousPositionM");
   exactKeys(input.target.positionM, VEC_KEYS, "target.positionM");
   exactKeys(input.target.velocityMps, VEC_KEYS, "target.velocityMps");
-  if (input.schemaVersion !== "vector.generic-aam-verification-input.v1" || input.subjectId !== "NASA_TM_109057_GENERIC_AAM_REFERENCE" || input.intendedUse !== "ENGINE_VERIFICATION_ONLY" || input.semantics !== "TM_109057_PRINTED_LISTING_BINARY64_V1") throw new Error("Generic AAM verification identity is invalid.");
+  if (input.schemaVersion !== "vector.generic-aam-verification-input.v2" || input.subjectId !== "NASA_TM_109057_GENERIC_AAM_REFERENCE" || input.intendedUse !== "ENGINE_VERIFICATION_ONLY" || input.semantics !== "TM_109057_PRINTED_LISTING_BINARY64_V1") throw new Error("Generic AAM verification identity is invalid.");
   if (input.sourceSha256 !== corpus.artifact.sha256 || input.corpusSha256 !== GENERIC_AAM_CORPUS_SHA256 || input.decisionSha256 !== GENERIC_AAM_DECISION_SHA256) throw new Error("Generic AAM verification digest binding is invalid.");
   if (input.axisConvention !== "EARTH_X_FORWARD_Y_RIGHT_Z_DOWN" || input.units !== "SI") throw new Error("Generic AAM axes or units are invalid.");
-  if (![32, 64, 128, 256].includes(input.tickRateHz) || !Number.isInteger(input.maxTicks) || input.maxTicks <= 0 || input.maxTicks > corpus.evaluator.maximumTicks || ![15, 20, 30].includes(input.seekerHalfAngleDeg)) throw new Error("Generic AAM work or seeker bounds are invalid.");
+  const estimatedOperations = input.maxTicks * corpus.evaluator.safeInputBounds.estimatedScalarOperationsPerTick;
+  if (![32, 64, 128, 256].includes(input.tickRateHz) || !Number.isInteger(input.maxTicks) || input.maxTicks <= 0 || input.maxTicks > corpus.evaluator.maximumTicks || estimatedOperations > corpus.evaluator.maximumEstimatedScalarOperations || input.seekerHalfAngleRad !== seekerLiteral(input.seekerHalfAngleDeg)) throw new Error("Generic AAM work or seeker bounds are invalid.");
   const { positionM: missilePosition, ...missileScalars } = input.missile;
   if (!finiteRecord(missileScalars) || !finiteRecord(missilePosition) || !finiteRecord(input.target.previousPositionM) || !finiteRecord(input.target.positionM) || !finiteRecord(input.target.velocityMps) || !finiteRecord(input.constants)) throw new Error("Generic AAM numeric input must be finite.");
   const target = input.target.positionM;
-  if (input.missile.speedMps <= 0 || input.missile.massKg !== input.constants.launchMassKg || input.constants.burnoutMassKg <= 0 || Math.abs(input.missile.pitchRad) >= Math.PI / 2 || target.x < 0 || target.x > 4500 || target.y < -4000 || target.y > 4000 || target.z > -2000 || target.z < -12000 || input.target.velocityMps.x !== 234.375 || input.target.velocityMps.y !== 0 || input.target.velocityMps.z !== 0) throw new Error("Generic AAM state is outside the reviewed domain.");
+  const bounds = corpus.evaluator.safeInputBounds;
+  const missileScalarsWithinBounds = input.missile.speedMps >= bounds.missileSpeedMinMps
+    && input.missile.speedMps <= bounds.missileSpeedMaxMps
+    && Math.abs(input.missile.pitchRateRadS) <= bounds.angularRateAbsMaxRadS
+    && Math.abs(input.missile.yawRateRadS) <= bounds.angularRateAbsMaxRadS
+    && Math.abs(input.missile.pitchSignalMps2) <= bounds.controlSignalAbsMaxMps2
+    && Math.abs(input.missile.yawSignalMps2) <= bounds.controlSignalAbsMaxMps2
+    && Math.abs(input.missile.pitchRad) <= bounds.pitchAbsMaxRad
+    && Math.abs(input.missile.yawRad) <= bounds.yawAbsMaxRad;
+  if (!missileScalarsWithinBounds || !Object.values(input.missile.positionM).every((value) => Math.abs(value) <= bounds.missilePositionAbsMaxM) || input.missile.massKg !== input.constants.launchMassKg || input.constants.burnoutMassKg <= 0 || target.x < 0 || target.x > 4500 || target.y < -4000 || target.y > 4000 || target.z > -2000 || target.z < -12000 || input.target.velocityMps.x !== 234.375 || input.target.velocityMps.y !== 0 || input.target.velocityMps.z !== 0) throw new Error("Generic AAM state is outside the reviewed safe domain.");
   const expectedThrust = input.caseRole === "TABLE_THRUST_CONFLICT_SENSITIVITY" ? 690 * 4.4482216152605 : 6800;
   const normalized = { ...input.constants, motorThrustN: 6800, maximumPitchG: 30, maximumYawG: 30 };
   const expectedLimit = input.caseRole === "COMMAND_LIMIT_SENSITIVITY" ? 1 : 30;
   if (!["PRINTED_LISTING_REPRODUCTION", "TABLE_THRUST_CONFLICT_SENSITIVITY", "COMMAND_LIMIT_SENSITIVITY"].includes(input.caseRole) || input.constants.motorThrustN !== expectedThrust || input.constants.maximumPitchG !== expectedLimit || input.constants.maximumYawG !== expectedLimit || canonical(normalized) !== canonical(PRINTED_CONSTANTS)) throw new Error("Generic AAM constants are not a closed reviewed decision.");
   if (canonical(input.target.previousPositionM) !== canonical(input.target.positionM)) throw new Error("Initial previous/current target state is inconsistent.");
+  const initialRelative = subtract(input.target.positionM, input.missile.positionM);
+  if (magnitude(initialRelative) === 0) throw new Error("D09 rejects an initial zero range.");
+  const initialMissileVelocity = {
+    x: input.missile.speedMps * Math.cos(input.missile.pitchRad) * Math.cos(input.missile.yawRad),
+    y: input.missile.speedMps * Math.cos(input.missile.pitchRad) * Math.sin(input.missile.yawRad),
+    z: input.missile.speedMps * Math.sin(input.missile.pitchRad),
+  };
+  if (magnitude(subtract(input.target.velocityMps, initialMissileVelocity)) === 0) throw new Error("D09 rejects an initial zero relative speed.");
 }
 
 const magnitude = (value: Vec3) => Math.hypot(value.x, value.y, value.z);
@@ -300,9 +349,20 @@ const scale = (value: Vec3, factor: number): Vec3 => ({ x: value.x * factor, y: 
 const add = (left: Vec3, right: Vec3): Vec3 => ({ x: left.x + right.x, y: left.y + right.y, z: left.z + right.z });
 const dot = (left: Vec3, right: Vec3) => left.x * right.x + left.y * right.y + left.z * right.z;
 
+function assertFiniteStage(label: string, ...values: Array<number | Vec3>) {
+  const bound = corpus.evaluator.safeInputBounds.dynamicScalarAbsMax;
+  for (const value of values) {
+    if (typeof value === "number") {
+      if (!Number.isFinite(value) || Math.abs(value) > bound) throw new Error(`Generic AAM ${label} stage exceeded its finite safe bound.`);
+    } else if (![value.x, value.y, value.z].every((component) => Number.isFinite(component) && Math.abs(component) <= bound)) {
+      throw new Error(`Generic AAM ${label} stage exceeded its finite safe bound.`);
+    }
+  }
+}
+
 export function genericAamLosRate(relative: Vec3, relativeVelocity: Vec3): Vec3 {
   const rangeSquared = dot(relative, relative);
-  if (rangeSquared === 0) return { x: 0, y: 0, z: 0 };
+  if (rangeSquared === 0) throw new Error("D09 zero range requires explicit terminal handling.");
   return {
     x: (relative.y * relativeVelocity.z - relative.z * relativeVelocity.y) / rangeSquared,
     y: (relative.z * relativeVelocity.x - relative.x * relativeVelocity.z) / rangeSquared,
@@ -312,10 +372,11 @@ export function genericAamLosRate(relative: Vec3, relativeVelocity: Vec3): Vec3 
 
 export function genericAamClosestApproach(relative: Vec3, relativeVelocity: Vec3) {
   const speedSquared = dot(relativeVelocity, relativeVelocity);
-  const timeSeconds = speedSquared === 0 ? Number.MAX_VALUE : -dot(relative, relativeVelocity) / speedSquared;
+  if (speedSquared === 0) throw new Error("D09 zero relative speed requires explicit terminal handling.");
+  const timeSeconds = -dot(relative, relativeVelocity) / speedSquared;
   return {
     timeSeconds,
-    distanceM: speedSquared === 0 ? magnitude(relative) : magnitude(add(relative, scale(relativeVelocity, timeSeconds))),
+    distanceM: magnitude(add(relative, scale(relativeVelocity, timeSeconds))),
   };
 }
 
@@ -333,22 +394,44 @@ export function assertGenericAamVerificationRun(
   const record = run as unknown as GenericAamVerificationRun;
   exactKeys(record.terminal, TERMINAL_KEYS, "terminal");
   if (!Array.isArray(record.frames) || !Array.isArray(record.limitations)) throw new Error("Generic AAM run arrays are invalid.");
-  if (record.schemaVersion !== "vector.generic-aam-verification-run.v1" || record.subjectId !== input.subjectId || record.intendedUse !== input.intendedUse || record.semantics !== input.semantics || record.backend !== backend || record.sourceSha256 !== input.sourceSha256 || record.corpusSha256 !== input.corpusSha256 || record.decisionSha256 !== input.decisionSha256 || record.inputSha256 !== sha256(JSON.stringify(input)) || record.caseRole !== input.caseRole || canonical(record.limitations) !== canonical(LIMITATIONS)) throw new Error("Generic AAM run identity, digest or limitation binding is invalid.");
-  const terminals = ["HIT", "MISS_SEEKER_LIMIT", "MISS_OPENING_AFTER_BURN", "MISS_GROUND_OR_ZERO_SPEED", "TIME_LIMIT"];
-  if (!terminals.includes(record.terminal.state) || !Number.isInteger(record.terminal.tick) || record.terminal.tick <= 0 || record.terminal.tick > input.maxTicks || typeof record.terminal.cause !== "string" || record.terminal.cause.length === 0 || record.frames.length !== record.terminal.tick) throw new Error("Generic AAM terminal contract is invalid.");
+  if (record.schemaVersion !== "vector.generic-aam-verification-run.v2" || record.subjectId !== input.subjectId || record.intendedUse !== input.intendedUse || record.semantics !== input.semantics || record.backend !== backend || record.sourceSha256 !== input.sourceSha256 || record.corpusSha256 !== input.corpusSha256 || record.decisionSha256 !== input.decisionSha256 || record.inputSha256 !== sha256(JSON.stringify(input)) || record.caseRole !== input.caseRole || canonical(record.limitations) !== canonical(LIMITATIONS)) throw new Error("Generic AAM run identity, digest or limitation binding is invalid.");
+  const terminals = Object.keys(TERMINAL_CAUSES) as GenericAamTerminalState[];
+  if (!terminals.includes(record.terminal.state) || !Number.isInteger(record.terminal.tick) || record.terminal.tick <= 0 || record.terminal.tick > input.maxTicks || !TERMINAL_CAUSES[record.terminal.state].includes(record.terminal.cause) || record.frames.length !== record.terminal.tick) throw new Error("Generic AAM terminal contract is invalid.");
   for (const [index, frame] of record.frames.entries()) {
     exactKeys(frame, FRAME_KEYS, "frame");
-    for (const name of ["missilePositionM", "targetPositionM", "relativePositionM", "losRateRadS"] as const) exactKeys(frame[name], VEC_KEYS, `frame.${name}`);
-    const scalars = Object.entries(frame).filter(([, value]) => typeof value === "number").map(([, value]) => value);
-    const vectors = [frame.missilePositionM, frame.targetPositionM, frame.relativePositionM, frame.losRateRadS];
-    if (!scalars.every(Number.isFinite) || !vectors.every(finiteRecord) || frame.tick !== index + 1 || frame.timeSeconds !== frame.tick / input.tickRateHz || !["TRACKING", ...terminals].includes(frame.state) || (index < record.frames.length - 1 && frame.state !== "TRACKING") || (index === record.frames.length - 1 && frame.state !== record.terminal.state)) throw new Error("Generic AAM frame contract is invalid.");
+    let finiteScalars = true;
+    for (const key of FRAME_NUMERIC_KEYS) {
+      const value = frame[key as keyof GenericAamVerificationFrame];
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        finiteScalars = false;
+        break;
+      }
+    }
+    const finiteVectors = exactFiniteVec(frame.missilePositionM, "frame.missilePositionM")
+      && exactFiniteVec(frame.targetPositionM, "frame.targetPositionM")
+      && exactFiniteVec(frame.relativePositionM, "frame.relativePositionM")
+      && exactFiniteVec(frame.losRateRadS, "frame.losRateRadS");
+    const knownState = frame.state === "TRACKING" || terminals.includes(frame.state as GenericAamTerminalState);
+    if (!finiteScalars || !finiteVectors || frame.tick !== index + 1 || frame.timeSeconds !== frame.tick / input.tickRateHz || !knownState || (index < record.frames.length - 1 && frame.state !== "TRACKING") || (index === record.frames.length - 1 && frame.state !== record.terminal.state)) throw new Error("Generic AAM frame contract is invalid.");
   }
 }
 
-function limitedSignal(raw: number, maximumG: number, mass: number, speed: number, constants: GenericAamVerificationInput["constants"]) {
+export function decodeGenericAamVerificationRunJson(
+  encoded: string,
+  input: GenericAamVerificationInput,
+  backend: GenericAamVerificationRun["backend"],
+): GenericAamVerificationRun {
+  const decoded: unknown = JSON.parse(encoded);
+  assertGenericAamVerificationRun(decoded, input, backend);
+  return decoded;
+}
+
+export function genericAamLimitedSignal(raw: number, maximumG: number, mass: number, speed: number, constants: GenericAamVerificationInput["constants"]) {
   const velocityFactor = Math.min(1, speed ** 2 / constants.operationalSpeedMps ** 2);
   const massSpeedLimitG = constants.burnoutMassKg / mass * velocityFactor * maximumG;
-  return Math.max(-maximumG, Math.min(maximumG, Math.max(-massSpeedLimitG, Math.min(massSpeedLimitG, raw))));
+  const limited = Math.max(-maximumG, Math.min(maximumG, Math.max(-massSpeedLimitG, Math.min(massSpeedLimitG, raw))));
+  if (![raw, maximumG, mass, speed, velocityFactor, massSpeedLimitG, limited].every(Number.isFinite) || maximumG <= 0 || mass <= 0 || speed <= 0) throw new Error("PN limiter stage is outside the finite reviewed domain.");
+  return limited;
 }
 
 export function runGenericAamVerification(input: GenericAamVerificationInput): GenericAamVerificationRun {
@@ -377,6 +460,7 @@ export function runGenericAamVerification(input: GenericAamVerificationInput): G
       y: missile.speedMps * Math.cos(missile.pitchRad) * Math.sin(missile.yawRad),
       z: missile.speedMps * Math.sin(missile.pitchRad),
     };
+    assertFiniteStage("pre-integration", target, currentRelative, currentRange, thrust, drag, acceleration, nextPitchRate, nextYawRate, pitchDerivative, yawDerivative, velocity);
     missile = {
       ...missile,
       speedMps: missile.speedMps + acceleration * dt,
@@ -385,32 +469,51 @@ export function runGenericAamVerification(input: GenericAamVerificationInput): G
       pitchRad: missile.pitchRad + pitchDerivative * dt,
       yawRad: missile.yawRad + yawDerivative * dt,
       positionM: { x: missile.positionM.x + velocity.x * dt, y: missile.positionM.y + velocity.y * dt, z: missile.positionM.z - velocity.z * dt },
-      massKg: second <= constants.burnSeconds ? missile.massKg - (constants.launchMassKg - constants.burnoutMassKg) / constants.burnSeconds * dt : missile.massKg,
+      massKg: second <= constants.burnSeconds
+        ? tick === constants.burnSeconds * input.tickRateHz
+          ? constants.burnoutMassKg
+          : missile.massKg - (constants.launchMassKg - constants.burnoutMassKg) / constants.burnSeconds * dt
+        : missile.massKg,
     };
+    assertFiniteStage("integrated-state", missile.positionM, missile.speedMps, missile.pitchRateRadS, missile.yawRateRadS, missile.pitchRad, missile.yawRad, missile.massKg);
     const relative = subtract(target, missile.positionM);
     const range = magnitude(relative);
     const relativeVelocity = scale(subtract(currentRelative, relative), input.tickRateHz);
     const closingVelocity = -(currentRange - range) * input.tickRateHz;
-    const losRate = genericAamLosRate(relative, relativeVelocity);
+    const relativeSpeedSquared = dot(relativeVelocity, relativeVelocity);
+    const zeroRange = range === 0;
+    const zeroRelativeSpeed = relativeSpeedSquared === 0;
+    const losRate = zeroRange ? { x: 0, y: 0, z: 0 } : genericAamLosRate(relative, relativeVelocity);
     const pitchOffset = -Math.sin(missile.yawRad) * losRate.x + Math.cos(missile.yawRad) * losRate.y;
     const yawOffset = Math.sin(missile.pitchRad) * (Math.cos(missile.yawRad) * losRate.x + Math.sin(missile.yawRad) * losRate.y) + Math.cos(missile.pitchRad) * losRate.z;
-    const pitchCommand = constants.gravityMps2 * limitedSignal(constants.navigationConstant * closingVelocity * pitchOffset, constants.maximumPitchG, missile.massKg, missile.speedMps, constants);
-    const yawCommand = constants.gravityMps2 * limitedSignal(constants.navigationConstant * closingVelocity * yawOffset, constants.maximumYawG, missile.massKg, missile.speedMps, constants);
+    const pitchCommand = constants.gravityMps2 * genericAamLimitedSignal(constants.navigationConstant * closingVelocity * pitchOffset, constants.maximumPitchG, missile.massKg, missile.speedMps, constants);
+    const yawCommand = constants.gravityMps2 * genericAamLimitedSignal(constants.navigationConstant * closingVelocity * yawOffset, constants.maximumYawG, missile.massKg, missile.speedMps, constants);
     missile.pitchSignalMps2 = pitchCommand;
     missile.yawSignalMps2 = yawCommand;
-    const closestApproach = genericAamClosestApproach(relative, relativeVelocity);
+    const closestApproach = zeroRange
+      ? { timeSeconds: 0, distanceM: 0 }
+      : zeroRelativeSpeed
+        ? { timeSeconds: 0, distanceM: range }
+        : genericAamClosestApproach(relative, relativeVelocity);
     const closestTime = closestApproach.timeSeconds;
     const closestDistance = closestApproach.distanceM;
-    const seekerAngle = range === 0 ? 0 : Math.atan(Math.hypot(relative.y, relative.z) / Math.abs(relative.x));
+    const seekerAngle = zeroRange ? 0 : Math.atan(Math.hypot(relative.y, relative.z) / Math.abs(relative.x));
+    assertFiniteStage("guidance-and-terminal", relative, range, relativeVelocity, relativeSpeedSquared, closingVelocity, losRate, pitchOffset, yawOffset, pitchCommand, yawCommand, closestTime, closestDistance, seekerAngle);
     let state: GenericAamVerificationFrame["state"] = "TRACKING";
     let cause = "tracking";
     if (missile.positionM.z > 0 || missile.speedMps <= 0) {
       state = "MISS_GROUND_OR_ZERO_SPEED";
       cause = "GROUND_ZERO";
-    } else if (closestDistance < constants.hitRangeM && Math.abs(closestTime) <= dt) {
+    } else if (zeroRange) {
+      state = "HIT";
+      cause = "EXACT_ZERO_RANGE";
+    } else if (zeroRelativeSpeed) {
+      state = "MISS_ZERO_RELATIVE_SPEED";
+      cause = "EXACT_ZERO_RELATIVE_SPEED";
+    } else if (closestDistance < constants.hitRangeM && closestTime >= 0 && closestTime <= dt) {
       state = "HIT";
       cause = "CPA_HIT";
-    } else if (Math.abs(seekerAngle) > input.seekerHalfAngleDeg * Math.PI / 180) {
+    } else if (Math.abs(seekerAngle) > input.seekerHalfAngleRad) {
       state = range < constants.hitRangeM ? "HIT" : "MISS_SEEKER_LIMIT";
       cause = range < constants.hitRangeM ? "SEEKER_HIT" : "SEEKER_LIMIT";
     } else if (closingVelocity > 0 && second > constants.burnSeconds) {
@@ -428,7 +531,7 @@ export function runGenericAamVerification(input: GenericAamVerificationInput): G
   }
   if (!terminal) throw new Error("Generic AAM evaluator failed to produce an exhaustive terminal state.");
   const run: GenericAamVerificationRun = {
-    schemaVersion: "vector.generic-aam-verification-run.v1",
+    schemaVersion: "vector.generic-aam-verification-run.v2",
     subjectId: input.subjectId,
     intendedUse: input.intendedUse,
     semantics: input.semantics,

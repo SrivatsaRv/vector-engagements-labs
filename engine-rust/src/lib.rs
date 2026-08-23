@@ -31,7 +31,6 @@ pub use validation::{
 const G0: f64 = 9.80665;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct Vec3 {
     pub x: f64,
     pub y: f64,

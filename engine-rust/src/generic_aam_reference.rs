@@ -1,11 +1,58 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::{EngineError, Vec3 as GenericAamVec3};
+use crate::EngineError;
 
 const SOURCE_SHA256: &str = "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa";
-const CORPUS_SHA256: &str = "465b1ade2d6d4521ee062a5f732e1d7d4717ae3ad07e63b4b11afba2ccbb76f0";
-const DECISION_SHA256: &str = "eb3bcd43d11e4fb10c6c5211b8997d56813b194c1805d6b87f6948b5381479a6";
+const CORPUS_SHA256: &str = "fad3f712102ad6172c09e68c0c5445842c5ea170323e873f1a7bc409079e788c";
+const DECISION_SHA256: &str = "884bca829ac1b94f959ecff1be6b9cf9847512810c7010f36d8b78cf6cef22f2";
+
+const MAX_TICKS: u32 = 7_680;
+const MAX_ESTIMATED_OPERATIONS: u32 = 1_500_000;
+const OPERATIONS_PER_TICK: u32 = 160;
+const DYNAMIC_ABS_MAX: f64 = 1_000_000_000.0;
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GenericAamVec3 {
+    x: f64,
+    y: f64,
+    z: f64,
+}
+
+impl GenericAamVec3 {
+    fn add(self, other: Self) -> Self {
+        Self {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+        }
+    }
+
+    fn subtract(self, other: Self) -> Self {
+        Self {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+        }
+    }
+
+    fn scale(self, factor: f64) -> Self {
+        Self {
+            x: self.x * factor,
+            y: self.y * factor,
+            z: self.z * factor,
+        }
+    }
+
+    fn dot(self, other: Self) -> f64 {
+        self.x * other.x + self.y * other.y + self.z * other.z
+    }
+
+    fn magnitude(self) -> f64 {
+        self.x.hypot(self.y).hypot(self.z)
+    }
+}
 
 fn finite_vec(value: GenericAamVec3) -> bool {
     value.x.is_finite() && value.y.is_finite() && value.z.is_finite()
@@ -68,6 +115,7 @@ pub struct GenericAamVerificationInput {
     pub tick_rate_hz: u32,
     pub max_ticks: u32,
     pub seeker_half_angle_deg: u32,
+    pub seeker_half_angle_rad: f64,
     pub missile: GenericAamMissileState,
     pub target: GenericAamTargetState,
     pub constants: GenericAamConstants,
@@ -161,7 +209,7 @@ fn valid_constants(input: &GenericAamVerificationInput) -> bool {
 }
 
 fn validate(input: &GenericAamVerificationInput) -> Result<(), EngineError> {
-    if input.schema_version != "vector.generic-aam-verification-input.v1"
+    if input.schema_version != "vector.generic-aam-verification-input.v2"
         || input.subject_id != "NASA_TM_109057_GENERIC_AAM_REFERENCE"
         || input.intended_use != "ENGINE_VERIFICATION_ONLY"
         || input.semantics != "TM_109057_PRINTED_LISTING_BINARY64_V1"
@@ -173,10 +221,17 @@ fn validate(input: &GenericAamVerificationInput) -> Result<(), EngineError> {
     {
         return Err(EngineError::InvalidScenario("identity".to_string()));
     }
+    let expected_seeker_radians = match input.seeker_half_angle_deg {
+        15 => 0.261_798,
+        20 => 0.349_064,
+        30 => 0.523_596,
+        _ => return Err(EngineError::InvalidScenario("seeker".to_string())),
+    };
     if !matches!(input.tick_rate_hz, 32 | 64 | 128 | 256)
         || input.max_ticks == 0
-        || input.max_ticks > 1_000_000
-        || !matches!(input.seeker_half_angle_deg, 15 | 20 | 30)
+        || input.max_ticks > MAX_TICKS
+        || input.max_ticks.saturating_mul(OPERATIONS_PER_TICK) > MAX_ESTIMATED_OPERATIONS
+        || input.seeker_half_angle_rad != expected_seeker_radians
     {
         return Err(EngineError::InvalidScenario("bounds".to_string()));
     }
@@ -210,7 +265,16 @@ fn validate(input: &GenericAamVerificationInput) -> Result<(), EngineError> {
         || !finite_vec(input.target.previous_position_m)
         || !finite_vec(input.target.position_m)
         || !finite_vec(input.target.velocity_mps)
-        || m.speed_mps <= 0.0
+        || !(1.0..=1000.0).contains(&m.speed_mps)
+        || m.pitch_rate_rad_s.abs() > 100.0
+        || m.yaw_rate_rad_s.abs() > 100.0
+        || m.pitch_signal_mps2.abs() > 1000.0
+        || m.yaw_signal_mps2.abs() > 1000.0
+        || m.pitch_rad.abs() > 1.5
+        || m.yaw_rad.abs() > std::f64::consts::PI
+        || m.position_m.x.abs() > 12_000.0
+        || m.position_m.y.abs() > 12_000.0
+        || m.position_m.z.abs() > 12_000.0
         || m.mass_kg != input.constants.launch_mass_kg
         || input.constants.burnout_mass_kg <= 0.0
         || m.pitch_rad.abs() >= std::f64::consts::FRAC_PI_2
@@ -229,6 +293,40 @@ fn validate(input: &GenericAamVerificationInput) -> Result<(), EngineError> {
         || input.target.previous_position_m.z != input.target.position_m.z
     {
         return Err(EngineError::InvalidScenario("state".to_string()));
+    }
+    let initial_relative = input.target.position_m.subtract(m.position_m);
+    if initial_relative.magnitude() == 0.0 {
+        return Err(EngineError::InvalidScenario(
+            "D09 initial zero range".to_string(),
+        ));
+    }
+    let initial_missile_velocity = GenericAamVec3 {
+        x: m.speed_mps * m.pitch_rad.cos() * m.yaw_rad.cos(),
+        y: m.speed_mps * m.pitch_rad.cos() * m.yaw_rad.sin(),
+        z: m.speed_mps * m.pitch_rad.sin(),
+    };
+    if input
+        .target
+        .velocity_mps
+        .subtract(initial_missile_velocity)
+        .magnitude()
+        == 0.0
+    {
+        return Err(EngineError::InvalidScenario(
+            "D09 initial zero relative speed".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn finite_stage(label: &str, values: &[f64]) -> Result<(), EngineError> {
+    if values
+        .iter()
+        .any(|value| !value.is_finite() || value.abs() > DYNAMIC_ABS_MAX)
+    {
+        return Err(EngineError::InvalidScenario(format!(
+            "generic AAM {label} stage exceeded finite safe bound"
+        )));
     }
     Ok(())
 }
@@ -287,6 +385,28 @@ pub fn run_generic_aam_verification(
             y: missile.speed_mps * missile.pitch_rad.cos() * missile.yaw_rad.sin(),
             z: missile.speed_mps * missile.pitch_rad.sin(),
         };
+        finite_stage(
+            "pre-integration",
+            &[
+                target.x,
+                target.y,
+                target.z,
+                current_relative.x,
+                current_relative.y,
+                current_relative.z,
+                current_range,
+                thrust,
+                drag,
+                acceleration,
+                pitch_rate_derivative,
+                yaw_rate_derivative,
+                pitch_derivative,
+                yaw_derivative,
+                velocity.x,
+                velocity.y,
+                velocity.z,
+            ],
+        )?;
         missile.speed_mps += acceleration * dt;
         missile.pitch_rate_rad_s += pitch_rate_derivative * dt;
         missile.yaw_rate_rad_s += yaw_rate_derivative * dt;
@@ -296,8 +416,26 @@ pub fn run_generic_aam_verification(
         missile.position_m.y += velocity.y * dt;
         missile.position_m.z -= velocity.z * dt;
         if f64::from(second) <= c.burn_seconds {
-            missile.mass_kg -= (c.launch_mass_kg - c.burnout_mass_kg) / c.burn_seconds * dt;
+            if tick == (c.burn_seconds * f64::from(input.tick_rate_hz)) as u32 {
+                missile.mass_kg = c.burnout_mass_kg;
+            } else {
+                missile.mass_kg -= (c.launch_mass_kg - c.burnout_mass_kg) / c.burn_seconds * dt;
+            }
         }
+        finite_stage(
+            "integrated-state",
+            &[
+                missile.speed_mps,
+                missile.pitch_rate_rad_s,
+                missile.yaw_rate_rad_s,
+                missile.pitch_rad,
+                missile.yaw_rad,
+                missile.position_m.x,
+                missile.position_m.y,
+                missile.position_m.z,
+                missile.mass_kg,
+            ],
+        )?;
         let relative = target.subtract(missile.position_m);
         let range = relative.magnitude();
         let relative_velocity = current_relative
@@ -305,7 +443,10 @@ pub fn run_generic_aam_verification(
             .scale(f64::from(input.tick_rate_hz));
         let closing_velocity = -(current_range - range) * f64::from(input.tick_rate_hz);
         let range_squared = range * range;
-        let los_rate = if range_squared == 0.0 {
+        let relative_speed_squared = relative_velocity.dot(relative_velocity);
+        let zero_range = range_squared == 0.0;
+        let zero_relative_speed = relative_speed_squared == 0.0;
+        let los_rate = if zero_range {
             GenericAamVec3 {
                 x: 0.0,
                 y: 0.0,
@@ -343,33 +484,64 @@ pub fn run_generic_aam_verification(
             );
         missile.pitch_signal_mps2 = pitch_command;
         missile.yaw_signal_mps2 = yaw_command;
-        let relative_speed_squared = relative_velocity.dot(relative_velocity);
-        let closest_time = if relative_speed_squared == 0.0 {
-            f64::MAX
+        let closest_time = if zero_range || zero_relative_speed {
+            0.0
         } else {
             -relative.dot(relative_velocity) / relative_speed_squared
         };
-        let closest_distance = if relative_speed_squared == 0.0 {
+        let closest_distance = if zero_range {
+            0.0
+        } else if zero_relative_speed {
             range
         } else {
             relative
                 .add(relative_velocity.scale(closest_time))
                 .magnitude()
         };
-        let seeker_angle = if range == 0.0 {
+        let seeker_angle = if zero_range {
             0.0
         } else {
             (relative.y.hypot(relative.z) / relative.x.abs()).atan()
         };
+        finite_stage(
+            "guidance-and-terminal",
+            &[
+                relative.x,
+                relative.y,
+                relative.z,
+                range,
+                relative_velocity.x,
+                relative_velocity.y,
+                relative_velocity.z,
+                relative_speed_squared,
+                closing_velocity,
+                los_rate.x,
+                los_rate.y,
+                los_rate.z,
+                pitch_offset,
+                yaw_offset,
+                pitch_command,
+                yaw_command,
+                closest_time,
+                closest_distance,
+                seeker_angle,
+            ],
+        )?;
         let mut state = "TRACKING";
         let mut cause = "tracking";
         if missile.position_m.z > 0.0 || missile.speed_mps <= 0.0 {
             state = "MISS_GROUND_OR_ZERO_SPEED";
             cause = "GROUND_ZERO";
-        } else if closest_distance < c.hit_range_m && closest_time.abs() <= dt {
+        } else if zero_range {
+            state = "HIT";
+            cause = "EXACT_ZERO_RANGE";
+        } else if zero_relative_speed {
+            state = "MISS_ZERO_RELATIVE_SPEED";
+            cause = "EXACT_ZERO_RELATIVE_SPEED";
+        } else if closest_distance < c.hit_range_m && closest_time >= 0.0 && closest_time <= dt {
             state = "HIT";
             cause = "CPA_HIT";
-        } else if seeker_angle.abs() > f64::from(input.seeker_half_angle_deg).to_radians() {
+        } else if seeker_angle.abs() > input.seeker_half_angle_rad {
             if range < c.hit_range_m {
                 state = "HIT";
                 cause = "SEEKER_HIT";
@@ -422,7 +594,7 @@ pub fn run_generic_aam_verification(
     }
     let terminal = terminal.ok_or_else(|| EngineError::InvalidScenario("terminal".to_string()))?;
     Ok(GenericAamVerificationRun {
-        schema_version: "vector.generic-aam-verification-run.v1",
+        schema_version: "vector.generic-aam-verification-run.v2",
         subject_id: input.subject_id,
         intended_use: input.intended_use,
         semantics: input.semantics,
@@ -449,4 +621,98 @@ pub fn run_generic_aam_verification_json(input: &str) -> Result<String, EngineEr
         serde_json::from_str(input).map_err(|error| EngineError::InvalidJson(error.to_string()))?;
     let run = run_generic_aam_verification(decoded, input_sha256)?;
     serde_json::to_string(&run).map_err(|error| EngineError::Serialization(error.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn valid_input() -> serde_json::Value {
+        serde_json::json!({
+            "schemaVersion": "vector.generic-aam-verification-input.v2",
+            "subjectId": "NASA_TM_109057_GENERIC_AAM_REFERENCE",
+            "intendedUse": "ENGINE_VERIFICATION_ONLY",
+            "semantics": "TM_109057_PRINTED_LISTING_BINARY64_V1",
+            "sourceSha256": SOURCE_SHA256,
+            "corpusSha256": CORPUS_SHA256,
+            "decisionSha256": DECISION_SHA256,
+            "caseRole": "PRINTED_LISTING_REPRODUCTION",
+            "axisConvention": "EARTH_X_FORWARD_Y_RIGHT_Z_DOWN",
+            "units": "SI",
+            "tickRateHz": 128,
+            "maxTicks": 1,
+            "seekerHalfAngleDeg": 15,
+            "seekerHalfAngleRad": 0.261798,
+            "missile": {
+                "speedMps": 200.0,
+                "pitchRateRadS": 0.0,
+                "pitchSignalMps2": 0.0,
+                "yawRateRadS": 0.0,
+                "yawSignalMps2": 0.0,
+                "pitchRad": 0.0,
+                "yawRad": 0.0,
+                "positionM": {"x": 0.0, "y": 0.0, "z": -6000.0},
+                "massKg": 56.7
+            },
+            "target": {
+                "previousPositionM": {"x": 1000.0, "y": 0.0, "z": -6000.0},
+                "positionM": {"x": 1000.0, "y": 0.0, "z": -6000.0},
+                "velocityMps": {"x": 234.375, "y": 0.0, "z": 0.0}
+            },
+            "constants": {
+                "navigationConstant": 4.0,
+                "gravityMps2": 9.8,
+                "maximumPitchG": 30.0,
+                "maximumYawG": 30.0,
+                "hitRangeM": 10.0,
+                "operationalSpeedMps": 700.0,
+                "motorThrustN": 6800.0,
+                "coastThrustN": 0.0,
+                "burnSeconds": 8.0,
+                "launchMassKg": 56.7,
+                "burnoutMassKg": 22.7,
+                "dragK1": 0.009412,
+                "dragK2": 93850.0 / 9.8_f64.powi(2),
+                "controlTimeConstantS": 0.25
+            }
+        })
+    }
+
+    #[test]
+    fn generic_reference_native_path_emits_the_closed_v2_contract(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let output = run_generic_aam_verification_json(&serde_json::to_string(&valid_input())?)?;
+        let decoded: serde_json::Value = serde_json::from_str(&output)?;
+        assert_eq!(
+            decoded["schemaVersion"],
+            "vector.generic-aam-verification-run.v2"
+        );
+        assert_eq!(decoded["frames"].as_array().map(Vec::len), Some(1));
+        Ok(())
+    }
+
+    #[test]
+    fn generic_reference_native_path_rejects_literal_extreme_d09_and_local_dto_forgery(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut cases = Vec::new();
+        let mut literal = valid_input();
+        literal["seekerHalfAngleRad"] = serde_json::json!(15.0 * std::f64::consts::PI / 180.0);
+        cases.push(literal);
+        let mut extreme = valid_input();
+        extreme["missile"]["pitchRateRadS"] = serde_json::json!(1e308);
+        cases.push(extreme);
+        let mut zero_range = valid_input();
+        zero_range["target"]["previousPositionM"] = zero_range["missile"]["positionM"].clone();
+        zero_range["target"]["positionM"] = zero_range["missile"]["positionM"].clone();
+        cases.push(zero_range);
+        let mut forged_vector = valid_input();
+        forged_vector["missile"]["positionM"]["extra"] = serde_json::json!(1.0);
+        cases.push(forged_vector);
+        for candidate in cases {
+            assert!(
+                run_generic_aam_verification_json(&serde_json::to_string(&candidate)?).is_err()
+            );
+        }
+        Ok(())
+    }
 }

@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "vector.weapon-verification-corpus.v2",
+  "id": "nasa-tm-109057-generic-aam-verification-corpus.v2",
+  "version": 2,
+  "ownerIssue": 140,
+  "parentIssues": [28, 39, 47],
+  "accessedAt": "2026-08-24",
+  "reviewedAt": "2026-08-24",
+  "subject": {
+    "id": "NASA_TM_109057_GENERIC_AAM_REFERENCE",
+    "intendedUse": "ENGINE_VERIFICATION_ONLY",
+    "capabilities": ["GENERIC_POINT_MASS_AAM_ARITHMETIC", "PRINTED_LISTING_CONVERGENCE"],
+    "prohibitedBindings": ["F-16", "SU-30MKI", "ASTRA", "AIM-9", "AIM-120", "SENSOR", "SUPPORT", "LAUNCH_AUTHORIZATION"]
+  },
+  "artifact": {
+    "id": "NASA_TM_109057_PDF_19940031931",
+    "authority": "NASA_NTRS",
+    "citationId": "19940031931",
+    "reportNumber": "NASA-TM-109057",
+    "title": "The Analysis of a Generic Air-to-Air Missile Simulation Model",
+    "publicationDate": "1994-06-01",
+    "recordModifiedAt": "2025-08-31",
+    "pageCount": 48,
+    "recordUri": "https://ntrs.nasa.gov/citations/19940031931",
+    "pdfUri": "https://ntrs.nasa.gov/api/citations/19940031931/downloads/19940031931.pdf",
+    "localPath": "fixtures/public-reference/nasa-tm-109057/19940031931.pdf",
+    "byteLength": 2606172,
+    "sha256": "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa",
+    "documentState": "PUBLIC",
+    "dissemination": "DOCUMENT_AND_METADATA",
+    "curationState": "CURATED",
+    "copyrightDecision": "GOV_PUBLIC_USE_PERMITTED",
+    "exportControl": "NO",
+    "ear": "NO",
+    "itar": "NO"
+  },
+  "claims": [
+    {
+      "id": "TM109057_APPENDIX_B_TEST_PROGRAM",
+      "role": "SOURCE",
+      "pages": [25, 26],
+      "ancestry": "Appendix B printed test program",
+      "permits": "Appendix B initial values, grid bounds and report sweep rates",
+      "prohibits": "named-system or independently validated trajectory claims"
+    },
+    {
+      "id": "TM109057_APPENDIX_C_PRINTED_LISTING",
+      "role": "SOURCE",
+      "pages": [27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38],
+      "ancestry": "Appendix C printed Fortran listing",
+      "permits": "literal binary64 port of printed equations with closed decisions",
+      "prohibits": "physical validation or silent dimensional repair"
+    },
+    {
+      "id": "TM109057_FIGURES_2_TO_10",
+      "role": "COMPARISON_ONLY",
+      "pages": [12, 13, 14, 15, 16, 17, 18, 19, 20],
+      "ancestry": "report-generated plotted hit envelopes",
+      "permits": "qualitative symmetry, narrowing and seeker-angle comparisons",
+      "prohibits": "digitized exact oracle or independent-validation role"
+    }
+  ],
+  "decisions": [
+    {"id":"D01_MASS","sourceConflict":"125/50 lb table values versus 56.7/22.7 kg listing values and binary64 depletion residue at burnout","decision":"USE_LISTING_SI_WITH_EXACT_BURNOUT_BOUNDARY","executableValue":"launchMassKg=56.7;burnoutMassKg=22.7;mass(t=8s)=22.7 exactly","limitation":"table values are rounded equivalents; the declared burnout boundary removes accumulated subtraction residue"},
+    {"id":"D02_THRUST","sourceConflict":"690 lbf Table 1 versus 6800 N active listing","decision":"USE_ACTIVE_LISTING","executableValue":"motorThrustN=6800","limitation":"690 lbf is conflict sensitivity only"},
+    {"id":"D03_SEEKER","sourceConflict":"15 degree narrative and commented 20/30 degree listing alternatives","decision":"USE_PRINTED_RADIAN_LITERALS","executableValue":"15deg=0.261798rad;20deg=0.349064rad;30deg=0.523596rad","limitation":"degrees identify the case; executable comparisons use the bound printed radian literal without conversion"},
+    {"id":"D04_SPEED","sourceConflict":"Mach 0.7 narrative versus Appendix B 200 and 234.375 m/s","decision":"USE_APPENDIX_B_VALUES","executableValue":"missileSpeedMps=200;targetSpeedMps=234.375","limitation":"Mach-derived case withheld"},
+    {"id":"D05_GRID","sourceConflict":"5000 m narrative versus TOPX=4500 listing","decision":"USE_APPENDIX_B_BOUNDS","executableValue":"x=0..4500;y=-4000..4000;altitude=2000..12000","limitation":"narrative geometry is comparison context"},
+    {"id":"D06_DRAG","sourceConflict":"underlying aerodynamic inputs absent","decision":"USE_PRINTED_LUMPED_CONSTANTS","executableValue":"K1=0.009412;K2=93850/(9.8^2)","limitation":"no inferred density, area or coefficients"},
+    {"id":"D07_PITCH","sourceConflict":"printed pitch kinematic expression is dimensionally ambiguous","decision":"USE_LITERAL_PRINTED_EXPRESSION","executableValue":"(pitchRate-cos(pitch))/speed","limitation":"no omitted factor is inserted"},
+    {"id":"D08_NUMERIC","sourceConflict":"Fortran REAL precision and compiler unspecified","decision":"USE_BINARY64_FIXED_ORDER","executableValue":"TM_109057_PRINTED_LISTING_BINARY64_V1","limitation":"not bit reproduction of NASA executable"},
+    {"id":"D09_CLOSEST_APPROACH","sourceConflict":"printed estimator is undefined for zero range or zero relative speed and its closest point may be behind the current tick","decision":"REJECT_INITIAL_EXCEPTIONS_AND_CLOSE_DYNAMIC_TERMINALS","executableValue":"initialZeroRange=REJECT;initialZeroRelativeSpeed=REJECT;dynamicZeroRange=HIT/EXACT_ZERO_RANGE/t=0/d=0;dynamicZeroRelativeSpeed=MISS_ZERO_RELATIVE_SPEED/EXACT_ZERO_RELATIVE_SPEED/t=0/d=currentRange;CPA_HIT requires 0<=t<=dt","limitation":"closed numerical verification semantics, not a validated fuze"},
+    {"id":"D10_FIGURES","sourceConflict":"no machine-readable trajectories or hit sets published","decision":"QUALITATIVE_COMPARISON_ONLY","executableValue":"WITHHELD","limitation":"pixels cannot become exact oracles"}
+  ],
+  "evaluator": {
+    "semantics": "TM_109057_PRINTED_LISTING_BINARY64_V1",
+    "axisConvention": "EARTH_X_FORWARD_Y_RIGHT_Z_DOWN",
+    "units": "SI",
+    "reportTickRatesHz": [32, 64, 128],
+    "convergenceTickRatesHz": [32, 64, 128, 256],
+    "seekerHalfAngles": [
+      {"degrees": 15, "printedRadians": 0.261798},
+      {"degrees": 20, "printedRadians": 0.349064},
+      {"degrees": 30, "printedRadians": 0.523596}
+    ],
+    "caseRoles": ["PRINTED_LISTING_REPRODUCTION", "TABLE_THRUST_CONFLICT_SENSITIVITY", "COMMAND_LIMIT_SENSITIVITY"],
+    "maximumTicks": 7680,
+    "maximumEstimatedScalarOperations": 1500000,
+    "safeInputBounds": {
+      "missilePositionAbsMaxM": 12000,
+      "missileSpeedMinMps": 1,
+      "missileSpeedMaxMps": 1000,
+      "angularRateAbsMaxRadS": 100,
+      "controlSignalAbsMaxMps2": 1000,
+      "pitchAbsMaxRad": 1.5,
+      "yawAbsMaxRad": 3.141592653589793,
+      "dynamicScalarAbsMax": 1000000000,
+      "estimatedScalarOperationsPerTick": 160
+    },
+    "terminalPrecedence": ["MISS_GROUND_OR_ZERO_SPEED", "HIT_EXACT_ZERO_RANGE", "MISS_ZERO_RELATIVE_SPEED", "HIT_CPA", "MISS_SEEKER_LIMIT", "MISS_OPENING_AFTER_BURN", "TIME_LIMIT"]
+  },
+  "evidencePolicy": {
+    "eligibleAuthorities": ["NASA_NTRS"],
+    "ineligibleKinds": ["DCS", "WAR_THUNDER", "GAME_TELEMETRY", "COMMUNITY_EXTRACTION", "REVERSE_ENGINEERED_TABLE", "FORUM", "VIDEO", "SCREENSHOT", "DERIVATIVE_SPREADSHEET"]
+  },
+  "derivedFixtures": [
+    {
+      "id": "NASA_TM_109057_BOUNDED_SWEEP_V2",
+      "path": "fixtures/public-reference/nasa-tm-109057/workload.v2.json",
+      "sha256": "0e9dd8b658f60476c8ab99c97bbd20b2ed42f3b54c3c5648e51f53b37a1592d7",
+      "byteLength": 8223,
+      "role": "GOVERNED_DERIVATIVE",
+      "evidenceRole": "COMPARISON_ONLY"
+    }
+  ],
+  "promotion": {
+    "runtimeAuthority": "NONE",
+    "prohibitedSurfaces": ["EngineScenario", "MODEL_PACK", "TRACK_SUPPORT", "SIMULATION_EVENT", "VSR", "WORKER", "UI", "NAMED_WEAPON"]
+  }
+}

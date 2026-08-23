@@ -7,8 +7,10 @@ import { runRustWasmGenericAamVerification } from "../lib/engine/backend.ts";
 import {
   GENERIC_AAM_CORPUS,
   assertGenericAamVerificationRun,
+  decodeGenericAamVerificationRunJson,
   genericAamClosestApproach,
   genericAamControlLagStep,
+  genericAamLimitedSignal,
   genericAamLosRate,
   genericAamVerificationInput,
   runGenericAamVerification,
@@ -17,7 +19,7 @@ import {
 } from "../lib/validation/generic-aam-verification.ts";
 
 const source = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/19940031931.pdf", import.meta.url));
-const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v1.json", import.meta.url));
+const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v2.json", import.meta.url));
 const workload = JSON.parse(workloadBytes);
 const clone = (value) => structuredClone(value);
 
@@ -64,6 +66,10 @@ test("TypeScript and actual WASM reject the same exact-key and numeric falsifier
     (value) => { value.target.positionM.z = -12000.01; },
     (value) => { value.target.velocityMps.x = 250; },
     (value) => { value.constants.dragK1 += 1e-6; },
+    (value) => { value.maxTicks = 7681; },
+    (value) => { value.seekerHalfAngleRad = 15 * Math.PI / 180; },
+    (value) => { value.missile.pitchRateRadS = 1e308; },
+    (value) => { value.missile.positionM.x = 1e308; },
   ];
   for (const mutate of mutations) {
     const input = clone(base);
@@ -74,6 +80,10 @@ test("TypeScript and actual WASM reject the same exact-key and numeric falsifier
 });
 
 test("independent vector oracles anchor LOS rate and closest approach", () => {
+  assert.throws(
+    () => genericAamLosRate({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }),
+    /zero range/i,
+  );
   assert.deepEqual(
     genericAamLosRate({ x: 3, y: 4, z: 0 }, { x: 1, y: -2, z: 0 }),
     { x: 0, y: 0, z: -0.4 },
@@ -82,10 +92,142 @@ test("independent vector oracles anchor LOS rate and closest approach", () => {
     genericAamClosestApproach({ x: 10, y: 5, z: 0 }, { x: -2, y: 0, z: 0 }),
     { timeSeconds: 5, distanceM: 5 },
   );
-  assert.deepEqual(
-    genericAamClosestApproach({ x: 3, y: 4, z: 0 }, { x: 0, y: 0, z: 0 }),
-    { timeSeconds: Number.MAX_VALUE, distanceM: 5 },
+  assert.throws(
+    () => genericAamClosestApproach({ x: 3, y: 4, z: 0 }, { x: 0, y: 0, z: 0 }),
+    /relative speed/i,
   );
+  assert.deepEqual(
+    genericAamClosestApproach({ x: 1, y: 0.5, z: 0 }, { x: 2, y: 0, z: 0 }),
+    { timeSeconds: -0.5, distanceM: 0.5 },
+  );
+});
+
+test("printed seeker radians, not recomputed degree conversions, own the boundary", () => {
+  const relativeX = 1000 + (234.375 - 200) / 128;
+  for (const [degrees, radians] of [[15, 0.261798], [20, 0.349064], [30, 0.523596]]) {
+    const base = genericAamVerificationInput({ maxTicks: 1, seekerHalfAngleDeg: degrees });
+    assert.equal(base.seekerHalfAngleRad, radians);
+    assert.notEqual(base.seekerHalfAngleRad, degrees * Math.PI / 180);
+    const boundaryY = relativeX * Math.tan(radians);
+    const make = (y) => genericAamVerificationInput({
+      maxTicks: 1,
+      seekerHalfAngleDeg: degrees,
+      target: {
+        previousPositionM: { x: 1000, y, z: -6000 },
+        positionM: { x: 1000, y, z: -6000 },
+        velocityMps: { x: 234.375, y: 0, z: 0 },
+      },
+    });
+    for (const run of [runGenericAamVerification, runRustWasmGenericAamVerification]) {
+      assert.equal(run(make(boundaryY)).terminal.state, "TIME_LIMIT");
+      assert.equal(run(make(boundaryY + 1e-6)).terminal.state, "MISS_SEEKER_LIMIT");
+    }
+  }
+});
+
+test("hit epsilon is strict and a receding closest point cannot become a hit", () => {
+  const make = (y) => genericAamVerificationInput({
+    maxTicks: 1,
+    target: {
+      previousPositionM: { x: 0, y, z: -6000 },
+      positionM: { x: 0, y, z: -6000 },
+      velocityMps: { x: 234.375, y: 0, z: 0 },
+    },
+  });
+  assert.equal(runGenericAamVerification(make(10 - 1e-9)).terminal.state, "HIT");
+  assert.notEqual(runGenericAamVerification(make(10)).terminal.state, "HIT");
+  const receding = genericAamClosestApproach({ x: 0.1, y: 9, z: 0 }, { x: 100, y: 0, z: 0 });
+  assert.ok(receding.timeSeconds < 0);
+  const recedingRun = runGenericAamVerification(genericAamVerificationInput({
+    maxTicks: 1,
+    missile: {
+      ...genericAamVerificationInput().missile,
+      speedMps: 1000,
+    },
+    target: {
+      previousPositionM: { x: 10, y: 9.5, z: -6000 },
+      positionM: { x: 10, y: 9.5, z: -6000 },
+      velocityMps: { x: 234.375, y: 0, z: 0 },
+    },
+  }));
+  assert.ok(recedingRun.frames[0].closestApproachTimeS < 0);
+  assert.notEqual(recedingRun.terminal.state, "HIT");
+});
+
+test("burnout transition and PN limiter boundaries are exact evaluator contracts", () => {
+  const input = genericAamVerificationInput({ maxTicks: 8 * 128 + 1 });
+  const run = runGenericAamVerification(input);
+  assert.ok(run.frames.length >= 8 * 128 + 1);
+  assert.equal(run.frames[8 * 128 - 1].thrustN, 6800);
+  assert.equal(run.frames[8 * 128].thrustN, 0);
+  assert.equal(run.frames[8 * 128 - 1].massKg, input.constants.burnoutMassKg);
+  assert.equal(run.frames[8 * 128].massKg, input.constants.burnoutMassKg);
+  assert.equal(genericAamLimitedSignal(1, 30, 22.7, 700, input.constants), 1);
+  assert.equal(genericAamLimitedSignal(31, 30, 22.7, 700, input.constants), 30);
+  assert.equal(genericAamLimitedSignal(-31, 30, 22.7, 700, input.constants), -30);
+  const limitedInput = genericAamVerificationInput({
+    maxTicks: 1,
+    caseRole: "COMMAND_LIMIT_SENSITIVITY",
+    missile: { ...genericAamVerificationInput().missile, speedMps: 700 },
+    target: {
+      previousPositionM: { x: 4500, y: 4000, z: -6000 },
+      positionM: { x: 4500, y: 4000, z: -6000 },
+      velocityMps: { x: 234.375, y: 0, z: 0 },
+    },
+  });
+  limitedInput.constants.maximumPitchG = 1;
+  limitedInput.constants.maximumYawG = 1;
+  const limitedFrame = runGenericAamVerification(limitedInput).frames[0];
+  assert.equal(
+    limitedFrame.yawCommandMps2,
+    9.8 * (22.7 / limitedFrame.massKg),
+  );
+});
+
+test("full evaluator trajectories converge through 32/64/128/256 Hz", () => {
+  const rates = [32, 64, 128, 256];
+  const runs = rates.map((tickRateHz) => runGenericAamVerification(
+    genericAamVerificationInput({ tickRateHz, maxTicks: tickRateHz * 30 }),
+  ));
+  assert.ok(runs.every((run) => run.terminal.state === "MISS_OPENING_AFTER_BURN"));
+  const ranges = runs.map((run) => run.frames.at(-1).rangeM);
+  const deltas = ranges.slice(0, -1).map((value, index) => Math.abs(value - ranges[index + 1]));
+  assert.ok(deltas[1] < deltas[0] && deltas[2] < deltas[1]);
+  const times = runs.map((run, index) => run.terminal.tick / rates[index]);
+  assert.ok(Math.max(...times) - Math.min(...times) <= 1 / 32);
+});
+
+test("controlled seeker-only cases produce nested actual hit sets", () => {
+  const grid = [];
+  for (const x of [500, 1000, 1500, 2500, 3500]) {
+    for (const y of [0, 100, 250, 500, 1000, 1500]) grid.push({ x, y });
+  }
+  const hitSet = (seekerHalfAngleDeg) => new Set(grid.filter(({ x, y }) => {
+    const target = {
+      previousPositionM: { x, y, z: -6000 },
+      positionM: { x, y, z: -6000 },
+      velocityMps: { x: 234.375, y: 0, z: 0 },
+    };
+    return runGenericAamVerification(genericAamVerificationInput({
+      tickRateHz: 64,
+      maxTicks: 64 * 30,
+      seekerHalfAngleDeg,
+      target,
+    })).terminal.state === "HIT";
+  }).map(({ x, y }) => `${x}:${y}`));
+  const [hits15, hits20, hits30] = [15, 20, 30].map(hitSet);
+  assert.ok([...hits15].every((id) => hits20.has(id)));
+  assert.ok([...hits20].every((id) => hits30.has(id)));
+  assert.ok(hits15.size < hits20.size && hits20.size < hits30.size);
+  const controlled = [15, 20, 30].map((seekerHalfAngleDeg) => genericAamVerificationInput({ seekerHalfAngleDeg }));
+  const withoutSeeker = (input) => {
+    const copy = clone(input);
+    delete copy.seekerHalfAngleDeg;
+    delete copy.seekerHalfAngleRad;
+    return copy;
+  };
+  assert.deepEqual(withoutSeeker(controlled[0]), withoutSeeker(controlled[1]));
+  assert.deepEqual(withoutSeeker(controlled[1]), withoutSeeker(controlled[2]));
 });
 
 test("first tick matches independent thrust, drag, mass, pitch, range and control-lag arithmetic", () => {
@@ -157,7 +299,7 @@ test("seeker, thrust-conflict and command-limit sensitivity roles alter only dec
 test("exact seeker equality is admitted, epsilon outside rejects, and terminal precedence is fixed", () => {
   const dt = 1 / 128;
   const relativeX = 1000 + (234.375 - 200) * dt;
-  const boundaryY = relativeX * Math.tan(15 * Math.PI / 180);
+  const boundaryY = relativeX * Math.tan(0.261798);
   const make = (y, missile = genericAamVerificationInput().missile) => genericAamVerificationInput({
     maxTicks: 1,
     seekerHalfAngleDeg: 15,
@@ -169,7 +311,7 @@ test("exact seeker equality is admitted, epsilon outside rejects, and terminal p
     },
   });
   const equality = runGenericAamVerification(make(boundaryY));
-  assert.ok(Math.abs(equality.frames[0].seekerAngleRad - 15 * Math.PI / 180) < 1e-15);
+  assert.ok(Math.abs(equality.frames[0].seekerAngleRad - 0.261798) < 1e-15);
   assert.equal(equality.terminal.state, "TIME_LIMIT");
   assert.equal(runGenericAamVerification(make(boundaryY + 1e-6)).terminal.state, "MISS_SEEKER_LIMIT");
   const ground = runGenericAamVerification(make(boundaryY + 100, {
@@ -182,7 +324,7 @@ test("exact seeker equality is admitted, epsilon outside rejects, and terminal p
 test("governed workload bytes, exact coverage and limits reject tamper", () => {
   const report = verifyGenericAamWorkload(workload, workloadBytes);
   assert.equal(report.cases, 15);
-  assert.equal(report.sha256, "be35b25977f85bb7953a508df0b67d2b92a0950cc17b217c1d5a6039467cea70");
+  assert.equal(report.sha256, "0e9dd8b658f60476c8ab99c97bbd20b2ed42f3b54c3c5648e51f53b37a1592d7");
   const changedBytes = Buffer.from(workloadBytes);
   changedBytes[changedBytes.length - 2] = 0x20;
   assert.throws(() => verifyGenericAamWorkload(workload, changedBytes));
@@ -253,13 +395,43 @@ test("run-contract forgery, unknown fields, nonfinite output and terminal enum t
     (run) => { run.inputSha256 = "0".repeat(64); },
     (run) => { run.terminal.state = "DETONATED"; },
     (run) => { run.frames[0].rangeM = Number.NaN; },
+    (run) => { run.frames[0].rangeM = null; },
+    (run) => { run.frames[0].dragN = "1"; },
+    (run) => { run.frames[0].missilePositionM.x = null; },
     (run) => { run.frames[0].unknown = true; },
     (run) => { run.frames[0].state = "TRACKING"; },
+    (run) => { run.terminal.cause = "FORGED_CAUSE"; },
     (run) => { run.limitations = []; },
   ];
   for (const mutate of mutations) {
     const run = clone(valid);
     mutate(run);
     assert.throws(() => assertGenericAamVerificationRun(run, input, "typescript"));
+    assert.throws(() => decodeGenericAamVerificationRunJson(JSON.stringify(run), input, "typescript"));
+  }
+});
+
+test("every frame numeric field and vector component rejects non-number JSON values", () => {
+  const input = genericAamVerificationInput({ maxTicks: 1 });
+  const valid = runGenericAamVerification(input);
+  const scalarKeys = [
+    "tick", "timeSeconds", "speedMps", "pitchRad", "yawRad", "pitchRateRadS",
+    "yawRateRadS", "pitchSignalMps2", "yawSignalMps2", "massKg", "thrustN",
+    "dragN", "rangeM", "seekerAngleRad", "closingVelocityMps", "pitchCommandMps2",
+    "yawCommandMps2", "closestApproachTimeS", "closestApproachDistanceM",
+  ];
+  for (const key of scalarKeys) {
+    for (const forged of [null, "1"]) {
+      const run = clone(valid);
+      run.frames[0][key] = forged;
+      assert.throws(() => decodeGenericAamVerificationRunJson(JSON.stringify(run), input, "typescript"), undefined, `${key}=${forged}`);
+    }
+  }
+  for (const vector of ["missilePositionM", "targetPositionM", "relativePositionM", "losRateRadS"]) {
+    for (const component of ["x", "y", "z"]) {
+      const run = clone(valid);
+      run.frames[0][vector][component] = null;
+      assert.throws(() => decodeGenericAamVerificationRunJson(JSON.stringify(run), input, "typescript"), undefined, `${vector}.${component}`);
+    }
   }
 });

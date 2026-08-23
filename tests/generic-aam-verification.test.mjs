@@ -11,7 +11,7 @@ import {
 } from "../lib/validation/generic-aam-verification.ts";
 
 const corpusPath = new URL(
-  "../governance/nasa-tm-109057-generic-aam-verification-corpus.v1.json",
+  "../governance/nasa-tm-109057-generic-aam-verification-corpus.v2.json",
   import.meta.url,
 );
 const sourcePath = new URL(
@@ -46,13 +46,18 @@ test("the exact NASA artifact and verification-only corpus verify offline", () =
   );
   assert.deepEqual(report, {
     schemaVersion: "vector.weapon-verification-corpus-report.v1",
-    corpusId: "nasa-tm-109057-generic-aam-verification-corpus.v1",
+    corpusId: "nasa-tm-109057-generic-aam-verification-corpus.v2",
     sourceSha256: "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa",
     byteLength: 2606172,
     state: "VERIFIED",
   });
   assert.equal(GENERIC_AAM_CORPUS.subject.intendedUse, "ENGINE_VERIFICATION_ONLY");
   assert.equal(GENERIC_AAM_CORPUS.promotion.runtimeAuthority, "NONE");
+  assert.deepEqual(GENERIC_AAM_CORPUS.evaluator.seekerHalfAngles, [
+    { degrees: 15, printedRadians: 0.261798 },
+    { degrees: 20, printedRadians: 0.349064 },
+    { degrees: 30, printedRadians: 0.523596 },
+  ]);
 });
 
 test("corpus admission fails closed for tamper, extra keys, duplicate decisions, and laundering", () => {
@@ -91,13 +96,56 @@ test("input admission rejects defaults, wrong bindings, nonfinite state, and exc
     { ...input, subjectId: "AIM_120" },
     { ...input, intendedUse: "PRODUCTION" },
     { ...input, tickRateHz: 31 },
-    { ...input, maxTicks: 1_000_001 },
+    { ...input, maxTicks: 7_681 },
     { ...input, sourceSha256: "0".repeat(64) },
     { ...input, missile: { ...input.missile, speedMps: Number.NaN } },
+    { ...input, missile: { ...input.missile, pitchRateRadS: 1e308 } },
+    { ...input, missile: { ...input.missile, positionM: { x: 1e308, y: 0, z: -6000 } } },
     { ...input, unknown: true },
   ];
   for (const candidate of candidates) {
     assert.throws(() => runGenericAamVerification(candidate));
+  }
+});
+
+test("D09 rejects exceptional initial range and relative-speed states in both engines", () => {
+  const base = genericAamVerificationInput({ maxTicks: 1 });
+  const zeroRange = {
+    ...base,
+    target: {
+      previousPositionM: { ...base.missile.positionM },
+      positionM: { ...base.missile.positionM },
+      velocityMps: { x: 234.375, y: 0, z: 0 },
+    },
+  };
+  const zeroRelativeSpeed = {
+    ...base,
+    missile: { ...base.missile, speedMps: 234.375 },
+  };
+  for (const candidate of [zeroRange, zeroRelativeSpeed]) {
+    assert.throws(() => runGenericAamVerification(candidate), /D09|range|relative speed/i);
+    assert.throws(() => runRustWasmGenericAamVerification(candidate));
+  }
+});
+
+test("D09 closes an admitted dynamic exact-zero range identically in both engines", () => {
+  const input = genericAamVerificationInput({
+    maxTicks: 1,
+    missile: {
+      ...genericAamVerificationInput().missile,
+      positionM: { x: 0.2685546875, y: 0, z: -6000 },
+    },
+    target: {
+      previousPositionM: { x: 0, y: 0, z: -6000 },
+      positionM: { x: 0, y: 0, z: -6000 },
+      velocityMps: { x: 234.375, y: 0, z: 0 },
+    },
+  });
+  for (const run of [runGenericAamVerification(input), runRustWasmGenericAamVerification(input)]) {
+    assert.deepEqual(run.terminal, { state: "HIT", tick: 1, cause: "EXACT_ZERO_RANGE" });
+    assert.equal(run.frames[0].rangeM, 0);
+    assert.equal(run.frames[0].closestApproachTimeS, 0);
+    assert.equal(run.frames[0].closestApproachDistanceM, 0);
   }
 });
 
@@ -125,8 +173,8 @@ test("terminal precedence is deterministic and explicit", () => {
   const hit = runGenericAamVerification({
     ...base,
     target: {
-      previousPositionM: { x: 0, y: 0, z: -6000 },
-      positionM: { x: 0, y: 0, z: -6000 },
+      previousPositionM: { x: 0, y: 1, z: -6000 },
+      positionM: { x: 0, y: 1, z: -6000 },
       velocityMps: { x: 234.375, y: 0, z: 0 },
     },
   });
@@ -135,6 +183,7 @@ test("terminal precedence is deterministic and explicit", () => {
   const seeker = runGenericAamVerification({
     ...base,
     seekerHalfAngleDeg: 15,
+    seekerHalfAngleRad: 0.261798,
     target: {
       previousPositionM: { x: 100, y: 100, z: -6000 },
       positionM: { x: 100, y: 100, z: -6000 },
@@ -174,4 +223,19 @@ test("the evaluator is deterministic and is not imported by production contracts
   ]) {
     assert.doesNotMatch(readFileSync(path, "utf8"), /generic-aam-verification/);
   }
+});
+
+test("Rust generic DTO is strict without mutating the shared production Vec3 contract", () => {
+  const shared = readFileSync(new URL("../engine-rust/src/lib.rs", import.meta.url), "utf8");
+  const generic = readFileSync(new URL("../engine-rust/src/generic_aam_reference.rs", import.meta.url), "utf8");
+  const expectedSharedContract = `#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+pub struct Vec3 {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}`;
+  assert.ok(shared.includes(expectedSharedContract));
+  assert.doesNotMatch(shared, /#\[serde\(deny_unknown_fields\)\]\npub struct Vec3/);
+  assert.match(generic, /struct GenericAamVec3/);
+  assert.match(generic, /deny_unknown_fields[\s\S]{0,100}struct GenericAamVec3/);
 });

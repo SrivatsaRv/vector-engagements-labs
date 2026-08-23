@@ -15,11 +15,11 @@ import type {
   PublicAircraftReferenceInput,
   PublicAircraftReferenceRun,
 } from "../validation/public-aircraft-reference.ts";
-import type {
-  GenericAamVerificationInput,
-  GenericAamVerificationRun,
+import {
+  decodeGenericAamVerificationRunJson,
+  type GenericAamVerificationInput,
+  type GenericAamVerificationRun,
 } from "../validation/generic-aam-verification.ts";
-
 type RustEngineExports = WebAssembly.Exports & {
   memory: WebAssembly.Memory;
   vector_abi_version: () => number;
@@ -127,16 +127,7 @@ export function runRustWasmGenericAamVerification(
   if (!succeeded) {
     throw new Error(`VECTOR Rust/WASM generic AAM runner rejected the case: ${output}`);
   }
-  const run = JSON.parse(output) as GenericAamVerificationRun;
-  const exact = (value: object, keys: string[]) => {
-    const actual = Object.keys(value).sort();
-    const expected = [...keys].sort();
-    return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
-  };
-  if (!exact(run, ["schemaVersion", "subjectId", "intendedUse", "semantics", "backend", "sourceSha256", "corpusSha256", "decisionSha256", "inputSha256", "caseRole", "frames", "terminal", "limitations"]) || run.backend !== "rust-wasm" || run.subjectId !== input.subjectId || run.intendedUse !== input.intendedUse || run.semantics !== input.semantics || run.sourceSha256 !== input.sourceSha256 || run.corpusSha256 !== input.corpusSha256 || run.decisionSha256 !== input.decisionSha256 || run.caseRole !== input.caseRole || run.frames.length !== run.terminal.tick) {
-    throw new Error("VECTOR Rust/WASM generic AAM runner returned an invalid contract.");
-  }
-  return run;
+  return decodeGenericAamVerificationRunJson(output, input, "rust-wasm");
 }
 
 export function runRustWasmPublicAircraftReference(

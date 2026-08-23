@@ -14,7 +14,7 @@ import {
 const root = new URL("../", import.meta.url);
 const source = readFileSync(new URL(GENERIC_AAM_CORPUS.artifact.localPath, root));
 const report = verifyGenericAamCorpus(GENERIC_AAM_CORPUS, source);
-const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v1.json", import.meta.url));
+const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v2.json", import.meta.url));
 const workload = JSON.parse(workloadBytes);
 verifyGenericAamWorkload(workload, workloadBytes);
 const digest = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
