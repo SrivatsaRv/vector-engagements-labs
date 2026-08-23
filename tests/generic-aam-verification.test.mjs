@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import test from "node:test";
 
@@ -11,7 +12,7 @@ import {
 } from "../lib/validation/generic-aam-verification.ts";
 
 const corpusPath = new URL(
-  "../governance/nasa-tm-109057-generic-aam-verification-corpus.v3.json",
+  "../governance/nasa-tm-109057-generic-aam-verification-corpus.v4.json",
   import.meta.url,
 );
 const sourcePath = new URL(
@@ -21,6 +22,7 @@ const sourcePath = new URL(
 
 const clone = (value) => structuredClone(value);
 const corpus = () => clone(genericAamCorpusView());
+const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 function assertCloseStructure(actual, expected, label = "value") {
   if (typeof expected === "number") {
@@ -47,7 +49,7 @@ test("the exact NASA artifact and verification-only corpus verify offline", () =
   );
   assert.deepEqual(report, {
     schemaVersion: "vector.weapon-verification-corpus-report.v1",
-    corpusId: "nasa-tm-109057-generic-aam-verification-corpus.v3",
+    corpusId: "nasa-tm-109057-generic-aam-verification-corpus.v4",
     sourceSha256: "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa",
     byteLength: 2606172,
     state: "VERIFIED",
@@ -62,6 +64,21 @@ test("the exact NASA artifact and verification-only corpus verify offline", () =
     { degrees: 20, printedRadians: 0.349064 },
     { degrees: 30, printedRadians: 0.523596 },
   ]);
+});
+
+test("immutable v3 corpus and workload bytes remain retained beside the v4 successor", () => {
+  const v3Corpus = readFileSync(new URL(
+    "../governance/nasa-tm-109057-generic-aam-verification-corpus.v3.json",
+    import.meta.url,
+  ));
+  const v3Workload = readFileSync(new URL(
+    "../fixtures/public-reference/nasa-tm-109057/workload.v3.json",
+    import.meta.url,
+  ));
+  assert.equal(v3Corpus.byteLength, 7456);
+  assert.equal(sha256(v3Corpus), "57af85c0bafdb47563e4bd09cce08d329f4044b52adbf50c6e1a072e228d81b3");
+  assert.equal(v3Workload.byteLength, 8223);
+  assert.equal(sha256(v3Workload), "0b7f7ba1395ff58629c26aaa62e46c239121d37e4197a2246e1064aa8caeb556");
 });
 
 test("corpus admission fails closed for tamper, extra keys, duplicate decisions, and laundering", () => {

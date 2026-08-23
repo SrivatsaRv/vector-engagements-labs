@@ -1,8 +1,10 @@
-import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 
 import { runRustWasmGenericAamVerification } from "../lib/validation/generic-aam-verification-wasm.ts";
 import {
+  genericAamSemanticBatchSha256,
+  genericAamSemanticOutcome,
+  genericAamSemanticOutcomeSha256,
   genericAamVerificationInput,
   runGenericAamVerification,
 } from "../lib/validation/generic-aam-verification.ts";
@@ -11,20 +13,17 @@ if (!process.argv.includes("--write")) {
   throw new Error("Refusing to rewrite the governed workload without --write.");
 }
 
-const workloadUrl = new URL("../fixtures/public-reference/nasa-tm-109057/workload.v3.json", import.meta.url);
-const workload = JSON.parse(readFileSync(workloadUrl, "utf8"));
-const digest = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
-const runDigest = (run) => digest({
-  schemaVersion: run.schemaVersion,
-  subjectId: run.subjectId,
-  intendedUse: run.intendedUse,
-  semantics: run.semantics,
-  backend: run.backend,
-  caseRole: run.caseRole,
-  frames: run.frames,
-  terminal: run.terminal,
-  limitations: run.limitations,
-});
+const previousWorkloadUrl = new URL("../fixtures/public-reference/nasa-tm-109057/workload.v3.json", import.meta.url);
+const workloadUrl = new URL("../fixtures/public-reference/nasa-tm-109057/workload.v4.json", import.meta.url);
+const previous = JSON.parse(readFileSync(previousWorkloadUrl, "utf8"));
+const workload = {
+  ...previous,
+  schemaVersion: "vector.generic-aam-verification-workload.v4",
+  id: "nasa-tm-109057-appendix-b-bounded-sweep.v4",
+  cases: previous.cases.map((entry) => Object.fromEntries(
+    Object.entries(entry).filter(([key]) => !["typescriptRunSha256", "rustWasmRunSha256"].includes(key)),
+  )),
+};
 
 const normalizedResults = workload.cases.map((entry) => {
   const input = genericAamVerificationInput({
@@ -46,19 +45,22 @@ const normalizedResults = workload.cases.map((entry) => {
   const rust = runRustWasmGenericAamVerification(input);
   entry.expectedTerminal = typescript.terminal.state;
   entry.expectedTick = typescript.terminal.tick;
-  entry.typescriptRunSha256 = runDigest(typescript);
-  entry.rustWasmRunSha256 = runDigest(rust);
-  return {
-    id: entry.id,
-    expectedTerminal: entry.expectedTerminal,
-    expectedTick: entry.expectedTick,
-    typescriptRunSha256: entry.typescriptRunSha256,
-    rustWasmRunSha256: entry.rustWasmRunSha256,
-  };
+  entry.expectedCause = typescript.terminal.cause;
+  entry.expectedFrameCount = typescript.frames.length;
+  entry.semanticOutcomeSha256 = genericAamSemanticOutcomeSha256(entry, typescript);
+  const typescriptOutcome = genericAamSemanticOutcome(entry, typescript);
+  const rustOutcome = genericAamSemanticOutcome(entry, rust);
+  if (JSON.stringify(typescriptOutcome) !== JSON.stringify(rustOutcome)) {
+    throw new Error(`${entry.id} TypeScript/Rust semantic outcome mismatch.`);
+  }
+  return typescriptOutcome;
 });
 
-workload.expectedBatchSha256 = digest(
-  [...normalizedResults].sort((left, right) => left.id.localeCompare(right.id)),
-);
+workload.expectedBatchSha256 = genericAamSemanticBatchSha256(normalizedResults);
 writeFileSync(workloadUrl, `${JSON.stringify(workload, null, 2)}\n`);
-process.stdout.write(`${JSON.stringify({ workloadId: workload.id, cases: workload.caseCount, expectedBatchSha256: workload.expectedBatchSha256 })}\n`);
+process.stdout.write(`${JSON.stringify({
+  workloadId: workload.id,
+  cases: workload.caseCount,
+  expectedBatchSha256: workload.expectedBatchSha256,
+  environment: { runtime: process.version, platform: process.platform, architecture: process.arch },
+})}\n`);

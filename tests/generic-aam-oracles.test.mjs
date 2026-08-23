@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
@@ -12,6 +11,11 @@ import {
   genericAamControlLagStep,
   genericAamLimitedSignal,
   genericAamLosRate,
+  GENERIC_AAM_SEMANTIC_QUANTUM,
+  genericAamSemanticBin,
+  genericAamSemanticBatchSha256,
+  genericAamSemanticOutcome,
+  genericAamSemanticOutcomeSha256,
   genericAamVerificationInput,
   runGenericAamVerification,
   verifyGenericAamCorpus,
@@ -19,10 +23,17 @@ import {
 } from "../lib/validation/generic-aam-verification.ts";
 
 const source = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/19940031931.pdf", import.meta.url));
-const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v3.json", import.meta.url));
+const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v4.json", import.meta.url));
 const workload = JSON.parse(workloadBytes);
 const clone = (value) => structuredClone(value);
 const corpus = () => clone(genericAamCorpusView());
+const nextUp = (value) => {
+  const bytes = new ArrayBuffer(8);
+  const view = new DataView(bytes);
+  view.setFloat64(0, value, false);
+  view.setBigUint64(0, view.getBigUint64(0, false) + 1n, false);
+  return view.getFloat64(0, false);
+};
 
 test("every governed corpus field family has a table-driven tamper falsifier", () => {
   const mutations = [
@@ -325,7 +336,7 @@ test("exact seeker equality is admitted, epsilon outside rejects, and terminal p
 test("governed workload bytes, exact coverage and limits reject tamper", () => {
   const report = verifyGenericAamWorkload(workload, workloadBytes);
   assert.equal(report.cases, 15);
-  assert.equal(report.sha256, "0b7f7ba1395ff58629c26aaa62e46c239121d37e4197a2246e1064aa8caeb556");
+  assert.equal(report.sha256, "9df2c63309e22931deed24c2ee267b7efed2fc7783061ad84b2628f8e577012d");
   const changedBytes = Buffer.from(workloadBytes);
   changedBytes[changedBytes.length - 2] = 0x20;
   assert.throws(() => verifyGenericAamWorkload(workload, changedBytes));
@@ -335,21 +346,77 @@ test("governed workload bytes, exact coverage and limits reject tamper", () => {
   const unknown = clone(workload);
   unknown.cases[0].defaultSeeker = 30;
   assert.throws(() => verifyGenericAamWorkload(unknown, workloadBytes));
+  for (const [name, mutate] of [
+    ["terminal", (value) => { value.cases[0].expectedTerminal = "HIT"; }],
+    ["tick", (value) => { value.cases[0].expectedTick += 1; }],
+    ["cause", (value) => { value.cases[0].expectedCause = "CPA_HIT"; }],
+    ["frame count", (value) => { value.cases[0].expectedFrameCount += 1; }],
+    ["semantic outcome digest", (value) => { value.cases[0].semanticOutcomeSha256 = "0".repeat(64); }],
+    ["batch digest", (value) => { value.expectedBatchSha256 = "0".repeat(64); }],
+    ["case order", (value) => { value.cases.reverse(); }],
+    ["duplicate case", (value) => { value.cases.push(clone(value.cases[0])); }],
+  ]) {
+    const candidate = clone(workload);
+    mutate(candidate);
+    assert.throws(() => verifyGenericAamWorkload(candidate, Buffer.from(JSON.stringify(candidate))), undefined, name);
+  }
 });
 
-test("workload per-case bytes and sorted batch digest are invariant to execution order", () => {
-  const digest = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
-  const runDigest = (run) => digest({
-    schemaVersion: run.schemaVersion,
-    subjectId: run.subjectId,
-    intendedUse: run.intendedUse,
-    semantics: run.semantics,
-    backend: run.backend,
-    caseRole: run.caseRole,
-    frames: run.frames,
-    terminal: run.terminal,
-    limitations: run.limitations,
+test("semantic quantization closes half-bin, negative-zero, and integer-overflow boundaries", () => {
+  const quantum = GENERIC_AAM_SEMANTIC_QUANTUM;
+  assert.equal(genericAamSemanticBin(0.499999 * quantum), 0);
+  assert.equal(genericAamSemanticBin(0.500001 * quantum), 1);
+  assert.equal(genericAamSemanticBin(-0.499999 * quantum), 0);
+  assert.equal(genericAamSemanticBin(-0.500001 * quantum), -1);
+  assert.equal(genericAamSemanticBin(0.5 * quantum), 1);
+  assert.equal(genericAamSemanticBin(-0.5 * quantum), 0, "ECMAScript rounding ties toward positive infinity");
+  assert.equal(Object.is(genericAamSemanticBin(-0), -0), false);
+  assert.equal(Object.is(genericAamSemanticBin(-0.499999 * quantum), -0), false);
+  for (const invalid of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.MAX_VALUE, (Number.MAX_SAFE_INTEGER + 1) * quantum]) {
+    assert.throws(() => genericAamSemanticBin(invalid), /finite|integer-bin/);
+  }
+});
+
+test("workload semantic identity excludes platform-sensitive trajectory bits", () => {
+  const entry = workload.cases[0];
+  const input = genericAamVerificationInput({
+    tickRateHz: entry.tickRateHz,
+    maxTicks: entry.maxTicks,
+    seekerHalfAngleDeg: entry.seekerHalfAngleDeg,
+    caseRole: entry.caseRole ?? "PRINTED_LISTING_REPRODUCTION",
+    target: { previousPositionM: entry.targetPositionM, positionM: entry.targetPositionM, velocityMps: { x: 234.375, y: 0, z: 0 } },
   });
+  const run = runGenericAamVerification(input);
+  const perturbed = clone(run);
+  perturbed.frames[1].speedMps = nextUp(perturbed.frames[1].speedMps);
+  assert.notEqual(JSON.stringify(perturbed.frames), JSON.stringify(run.frames));
+  assert.deepEqual(genericAamSemanticOutcome(entry, perturbed), genericAamSemanticOutcome(entry, run));
+  assert.equal(genericAamSemanticOutcomeSha256(entry, perturbed), genericAamSemanticOutcomeSha256(entry, run));
+  const materiallyChanged = clone(run);
+  const interiorIndex = Math.floor((materiallyChanged.frames.length - 1) / 2);
+  assert.ok(interiorIndex > 0 && interiorIndex < materiallyChanged.frames.length - 1);
+  materiallyChanged.frames[interiorIndex].missilePositionM.x += 0.001;
+  assert.notDeepEqual(genericAamSemanticOutcome(entry, materiallyChanged), genericAamSemanticOutcome(entry, run));
+  const aggregateChanged = clone(run);
+  const sampledTicks = new Set(genericAamSemanticOutcome(entry, run).samples.map(({ tick }) => tick));
+  const aggregateIndex = aggregateChanged.frames.findIndex((frame) => !sampledTicks.has(frame.tick));
+  assert.ok(aggregateIndex > 0, "workload must include a non-sampled interior frame");
+  const previousSamples = genericAamSemanticOutcome(entry, aggregateChanged).samples;
+  aggregateChanged.frames[aggregateIndex].yawCommandMps2 = Math.max(
+    ...aggregateChanged.frames.map(({ yawCommandMps2 }) => Math.abs(yawCommandMps2)),
+  ) + 0.001;
+  const aggregateOutcome = genericAamSemanticOutcome(entry, aggregateChanged);
+  assert.deepEqual(aggregateOutcome.samples, previousSamples);
+  assert.notDeepEqual(aggregateOutcome.aggregates, genericAamSemanticOutcome(entry, run).aggregates);
+  assert.notEqual(genericAamSemanticOutcomeSha256(entry, aggregateChanged), genericAamSemanticOutcomeSha256(entry, run));
+  const changedConfiguration = { ...entry, seekerHalfAngleDeg: 20, seekerHalfAngleRad: 0.349064 };
+  assert.notEqual(genericAamSemanticOutcomeSha256(changedConfiguration, run), genericAamSemanticOutcomeSha256(entry, run));
+  const outcome = genericAamSemanticOutcome(entry, run);
+  assert.equal(genericAamSemanticBatchSha256([outcome]), genericAamSemanticBatchSha256([outcome]));
+  assert.throws(() => genericAamSemanticBatchSha256([outcome, outcome]), /duplicate/i);
+});
+
+test("workload per-case semantics and sorted batch digest are invariant to execution order", () => {
   const execute = (entries) => entries.map((entry) => {
     const input = genericAamVerificationInput({
       tickRateHz: entry.tickRateHz,
@@ -361,13 +428,29 @@ test("workload per-case bytes and sorted batch digest are invariant to execution
     if (input.caseRole === "TABLE_THRUST_CONFLICT_SENSITIVITY") input.constants.motorThrustN = 690 * 4.4482216152605;
     const typescript = runGenericAamVerification(input);
     const rust = runRustWasmGenericAamVerification(input);
-    return { id: entry.id, expectedTerminal: typescript.terminal.state, expectedTick: typescript.terminal.tick, typescriptRunSha256: runDigest(typescript), rustWasmRunSha256: runDigest(rust) };
+    const outcome = genericAamSemanticOutcome(entry, typescript);
+    assert.deepEqual(genericAamSemanticOutcome(entry, rust), outcome);
+    return {
+      id: entry.id,
+      outcome,
+      sha256: genericAamSemanticOutcomeSha256(entry, typescript),
+      typescriptOutputSha256: typescript.outputSha256,
+      rustWasmOutputSha256: rust.outputSha256,
+    };
   });
   const forward = execute(workload.cases);
   const reversed = execute([...workload.cases].reverse());
-  const sort = (results) => [...results].sort((left, right) => left.id.localeCompare(right.id));
+  const sort = (results) => [...results].sort((left, right) => left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
   assert.deepEqual(sort(reversed), sort(forward));
-  assert.equal(digest(sort(forward)), workload.expectedBatchSha256);
+  for (const result of forward) {
+    const expected = workload.cases.find(({ id }) => id === result.id);
+    assert.equal(result.outcome.terminalState, expected.expectedTerminal);
+    assert.equal(result.outcome.terminalTick, expected.expectedTick);
+    assert.equal(result.outcome.terminalCause, expected.expectedCause);
+    assert.equal(result.outcome.frameCount, expected.expectedFrameCount);
+    assert.equal(result.sha256, expected.semanticOutcomeSha256);
+  }
+  assert.equal(genericAamSemanticBatchSha256(forward.map(({ outcome }) => outcome)), workload.expectedBatchSha256);
 });
 
 test("report-supported qualitative comparisons stay qualitative and independently anchored", () => {

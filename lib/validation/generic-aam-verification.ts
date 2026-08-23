@@ -1,4 +1,4 @@
-import corpus from "../../governance/nasa-tm-109057-generic-aam-verification-corpus.v3.json" with { type: "json" };
+import corpus from "../../governance/nasa-tm-109057-generic-aam-verification-corpus.v4.json" with { type: "json" };
 import { createHash } from "node:crypto";
 
 type Vec3 = { x: number; y: number; z: number };
@@ -105,6 +105,52 @@ export type GenericAamVerificationRun = {
   limitations: string[];
 };
 
+export type GenericAamWorkloadCase = {
+  id: string;
+  tickRateHz: 32 | 64 | 128;
+  seekerHalfAngleDeg: 15 | 20 | 30;
+  seekerHalfAngleRad: 0.261798 | 0.349064 | 0.523596;
+  maxTicks: number;
+  caseRole?: GenericAamVerificationInput["caseRole"];
+  targetPositionM: Vec3;
+  expectedTerminal: GenericAamTerminalState;
+  expectedTick: number;
+  expectedCause: string;
+  expectedFrameCount: number;
+  semanticOutcomeSha256: string;
+};
+
+export type GenericAamSemanticOutcome = {
+  schemaVersion: "vector.generic-aam-semantic-outcome.v1";
+  quantization: { scheme: "ROUND_TO_NEAREST_INTEGER_BIN"; quantum: 0.000001; parityTolerance: 0.000000001 };
+  id: string;
+  caseRole: GenericAamVerificationInput["caseRole"];
+  tickRateHz: number;
+  seekerHalfAngleDeg: number;
+  seekerHalfAngleRad: number;
+  maxTicks: number;
+  targetPositionM: Vec3;
+  terminalState: GenericAamTerminalState;
+  terminalTick: number;
+  terminalCause: string;
+  frameCount: number;
+  samples: Array<{
+    tick: number;
+    missilePositionBins: Vec3;
+    speedBin: number;
+    massBin: number;
+    rangeBin: number;
+    seekerAngleBin: number;
+    pitchCommandBin: number;
+    yawCommandBin: number;
+  }>;
+  aggregates: {
+    minimumRangeBin: number;
+    maximumAbsPitchCommandBin: number;
+    maximumAbsYawCommandBin: number;
+  };
+};
+
 const ROOT_KEYS = ["schemaVersion", "id", "version", "ownerIssue", "parentIssues", "accessedAt", "reviewedAt", "subject", "artifact", "claims", "decisions", "evaluator", "evidencePolicy", "derivedFixtures", "promotion"];
 const SUBJECT_KEYS = ["id", "intendedUse", "capabilities", "prohibitedBindings"];
 const ARTIFACT_KEYS = ["id", "authority", "citationId", "reportNumber", "title", "publicationDate", "recordModifiedAt", "pageCount", "recordUri", "pdfUri", "localPath", "byteLength", "sha256", "documentState", "dissemination", "curationState", "copyrightDecision", "exportControl", "ear", "itar"];
@@ -117,7 +163,7 @@ const POLICY_KEYS = ["eligibleAuthorities", "ineligibleKinds"];
 const DERIVED_FIXTURE_KEYS = ["id", "path", "sha256", "byteLength", "role", "evidenceRole"];
 const PROMOTION_KEYS = ["runtimeAuthority", "prohibitedSurfaces"];
 const WORKLOAD_KEYS = ["schemaVersion", "id", "sourceSha256", "caseCount", "cases", "expectedBatchSha256"];
-const WORKLOAD_CASE_KEYS = ["id", "tickRateHz", "seekerHalfAngleDeg", "seekerHalfAngleRad", "maxTicks", "targetPositionM", "expectedTerminal", "expectedTick", "typescriptRunSha256", "rustWasmRunSha256"];
+const WORKLOAD_CASE_KEYS = ["id", "tickRateHz", "seekerHalfAngleDeg", "seekerHalfAngleRad", "maxTicks", "targetPositionM", "expectedTerminal", "expectedTick", "expectedCause", "expectedFrameCount", "semanticOutcomeSha256"];
 const INPUT_KEYS = ["schemaVersion", "subjectId", "intendedUse", "semantics", "sourceSha256", "corpusSha256", "decisionSha256", "caseRole", "axisConvention", "units", "tickRateHz", "maxTicks", "seekerHalfAngleDeg", "seekerHalfAngleRad", "missile", "target", "constants"];
 const MISSILE_KEYS = ["speedMps", "pitchRateRadS", "pitchSignalMps2", "yawRateRadS", "yawSignalMps2", "pitchRad", "yawRad", "positionM", "massKg"];
 const TARGET_KEYS = ["previousPositionM", "positionM", "velocityMps"];
@@ -154,6 +200,87 @@ function canonical(value: unknown): string {
 
 function sha256(value: string | Uint8Array) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function compareUtf8(left: string, right: string) {
+  const encoder = new TextEncoder();
+  const leftBytes = encoder.encode(left);
+  const rightBytes = encoder.encode(right);
+  const length = Math.min(leftBytes.length, rightBytes.length);
+  for (let index = 0; index < length; index += 1) {
+    if (leftBytes[index] !== rightBytes[index]) return leftBytes[index] - rightBytes[index];
+  }
+  return leftBytes.length - rightBytes.length;
+}
+
+export const GENERIC_AAM_SEMANTIC_QUANTUM = 0.000001 as const;
+export const GENERIC_AAM_PARITY_TOLERANCE = 0.000000001 as const;
+
+export function genericAamSemanticBin(value: number) {
+  if (!Number.isFinite(value)) throw new Error("Generic AAM semantic projection requires finite trajectory values.");
+  const encoded = Math.round(value / GENERIC_AAM_SEMANTIC_QUANTUM);
+  if (!Number.isSafeInteger(encoded)) throw new Error("Generic AAM semantic projection exceeded its integer-bin range.");
+  return encoded === 0 ? 0 : encoded;
+}
+
+export function genericAamSemanticOutcome(
+  entry: Pick<GenericAamWorkloadCase, "id" | "caseRole" | "tickRateHz" | "seekerHalfAngleDeg" | "seekerHalfAngleRad" | "maxTicks" | "targetPositionM">,
+  run: GenericAamVerificationRun,
+): GenericAamSemanticOutcome {
+  const sampleIndexes = [...new Set([0, Math.floor((run.frames.length - 1) / 2), run.frames.length - 1])];
+  return {
+    schemaVersion: "vector.generic-aam-semantic-outcome.v1",
+    quantization: { scheme: "ROUND_TO_NEAREST_INTEGER_BIN", quantum: GENERIC_AAM_SEMANTIC_QUANTUM, parityTolerance: GENERIC_AAM_PARITY_TOLERANCE },
+    id: entry.id,
+    caseRole: entry.caseRole ?? "PRINTED_LISTING_REPRODUCTION",
+    tickRateHz: entry.tickRateHz,
+    seekerHalfAngleDeg: entry.seekerHalfAngleDeg,
+    seekerHalfAngleRad: entry.seekerHalfAngleRad,
+    maxTicks: entry.maxTicks,
+    targetPositionM: { ...entry.targetPositionM },
+    terminalState: run.terminal.state,
+    terminalTick: run.terminal.tick,
+    terminalCause: run.terminal.cause,
+    frameCount: run.frames.length,
+    samples: sampleIndexes.map((index) => {
+      const frame = run.frames[index];
+      if (!frame) throw new Error("Generic AAM semantic projection requires at least one frame.");
+      return {
+        tick: frame.tick,
+        missilePositionBins: {
+          x: genericAamSemanticBin(frame.missilePositionM.x),
+          y: genericAamSemanticBin(frame.missilePositionM.y),
+          z: genericAamSemanticBin(frame.missilePositionM.z),
+        },
+        speedBin: genericAamSemanticBin(frame.speedMps),
+        massBin: genericAamSemanticBin(frame.massKg),
+        rangeBin: genericAamSemanticBin(frame.rangeM),
+        seekerAngleBin: genericAamSemanticBin(frame.seekerAngleRad),
+        pitchCommandBin: genericAamSemanticBin(frame.pitchCommandMps2),
+        yawCommandBin: genericAamSemanticBin(frame.yawCommandMps2),
+      };
+    }),
+    aggregates: {
+      minimumRangeBin: genericAamSemanticBin(Math.min(...run.frames.map(({ rangeM }) => rangeM))),
+      maximumAbsPitchCommandBin: genericAamSemanticBin(Math.max(...run.frames.map(({ pitchCommandMps2 }) => Math.abs(pitchCommandMps2)))),
+      maximumAbsYawCommandBin: genericAamSemanticBin(Math.max(...run.frames.map(({ yawCommandMps2 }) => Math.abs(yawCommandMps2)))),
+    },
+  };
+}
+
+export function genericAamSemanticOutcomeSha256(
+  entry: Pick<GenericAamWorkloadCase, "id" | "caseRole" | "tickRateHz" | "seekerHalfAngleDeg" | "seekerHalfAngleRad" | "maxTicks" | "targetPositionM">,
+  run: GenericAamVerificationRun,
+) {
+  return sha256(canonical(genericAamSemanticOutcome(entry, run)));
+}
+
+export function genericAamSemanticBatchSha256(outcomes: readonly GenericAamSemanticOutcome[]) {
+  const sorted = [...outcomes].sort((left, right) => compareUtf8(left.id, right.id));
+  if (new Set(sorted.map(({ id }) => id)).size !== sorted.length) {
+    throw new Error("Generic AAM semantic batch contains duplicate case IDs.");
+  }
+  return sha256(canonical(sorted));
 }
 
 const FRAME_VECTORS = ["missilePositionM", "targetPositionM", "relativePositionM", "losRateRadS"] as const;
@@ -221,7 +348,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 const COMPILED_SOURCE_SHA256 = "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa";
-export const GENERIC_AAM_CORPUS_SHA256 = "e4d0b37e08aff711d0f7260d0ba10d8ee73b0b6ef84ad81616116988eae3a7a7";
+export const GENERIC_AAM_CORPUS_SHA256 = "2b7c3ea5199a2d4b07990f29f9c8209769bd782a99b7d484d02d39abda6c16a1";
 export const GENERIC_AAM_DECISION_SHA256 = "884bca829ac1b94f959ecff1be6b9cf9847512810c7010f36d8b78cf6cef22f2";
 const TRUSTED_CORPUS = deepFreeze(structuredClone(corpus));
 const TRUSTED_CORPUS_CANONICAL = canonical(TRUSTED_CORPUS);
@@ -271,7 +398,7 @@ export function verifyGenericAamWorkload(candidate: unknown, workloadBytes: Uint
   exactKeys(candidate, WORKLOAD_KEYS, "workload");
   const workload = candidate as unknown as {
     schemaVersion: string; id: string; sourceSha256: string; caseCount: number; expectedBatchSha256: string;
-    cases: Array<{ id: string; tickRateHz: number; seekerHalfAngleDeg: number; seekerHalfAngleRad: number; maxTicks: number; caseRole?: string; targetPositionM: Vec3; expectedTerminal: string; expectedTick: number; typescriptRunSha256: string; rustWasmRunSha256: string }>;
+    cases: GenericAamWorkloadCase[];
   };
   if (!Array.isArray(workload.cases)) throw new Error("Workload cases must be an array.");
   for (const entry of workload.cases) {
@@ -279,9 +406,10 @@ export function verifyGenericAamWorkload(candidate: unknown, workloadBytes: Uint
     exactKeys(entry, keys, "workloadCase");
     exactKeys(entry.targetPositionM, VEC_KEYS, "workloadTarget");
     const literal = seekerLiteral(entry.seekerHalfAngleDeg);
-    if (![32, 64, 128].includes(entry.tickRateHz) || entry.seekerHalfAngleRad !== literal || entry.maxTicks !== entry.tickRateHz * 30 || !Object.keys(TERMINAL_CAUSES).includes(entry.expectedTerminal) || !Number.isInteger(entry.expectedTick) || entry.expectedTick <= 0 || entry.expectedTick > entry.maxTicks || !/^[a-f0-9]{64}$/.test(entry.typescriptRunSha256) || !/^[a-f0-9]{64}$/.test(entry.rustWasmRunSha256)) throw new Error("Workload case bounds or expected result are invalid.");
+    const role = entry.caseRole ?? "PRINTED_LISTING_REPRODUCTION";
+    if (!/^[A-Z0-9_]+$/.test(entry.id) || !["PRINTED_LISTING_REPRODUCTION", "TABLE_THRUST_CONFLICT_SENSITIVITY", "COMMAND_LIMIT_SENSITIVITY"].includes(role) || ![32, 64, 128].includes(entry.tickRateHz) || entry.seekerHalfAngleRad !== literal || entry.maxTicks !== entry.tickRateHz * 30 || !Object.keys(TERMINAL_CAUSES).includes(entry.expectedTerminal) || !TERMINAL_CAUSES[entry.expectedTerminal].includes(entry.expectedCause) || !Number.isInteger(entry.expectedTick) || entry.expectedTick <= 0 || entry.expectedTick > entry.maxTicks || entry.expectedFrameCount !== entry.expectedTick || !/^[a-f0-9]{64}$/.test(entry.semanticOutcomeSha256)) throw new Error("Workload case bounds or expected result are invalid.");
   }
-  if (workload.schemaVersion !== "vector.generic-aam-verification-workload.v3" || workload.id !== "nasa-tm-109057-appendix-b-bounded-sweep.v3" || workload.sourceSha256 !== COMPILED_SOURCE_SHA256 || workload.caseCount !== 15 || workload.cases.length !== workload.caseCount || !/^[a-f0-9]{64}$/.test(workload.expectedBatchSha256)) throw new Error("Workload identity or count is invalid.");
+  if (workload.schemaVersion !== "vector.generic-aam-verification-workload.v4" || workload.id !== "nasa-tm-109057-appendix-b-bounded-sweep.v4" || workload.sourceSha256 !== COMPILED_SOURCE_SHA256 || workload.caseCount !== 15 || workload.cases.length !== workload.caseCount || !/^[a-f0-9]{64}$/.test(workload.expectedBatchSha256)) throw new Error("Workload identity or count is invalid.");
   const decoded = JSON.parse(new TextDecoder().decode(workloadBytes));
   if (canonical(candidate) !== canonical(decoded)) throw new Error("Workload object does not match supplied bytes.");
   const governed = TRUSTED_CORPUS.derivedFixtures[0];
@@ -290,7 +418,7 @@ export function verifyGenericAamWorkload(candidate: unknown, workloadBytes: Uint
   if (new Set(ids).size !== ids.length) throw new Error("Workload case IDs must be unique.");
   const rates = new Set(workload.cases.map((entry) => entry.tickRateHz));
   const seekers = new Set(workload.cases.map((entry) => entry.seekerHalfAngleDeg));
-  if (![32, 64, 128].every((value) => rates.has(value)) || ![15, 20, 30].every((value) => seekers.has(value))) throw new Error("Workload report sweep coverage is incomplete.");
+  if (!([32, 64, 128] as const).every((value) => rates.has(value)) || !([15, 20, 30] as const).every((value) => seekers.has(value))) throw new Error("Workload report sweep coverage is incomplete.");
   const positions = workload.cases.map((entry) => entry.targetPositionM);
   if (!positions.some(({ x }) => x === 0) || !positions.some(({ x }) => x === 4500) || !positions.some(({ y }) => y === -4000) || !positions.some(({ y }) => y === 4000) || !positions.some(({ z }) => z === -2000) || !positions.some(({ z }) => z === -12000)) throw new Error("Workload Appendix B boundary coverage is incomplete.");
   return { schemaVersion: workload.schemaVersion, workloadId: workload.id, cases: workload.caseCount, sha256: governed.sha256, byteLength: governed.byteLength };

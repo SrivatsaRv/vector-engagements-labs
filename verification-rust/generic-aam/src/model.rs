@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use crate::EngineError;
 
 const SOURCE_SHA256: &str = "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa";
-const CORPUS_SHA256: &str = "e4d0b37e08aff711d0f7260d0ba10d8ee73b0b6ef84ad81616116988eae3a7a7";
+const CORPUS_SHA256: &str = "2b7c3ea5199a2d4b07990f29f9c8209769bd782a99b7d484d02d39abda6c16a1";
 const DECISION_SHA256: &str = "884bca829ac1b94f959ecff1be6b9cf9847512810c7010f36d8b78cf6cef22f2";
 
 const MAX_TICKS: u32 = 7_680;
