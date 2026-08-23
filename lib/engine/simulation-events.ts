@@ -2,6 +2,7 @@ import { canonicalJson } from "../canonical-json.ts";
 import type {
   EngineFrame,
   EngineScenario,
+  EntityLifecycle,
   EngineTermination,
   SimulationEventParticipant,
   SimulationEventPayload,
@@ -14,21 +15,21 @@ import {
 
 export const MAX_SIMULATION_EVENTS = 100_000;
 
-export type SimulationEventDraftReference = {
+export type SimulationEventReceipt = {
   tick: number;
   localKey: string;
 };
 
-export type SimulationEventCauseReference =
-  | { kind: "COMMITTED_EVENT"; eventId: string }
-  | { kind: "SAME_TICK_EVENT"; reference: SimulationEventDraftReference };
+export type SimulationEventCauseReference = {
+  kind: "EVENT_RECEIPT";
+  receipt: SimulationEventReceipt;
+};
 
 export type SimulationEventDraft = Omit<
   SimulationEventV2,
   "schemaVersion" | "id" | "sequence" | "frameIndex" | "causeEventIds"
 > & {
   causes: SimulationEventCauseReference[];
-  localOrdinal?: number;
 };
 
 const PHASES = [
@@ -66,6 +67,7 @@ const TERMINATIONS = [
   "invalid_scenario",
 ] as const;
 const PARTICIPANT_ROLES = ["ACTOR", "SUBJECT", "LAUNCHER", "WEAPON", "SENSOR"] as const;
+const UTF8_ENCODER = new TextEncoder();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -99,7 +101,18 @@ function member<T extends string>(value: unknown, values: readonly T[], label: s
 }
 
 function compareText(left: string, right: string) {
-  return left < right ? -1 : left > right ? 1 : 0;
+  if (left === right) return 0;
+  const leftBytes = UTF8_ENCODER.encode(left);
+  const rightBytes = UTF8_ENCODER.encode(right);
+  const length = Math.min(leftBytes.length, rightBytes.length);
+  for (let index = 0; index < length; index += 1) {
+    if (leftBytes[index] !== rightBytes[index]) return leftBytes[index]! - rightBytes[index]!;
+  }
+  return leftBytes.length - rightBytes.length;
+}
+
+function receiptKey(receipt: SimulationEventReceipt) {
+  return `${receipt.tick}\u0000${receipt.localKey}`;
 }
 
 function normalizeParticipants(
@@ -123,10 +136,8 @@ function participantKey(participants: readonly SimulationEventParticipant[]) {
 
 function causeDraftKey(causes: readonly SimulationEventCauseReference[]) {
   return [...causes]
-    .map((cause) => cause.kind === "COMMITTED_EVENT"
-      ? `COMMITTED:${cause.eventId}`
-      : `SAME_TICK:${cause.reference.tick}:${cause.reference.localKey}`)
-    .sort()
+    .map((cause) => `RECEIPT:${cause.receipt.tick}:${cause.receipt.localKey}`)
+    .sort(compareText)
     .join("|");
 }
 
@@ -155,7 +166,6 @@ function canonicalDraftSortKey(event: SimulationEventDraft) {
     event.ownerAffiliation ?? "",
     event.correlationId ?? "",
     event.localKey,
-    String(event.localOrdinal ?? 0).padStart(10, "0"),
     causeDraftKey(event.causes),
   ].join("\u0001");
 }
@@ -172,8 +182,7 @@ function canonicalCommittedSortKey(event: SimulationEventV2) {
     event.ownerAffiliation ?? "",
     event.correlationId ?? "",
     event.localKey,
-    "0000000000",
-    [...event.causeEventIds].sort().join("|"),
+    [...event.causeEventIds].sort(compareText).join("|"),
   ].join("\u0001");
 }
 
@@ -212,7 +221,6 @@ function assertDraftShape(event: SimulationEventDraft) {
   if (!Number.isSafeInteger(event.tick) || event.tick < 0) throw new Error("Simulation event tick must be a non-negative safe integer.");
   if (!Number.isFinite(event.modelTimeSeconds) || event.modelTimeSeconds < 0) throw new Error("Simulation event model time must be finite and non-negative.");
   nonEmptyString(event.localKey, "Simulation event local key");
-  if (!Number.isSafeInteger(event.localOrdinal ?? 0) || (event.localOrdinal ?? 0) < 0) throw new Error("Simulation event local ordinal must be a non-negative safe integer.");
   if (new Set(event.causes.map((cause) => canonicalJson(cause))).size !== event.causes.length) throw new Error("Simulation event causal references must be unique.");
   event.participants = normalizeParticipants(event.participants);
 }
@@ -220,10 +228,10 @@ function assertDraftShape(event: SimulationEventDraft) {
 /** Deterministic per-tick journal. It records committed transitions; it never drives them. */
 export class SimulationEventJournal {
   private readonly committed: SimulationEventV2[] = [];
-  private readonly committedSequenceById = new Map<string, number>();
+  private readonly committedSequenceByReceipt = new Map<string, number>();
   private pending: SimulationEventDraft[] = [];
 
-  emit(event: SimulationEventDraft): SimulationEventDraftReference {
+  emit(event: SimulationEventDraft): SimulationEventReceipt {
     const copy = structuredClone(event);
     assertDraftShape(copy);
     this.pending.push(copy);
@@ -232,6 +240,12 @@ export class SimulationEventJournal {
 
   hasPending() {
     return this.pending.length > 0;
+  }
+
+  resolveReceipt(receipt: SimulationEventReceipt) {
+    const sequence = this.committedSequenceByReceipt.get(receiptKey(receipt));
+    if (sequence === undefined) throw new Error("Simulation event receipt is unresolved.");
+    return `event-${sequence.toString().padStart(6, "0")}`;
   }
 
   commitTick(tick: number, modelTimeSeconds: number, frameIndex: number) {
@@ -254,15 +268,18 @@ export class SimulationEventJournal {
     for (const [index, event] of ordered.entries()) {
       const causeSequences: number[] = [];
       for (const cause of event.causes) {
-        if (cause.kind === "COMMITTED_EVENT") {
-          const sequence = this.committedSequenceById.get(cause.eventId);
-          if (sequence === undefined) throw new Error(`Simulation event causal reference ${cause.eventId} does not precede its response.`);
+        const receipt = cause.receipt;
+        if (receipt.tick > tick) {
+          throw new Error(`Simulation event receipt ${receipt.localKey} is future or cyclic.`);
+        }
+        if (receipt.tick < tick) {
+          const sequence = this.committedSequenceByReceipt.get(receiptKey(receipt));
+          if (sequence === undefined) throw new Error(`Simulation event receipt ${receipt.localKey} is unresolved.`);
           causeSequences.push(sequence);
         } else {
-          if (cause.reference.tick !== tick) throw new Error("Same-tick simulation event reference uses a different tick.");
-          const causeIndex = indexByLocalKey.get(cause.reference.localKey);
-          if (causeIndex === undefined) throw new Error(`Same-tick simulation event reference ${cause.reference.localKey} is missing.`);
-          if (causeIndex >= index) throw new Error(`Same-tick simulation event reference ${cause.reference.localKey} is future or cyclic.`);
+          const causeIndex = indexByLocalKey.get(receipt.localKey);
+          if (causeIndex === undefined) throw new Error(`Simulation event receipt ${receipt.localKey} is unresolved.`);
+          if (causeIndex >= index) throw new Error(`Simulation event receipt ${receipt.localKey} is future or cyclic.`);
           causeSequences.push(committedBase + causeIndex);
         }
       }
@@ -289,7 +306,10 @@ export class SimulationEventJournal {
         payload: structuredClone(event.payload),
       };
       this.committed.push(committed);
-      this.committedSequenceById.set(committed.id, committed.sequence);
+      this.committedSequenceByReceipt.set(
+        receiptKey({ tick: committed.tick, localKey: committed.localKey }),
+        committed.sequence,
+      );
     }
     this.pending = [];
   }
@@ -308,6 +328,31 @@ export function assertSimulationEventStream(
 ): asserts values is readonly SimulationEventV2[] {
   if (values.length > MAX_SIMULATION_EVENTS) throw new Error(`Simulation event stream exceeds ${MAX_SIMULATION_EVENTS} events.`);
   const entityById = new Map(scenario.entities.map((entity) => [entity.id, entity]));
+  const lifecycleByEntity = new Map<string, EntityLifecycle>(
+    scenario.entities.map((entity) => [entity.id, entity.lifecycle]),
+  );
+  const enteredEntityIds = new Set<string>();
+  const firstFrameIndexByEntity = new Map<string, number>();
+  const finalLifecycleByEntity = new Map<string, EntityLifecycle>();
+  const frameTransitionsByEntity = new Map<
+    string,
+    Array<{ frameIndex: number; from: EntityLifecycle; to: EntityLifecycle }>
+  >();
+  for (const [frameIndex, frame] of frames.entries()) {
+    for (const entity of frame.entities) {
+      if (!firstFrameIndexByEntity.has(entity.id)) {
+        firstFrameIndexByEntity.set(entity.id, frameIndex);
+      }
+      const priorLifecycle = finalLifecycleByEntity.get(entity.id);
+      if (priorLifecycle !== undefined && priorLifecycle !== entity.lifecycle) {
+        const transitions = frameTransitionsByEntity.get(entity.id) ?? [];
+        transitions.push({ frameIndex, from: priorLifecycle, to: entity.lifecycle });
+        frameTransitionsByEntity.set(entity.id, transitions);
+      }
+      finalLifecycleByEntity.set(entity.id, entity.lifecycle);
+    }
+  }
+  const consumedFrameTransitionsByEntity = new Map<string, number>();
   const seenIds = new Set<string>();
   const seenTransitions = new Set<string>();
   const seenLocalKeysByTick = new Map<number, Set<string>>();
@@ -366,9 +411,9 @@ export function assertSimulationEventStream(
 
     const frame = frames[event.frameIndex]!;
     if (event.payload.kind === "RUN_STARTED") {
-      if (index !== 0 || event.tick !== 0 || event.phase !== "LIFECYCLE" || event.producer.subsystem !== "RUN_COORDINATOR" || event.producer.entityId !== undefined || event.participants.length !== 0 || event.payload.scenarioId !== scenario.id || event.payload.scenarioVersion !== scenario.version) throw new Error("RUN_STARTED event is inconsistent with its scenario.");
+      if (index !== 0 || event.tick !== 0 || event.frameIndex !== 0 || event.phase !== "LIFECYCLE" || event.producer.subsystem !== "RUN_COORDINATOR" || event.producer.entityId !== undefined || event.participants.length !== 0 || event.payload.scenarioId !== scenario.id || event.payload.scenarioVersion !== scenario.version) throw new Error("RUN_STARTED event is inconsistent with its scenario boundary.");
     } else if (event.payload.kind === "RUN_COMPLETED") {
-      if (index !== values.length - 1 || event.phase !== "TERMINATION" || event.producer.subsystem !== "RUN_COORDINATOR" || event.producer.entityId !== undefined || event.participants.length !== 0 || event.payload.termination !== termination) throw new Error("RUN_COMPLETED event is inconsistent with the run termination.");
+      if (index !== values.length - 1 || event.frameIndex !== frames.length - 1 || event.phase !== "TERMINATION" || event.producer.subsystem !== "RUN_COORDINATOR" || event.producer.entityId !== undefined || event.participants.length !== 0 || event.payload.termination !== termination) throw new Error("RUN_COMPLETED event does not reference the final retained frame or run termination.");
     } else {
       const entityId = event.producer.entityId;
       const entity = entityId ? entityById.get(entityId) : undefined;
@@ -376,9 +421,47 @@ export function assertSimulationEventStream(
       if (event.producer.subsystem !== "ENTITY_LIFECYCLE" || !entity || event.participants.length !== 1 || event.participants[0]?.entityId !== entityId || event.participants[0]?.role !== "SUBJECT" || event.payload.entityKind !== entity.kind || !frameEntity) throw new Error(`Simulation entity event ${event.id} has invalid ownership or frame state.`);
       if (event.payload.kind === "ENTITY_ENTERED_WORLD") {
         if (event.phase !== "LIFECYCLE" || frameEntity.lifecycle !== event.payload.lifecycle) throw new Error(`Simulation event ${event.id} has an invalid world-entry state.`);
+        if (enteredEntityIds.has(entityId!)) throw new Error(`Simulation event ${event.id} repeats world entry for ${entityId}.`);
+        const priorLifecycle = lifecycleByEntity.get(entityId!);
+        if (priorLifecycle === "STOWED") {
+          const launchTimeSeconds = entity.weapon?.launchTimeSeconds;
+          if (
+            launchTimeSeconds === null ||
+            launchTimeSeconds === undefined ||
+            event.modelTimeSeconds !== Number(launchTimeSeconds.toFixed(6)) ||
+            event.frameIndex !== firstFrameIndexByEntity.get(entityId!)
+          ) {
+            throw new Error(`Simulation event ${event.id} does not match the declared launch boundary.`);
+          }
+          lifecycleByEntity.set(entityId!, event.payload.lifecycle);
+        } else if (
+          event.tick !== 0 ||
+          event.frameIndex !== 0 ||
+          firstFrameIndexByEntity.get(entityId!) !== 0 ||
+          priorLifecycle === "TERMINATED" ||
+          priorLifecycle !== event.payload.lifecycle
+        ) {
+          throw new Error(`Simulation event ${event.id} does not match the entity's canonical pre-world lifecycle.`);
+        }
+        enteredEntityIds.add(entityId!);
       } else {
         const expectedPhase = event.payload.to === "TERMINATED" ? "TERMINATION" : "LIFECYCLE";
         if (event.phase !== expectedPhase || frameEntity.lifecycle !== event.payload.to) throw new Error(`Simulation event ${event.id} has an invalid lifecycle phase or frame state.`);
+        if (!enteredEntityIds.has(entityId!)) throw new Error(`Simulation event ${event.id} changes lifecycle before world entry.`);
+        if (lifecycleByEntity.get(entityId!) !== event.payload.from) {
+          throw new Error(`Simulation event ${event.id} does not match the entity's prior canonical lifecycle.`);
+        }
+        const transitionIndex = consumedFrameTransitionsByEntity.get(entityId!) ?? 0;
+        const frameTransition = frameTransitionsByEntity.get(entityId!)?.[transitionIndex];
+        if (
+          frameTransition?.frameIndex !== event.frameIndex ||
+          frameTransition.from !== event.payload.from ||
+          frameTransition.to !== event.payload.to
+        ) {
+          throw new Error(`Simulation event ${event.id} does not reference the first retained frame for its lifecycle transition.`);
+        }
+        consumedFrameTransitionsByEntity.set(entityId!, transitionIndex + 1);
+        lifecycleByEntity.set(entityId!, event.payload.to);
       }
     }
     prior = event;
@@ -387,5 +470,26 @@ export function assertSimulationEventStream(
     const typed = values as readonly SimulationEventV2[];
     if (typed[0]?.payload.kind !== "RUN_STARTED") throw new Error("Simulation event stream is missing RUN_STARTED.");
     if (typed.at(-1)?.payload.kind !== "RUN_COMPLETED") throw new Error("Simulation event stream is missing RUN_COMPLETED.");
+    for (const entity of scenario.entities) {
+      if (
+        entity.lifecycle !== "STOWED" &&
+        entity.lifecycle !== "TERMINATED" &&
+        !enteredEntityIds.has(entity.id)
+      ) {
+        throw new Error(`Simulation event stream is missing initial world entry for ${entity.id}.`);
+      }
+      const finalLifecycle = finalLifecycleByEntity.get(entity.id);
+      if (
+        finalLifecycle &&
+        lifecycleByEntity.get(entity.id) !== finalLifecycle
+      ) {
+        throw new Error(`Simulation event stream does not reach the final canonical lifecycle for ${entity.id}.`);
+      }
+      const consumedTransitions = consumedFrameTransitionsByEntity.get(entity.id) ?? 0;
+      const retainedTransitions = frameTransitionsByEntity.get(entity.id)?.length ?? 0;
+      if (consumedTransitions !== retainedTransitions) {
+        throw new Error(`Simulation event stream is missing a retained lifecycle transition for ${entity.id}.`);
+      }
+    }
   }
 }

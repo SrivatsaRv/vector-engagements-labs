@@ -12,10 +12,12 @@ import {
 import { canonicalJson } from "../lib/canonical-json.ts";
 import { sha256Bytes } from "../lib/runtime/digest.ts";
 import {
+  buildSimulationResult,
   prepareSimulation,
   simulate,
   simulateWithCapabilitiesForVerification,
 } from "../lib/simulation.ts";
+import { runEngineBackend } from "../lib/engine/backend.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
 import {
@@ -337,6 +339,93 @@ test("VSR rejects unsupported, reordered, and causally corrupt v2 event streams"
   await assert.rejects(
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
     /payload schema is unsupported/,
+  );
+});
+
+test("VSR rejects a lifecycle event whose valid from-enum falsifies canonical history", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const prepared = prepareSimulation(scenario, scenario.profile, capabilities);
+  const target = prepared.engineScenario.entities.find((entity) => entity.id === "red-object-1");
+  assert.ok(target);
+  target.lifecycle = "TERMINATED";
+  const engineRun = runEngineBackend(prepared.engineScenario, "typescript");
+  const result = buildSimulationResult(prepared, engineRun);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  assert.equal(engineRun.events.state, "AVAILABLE");
+  const events = structuredClone(engineRun.events.items);
+  const transition = events.find((event) =>
+    event.payload.kind === "ENTITY_LIFECYCLE_CHANGED"
+  );
+  assert.ok(transition?.payload.kind === "ENTITY_LIFECYCLE_CHANGED");
+  transition.payload.from = "TRACKING";
+  const corrupt = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /prior canonical lifecycle/,
+  );
+});
+
+test("VSR rejects valid-state events moved away from their transition boundaries", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  const engineRun = result.engineRun;
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  assert.equal(engineRun.events.state, "AVAILABLE");
+  const weapon = engineRun.scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON");
+  assert.ok(weapon?.weapon);
+  const encodeEvents = (events) =>
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n"));
+
+  const delayedEntry = structuredClone(engineRun.events.items);
+  const entry = delayedEntry.find((event) =>
+    event.payload.kind === "ENTITY_ENTERED_WORLD" && event.producer.entityId === weapon.id
+  );
+  assert.ok(entry);
+  const laterFrame = engineRun.frames.findIndex((frame) => frame.t === 0.25);
+  assert.ok(laterFrame >= 0);
+  entry.tick = 5;
+  entry.modelTimeSeconds = 0.25;
+  entry.frameIndex = laterFrame;
+  let corrupt = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    encodeEvents(delayedEntry),
+  );
+  let serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /declared launch boundary/,
+  );
+
+  const earlyCompletion = structuredClone(engineRun.events.items);
+  const completed = earlyCompletion.at(-1);
+  assert.equal(completed?.payload.kind, "RUN_COMPLETED");
+  const terminalTime = engineRun.frames.at(-1).t;
+  const earlierTime = Number((terminalTime - 0.25).toFixed(6));
+  const earlierFrame = engineRun.frames.findIndex((frame) => frame.t === earlierTime);
+  assert.ok(earlierFrame >= 0);
+  completed.tick = Math.round(earlierTime / engineRun.scenario.fixedStepSeconds);
+  completed.modelTimeSeconds = earlierTime;
+  completed.frameIndex = earlierFrame;
+  corrupt = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    encodeEvents(earlyCompletion),
+  );
+  serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /final retained frame/,
   );
 });
 

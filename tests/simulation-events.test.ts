@@ -55,11 +55,14 @@ test("the per-tick journal rejects duplicate transitions and missing causal refe
 
   const missingCause = new SimulationEventJournal();
   missingCause.emit(runStartedDraft({
-    causes: [{ kind: "COMMITTED_EVENT", eventId: "event-999999" }],
+    causes: [{
+      kind: "EVENT_RECEIPT",
+      receipt: { tick: 0, localKey: "missing" },
+    }],
   }));
   assert.throws(
     () => missingCause.commitTick(0, 0, 0),
-    /does not precede its response/,
+    /unresolved/,
   );
 });
 
@@ -69,7 +72,7 @@ test("same-tick references resolve after deterministic ordering and reject futur
   journal.emit(runStartedDraft({
     localKey: "run-completed",
     phase: "TERMINATION",
-    causes: [{ kind: "SAME_TICK_EVENT", reference: started }],
+    causes: [{ kind: "EVENT_RECEIPT", receipt: started }],
     payload: {
       kind: "RUN_COMPLETED",
       schemaVersion: SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_COMPLETED,
@@ -82,16 +85,16 @@ test("same-tick references resolve after deterministic ordering and reject futur
   const cyclic = new SimulationEventJournal();
   cyclic.emit(runStartedDraft({
     causes: [{
-      kind: "SAME_TICK_EVENT",
-      reference: { tick: 0, localKey: "run-completed" },
+      kind: "EVENT_RECEIPT",
+      receipt: { tick: 0, localKey: "run-completed" },
     }],
   }));
   cyclic.emit(runStartedDraft({
     localKey: "run-completed",
     phase: "TERMINATION",
     causes: [{
-      kind: "SAME_TICK_EVENT",
-      reference: { tick: 0, localKey: "run-started" },
+      kind: "EVENT_RECEIPT",
+      receipt: { tick: 0, localKey: "run-started" },
     }],
     payload: {
       kind: "RUN_COMPLETED",
@@ -100,6 +103,48 @@ test("same-tick references resolve after deterministic ordering and reject futur
     },
   }));
   assert.throws(() => cyclic.commitTick(0, 0, 0), /future or cyclic/);
+});
+
+test("a journal receipt carries causality across ticks without an inferred event ID", () => {
+  const journal = new SimulationEventJournal();
+  const receipt = journal.emit(runStartedDraft());
+  assert.throws(() => journal.resolveReceipt(receipt), /unresolved/);
+  journal.commitTick(0, 0, 0);
+  assert.equal(journal.resolveReceipt(receipt), "event-000000");
+  journal.emit(runStartedDraft({
+    localKey: "run-completed",
+    tick: 1,
+    modelTimeSeconds: 0.05,
+    phase: "TERMINATION",
+    causes: [{ kind: "EVENT_RECEIPT", receipt }],
+    payload: {
+      kind: "RUN_COMPLETED",
+      schemaVersion: SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_COMPLETED,
+      termination: "time_limit",
+    },
+  }));
+  assert.doesNotThrow(() => journal.commitTick(1, 0.05, 1));
+  assert.deepEqual(journal.items()[1]?.causeEventIds, ["event-000000"]);
+
+  const unresolved = new SimulationEventJournal();
+  unresolved.emit(runStartedDraft());
+  unresolved.commitTick(0, 0, 0);
+  unresolved.emit(runStartedDraft({
+    localKey: "run-completed",
+    tick: 1,
+    modelTimeSeconds: 0.05,
+    phase: "TERMINATION",
+    causes: [{
+      kind: "EVENT_RECEIPT",
+      receipt: { tick: 0, localKey: "not-emitted" },
+    }],
+    payload: {
+      kind: "RUN_COMPLETED",
+      schemaVersion: SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_COMPLETED,
+      termination: "time_limit",
+    },
+  }));
+  assert.throws(() => unresolved.commitTick(1, 0.05, 1), /unresolved/);
 });
 
 test("participant input order and duplicates cannot alter committed bytes", () => {
@@ -211,6 +256,103 @@ test("runtime decoding rejects duplicate producer-local keys within one tick", (
     () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination),
     /repeats local key/,
   );
+});
+
+test("runtime decoding rejects a valid enum that falsifies lifecycle history", () => {
+  const scenario = admittedScenario();
+  const target = scenario.entities.find((entity) => entity.id === "red-object-1")!;
+  target.lifecycle = "TERMINATED";
+
+  for (const backend of ["typescript", "rust-wasm"] as const) {
+    const run = runEngineBackend(structuredClone(scenario), backend);
+    assert.equal(run.events.state, "AVAILABLE");
+    const events = structuredClone(run.events.items);
+    const transition = events.find((event) =>
+      event.payload.kind === "ENTITY_LIFECYCLE_CHANGED"
+    );
+    assert.ok(transition?.payload.kind === "ENTITY_LIFECYCLE_CHANGED");
+    assert.equal(transition.payload.from, "ACTIVE");
+    assert.equal(transition.payload.to, "TERMINATED");
+    transition.payload.from = "TRACKING";
+    assert.throws(
+      () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination),
+      /prior canonical lifecycle/,
+      `${backend} history corruption must fail closed`,
+    );
+  }
+});
+
+test("runtime decoding binds world entry and run completion to their true boundary frames", () => {
+  const scenario = admittedScenario();
+  scenario.durationSeconds = 3;
+  const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
+  weapon.weapon!.launchTimeSeconds = 2.05;
+  const run = runEngineBackend(scenario, "typescript");
+  assert.equal(run.events.state, "AVAILABLE");
+
+  const delayedEntry = structuredClone(run.events.items);
+  const entry = delayedEntry.find((event) =>
+    event.payload.kind === "ENTITY_ENTERED_WORLD" && event.producer.entityId === weapon.id
+  )!;
+  const laterActiveFrame = run.frames.findIndex((frame) =>
+    frame.t === 2.25 && frame.entities.some((entity) => entity.id === weapon.id)
+  );
+  assert.ok(laterActiveFrame >= 0);
+  entry.tick = 45;
+  entry.modelTimeSeconds = 2.25;
+  entry.frameIndex = laterActiveFrame;
+  assert.throws(
+    () => assertSimulationEventStream(delayedEntry, run.frames, run.scenario, run.termination),
+    /declared launch boundary/,
+  );
+
+  const earlyCompletion = structuredClone(run.events.items);
+  const completed = earlyCompletion.at(-1)!;
+  assert.equal(completed.payload.kind, "RUN_COMPLETED");
+  const earlierFrame = run.frames.findIndex((frame) => frame.t === 2.75);
+  assert.ok(earlierFrame >= 0);
+  completed.tick = 55;
+  completed.modelTimeSeconds = 2.75;
+  completed.frameIndex = earlierFrame;
+  assert.throws(
+    () => assertSimulationEventStream(earlyCompletion, run.frames, run.scenario, run.termination),
+    /final retained frame/,
+  );
+});
+
+test("Unicode identifiers use one UTF-8 canonical order in TypeScript and Rust", () => {
+  const scenario = admittedScenario();
+  scenario.durationSeconds = 1;
+  const source = scenario.entities.find((entity) => entity.kind === "AIRCRAFT")!;
+  const unicodeIds = ["unicode-𐀀", "unicode-"];
+  const additions = unicodeIds.map((id, index) => ({
+    ...structuredClone(source),
+    id,
+    rddfId: id,
+    designation: id,
+    callsign: id,
+    kind: "FIXED_OBJECTIVE" as const,
+    symbolRole: "FIXED_OBJECTIVE" as const,
+    route: undefined,
+    routePlan: undefined,
+    aircraft: undefined,
+    initial: {
+      ...structuredClone(source.initial),
+      position: { x: 10_000 + index * 100, y: 0, z: 100 },
+      massKg: 1_000,
+      fuelKg: 0,
+    },
+  }));
+  scenario.entities.push(...additions);
+  const reversed = structuredClone(scenario);
+  reversed.entities = [
+    ...reversed.entities.filter((entity) => !unicodeIds.includes(entity.id)),
+    ...additions.toReversed(),
+  ];
+  const baseline = runEngineBackend(structuredClone(scenario), "typescript").events;
+  assert.deepEqual(runEngineBackend(structuredClone(reversed), "typescript").events, baseline);
+  assert.deepEqual(runEngineBackend(structuredClone(scenario), "rust-wasm").events, baseline);
+  assert.deepEqual(runEngineBackend(structuredClone(reversed), "rust-wasm").events, baseline);
 });
 
 test("event ordering is independent of arbitrary scenario entity insertion order", () => {

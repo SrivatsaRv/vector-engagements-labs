@@ -120,13 +120,28 @@ causal references. A
 per-tick journal orders drafts by canonical event semantics rather than call or
 entity insertion order, retains an exact frame for every event-bearing tick,
 sorts and deduplicates participants, and rejects duplicate semantic
-transitions, missing/forward/cyclic causal references, and configured capacity
-overflow. Producers may reference an already canonical earlier phase in the
-same tick through its stable local key; final sequence IDs remain journal-owned.
+transitions, duplicate causes, missing/forward/cyclic causal receipts, and
+configured capacity overflow. `emit` returns a journal-issued receipt keyed by
+tick and stable local key. Producers pass that receipt across phases or later
+ticks; they never infer an `event-NNN` ID. The journal resolves the receipt only
+after its event commits and rejects every unresolved receipt.
 The admission bound includes both regular samples and event-forced frames, so a
 future high-rate #26 producer cannot bypass the recorded-state budget. VSR opening repeats schema,
 ordering, frame, ownership, lifecycle, and causal-integrity validation before
 exposing the stream.
+
+The read boundary replays each entity's lifecycle history from its compiled
+initial state. Initial non-stowed entries must match that state, later world
+entries must activate a previously `STOWED` entity, and every lifecycle
+transition's `from` value must equal the prior canonical lifecycle. The replayed
+history must reach the lifecycle in the final retained frame. A syntactically
+valid enum cannot therefore falsify the recorded transition history.
+
+World entry for a scheduled stowed weapon is bound to its declared launch time
+and the first retained frame containing that entity. A later lifecycle event is
+bound to the first retained frame that changes from its prior canonical state,
+and `RUN_COMPLETED` is bound to the final retained frame. Referencing any other
+frame fails even when that frame contains the same lifecycle value.
 
 Frames represent state committed at their stated fixed-step boundary. Initial
 and store-world-entry events are captured before the following integration
@@ -175,8 +190,12 @@ immutable scenario with a v4-capable runtime. VECTOR
 does not synthesize a missing requested command during replay.
 
 Authoritative events are ordered within each tick by phase, typed payload,
-producer identity, participant identity, and producer-local ordinal before
-receiving monotonically increasing IDs and sequences. Record identity is
+producer identity, every canonical participant, knowledge scope, correlation,
+producer-stable local key, and causal receipt. Text comparison uses unsigned
+UTF-8 byte order in both TypeScript and Rust. Current run/lifecycle producers
+have semantic TypeScript/Rust parity and carry no causal edges; serialized
+cause-byte parity remains required when #26, #28, or #38 lands its first causal
+producer. Events then receive monotonically increasing IDs and sequences. Record identity is
 derived from member content digests, so wall-clock creation metadata cannot
 masquerade as simulation identity. Reusable transport capacity is not part of
 the record bytes or content identity.

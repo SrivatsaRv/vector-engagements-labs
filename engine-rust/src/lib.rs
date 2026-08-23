@@ -2061,6 +2061,27 @@ mod tests {
             weapon.weapon_flight_state,
             Some(WeaponFlightState::TargetUnavailable)
         );
+        let transition = run
+            .events
+            .items
+            .iter()
+            .find(|event| {
+                event.producer.entity_id.as_deref() == Some("blue-weapon")
+                    && matches!(
+                        &event.payload,
+                        simulation_events::SimulationEventPayload::EntityLifecycleChanged { .. }
+                    )
+            })
+            .ok_or("run has no weapon lifecycle transition")?;
+        match &transition.payload {
+            simulation_events::SimulationEventPayload::EntityLifecycleChanged {
+                from, to, ..
+            } => {
+                assert_eq!(*from, EntityLifecycle::Active);
+                assert_eq!(*to, EntityLifecycle::Terminated);
+            }
+            _ => return Err("weapon lifecycle event has the wrong payload".into()),
+        }
         Ok(())
     }
 
