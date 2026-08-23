@@ -8,6 +8,11 @@ import type {
   EngineScenario,
   WeaponFlightState,
 } from "./contracts.ts";
+import { SIMULATION_EVENT_SCHEMA } from "./contracts.ts";
+import {
+  assertSimulationEventStream,
+  SimulationEventJournal,
+} from "./simulation-events.ts";
 import type { Vec3 } from "./primitives.ts";
 import {
   add,
@@ -699,6 +704,7 @@ export class EngineSession {
   private readonly primaryWeapon?: RuntimeState;
   private readonly primaryTarget?: RuntimeState;
   private readonly frames: EngineRun["frames"] = [];
+  private readonly eventJournal = new SimulationEventJournal();
   private readonly sampleEvery: number;
   private readonly recordingOrigin: EngineScenario["geospatial"]["origin"];
   private time = 0;
@@ -916,9 +922,74 @@ export class EngineSession {
       const primaryWeapon = this.primaryWeapon!;
       const primaryTarget = this.primaryTarget!;
       const time = this.time;
+      const eventTime = Number(time.toFixed(6));
+      const tick = this.integratedSteps;
       const scenario = this.scenario;
+      if (tick === 0) {
+        this.eventJournal.emit({
+          tick,
+          modelTimeSeconds: eventTime,
+          phase: "LIFECYCLE",
+          producer: { subsystem: "RUN_COORDINATOR" },
+          knowledgeScope: "WORLD",
+          participants: [],
+          causeEventIds: [],
+          payload: {
+            kind: "RUN_STARTED",
+            scenarioId: scenario.id,
+            scenarioVersion: scenario.version,
+          },
+        });
+        for (const state of this.states.values()) {
+          if (state.lifecycle === "STOWED" || state.lifecycle === "TERMINATED") continue;
+          this.eventJournal.emit({
+            tick,
+            modelTimeSeconds: eventTime,
+            phase: "LIFECYCLE",
+            producer: {
+              subsystem: "ENTITY_LIFECYCLE",
+              entityId: state.definition.id,
+            },
+            knowledgeScope: "WORLD",
+            participants: [{ entityId: state.definition.id, role: "SUBJECT" }],
+            causeEventIds: [],
+            payload: {
+              kind: "ENTITY_ENTERED_WORLD",
+              entityKind: state.definition.kind,
+              lifecycle: state.lifecycle,
+            },
+          });
+        }
+      }
+      const beforeActivation = new Map(
+        [...this.states.values()].map((state) => [state.definition.id, state.lifecycle]),
+      );
       for (const state of this.states.values())
         activateWeapon(state, this.states, time);
+      for (const state of this.states.values()) {
+        const prior = beforeActivation.get(state.definition.id)!;
+        if (prior !== "STOWED" || state.lifecycle === "STOWED") continue;
+        this.eventJournal.emit({
+          tick,
+          modelTimeSeconds: eventTime,
+          phase: "LIFECYCLE",
+          producer: {
+            subsystem: "ENTITY_LIFECYCLE",
+            entityId: state.definition.id,
+          },
+          knowledgeScope: "WORLD",
+          participants: [{ entityId: state.definition.id, role: "SUBJECT" }],
+          causeEventIds: [],
+          payload: {
+            kind: "ENTITY_ENTERED_WORLD",
+            entityKind: state.definition.kind,
+            lifecycle: state.lifecycle as Exclude<typeof state.lifecycle, "STOWED">,
+          },
+        });
+      }
+      const beforeUpdates = new Map(
+        [...this.states.values()].map((state) => [state.definition.id, state.lifecycle]),
+      );
       for (const state of this.states.values())
         updateKinematicEntity(state, scenario, time, scenario.fixedStepSeconds);
       for (const state of this.states.values())
@@ -929,6 +1000,28 @@ export class EngineSession {
           time,
           scenario.fixedStepSeconds,
         );
+      for (const state of this.states.values()) {
+        const prior = beforeUpdates.get(state.definition.id)!;
+        if (prior === state.lifecycle) continue;
+        this.eventJournal.emit({
+          tick,
+          modelTimeSeconds: eventTime,
+          phase: state.lifecycle === "TERMINATED" ? "TERMINATION" : "LIFECYCLE",
+          producer: {
+            subsystem: "ENTITY_LIFECYCLE",
+            entityId: state.definition.id,
+          },
+          knowledgeScope: "WORLD",
+          participants: [{ entityId: state.definition.id, role: "SUBJECT" }],
+          causeEventIds: [],
+          payload: {
+            kind: "ENTITY_LIFECYCLE_CHANGED",
+            entityKind: state.definition.kind,
+            from: prior,
+            to: state.lifecycle,
+          },
+        });
+      }
       this.integratedSteps += 1;
       batchSteps += 1;
 
@@ -961,15 +1054,53 @@ export class EngineSession {
           this.nonFiniteStateCount += 1;
       }
 
+      if (primaryWeapon.weaponFlightState === "TARGET_UNAVAILABLE") {
+        this.termination = "target_unavailable";
+        this.completed = true;
+      } else if (separationM <= scenario.completion.distanceMeters) {
+        this.termination = "threshold_reached";
+        this.completed = true;
+      } else {
+        const speed = magnitude(primaryWeapon.velocity);
+        const weapon = primaryWeapon.definition.weapon!;
+        const sinceLaunch = time - (weapon.launchTimeSeconds ?? 0);
+        if (
+          (sinceLaunch > weapon.burnSeconds + 2 &&
+            speed < 80 &&
+            separationM > 1000) ||
+          (primaryWeapon.position.z <= 0 && time > 1)
+        ) {
+          this.termination = "energy_depleted";
+          this.completed = true;
+        }
+      }
+      const nextTime = time + scenario.fixedStepSeconds;
+      if (!this.completed && nextTime > scenario.durationSeconds + 1e-9) {
+        this.termination = "time_limit";
+        this.completed = true;
+      }
+      if (this.completed) {
+        this.eventJournal.emit({
+          tick,
+          modelTimeSeconds: eventTime,
+          phase: "TERMINATION",
+          producer: { subsystem: "RUN_COORDINATOR" },
+          knowledgeScope: "WORLD",
+          participants: [],
+          causeEventIds: [],
+          payload: { kind: "RUN_COMPLETED", termination: this.termination },
+        });
+      }
       if (
         this.integratedSteps % this.sampleEvery === 1 ||
-        this.integratedSteps === 1
+        this.integratedSteps === 1 ||
+        this.eventJournal.hasPending()
       ) {
+        const frameIndex = this.frames.length;
         this.frames.push({
-          t: Number(time.toFixed(6)),
-          // Carried inventory is part of the scenario package, not yet a world
-          // track. It enters the observable frame only when its launch event
-          // activates it and gives it inherited launcher state.
+          t: eventTime,
+          // Carried inventory is scenario state, not yet a world entity. It
+          // enters the frame only after its lifecycle transition is committed.
           entities: [...this.states.values()]
             .filter((state) => state.lifecycle !== "STOWED")
             .map((state) => toFrame(state, scenario)),
@@ -994,32 +1125,11 @@ export class EngineSession {
             scenario.fixedStepSeconds,
           ),
         });
-      }
-
-      if (primaryWeapon.weaponFlightState === "TARGET_UNAVAILABLE") {
-        this.termination = "target_unavailable";
-        this.completed = true;
-      } else if (separationM <= scenario.completion.distanceMeters) {
-        this.termination = "threshold_reached";
-        this.completed = true;
-      } else {
-        const speed = magnitude(primaryWeapon.velocity);
-        const weapon = primaryWeapon.definition.weapon!;
-        const sinceLaunch = time - (weapon.launchTimeSeconds ?? 0);
-        if (
-          sinceLaunch > weapon.burnSeconds + 2 &&
-          speed < 80 &&
-          separationM > 1000
-        ) {
-          this.termination = "energy_depleted";
-          this.completed = true;
-        } else if (primaryWeapon.position.z <= 0 && time > 1) {
-          this.termination = "energy_depleted";
-          this.completed = true;
+        if (this.eventJournal.hasPending()) {
+          this.eventJournal.commitTick(tick, eventTime, frameIndex);
         }
       }
-      this.time = time + scenario.fixedStepSeconds;
-      if (this.time > scenario.durationSeconds + 1e-9) this.completed = true;
+      this.time = nextTime;
     }
 
     return {
@@ -1039,9 +1149,15 @@ export class EngineSession {
 
   result(): EngineRun {
     if (!this.completed) throw new Error("The engine session is not complete.");
-    return {
+    const events = this.eventJournal.items();
+    const run: EngineRun = {
       scenario: this.scenario,
       frames: this.frames,
+      events: {
+        state: "AVAILABLE",
+        schemaVersion: SIMULATION_EVENT_SCHEMA,
+        items: events,
+      },
       envelopes: buildEnvelopes(this.scenario),
       primaryWeaponId: this.primaryWeapon?.definition.id ?? "",
       primaryTargetId: this.primaryTarget?.definition.id ?? "",
@@ -1058,6 +1174,8 @@ export class EngineSession {
           : 0,
       },
     };
+    assertSimulationEventStream(events, run.frames, run.scenario, run.termination);
+    return run;
   }
 }
 

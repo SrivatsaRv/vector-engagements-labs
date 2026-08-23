@@ -4,7 +4,11 @@ import type {
   EngineEntityFrame,
   EngineFrame,
   EngineRun,
+  SimulationEventStream,
+  SimulationEventV2,
 } from "../engine/contracts.ts";
+import { SIMULATION_EVENT_SCHEMA } from "../engine/contracts.ts";
+import { assertSimulationEventStream } from "../engine/simulation-events.ts";
 import { sha256Bytes } from "../runtime/digest.ts";
 import {
   buildSimulationResult,
@@ -21,7 +25,8 @@ import {
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v4" as const;
-export const VECTOR_EVENT_SCHEMA = "vector.events.v1" as const;
+export const VECTOR_EVENT_SCHEMA = SIMULATION_EVENT_SCHEMA;
+export const LEGACY_VECTOR_EVENT_SCHEMA = "vector.events.v1" as const;
 export const VECTOR_PICTURE_SCHEMA = "vector.pictures.v3" as const;
 export const MAX_VECTOR_RECORD_BYTES = 64 * 1024 * 1024;
 
@@ -63,15 +68,7 @@ export type VectorRecordManifest = {
   members: VectorRecordMember[];
 };
 
-export type VectorRecordEvent = {
-  schemaVersion: typeof VECTOR_EVENT_SCHEMA;
-  id: string;
-  sequence: number;
-  t: number;
-  type: "ENGINE_INPUT" | "ENTITY_ACTIVATED" | "LIFECYCLE_CHANGED";
-  entityId?: string;
-  detail: string;
-};
+export type VectorRecordEvent = SimulationEventV2;
 
 type RecordReport = {
   schemaVersion: "vector.report.v1";
@@ -85,7 +82,7 @@ type RecordReport = {
     peakDemand: number;
     reason: string;
   };
-  engine: Omit<EngineRun, "scenario" | "frames">;
+  engine: Omit<EngineRun, "scenario" | "frames" | "events">;
   limitations: string[];
 };
 
@@ -107,7 +104,7 @@ export type OpenedVectorRecord = {
   manifest: VectorRecordManifest;
   scenario: Scenario;
   result: SimulationResult;
-  events: VectorRecordEvent[];
+  events: SimulationEventStream;
   pictures: RaspTrack[];
   report: RecordReport;
 };
@@ -422,56 +419,6 @@ export function decodeColumnarFrames(bytes: Uint8Array): EngineFrame[] {
   }));
 }
 
-function stableEvents(result: SimulationResult): VectorRecordEvent[] {
-  const pending: Array<Omit<VectorRecordEvent, "sequence" | "id">> = [];
-  for (const event of result.engineRun.scenario.events) {
-    pending.push({
-      schemaVersion: VECTOR_EVENT_SCHEMA,
-      t: event.startSeconds,
-      type: "ENGINE_INPUT",
-      detail: `${event.type}:${event.id}`,
-    });
-  }
-  const previous = new Map<string, EngineEntityFrame>();
-  for (const frame of result.engineRun.frames) {
-    for (const entity of [...frame.entities].sort((left, right) => left.id.localeCompare(right.id))) {
-      const prior = previous.get(entity.id);
-      if (!prior) {
-        pending.push({
-          schemaVersion: VECTOR_EVENT_SCHEMA,
-          t: frame.t,
-          type: "ENTITY_ACTIVATED",
-          entityId: entity.id,
-          detail: entity.lifecycle,
-        });
-      } else if (prior.lifecycle !== entity.lifecycle) {
-        pending.push({
-          schemaVersion: VECTOR_EVENT_SCHEMA,
-          t: frame.t,
-          type: "LIFECYCLE_CHANGED",
-          entityId: entity.id,
-          detail: `${prior.lifecycle}->${entity.lifecycle}`,
-        });
-      }
-      previous.set(entity.id, entity);
-    }
-  }
-  const rank = { ENGINE_INPUT: 0, ENTITY_ACTIVATED: 1, LIFECYCLE_CHANGED: 2 } as const;
-  return pending
-    .sort(
-      (left, right) =>
-        left.t - right.t ||
-        rank[left.type] - rank[right.type] ||
-        (left.entityId ?? "").localeCompare(right.entityId ?? "") ||
-        left.detail.localeCompare(right.detail),
-    )
-    .map((event, sequence) => ({
-      ...event,
-      sequence,
-      id: `event-${sequence.toString().padStart(6, "0")}`,
-    }));
-}
-
 async function member(
   path: string,
   schemaVersion: string,
@@ -526,7 +473,16 @@ export async function createVectorSimulationRecord(
       "Observer state is recorded from the canonical fail-closed tick boundary.",
     ],
   };
-  const events = stableEvents(result);
+  if (result.engineRun.events.state !== "AVAILABLE") {
+    throw new Error("A new VECTOR record requires an available simulation-event stream.");
+  }
+  const events = result.engineRun.events.items;
+  assertSimulationEventStream(
+    events,
+    result.engineRun.frames,
+    result.engineRun.scenario,
+    result.engineRun.termination,
+  );
   const pictures = result.pictures;
   const nonManifest = await Promise.all([
     member("scenario.json", "vector.scenario.v2", "application/json", true, jsonBytes(prepared.scenario)),
@@ -742,6 +698,15 @@ export async function openVectorSimulationRecord(
   ) {
     throw new Error("VECTOR record does not admit the required observer-picture schema.");
   }
+  const eventMember = header.members.find((candidate) => candidate.path === "events.jsonl");
+  if (
+    !eventMember ||
+    (eventMember.schemaVersion !== VECTOR_EVENT_SCHEMA &&
+      eventMember.schemaVersion !== LEGACY_VECTOR_EVENT_SCHEMA) ||
+    !manifest.requiredViewerFeatures.includes(eventMember.schemaVersion)
+  ) {
+    throw new Error("VECTOR record does not admit a supported simulation-event schema.");
+  }
   const scenario = JSON.parse(decoder.decode(required("scenario.json"))) as Scenario;
   const compiled = JSON.parse(decoder.decode(required("compiled.json"))) as Omit<
     PreparedSimulation,
@@ -767,9 +732,29 @@ export async function openVectorSimulationRecord(
   if (report.schemaVersion !== "vector.report.v1") throw new Error("VECTOR report schema is unsupported.");
   const decodedFrames = decodeColumnarFrames(required("frames.arrow"));
   const pictures = jsonLines<RaspTrack>(required("pictures.jsonl"));
+  const events: SimulationEventStream = eventMember.schemaVersion === VECTOR_EVENT_SCHEMA
+    ? {
+        state: "AVAILABLE",
+        schemaVersion: VECTOR_EVENT_SCHEMA,
+        items: jsonLines<SimulationEventV2>(required("events.jsonl")),
+      }
+    : {
+        state: "UNAVAILABLE",
+        sourceSchemaVersion: LEGACY_VECTOR_EVENT_SCHEMA,
+        reason: "LEGACY_EVENT_SCHEMA",
+      };
+  if (events.state === "AVAILABLE") {
+    assertSimulationEventStream(
+      events.items,
+      decodedFrames,
+      compiled.engineScenario,
+      report.engine.termination,
+    );
+  }
   const engineRun: EngineRun = {
     scenario: compiled.engineScenario,
     frames: attachRecordedObserverStates(decodedFrames, pictures),
+    events,
     ...report.engine,
   };
   if (
@@ -791,7 +776,7 @@ export async function openVectorSimulationRecord(
     manifest,
     scenario,
     result,
-    events: jsonLines<VectorRecordEvent>(required("events.jsonl")),
+    events,
     pictures,
     report,
   };

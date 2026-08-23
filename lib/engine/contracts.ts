@@ -47,6 +47,20 @@ export type Affiliation = "BLUE" | "RED" | "NEUTRAL";
 export type EngineBackendId = "typescript" | "rust-wasm";
 export type ObserverPerspective = "IAF" | "PAF";
 
+export const SIMULATION_EVENT_SCHEMA = "vector.simulation-event.v2" as const;
+
+export type SimulationEventParticipantRole =
+  | "ACTOR"
+  | "SUBJECT"
+  | "LAUNCHER"
+  | "WEAPON"
+  | "SENSOR";
+
+export type SimulationEventParticipant = {
+  entityId: string;
+  role: SimulationEventParticipantRole;
+};
+
 /**
  * Tick-owned information state. The current deployment has no admitted sensor
  * model pack, so it can only emit this explicit fail-closed state.
@@ -98,6 +112,72 @@ export type EntityLifecycle =
   | "TRACKING"
   | "ENGAGING"
   | "TERMINATED";
+
+export type EngineTermination =
+  | "threshold_reached"
+  | "energy_depleted"
+  | "target_unavailable"
+  | "time_limit"
+  | "invalid_scenario";
+
+/**
+ * Closed output-event union delivered by the current runtime. #26, #28, and
+ * #38 extend this union only when their owning causal state machines exist.
+ * Engine events contain typed facts, never presentation text.
+ */
+export type SimulationEventPayload =
+  | {
+      kind: "RUN_STARTED";
+      scenarioId: string;
+      scenarioVersion: string;
+    }
+  | {
+      kind: "ENTITY_ENTERED_WORLD";
+      entityKind: EntityKind;
+      lifecycle: Exclude<EntityLifecycle, "STOWED">;
+    }
+  | {
+      kind: "ENTITY_LIFECYCLE_CHANGED";
+      entityKind: EntityKind;
+      from: EntityLifecycle;
+      to: EntityLifecycle;
+    }
+  | {
+      kind: "RUN_COMPLETED";
+      termination: EngineTermination;
+    };
+
+export type SimulationEventV2 = {
+  schemaVersion: typeof SIMULATION_EVENT_SCHEMA;
+  id: string;
+  sequence: number;
+  tick: number;
+  modelTimeSeconds: number;
+  frameIndex: number;
+  phase: "LIFECYCLE" | "TERMINATION";
+  producer: {
+    subsystem: "RUN_COORDINATOR" | "ENTITY_LIFECYCLE";
+    entityId?: string;
+  };
+  ownerAffiliation?: Affiliation;
+  knowledgeScope: "WORLD" | "SIDE_OWNED";
+  participants: SimulationEventParticipant[];
+  causeEventIds: string[];
+  correlationId?: string;
+  payload: SimulationEventPayload;
+};
+
+export type SimulationEventStream =
+  | {
+      state: "AVAILABLE";
+      schemaVersion: typeof SIMULATION_EVENT_SCHEMA;
+      items: SimulationEventV2[];
+    }
+  | {
+      state: "UNAVAILABLE";
+      sourceSchemaVersion: "vector.events.v1";
+      reason: "LEGACY_EVENT_SCHEMA";
+    };
 
 /** Achieved propulsion/guidance stage; not a seeker or support claim. */
 export type WeaponFlightState =
@@ -341,15 +421,11 @@ export type EngineFrame = {
 export type EngineRun = {
   scenario: EngineScenario;
   frames: EngineFrame[];
+  events: SimulationEventStream;
   envelopes: CoverageEnvelope[];
   primaryWeaponId: string;
   primaryTargetId: string;
-  termination:
-    | "threshold_reached"
-    | "energy_depleted"
-    | "target_unavailable"
-    | "time_limit"
-    | "invalid_scenario";
+  termination: EngineTermination;
   closestApproachM: number;
   peakCommandG: number;
   diagnostics: {

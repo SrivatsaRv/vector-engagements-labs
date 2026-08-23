@@ -75,6 +75,11 @@ for (const definition of SCENARIO_LIBRARY) {
     assert.equal(rust.termination, typescript.termination);
     assert.equal(rust.outcome, typescript.outcome);
     assert.equal(rust.frames.length, typescript.frames.length);
+    assert.deepEqual(
+      rust.engineRun.events,
+      typescript.engineRun.events,
+      "delivered run/lifecycle events must preserve TypeScript/Rust ordering and payload parity",
+    );
     if (definition.scenario.domain === "A2A") {
       assert.ok(typescript.pictures.length > 0, "A2A ticks must publish canonical observer state");
       assert.ok(typescript.pictures.every((picture) => picture.trackState === "UNSUPPORTED" && !picture.visible && !("position" in picture)));

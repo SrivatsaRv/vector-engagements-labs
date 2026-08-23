@@ -4,9 +4,13 @@ import {
   createVectorSimulationRecord,
   decodeColumnarFrames,
   encodeColumnarFrames,
+  LEGACY_VECTOR_EVENT_SCHEMA,
   openVectorSimulationRecord,
   serializeVectorRecord,
+  VECTOR_EVENT_SCHEMA,
 } from "../lib/record/vector-record.ts";
+import { canonicalJson } from "../lib/canonical-json.ts";
+import { sha256Bytes } from "../lib/runtime/digest.ts";
 import {
   prepareSimulation,
   simulate,
@@ -20,6 +24,58 @@ import {
 } from "../lib/geospatial/environment-pack.ts";
 
 const createdAt = "2026-08-06T00:00:00.000Z";
+const textEncoder = new TextEncoder();
+const jsonBytes = (value) => textEncoder.encode(canonicalJson(value));
+
+async function replaceRecordMember(record, path, schemaVersion, bytes) {
+  const replacement = {
+    ...record.members.find((member) => member.path === path),
+    schemaVersion,
+    bytes,
+    sha256: await sha256Bytes(bytes),
+  };
+  const nonManifest = record.members
+    .filter((member) => member.path !== "manifest.json")
+    .map((member) => member.path === path ? replacement : member);
+  const members = record.manifest.members.map((member) => {
+    const source = nonManifest.find((candidate) => candidate.path === member.path);
+    return {
+      path: source.path,
+      schemaVersion: source.schemaVersion,
+      mediaType: source.mediaType,
+      required: source.required,
+      byteLength: source.bytes.byteLength,
+      sha256: source.sha256,
+    };
+  });
+  const recordId = await sha256Bytes(
+    jsonBytes(nonManifest.map(({ path: memberPath, sha256 }) => ({ path: memberPath, sha256 }))),
+  );
+  const priorManifest = { ...record.manifest };
+  delete priorManifest.contentDigest;
+  const manifestWithoutDigest = {
+    ...priorManifest,
+    recordId,
+    requiredViewerFeatures: priorManifest.requiredViewerFeatures.map((feature) =>
+      feature === VECTOR_EVENT_SCHEMA || feature === LEGACY_VECTOR_EVENT_SCHEMA
+        ? schemaVersion
+        : feature,
+    ),
+    members,
+  };
+  const manifest = {
+    ...manifestWithoutDigest,
+    contentDigest: await sha256Bytes(jsonBytes(manifestWithoutDigest)),
+  };
+  const manifestBytes = jsonBytes(manifest);
+  const priorManifestMember = record.members.find((member) => member.path === "manifest.json");
+  const manifestMember = {
+    ...priorManifestMember,
+    bytes: manifestBytes,
+    sha256: await sha256Bytes(manifestBytes),
+  };
+  return { manifest, members: [manifestMember, ...nonManifest] };
+}
 
 test("columnar frame transport round-trips exact engine frames", () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
@@ -81,7 +137,9 @@ for (const backend of ["typescript", "rust-wasm"]) {
     assert.deepEqual(opened.result.frames, result.frames);
     assert.deepEqual(opened.result.envelopes, result.envelopes);
     assert.equal(opened.result.reason, result.reason);
-    assert.ok(opened.events.length > 0);
+    assert.equal(opened.events.state, "AVAILABLE");
+    assert.ok(opened.events.items.length > 0);
+    assert.deepEqual(opened.events, result.engineRun.events);
     assert.ok(opened.pictures.length > 0, "tick-owned observer state must be recorded");
     assert.deepEqual(
       opened.result.pictures,
@@ -163,6 +221,93 @@ test("VSR rejects an observer-picture member with an unadmitted schema", async (
   await assert.rejects(
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
     /does not admit the required observer-picture schema/,
+  );
+});
+
+test("VSR opens legacy v1 events only as an explicit unavailable stream", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const record = await createVectorSimulationRecord(
+    prepareSimulation(scenario),
+    simulate(scenario),
+    createdAt,
+  );
+  const legacyBytes = textEncoder.encode(canonicalJson({
+    schemaVersion: LEGACY_VECTOR_EVENT_SCHEMA,
+    id: "event-000000",
+    sequence: 0,
+    t: 0,
+    type: "ENTITY_ACTIVATED",
+    entityId: "blue-aircraft-1",
+    detail: "ACTIVE",
+  }));
+  const legacyRecord = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    LEGACY_VECTOR_EVENT_SCHEMA,
+    legacyBytes,
+  );
+  const serialized = serializeVectorRecord(legacyRecord);
+  const opened = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+
+  assert.deepEqual(opened.events, {
+    state: "UNAVAILABLE",
+    sourceSchemaVersion: LEGACY_VECTOR_EVENT_SCHEMA,
+    reason: "LEGACY_EVENT_SCHEMA",
+  });
+  assert.deepEqual(opened.result.engineRun.events, opened.events);
+  assert.ok(opened.result.frames.length > 0, "legacy replay remains read-only without invented v2 events");
+});
+
+test("VSR rejects unsupported, reordered, and causally corrupt v2 event streams", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const result = simulate(scenario);
+  const record = await createVectorSimulationRecord(
+    prepareSimulation(scenario),
+    result,
+    createdAt,
+  );
+  assert.equal(result.engineRun.events.state, "AVAILABLE");
+  const encodeEvents = (events) =>
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n"));
+
+  const unsupported = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    "vector.simulation-event.v3",
+    encodeEvents(result.engineRun.events.items),
+  );
+  let serialized = serializeVectorRecord(unsupported);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /does not admit a supported simulation-event schema/,
+  );
+
+  const reorderedItems = structuredClone(result.engineRun.events.items);
+  [reorderedItems[0], reorderedItems[1]] = [reorderedItems[1], reorderedItems[0]];
+  const reordered = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    encodeEvents(reorderedItems),
+  );
+  serialized = serializeVectorRecord(reordered);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /invalid sequence or ID/,
+  );
+
+  const causalItems = structuredClone(result.engineRun.events.items);
+  causalItems[0].causeEventIds = [causalItems[1].id];
+  const causal = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    encodeEvents(causalItems),
+  );
+  serialized = serializeVectorRecord(causal);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /missing or future causal reference/,
   );
 });
 

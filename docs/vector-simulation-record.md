@@ -2,7 +2,7 @@
 
 Status: browser implementation available, schema name `vector.record.v1`.
 
-The VECTOR Simulation Record (VSR) is VECTOR's equivalent of an ACMI recording. It is a portable, immutable analysis artifact, not a second simulation engine. A viewer must be able to open one VSR and reproduce the same entity list, event timeline, map/3D playback, telemetry, RASP views, explanation, and report without rerunning physics.
+The VECTOR Simulation Record (VSR) is VECTOR's equivalent of an ACMI recording. It is a portable, immutable analysis artifact, not a second simulation engine. A viewer must be able to open one VSR and reproduce the same entity list, Situation Log inputs, map/3D playback, telemetry, RASP views, explanation, and report without rerunning physics.
 
 Tacview's ACMI 2.x format establishes the useful separation: a producer records time-addressed object properties and a viewer renders and analyzes them. Tacview also prefers recorded advanced telemetry over calculated fallback values and recommends object-class-specific export rates to control size. VECTOR adopts those principles while retaining additional scenario, model, source, and integrity records required by the workbench.
 
@@ -21,7 +21,7 @@ Primary references:
 | `compiled.json` | immutable engine input with resolved catalog IDs, compiled model-pack digest, model indexes, scenario-local patches, and model revisions |
 | `entities.json` | stable entity identities, affiliation, class, labels, lifecycle and presentation references |
 | `frames.arrow` | columnar time-addressed state for every active entity |
-| `events.jsonl` | launches, detections, track changes, guidance phases, terminations and annotations |
+| `events.jsonl` | authoritative typed simulation events; the current producer set records run and entity lifecycle boundaries |
 | `pictures.jsonl` | optional IAF, PAF or other observer-specific track states; Model Truth remains in frames |
 | `sources.json` | cited public facts, model assumptions, user overrides and confidence state |
 | `report.json` | frozen report content and analyst notes |
@@ -95,6 +95,31 @@ Weapons remain loadout inventory before launch. Aircraft frames preserve the ins
 
 The manifest records SHA-256 hashes for the canonical scenario, compiled engine input, compiled model pack, frames, events, sources and optional assets. It also records intended-use and credibility-manifest identities. Saving a run is complete only after all required hashes and a terminal run state exist. Editing a scenario creates a new draft revision; it cannot mutate a saved VSR.
 
+### Simulation event stream
+
+`events.jsonl` is the direct serialization of the engine-owned
+`vector.simulation-event.v2` stream. It is not rebuilt from sampled frames and
+does not contain display-ready English. The current closed producer set is
+`RUN_STARTED`, `ENTITY_ENTERED_WORLD`, `ENTITY_LIFECYCLE_CHANGED`, and
+`RUN_COMPLETED`. Sensor, track, launch-decision, guidance, support, and weapon
+termination events remain unavailable until their owning simulation contracts
+produce them; the record and browser may not infer them.
+
+Every available event has a monotonically assigned ID and sequence, exact
+fixed-step model time, the corresponding retained frame index, producer and
+participant identities, typed payload, phase, and causal references. A
+per-tick journal orders drafts by canonical event semantics rather than call or
+entity insertion order, retains an exact frame for every event-bearing tick,
+and rejects duplicate semantic transitions, missing or forward causal
+references, and configured capacity overflow. VSR opening repeats schema,
+ordering, frame, ownership, lifecycle, and causal-integrity validation before
+exposing the stream.
+
+Historical `vector.events.v1` members remain readable only as an explicit
+`UNAVAILABLE / LEGACY_EVENT_SCHEMA` state. Their frames remain replayable, but
+the viewer must not upgrade legacy free-text or frame-derived events into the
+authoritative v2 stream.
+
 ## Browser and interoperability boundary
 
 VSR is designed for browser production and playback. Frames use a transferable columnar buffer so a Web Worker, TypeScript engine or Rust/WASM engine can produce the same record contract. An ACMI 2.2 exporter can be added as an interoperability adapter; ACMI is not used as VECTOR's internal source of model truth because it does not carry VECTOR's full coefficient, provenance and scenario contracts.
@@ -102,7 +127,8 @@ VSR is designed for browser production and playback. Frames use a transferable c
 ## Implemented replay boundary
 
 `createVectorSimulationRecord` freezes the authored scenario, compiled adapter,
-entity manifest, engine frames, stable lifecycle/input events, both observer
+entity manifest, engine frames, the direct authoritative simulation-event
+stream, both observer
 pictures for A2A runs, provenance, limitations, and report outcome. The
 `openVectorSimulationRecord` path reconstructs the existing `SimulationResult`
 from recorded frames and metadata without calling either physics backend. That
@@ -129,8 +155,9 @@ an explicit incomplete-observer-state error; it must be regenerated from its
 immutable scenario with a v4-capable runtime. VECTOR
 does not synthesize a missing requested command during replay.
 
-Stable events are ordered by model timestamp, event-class rank, entity ID, and
-detail, then assigned monotonically increasing sequence numbers. Record identity
-is derived from member content digests, so wall-clock creation metadata cannot
-masquerade as simulation identity. Reusable transport capacity is not part of the
-record bytes or content identity.
+Authoritative events are ordered within each tick by phase, typed payload,
+producer identity, participant identity, and producer-local ordinal before
+receiving monotonically increasing IDs and sequences. Record identity is
+derived from member content digests, so wall-clock creation metadata cannot
+masquerade as simulation identity. Reusable transport capacity is not part of
+the record bytes or content identity.

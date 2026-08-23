@@ -10,6 +10,7 @@ import {
   VECTOR_ENGINE_WASM_SHA256,
 } from "./generated/vector-engine-wasm.ts";
 import { localFrameToGeographic } from "../geospatial/geodesy.ts";
+import { assertSimulationEventStream } from "./simulation-events.ts";
 import type {
   PublicAircraftReferenceInput,
   PublicAircraftReferenceRun,
@@ -154,6 +155,15 @@ export function runRustWasmEngine(scenario: EngineScenario): EngineRun {
   if (run.diagnostics.backend !== "rust-wasm") {
     throw new Error("The VECTOR Rust/WASM engine returned invalid provenance.");
   }
+  if (run.events?.state !== "AVAILABLE") {
+    throw new Error("The VECTOR Rust/WASM engine returned no admitted simulation-event stream.");
+  }
+  assertSimulationEventStream(
+    run.events.items,
+    run.frames,
+    scenario,
+    run.termination,
+  );
   return withGeospatialRecord(scenario, run);
 }
 
