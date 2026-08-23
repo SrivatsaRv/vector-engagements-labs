@@ -5,14 +5,16 @@ use crate::EngineError;
 const MINIMUM_FIXED_STEP_SECONDS: f64 = 1.0e-6;
 const MAXIMUM_FIXED_STEP_SECONDS: f64 = 1.0;
 const MAXIMUM_TICK_COUNT: u32 = 100_000;
+const MINIMUM_MASS_KG: f64 = 1.0;
 const MAXIMUM_MASS_KG: f64 = 1.0e9;
+const MINIMUM_INERTIA_SCALE_KG_M2: f64 = 1.0e-6;
 const MAXIMUM_INERTIA_KG_M2: f64 = 1.0e15;
 const MAXIMUM_ABSOLUTE_STATE: f64 = 1.0e9;
 const MAXIMUM_ABSOLUTE_WRENCH: f64 = 1.0e12;
 const MAXIMUM_ANGULAR_INCREMENT_RAD: f64 = 0.25;
 const MINIMUM_STAGE_QUATERNION_NORM: f64 = 0.5;
 const MAXIMUM_STAGE_QUATERNION_NORM: f64 = 2.0;
-const MINIMUM_RELATIVE_CHOLESKY_PIVOT: f64 = 1.0e-10;
+const MINIMUM_RELATIVE_CHOLESKY_PIVOT: f64 = 2.328_306_436_538_696_3e-10;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -55,8 +57,12 @@ impl Vector3 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
+    fn squared_magnitude(self) -> f64 {
+        (self.x * self.x + self.y * self.y) + self.z * self.z
+    }
+
     fn magnitude(self) -> f64 {
-        self.x.hypot(self.y).hypot(self.z)
+        self.squared_magnitude().sqrt()
     }
 
     fn is_finite_and_bounded(self, bound: f64) -> bool {
@@ -80,15 +86,20 @@ pub struct Quaternion {
 }
 
 impl Quaternion {
+    fn squared_magnitude(self) -> f64 {
+        ((self.w * self.w + self.x * self.x) + self.y * self.y) + self.z * self.z
+    }
+
     fn magnitude(self) -> f64 {
-        self.w.hypot(self.x).hypot(self.y).hypot(self.z)
+        self.squared_magnitude().sqrt()
     }
 
     fn normalize(self) -> Result<Self, EngineError> {
-        let magnitude = self.magnitude();
-        if !magnitude.is_finite() || !(1.0e-12..=1.0e6).contains(&magnitude) {
+        let squared_magnitude = self.squared_magnitude();
+        if !squared_magnitude.is_finite() || !(1.0e-24..=1.0e12).contains(&squared_magnitude) {
             return Err(invalid("the body-to-world quaternion has an invalid norm"));
         }
+        let magnitude = squared_magnitude.sqrt();
         Ok(Self {
             w: self.w / magnitude,
             x: self.x / magnitude,
@@ -121,13 +132,18 @@ pub struct InertiaTensor {
     pub zz: f64,
 }
 
-impl InertiaTensor {
-    fn determinant(self) -> f64 {
-        self.xx * (self.yy * self.zz - self.yz * self.zy)
-            - self.xy * (self.yx * self.zz - self.yz * self.zx)
-            + self.xz * (self.yx * self.zy - self.yy * self.zx)
-    }
+#[derive(Clone, Copy, Debug)]
+struct ConditionedInertiaFactor {
+    scale: f64,
+    lower_11: f64,
+    lower_21: f64,
+    lower_31: f64,
+    lower_22: f64,
+    lower_32: f64,
+    lower_33: f64,
+}
 
+impl InertiaTensor {
     fn multiply(self, value: Vector3) -> Vector3 {
         Vector3 {
             x: self.xx * value.x + self.xy * value.y + self.xz * value.z,
@@ -136,22 +152,22 @@ impl InertiaTensor {
         }
     }
 
-    fn solve(self, value: Vector3) -> Vector3 {
-        let determinant = self.determinant();
-        Vector3 {
-            x: ((self.yy * self.zz - self.yz * self.zy) * value.x
-                + (self.xz * self.zy - self.xy * self.zz) * value.y
-                + (self.xy * self.yz - self.xz * self.yy) * value.z)
-                / determinant,
-            y: ((self.yz * self.zx - self.yx * self.zz) * value.x
-                + (self.xx * self.zz - self.xz * self.zx) * value.y
-                + (self.xz * self.yx - self.xx * self.yz) * value.z)
-                / determinant,
-            z: ((self.yx * self.zy - self.yy * self.zx) * value.x
-                + (self.xy * self.zx - self.xx * self.zy) * value.y
-                + (self.xx * self.yy - self.xy * self.yx) * value.z)
-                / determinant,
-        }
+    fn solve(self, value: Vector3) -> Result<Vector3, EngineError> {
+        let factor = self.factor()?;
+        let scaled = value.scale(1.0 / factor.scale);
+        let forward_x = scaled.x / factor.lower_11;
+        let forward_y = (scaled.y - factor.lower_21 * forward_x) / factor.lower_22;
+        let forward_z = ((scaled.z - factor.lower_31 * forward_x) - factor.lower_32 * forward_y)
+            / factor.lower_33;
+        let result_z = forward_z / factor.lower_33;
+        let result_y = (forward_y - factor.lower_32 * result_z) / factor.lower_22;
+        let result_x = ((forward_x - factor.lower_21 * result_y) - factor.lower_31 * result_z)
+            / factor.lower_11;
+        Ok(Vector3 {
+            x: result_x,
+            y: result_y,
+            z: result_z,
+        })
     }
 
     fn validate(self) -> Result<(), EngineError> {
@@ -167,32 +183,55 @@ impl InertiaTensor {
         if self.xy != self.yx || self.xz != self.zx || self.yz != self.zy {
             return Err(invalid("the inertia tensor must be exactly symmetric"));
         }
-        let scale = self.xx.max(self.yy).max(self.zz);
-        let minimum_pivot = scale * MINIMUM_RELATIVE_CHOLESKY_PIVOT;
-        let first_pivot = self.xx;
-        if !scale.is_finite() || scale <= 0.0 || first_pivot < minimum_pivot {
-            return Err(invalid(
-                "the inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound",
-            ));
-        }
-        let first_root = first_pivot.sqrt();
-        let lower_21 = self.yx / first_root;
-        let lower_31 = self.zx / first_root;
-        let second_pivot = self.yy - lower_21 * lower_21;
-        if !second_pivot.is_finite() || second_pivot < minimum_pivot {
-            return Err(invalid(
-                "the inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound",
-            ));
-        }
-        let second_root = second_pivot.sqrt();
-        let lower_32 = (self.zy - lower_31 * lower_21) / second_root;
-        let third_pivot = self.zz - lower_31 * lower_31 - lower_32 * lower_32;
-        if !third_pivot.is_finite() || third_pivot < minimum_pivot {
-            return Err(invalid(
-                "the inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound",
-            ));
-        }
+        self.factor()?;
         Ok(())
+    }
+
+    fn factor(self) -> Result<ConditionedInertiaFactor, EngineError> {
+        let scale = self.xx.max(self.yy).max(self.zz);
+        if !scale.is_finite() || scale < MINIMUM_INERTIA_SCALE_KG_M2 {
+            return Err(invalid(
+                "the inertia tensor scale is below the minimum safe-domain bound",
+            ));
+        }
+        let normalized_xx = self.xx / scale;
+        let normalized_yx = self.yx / scale;
+        let normalized_yy = self.yy / scale;
+        let normalized_zx = self.zx / scale;
+        let normalized_zy = self.zy / scale;
+        let normalized_zz = self.zz / scale;
+        let first_pivot = normalized_xx;
+        if !first_pivot.is_finite() || first_pivot < MINIMUM_RELATIVE_CHOLESKY_PIVOT {
+            return Err(invalid(
+                "the inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound",
+            ));
+        }
+        let lower_11 = first_pivot.sqrt();
+        let lower_21 = normalized_yx / lower_11;
+        let lower_31 = normalized_zx / lower_11;
+        let second_pivot = normalized_yy - lower_21 * lower_21;
+        if !second_pivot.is_finite() || second_pivot < MINIMUM_RELATIVE_CHOLESKY_PIVOT {
+            return Err(invalid(
+                "the inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound",
+            ));
+        }
+        let lower_22 = second_pivot.sqrt();
+        let lower_32 = (normalized_zy - lower_31 * lower_21) / lower_22;
+        let third_pivot = (normalized_zz - lower_31 * lower_31) - lower_32 * lower_32;
+        if !third_pivot.is_finite() || third_pivot < MINIMUM_RELATIVE_CHOLESKY_PIVOT {
+            return Err(invalid(
+                "the inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound",
+            ));
+        }
+        Ok(ConditionedInertiaFactor {
+            scale,
+            lower_11,
+            lower_21,
+            lower_31,
+            lower_22,
+            lower_32,
+            lower_33: third_pivot.sqrt(),
+        })
     }
 }
 
@@ -299,10 +338,11 @@ fn validate(input: &SixDofVerificationInput) -> Result<(), EngineError> {
         return Err(invalid("tickCount exceeds its declared work bound"));
     }
     if !input.mass_properties.mass_kg.is_finite()
-        || !(0.0..=MAXIMUM_MASS_KG).contains(&input.mass_properties.mass_kg)
-        || input.mass_properties.mass_kg == 0.0
+        || !(MINIMUM_MASS_KG..=MAXIMUM_MASS_KG).contains(&input.mass_properties.mass_kg)
     {
-        return Err(invalid("massKg must be finite, positive, and bounded"));
+        return Err(invalid(
+            "massKg is below the minimum safe-domain bound or above the maximum bound",
+        ));
     }
     if !input
         .mass_properties
@@ -357,8 +397,10 @@ fn validate_angular_increment(
     step_seconds: f64,
     label: &str,
 ) -> Result<(), EngineError> {
-    let increment = angular_rate.magnitude() * step_seconds;
-    if !increment.is_finite() || increment > MAXIMUM_ANGULAR_INCREMENT_RAD {
+    let scaled_rate = angular_rate.scale(step_seconds);
+    let squared_increment = scaled_rate.squared_magnitude();
+    let squared_limit = MAXIMUM_ANGULAR_INCREMENT_RAD * MAXIMUM_ANGULAR_INCREMENT_RAD;
+    if !squared_increment.is_finite() || squared_increment > squared_limit {
         return Err(invalid(&format!(
             "{label} angular increment exceeds the fixed-step bound"
         )));
@@ -390,11 +432,10 @@ fn validate_integration_stage(
 }
 
 fn validate_stage_quaternion(quaternion: Quaternion, label: &str) -> Result<(), EngineError> {
-    let quaternion_norm = quaternion.magnitude();
-    if !quaternion_norm.is_finite()
-        || !(MINIMUM_STAGE_QUATERNION_NORM..=MAXIMUM_STAGE_QUATERNION_NORM)
-            .contains(&quaternion_norm)
-    {
+    let squared_norm = quaternion.squared_magnitude();
+    let minimum_squared = MINIMUM_STAGE_QUATERNION_NORM * MINIMUM_STAGE_QUATERNION_NORM;
+    let maximum_squared = MAXIMUM_STAGE_QUATERNION_NORM * MAXIMUM_STAGE_QUATERNION_NORM;
+    if !squared_norm.is_finite() || !(minimum_squared..=maximum_squared).contains(&squared_norm) {
         return Err(invalid(&format!(
             "{label} quaternion is outside the RK4 stage norm bound"
         )));
@@ -426,12 +467,15 @@ fn quaternion_derivative(quaternion: Quaternion, omega: Vector3) -> Quaternion {
     }
 }
 
-fn derivative(input: &SixDofVerificationInput, state: SixDofState) -> SixDofState {
+fn derivative(
+    input: &SixDofVerificationInput,
+    state: SixDofState,
+) -> Result<SixDofState, EngineError> {
     let angular_momentum_body = input
         .mass_properties
         .inertia_kg_m2
         .multiply(state.angular_rate_body_rad_s);
-    SixDofState {
+    Ok(SixDofState {
         position_world_m: rotate_body_to_world(
             state.body_to_world_quaternion,
             state.velocity_body_mps,
@@ -446,12 +490,12 @@ fn derivative(input: &SixDofVerificationInput, state: SixDofState) -> SixDofStat
                 .applied_wrench
                 .body_moment_nm
                 .subtract(state.angular_rate_body_rad_s.cross(angular_momentum_body)),
-        ),
+        )?,
         body_to_world_quaternion: quaternion_derivative(
             state.body_to_world_quaternion,
             state.angular_rate_body_rad_s,
         ),
-    }
+    })
 }
 
 fn advance(state: SixDofState, derivative: SixDofState, factor: f64) -> SixDofState {
@@ -487,16 +531,16 @@ fn combined_vector(
 fn rk4(input: &SixDofVerificationInput, state: SixDofState) -> Result<SixDofState, EngineError> {
     let step = input.fixed_step_seconds;
     validate_integration_stage(state, step, "RK4 stage 1")?;
-    let first = derivative(input, state);
+    let first = derivative(input, state)?;
     let second_state = advance(state, first, step / 2.0);
     validate_integration_stage(second_state, step, "RK4 stage 2")?;
-    let second = derivative(input, second_state);
+    let second = derivative(input, second_state)?;
     let third_state = advance(state, second, step / 2.0);
     validate_integration_stage(third_state, step, "RK4 stage 3")?;
-    let third = derivative(input, third_state);
+    let third = derivative(input, third_state)?;
     let fourth_state = advance(state, third, step);
     validate_integration_stage(fourth_state, step, "RK4 stage 4")?;
-    let fourth = derivative(input, fourth_state);
+    let fourth = derivative(input, fourth_state)?;
     let combined_quaternion = Quaternion {
         w: state.body_to_world_quaternion.w
             + step
@@ -558,9 +602,13 @@ fn rk4(input: &SixDofVerificationInput, state: SixDofState) -> Result<SixDofStat
 }
 
 fn rotational_energy(inertia: InertiaTensor, state: SixDofState) -> f64 {
-    0.5 * state
-        .angular_rate_body_rad_s
-        .dot(inertia.multiply(state.angular_rate_body_rad_s))
+    let omega = state.angular_rate_body_rad_s;
+    0.5 * (inertia.xx * (omega.x * omega.x)
+        + inertia.yy * (omega.y * omega.y)
+        + inertia.zz * (omega.z * omega.z)
+        + 2.0 * inertia.xy * omega.x * omega.y
+        + 2.0 * inertia.xz * omega.x * omega.z
+        + 2.0 * inertia.yz * omega.y * omega.z)
 }
 
 fn inertial_angular_momentum(inertia: InertiaTensor, state: SixDofState) -> Vector3 {
@@ -645,6 +693,15 @@ pub fn run_sixdof_verification_json(input: &str) -> Result<String, EngineError> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn adjacent_positive_float(value: f64, ulps: i64) -> f64 {
+        let bits = value.to_bits();
+        if ulps < 0 {
+            f64::from_bits(bits - ulps.unsigned_abs())
+        } else {
+            f64::from_bits(bits + ulps as u64)
+        }
+    }
 
     fn input() -> SixDofVerificationInput {
         SixDofVerificationInput {
@@ -757,6 +814,46 @@ mod tests {
     }
 
     #[test]
+    fn angular_boundary_uses_the_ordered_squared_representation() {
+        let vectors = [
+            Vector3 {
+                x: 0.0,
+                y: 15.0,
+                z: 20.0,
+            },
+            Vector3 {
+                x: 7.0,
+                y: 24.0,
+                z: 0.0,
+            },
+            Vector3 {
+                x: 14.485_848_611_447_416,
+                y: 16.020_079_621_048_747,
+                z: 12.590_362_939_227_987,
+            },
+        ];
+        for vector in vectors {
+            let vary_z = vector.z != 0.0;
+            let base = if vary_z { vector.z } else { vector.y };
+            for ulps in [-1, 0, 1] {
+                let mut rate = vector;
+                if vary_z {
+                    rate.z = adjacent_positive_float(base, ulps);
+                } else {
+                    rate.y = adjacent_positive_float(base, ulps);
+                }
+                let mut case = input();
+                case.tick_count = 0;
+                case.initial_state.angular_rate_body_rad_s = rate;
+                let scaled = rate.scale(case.fixed_step_seconds);
+                let expected = scaled.squared_magnitude()
+                    <= MAXIMUM_ANGULAR_INCREMENT_RAD * MAXIMUM_ANGULAR_INCREMENT_RAD;
+                assert_eq!(run_sixdof_verification(case).is_ok(), expected);
+            }
+        }
+    }
+
+    #[test]
     fn conditions_inertia_by_scale_and_accepts_a_full_cross_term_tensor() {
         for scale in [1.0, 1.0e12] {
             let mut near_singular = input();
@@ -788,6 +885,73 @@ mod tests {
             zz: 5.0,
         };
         assert!(run_sixdof_verification(coupled).is_ok());
+    }
+
+    #[test]
+    fn normalized_cholesky_boundary_and_safe_domain_are_executable() -> Result<(), EngineError> {
+        for scale in [1.0, 0.01, 1.0e12] {
+            let nominal = scale * MINIMUM_RELATIVE_CHOLESKY_PIVOT;
+            for ulps in [-1, 0, 1] {
+                let second_diagonal = adjacent_positive_float(nominal, ulps);
+                let mut case = input();
+                case.tick_count = 0;
+                case.mass_properties.inertia_kg_m2 = InertiaTensor {
+                    xx: scale,
+                    xy: 0.0,
+                    xz: 0.0,
+                    yx: 0.0,
+                    yy: second_diagonal,
+                    yz: 0.0,
+                    zx: 0.0,
+                    zy: 0.0,
+                    zz: scale,
+                };
+                let expected = second_diagonal >= nominal;
+                assert_eq!(run_sixdof_verification(case).is_ok(), expected);
+            }
+        }
+
+        let mut subnormal_mass = input();
+        subnormal_mass.tick_count = 0;
+        subnormal_mass.mass_properties.mass_kg = f64::from_bits(1);
+        assert!(run_sixdof_verification(subnormal_mass).is_err());
+
+        let mut tiny_inertia = input();
+        tiny_inertia.tick_count = 0;
+        tiny_inertia.mass_properties.inertia_kg_m2 = InertiaTensor {
+            xx: 1.0e-108,
+            xy: 0.0,
+            xz: 0.0,
+            yx: 0.0,
+            yy: 1.0e-108,
+            yz: 0.0,
+            zx: 0.0,
+            zy: 0.0,
+            zz: 1.0e-108,
+        };
+        assert!(run_sixdof_verification(tiny_inertia).is_err());
+
+        for mass in [MINIMUM_MASS_KG, MAXIMUM_MASS_KG] {
+            for scale in [MINIMUM_INERTIA_SCALE_KG_M2, 1.0, MAXIMUM_INERTIA_KG_M2] {
+                let mut case = input();
+                case.tick_count = 1;
+                case.mass_properties.mass_kg = mass;
+                case.mass_properties.inertia_kg_m2 = InertiaTensor {
+                    xx: scale,
+                    xy: 0.0,
+                    xz: 0.0,
+                    yx: 0.0,
+                    yy: scale * MINIMUM_RELATIVE_CHOLESKY_PIVOT,
+                    yz: 0.0,
+                    zx: 0.0,
+                    zy: 0.0,
+                    zz: scale,
+                };
+                let run = run_sixdof_verification(case)?;
+                assert_eq!(run.frames.len(), 2);
+            }
+        }
+        Ok(())
     }
 
     #[test]

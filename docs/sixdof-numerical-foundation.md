@@ -1,6 +1,6 @@
 # Generic 6DOF numerical foundation
 
-Status: isolated verification kernel, schema v1, 2026-08-23.
+Status: isolated verification kernel, schema v1, 2026-08-24.
 
 This foundation proves the source-independent rigid-body equations and the
 TypeScript/Rust-WASM boundary required by #134. It is deliberately not connected
@@ -18,9 +18,10 @@ F-16, weapon, sensor, control-law, or handling-quality evidence.
 - position at and body forces/moments about the centre of gravity;
 - SI units only;
 - an integer tick count and fixed step in seconds;
-- positive mass, an exactly symmetric, scale-conditioned positive-definite
-  inertia tensor in kg·m², and an exact zero `cgBodyM` because the kernel datum
-  is the centre of gravity;
+- mass in the governed `[1, 1e9] kg` safe domain, an exactly symmetric,
+  scale-conditioned positive-definite inertia tensor in kg·m² with largest
+  diagonal in `[1e-6, 1e15]`, and an exact zero `cgBodyM` because the kernel
+  datum is the centre of gravity;
 - world position, body linear velocity, body angular rate, attitude, and a
   constant body-axis wrench.
 
@@ -32,17 +33,21 @@ reported only for an exactly zero applied force and moment; a nonzero wrench
 returns typed `NOT_APPLICABLE_NONZERO_WRENCH` with both drift values `null`.
 
 Both input paths reject unknown/missing keys, non-finite values, invalid schema
-or convention identities, non-integer or excessive work, non-positive mass,
-non-symmetric or poorly conditioned inertia, nonzero CG offset, invalid
+or convention identities, non-integer or excessive work, mass or inertia scale
+below the governed safe domain, non-symmetric or poorly conditioned inertia,
+nonzero CG offset, invalid
 quaternion norm, excessive angular increment, invalid RK4 stage quaternion, and
 out-of-bound state or wrench values. There is no clamp, extrapolation, default,
 or fallback.
 
-Positive definiteness uses the same Cholesky decomposition in TypeScript and
-Rust. Every diagonal pivot must be at least `1e-10` of the largest tensor
-diagonal. This scale-aware gate rejects mathematically positive but numerically
-near-singular tensors before the inverse is evaluated. Full symmetric cross-term
-tensors are admitted when all three conditioned pivots pass.
+Positive definiteness and the solve use the same scale-normalized Cholesky
+decomposition in TypeScript and Rust. Every normalized diagonal pivot must be at
+least the exact binary fraction `2^-32` of the largest tensor diagonal. This is
+stricter than the superseded decimal `1e-10` threshold and gives both runtimes
+one exactly representable comparison boundary. The triangular Cholesky solve
+replaces the determinant/adjugate inverse, so an admitted minimum-scale tensor
+does not underflow its determinant. Full symmetric cross-term tensors are
+admitted when all three conditioned pivots pass.
 
 ## Equations and numerical method
 
@@ -59,9 +64,13 @@ quaternion_dot     = 1/2 q ⊗ [0, ω]
 The kernel uses fixed-step fourth-order Runge-Kutta and normalizes the quaternion
 after each committed tick. Initial, intermediate, combined and committed stages
 fail closed unless the angular increment is at most `0.25 rad` per full step and
-each RK stage quaternion norm is within `[0.5, 2]`. These identical TypeScript
-and Rust constraints prevent finite-but-unresolved attitude steps from entering
-the equations. Every intermediate and committed position, velocity and angular
+each RK stage quaternion norm is within `[0.5, 2]`. Angular admission never calls
+a runtime-specific `hypot`: both implementations multiply each rate component
+by the step, evaluate `((x² + y²) + z²)` in that order, and compare it with the
+exact binary value `0.25²`. Quaternion admission uses the corresponding ordered
+squared norm. These identical constraints prevent finite-but-unresolved attitude
+steps and ULP-dependent cross-runtime admission from entering the equations.
+Every intermediate and committed position, velocity and angular
 rate must also remain inside the declared finite state bound; crossing it during
 a step rejects instead of committing an out-of-domain state. There is one clock
 and no wall-clock, network, database, atmosphere, gravity, ground, actuator,
@@ -93,6 +102,13 @@ falsification cases:
 - exact repeated serialized bytes and per-frame TypeScript/Rust-WASM parity;
 - exact/cross-bound angular-step, dynamic RK-stage, scale-conditioned inertia,
   CG-origin and admitted numeric-extreme cases in both backends;
+- the previously divergent angular vector
+  `{14.485848611447416, 16.020079621048747, 12.590362939227987}` plus deterministic
+  adjacent-ULP sweeps around multiple angular boundaries;
+- exact and adjacent-ULP Cholesky boundaries at multiple tensor scales, explicit
+  rejection of `Number.MIN_VALUE` mass and `diag(1e-108)` inertia, and one finite
+  zero-wrench tick at every minimum/maximum mass and conditioned-inertia scale
+  combination;
 - conservation diagnostic applicability for zero versus nonzero wrench;
 - TypeScript and independent Rust/WASM fail-closed admission cases.
 

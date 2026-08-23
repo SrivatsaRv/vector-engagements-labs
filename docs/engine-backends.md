@@ -97,6 +97,10 @@ enter a Worker or VSR, or silently substitute for the deployed 3DOF engine. See
 [`sixdof-numerical-foundation.md`](sixdof-numerical-foundation.md).
 
 Both adapters enforce the same conditioned-inertia, CG-origin, per-step angular
-increment and RK-stage quaternion bounds. Rust/WASM does not accept a broader
-finite-input domain than TypeScript, and neither adapter emits conservation
-drift for a nonzero applied wrench.
+increment and RK-stage quaternion bounds. Angular admission uses the identical
+ordered squared-increment comparison rather than runtime-specific `hypot`
+implementations. Inertia admission and the triangular solve use the same
+scale-normalized Cholesky factor with an exactly representable `2^-32` relative
+pivot threshold and governed minimum mass/inertia scale. Rust/WASM does not
+accept a broader finite-input domain than TypeScript, and neither adapter emits
+conservation drift for a nonzero applied wrench.

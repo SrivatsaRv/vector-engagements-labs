@@ -55,14 +55,16 @@ export const SIX_DOF_VERIFICATION_LIMITS = Object.freeze({
   minimumFixedStepSeconds: 1e-6,
   maximumFixedStepSeconds: 1,
   maximumTickCount: 100_000,
+  minimumMassKg: 1,
   maximumMassKg: 1e9,
+  minimumInertiaScaleKgM2: 1e-6,
   maximumInertiaKgM2: 1e15,
   maximumAbsoluteState: 1e9,
   maximumAbsoluteWrench: 1e12,
   maximumAngularIncrementRad: 0.25,
   minimumStageQuaternionNorm: 0.5,
   maximumStageQuaternionNorm: 2,
-  minimumRelativeCholeskyPivot: 1e-10,
+  minimumRelativeCholeskyPivot: 2 ** -32,
 });
 
 const VECTOR_KEYS = ["x", "y", "z"] as const;
@@ -101,8 +103,10 @@ function validateQuaternion(value: SixDofQuaternion) {
   for (const key of QUATERNION_KEYS) {
     assertFiniteBound(value[key], SIX_DOF_VERIFICATION_LIMITS.maximumAbsoluteState, `quaternion.${key}`);
   }
-  const norm = Math.hypot(value.w, value.x, value.y, value.z);
-  if (norm < 1e-12 || norm > 1e6) throw new Error("The body-to-world quaternion has an invalid norm.");
+  const normSquared = ((value.w * value.w + value.x * value.x) + value.y * value.y) + value.z * value.z;
+  if (normSquared < 1e-24 || normSquared > 1e12) {
+    throw new Error("The body-to-world quaternion has an invalid norm.");
+  }
 }
 
 function validateInput(input: SixDofVerificationInput) {
@@ -130,7 +134,9 @@ function validateInput(input: SixDofVerificationInput) {
   }
   assertExactKeys(input.massProperties, ["massKg", "cgBodyM", "inertiaKgM2"], "massProperties");
   assertFiniteBound(input.massProperties.massKg, SIX_DOF_VERIFICATION_LIMITS.maximumMassKg, "massKg");
-  if (input.massProperties.massKg <= 0) throw new Error("massKg must be positive.");
+  if (input.massProperties.massKg < SIX_DOF_VERIFICATION_LIMITS.minimumMassKg) {
+    throw new Error("massKg is below the minimum safe-domain bound.");
+  }
   validateVector(input.massProperties.cgBodyM, SIX_DOF_VERIFICATION_LIMITS.maximumAbsoluteState, "cgBodyM");
   if (Object.values(input.massProperties.cgBodyM).some((value) => value !== 0)) {
     throw new Error("cgBodyM must be the exact zero vector for this CG-origin kernel.");
@@ -156,25 +162,48 @@ function validateInput(input: SixDofVerificationInput) {
 }
 
 function validateConditionedPositiveDefiniteInertia(inertia: SixDofInertia) {
+  factorConditionedInertia(inertia);
+}
+
+type ConditionedInertiaFactor = {
+  scale: number;
+  lower11: number;
+  lower21: number;
+  lower31: number;
+  lower22: number;
+  lower32: number;
+  lower33: number;
+};
+
+function factorConditionedInertia(inertia: SixDofInertia): ConditionedInertiaFactor {
   const scale = Math.max(inertia.xx, inertia.yy, inertia.zz);
-  const minimumPivot = scale * SIX_DOF_VERIFICATION_LIMITS.minimumRelativeCholeskyPivot;
-  const firstPivot = inertia.xx;
-  if (!Number.isFinite(scale) || scale <= 0 || firstPivot < minimumPivot) {
+  if (!Number.isFinite(scale) || scale < SIX_DOF_VERIFICATION_LIMITS.minimumInertiaScaleKgM2) {
+    throw new Error("The inertia tensor scale is below the minimum safe-domain bound.");
+  }
+  const normalizedXx = inertia.xx / scale;
+  const normalizedYx = inertia.yx / scale;
+  const normalizedYy = inertia.yy / scale;
+  const normalizedZx = inertia.zx / scale;
+  const normalizedZy = inertia.zy / scale;
+  const normalizedZz = inertia.zz / scale;
+  const firstPivot = normalizedXx;
+  if (!Number.isFinite(firstPivot) || firstPivot < SIX_DOF_VERIFICATION_LIMITS.minimumRelativeCholeskyPivot) {
     throw new Error("The inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound.");
   }
-  const firstRoot = Math.sqrt(firstPivot);
-  const lower21 = inertia.yx / firstRoot;
-  const lower31 = inertia.zx / firstRoot;
-  const secondPivot = inertia.yy - lower21 * lower21;
-  if (!Number.isFinite(secondPivot) || secondPivot < minimumPivot) {
+  const lower11 = Math.sqrt(firstPivot);
+  const lower21 = normalizedYx / lower11;
+  const lower31 = normalizedZx / lower11;
+  const secondPivot = normalizedYy - lower21 * lower21;
+  if (!Number.isFinite(secondPivot) || secondPivot < SIX_DOF_VERIFICATION_LIMITS.minimumRelativeCholeskyPivot) {
     throw new Error("The inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound.");
   }
-  const secondRoot = Math.sqrt(secondPivot);
-  const lower32 = (inertia.zy - lower31 * lower21) / secondRoot;
-  const thirdPivot = inertia.zz - lower31 * lower31 - lower32 * lower32;
-  if (!Number.isFinite(thirdPivot) || thirdPivot < minimumPivot) {
+  const lower22 = Math.sqrt(secondPivot);
+  const lower32 = (normalizedZy - lower31 * lower21) / lower22;
+  const thirdPivot = (normalizedZz - lower31 * lower31) - lower32 * lower32;
+  if (!Number.isFinite(thirdPivot) || thirdPivot < SIX_DOF_VERIFICATION_LIMITS.minimumRelativeCholeskyPivot) {
     throw new Error("The inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound.");
   }
+  return { scale, lower11, lower21, lower31, lower22, lower32, lower33: Math.sqrt(thirdPivot) };
 }
 
 const add = (a: SixDofVector3, b: SixDofVector3): SixDofVector3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
@@ -185,14 +214,10 @@ const cross = (a: SixDofVector3, b: SixDofVector3): SixDofVector3 => ({
   z: a.x * b.y - a.y * b.x,
 });
 const dot = (a: SixDofVector3, b: SixDofVector3) => a.x * b.x + a.y * b.y + a.z * b.z;
-const norm3 = (a: SixDofVector3) => Math.hypot(a.x, a.y, a.z);
+const squaredNorm3 = (a: SixDofVector3) => (a.x * a.x + a.y * a.y) + a.z * a.z;
+const norm3 = (a: SixDofVector3) => Math.sqrt(squaredNorm3(a));
+const squaredNorm4 = (q: SixDofQuaternion) => ((q.w * q.w + q.x * q.x) + q.y * q.y) + q.z * q.z;
 const subtract = (a: SixDofVector3, b: SixDofVector3) => add(a, scale(b, -1));
-
-function determinant3(i: SixDofInertia) {
-  return i.xx * (i.yy * i.zz - i.yz * i.zy)
-    - i.xy * (i.yx * i.zz - i.yz * i.zx)
-    + i.xz * (i.yx * i.zy - i.yy * i.zx);
-}
 
 function matrixVector(i: SixDofInertia, value: SixDofVector3): SixDofVector3 {
   return {
@@ -203,32 +228,42 @@ function matrixVector(i: SixDofInertia, value: SixDofVector3): SixDofVector3 {
 }
 
 function inverseMatrixVector(i: SixDofInertia, value: SixDofVector3): SixDofVector3 {
-  const det = determinant3(i);
+  const factor = factorConditionedInertia(i);
+  const scaled = scale(value, 1 / factor.scale);
+  const forwardX = scaled.x / factor.lower11;
+  const forwardY = (scaled.y - factor.lower21 * forwardX) / factor.lower22;
+  const forwardZ = ((scaled.z - factor.lower31 * forwardX) - factor.lower32 * forwardY) / factor.lower33;
+  const resultZ = forwardZ / factor.lower33;
+  const resultY = (forwardY - factor.lower32 * resultZ) / factor.lower22;
+  const resultX = ((forwardX - factor.lower21 * resultY) - factor.lower31 * resultZ) / factor.lower11;
   return {
-    x: ((i.yy * i.zz - i.yz * i.zy) * value.x + (i.xz * i.zy - i.xy * i.zz) * value.y + (i.xy * i.yz - i.xz * i.yy) * value.z) / det,
-    y: ((i.yz * i.zx - i.yx * i.zz) * value.x + (i.xx * i.zz - i.xz * i.zx) * value.y + (i.xz * i.yx - i.xx * i.yz) * value.z) / det,
-    z: ((i.yx * i.zy - i.yy * i.zx) * value.x + (i.xy * i.zx - i.xx * i.zy) * value.y + (i.xx * i.yy - i.xy * i.yx) * value.z) / det,
+    x: resultX,
+    y: resultY,
+    z: resultZ,
   };
 }
 
 function normalizeQuaternion(q: SixDofQuaternion): SixDofQuaternion {
-  const magnitude = Math.hypot(q.w, q.x, q.y, q.z);
+  const magnitude = Math.sqrt(squaredNorm4(q));
   return { w: q.w / magnitude, x: q.x / magnitude, y: q.y / magnitude, z: q.z / magnitude };
 }
 
 function assertAngularIncrement(angularRate: SixDofVector3, stepSeconds: number, label: string) {
-  const increment = norm3(angularRate) * stepSeconds;
-  if (!Number.isFinite(increment) || increment > SIX_DOF_VERIFICATION_LIMITS.maximumAngularIncrementRad) {
+  const scaledRate = scale(angularRate, stepSeconds);
+  const squaredIncrement = squaredNorm3(scaledRate);
+  const squaredLimit = SIX_DOF_VERIFICATION_LIMITS.maximumAngularIncrementRad
+    * SIX_DOF_VERIFICATION_LIMITS.maximumAngularIncrementRad;
+  if (!Number.isFinite(squaredIncrement) || squaredIncrement > squaredLimit) {
     throw new Error(`${label} angular increment exceeds the fixed-step bound.`);
   }
 }
 
 function assertStageQuaternion(quaternion: SixDofQuaternion, label: string) {
-  const quaternionNorm = Math.hypot(...Object.values(quaternion));
+  const quaternionNormSquared = squaredNorm4(quaternion);
   if (
-    !Number.isFinite(quaternionNorm) ||
-    quaternionNorm < SIX_DOF_VERIFICATION_LIMITS.minimumStageQuaternionNorm ||
-    quaternionNorm > SIX_DOF_VERIFICATION_LIMITS.maximumStageQuaternionNorm
+    !Number.isFinite(quaternionNormSquared) ||
+    quaternionNormSquared < SIX_DOF_VERIFICATION_LIMITS.minimumStageQuaternionNorm ** 2 ||
+    quaternionNormSquared > SIX_DOF_VERIFICATION_LIMITS.maximumStageQuaternionNorm ** 2
   ) throw new Error(`${label} quaternion is outside the RK4 stage norm bound.`);
 }
 
@@ -327,7 +362,13 @@ function rk4(input: SixDofVerificationInput, state: SixDofVerificationState) {
 }
 
 function rotationalEnergy(inertia: SixDofInertia, state: SixDofVerificationState) {
-  return 0.5 * dot(state.angularRateBodyRadS, matrixVector(inertia, state.angularRateBodyRadS));
+  const omega = state.angularRateBodyRadS;
+  return 0.5 * (
+    inertia.xx * omega.x ** 2 + inertia.yy * omega.y ** 2 + inertia.zz * omega.z ** 2
+    + 2 * inertia.xy * omega.x * omega.y
+    + 2 * inertia.xz * omega.x * omega.z
+    + 2 * inertia.yz * omega.y * omega.z
+  );
 }
 
 function inertialAngularMomentum(inertia: SixDofInertia, state: SixDofVerificationState) {
@@ -348,11 +389,14 @@ export function runSixDofVerification(input: SixDofVerificationInput): SixDofVer
   ].every((value) => value === 0);
   const initialEnergy = zeroWrench ? rotationalEnergy(input.massProperties.inertiaKgM2, state) : null;
   const initialMomentum = zeroWrench ? inertialAngularMomentum(input.massProperties.inertiaKgM2, state) : null;
-  let maximumQuaternionNormError = Math.abs(Math.hypot(...Object.values(state.bodyToWorldQuaternion)) - 1);
+  let maximumQuaternionNormError = Math.abs(Math.sqrt(squaredNorm4(state.bodyToWorldQuaternion)) - 1);
   const frames = [{ tick: 0, timeSeconds: 0, state: structuredClone(state) }];
   for (let tick = 1; tick <= input.tickCount; tick += 1) {
     state = rk4(input, state);
-    maximumQuaternionNormError = Math.max(maximumQuaternionNormError, Math.abs(Math.hypot(...Object.values(state.bodyToWorldQuaternion)) - 1));
+    maximumQuaternionNormError = Math.max(
+      maximumQuaternionNormError,
+      Math.abs(Math.sqrt(squaredNorm4(state.bodyToWorldQuaternion)) - 1),
+    );
     frames.push({ tick, timeSeconds: tick * input.fixedStepSeconds, state: structuredClone(state) });
   }
   const finalEnergy = zeroWrench ? rotationalEnergy(input.massProperties.inertiaKgM2, state) : null;

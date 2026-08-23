@@ -30,7 +30,8 @@ TypeScript reference engine and returns the same replayable run contract.
   oracle and versioned output used for external-history and cross-backend
   verification. It does not modify the operational scenario engine.
 - `sixdof_foundation.rs` owns the isolated, generic rigid-body verification
-  kernel and its strict v1 input/output contract. It is not a production
+  kernel, deterministic angular/conditioning admission, scale-normalized
+  Cholesky solve, and strict v1 input/output contract. It is not a production
   `EngineScenario` backend and contains no named-aircraft data.
 
 The physics loop remains intentionally colocated while its equations and state

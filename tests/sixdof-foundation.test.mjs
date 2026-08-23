@@ -84,6 +84,21 @@ function assertBothReject(input, pattern) {
   assert.throws(() => runRustWasmSixDofVerification(input), pattern);
 }
 
+function adjacentFloat(value, ulps) {
+  const bytes = new ArrayBuffer(8);
+  const view = new DataView(bytes);
+  view.setFloat64(0, value);
+  view.setBigUint64(0, view.getBigUint64(0) + BigInt(ulps));
+  return view.getFloat64(0);
+}
+
+function canonicalAngularIncrementIsAdmitted(rate, stepSeconds) {
+  const x = rate.x * stepSeconds;
+  const y = rate.y * stepSeconds;
+  const z = rate.z * stepSeconds;
+  return ((x * x + y * y) + z * z) <= 0.25 * 0.25;
+}
+
 test("force- and moment-free state remains fixed and uses the integer tick clock", () => {
   const run = runSixDofVerification(caseInput());
   assert.equal(run.schemaVersion, "vector.sixdof-verification-run.v1");
@@ -315,6 +330,38 @@ test("both backends enforce identical angular-increment and RK stage constraints
   assertBothReject(stateBoundary(101), /state bound/);
 });
 
+test("angular admission uses one ordered squared representation at every boundary ULP", () => {
+  const mismatchRate = {
+    x: 14.485848611447416,
+    y: 16.020079621048747,
+    z: 12.590362939227987,
+  };
+  const boundaryVectors = [
+    { x: 0, y: 15, z: 20 },
+    { x: 7, y: 24, z: 0 },
+    mismatchRate,
+  ];
+  for (const vector of boundaryVectors) {
+    const variedKey = vector.z === 0 ? "y" : "z";
+    for (const varied of [
+      adjacentFloat(vector[variedKey], -1),
+      vector[variedKey],
+      adjacentFloat(vector[variedKey], 1),
+    ]) {
+      const rate = { ...vector, [variedKey]: varied };
+      const input = caseInput({
+        tickCount: 0,
+        initialState: { ...caseInput().initialState, angularRateBodyRadS: rate },
+      });
+      const expected = canonicalAngularIncrementIsAdmitted(rate, input.fixedStepSeconds);
+      for (const run of [runSixDofVerification, runRustWasmSixDofVerification]) {
+        if (expected) assert.equal(run(input).frames.length, 1);
+        else assert.throws(() => run(input), /angular increment/);
+      }
+    }
+  }
+});
+
 test("both backends use a scale-aware Cholesky conditioning gate", () => {
   for (const scale of [1, 1e12]) {
     assertBothReject(caseInput({
@@ -335,6 +382,81 @@ test("both backends use a scale-aware Cholesky conditioning gate", () => {
   });
   assert.equal(runSixDofVerification(coupled).frames.length, 2);
   assert.equal(runRustWasmSixDofVerification(coupled).frames.length, 2);
+});
+
+test("Cholesky admission uses one normalized exact and ULP boundary", () => {
+  const diagonalCase = (scale, secondDiagonal) => caseInput({
+    tickCount: 0,
+    massProperties: { ...caseInput().massProperties, inertiaKgM2: {
+      xx: scale, xy: 0, xz: 0,
+      yx: 0, yy: secondDiagonal, yz: 0,
+      zx: 0, zy: 0, zz: scale,
+    } },
+  });
+  for (const scale of [1, 0.01, 1e12]) {
+    const nominal = scale * SIX_DOF_VERIFICATION_LIMITS.minimumRelativeCholeskyPivot;
+    for (const secondDiagonal of [
+      adjacentFloat(nominal, -1),
+      nominal,
+      adjacentFloat(nominal, 1),
+    ]) {
+      const expected = secondDiagonal >= nominal;
+      for (const run of [runSixDofVerification, runRustWasmSixDofVerification]) {
+        if (expected) assert.equal(run(diagonalCase(scale, secondDiagonal)).frames.length, 1);
+        else assert.throws(() => run(diagonalCase(scale, secondDiagonal)), /conditioned positive definite/);
+      }
+    }
+  }
+});
+
+test("subnormal mass and inertia scales fail admission before integration", () => {
+  assertBothReject(caseInput({
+    tickCount: 0,
+    massProperties: { ...caseInput().massProperties, massKg: Number.MIN_VALUE },
+  }), /minimum safe-domain bound/);
+  assertBothReject(caseInput({
+    tickCount: 0,
+    massProperties: { ...caseInput().massProperties, inertiaKgM2: {
+      xx: 1e-108, xy: 0, xz: 0,
+      yx: 0, yy: 1e-108, yz: 0,
+      zx: 0, zy: 0, zz: 1e-108,
+    } },
+  }), /minimum safe-domain bound/);
+});
+
+test("safe-domain mass and conditioned-inertia boundaries execute a zero-wrench tick", () => {
+  for (const massKg of [
+    SIX_DOF_VERIFICATION_LIMITS.minimumMassKg,
+    SIX_DOF_VERIFICATION_LIMITS.maximumMassKg,
+  ]) {
+    for (const inertiaScale of [
+      SIX_DOF_VERIFICATION_LIMITS.minimumInertiaScaleKgM2,
+      1,
+      SIX_DOF_VERIFICATION_LIMITS.maximumInertiaKgM2,
+    ]) {
+      const minimumPivot = inertiaScale * SIX_DOF_VERIFICATION_LIMITS.minimumRelativeCholeskyPivot;
+      const input = caseInput({
+        tickCount: 1,
+        massProperties: {
+          massKg,
+          cgBodyM: { ...ZERO },
+          inertiaKgM2: {
+            xx: inertiaScale, xy: 0, xz: 0,
+            yx: 0, yy: minimumPivot, yz: 0,
+            zx: 0, zy: 0, zz: inertiaScale,
+          },
+        },
+      });
+      for (const run of [runSixDofVerification(input), runRustWasmSixDofVerification(input)]) {
+        assert.equal(run.frames.length, 2);
+        for (const state of run.frames.map((frame) => frame.state)) {
+          for (const vector of [state.positionWorldM, state.velocityBodyMps, state.angularRateBodyRadS]) {
+            assert.ok(Object.values(vector).every(Number.isFinite));
+          }
+        }
+      }
+    }
+  }
 });
 
 test("runs repeat exactly and TypeScript matches Rust/WASM within the declared parity tolerance", () => {
