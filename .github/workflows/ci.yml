@@ -98,8 +98,11 @@ jobs:
         run: npm ci
       - name: Verify generated assets, lint, and types
         run: |
+          npm run environment:sources:verify
+          npm run policy:aircraft-evidence:verify
           npm run symbols:verify
           npm run models:verify
+          npm run reference-aircraft:verify
           npm run lint
           npm run typecheck
 
@@ -286,7 +289,7 @@ jobs:
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
           name: integration-application-log
-          path: /tmp/vector-integration.log
+          path: outputs/integration/
           if-no-files-found: ignore
           retention-days: 7
 

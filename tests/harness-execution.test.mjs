@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { constants } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { once } from "node:events";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 const run = (command, arguments_) =>
@@ -54,6 +58,19 @@ test("the clean-clone gate executes the context slice and built Worker verifier"
   assert.match(cleanClone, /make ci-local worker-local/);
 });
 
+test("the integration target delegates server lifecycle and retains its log", async () => {
+  const makefile = await readFile("Makefile", "utf8");
+  const integration = makefile.split(/^integration-ci:/m)[1]?.split(/^observability-local:/m)[0];
+  assert.ok(integration, "integration-ci is not declared");
+  assert.match(integration, /node scripts\/run-managed-server\.mjs/);
+  assert.doesNotMatch(integration, /&\s*\\|trap\s/);
+
+  const workflow = await readFile(".github/workflows/ci.yml", "utf8");
+  const integrationJob = workflow.split(/^  integration:/m)[1]?.split(/^  container:/m)[0];
+  assert.ok(integrationJob, "integration job is missing");
+  assert.match(integrationJob, /path: outputs\/integration\//);
+});
+
 test("the pull request template requires layer-specific evidence", async () => {
   const template = await readFile(".github/pull_request_template.md", "utf8");
   assert.match(template, /Owning issue/);
@@ -95,4 +112,53 @@ test("the Worker verifier uses the pinned Playwright browser outside local overr
   const verifier = await readFile("scripts/verify-browser-worker.ts", "utf8");
   assert.match(verifier, /VECTOR_CHROME_PATH\s*\?\?\s*chromium\.executablePath\(\)/);
   assert.doesNotMatch(verifier, /\/Applications\/Google Chrome\.app/);
+});
+
+async function unusedLocalPort() {
+  const server = createServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  await new Promise((resolve, reject) =>
+    server.close((error) => (error ? reject(error) : resolve())),
+  );
+  return address.port;
+}
+
+test("managed live-target failure retains its server log and releases the port", async (t) => {
+  const { runManagedServer } = await import("../scripts/run-managed-server.mjs");
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), "vector-managed-server-"));
+  t.after(() => rm(temporaryDirectory, { recursive: true, force: true }));
+  const port = await unusedLocalPort();
+  const logPath = join(temporaryDirectory, "application.log");
+  const serverProgram = [
+    "const http = require('node:http');",
+    `const server = http.createServer((_request, response) => response.end('ready')).listen(${port}, '127.0.0.1', () => console.log('managed-server-ready'));`,
+    "process.on('SIGTERM', () => server.close(() => process.exit(0)));",
+  ].join("");
+  const taskProgram = [
+    `fetch('http://127.0.0.1:${port}')`,
+    ".then((response) => response.text())",
+    ".then((body) => { if (body !== 'ready') process.exit(8); process.exit(7); })",
+    ".catch(() => process.exit(9));",
+  ].join("");
+
+  const result = await runManagedServer({
+    server: { command: process.execPath, args: ["-e", serverProgram] },
+    task: { command: process.execPath, args: ["-e", taskProgram] },
+    logPath,
+    readyUrl: `http://127.0.0.1:${port}`,
+    startupTimeoutMs: 2_000,
+    shutdownTimeoutMs: 1_000,
+  });
+  assert.equal(result.taskExitCode, 7);
+  assert.match(await readFile(logPath, "utf8"), /managed-server-ready/);
+
+  const probe = createServer();
+  probe.listen(port, "127.0.0.1");
+  await once(probe, "listening");
+  await new Promise((resolve, reject) =>
+    probe.close((error) => (error ? reject(error) : resolve())),
+  );
 });

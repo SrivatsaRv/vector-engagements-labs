@@ -19,11 +19,13 @@ const WORKFLOW_CONTROL = [
   /^\.github\/dependabot\.yml$/,
   /^Makefile$/,
   /^scripts\/classify-ci-changes\.mjs$/,
+  /^scripts\/run-managed-server\.mjs$/,
 ];
 
 const WEB_SOURCE = [
   /^config\/deployment-capabilities\.json$/,
   /^(?:app|components|content|lib|public|scripts|tests|worker)\//,
+  /^fixtures\/public-reference\//,
   /^(?:blog-content\.d\.ts|cloudflare-env\.d\.ts|drizzle\.config\.ts|eslint\.config\.mjs|next\.config\.ts|postcss\.config\.mjs|vite-env\.d\.ts|vite\.config\.ts)$/,
   /^(?:package|package-lock)\.json$/,
   /^tsconfig\.json$/,
@@ -31,11 +33,15 @@ const WEB_SOURCE = [
 
 const BROWSER_SURFACE = [
   /^config\/deployment-capabilities\.json$/,
+  /^fixtures\/model-packs\//,
   /^(?:app|components)\//,
   /^lib\/engine\//,
+  /^lib\/frontend\//,
+  /^lib\/record\//,
   /^lib\/runtime\//,
-  /^lib\/geospatial\/environment-sampler\.worker\.ts$/,
-  /^lib\/(?:runtime\/deployment-capabilities|scenarios)\.ts$/,
+  /^lib\/geospatial\/(?:environment-pack|environment-sampler\.worker)\.ts$/,
+  /^lib\/(?:information-state|map-layer-contracts|mission-admission|scenario-draft|scenario-package|scenario-spatial|scenario-validation|scenarios|simulation|tactical-symbol-contract|tactical-symbol-library|tactical-symbol-markup)\.ts$/,
+  /^lib\/security\/browser-response\.ts$/,
   /^scripts\/(?:browser-worker-assets|build-runtime-bundles|verify-browser-worker)\.(?:c|m)?tsx?$/,
   /^tests\/(?:browser-runtime|browser-worker-assets)\.test\.(?:c|m)?tsx?$/,
   /^tests\/(?:browser|component)\//,
@@ -62,16 +68,17 @@ const RUST_CONTRACT = [
 const RUST_MANIFEST = [/^engine-rust\/(?:Cargo\.toml|Cargo\.lock)$/];
 
 const SHARED_SIMULATION_CONTRACT = [
-  /^fixtures\/(?:environment|model-pack|scenario|simulation|vector-record)/,
-  /^lib\/(?:environment-pack|model-pack|reference-model-pack|scenario-contract|scenario-draft|scenario-package|scenarios|simulation-contract|simulation-models|vector-record)\.ts$/,
-  /^worker\/(?:protocol|simulation-worker)\.(?:c|m)?tsx?$/,
+  /^fixtures\/(?:environment|model-packs|scenario|simulation|vector-record)\//,
+  /^lib\/record\//,
+  /^lib\/(?:information-state|mission-admission|model-pack|reference-model-pack|scenario-draft|scenario-package|scenario-spatial|scenario-validation|scenarios|simulation|simulation-models|study-areas)\.ts$/,
 ];
 
 const ENVIRONMENT_OR_MODEL_DATA = [
+  /^governance\/environment-sources\//,
   /^db\/(?:seeds|fixtures)\/(?:environment|installation|model|runway)/,
-  /^fixtures\/(?:environment|model-pack)/,
+  /^fixtures\/(?:environment|model-packs)\//,
   /^lib\/(?:geospatial\/.*|study-areas\.ts)$/,
-  /^scripts\/(?:generate-model-pack-fixture|verify-governed-catalog-data|verify-public-aircraft-reference)\.(?:c|m)?tsx?$/,
+  /^scripts\/(?:generate-model-pack-fixture|verify-environment-source-assets|verify-governed-catalog-data|verify-public-aircraft-reference)\.(?:c|m)?tsx?$/,
 ];
 
 const DATABASE_OR_API = [
@@ -79,8 +86,9 @@ const DATABASE_OR_API = [
   /^drizzle\//,
   /^drizzle\.config\.ts$/,
   /^app\/api\//,
-  /^lib\/security\/saved-run\.ts$/,
-  /^lib\/(?:report-export|scenario-package|scenarios)\.ts$/,
+  /^lib\/record\//,
+  /^lib\/security\/(?:admission-policy|basemap-tiles|public-api|runtime|saved-run-admission|saved-run)\.ts$/,
+  /^lib\/(?:mission-admission|report-export|scenario-package|scenario-spatial|scenario-validation|scenarios)\.ts$/,
   /^scripts\/(?:migrate-db|seed-db|verify-app|verify-db)\.mjs$/,
 ];
 
@@ -88,6 +96,7 @@ const CONTAINER_OR_RUNTIME = [
   /^config\/deployment-capabilities\.json$/,
   /^(?:Dockerfile|compose\.ya?ml|\.dockerignore)$/,
   /^observability\//,
+  /^lib\/security\/(?:admission-policy|runtime)\.ts$/,
   /^(?:package|package-lock)\.json$/,
   /^scripts\/(?:build-runtime-bundles|node-postgres-adapter|start-production|verify-container-image)\.mjs$/,
   /^(?:vite\.config\.ts|worker\/)/,
