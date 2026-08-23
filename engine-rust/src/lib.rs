@@ -2,6 +2,7 @@
 #![deny(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
 mod error;
+mod generic_aam_reference;
 mod model_pack;
 mod public_aircraft_reference;
 mod simulation_events;
@@ -11,6 +12,10 @@ mod wasm_abi;
 use serde::{Deserialize, Serialize};
 
 pub use error::EngineError;
+pub use generic_aam_reference::{
+    run_generic_aam_verification, run_generic_aam_verification_json, GenericAamVerificationInput,
+    GenericAamVerificationRun,
+};
 pub use model_pack::{validate_model_pack_json, CompiledModelPack};
 pub use public_aircraft_reference::{
     run_public_aircraft_reference, run_public_aircraft_reference_json,
@@ -26,6 +31,7 @@ pub use validation::{
 const G0: f64 = 9.80665;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Vec3 {
     pub x: f64,
     pub y: f64,

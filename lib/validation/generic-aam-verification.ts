@@ -1,0 +1,446 @@
+import { createHash } from "node:crypto";
+
+import corpus from "../../governance/nasa-tm-109057-generic-aam-verification-corpus.v1.json" with { type: "json" };
+
+type Vec3 = { x: number; y: number; z: number };
+
+export type GenericAamVerificationInput = {
+  schemaVersion: "vector.generic-aam-verification-input.v1";
+  subjectId: "NASA_TM_109057_GENERIC_AAM_REFERENCE";
+  intendedUse: "ENGINE_VERIFICATION_ONLY";
+  semantics: "TM_109057_PRINTED_LISTING_BINARY64_V1";
+  sourceSha256: string;
+  corpusSha256: string;
+  decisionSha256: string;
+  caseRole: "PRINTED_LISTING_REPRODUCTION" | "TABLE_THRUST_CONFLICT_SENSITIVITY" | "COMMAND_LIMIT_SENSITIVITY";
+  axisConvention: "EARTH_X_FORWARD_Y_RIGHT_Z_DOWN";
+  units: "SI";
+  tickRateHz: 32 | 64 | 128 | 256;
+  maxTicks: number;
+  seekerHalfAngleDeg: 15 | 20 | 30;
+  missile: {
+    speedMps: number;
+    pitchRateRadS: number;
+    pitchSignalMps2: number;
+    yawRateRadS: number;
+    yawSignalMps2: number;
+    pitchRad: number;
+    yawRad: number;
+    positionM: Vec3;
+    massKg: number;
+  };
+  target: {
+    previousPositionM: Vec3;
+    positionM: Vec3;
+    velocityMps: Vec3;
+  };
+  constants: {
+    navigationConstant: number;
+    gravityMps2: number;
+    maximumPitchG: number;
+    maximumYawG: number;
+    hitRangeM: number;
+    operationalSpeedMps: number;
+    motorThrustN: number;
+    coastThrustN: number;
+    burnSeconds: number;
+    launchMassKg: number;
+    burnoutMassKg: number;
+    dragK1: number;
+    dragK2: number;
+    controlTimeConstantS: number;
+  };
+};
+
+export type GenericAamTerminalState =
+  | "HIT"
+  | "MISS_SEEKER_LIMIT"
+  | "MISS_OPENING_AFTER_BURN"
+  | "MISS_GROUND_OR_ZERO_SPEED"
+  | "TIME_LIMIT";
+
+export type GenericAamVerificationFrame = {
+  tick: number;
+  timeSeconds: number;
+  missilePositionM: Vec3;
+  targetPositionM: Vec3;
+  speedMps: number;
+  pitchRad: number;
+  yawRad: number;
+  pitchRateRadS: number;
+  yawRateRadS: number;
+  pitchSignalMps2: number;
+  yawSignalMps2: number;
+  massKg: number;
+  thrustN: number;
+  dragN: number;
+  relativePositionM: Vec3;
+  rangeM: number;
+  seekerAngleRad: number;
+  losRateRadS: Vec3;
+  closingVelocityMps: number;
+  pitchCommandMps2: number;
+  yawCommandMps2: number;
+  closestApproachTimeS: number;
+  closestApproachDistanceM: number;
+  state: "TRACKING" | GenericAamTerminalState;
+};
+
+export type GenericAamVerificationRun = {
+  schemaVersion: "vector.generic-aam-verification-run.v1";
+  subjectId: "NASA_TM_109057_GENERIC_AAM_REFERENCE";
+  intendedUse: "ENGINE_VERIFICATION_ONLY";
+  semantics: "TM_109057_PRINTED_LISTING_BINARY64_V1";
+  backend: "typescript" | "rust-wasm";
+  sourceSha256: string;
+  corpusSha256: string;
+  decisionSha256: string;
+  inputSha256: string;
+  caseRole: GenericAamVerificationInput["caseRole"];
+  frames: GenericAamVerificationFrame[];
+  terminal: { state: GenericAamTerminalState; tick: number; cause: string };
+  limitations: string[];
+};
+
+const ROOT_KEYS = ["schemaVersion", "id", "version", "ownerIssue", "parentIssues", "accessedAt", "reviewedAt", "subject", "artifact", "claims", "decisions", "evaluator", "evidencePolicy", "derivedFixtures", "promotion"];
+const SUBJECT_KEYS = ["id", "intendedUse", "capabilities", "prohibitedBindings"];
+const ARTIFACT_KEYS = ["id", "authority", "citationId", "reportNumber", "title", "publicationDate", "recordModifiedAt", "pageCount", "recordUri", "pdfUri", "localPath", "byteLength", "sha256", "documentState", "dissemination", "curationState", "copyrightDecision", "exportControl", "ear", "itar"];
+const CLAIM_KEYS = ["id", "role", "pages", "ancestry", "permits", "prohibits"];
+const DECISION_KEYS = ["id", "sourceConflict", "decision", "executableValue", "limitation"];
+const EVALUATOR_KEYS = ["semantics", "axisConvention", "units", "reportTickRatesHz", "convergenceTickRatesHz", "seekerHalfAnglesDeg", "caseRoles", "maximumTicks", "terminalPrecedence"];
+const POLICY_KEYS = ["eligibleAuthorities", "ineligibleKinds"];
+const DERIVED_FIXTURE_KEYS = ["id", "path", "sha256", "byteLength", "role", "evidenceRole"];
+const PROMOTION_KEYS = ["runtimeAuthority", "prohibitedSurfaces"];
+const WORKLOAD_KEYS = ["schemaVersion", "id", "sourceSha256", "caseCount", "cases", "expectedBatchSha256"];
+const WORKLOAD_CASE_KEYS = ["id", "tickRateHz", "seekerHalfAngleDeg", "maxTicks", "targetPositionM", "expectedTerminal", "expectedTick", "typescriptRunSha256", "rustWasmRunSha256"];
+const INPUT_KEYS = ["schemaVersion", "subjectId", "intendedUse", "semantics", "sourceSha256", "corpusSha256", "decisionSha256", "caseRole", "axisConvention", "units", "tickRateHz", "maxTicks", "seekerHalfAngleDeg", "missile", "target", "constants"];
+const MISSILE_KEYS = ["speedMps", "pitchRateRadS", "pitchSignalMps2", "yawRateRadS", "yawSignalMps2", "pitchRad", "yawRad", "positionM", "massKg"];
+const TARGET_KEYS = ["previousPositionM", "positionM", "velocityMps"];
+const CONSTANT_KEYS = ["navigationConstant", "gravityMps2", "maximumPitchG", "maximumYawG", "hitRangeM", "operationalSpeedMps", "motorThrustN", "coastThrustN", "burnSeconds", "launchMassKg", "burnoutMassKg", "dragK1", "dragK2", "controlTimeConstantS"];
+const VEC_KEYS = ["x", "y", "z"];
+const RUN_KEYS = ["schemaVersion", "subjectId", "intendedUse", "semantics", "backend", "sourceSha256", "corpusSha256", "decisionSha256", "inputSha256", "caseRole", "frames", "terminal", "limitations"];
+const FRAME_KEYS = ["tick", "timeSeconds", "missilePositionM", "targetPositionM", "speedMps", "pitchRad", "yawRad", "pitchRateRadS", "yawRateRadS", "pitchSignalMps2", "yawSignalMps2", "massKg", "thrustN", "dragN", "relativePositionM", "rangeM", "seekerAngleRad", "losRateRadS", "closingVelocityMps", "pitchCommandMps2", "yawCommandMps2", "closestApproachTimeS", "closestApproachDistanceM", "state"];
+const TERMINAL_KEYS = ["state", "tick", "cause"];
+const LIMITATIONS = ["GENERIC_VERIFICATION_ONLY", "LITERAL_PITCH_AMBIGUITY", "FIGURES_NOT_VALIDATION", "NOT_FORTRAN_BIT_REPRODUCTION"];
+
+function exactKeys(value: unknown, keys: string[], label: string): asserts value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object.`);
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
+    throw new Error(`${label} has missing or unknown fields.`);
+  }
+}
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sha256(value: string | Uint8Array) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+export const GENERIC_AAM_CORPUS = corpus;
+export const GENERIC_AAM_CORPUS_SHA256 = sha256(canonical(corpus));
+export const GENERIC_AAM_DECISION_SHA256 = sha256(canonical(corpus.decisions));
+
+export function verifyGenericAamCorpus(candidate: unknown, sourceBytes: Uint8Array) {
+  exactKeys(candidate, ROOT_KEYS, "corpus");
+  exactKeys(candidate.subject, SUBJECT_KEYS, "subject");
+  exactKeys(candidate.artifact, ARTIFACT_KEYS, "artifact");
+  exactKeys(candidate.evaluator, EVALUATOR_KEYS, "evaluator");
+  exactKeys(candidate.evidencePolicy, POLICY_KEYS, "evidencePolicy");
+  if (!Array.isArray(candidate.derivedFixtures)) throw new Error("Derived fixtures must be an array.");
+  for (const fixture of candidate.derivedFixtures) exactKeys(fixture, DERIVED_FIXTURE_KEYS, "derivedFixture");
+  exactKeys(candidate.promotion, PROMOTION_KEYS, "promotion");
+  if (!Array.isArray(candidate.claims) || !Array.isArray(candidate.decisions)) throw new Error("Claims and decisions must be arrays.");
+  for (const claim of candidate.claims) exactKeys(claim, CLAIM_KEYS, "claim");
+  for (const decision of candidate.decisions) exactKeys(decision, DECISION_KEYS, "decision");
+  if (canonical(candidate) !== canonical(corpus)) throw new Error("Corpus content or descendant conflicts with the reviewed immutable record.");
+  const ids = [...candidate.claims, ...candidate.decisions].map((item) => item.id);
+  if (new Set(ids).size !== ids.length) throw new Error("Corpus contains duplicate claim or decision IDs.");
+  if (candidate.subject.id !== "NASA_TM_109057_GENERIC_AAM_REFERENCE" || candidate.subject.intendedUse !== "ENGINE_VERIFICATION_ONLY") throw new Error("Corpus subject binding is invalid.");
+  if (candidate.artifact.authority !== "NASA_NTRS" || candidate.claims.some((claim) => !["SOURCE", "COMPARISON_ONLY"].includes(claim.role))) throw new Error("Corpus evidence role is ineligible or laundered.");
+  if (candidate.promotion.runtimeAuthority !== "NONE") throw new Error("Verification corpus cannot acquire runtime authority.");
+  if (sourceBytes.byteLength !== candidate.artifact.byteLength) throw new Error("NASA source byte length mismatch.");
+  if (sha256(sourceBytes) !== candidate.artifact.sha256) throw new Error("NASA source digest mismatch.");
+  return {
+    schemaVersion: "vector.weapon-verification-corpus-report.v1" as const,
+    corpusId: corpus.id,
+    sourceSha256: corpus.artifact.sha256,
+    byteLength: corpus.artifact.byteLength,
+    state: "VERIFIED" as const,
+  };
+}
+
+export function verifyGenericAamWorkload(candidate: unknown, workloadBytes: Uint8Array) {
+  exactKeys(candidate, WORKLOAD_KEYS, "workload");
+  const workload = candidate as unknown as {
+    schemaVersion: string; id: string; sourceSha256: string; caseCount: number; expectedBatchSha256: string;
+    cases: Array<{ id: string; tickRateHz: number; seekerHalfAngleDeg: number; maxTicks: number; caseRole?: string; targetPositionM: Vec3; expectedTerminal: string; expectedTick: number; typescriptRunSha256: string; rustWasmRunSha256: string }>;
+  };
+  if (!Array.isArray(workload.cases)) throw new Error("Workload cases must be an array.");
+  for (const entry of workload.cases) {
+    const keys = "caseRole" in entry ? [...WORKLOAD_CASE_KEYS, "caseRole"] : WORKLOAD_CASE_KEYS;
+    exactKeys(entry, keys, "workloadCase");
+    exactKeys(entry.targetPositionM, VEC_KEYS, "workloadTarget");
+    if (![32, 64, 128].includes(entry.tickRateHz) || ![15, 20, 30].includes(entry.seekerHalfAngleDeg) || entry.maxTicks !== entry.tickRateHz * 30 || !["HIT", "MISS_SEEKER_LIMIT", "MISS_OPENING_AFTER_BURN", "MISS_GROUND_OR_ZERO_SPEED", "TIME_LIMIT"].includes(entry.expectedTerminal) || !Number.isInteger(entry.expectedTick) || entry.expectedTick <= 0 || entry.expectedTick > entry.maxTicks || !/^[a-f0-9]{64}$/.test(entry.typescriptRunSha256) || !/^[a-f0-9]{64}$/.test(entry.rustWasmRunSha256)) throw new Error("Workload case bounds or expected result are invalid.");
+  }
+  if (workload.schemaVersion !== "vector.generic-aam-verification-workload.v1" || workload.id !== "nasa-tm-109057-appendix-b-bounded-sweep.v1" || workload.sourceSha256 !== corpus.artifact.sha256 || workload.caseCount !== 15 || workload.cases.length !== workload.caseCount || !/^[a-f0-9]{64}$/.test(workload.expectedBatchSha256)) throw new Error("Workload identity or count is invalid.");
+  const decoded = JSON.parse(new TextDecoder().decode(workloadBytes));
+  if (canonical(candidate) !== canonical(decoded)) throw new Error("Workload object does not match supplied bytes.");
+  const governed = corpus.derivedFixtures[0];
+  if (workloadBytes.byteLength !== governed.byteLength || sha256(workloadBytes) !== governed.sha256) throw new Error("Workload bytes failed governed digest verification.");
+  const ids = workload.cases.map((entry) => entry.id);
+  if (new Set(ids).size !== ids.length) throw new Error("Workload case IDs must be unique.");
+  const rates = new Set(workload.cases.map((entry) => entry.tickRateHz));
+  const seekers = new Set(workload.cases.map((entry) => entry.seekerHalfAngleDeg));
+  if (![32, 64, 128].every((value) => rates.has(value)) || ![15, 20, 30].every((value) => seekers.has(value))) throw new Error("Workload report sweep coverage is incomplete.");
+  const positions = workload.cases.map((entry) => entry.targetPositionM);
+  if (!positions.some(({ x }) => x === 0) || !positions.some(({ x }) => x === 4500) || !positions.some(({ y }) => y === -4000) || !positions.some(({ y }) => y === 4000) || !positions.some(({ z }) => z === -2000) || !positions.some(({ z }) => z === -12000)) throw new Error("Workload Appendix B boundary coverage is incomplete.");
+  return { schemaVersion: workload.schemaVersion, workloadId: workload.id, cases: workload.caseCount, sha256: governed.sha256, byteLength: governed.byteLength };
+}
+
+const PRINTED_CONSTANTS: GenericAamVerificationInput["constants"] = {
+  navigationConstant: 4,
+  gravityMps2: 9.8,
+  maximumPitchG: 30,
+  maximumYawG: 30,
+  hitRangeM: 10,
+  operationalSpeedMps: 700,
+  motorThrustN: 6800,
+  coastThrustN: 0,
+  burnSeconds: 8,
+  launchMassKg: 56.7,
+  burnoutMassKg: 22.7,
+  dragK1: 0.009412,
+  dragK2: 93850 / (9.8 ** 2),
+  controlTimeConstantS: 0.25,
+};
+
+export function genericAamVerificationInput(
+  overrides: Partial<GenericAamVerificationInput> = {},
+): GenericAamVerificationInput {
+  const initial: GenericAamVerificationInput = {
+    schemaVersion: "vector.generic-aam-verification-input.v1",
+    subjectId: "NASA_TM_109057_GENERIC_AAM_REFERENCE",
+    intendedUse: "ENGINE_VERIFICATION_ONLY",
+    semantics: "TM_109057_PRINTED_LISTING_BINARY64_V1",
+    sourceSha256: corpus.artifact.sha256,
+    corpusSha256: GENERIC_AAM_CORPUS_SHA256,
+    decisionSha256: GENERIC_AAM_DECISION_SHA256,
+    caseRole: "PRINTED_LISTING_REPRODUCTION",
+    axisConvention: "EARTH_X_FORWARD_Y_RIGHT_Z_DOWN",
+    units: "SI",
+    tickRateHz: 128,
+    maxTicks: 30 * 128,
+    seekerHalfAngleDeg: 30,
+    missile: {
+      speedMps: 200,
+      pitchRateRadS: 0,
+      pitchSignalMps2: 0,
+      yawRateRadS: 0,
+      yawSignalMps2: 0,
+      pitchRad: 0,
+      yawRad: 0,
+      positionM: { x: 0, y: 0, z: -6000 },
+      massKg: 56.7,
+    },
+    target: {
+      previousPositionM: { x: 4500, y: 0, z: -6000 },
+      positionM: { x: 4500, y: 0, z: -6000 },
+      velocityMps: { x: 234.375, y: 0, z: 0 },
+    },
+    constants: { ...PRINTED_CONSTANTS },
+  };
+  return {
+    ...initial,
+    ...overrides,
+    missile: overrides.missile ?? initial.missile,
+    target: overrides.target ?? initial.target,
+    constants: overrides.constants ?? initial.constants,
+  };
+}
+
+function finiteRecord(value: Record<string, unknown>) {
+  return Object.values(value).every((field) => typeof field === "number" && Number.isFinite(field));
+}
+
+function validateInput(input: GenericAamVerificationInput) {
+  exactKeys(input, INPUT_KEYS, "input");
+  exactKeys(input.missile, MISSILE_KEYS, "missile");
+  exactKeys(input.target, TARGET_KEYS, "target");
+  exactKeys(input.constants, CONSTANT_KEYS, "constants");
+  exactKeys(input.missile.positionM, VEC_KEYS, "missile.positionM");
+  exactKeys(input.target.previousPositionM, VEC_KEYS, "target.previousPositionM");
+  exactKeys(input.target.positionM, VEC_KEYS, "target.positionM");
+  exactKeys(input.target.velocityMps, VEC_KEYS, "target.velocityMps");
+  if (input.schemaVersion !== "vector.generic-aam-verification-input.v1" || input.subjectId !== "NASA_TM_109057_GENERIC_AAM_REFERENCE" || input.intendedUse !== "ENGINE_VERIFICATION_ONLY" || input.semantics !== "TM_109057_PRINTED_LISTING_BINARY64_V1") throw new Error("Generic AAM verification identity is invalid.");
+  if (input.sourceSha256 !== corpus.artifact.sha256 || input.corpusSha256 !== GENERIC_AAM_CORPUS_SHA256 || input.decisionSha256 !== GENERIC_AAM_DECISION_SHA256) throw new Error("Generic AAM verification digest binding is invalid.");
+  if (input.axisConvention !== "EARTH_X_FORWARD_Y_RIGHT_Z_DOWN" || input.units !== "SI") throw new Error("Generic AAM axes or units are invalid.");
+  if (![32, 64, 128, 256].includes(input.tickRateHz) || !Number.isInteger(input.maxTicks) || input.maxTicks <= 0 || input.maxTicks > corpus.evaluator.maximumTicks || ![15, 20, 30].includes(input.seekerHalfAngleDeg)) throw new Error("Generic AAM work or seeker bounds are invalid.");
+  const { positionM: missilePosition, ...missileScalars } = input.missile;
+  if (!finiteRecord(missileScalars) || !finiteRecord(missilePosition) || !finiteRecord(input.target.previousPositionM) || !finiteRecord(input.target.positionM) || !finiteRecord(input.target.velocityMps) || !finiteRecord(input.constants)) throw new Error("Generic AAM numeric input must be finite.");
+  const target = input.target.positionM;
+  if (input.missile.speedMps <= 0 || input.missile.massKg !== input.constants.launchMassKg || input.constants.burnoutMassKg <= 0 || Math.abs(input.missile.pitchRad) >= Math.PI / 2 || target.x < 0 || target.x > 4500 || target.y < -4000 || target.y > 4000 || target.z > -2000 || target.z < -12000 || input.target.velocityMps.x !== 234.375 || input.target.velocityMps.y !== 0 || input.target.velocityMps.z !== 0) throw new Error("Generic AAM state is outside the reviewed domain.");
+  const expectedThrust = input.caseRole === "TABLE_THRUST_CONFLICT_SENSITIVITY" ? 690 * 4.4482216152605 : 6800;
+  const normalized = { ...input.constants, motorThrustN: 6800, maximumPitchG: 30, maximumYawG: 30 };
+  const expectedLimit = input.caseRole === "COMMAND_LIMIT_SENSITIVITY" ? 1 : 30;
+  if (!["PRINTED_LISTING_REPRODUCTION", "TABLE_THRUST_CONFLICT_SENSITIVITY", "COMMAND_LIMIT_SENSITIVITY"].includes(input.caseRole) || input.constants.motorThrustN !== expectedThrust || input.constants.maximumPitchG !== expectedLimit || input.constants.maximumYawG !== expectedLimit || canonical(normalized) !== canonical(PRINTED_CONSTANTS)) throw new Error("Generic AAM constants are not a closed reviewed decision.");
+  if (canonical(input.target.previousPositionM) !== canonical(input.target.positionM)) throw new Error("Initial previous/current target state is inconsistent.");
+}
+
+const magnitude = (value: Vec3) => Math.hypot(value.x, value.y, value.z);
+const subtract = (left: Vec3, right: Vec3): Vec3 => ({ x: left.x - right.x, y: left.y - right.y, z: left.z - right.z });
+const scale = (value: Vec3, factor: number): Vec3 => ({ x: value.x * factor, y: value.y * factor, z: value.z * factor });
+const add = (left: Vec3, right: Vec3): Vec3 => ({ x: left.x + right.x, y: left.y + right.y, z: left.z + right.z });
+const dot = (left: Vec3, right: Vec3) => left.x * right.x + left.y * right.y + left.z * right.z;
+
+export function genericAamLosRate(relative: Vec3, relativeVelocity: Vec3): Vec3 {
+  const rangeSquared = dot(relative, relative);
+  if (rangeSquared === 0) return { x: 0, y: 0, z: 0 };
+  return {
+    x: (relative.y * relativeVelocity.z - relative.z * relativeVelocity.y) / rangeSquared,
+    y: (relative.z * relativeVelocity.x - relative.x * relativeVelocity.z) / rangeSquared,
+    z: (relative.x * relativeVelocity.y - relative.y * relativeVelocity.x) / rangeSquared,
+  };
+}
+
+export function genericAamClosestApproach(relative: Vec3, relativeVelocity: Vec3) {
+  const speedSquared = dot(relativeVelocity, relativeVelocity);
+  const timeSeconds = speedSquared === 0 ? Number.MAX_VALUE : -dot(relative, relativeVelocity) / speedSquared;
+  return {
+    timeSeconds,
+    distanceM: speedSquared === 0 ? magnitude(relative) : magnitude(add(relative, scale(relativeVelocity, timeSeconds))),
+  };
+}
+
+export function genericAamControlLagStep(rate: number, command: number, dt: number, timeConstant: number) {
+  if (![rate, command, dt, timeConstant].every(Number.isFinite) || dt <= 0 || timeConstant <= 0 || dt > timeConstant) throw new Error("Control-lag fixture is outside its reviewed domain.");
+  return rate + (command - rate) / timeConstant * dt;
+}
+
+export function assertGenericAamVerificationRun(
+  run: unknown,
+  input: GenericAamVerificationInput,
+  backend: GenericAamVerificationRun["backend"],
+): asserts run is GenericAamVerificationRun {
+  exactKeys(run, RUN_KEYS, "run");
+  const record = run as unknown as GenericAamVerificationRun;
+  exactKeys(record.terminal, TERMINAL_KEYS, "terminal");
+  if (!Array.isArray(record.frames) || !Array.isArray(record.limitations)) throw new Error("Generic AAM run arrays are invalid.");
+  if (record.schemaVersion !== "vector.generic-aam-verification-run.v1" || record.subjectId !== input.subjectId || record.intendedUse !== input.intendedUse || record.semantics !== input.semantics || record.backend !== backend || record.sourceSha256 !== input.sourceSha256 || record.corpusSha256 !== input.corpusSha256 || record.decisionSha256 !== input.decisionSha256 || record.inputSha256 !== sha256(JSON.stringify(input)) || record.caseRole !== input.caseRole || canonical(record.limitations) !== canonical(LIMITATIONS)) throw new Error("Generic AAM run identity, digest or limitation binding is invalid.");
+  const terminals = ["HIT", "MISS_SEEKER_LIMIT", "MISS_OPENING_AFTER_BURN", "MISS_GROUND_OR_ZERO_SPEED", "TIME_LIMIT"];
+  if (!terminals.includes(record.terminal.state) || !Number.isInteger(record.terminal.tick) || record.terminal.tick <= 0 || record.terminal.tick > input.maxTicks || typeof record.terminal.cause !== "string" || record.terminal.cause.length === 0 || record.frames.length !== record.terminal.tick) throw new Error("Generic AAM terminal contract is invalid.");
+  for (const [index, frame] of record.frames.entries()) {
+    exactKeys(frame, FRAME_KEYS, "frame");
+    for (const name of ["missilePositionM", "targetPositionM", "relativePositionM", "losRateRadS"] as const) exactKeys(frame[name], VEC_KEYS, `frame.${name}`);
+    const scalars = Object.entries(frame).filter(([, value]) => typeof value === "number").map(([, value]) => value);
+    const vectors = [frame.missilePositionM, frame.targetPositionM, frame.relativePositionM, frame.losRateRadS];
+    if (!scalars.every(Number.isFinite) || !vectors.every(finiteRecord) || frame.tick !== index + 1 || frame.timeSeconds !== frame.tick / input.tickRateHz || !["TRACKING", ...terminals].includes(frame.state) || (index < record.frames.length - 1 && frame.state !== "TRACKING") || (index === record.frames.length - 1 && frame.state !== record.terminal.state)) throw new Error("Generic AAM frame contract is invalid.");
+  }
+}
+
+function limitedSignal(raw: number, maximumG: number, mass: number, speed: number, constants: GenericAamVerificationInput["constants"]) {
+  const velocityFactor = Math.min(1, speed ** 2 / constants.operationalSpeedMps ** 2);
+  const massSpeedLimitG = constants.burnoutMassKg / mass * velocityFactor * maximumG;
+  return Math.max(-maximumG, Math.min(maximumG, Math.max(-massSpeedLimitG, Math.min(massSpeedLimitG, raw))));
+}
+
+export function runGenericAamVerification(input: GenericAamVerificationInput): GenericAamVerificationRun {
+  validateInput(input);
+  const dt = 1 / input.tickRateHz;
+  const constants = input.constants;
+  let missile = structuredClone(input.missile);
+  let target = structuredClone(input.target.positionM);
+  const frames: GenericAamVerificationFrame[] = [];
+  let terminal: GenericAamVerificationRun["terminal"] | undefined;
+  for (let tick = 1; tick <= input.maxTicks; tick += 1) {
+    const second = Math.floor((tick - 1) / input.tickRateHz) + 1;
+    const oldTarget = target;
+    target = add(target, scale(input.target.velocityMps, dt));
+    const currentRelative = subtract(oldTarget, missile.positionM);
+    const currentRange = magnitude(currentRelative);
+    const thrust = second <= constants.burnSeconds ? constants.motorThrustN : constants.coastThrustN;
+    const drag = constants.dragK1 * missile.speedMps ** 2 + constants.dragK2 * (missile.pitchRateRadS ** 2 + missile.yawRateRadS ** 2) / missile.speedMps ** 2;
+    const acceleration = (thrust - drag) / missile.massKg - constants.gravityMps2 * Math.sin(missile.pitchRad);
+    const nextPitchRate = genericAamControlLagStep(missile.pitchRateRadS, missile.pitchSignalMps2, dt, constants.controlTimeConstantS);
+    const nextYawRate = genericAamControlLagStep(missile.yawRateRadS, missile.yawSignalMps2, dt, constants.controlTimeConstantS);
+    const pitchDerivative = (missile.pitchRateRadS - Math.cos(missile.pitchRad)) / missile.speedMps;
+    const yawDerivative = missile.yawRateRadS / (missile.speedMps * Math.cos(missile.pitchRad));
+    const velocity = {
+      x: missile.speedMps * Math.cos(missile.pitchRad) * Math.cos(missile.yawRad),
+      y: missile.speedMps * Math.cos(missile.pitchRad) * Math.sin(missile.yawRad),
+      z: missile.speedMps * Math.sin(missile.pitchRad),
+    };
+    missile = {
+      ...missile,
+      speedMps: missile.speedMps + acceleration * dt,
+      pitchRateRadS: nextPitchRate,
+      yawRateRadS: nextYawRate,
+      pitchRad: missile.pitchRad + pitchDerivative * dt,
+      yawRad: missile.yawRad + yawDerivative * dt,
+      positionM: { x: missile.positionM.x + velocity.x * dt, y: missile.positionM.y + velocity.y * dt, z: missile.positionM.z - velocity.z * dt },
+      massKg: second <= constants.burnSeconds ? missile.massKg - (constants.launchMassKg - constants.burnoutMassKg) / constants.burnSeconds * dt : missile.massKg,
+    };
+    const relative = subtract(target, missile.positionM);
+    const range = magnitude(relative);
+    const relativeVelocity = scale(subtract(currentRelative, relative), input.tickRateHz);
+    const closingVelocity = -(currentRange - range) * input.tickRateHz;
+    const losRate = genericAamLosRate(relative, relativeVelocity);
+    const pitchOffset = -Math.sin(missile.yawRad) * losRate.x + Math.cos(missile.yawRad) * losRate.y;
+    const yawOffset = Math.sin(missile.pitchRad) * (Math.cos(missile.yawRad) * losRate.x + Math.sin(missile.yawRad) * losRate.y) + Math.cos(missile.pitchRad) * losRate.z;
+    const pitchCommand = constants.gravityMps2 * limitedSignal(constants.navigationConstant * closingVelocity * pitchOffset, constants.maximumPitchG, missile.massKg, missile.speedMps, constants);
+    const yawCommand = constants.gravityMps2 * limitedSignal(constants.navigationConstant * closingVelocity * yawOffset, constants.maximumYawG, missile.massKg, missile.speedMps, constants);
+    missile.pitchSignalMps2 = pitchCommand;
+    missile.yawSignalMps2 = yawCommand;
+    const closestApproach = genericAamClosestApproach(relative, relativeVelocity);
+    const closestTime = closestApproach.timeSeconds;
+    const closestDistance = closestApproach.distanceM;
+    const seekerAngle = range === 0 ? 0 : Math.atan(Math.hypot(relative.y, relative.z) / Math.abs(relative.x));
+    let state: GenericAamVerificationFrame["state"] = "TRACKING";
+    let cause = "tracking";
+    if (missile.positionM.z > 0 || missile.speedMps <= 0) {
+      state = "MISS_GROUND_OR_ZERO_SPEED";
+      cause = "GROUND_ZERO";
+    } else if (closestDistance < constants.hitRangeM && Math.abs(closestTime) <= dt) {
+      state = "HIT";
+      cause = "CPA_HIT";
+    } else if (Math.abs(seekerAngle) > input.seekerHalfAngleDeg * Math.PI / 180) {
+      state = range < constants.hitRangeM ? "HIT" : "MISS_SEEKER_LIMIT";
+      cause = range < constants.hitRangeM ? "SEEKER_HIT" : "SEEKER_LIMIT";
+    } else if (closingVelocity > 0 && second > constants.burnSeconds) {
+      state = range < constants.hitRangeM ? "HIT" : "MISS_OPENING_AFTER_BURN";
+      cause = range < constants.hitRangeM ? "OPENING_HIT" : "POST_BURN_OPEN";
+    } else if (tick === input.maxTicks) {
+      state = "TIME_LIMIT";
+      cause = "TIME_LIMIT";
+    }
+    frames.push({ tick, timeSeconds: tick / input.tickRateHz, missilePositionM: { ...missile.positionM }, targetPositionM: { ...target }, speedMps: missile.speedMps, pitchRad: missile.pitchRad, yawRad: missile.yawRad, pitchRateRadS: missile.pitchRateRadS, yawRateRadS: missile.yawRateRadS, pitchSignalMps2: missile.pitchSignalMps2, yawSignalMps2: missile.yawSignalMps2, massKg: missile.massKg, thrustN: thrust, dragN: drag, relativePositionM: relative, rangeM: range, seekerAngleRad: seekerAngle, losRateRadS: losRate, closingVelocityMps: closingVelocity, pitchCommandMps2: pitchCommand, yawCommandMps2: yawCommand, closestApproachTimeS: closestTime, closestApproachDistanceM: closestDistance, state });
+    if (state !== "TRACKING") {
+      terminal = { state, tick, cause };
+      break;
+    }
+  }
+  if (!terminal) throw new Error("Generic AAM evaluator failed to produce an exhaustive terminal state.");
+  const run: GenericAamVerificationRun = {
+    schemaVersion: "vector.generic-aam-verification-run.v1",
+    subjectId: input.subjectId,
+    intendedUse: input.intendedUse,
+    semantics: input.semantics,
+    backend: "typescript",
+    sourceSha256: input.sourceSha256,
+    corpusSha256: input.corpusSha256,
+    decisionSha256: input.decisionSha256,
+    inputSha256: sha256(JSON.stringify(input)),
+    caseRole: input.caseRole,
+    frames,
+    terminal,
+    limitations: [...LIMITATIONS],
+  };
+  return run;
+}

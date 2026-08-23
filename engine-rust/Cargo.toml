@@ -21,7 +21,10 @@ sha2 = "0.10.9"
 [profile.release]
 codegen-units = 1
 lto = true
-opt-level = "s"
+# Verification-only ABIs retain full frame contracts; optimize the single
+# browser artifact for code size so product and reference exports stay below
+# the unchanged 500 kB admission gate.
+opt-level = "z"
 overflow-checks = true
 panic = "abort"
 strip = true

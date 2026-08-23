@@ -41,6 +41,8 @@
     "models:generate": "tsx scripts/generate-model-pack-fixture.ts",
     "models:verify": "tsx scripts/generate-model-pack-fixture.ts --check",
     "reference-aircraft:verify": "node --import tsx scripts/verify-public-aircraft-reference.mjs",
+    "reference-aam:verify": "node --import tsx scripts/verify-nasa-generic-aam-reference.mjs",
+    "reference-aam:performance": "tsx scripts/benchmark-generic-aam.ts",
     "worker:verify": "tsx scripts/verify-browser-worker.ts",
     "runtime:verify": "node --import tsx --test tests/browser-runtime.test.mjs tests/vector-record.test.mjs tests/engine-backends.test.mjs",
     "symbols:generate": "node scripts/generate-tactical-icons.mjs",

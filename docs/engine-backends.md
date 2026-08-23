@@ -10,6 +10,8 @@ The default backend is a Rust 2021 `cdylib` compiled for `wasm32-unknown-unknown
 - `vector_max_input_len()` publishes the bounded admission limit;
 - `vector_input_reserve(length)` allocates the JSON input buffer;
 - `vector_run_json()` executes the deterministic fixed-step model;
+- `vector_generic_aam_run_json()` executes the isolated NASA TM-109057
+  `ENGINE_VERIFICATION_ONLY` contract and is not a production scenario entry;
 - `vector_output_ptr()` and `vector_output_len()` expose the serialized run.
 
 The build embeds the compiled module in the application with its SHA-256 digest and byte length. Loading fails closed if the required ABI or provenance is missing. VECTOR does not silently fall back to TypeScript after a Rust/WASM run has been selected.
@@ -60,6 +62,8 @@ committed, integrity-checked artifact and does not install a compiler at runtime
 - `tests/simulation-events.test.ts` proves insertion-order-independent event ordering, arbitrary-entity coverage, exact off-cadence event frames, duplicate and causal-reference rejection, and the absence of authoritative English strings.
 - `tests/model-pack.test.mjs` plus Rust `model_pack` tests verify the shared compiled object-data contract and committed digest fixture.
 - `npm run performance:verify` measures cold initialization and warm-run p50/p95 for both backends.
+- `npm run reference-aam:verify` and `npm run reference-aam:performance`
+  verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
 
 ## Swap boundary
 

@@ -15,6 +15,10 @@ import type {
   PublicAircraftReferenceInput,
   PublicAircraftReferenceRun,
 } from "../validation/public-aircraft-reference.ts";
+import type {
+  GenericAamVerificationInput,
+  GenericAamVerificationRun,
+} from "../validation/generic-aam-verification.ts";
 
 type RustEngineExports = WebAssembly.Exports & {
   memory: WebAssembly.Memory;
@@ -22,6 +26,7 @@ type RustEngineExports = WebAssembly.Exports & {
   vector_input_reserve: (length: number) => number;
   vector_max_input_len: () => number;
   vector_run_json: () => number;
+  vector_generic_aam_run_json: () => number;
   vector_reference_run_json: () => number;
   vector_output_ptr: () => number;
   vector_output_len: () => number;
@@ -88,6 +93,7 @@ function getRustEngine() {
     typeof exports.vector_input_reserve !== "function" ||
     typeof exports.vector_max_input_len !== "function" ||
     typeof exports.vector_run_json !== "function" ||
+    typeof exports.vector_generic_aam_run_json !== "function" ||
     typeof exports.vector_reference_run_json !== "function" ||
     typeof exports.vector_output_ptr !== "function" ||
     typeof exports.vector_output_len !== "function"
@@ -99,6 +105,38 @@ function getRustEngine() {
   }
   rustEngine = exports;
   return exports;
+}
+
+export function runRustWasmGenericAamVerification(
+  input: GenericAamVerificationInput,
+): GenericAamVerificationRun {
+  const engine = getRustEngine();
+  const encoded = new TextEncoder().encode(JSON.stringify(input));
+  if (encoded.byteLength > engine.vector_max_input_len()) {
+    throw new Error("The generic AAM verification input exceeds the Rust/WASM ABI limit.");
+  }
+  const inputPointer = engine.vector_input_reserve(encoded.byteLength);
+  if (encoded.byteLength > 0 && inputPointer === 0) {
+    throw new Error("The Rust/WASM engine could not reserve the generic AAM input buffer.");
+  }
+  new Uint8Array(engine.memory.buffer, inputPointer, encoded.byteLength).set(encoded);
+  const succeeded = engine.vector_generic_aam_run_json() === 1;
+  const output = new TextDecoder().decode(
+    new Uint8Array(engine.memory.buffer, engine.vector_output_ptr(), engine.vector_output_len()),
+  );
+  if (!succeeded) {
+    throw new Error(`VECTOR Rust/WASM generic AAM runner rejected the case: ${output}`);
+  }
+  const run = JSON.parse(output) as GenericAamVerificationRun;
+  const exact = (value: object, keys: string[]) => {
+    const actual = Object.keys(value).sort();
+    const expected = [...keys].sort();
+    return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+  };
+  if (!exact(run, ["schemaVersion", "subjectId", "intendedUse", "semantics", "backend", "sourceSha256", "corpusSha256", "decisionSha256", "inputSha256", "caseRole", "frames", "terminal", "limitations"]) || run.backend !== "rust-wasm" || run.subjectId !== input.subjectId || run.intendedUse !== input.intendedUse || run.semantics !== input.semantics || run.sourceSha256 !== input.sourceSha256 || run.corpusSha256 !== input.corpusSha256 || run.decisionSha256 !== input.decisionSha256 || run.caseRole !== input.caseRole || run.frames.length !== run.terminal.tick) {
+    throw new Error("VECTOR Rust/WASM generic AAM runner returned an invalid contract.");
+  }
+  return run;
 }
 
 export function runRustWasmPublicAircraftReference(

@@ -1,4 +1,4 @@
-.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local capacity-baseline-local reference-aircraft-local air-reference-local worker-local frontend-local browser-local clean-clone-local
+.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local capacity-baseline-local reference-aircraft-local reference-aam-local air-reference-local worker-local frontend-local browser-local clean-clone-local
 
 db-up: compose-build
 	docker compose up -d database
@@ -52,12 +52,16 @@ observability-local: compose-up
 performance-local:
 	npm run performance:verify
 	npm run capacity:baseline:verify
+	npm run reference-aam:performance
 
 capacity-baseline-local:
 	npm run capacity:baseline:verify
 
 reference-aircraft-local:
 	npm run reference-aircraft:verify
+
+reference-aam-local:
+	npm run reference-aam:verify
 
 worker-local:
 	npm run build
@@ -93,6 +97,7 @@ ci-quality:
 	npm run symbols:verify
 	npm run models:verify
 	npm run reference-aircraft:verify
+	npm run reference-aam:verify
 	npm run engine:rust:fmt
 	npm run lint
 	npm run typecheck
