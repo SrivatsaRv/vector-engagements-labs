@@ -61,6 +61,7 @@ reference-aircraft-local:
 
 sixdof-foundation-local:
 	npm run sixdof-foundation:verify
+	npm run sixdof-foundation:performance
 
 worker-local:
 	npm run build
@@ -105,6 +106,7 @@ ci-tests:
 	npm run engine:rust:verify
 	npm run engine:rust:test
 	npm run engine:rust:doc
+	npm run sixdof-foundation:performance
 	npm test
 	npm run test:component
 

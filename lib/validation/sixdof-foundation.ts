@@ -45,8 +45,9 @@ export type SixDofVerificationRun = {
   frames: Array<{ tick: number; timeSeconds: number; state: SixDofVerificationState }>;
   diagnostics: {
     maximumQuaternionNormError: number;
-    relativeRotationalEnergyDrift: number;
-    relativeInertialAngularMomentumDrift: number;
+    conservationState: "AVAILABLE_ZERO_WRENCH" | "NOT_APPLICABLE_NONZERO_WRENCH";
+    relativeRotationalEnergyDrift: number | null;
+    relativeInertialAngularMomentumDrift: number | null;
   };
 };
 
@@ -58,6 +59,10 @@ export const SIX_DOF_VERIFICATION_LIMITS = Object.freeze({
   maximumInertiaKgM2: 1e15,
   maximumAbsoluteState: 1e9,
   maximumAbsoluteWrench: 1e12,
+  maximumAngularIncrementRad: 0.25,
+  minimumStageQuaternionNorm: 0.5,
+  maximumStageQuaternionNorm: 2,
+  minimumRelativeCholeskyPivot: 1e-10,
 });
 
 const VECTOR_KEYS = ["x", "y", "z"] as const;
@@ -127,6 +132,9 @@ function validateInput(input: SixDofVerificationInput) {
   assertFiniteBound(input.massProperties.massKg, SIX_DOF_VERIFICATION_LIMITS.maximumMassKg, "massKg");
   if (input.massProperties.massKg <= 0) throw new Error("massKg must be positive.");
   validateVector(input.massProperties.cgBodyM, SIX_DOF_VERIFICATION_LIMITS.maximumAbsoluteState, "cgBodyM");
+  if (Object.values(input.massProperties.cgBodyM).some((value) => value !== 0)) {
+    throw new Error("cgBodyM must be the exact zero vector for this CG-origin kernel.");
+  }
   assertExactKeys(input.massProperties.inertiaKgM2, INERTIA_KEYS, "inertiaKgM2");
   const inertia = input.massProperties.inertiaKgM2;
   for (const key of INERTIA_KEYS) {
@@ -135,19 +143,38 @@ function validateInput(input: SixDofVerificationInput) {
   if (inertia.xy !== inertia.yx || inertia.xz !== inertia.zx || inertia.yz !== inertia.zy) {
     throw new Error("The inertia tensor must be exactly symmetric.");
   }
-  const leading2 = inertia.xx * inertia.yy - inertia.xy * inertia.xy;
-  const determinant = determinant3(inertia);
-  if (inertia.xx <= 0 || leading2 <= 0 || determinant <= 0 || !Number.isFinite(determinant)) {
-    throw new Error("The inertia tensor must be symmetric positive definite.");
-  }
+  validateConditionedPositiveDefiniteInertia(inertia);
   assertExactKeys(input.initialState, ["positionWorldM", "velocityBodyMps", "angularRateBodyRadS", "bodyToWorldQuaternion"], "initialState");
   validateVector(input.initialState.positionWorldM, SIX_DOF_VERIFICATION_LIMITS.maximumAbsoluteState, "positionWorldM");
   validateVector(input.initialState.velocityBodyMps, SIX_DOF_VERIFICATION_LIMITS.maximumAbsoluteState, "velocityBodyMps");
   validateVector(input.initialState.angularRateBodyRadS, SIX_DOF_VERIFICATION_LIMITS.maximumAbsoluteState, "angularRateBodyRadS");
   validateQuaternion(input.initialState.bodyToWorldQuaternion);
+  assertAngularIncrement(input.initialState.angularRateBodyRadS, input.fixedStepSeconds, "initial state");
   assertExactKeys(input.appliedWrench, ["bodyForceN", "bodyMomentNm"], "appliedWrench");
   validateVector(input.appliedWrench.bodyForceN, SIX_DOF_VERIFICATION_LIMITS.maximumAbsoluteWrench, "bodyForceN");
   validateVector(input.appliedWrench.bodyMomentNm, SIX_DOF_VERIFICATION_LIMITS.maximumAbsoluteWrench, "bodyMomentNm");
+}
+
+function validateConditionedPositiveDefiniteInertia(inertia: SixDofInertia) {
+  const scale = Math.max(inertia.xx, inertia.yy, inertia.zz);
+  const minimumPivot = scale * SIX_DOF_VERIFICATION_LIMITS.minimumRelativeCholeskyPivot;
+  const firstPivot = inertia.xx;
+  if (!Number.isFinite(scale) || scale <= 0 || firstPivot < minimumPivot) {
+    throw new Error("The inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound.");
+  }
+  const firstRoot = Math.sqrt(firstPivot);
+  const lower21 = inertia.yx / firstRoot;
+  const lower31 = inertia.zx / firstRoot;
+  const secondPivot = inertia.yy - lower21 * lower21;
+  if (!Number.isFinite(secondPivot) || secondPivot < minimumPivot) {
+    throw new Error("The inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound.");
+  }
+  const secondRoot = Math.sqrt(secondPivot);
+  const lower32 = (inertia.zy - lower31 * lower21) / secondRoot;
+  const thirdPivot = inertia.zz - lower31 * lower31 - lower32 * lower32;
+  if (!Number.isFinite(thirdPivot) || thirdPivot < minimumPivot) {
+    throw new Error("The inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound.");
+  }
 }
 
 const add = (a: SixDofVector3, b: SixDofVector3): SixDofVector3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
@@ -187,6 +214,36 @@ function inverseMatrixVector(i: SixDofInertia, value: SixDofVector3): SixDofVect
 function normalizeQuaternion(q: SixDofQuaternion): SixDofQuaternion {
   const magnitude = Math.hypot(q.w, q.x, q.y, q.z);
   return { w: q.w / magnitude, x: q.x / magnitude, y: q.y / magnitude, z: q.z / magnitude };
+}
+
+function assertAngularIncrement(angularRate: SixDofVector3, stepSeconds: number, label: string) {
+  const increment = norm3(angularRate) * stepSeconds;
+  if (!Number.isFinite(increment) || increment > SIX_DOF_VERIFICATION_LIMITS.maximumAngularIncrementRad) {
+    throw new Error(`${label} angular increment exceeds the fixed-step bound.`);
+  }
+}
+
+function assertStageQuaternion(quaternion: SixDofQuaternion, label: string) {
+  const quaternionNorm = Math.hypot(...Object.values(quaternion));
+  if (
+    !Number.isFinite(quaternionNorm) ||
+    quaternionNorm < SIX_DOF_VERIFICATION_LIMITS.minimumStageQuaternionNorm ||
+    quaternionNorm > SIX_DOF_VERIFICATION_LIMITS.maximumStageQuaternionNorm
+  ) throw new Error(`${label} quaternion is outside the RK4 stage norm bound.`);
+}
+
+function assertIntegrationStage(state: SixDofVerificationState, stepSeconds: number, label: string) {
+  for (const [stateLabel, vector] of [
+    ["position", state.positionWorldM],
+    ["velocity", state.velocityBodyMps],
+    ["angular rate", state.angularRateBodyRadS],
+  ] as const) {
+    if (Object.values(vector).some((value) => !Number.isFinite(value) || Math.abs(value) > SIX_DOF_VERIFICATION_LIMITS.maximumAbsoluteState)) {
+      throw new Error(`${label} ${stateLabel} is outside the finite state bound.`);
+    }
+  }
+  assertStageQuaternion(state.bodyToWorldQuaternion, label);
+  assertAngularIncrement(state.angularRateBodyRadS, stepSeconds, label);
 }
 
 function rotateBodyToWorld(q: SixDofQuaternion, v: SixDofVector3): SixDofVector3 {
@@ -239,10 +296,17 @@ function advanceState(state: SixDofVerificationState, change: Derivative, factor
 
 function rk4(input: SixDofVerificationInput, state: SixDofVerificationState) {
   const dt = input.fixedStepSeconds;
+  assertIntegrationStage(state, dt, "RK4 stage 1");
   const k1 = derivative(input, state);
-  const k2 = derivative(input, advanceState(state, k1, dt / 2));
-  const k3 = derivative(input, advanceState(state, k2, dt / 2));
-  const k4 = derivative(input, advanceState(state, k3, dt));
+  const secondState = advanceState(state, k1, dt / 2);
+  assertIntegrationStage(secondState, dt, "RK4 stage 2");
+  const k2 = derivative(input, secondState);
+  const thirdState = advanceState(state, k2, dt / 2);
+  assertIntegrationStage(thirdState, dt, "RK4 stage 3");
+  const k3 = derivative(input, thirdState);
+  const fourthState = advanceState(state, k3, dt);
+  assertIntegrationStage(fourthState, dt, "RK4 stage 4");
+  const k4 = derivative(input, fourthState);
   const combineVector = (key: "positionWorldM" | "velocityBodyMps" | "angularRateBodyRadS") => scale(add(add(k1[key], scale(k2[key], 2)), add(scale(k3[key], 2), k4[key])), dt / 6);
   const q = state.bodyToWorldQuaternion;
   const combinedQ = {
@@ -251,15 +315,14 @@ function rk4(input: SixDofVerificationInput, state: SixDofVerificationState) {
     y: q.y + dt * (k1.bodyToWorldQuaternion.y + 2 * k2.bodyToWorldQuaternion.y + 2 * k3.bodyToWorldQuaternion.y + k4.bodyToWorldQuaternion.y) / 6,
     z: q.z + dt * (k1.bodyToWorldQuaternion.z + 2 * k2.bodyToWorldQuaternion.z + 2 * k3.bodyToWorldQuaternion.z + k4.bodyToWorldQuaternion.z) / 6,
   };
+  assertStageQuaternion(combinedQ, "RK4 combined quaternion");
   const next = {
     positionWorldM: add(state.positionWorldM, combineVector("positionWorldM")),
     velocityBodyMps: add(state.velocityBodyMps, combineVector("velocityBodyMps")),
     angularRateBodyRadS: add(state.angularRateBodyRadS, combineVector("angularRateBodyRadS")),
     bodyToWorldQuaternion: normalizeQuaternion(combinedQ),
   };
-  for (const vector of [next.positionWorldM, next.velocityBodyMps, next.angularRateBodyRadS]) {
-    if (![vector.x, vector.y, vector.z].every(Number.isFinite)) throw new Error("Six-DOF integration produced non-finite state.");
-  }
+  assertIntegrationStage(next, dt, "RK4 committed state");
   return next;
 }
 
@@ -279,8 +342,12 @@ export function runSixDofVerification(input: SixDofVerificationInput): SixDofVer
     angularRateBodyRadS: { ...input.initialState.angularRateBodyRadS },
     bodyToWorldQuaternion: normalizeQuaternion(input.initialState.bodyToWorldQuaternion),
   };
-  const initialEnergy = rotationalEnergy(input.massProperties.inertiaKgM2, state);
-  const initialMomentum = inertialAngularMomentum(input.massProperties.inertiaKgM2, state);
+  const zeroWrench = [
+    ...Object.values(input.appliedWrench.bodyForceN),
+    ...Object.values(input.appliedWrench.bodyMomentNm),
+  ].every((value) => value === 0);
+  const initialEnergy = zeroWrench ? rotationalEnergy(input.massProperties.inertiaKgM2, state) : null;
+  const initialMomentum = zeroWrench ? inertialAngularMomentum(input.massProperties.inertiaKgM2, state) : null;
   let maximumQuaternionNormError = Math.abs(Math.hypot(...Object.values(state.bodyToWorldQuaternion)) - 1);
   const frames = [{ tick: 0, timeSeconds: 0, state: structuredClone(state) }];
   for (let tick = 1; tick <= input.tickCount; tick += 1) {
@@ -288,8 +355,8 @@ export function runSixDofVerification(input: SixDofVerificationInput): SixDofVer
     maximumQuaternionNormError = Math.max(maximumQuaternionNormError, Math.abs(Math.hypot(...Object.values(state.bodyToWorldQuaternion)) - 1));
     frames.push({ tick, timeSeconds: tick * input.fixedStepSeconds, state: structuredClone(state) });
   }
-  const finalEnergy = rotationalEnergy(input.massProperties.inertiaKgM2, state);
-  const finalMomentum = inertialAngularMomentum(input.massProperties.inertiaKgM2, state);
+  const finalEnergy = zeroWrench ? rotationalEnergy(input.massProperties.inertiaKgM2, state) : null;
+  const finalMomentum = zeroWrench ? inertialAngularMomentum(input.massProperties.inertiaKgM2, state) : null;
   return {
     schemaVersion: "vector.sixdof-verification-run.v1",
     backend: "typescript",
@@ -299,8 +366,13 @@ export function runSixDofVerification(input: SixDofVerificationInput): SixDofVer
     frames,
     diagnostics: {
       maximumQuaternionNormError,
-      relativeRotationalEnergyDrift: Math.abs(finalEnergy - initialEnergy) / Math.max(Math.abs(initialEnergy), 1e-15),
-      relativeInertialAngularMomentumDrift: norm3(subtract(finalMomentum, initialMomentum)) / Math.max(norm3(initialMomentum), 1e-15),
+      conservationState: zeroWrench ? "AVAILABLE_ZERO_WRENCH" : "NOT_APPLICABLE_NONZERO_WRENCH",
+      relativeRotationalEnergyDrift: zeroWrench && initialEnergy !== null && finalEnergy !== null
+        ? Math.abs(finalEnergy - initialEnergy) / Math.max(Math.abs(initialEnergy), 1e-15)
+        : null,
+      relativeInertialAngularMomentumDrift: zeroWrench && initialMomentum !== null && finalMomentum !== null
+        ? norm3(subtract(finalMomentum, initialMomentum)) / Math.max(norm3(initialMomentum), 1e-15)
+        : null,
     },
   };
 }

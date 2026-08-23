@@ -9,6 +9,10 @@ const MAXIMUM_MASS_KG: f64 = 1.0e9;
 const MAXIMUM_INERTIA_KG_M2: f64 = 1.0e15;
 const MAXIMUM_ABSOLUTE_STATE: f64 = 1.0e9;
 const MAXIMUM_ABSOLUTE_WRENCH: f64 = 1.0e12;
+const MAXIMUM_ANGULAR_INCREMENT_RAD: f64 = 0.25;
+const MINIMUM_STAGE_QUATERNION_NORM: f64 = 0.5;
+const MAXIMUM_STAGE_QUATERNION_NORM: f64 = 2.0;
+const MINIMUM_RELATIVE_CHOLESKY_PIVOT: f64 = 1.0e-10;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -59,6 +63,10 @@ impl Vector3 {
         [self.x, self.y, self.z]
             .iter()
             .all(|value| value.is_finite() && value.abs() <= bound)
+    }
+
+    fn is_exact_zero(self) -> bool {
+        self.x == 0.0 && self.y == 0.0 && self.z == 0.0
     }
 }
 
@@ -159,11 +167,29 @@ impl InertiaTensor {
         if self.xy != self.yx || self.xz != self.zx || self.yz != self.zy {
             return Err(invalid("the inertia tensor must be exactly symmetric"));
         }
-        let leading_two = self.xx * self.yy - self.xy * self.xy;
-        let determinant = self.determinant();
-        if self.xx <= 0.0 || leading_two <= 0.0 || determinant <= 0.0 || !determinant.is_finite() {
+        let scale = self.xx.max(self.yy).max(self.zz);
+        let minimum_pivot = scale * MINIMUM_RELATIVE_CHOLESKY_PIVOT;
+        let first_pivot = self.xx;
+        if !scale.is_finite() || scale <= 0.0 || first_pivot < minimum_pivot {
             return Err(invalid(
-                "the inertia tensor must be symmetric positive definite",
+                "the inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound",
+            ));
+        }
+        let first_root = first_pivot.sqrt();
+        let lower_21 = self.yx / first_root;
+        let lower_31 = self.zx / first_root;
+        let second_pivot = self.yy - lower_21 * lower_21;
+        if !second_pivot.is_finite() || second_pivot < minimum_pivot {
+            return Err(invalid(
+                "the inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound",
+            ));
+        }
+        let second_root = second_pivot.sqrt();
+        let lower_32 = (self.zy - lower_31 * lower_21) / second_root;
+        let third_pivot = self.zz - lower_31 * lower_31 - lower_32 * lower_32;
+        if !third_pivot.is_finite() || third_pivot < minimum_pivot {
+            return Err(invalid(
+                "the inertia tensor must be well-conditioned positive definite by the Cholesky pivot bound",
             ));
         }
         Ok(())
@@ -228,8 +254,9 @@ pub struct SixDofFrame {
 #[serde(rename_all = "camelCase")]
 pub struct SixDofDiagnostics {
     pub maximum_quaternion_norm_error: f64,
-    pub relative_rotational_energy_drift: f64,
-    pub relative_inertial_angular_momentum_drift: f64,
+    pub conservation_state: &'static str,
+    pub relative_rotational_energy_drift: Option<f64>,
+    pub relative_inertial_angular_momentum_drift: Option<f64>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -284,6 +311,11 @@ fn validate(input: &SixDofVerificationInput) -> Result<(), EngineError> {
     {
         return Err(invalid("cgBodyM must be finite and bounded"));
     }
+    if !input.mass_properties.cg_body_m.is_exact_zero() {
+        return Err(invalid(
+            "cgBodyM must be the exact zero vector for this CG origin kernel",
+        ));
+    }
     input.mass_properties.inertia_kg_m2.validate()?;
     if !input
         .initial_state
@@ -301,6 +333,11 @@ fn validate(input: &SixDofVerificationInput) -> Result<(), EngineError> {
         return Err(invalid("initial state must be finite and bounded"));
     }
     input.initial_state.body_to_world_quaternion.normalize()?;
+    validate_angular_increment(
+        input.initial_state.angular_rate_body_rad_s,
+        input.fixed_step_seconds,
+        "initial state",
+    )?;
     if !input
         .applied_wrench
         .body_force_n
@@ -311,6 +348,56 @@ fn validate(input: &SixDofVerificationInput) -> Result<(), EngineError> {
             .is_finite_and_bounded(MAXIMUM_ABSOLUTE_WRENCH)
     {
         return Err(invalid("applied wrench must be finite and bounded"));
+    }
+    Ok(())
+}
+
+fn validate_angular_increment(
+    angular_rate: Vector3,
+    step_seconds: f64,
+    label: &str,
+) -> Result<(), EngineError> {
+    let increment = angular_rate.magnitude() * step_seconds;
+    if !increment.is_finite() || increment > MAXIMUM_ANGULAR_INCREMENT_RAD {
+        return Err(invalid(&format!(
+            "{label} angular increment exceeds the fixed-step bound"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_integration_stage(
+    state: SixDofState,
+    step_seconds: f64,
+    label: &str,
+) -> Result<(), EngineError> {
+    if !state
+        .position_world_m
+        .is_finite_and_bounded(MAXIMUM_ABSOLUTE_STATE)
+        || !state
+            .velocity_body_mps
+            .is_finite_and_bounded(MAXIMUM_ABSOLUTE_STATE)
+        || !state
+            .angular_rate_body_rad_s
+            .is_finite_and_bounded(MAXIMUM_ABSOLUTE_STATE)
+    {
+        return Err(invalid(&format!(
+            "{label} state is outside the finite state bound"
+        )));
+    }
+    validate_stage_quaternion(state.body_to_world_quaternion, label)?;
+    validate_angular_increment(state.angular_rate_body_rad_s, step_seconds, label)
+}
+
+fn validate_stage_quaternion(quaternion: Quaternion, label: &str) -> Result<(), EngineError> {
+    let quaternion_norm = quaternion.magnitude();
+    if !quaternion_norm.is_finite()
+        || !(MINIMUM_STAGE_QUATERNION_NORM..=MAXIMUM_STAGE_QUATERNION_NORM)
+            .contains(&quaternion_norm)
+    {
+        return Err(invalid(&format!(
+            "{label} quaternion is outside the RK4 stage norm bound"
+        )));
     }
     Ok(())
 }
@@ -399,11 +486,18 @@ fn combined_vector(
 
 fn rk4(input: &SixDofVerificationInput, state: SixDofState) -> Result<SixDofState, EngineError> {
     let step = input.fixed_step_seconds;
+    validate_integration_stage(state, step, "RK4 stage 1")?;
     let first = derivative(input, state);
-    let second = derivative(input, advance(state, first, step / 2.0));
-    let third = derivative(input, advance(state, second, step / 2.0));
-    let fourth = derivative(input, advance(state, third, step));
-    let quaternion = Quaternion {
+    let second_state = advance(state, first, step / 2.0);
+    validate_integration_stage(second_state, step, "RK4 stage 2")?;
+    let second = derivative(input, second_state);
+    let third_state = advance(state, second, step / 2.0);
+    validate_integration_stage(third_state, step, "RK4 stage 3")?;
+    let third = derivative(input, third_state);
+    let fourth_state = advance(state, third, step);
+    validate_integration_stage(fourth_state, step, "RK4 stage 4")?;
+    let fourth = derivative(input, fourth_state);
+    let combined_quaternion = Quaternion {
         w: state.body_to_world_quaternion.w
             + step
                 * (first.body_to_world_quaternion.w
@@ -432,8 +526,9 @@ fn rk4(input: &SixDofVerificationInput, state: SixDofState) -> Result<SixDofStat
                     + 2.0 * third.body_to_world_quaternion.z
                     + fourth.body_to_world_quaternion.z)
                 / 6.0,
-    }
-    .normalize()?;
+    };
+    validate_stage_quaternion(combined_quaternion, "RK4 combined quaternion")?;
+    let quaternion = combined_quaternion.normalize()?;
     let next = SixDofState {
         position_world_m: state.position_world_m.add(combined_vector(
             first.position_world_m,
@@ -458,12 +553,7 @@ fn rk4(input: &SixDofVerificationInput, state: SixDofState) -> Result<SixDofStat
         )),
         body_to_world_quaternion: quaternion,
     };
-    if !next.position_world_m.is_finite_and_bounded(f64::MAX)
-        || !next.velocity_body_mps.is_finite_and_bounded(f64::MAX)
-        || !next.angular_rate_body_rad_s.is_finite_and_bounded(f64::MAX)
-    {
-        return Err(invalid("six-DOF integration produced non-finite state"));
-    }
+    validate_integration_stage(next, step, "RK4 committed state")?;
     Ok(next)
 }
 
@@ -488,8 +578,12 @@ pub fn run_sixdof_verification(
         body_to_world_quaternion: input.initial_state.body_to_world_quaternion.normalize()?,
         ..input.initial_state
     };
-    let initial_energy = rotational_energy(input.mass_properties.inertia_kg_m2, state);
-    let initial_momentum = inertial_angular_momentum(input.mass_properties.inertia_kg_m2, state);
+    let zero_wrench = input.applied_wrench.body_force_n.is_exact_zero()
+        && input.applied_wrench.body_moment_nm.is_exact_zero();
+    let initial_energy =
+        zero_wrench.then(|| rotational_energy(input.mass_properties.inertia_kg_m2, state));
+    let initial_momentum =
+        zero_wrench.then(|| inertial_angular_momentum(input.mass_properties.inertia_kg_m2, state));
     let mut maximum_quaternion_norm_error =
         (state.body_to_world_quaternion.magnitude() - 1.0).abs();
     let mut frames = Vec::with_capacity(input.tick_count as usize + 1);
@@ -508,8 +602,19 @@ pub fn run_sixdof_verification(
             state,
         });
     }
-    let final_energy = rotational_energy(input.mass_properties.inertia_kg_m2, state);
-    let final_momentum = inertial_angular_momentum(input.mass_properties.inertia_kg_m2, state);
+    let final_energy =
+        zero_wrench.then(|| rotational_energy(input.mass_properties.inertia_kg_m2, state));
+    let final_momentum =
+        zero_wrench.then(|| inertial_angular_momentum(input.mass_properties.inertia_kg_m2, state));
+    let relative_rotational_energy_drift = initial_energy
+        .zip(final_energy)
+        .map(|(initial, final_value)| (final_value - initial).abs() / initial.abs().max(1.0e-15));
+    let relative_inertial_angular_momentum_drift =
+        initial_momentum
+            .zip(final_momentum)
+            .map(|(initial, final_value)| {
+                final_value.subtract(initial).magnitude() / initial.magnitude().max(1.0e-15)
+            });
     Ok(SixDofVerificationRun {
         schema_version: "vector.sixdof-verification-run.v1",
         backend: "rust-wasm",
@@ -519,12 +624,13 @@ pub fn run_sixdof_verification(
         frames,
         diagnostics: SixDofDiagnostics {
             maximum_quaternion_norm_error,
-            relative_rotational_energy_drift: (final_energy - initial_energy).abs()
-                / initial_energy.abs().max(1.0e-15),
-            relative_inertial_angular_momentum_drift: final_momentum
-                .subtract(initial_momentum)
-                .magnitude()
-                / initial_momentum.magnitude().max(1.0e-15),
+            conservation_state: if zero_wrench {
+                "AVAILABLE_ZERO_WRENCH"
+            } else {
+                "NOT_APPLICABLE_NONZERO_WRENCH"
+            },
+            relative_rotational_energy_drift,
+            relative_inertial_angular_momentum_drift,
         },
     })
 }
@@ -632,6 +738,73 @@ mod tests {
         case.mass_properties.inertia_kg_m2.yx = 2.0;
         case.mass_properties.inertia_kg_m2.yy = 1.0;
         assert!(run_sixdof_verification(case).is_err());
+    }
+
+    #[test]
+    fn rejects_nonzero_cg_and_unresolved_angular_increment() {
+        let mut nonzero_cg = input();
+        nonzero_cg.mass_properties.cg_body_m.x = 0.001;
+        assert!(run_sixdof_verification(nonzero_cg).is_err());
+
+        let mut unresolved = input();
+        unresolved.initial_state.angular_rate_body_rad_s.x = 25.000_000_001;
+        assert!(run_sixdof_verification(unresolved).is_err());
+
+        let mut stage_overflow = input();
+        stage_overflow.tick_count = 1;
+        stage_overflow.applied_wrench.body_moment_nm.x = 20_000.0;
+        assert!(run_sixdof_verification(stage_overflow).is_err());
+    }
+
+    #[test]
+    fn conditions_inertia_by_scale_and_accepts_a_full_cross_term_tensor() {
+        for scale in [1.0, 1.0e12] {
+            let mut near_singular = input();
+            near_singular.mass_properties.inertia_kg_m2 = InertiaTensor {
+                xx: scale,
+                xy: 0.0,
+                xz: 0.0,
+                yx: 0.0,
+                yy: scale * 1.0e-12,
+                yz: 0.0,
+                zx: 0.0,
+                zy: 0.0,
+                zz: scale,
+            };
+            assert!(run_sixdof_verification(near_singular).is_err());
+        }
+
+        let mut coupled = input();
+        coupled.tick_count = 1;
+        coupled.mass_properties.inertia_kg_m2 = InertiaTensor {
+            xx: 4.0,
+            xy: 1.0,
+            xz: 0.5,
+            yx: 1.0,
+            yy: 4.0,
+            yz: 0.5,
+            zx: 0.5,
+            zy: 0.5,
+            zz: 5.0,
+        };
+        assert!(run_sixdof_verification(coupled).is_ok());
+    }
+
+    #[test]
+    fn conservation_diagnostics_are_unavailable_for_nonzero_wrench() -> Result<(), EngineError> {
+        let mut case = input();
+        case.applied_wrench.body_force_n.x = 1.0;
+        let run = run_sixdof_verification(case)?;
+        assert_eq!(
+            run.diagnostics.conservation_state,
+            "NOT_APPLICABLE_NONZERO_WRENCH"
+        );
+        assert_eq!(run.diagnostics.relative_rotational_energy_drift, None);
+        assert_eq!(
+            run.diagnostics.relative_inertial_angular_momentum_drift,
+            None
+        );
+        Ok(())
     }
 
     #[test]

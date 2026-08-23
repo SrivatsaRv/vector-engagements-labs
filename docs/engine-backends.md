@@ -95,3 +95,8 @@ transport. This operation is an ABI and numerical conformance surface, not an
 `EngineScenario` backend selection. It does not emit production frames/events,
 enter a Worker or VSR, or silently substitute for the deployed 3DOF engine. See
 [`sixdof-numerical-foundation.md`](sixdof-numerical-foundation.md).
+
+Both adapters enforce the same conditioned-inertia, CG-origin, per-step angular
+increment and RK-stage quaternion bounds. Rust/WASM does not accept a broader
+finite-input domain than TypeScript, and neither adapter emits conservation
+drift for a nonzero applied wrench.
