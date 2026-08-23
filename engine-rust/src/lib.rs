@@ -1098,7 +1098,7 @@ fn route_transition(plan: &RoutePlan, index: usize) -> Result<&str, EngineError>
     }
 }
 
-fn activate_weapons(states: &mut [RuntimeState], time: f64) {
+fn activate_weapons(states: &mut [RuntimeState], tick: u64, scenario: &EngineScenario) {
     for index in 0..states.len() {
         let Some(weapon) = states[index].definition.weapon.clone() else {
             continue;
@@ -1106,7 +1106,10 @@ fn activate_weapons(states: &mut [RuntimeState], time: f64) {
         let Some(launch_time) = weapon.launch_time_seconds else {
             continue;
         };
-        if states[index].lifecycle != EntityLifecycle::Stowed || time < launch_time {
+        if states[index].lifecycle != EntityLifecycle::Stowed
+            || launch_time > scenario.duration_seconds
+            || tick < first_fixed_step_tick_at_or_after(launch_time, scenario.fixed_step_seconds)
+        {
             continue;
         }
         let launcher_id = weapon.launch_platform_id;
@@ -1423,6 +1426,27 @@ fn invalid_run(scenario: EngineScenario) -> EngineRun {
     }
 }
 
+fn model_time_at_tick(tick: u64, fixed_step_seconds: f64) -> f64 {
+    tick as f64 * fixed_step_seconds
+}
+
+fn recorded_model_time_at_tick(tick: u64, fixed_step_seconds: f64) -> f64 {
+    (model_time_at_tick(tick, fixed_step_seconds) * 1_000_000.0).round() / 1_000_000.0
+}
+
+fn first_fixed_step_tick_at_or_after(model_time_seconds: f64, fixed_step_seconds: f64) -> u64 {
+    let mut candidate = (model_time_seconds / fixed_step_seconds).ceil() as u64;
+    while candidate > 0
+        && model_time_at_tick(candidate - 1, fixed_step_seconds) >= model_time_seconds
+    {
+        candidate -= 1;
+    }
+    while model_time_at_tick(candidate, fixed_step_seconds) < model_time_seconds {
+        candidate += 1;
+    }
+    candidate
+}
+
 /// Run a validated deterministic scenario and return a replayable engine record.
 pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError> {
     validate_scenario(&scenario)?;
@@ -1479,12 +1503,12 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
     let mut non_finite = 0_u64;
     let mut mass_margin = f64::INFINITY;
     let sample_every = (0.25 / scenario.fixed_step_seconds).round().max(1.0) as u64;
-    let mut time: f64 = 0.0;
     let mut event_journal = SimulationEventJournal::default();
     let mut recorded_entity_states = 0_u64;
     loop {
         let tick = steps;
-        let event_time = (time * 1_000_000.0).round() / 1_000_000.0;
+        let time = model_time_at_tick(tick, scenario.fixed_step_seconds);
+        let event_time = recorded_model_time_at_tick(tick, scenario.fixed_step_seconds);
         if tick == 0 {
             event_journal.emit(SimulationEventDraft::run_started(
                 tick,
@@ -1507,7 +1531,7 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
         }
         let before_activation: Vec<EntityLifecycle> =
             states.iter().map(|state| state.lifecycle).collect();
-        activate_weapons(&mut states, time);
+        activate_weapons(&mut states, tick, &scenario);
         for (index, state) in states.iter().enumerate() {
             if before_activation[index] != EntityLifecycle::Stowed
                 || state.lifecycle == EntityLifecycle::Stowed
@@ -1583,7 +1607,8 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 completed_this_tick = true;
             }
         }
-        let next_time = time + scenario.fixed_step_seconds;
+        let next_tick = tick + 1;
+        let next_time = model_time_at_tick(next_tick, scenario.fixed_step_seconds);
         if completed_this_tick {
             event_journal.emit(SimulationEventDraft::run_completed(
                 tick,
@@ -1628,9 +1653,8 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 scenario.fixed_step_seconds,
             );
         }
-        steps += 1;
-        time = next_time;
-        let next_event_time = (next_time * 1_000_000.0).round() / 1_000_000.0;
+        steps = next_tick;
+        let next_event_time = recorded_model_time_at_tick(next_tick, scenario.fixed_step_seconds);
         for (index, state) in states.iter().enumerate() {
             let prior = before_updates[index];
             if prior == state.lifecycle {
@@ -1694,7 +1718,13 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                     .weapon
                     .as_ref()
                     .and_then(|weapon| weapon.launch_time_seconds)
-                    .is_some_and(|launch_time| (launch_time - next_time).abs() <= 1e-9)
+                    .is_some_and(|launch_time| {
+                        launch_time <= scenario.duration_seconds
+                            && first_fixed_step_tick_at_or_after(
+                                launch_time,
+                                scenario.fixed_step_seconds,
+                            ) == steps
+                    })
         });
         if event_journal.has_pending()
             || steps == 1
@@ -2028,10 +2058,13 @@ mod tests {
     #[test]
     fn off_grid_launch_uses_the_first_fixed_step_boundary() -> Result<(), Box<dyn std::error::Error>>
     {
-        for (launch_time, expected_tick, expected_time) in
-            [(2.03, 41, 2.05), (2.050_000_000_001, 42, 2.1)]
-        {
+        for (fixed_step, launch_time, expected_tick, expected_time) in [
+            (0.05, 2.03, 41, 2.05),
+            (0.05, 2.050_000_000_001, 42, 2.1),
+            (0.001, 1.008, 1008, 1.008),
+        ] {
             let mut input = scenario();
+            input.fixed_step_seconds = fixed_step;
             let weapon = input
                 .entities
                 .iter_mut()
@@ -2056,6 +2089,54 @@ mod tests {
             assert_eq!(entry.tick, expected_tick);
             assert_eq!(entry.model_time_seconds, expected_time);
             assert_eq!(run.frames[entry.frame_index].t, expected_time);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn activation_boundary_correction_covers_the_admitted_step_range() {
+        for fixed_step in [0.001, 0.003, 0.01, 0.05, 0.2, 1.0] {
+            for grid_tick in [0_u64, 1, 7, 257, 1008] {
+                let boundary = model_time_at_tick(grid_tick, fixed_step);
+                let near_grid_delta =
+                    (f64::EPSILON * boundary.abs().max(1.0) * 4.0).max(fixed_step * 1e-12);
+                for launch_time in [
+                    boundary,
+                    boundary + fixed_step * 0.37,
+                    boundary + near_grid_delta,
+                ] {
+                    let mut expected_tick = 0_u64;
+                    while model_time_at_tick(expected_tick, fixed_step) < launch_time {
+                        expected_tick += 1;
+                    }
+                    let actual_tick = first_fixed_step_tick_at_or_after(launch_time, fixed_step);
+                    assert_eq!(actual_tick, expected_tick);
+                    assert!(model_time_at_tick(actual_tick, fixed_step) >= launch_time);
+                    if actual_tick > 0 {
+                        assert!(model_time_at_tick(actual_tick - 1, fixed_step) < launch_time);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn post_duration_weapon_schedule_fails_before_clock_quantization(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for launch_time in [3.001, f64::MAX] {
+            let mut input = scenario();
+            let weapon = input
+                .entities
+                .iter_mut()
+                .find(|entity| entity.id == "blue-weapon")
+                .and_then(|entity| entity.weapon.as_mut())
+                .ok_or("scenario has no scheduled weapon")?;
+            weapon.launch_time_seconds = Some(launch_time);
+            assert!(matches!(
+                try_run_engine(input),
+                Err(EngineError::InvalidScenario(message))
+                    if message.contains("launches after scenario duration")
+            ));
         }
         Ok(())
     }

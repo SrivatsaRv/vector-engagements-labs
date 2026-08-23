@@ -115,8 +115,43 @@ function receiptKey(receipt: SimulationEventReceipt) {
   return `${receipt.tick}\u0000${receipt.localKey}`;
 }
 
-function firstFixedStepTickAtOrAfter(modelTimeSeconds: number, fixedStepSeconds: number) {
-  return Math.ceil(modelTimeSeconds / fixedStepSeconds);
+export function modelTimeAtTick(tick: number, fixedStepSeconds: number) {
+  return tick * fixedStepSeconds;
+}
+
+export function recordedModelTimeAtTick(tick: number, fixedStepSeconds: number) {
+  return Number(modelTimeAtTick(tick, fixedStepSeconds).toFixed(6));
+}
+
+export function firstFixedStepTickAtOrAfter(
+  modelTimeSeconds: number,
+  fixedStepSeconds: number,
+) {
+  if (
+    !Number.isFinite(modelTimeSeconds) ||
+    modelTimeSeconds < 0 ||
+    !Number.isFinite(fixedStepSeconds) ||
+    fixedStepSeconds <= 0
+  ) {
+    throw new Error("Fixed-step activation boundary requires finite non-negative time and a positive step.");
+  }
+  let candidate = Math.ceil(modelTimeSeconds / fixedStepSeconds);
+  if (!Number.isSafeInteger(candidate)) {
+    throw new Error("Fixed-step activation boundary exceeds the safe tick range.");
+  }
+  while (
+    candidate > 0 &&
+    modelTimeAtTick(candidate - 1, fixedStepSeconds) >= modelTimeSeconds
+  ) {
+    candidate -= 1;
+  }
+  while (modelTimeAtTick(candidate, fixedStepSeconds) < modelTimeSeconds) {
+    candidate += 1;
+    if (!Number.isSafeInteger(candidate)) {
+      throw new Error("Fixed-step activation boundary exceeds the safe tick range.");
+    }
+  }
+  return candidate;
 }
 
 function normalizeParticipants(
@@ -378,7 +413,7 @@ export function assertSimulationEventStream(
     nonEmptyString(raw.localKey, `Simulation event ${index} local key`);
     if (raw.sequence !== index || raw.id !== `event-${index.toString().padStart(6, "0")}`) throw new Error(`Simulation event ${index} has an invalid sequence or ID.`);
     if (!Number.isSafeInteger(raw.tick) || (raw.tick as number) < 0) throw new Error(`Simulation event ${index} has an invalid tick.`);
-    const expectedTime = Number(((raw.tick as number) * scenario.fixedStepSeconds).toFixed(6));
+    const expectedTime = recordedModelTimeAtTick(raw.tick as number, scenario.fixedStepSeconds);
     if (raw.modelTimeSeconds !== expectedTime) throw new Error(`Simulation event ${index} does not match its fixed-step tick.`);
     if (!Number.isSafeInteger(raw.frameIndex) || (raw.frameIndex as number) < 0 || (raw.frameIndex as number) >= frames.length) throw new Error(`Simulation event ${index} references a missing frame.`);
     if (!Number.isFinite(raw.modelTimeSeconds) || frames[raw.frameIndex as number]!.t !== raw.modelTimeSeconds) throw new Error(`Simulation event ${index} does not reference its exact model-time frame.`);

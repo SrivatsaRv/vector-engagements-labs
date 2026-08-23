@@ -144,11 +144,17 @@ bound to the first retained frame that changes from its prior canonical state,
 and `RUN_COMPLETED` is bound to the final retained frame. Referencing any other
 frame fails even when that frame contains the same lifecycle value.
 
-Frames represent state committed at their stated fixed-step boundary. Initial
-and store-world-entry events are captured before the following integration
-step; post-integration lifecycle and run-terminal transitions use the next
-boundary time. An event frame therefore cannot show an entity already moved
-beyond the transition it records.
+The integer tick owns model time: each boundary is derived as `tick × fixed
+step`; neither engine accumulates a floating model clock. Scheduled activation
+starts from the quotient estimate and then compares the adjacent tick-derived
+boundaries directly, so grid, off-grid and near-grid values use the same rule in
+the producer and validator. A finite schedule after the admitted run duration
+fails admission before clock quantization; it is not accepted as an inert
+control. Frames represent state committed at that boundary.
+Initial and store-world-entry events are captured before the following
+integration step; post-integration lifecycle and run-terminal transitions use
+the next boundary time. An event frame therefore cannot show an entity already
+moved beyond the transition it records.
 
 Historical `vector.events.v1` members remain readable only as an explicit
 `UNAVAILABLE / LEGACY_EVENT_SCHEMA` state. Their frames remain replayable, but

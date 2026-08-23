@@ -12,7 +12,10 @@ import { SIMULATION_EVENT_PAYLOAD_SCHEMAS } from "./contracts.ts";
 import { SIMULATION_EVENT_SCHEMA } from "./contracts.ts";
 import {
   assertSimulationEventStream,
+  firstFixedStepTickAtOrAfter,
   MAX_SIMULATION_EVENTS,
+  modelTimeAtTick,
+  recordedModelTimeAtTick,
   SimulationEventJournal,
 } from "./simulation-events.ts";
 import type { Vec3 } from "./primitives.ts";
@@ -420,11 +423,19 @@ function routeTransition(
 function activateWeapon(
   state: RuntimeState,
   states: Map<string, RuntimeState>,
-  time: number,
+  tick: number,
+  scenario: EngineScenario,
 ) {
   const weapon = state.definition.weapon;
   if (!weapon || weapon.launchTimeSeconds === null) return;
-  if (state.lifecycle !== "STOWED" || time < weapon.launchTimeSeconds) return;
+  if (
+    state.lifecycle !== "STOWED" ||
+    weapon.launchTimeSeconds > scenario.durationSeconds ||
+    tick < firstFixedStepTickAtOrAfter(
+      weapon.launchTimeSeconds,
+      scenario.fixedStepSeconds,
+    )
+  ) return;
   const launcher = states.get(weapon.launchPlatformId);
   if (launcher) {
     if (launcher.definition.kind === "AIRCRAFT") {
@@ -709,7 +720,6 @@ export class EngineSession {
   private readonly eventJournal = new SimulationEventJournal();
   private readonly sampleEvery: number;
   private readonly recordingOrigin: EngineScenario["geospatial"]["origin"];
-  private time = 0;
   private termination: EngineRun["termination"] = "time_limit";
   private closestApproachM = Number.POSITIVE_INFINITY;
   private peakCommandG = 0;
@@ -832,6 +842,10 @@ export class EngineSession {
     ]);
     for (const entity of scenario.entities) {
       if (!entity.weapon) continue;
+      const launchTimeSeconds = entity.weapon.launchTimeSeconds;
+      if (launchTimeSeconds !== null && launchTimeSeconds > scenario.durationSeconds) {
+        throw new Error(`Weapon ${entity.id} launches after scenario duration.`);
+      }
       const admission = entity.weapon.admission;
       if (
         !admission ||
@@ -975,10 +989,10 @@ export class EngineSession {
     while (!this.completed && batchSteps < maximumTicks) {
       const primaryWeapon = this.primaryWeapon!;
       const primaryTarget = this.primaryTarget!;
-      const time = this.time;
-      const eventTime = Number(time.toFixed(6));
       const tick = this.integratedSteps;
       const scenario = this.scenario;
+      const time = modelTimeAtTick(tick, scenario.fixedStepSeconds);
+      const eventTime = recordedModelTimeAtTick(tick, scenario.fixedStepSeconds);
       if (tick === 0) {
         this.eventJournal.emit({
           localKey: "run-started",
@@ -1023,7 +1037,7 @@ export class EngineSession {
         [...this.states.values()].map((state) => [state.definition.id, state.lifecycle]),
       );
       for (const state of this.states.values())
-        activateWeapon(state, this.states, time);
+        activateWeapon(state, this.states, tick, scenario);
       for (const state of this.states.values()) {
         const prior = beforeActivation.get(state.definition.id)!;
         if (prior !== "STOWED" || state.lifecycle === "STOWED") continue;
@@ -1093,7 +1107,8 @@ export class EngineSession {
           this.completed = true;
         }
       }
-      const nextTime = time + scenario.fixedStepSeconds;
+      const nextTick = tick + 1;
+      const nextTime = modelTimeAtTick(nextTick, scenario.fixedStepSeconds);
       if (this.completed) {
         this.eventJournal.emit({
           localKey: "run-completed",
@@ -1129,10 +1144,9 @@ export class EngineSession {
         updateKinematicEntity(state, scenario, time, scenario.fixedStepSeconds);
       for (const state of this.states.values())
         updateWeapon(state, this.states, scenario, time, scenario.fixedStepSeconds);
-      this.integratedSteps += 1;
+      this.integratedSteps = nextTick;
       batchSteps += 1;
-      this.time = nextTime;
-      const nextEventTime = Number(nextTime.toFixed(6));
+      const nextEventTime = recordedModelTimeAtTick(nextTick, scenario.fixedStepSeconds);
       for (const state of this.states.values()) {
         const prior = beforeUpdates.get(state.definition.id)!;
         if (prior === state.lifecycle) continue;
@@ -1195,11 +1209,17 @@ export class EngineSession {
           },
         });
       }
-      const activationAtNextBoundary = [...this.states.values()].some((state) =>
-        state.lifecycle === "STOWED" &&
-        state.definition.weapon?.launchTimeSeconds !== null &&
-        Math.abs((state.definition.weapon?.launchTimeSeconds ?? Number.NaN) - nextTime) <= 1e-9
-      );
+      const activationAtNextBoundary = [...this.states.values()].some((state) => {
+        const launchTimeSeconds = state.definition.weapon?.launchTimeSeconds;
+        return state.lifecycle === "STOWED" &&
+          launchTimeSeconds !== null &&
+          launchTimeSeconds !== undefined &&
+          launchTimeSeconds <= scenario.durationSeconds &&
+          firstFixedStepTickAtOrAfter(
+            launchTimeSeconds,
+            scenario.fixedStepSeconds,
+          ) === this.integratedSteps;
+      });
       if (
         this.eventJournal.hasPending() ||
         this.integratedSteps === 1 ||
@@ -1212,13 +1232,17 @@ export class EngineSession {
       }
     }
 
+    const modelTimeSeconds = modelTimeAtTick(
+      this.integratedSteps,
+      this.scenario.fixedStepSeconds,
+    );
     return {
       completed: this.completed,
       integratedSteps: this.integratedSteps,
-      modelTimeSeconds: Math.min(this.time, this.scenario.durationSeconds),
+      modelTimeSeconds: Math.min(modelTimeSeconds, this.scenario.durationSeconds),
       progress:
         this.scenario.durationSeconds > 0
-          ? Math.min(1, this.time / this.scenario.durationSeconds)
+          ? Math.min(1, modelTimeSeconds / this.scenario.durationSeconds)
           : 1,
     };
   }

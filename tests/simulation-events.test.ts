@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { runEngineBackend } from "../lib/engine/backend.ts";
+import { EngineSession } from "../lib/engine/core.ts";
 import {
   SIMULATION_EVENT_PAYLOAD_SCHEMAS,
   type EngineScenario,
 } from "../lib/engine/contracts.ts";
 import {
   assertSimulationEventStream,
+  firstFixedStepTickAtOrAfter,
+  modelTimeAtTick,
   SimulationEventJournal,
   type SimulationEventDraft,
 } from "../lib/engine/simulation-events.ts";
@@ -288,6 +291,79 @@ test("a launch just after a grid boundary is not rounded back to the prior tick"
       run.scenario,
       run.termination,
     );
+  }
+});
+
+test("the tick-owned clock admits the reported millisecond-grid launch in both engines and every batch size", () => {
+  const scenario = admittedScenario();
+  scenario.fixedStepSeconds = 0.001;
+  scenario.durationSeconds = 1.02;
+  const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
+  weapon.weapon!.launchTimeSeconds = 1.008;
+
+  for (const backend of ["typescript", "rust-wasm"] as const) {
+    const run = runEngineBackend(structuredClone(scenario), backend);
+    assert.equal(run.events.state, "AVAILABLE");
+    const release = run.events.items.find(
+      (event) =>
+        event.payload.kind === "ENTITY_ENTERED_WORLD" &&
+        event.producer.entityId === weapon.id,
+    );
+    assert.ok(release, `${backend} must record the millisecond-grid store release`);
+    assert.equal(release.tick, 1008);
+    assert.equal(release.modelTimeSeconds, 1.008);
+    assertSimulationEventStream(run.events.items, run.frames, run.scenario, run.termination);
+  }
+
+  const baseline = runEngineBackend(structuredClone(scenario), "typescript");
+  for (const batchSize of [1, 7, 128, 2_048]) {
+    const session = new EngineSession(structuredClone(scenario));
+    while (!session.isCompleted()) session.runTicks(batchSize);
+    assert.deepEqual(session.result(), baseline, `batch size ${batchSize}`);
+  }
+});
+
+test("fixed-step activation boundary correction covers grid and off-grid values across the admitted step range", () => {
+  const steps = [0.001, 0.003, 0.01, 0.05, 0.2, 1];
+  const gridTicks = [0, 1, 7, 257, 1008];
+  for (const step of steps) {
+    for (const gridTick of gridTicks) {
+      const boundary = modelTimeAtTick(gridTick, step);
+      const nearGridDelta = Math.max(
+        Number.EPSILON * Math.max(1, Math.abs(boundary)) * 4,
+        step * 1e-12,
+      );
+      const launchTimes = [boundary, boundary + step * 0.37, boundary + nearGridDelta];
+      for (const launchTime of launchTimes) {
+        let expectedTick = 0;
+        while (modelTimeAtTick(expectedTick, step) < launchTime) expectedTick += 1;
+        const actualTick = firstFixedStepTickAtOrAfter(launchTime, step);
+        assert.equal(actualTick, expectedTick, `step=${step} launch=${launchTime}`);
+        assert.ok(modelTimeAtTick(actualTick, step) >= launchTime);
+        if (actualTick > 0) {
+          assert.ok(modelTimeAtTick(actualTick - 1, step) < launchTime);
+        }
+      }
+    }
+  }
+});
+
+test("finite schedules outside the executable run window fail admission before quantization", () => {
+  for (const launchTimeSeconds of [0.201, Number.MAX_VALUE]) {
+    const scenario = admittedScenario();
+    scenario.fixedStepSeconds = 0.001;
+    scenario.durationSeconds = 0.2;
+    const store = scenario.entities.find((entity) =>
+      entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds === null
+    )!;
+    store.weapon!.launchTimeSeconds = launchTimeSeconds;
+    for (const backend of ["typescript", "rust-wasm"] as const) {
+      assert.throws(
+        () => runEngineBackend(structuredClone(scenario), backend),
+        /launches after scenario duration/,
+        `${backend} must reject the post-duration schedule before execution`,
+      );
+    }
   }
 });
 
