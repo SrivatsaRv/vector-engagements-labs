@@ -71,16 +71,22 @@ Issue #135 registers NASA TP-1538, NASA/TM-2003-212145, the NESC F-16 package
 and Atmospheric Case 13.2 under the exact subject
 `NASA_NESC_GENERIC_F16_REFERENCE` and intended use
 `ENGINE_VERIFICATION_ONLY`. The two NTRS reports are public-use-permitted and
-their immutable PDF hashes and table-page ancestry are governed in the aircraft
-evidence registry.
+their immutable PDF hashes and table-page ancestry are governed in the separate
+`nasa-generic-f16-verification-corpus.v1.json` artifact. Aircraft evidence
+registry v2 remains unchanged.
 
 No Case 13.2 evaluator or normalized table derivative is admitted by the first
 slice. TP-1538 publishes aerodynamic data, and TM-2003-212145 publishes mass
 properties and model equations/ranges, but the reports do not embed the full
 propulsion and control tables needed by the case. The NESC package includes
 those values through third-party/book-derived ancestry without an established
-package-wide derivative redistribution decision. Copying them into the model
-pack would therefore violate the evidence boundary.
+new-derivative licence and ancestry decision. Copying them into the model pack
+without that explicit review would therefore violate the evidence boundary.
+
+This does not erase the narrow Case 11 derivative already reviewed and recorded
+in aircraft evidence registry v2. The corpus binds that legacy fixture to its
+published digest and ancestry while denying it runtime authority. It permits no
+new Case 13.2 or DAVE-ML descendant by implication.
 
 The offline gate `npm run policy:nasa-generic-f16:verify` verifies exact source
 identities, source-versus-comparison roles, licence decisions, page ancestry,

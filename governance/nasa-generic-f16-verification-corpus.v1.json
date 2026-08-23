@@ -1,0 +1,220 @@
+{
+  "schemaVersion": "vector.aircraft-verification-corpus.v1",
+  "id": "nasa-nesc-generic-f16-reference",
+  "version": "1.0.0",
+  "ownerIssue": "#135",
+  "parentIssue": "#64",
+  "dependentIssues": ["#134", "#39"],
+  "accessedAt": "2026-08-24",
+  "reviewedAt": "2026-08-24",
+  "subject": {
+    "id": "NASA_NESC_GENERIC_F16_REFERENCE",
+    "intendedUse": "ENGINE_VERIFICATION_ONLY",
+    "runtimeAuthority": "NONE",
+    "namedPerformanceAdmission": false,
+    "capabilities": ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS", "MASS_AND_INERTIA"],
+    "excludedCapabilities": ["SENSORS", "WEAPONS", "EW", "DATALINK", "TACTICS"],
+    "excludedNamedSubjects": [
+      "IAF_SU_30MKI",
+      "PAF_F16C_BLOCK52_PEACE_DRIVE_I",
+      "PAF_F16D_BLOCK52_PEACE_DRIVE_I"
+    ]
+  },
+  "artifacts": [
+    {
+      "id": "nasa-tp-1538-f16-aerodynamics-source",
+      "role": "SOURCE_REPORT",
+      "authority": "NASA",
+      "uri": "https://ntrs.nasa.gov/api/citations/19800005879/downloads/19800005879.pdf",
+      "fileName": "19800005879.pdf",
+      "sha256": "aae0ece64474291368c0b4c816d3ab327c6100329e6eb030c2f4545d0913feb3",
+      "accessedAt": "2026-08-24",
+      "reviewedAt": "2026-08-24",
+      "hashReviewState": "VERIFIED",
+      "licenceReviewState": "REVIEWED",
+      "licenceDecision": "GOV_PUBLIC_USE_PERMITTED",
+      "subjectId": "NASA_NESC_GENERIC_F16_REFERENCE",
+      "intendedUse": "ENGINE_VERIFICATION_ONLY",
+      "capabilities": ["AERODYNAMICS", "FLIGHT_CONTROLS", "MASS_AND_INERTIA"],
+      "ancestry": {
+        "state": "PRIMARY_PUBLIC_REPORT",
+        "sourceArtifactIds": [],
+        "externalLineage": []
+      },
+      "scopeCode": "TP1538_FACTUAL_TABLES_AND_DOCUMENTED_EQUATIONS"
+    },
+    {
+      "id": "nasa-tm-2003-212145-f16-simulation-source",
+      "role": "SOURCE_REPORT",
+      "authority": "NASA",
+      "uri": "https://ntrs.nasa.gov/api/citations/20030013626/downloads/20030013626.pdf",
+      "fileName": "20030013626.pdf",
+      "sha256": "df7eb1a40f18c5d025de7759c4c227a36c283b8522f89dd9bed5c7d6b6aaedc9",
+      "accessedAt": "2026-08-24",
+      "reviewedAt": "2026-08-24",
+      "hashReviewState": "VERIFIED",
+      "licenceReviewState": "REVIEWED",
+      "licenceDecision": "PUBLIC_USE_PERMITTED",
+      "subjectId": "NASA_NESC_GENERIC_F16_REFERENCE",
+      "intendedUse": "ENGINE_VERIFICATION_ONLY",
+      "capabilities": ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS", "MASS_AND_INERTIA"],
+      "ancestry": {
+        "state": "PRIMARY_PUBLIC_REPORT",
+        "sourceArtifactIds": [],
+        "externalLineage": []
+      },
+      "scopeCode": "TM212145_MODEL_DESCRIPTION_AND_PUBLISHED_MASS_PROPERTIES"
+    },
+    {
+      "id": "nasa-nesc-2015-f16-daveml-source",
+      "role": "COMMON_MODEL_REFERENCE",
+      "authority": "NASA NESC",
+      "uri": "https://nescacademy.nasa.gov/workshop/FlightSim/2015/models/F16_package.zip",
+      "fileName": "F16_package.zip",
+      "sha256": "20c60f615ae8e87d81c9d98b54fff45a2832840201499cbcfe3f45a60ef3e5b2",
+      "accessedAt": "2026-08-24",
+      "reviewedAt": "2026-08-24",
+      "hashReviewState": "VERIFIED",
+      "licenceReviewState": "REVIEWED_WITH_NEW_DERIVATIVE_RESTRICTION",
+      "licenceDecision": "NEW_DERIVATIVE_REQUIRES_EXPLICIT_REVIEW",
+      "subjectId": "NASA_NESC_GENERIC_F16_REFERENCE",
+      "intendedUse": "ENGINE_VERIFICATION_ONLY",
+      "capabilities": ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS", "MASS_AND_INERTIA"],
+      "ancestry": {
+        "state": "COMMON_MODEL_REFERENCE_WITH_MIXED_ANCESTRY",
+        "sourceArtifactIds": [
+          "nasa-tp-1538-f16-aerodynamics-source",
+          "nasa-tm-2003-212145-f16-simulation-source"
+        ],
+        "externalLineage": [
+          "MORELLI_MODEL_COPYRIGHT_NOTICE_PRESENT",
+          "STEVENS_AND_LEWIS_PROPULSION_AND_INERTIA_LINEAGE"
+        ]
+      },
+      "scopeCode": "REFERENCE_AND_COMPARISON_ONLY_NO_NEW_TABLE_PROMOTION"
+    },
+    {
+      "id": "nasa-nesc-2015-atmos13p2-comparison",
+      "role": "COMMON_MODEL_COMPARISON",
+      "authority": "NASA NESC",
+      "uri": "https://nescacademy.nasa.gov/src/flightsim/Datasets/Atmos_13p2_SubsonicAirspeedChangeF16.zip",
+      "fileName": "Atmos_13p2_SubsonicAirspeedChangeF16.zip",
+      "sha256": "b26a2f9eb4c537ea96bf73493004ae77d37b38d496b32e6d50e00b4ec9482fb1",
+      "accessedAt": "2026-08-24",
+      "reviewedAt": "2026-08-24",
+      "hashReviewState": "VERIFIED",
+      "licenceReviewState": "REVIEWED_WITH_NEW_DERIVATIVE_RESTRICTION",
+      "licenceDecision": "NEW_DERIVATIVE_REQUIRES_EXPLICIT_REVIEW",
+      "subjectId": "NASA_NESC_GENERIC_F16_REFERENCE",
+      "intendedUse": "ENGINE_VERIFICATION_ONLY",
+      "capabilities": ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS", "MASS_AND_INERTIA"],
+      "ancestry": {
+        "state": "COMMON_MODEL_OUTPUT_COMPARISON",
+        "sourceArtifactIds": ["nasa-nesc-2015-f16-daveml-source"],
+        "externalLineage": []
+      },
+      "scopeCode": "CASE13P2_IMPLEMENTATION_COMPARISON_NOT_PHYSICAL_VALIDATION"
+    }
+  ],
+  "sourcePageClaims": [
+    {
+      "id": "tp1538-table-i-mass-geometry",
+      "sourceArtifactId": "nasa-tp-1538-f16-aerodynamics-source",
+      "capabilities": ["MASS_AND_INERTIA"],
+      "tableLabel": "TABLE I",
+      "pdfPageRange": [49, 49],
+      "reportPageRange": [43, 43],
+      "pdfToReportPageOffset": 6,
+      "publishedAxes": [],
+      "publishedOutputs": [
+        "WEIGHT_LB",
+        "INERTIA_XX_SLUG_FT2",
+        "INERTIA_YY_SLUG_FT2",
+        "INERTIA_ZZ_SLUG_FT2",
+        "INERTIA_XZ_SLUG_FT2",
+        "REFERENCE_WING_SPAN_FT",
+        "REFERENCE_WING_AREA_FT2",
+        "REFERENCE_MEAN_AERODYNAMIC_CHORD_FT"
+      ]
+    },
+    {
+      "id": "tp1538-table-iii-longitudinal-aerodynamics",
+      "sourceArtifactId": "nasa-tp-1538-f16-aerodynamics-source",
+      "capabilities": ["AERODYNAMICS", "FLIGHT_CONTROLS"],
+      "tableLabel": "TABLE III",
+      "pdfPageRange": [51, 85],
+      "reportPageRange": [45, 79],
+      "pdfToReportPageOffset": 6,
+      "publishedAxes": [
+        "ANGLE_OF_ATTACK_DEG",
+        "SIDESLIP_DEG",
+        "HORIZONTAL_TAIL_DEFLECTION_DEG"
+      ],
+      "publishedOutputs": [
+        "BODY_FORCE_COEFFICIENT_X",
+        "BODY_FORCE_COEFFICIENT_Z",
+        "PITCHING_MOMENT_COEFFICIENT"
+      ]
+    },
+    {
+      "id": "tm212145-table-1-mass-properties",
+      "sourceArtifactId": "nasa-tm-2003-212145-f16-simulation-source",
+      "capabilities": ["MASS_AND_INERTIA"],
+      "tableLabel": "Table 1",
+      "pdfPageRange": [48, 48],
+      "reportPageRange": [33, 33],
+      "pdfToReportPageOffset": 15,
+      "publishedAxes": [],
+      "publishedOutputs": [
+        "WEIGHT_LB",
+        "INERTIA_XX_SLUG_FT2",
+        "INERTIA_YY_SLUG_FT2",
+        "INERTIA_ZZ_SLUG_FT2",
+        "INERTIA_XZ_SLUG_FT2"
+      ]
+    }
+  ],
+  "case13p2": {
+    "artifactId": "nasa-nesc-2015-atmos13p2-comparison",
+    "specificationUri": "https://nescacademy.nasa.gov/flightsim/2015/atmospheric/acc13_p2",
+    "durationSeconds": 20,
+    "commandAtSeconds": 5,
+    "equivalentAirspeedDeltaKnots": -5,
+    "comparisonRole": "COMMON_MODEL_IMPLEMENTATION_COMPARISON_NOT_PHYSICAL_VALIDATION",
+    "physicalValidation": false
+  },
+  "legacyCase11": {
+    "registryPath": "governance/aircraft-evidence-registry.v2.json",
+    "registrySchemaVersion": "vector.aircraft-evidence-registry.v2",
+    "sourceArtifactId": "nasa-nesc-2015-f16-daveml-source",
+    "comparisonArtifactId": "nasa-nesc-2015-atmos11-sim04-validation",
+    "derivativeArtifactId": "vector-nesc-case11-derived-fixture",
+    "derivativeSha256": "85f14b1d28e0d839f6f75cc03e1ff7d577c181809f38d1b30a2f5f83e3bd3602",
+    "ancestryState": "LEGACY_REVIEWED_COMMON_MODEL_FIXTURE",
+    "licenceReviewState": "REVIEWED_IN_PUBLISHED_REGISTRY_V2",
+    "scopeCode": "CASE11_SI_NORMALIZED_CHECKPOINTS_ONLY",
+    "newDerivativePolicy": "EXPLICIT_LICENCE_AND_ANCESTRY_REVIEW_REQUIRED",
+    "runtimeAuthority": "NONE"
+  },
+  "derivativeAdmission": {
+    "state": "WITHHELD",
+    "decisionCode": "NEW_DERIVATIVE_REQUIRES_EXPLICIT_LICENCE_AND_ANCESTRY_REVIEW",
+    "requiredLongitudinalFields": [
+      "BODY_FORCE_COEFFICIENT_X",
+      "BODY_FORCE_COEFFICIENT_Z",
+      "PITCHING_MOMENT_COEFFICIENT",
+      "PROPULSION_THRUST_TABLE",
+      "CONSTANT_MASS",
+      "CONSTANT_INERTIA",
+      "THROTTLE_CONTROL_OUTPUT",
+      "ELEVATOR_CONTROL_OUTPUT",
+      "AXES_UNITS_DOMAINS_INTERPOLATION"
+    ],
+    "blockerCodes": [
+      "PUBLIC_REPORT_PROPULSION_TABLE_VALUES_NOT_EMBEDDED",
+      "PUBLIC_REPORT_CONTROL_OUTPUT_TABLE_VALUES_NOT_EMBEDDED",
+      "NESC_NEW_DERIVATIVE_EXPLICIT_REVIEW_REQUIRED",
+      "NESC_PROPULSION_INERTIA_THIRD_PARTY_BOOK_ANCESTRY"
+    ]
+  }
+}

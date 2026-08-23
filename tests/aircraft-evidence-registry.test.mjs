@@ -20,7 +20,7 @@ test("aircraft evidence registry v1 remains readable after v2 becomes current", 
 
 test("aircraft evidence registry validates local artifact content and explicit named-platform gaps", () => {
   const result = validateAircraftEvidenceRegistry(registry);
-  assert.deepEqual(result, { artifacts: 14, claims: 3 });
+  assert.deepEqual(result, { artifacts: 11, claims: 3 });
   const su30 = findAircraftEvidenceClaim(registry, "su-30mki");
   assert.equal(su30?.state, "UNSUPPORTED");
   assert.equal(su30?.capabilities.length, 5);
