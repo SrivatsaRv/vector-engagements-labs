@@ -16,21 +16,163 @@
     "remoteArtifact": "A remote hash records reviewed content identity. It does not prove ingestion or coefficient extraction. A dynamic locator without an approved hash is context only and cannot support admission.",
     "localArtifact": "A committed derivative fixture must hash to the registry value. A changed fixture needs a new registry version and a new review. No copyrighted source bytes are committed by this registry."
   },
+  "verificationCorpora": [
+    {
+      "schemaVersion": "vector.aircraft-verification-corpus.v1",
+      "id": "nasa-nesc-generic-f16-reference",
+      "ownerIssue": "#135",
+      "parentIssue": "#64",
+      "dependentIssue": "#134",
+      "subject": "NASA_NESC_GENERIC_F16_REFERENCE",
+      "intendedUse": "ENGINE_VERIFICATION_ONLY",
+      "runtimeAuthority": "NONE",
+      "namedPerformanceAdmission": false,
+      "artifactRoles": {
+        "SOURCE_REPORT": [
+          "nasa-tp-1538-f16-aerodynamics-source",
+          "nasa-tm-2003-212145-f16-simulation-source"
+        ],
+        "COMMON_MODEL_REFERENCE": ["nasa-nesc-2015-f16-daveml-source"],
+        "COMMON_MODEL_COMPARISON": ["nasa-nesc-2015-atmos13p2-comparison"]
+      },
+      "sourcePageClaims": [
+        {
+          "id": "tp1538-table-i-mass-geometry",
+          "sourceArtifactId": "nasa-tp-1538-f16-aerodynamics-source",
+          "capabilities": ["MASS_AND_STORES"],
+          "tableLabel": "TABLE I",
+          "pdfPageRange": [49, 49],
+          "reportPageRange": [43, 43],
+          "pdfToReportPageOffset": 6,
+          "publishedAxes": [],
+          "publishedOutputs": ["weight", "inertia", "referenceGeometry", "controlLimits"]
+        },
+        {
+          "id": "tp1538-table-iii-aerodynamics",
+          "sourceArtifactId": "nasa-tp-1538-f16-aerodynamics-source",
+          "capabilities": ["AERODYNAMICS", "FLIGHT_CONTROLS"],
+          "tableLabel": "TABLE III",
+          "pdfPageRange": [51, 85],
+          "reportPageRange": [45, 79],
+          "pdfToReportPageOffset": 6,
+          "publishedAxes": ["angleOfAttack", "sideslip", "horizontalTailDeflection"],
+          "publishedOutputs": ["bodyForceCoefficients", "bodyMomentCoefficients", "controlDerivatives"]
+        },
+        {
+          "id": "tm212145-table-1-mass-properties",
+          "sourceArtifactId": "nasa-tm-2003-212145-f16-simulation-source",
+          "capabilities": ["MASS_AND_STORES"],
+          "tableLabel": "Table 1",
+          "pdfPageRange": [48, 48],
+          "reportPageRange": [33, 33],
+          "pdfToReportPageOffset": 15,
+          "publishedAxes": [],
+          "publishedOutputs": ["weight", "inertia"]
+        }
+      ],
+      "case13p2": {
+        "scenarioUri": "https://nescacademy.nasa.gov/flightsim/2015/atmospheric/acc13_p2",
+        "durationSeconds": 20,
+        "command": {
+          "timeSeconds": 5,
+          "equivalentAirspeedDeltaKnots": -5
+        },
+        "comparisonRole": "COMMON_MODEL_IMPLEMENTATION_COMPARISON_NOT_PHYSICAL_VALIDATION"
+      },
+      "derivative": {
+        "state": "WITHHELD",
+        "localPath": null,
+        "sha256": null,
+        "tables": [],
+        "requiredLongitudinalFields": [
+          "body-axis drag/lift coefficient tables",
+          "propulsion tables across altitude, Mach and power",
+          "constant mass and inertia",
+          "throttle and elevator/control outputs",
+          "declared axes, units, domains and interpolation"
+        ],
+        "blockerCodes": [
+          "PUBLIC_REPORT_PROPULSION_TABLE_VALUES_NOT_EMBEDDED",
+          "PUBLIC_REPORT_CONTROL_OUTPUT_TABLE_VALUES_NOT_EMBEDDED",
+          "NESC_PACKAGE_REDISTRIBUTION_NOT_ESTABLISHED",
+          "NESC_PROPULSION_INERTIA_THIRD_PARTY_BOOK_ANCESTRY"
+        ],
+        "decision": "No executable derivative or evaluator is admitted. TP-1538 table transcription may proceed independently, but cannot become a Case 13.2 evaluator until every required longitudinal field has lawful source ancestry."
+      }
+    }
+  ],
   "artifacts": [
+    {
+      "id": "nasa-tp-1538-f16-aerodynamics-source",
+      "kind": "SOURCE",
+      "authority": "NASA Langley Research Center",
+      "uri": "https://ntrs.nasa.gov/api/citations/19800005879/downloads/19800005879.pdf",
+      "citationId": "19800005879",
+      "reportNumber": "NASA-TP-1538",
+      "sha256": "aae0ece64474291368c0b4c816d3ab327c6100329e6eb030c2f4545d0913feb3",
+      "fileName": "19800005879.pdf",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "REVIEWED",
+      "licenseDecision": "PUBLIC_USE_PERMITTED",
+      "admissionUse": "REFERENCE_ONLY",
+      "subjectClaimIds": [],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["AERODYNAMICS", "FLIGHT_CONTROLS", "MASS_AND_STORES"],
+      "scope": "Public-use NASA report containing the simulator configuration, mass/dimensional characteristics and wind-tunnel-derived aerodynamic tables. It is evidence for the generic NASA reference only, not a named operational F-16 variant."
+    },
+    {
+      "id": "nasa-tm-2003-212145-f16-simulation-source",
+      "kind": "SOURCE",
+      "authority": "NASA Langley Research Center",
+      "uri": "https://ntrs.nasa.gov/api/citations/20030013626/downloads/20030013626.pdf",
+      "citationId": "20030013626",
+      "reportNumber": "NASA/TM-2003-212145",
+      "sha256": "df7eb1a40f18c5d025de7759c4c227a36c283b8522f89dd9bed5c7d6b6aaedc9",
+      "fileName": "20030013626.pdf",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "REVIEWED",
+      "licenseDecision": "PUBLIC_USE_PERMITTED",
+      "admissionUse": "REFERENCE_ONLY",
+      "subjectClaimIds": [],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS", "MASS_AND_STORES"],
+      "scope": "Public-use NASA report documenting the generic nonlinear F-16 simulation, equations, valid ranges and mass properties. Its aerodynamic and propulsion table values are referenced as external package files rather than printed in full."
+    },
     {
       "id": "nasa-nesc-2015-f16-daveml-source",
       "kind": "SOURCE",
       "authority": "NASA NESC",
       "uri": "https://nescacademy.nasa.gov/workshop/FlightSim/2015/models/F16_package.zip",
       "sha256": "20c60f615ae8e87d81c9d98b54fff45a2832840201499cbcfe3f45a60ef3e5b2",
+      "fileName": "F16_package.zip",
       "retrievalState": "DECLARED_REMOTE",
       "hashReviewState": "VERIFIED",
       "licenseReviewState": "REVIEWED",
+      "licenseDecision": "REFERENCE_ONLY_NO_DERIVATIVE_COMMIT",
       "admissionUse": "REFERENCE_ONLY",
       "subjectClaimIds": [],
       "eligibleClaimIds": [],
       "capabilityCoverage": ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS"],
-      "scope": "NASA NESC F-16 DAVE-ML verification model; not an IAF Su-30MKI or PAF Peace Drive I F-16C/D model."
+      "scope": "NASA NESC F-16 DAVE-ML verification model; not an IAF Su-30MKI or PAF Peace Drive I F-16C/D model. Package-wide redistribution is not established and its propulsion/inertia ancestry includes Stevens and Lewis; no DAVE-ML-derived values may be committed under this decision."
+    },
+    {
+      "id": "nasa-nesc-2015-atmos13p2-comparison",
+      "kind": "CONTEXT",
+      "authority": "NASA NESC",
+      "uri": "https://nescacademy.nasa.gov/src/flightsim/Datasets/Atmos_13p2_SubsonicAirspeedChangeF16.zip",
+      "sha256": "b26a2f9eb4c537ea96bf73493004ae77d37b38d496b32e6d50e00b4ec9482fb1",
+      "fileName": "Atmos_13p2_SubsonicAirspeedChangeF16.zip",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "REVIEWED",
+      "licenseDecision": "REFERENCE_ONLY_NO_DERIVATIVE_COMMIT",
+      "admissionUse": "REFERENCE_ONLY",
+      "subjectClaimIds": [],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS", "MASS_AND_STORES"],
+      "scope": "Case 13.2 multi-tool trajectories are common-model comparison evidence only. They are not an independent physical validation corpus and their values are not committed by this registry."
     },
     {
       "id": "nasa-nesc-2015-atmos11-sim04-validation",

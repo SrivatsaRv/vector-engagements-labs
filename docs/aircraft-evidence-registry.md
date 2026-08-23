@@ -105,3 +105,40 @@ The registry does not fetch remote data in a simulation tick, or at build time.
 Remote hashes identify source material; only a committed derivative has its
 content re-hashed locally. A corrected source or derivative requires a new
 registry version and review.
+
+## Generic NASA F-16 verification corpus
+
+The registry also owns one non-catalog verification corpus with the exact
+subject `NASA_NESC_GENERIC_F16_REFERENCE` and intended use
+`ENGINE_VERIFICATION_ONLY`. It is not a fourth named-aircraft subject and has
+`runtimeAuthority: NONE`; it cannot be selected as a PAF F-16, relabelled as a
+Su-30-family aircraft, or used to admit named performance.
+
+The immutable evidence identities for the first #135 slice are:
+
+| Role | Artifact | SHA-256 | Licence decision |
+| --- | --- | --- | --- |
+| source report | NASA TP-1538 / NTRS 19800005879 | `aae0ece64474291368c0b4c816d3ab327c6100329e6eb030c2f4545d0913feb3` | NASA NTRS `GOV_PUBLIC_USE_PERMITTED` |
+| source report | NASA/TM-2003-212145 / NTRS 20030013626 | `df7eb1a40f18c5d025de7759c4c227a36c283b8522f89dd9bed5c7d6b6aaedc9` | NASA NTRS `PUBLIC_USE_PERMITTED` |
+| common-model reference | NASA NESC F-16 package | `20c60f615ae8e87d81c9d98b54fff45a2832840201499cbcfe3f45a60ef3e5b2` | reference only; no derivative commit |
+| common-model comparison | NESC Atmospheric Case 13.2 archive | `b26a2f9eb4c537ea96bf73493004ae77d37b38d496b32e6d50e00b4ec9482fb1` | reference only; no derivative commit |
+
+TP-1538 publishes numeric aerodynamic tables in Table III (PDF pages 51–85,
+report pages 45–79) and mass/dimensional data in Table I (PDF/report pages
+49/43). TM-2003-212145 publishes the simulated mass properties in Table 1
+(PDF/report pages 48/33), but directs the actual aerodynamic and propulsion
+table values to external MATLAB package files. The NESC package fills those
+gaps only through a lineage that includes a Morelli copyright notice and
+Stevens and Lewis book-derived propulsion and inertia material. Its
+package-wide derivative redistribution authority is not established.
+
+Consequently the normalized derivative is deliberately `WITHHELD`: there are
+no committed Case 13.2 coefficient, propulsion, inertia, control or trajectory
+tables and no production evaluator. The NESC trajectories remain a comparison
+between implementations of a common model, not independent physical
+validation. `npm run policy:nasa-generic-f16:verify` checks the exact identities,
+roles, licence decisions, subject, intended use, page ancestry and withheld
+state without accessing the network. Passing `-- --artifact-dir <directory>`
+also hashes locally retained source bytes offline; expected filenames are
+`19800005879.pdf`, `20030013626.pdf`, `F16_package.zip`, and
+`Atmos_13p2_SubsonicAirspeedChangeF16.zip`.

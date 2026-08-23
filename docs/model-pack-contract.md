@@ -187,6 +187,15 @@ report instead retain the pack's blocking limitation verbatim. Neither surface
 may upgrade a geometry-teaching fixture into an `ADMITTED` named-performance
 claim.
 
+The registry's `NASA_NESC_GENERIC_F16_REFERENCE` verification corpus is a
+separate `ENGINE_VERIFICATION_ONLY` boundary. Its first #135 slice registers
+immutable source and comparison identities but deliberately withholds an
+executable derivative because the public reports do not contain every Case
+13.2 propulsion/control table and the NESC package's derivative redistribution
+authority is unresolved. A verification corpus with `runtimeAuthority: NONE`
+cannot satisfy a compiled aircraft component, expand a model validity domain,
+or be promoted through a catalog identity.
+
 ## Scenario binding and patches
 
 Every `vector.scenario.v3` package contains:

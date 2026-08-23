@@ -100,6 +100,7 @@ jobs:
         run: |
           npm run environment:sources:verify
           npm run policy:aircraft-evidence:verify
+          npm run policy:nasa-generic-f16:verify
           npm run symbols:verify
           npm run models:verify
           npm run reference-aircraft:verify
