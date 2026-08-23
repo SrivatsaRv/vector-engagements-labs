@@ -91,6 +91,25 @@ minimum range. This contract does not add a positive sensor to the deployed
 pack or make a track. It prevents incomplete public research evidence from
 becoming a generic radar by accident.
 
+### Generic track verification pack
+
+`vector.intended-use.engine-verification` is a separate non-production intended
+use for bounded engine tests. A source-authored sensor may attach
+`vector.generic-track-model.v1` only under that intended use and only with
+`TEST_FIXTURE / ENGINE_VERIFICATION_ONLY` state. The model freezes position and
+velocity bias, diagonal standard deviation, confirmation count, maximum source
+age, coast/loss thresholds, and deterministic observation windows. It is
+compiled and content-addressed through the same model-pack path as every other
+model; it is not an entity-level test mutation or a weapon/sensor-name heuristic.
+
+The engine scenario also binds a SHA-256 digest over the compact runtime
+model-pack projection. TypeScript and Rust recompute it before constructing
+runtime state, using the same canonical object-key and integral-number
+representation. A changed projection, missing digest, wrong intended use, or
+unknown field fails admission. The production deployment manifest does not
+admit this pack, so the browser Worker rejects it. This contract proves generic
+TrackStore mechanics only; no named aircraft sensor is thereby available.
+
 ## Compilation and digest
 
 `compileModelPack(source)` performs all work before the engine starts:

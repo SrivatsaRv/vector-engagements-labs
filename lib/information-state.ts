@@ -12,22 +12,187 @@ type ObserverStateFrame = Pick<EngineFrame, "t" | "observerStates">;
 
 export function projectObserverStates(frames: readonly ObserverStateFrame[]): RaspTrack[] {
   return frames.flatMap((frame) =>
-    frame.observerStates.map((state) => ({
-      ...state,
-      modelTimeSeconds: frame.t,
-      trackId: state.trackState === "PLOT"
-        ? `${state.perspective}:${state.sensorModelId}:plot`
-        : "UNAVAILABLE",
-      classification: state.trackState === "PLOT" ? "UNKNOWN" as const : "UNAVAILABLE" as const,
-      identification: "UNKNOWN" as const,
-      source: state.sensorModelId ?? "No admitted sensor model",
-      lastUpdateSeconds: frame.t,
-      ageSeconds: 0,
-      confidence: 0,
-      uncertaintyMeters: 0,
-      status: state.trackState === "PLOT" ? "PLOT" as const : "NO_TRACK" as const,
-    })),
+    frame.observerStates.map((state) => {
+      assertEngineObserverState(state);
+      const track = state.schemaVersion === "vector.observer-state.v3" ? state.tracks[0] : undefined;
+      const sensorModelId = "sensorModelId" in state ? state.sensorModelId : undefined;
+      return {
+        ...state,
+        modelTimeSeconds: frame.t,
+        trackId: track?.trackId ?? (state.trackState === "PLOT"
+          ? `${state.perspective}:${sensorModelId}:plot`
+          : "UNAVAILABLE"),
+        classification: state.trackState === "PLOT" || track ? "UNKNOWN" as const : "UNAVAILABLE" as const,
+        identification: "UNKNOWN" as const,
+        source: sensorModelId ?? "No admitted sensor model",
+        lastUpdateSeconds: track?.sourceTimeSeconds ?? frame.t,
+        ageSeconds: track?.ageSeconds ?? 0,
+        confidence: null,
+        uncertaintyMeters: track
+          ? Math.max(
+              track.uncertainty.positionStandardDeviationM.x,
+              track.uncertainty.positionStandardDeviationM.y,
+              track.uncertainty.positionStandardDeviationM.z,
+            )
+          : null,
+        status: track?.state ?? (state.trackState === "PLOT" ? "PLOT" as const : "NO_TRACK" as const),
+      };
+    }),
   );
+}
+
+function exactKeys(value: Record<string, unknown>, required: readonly string[], optional: readonly string[] = []) {
+  const allowed = new Set([...required, ...optional]);
+  if (required.some((key) => !Object.hasOwn(value, key)) || Object.keys(value).some((key) => !allowed.has(key))) {
+    throw new Error("Observer state contains unsupported or missing fields.");
+  }
+}
+
+function object(value: unknown, label: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object.`);
+  return value as Record<string, unknown>;
+}
+
+function finiteVector(value: unknown, label: string) {
+  const vector = object(value, label);
+  exactKeys(vector, ["x", "y", "z"]);
+  if (![vector.x, vector.y, vector.z].every((component) => typeof component === "number" && Number.isFinite(component))) {
+    throw new Error(`${label} must contain finite x, y, and z components.`);
+  }
+}
+
+function assertSourceIdentity(value: unknown, owner: unknown, sensorModelId: unknown) {
+  const source = object(value, "Track source identity");
+  exactKeys(source, ["modelPackDigest", "sensorModelId", "sensorModelVersion"]);
+  if (
+    typeof source.modelPackDigest !== "string" || !/^[a-f0-9]{64}$/.test(source.modelPackDigest) ||
+    source.sensorModelId !== sensorModelId || typeof source.sensorModelVersion !== "string" || !source.sensorModelVersion ||
+    !["IAF", "PAF"].includes(String(owner))
+  ) throw new Error("Track source identity is invalid or not bound to its observer state.");
+}
+
+function assertEstimate(value: unknown) {
+  const estimate = object(value, "Track estimate");
+  exactKeys(estimate, ["valueState", "positionM", "velocityMps"]);
+  if (estimate.valueState !== "ESTIMATED") throw new Error("Track estimate value state is invalid.");
+  finiteVector(estimate.positionM, "Track position estimate");
+  finiteVector(estimate.velocityMps, "Track velocity estimate");
+}
+
+function assertUncertainty(value: unknown) {
+  const uncertainty = object(value, "Track uncertainty");
+  exactKeys(uncertainty, ["valueState", "positionStandardDeviationM", "velocityStandardDeviationMps"]);
+  if (uncertainty.valueState !== "ESTIMATED") throw new Error("Track uncertainty value state is invalid.");
+  finiteVector(uncertainty.positionStandardDeviationM, "Track position uncertainty");
+  finiteVector(uncertainty.velocityStandardDeviationMps, "Track velocity uncertainty");
+  const encoded = uncertainty as {
+    positionStandardDeviationM: { x: number; y: number; z: number };
+    velocityStandardDeviationMps: { x: number; y: number; z: number };
+  };
+  if (
+    Object.values(encoded.positionStandardDeviationM).some((component) => component <= 0) ||
+    Object.values(encoded.velocityStandardDeviationMps).some((component) => component <= 0)
+  ) throw new Error("Track uncertainty components must be positive.");
+}
+
+function assertObservation(value: unknown, perspective: unknown, sensorModelId: unknown) {
+  const observation = object(value, "Observation");
+  exactKeys(observation, [
+    "schemaVersion", "id", "owner", "source", "sourceSequence", "sourceTimeSeconds", "estimate", "uncertainty",
+  ]);
+  if (
+    observation.schemaVersion !== "vector.observation.v1" || observation.owner !== perspective ||
+    typeof observation.id !== "string" || !observation.id.startsWith(`${String(perspective)}-OBS-`) ||
+    !Number.isSafeInteger(observation.sourceSequence) || (observation.sourceSequence as number) < 1 ||
+    typeof observation.sourceTimeSeconds !== "number" || !Number.isFinite(observation.sourceTimeSeconds) ||
+    observation.sourceTimeSeconds < 0
+  ) throw new Error("Observation identity, ownership, sequence, or time is invalid.");
+  assertSourceIdentity(observation.source, observation.owner, sensorModelId);
+  assertEstimate(observation.estimate);
+  assertUncertainty(observation.uncertainty);
+}
+
+function assertTrack(value: unknown, perspective: unknown, sensorModelId: unknown) {
+  const track = object(value, "Track");
+  exactKeys(track, [
+    "schemaVersion", "trackId", "owner", "source", "sourceSequence", "sourceTimeSeconds", "state",
+    "estimate", "uncertainty", "updateCount", "ageSeconds", "freshUntilSeconds", "expiresAtSeconds",
+  ]);
+  if (
+    track.schemaVersion !== "vector.track.v1" || track.owner !== perspective ||
+    typeof track.trackId !== "string" || !track.trackId.startsWith(`${String(perspective)}-TRACK-`) ||
+    !["TENTATIVE", "CONFIRMED", "COASTING", "LOST"].includes(String(track.state)) ||
+    !Number.isSafeInteger(track.sourceSequence) || (track.sourceSequence as number) < 1 ||
+    !Number.isSafeInteger(track.updateCount) || (track.updateCount as number) < 1 ||
+    [track.sourceTimeSeconds, track.ageSeconds, track.freshUntilSeconds, track.expiresAtSeconds]
+      .some((item) => typeof item !== "number" || !Number.isFinite(item)) ||
+    (track.sourceTimeSeconds as number) < 0 || (track.ageSeconds as number) < 0 ||
+    (track.freshUntilSeconds as number) < (track.sourceTimeSeconds as number) ||
+    (track.expiresAtSeconds as number) <= (track.freshUntilSeconds as number)
+  ) throw new Error("Track identity, ownership, lifecycle, sequence, or time is invalid.");
+  assertSourceIdentity(track.source, track.owner, sensorModelId);
+  assertEstimate(track.estimate);
+  assertUncertainty(track.uncertainty);
+}
+
+export function assertEngineObserverState(value: unknown): asserts value is EngineObserverState {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Observer state must be an object.");
+  const state = value as Record<string, unknown>;
+  const base = [
+    "schemaVersion", "perspective", "sensorState", "observationCount", "trackState",
+    "visible", "availabilityReason", "effectScope", "stateExplanation",
+  ];
+  if (state.schemaVersion === "vector.observer-state.v2") {
+    exactKeys(state, base, ["sensorModelId"]);
+    const unsupported = state.sensorState === "UNSUPPORTED" && state.observationCount === 0 &&
+      state.trackState === "UNSUPPORTED" && state.visible === false &&
+      state.availabilityReason === "SENSOR_MODEL_UNAVAILABLE" && state.sensorModelId === undefined;
+    const off = state.sensorState === "OFF" && state.observationCount === 0 &&
+      state.trackState === "NONE" && state.visible === false && state.availabilityReason === "SENSOR_OFF" &&
+      typeof state.sensorModelId === "string";
+    const noTrack = state.sensorState === "SEARCH" && state.observationCount === 0 &&
+      state.trackState === "NONE" && state.visible === false &&
+      ["SCAN_NOT_DUE", "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME"].includes(String(state.availabilityReason)) &&
+      typeof state.sensorModelId === "string";
+    const plot = state.sensorState === "SEARCH" && state.observationCount === 1 &&
+      state.trackState === "PLOT" && state.visible === false && state.availabilityReason === "OBSERVATION_ADMITTED" &&
+      typeof state.sensorModelId === "string";
+    if (!(unsupported || off || noTrack || plot)) throw new Error("Observer state v2 is contradictory.");
+  } else if (state.schemaVersion === "vector.observer-state.v3") {
+    exactKeys(state, [...base, "sensorModelId", "observations", "tracks"]);
+    if (
+      state.sensorState !== "SEARCH" ||
+      !Array.isArray(state.observations) || !Array.isArray(state.tracks) ||
+      state.observations.length !== state.observationCount || state.observations.length > 1 ||
+      state.tracks.length > 1 || typeof state.sensorModelId !== "string"
+    ) throw new Error("Observer state v3 is contradictory.");
+    const track = state.tracks[0] as Record<string, unknown> | undefined;
+    state.observations.forEach((observation) => assertObservation(observation, state.perspective, state.sensorModelId));
+    state.tracks.forEach((candidate) => assertTrack(candidate, state.perspective, state.sensorModelId));
+    if (state.observations[0] && track) {
+      const observation = state.observations[0] as Record<string, unknown>;
+      if (
+        observation.sourceSequence !== track.sourceSequence || observation.sourceTimeSeconds !== track.sourceTimeSeconds ||
+        canonicalJson(observation.source) !== canonicalJson(track.source) ||
+        canonicalJson(observation.estimate) !== canonicalJson(track.estimate) ||
+        canonicalJson(observation.uncertainty) !== canonicalJson(track.uncertainty)
+      ) throw new Error("Observation and updated track do not share one admitted estimate.");
+    }
+    const expectedTrackState = track?.state ?? "NONE";
+    const expectedVisible = expectedTrackState === "CONFIRMED" || expectedTrackState === "COASTING";
+    if (state.trackState !== expectedTrackState || state.visible !== expectedVisible) {
+      throw new Error("Observer state v3 track visibility is contradictory.");
+    }
+    const encoded = JSON.stringify(state);
+    if (/observedEntityId|targetEntityId|truthEntityId|truthPosition/.test(encoded)) {
+      throw new Error("Observer state v3 leaks prohibited truth identity.");
+    }
+  } else {
+    throw new Error("Observer state schema is unsupported.");
+  }
+  if (!["IAF", "PAF"].includes(String(state.perspective)) || state.effectScope !== "AIR_PICTURE_ONLY") {
+    throw new Error("Observer state ownership or effect scope is invalid.");
+  }
 }
 
 /**
@@ -52,8 +217,26 @@ export function attachRecordedObserverStates(
 }
 
 function observerStateFromPicture(picture: RaspTrack): EngineObserverState {
-  const state: EngineObserverState = {
-    schemaVersion: picture.schemaVersion,
+  if (picture.schemaVersion === "vector.observer-state.v3") {
+    const state: EngineObserverState = {
+      schemaVersion: "vector.observer-state.v3",
+      perspective: picture.perspective,
+      sensorState: "SEARCH",
+      observationCount: picture.observationCount,
+      trackState: picture.trackState,
+      visible: picture.visible,
+      availabilityReason: picture.availabilityReason,
+      effectScope: "AIR_PICTURE_ONLY",
+      stateExplanation: picture.stateExplanation,
+      sensorModelId: picture.sensorModelId,
+      observations: structuredClone(picture.observations),
+      tracks: structuredClone(picture.tracks),
+    };
+    assertEngineObserverState(state);
+    return state;
+  }
+  const base = {
+    schemaVersion: "vector.observer-state.v2" as const,
     perspective: picture.perspective,
     sensorState: picture.sensorState,
     observationCount: picture.observationCount,
@@ -63,9 +246,11 @@ function observerStateFromPicture(picture: RaspTrack): EngineObserverState {
     effectScope: picture.effectScope,
     stateExplanation: picture.stateExplanation,
   };
-  return picture.sensorModelId === undefined
-    ? state
-    : { ...state, sensorModelId: picture.sensorModelId };
+  const state = "sensorModelId" in picture
+    ? { ...base, sensorModelId: picture.sensorModelId }
+    : base;
+  assertEngineObserverState(state);
+  return state;
 }
 
 /**
@@ -86,7 +271,7 @@ export function assertRecordedSidePictures(
     const key = `${picture.perspective}:${picture.modelTimeSeconds}`;
     if (seen.has(key)) throw new Error("Recorded observer picture has a duplicate side/frame identity.");
     seen.add(key);
-    if ("position" in picture || "observedEntityId" in picture || "truthPosition" in picture) {
+    if ("position" in picture || "observedEntityId" in picture || "truthPosition" in picture || "truthEntityId" in picture) {
       throw new Error("Recorded observer picture exposes prohibited track or truth data.");
     }
   }

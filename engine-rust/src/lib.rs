@@ -9,6 +9,7 @@ mod validation;
 mod wasm_abi;
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub use error::EngineError;
 pub use model_pack::{validate_model_pack_json, CompiledModelPack};
@@ -16,7 +17,7 @@ pub use public_aircraft_reference::{
     run_public_aircraft_reference, run_public_aircraft_reference_json,
     PublicAircraftReferenceInput, PublicAircraftReferenceRun,
 };
-use simulation_events::{SimulationEventDraft, SimulationEventJournal};
+use simulation_events::{SimulationEventDraft, SimulationEventJournal, SimulationEventReceipt};
 pub use simulation_events::{SimulationEventStream, SimulationEventV2};
 pub use validation::{
     validate_scenario, MAX_ENTITIES, MAX_EVENTS, MAX_INPUT_BYTES, MAX_INTEGRATED_STEPS,
@@ -25,7 +26,7 @@ pub use validation::{
 
 const G0: f64 = 9.80665;
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct Vec3 {
     pub x: f64,
     pub y: f64,
@@ -413,7 +414,7 @@ pub struct ScenarioModelPatch {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ModelPackBinding {
     pub schema_version: String,
     pub id: String,
@@ -421,12 +422,15 @@ pub struct ModelPackBinding {
     pub digest: String,
     pub intended_use: IntendedUseRef,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runtime_digest: Option<String>,
+    #[serde(default)]
     pub observer_sensors: Vec<ObserverSensorBinding>,
     pub scenario_patches: Vec<ScenarioModelPatch>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ObserverSensorBinding {
     pub model_id: String,
     pub model_version: String,
@@ -437,6 +441,9 @@ pub struct ObserverSensorBinding {
     pub scan_period_s: f64,
     pub azimuth_field_of_view_rad: f64,
     pub elevation_field_of_view_rad: f64,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification_track_model: Option<ObserverTrackModel>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -464,7 +471,7 @@ pub struct EntityDefinition {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ObserverSensorAdmission {
     pub schema_version: String,
     pub model_pack_digest: String,
@@ -478,6 +485,33 @@ pub struct ObserverSensorAdmission {
     pub scan_period_s: f64,
     pub azimuth_field_of_view_rad: f64,
     pub elevation_field_of_view_rad: f64,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification_track_model: Option<ObserverTrackModel>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ObservationWindow {
+    pub start: f64,
+    pub end: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ObserverTrackModel {
+    pub schema_version: String,
+    pub value_state: String,
+    pub intended_use: String,
+    pub position_bias_m: Vec3,
+    pub velocity_bias_mps: Vec3,
+    pub position_standard_deviation_m: Vec3,
+    pub velocity_standard_deviation_mps: Vec3,
+    pub confirmation_observations: u64,
+    pub maximum_observation_age_seconds: f64,
+    pub coast_after_seconds: f64,
+    pub lost_after_seconds: f64,
+    pub observation_windows_seconds: Vec<ObservationWindow>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -632,6 +666,74 @@ pub struct EngineFrame {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TrackSourceIdentity {
+    pub model_pack_digest: String,
+    pub sensor_model_id: String,
+    pub sensor_model_version: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackEstimate {
+    pub value_state: &'static str,
+    pub position_m: Vec3,
+    pub velocity_mps: Vec3,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackUncertainty {
+    pub value_state: &'static str,
+    pub position_standard_deviation_m: Vec3,
+    pub velocity_standard_deviation_mps: Vec3,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineObservation {
+    pub schema_version: &'static str,
+    pub id: String,
+    pub owner: &'static str,
+    pub source: TrackSourceIdentity,
+    pub source_sequence: u64,
+    pub source_time_seconds: f64,
+    pub estimate: TrackEstimate,
+    pub uncertainty: TrackUncertainty,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineTrack {
+    pub schema_version: &'static str,
+    pub track_id: String,
+    pub owner: &'static str,
+    pub source: TrackSourceIdentity,
+    pub source_sequence: u64,
+    pub source_time_seconds: f64,
+    pub state: &'static str,
+    pub estimate: TrackEstimate,
+    pub uncertainty: TrackUncertainty,
+    pub update_count: u64,
+    pub age_seconds: f64,
+    pub fresh_until_seconds: f64,
+    pub expires_at_seconds: f64,
+}
+
+#[derive(Clone, Debug)]
+pub struct TrackTransitionCommit {
+    pub local_key: String,
+    pub track_id: String,
+    pub owner: &'static str,
+    pub from: &'static str,
+    pub to: &'static str,
+    pub cause: &'static str,
+    pub source: TrackSourceIdentity,
+    pub source_sequence: u64,
+    pub source_time_seconds: f64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ObserverState {
     pub schema_version: &'static str,
     pub perspective: &'static str,
@@ -644,6 +746,135 @@ pub struct ObserverState {
     pub state_explanation: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sensor_model_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observations: Option<Vec<EngineObservation>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tracks: Option<Vec<EngineTrack>>,
+}
+
+#[derive(Clone)]
+struct TrackStore {
+    owner: &'static str,
+    source: TrackSourceIdentity,
+    track_id: String,
+    model: ObserverTrackModel,
+    track: Option<EngineTrack>,
+    transition_sequence: u64,
+}
+
+impl TrackStore {
+    fn new(owner: &'static str, source: TrackSourceIdentity, model: &ObserverTrackModel) -> Self {
+        Self {
+            owner,
+            source,
+            track_id: format!("{owner}-TRACK-0001"),
+            model: model.clone(),
+            track: None,
+            transition_sequence: 0,
+        }
+    }
+
+    fn transition(
+        &mut self,
+        from: &'static str,
+        to: &'static str,
+        cause: &'static str,
+    ) -> TrackTransitionCommit {
+        self.transition_sequence += 1;
+        let (source_sequence, source_time_seconds) =
+            self.track.as_ref().map_or((0, 0.0), |track| {
+                (track.source_sequence, track.source_time_seconds)
+            });
+        TrackTransitionCommit {
+            local_key: format!("track:{}:{:06}", self.track_id, self.transition_sequence),
+            track_id: self.track_id.clone(),
+            owner: self.owner,
+            from,
+            to,
+            cause,
+            source: self.source.clone(),
+            source_sequence,
+            source_time_seconds,
+        }
+    }
+
+    fn update(
+        &mut self,
+        time: f64,
+        observation: Option<EngineObservation>,
+    ) -> (Option<EngineTrack>, Vec<TrackTransitionCommit>) {
+        let mut transitions = Vec::new();
+        if let Some(observation) = observation {
+            let previous = self.track.as_ref().map_or("NONE", |track| track.state);
+            let previous_count = if previous == "LOST" {
+                0
+            } else {
+                self.track.as_ref().map_or(0, |track| track.update_count)
+            };
+            let update_count = previous_count + 1;
+            let state = if previous == "COASTING" {
+                "CONFIRMED"
+            } else if previous == "LOST" || previous == "NONE" {
+                "TENTATIVE"
+            } else if update_count >= self.model.confirmation_observations {
+                "CONFIRMED"
+            } else {
+                "TENTATIVE"
+            };
+            self.track = Some(EngineTrack {
+                schema_version: "vector.track.v1",
+                track_id: self.track_id.clone(),
+                owner: self.owner,
+                source: observation.source.clone(),
+                source_sequence: observation.source_sequence,
+                source_time_seconds: observation.source_time_seconds,
+                state,
+                estimate: observation.estimate.clone(),
+                uncertainty: observation.uncertainty.clone(),
+                update_count,
+                age_seconds: time - observation.source_time_seconds,
+                fresh_until_seconds: observation.source_time_seconds
+                    + self.model.coast_after_seconds,
+                expires_at_seconds: observation.source_time_seconds + self.model.lost_after_seconds,
+            });
+            if previous == "NONE" {
+                transitions.push(self.transition(previous, state, "INITIAL_OBSERVATION"));
+            } else if previous == "LOST" || previous == "COASTING" {
+                transitions.push(self.transition(previous, state, "OBSERVATION_REACQUIRED"));
+            } else if previous == "TENTATIVE" && state == "CONFIRMED" {
+                transitions.push(self.transition(previous, state, "CONFIRMATION_THRESHOLD_MET"));
+            }
+        } else if let Some(track) = self.track.as_mut() {
+            let age = time - track.source_time_seconds;
+            let previous = track.state;
+            let state = if previous != "LOST" && age > self.model.lost_after_seconds {
+                "LOST"
+            } else if previous == "CONFIRMED" && age > self.model.coast_after_seconds {
+                "COASTING"
+            } else if previous == "TENTATIVE" && age > self.model.coast_after_seconds {
+                "LOST"
+            } else {
+                previous
+            };
+            track.state = state;
+            track.age_seconds = age;
+            if state != previous {
+                let cause = if state == "COASTING" {
+                    "FRESHNESS_EXPIRED"
+                } else {
+                    "TRACK_EXPIRED"
+                };
+                transitions.push(self.transition(previous, state, cause));
+            }
+        }
+        (self.track.clone(), transitions)
+    }
+}
+
+struct ObserverTickResult {
+    state: ObserverState,
+    sensor_entity_id: Option<String>,
+    transitions: Vec<TrackTransitionCommit>,
 }
 
 fn unavailable_observer_state(
@@ -661,6 +892,8 @@ fn unavailable_observer_state(
         effect_scope: "AIR_PICTURE_ONLY",
         state_explanation: explanation,
         sensor_model_id: None,
+        observations: None,
+        tracks: None,
     }
 }
 
@@ -669,7 +902,8 @@ fn observer_states(
     scenario: &EngineScenario,
     time: f64,
     dt: f64,
-) -> Vec<ObserverState> {
+    track_stores: &mut HashMap<&'static str, TrackStore>,
+) -> Vec<ObserverTickResult> {
     if scenario.domain != EngagementDomain::AirToAir {
         return Vec::new();
     }
@@ -687,15 +921,15 @@ fn observer_states(
                     && state.lifecycle == EntityLifecycle::Active
             });
             let Some(observer) = observer else {
-                return unavailable_observer_state(perspective, "No admitted sensor model pack is bound to this run.");
+                return ObserverTickResult { state: unavailable_observer_state(perspective, "No admitted sensor model pack is bound to this run."), sensor_entity_id: None, transitions: Vec::new() };
             };
             let Some(target) = target else {
-                return unavailable_observer_state(perspective, "No admitted sensor model pack is bound to this run.");
+                return ObserverTickResult { state: unavailable_observer_state(perspective, "No admitted sensor model pack is bound to this run."), sensor_entity_id: None, transitions: Vec::new() };
             };
             let Some(sensor) = observer.definition.observer_sensor.as_ref() else {
-                return unavailable_observer_state(perspective, "No admitted sensor model pack is bound to this run.");
+                return ObserverTickResult { state: unavailable_observer_state(perspective, "No admitted sensor model pack is bound to this run."), sensor_entity_id: None, transitions: Vec::new() };
             };
-            let valid = sensor.schema_version == "vector.observer-sensor-admission.v1"
+            let valid = matches!(sensor.schema_version.as_str(), "vector.observer-sensor-admission.v1" | "vector.observer-sensor-admission.v2")
                 && sensor.model_pack_digest == scenario.model_pack.digest
                 && !sensor.model_id.is_empty()
                 && !sensor.model_version.is_empty()
@@ -709,11 +943,11 @@ fn observer_states(
                 && sensor.azimuth_field_of_view_rad.is_finite() && sensor.azimuth_field_of_view_rad > 0.0 && sensor.azimuth_field_of_view_rad <= std::f64::consts::TAU
                 && sensor.elevation_field_of_view_rad.is_finite() && sensor.elevation_field_of_view_rad > 0.0 && sensor.elevation_field_of_view_rad <= std::f64::consts::PI;
             if !valid {
-                return unavailable_observer_state(perspective, "The admitted sensor inputs are incomplete or inconsistent with the compiled model pack.");
+                return ObserverTickResult { state: unavailable_observer_state(perspective, "The admitted sensor inputs are incomplete or inconsistent with the compiled model pack."), sensor_entity_id: None, transitions: Vec::new() };
             }
             let sensor_model_id = Some(sensor.model_id.clone());
             if sensor.mode == "OFF" {
-                return ObserverState {
+                return ObserverTickResult { state: ObserverState {
                     schema_version: "vector.observer-state.v2",
                     perspective,
                     sensor_state: "OFF",
@@ -724,12 +958,61 @@ fn observer_states(
                     effect_scope: "AIR_PICTURE_ONLY",
                     state_explanation: "The admitted sensor is off. No observation or track is emitted.",
                     sensor_model_id,
-                };
+                    observations: None,
+                    tracks: None,
+                }, sensor_entity_id: Some(observer.definition.id.clone()), transitions: Vec::new() };
             }
+            let source = TrackSourceIdentity {
+                model_pack_digest: sensor.model_pack_digest.clone(),
+                sensor_model_id: sensor.model_id.clone(),
+                sensor_model_version: sensor.model_version.clone(),
+            };
+            if let Some(model) = sensor.verification_track_model.as_ref() {
+                track_stores.entry(perspective).or_insert_with(|| {
+                    TrackStore::new(perspective, source.clone(), model)
+                });
+            }
+            let tracked = |store: &mut TrackStore,
+                           reason: &'static str,
+                           explanation: &'static str,
+                           observation: Option<EngineObservation>| {
+                let observation_count = u8::from(observation.is_some());
+                let observations = observation.clone().into_iter().collect::<Vec<_>>();
+                let (track, transitions) = store.update(time, observation);
+                let track_state = track.as_ref().map_or("NONE", |item| item.state);
+                let availability_reason = if track_state == "COASTING" {
+                    "TRACK_COASTING"
+                } else if track_state == "LOST" {
+                    "TRACK_LOST"
+                } else {
+                    reason
+                };
+                ObserverTickResult {
+                    state: ObserverState {
+                        schema_version: "vector.observer-state.v3",
+                        perspective,
+                        sensor_state: "SEARCH",
+                        observation_count,
+                        track_state,
+                        visible: matches!(track_state, "CONFIRMED" | "COASTING"),
+                        availability_reason,
+                        effect_scope: "AIR_PICTURE_ONLY",
+                        state_explanation: explanation,
+                        sensor_model_id: Some(sensor.model_id.clone()),
+                        observations: Some(observations),
+                        tracks: Some(track.into_iter().collect()),
+                    },
+                    sensor_entity_id: Some(observer.definition.id.clone()),
+                    transitions,
+                }
+            };
             let due = (time / sensor.scan_period_s - (time / sensor.scan_period_s).round()).abs()
                 <= dt / sensor.scan_period_s / 2.0 + 1e-9;
             if !due {
-                return ObserverState {
+                if let Some(store) = track_stores.get_mut(perspective) {
+                    return tracked(store, "SCAN_NOT_DUE", "No admitted scan is due at this model time.", None);
+                }
+                return ObserverTickResult { state: ObserverState {
                     schema_version: "vector.observer-state.v2",
                     perspective,
                     sensor_state: "SEARCH",
@@ -740,7 +1023,9 @@ fn observer_states(
                     effect_scope: "AIR_PICTURE_ONLY",
                     state_explanation: "No admitted scan is due at this model time.",
                     sensor_model_id,
-                };
+                    observations: None,
+                    tracks: None,
+                }, sensor_entity_id: Some(observer.definition.id.clone()), transitions: Vec::new() };
             }
             let relative = target.position.subtract(observer.position);
             let range = relative.magnitude();
@@ -750,11 +1035,17 @@ fn observer_states(
                 ((relative.x * forward.x + relative.y * forward.y) / horizontal).clamp(-1.0, 1.0).acos()
             } else { 0.0 };
             let elevation = if range > 0.0 { (relative.z / range).clamp(-1.0, 1.0).asin() } else { 0.0 };
-            let detected = range >= sensor.minimum_range_m && range <= sensor.detection_range_m
+            let verification_window_open = sensor.verification_track_model.as_ref().is_none_or(|model| {
+                model.observation_windows_seconds.iter().any(|window| time >= window.start && time <= window.end)
+            });
+            let detected = verification_window_open && range >= sensor.minimum_range_m && range <= sensor.detection_range_m
                 && azimuth <= sensor.azimuth_field_of_view_rad / 2.0
                 && elevation.abs() <= sensor.elevation_field_of_view_rad / 2.0;
             if !detected {
-                return ObserverState {
+                if let Some(store) = track_stores.get_mut(perspective) {
+                    return tracked(store, "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME", "The due verification scan produced no observation.", None);
+                }
+                return ObserverTickResult { state: ObserverState {
                     schema_version: "vector.observer-state.v2",
                     perspective,
                     sensor_state: "SEARCH",
@@ -765,9 +1056,42 @@ fn observer_states(
                     effect_scope: "AIR_PICTURE_ONLY",
                     state_explanation: "The opposing aircraft is outside the admitted range or field of view at the due scan.",
                     sensor_model_id,
-                };
+                    observations: None,
+                    tracks: None,
+                }, sensor_entity_id: Some(observer.definition.id.clone()), transitions: Vec::new() };
             }
-            ObserverState {
+            if let Some(model) = sensor.verification_track_model.as_ref() {
+                let stable = |value: f64| (value * 1_000_000.0).round() / 1_000_000.0;
+                let observation = EngineObservation {
+                    schema_version: "vector.observation.v1",
+                    id: format!("{perspective}-OBS-{:08}", (time / sensor.scan_period_s).round() as u64 + 1),
+                    owner: perspective,
+                    source: source.clone(),
+                    source_sequence: (time / sensor.scan_period_s).round() as u64 + 1,
+                    source_time_seconds: time,
+                    estimate: TrackEstimate {
+                        value_state: "ESTIMATED",
+                        position_m: {
+                            let value = target.position.add(model.position_bias_m);
+                            Vec3 { x: stable(value.x), y: stable(value.y), z: stable(value.z) }
+                        },
+                        velocity_mps: {
+                            let value = target.velocity.add(model.velocity_bias_mps);
+                            Vec3 { x: stable(value.x), y: stable(value.y), z: stable(value.z) }
+                        },
+                    },
+                    uncertainty: TrackUncertainty {
+                        value_state: "ESTIMATED",
+                        position_standard_deviation_m: model.position_standard_deviation_m,
+                        velocity_standard_deviation_mps: model.velocity_standard_deviation_mps,
+                    },
+                };
+                if let Some(store) = track_stores.get_mut(perspective) {
+                    return tracked(store, "OBSERVATION_ADMITTED", "One source-authored generic verification observation updated this side-owned track.", Some(observation));
+                }
+                return ObserverTickResult { state: unavailable_observer_state(perspective, "The admitted verification TrackStore is unavailable."), sensor_entity_id: None, transitions: Vec::new() };
+            }
+            ObserverTickResult { state: ObserverState {
                 schema_version: "vector.observer-state.v2",
                 perspective,
                 sensor_state: "SEARCH",
@@ -778,9 +1102,50 @@ fn observer_states(
                 effect_scope: "AIR_PICTURE_ONLY",
                 state_explanation: "One due scan satisfied the admitted range and field-of-view conditions. This plot has no position estimate or weapon-support authority.",
                 sensor_model_id,
-            }
+                observations: None,
+                tracks: None,
+            }, sensor_entity_id: Some(observer.definition.id.clone()), transitions: Vec::new() }
         })
         .collect()
+}
+
+fn update_observer_runtime(
+    states: &[RuntimeState],
+    scenario: &EngineScenario,
+    tick: u64,
+    terminal_tick: u64,
+    stores: &mut HashMap<&'static str, TrackStore>,
+    prior_receipts: &mut HashMap<&'static str, SimulationEventReceipt>,
+    journal: &mut SimulationEventJournal,
+) -> Result<Option<Vec<ObserverState>>, EngineError> {
+    if tick >= terminal_tick {
+        return Ok(None);
+    }
+    let time = recorded_model_time_at_tick(tick, scenario.fixed_step_seconds);
+    let results = observer_states(states, scenario, time, scenario.fixed_step_seconds, stores);
+    let observer_states = results.iter().map(|result| result.state.clone()).collect();
+    for result in results {
+        let Some(sensor_entity_id) = result.sensor_entity_id else {
+            continue;
+        };
+        for transition in result.transitions {
+            let owner_affiliation = if transition.owner == "IAF" {
+                Affiliation::Blue
+            } else {
+                Affiliation::Red
+            };
+            let receipt = journal.emit(SimulationEventDraft::track_changed(
+                tick,
+                time,
+                &sensor_entity_id,
+                owner_affiliation,
+                &transition,
+                prior_receipts.get(transition.owner).cloned(),
+            ))?;
+            prior_receipts.insert(transition.owner, receipt);
+        }
+    }
+    Ok(Some(observer_states))
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1345,6 +1710,7 @@ fn sampled_engine_frame(
     separation: f64,
     closure: f64,
     los_rate: f64,
+    observer_states: Vec<ObserverState>,
 ) -> EngineFrame {
     EngineFrame {
         t: (time * 1_000_000.0).round() / 1_000_000.0,
@@ -1358,7 +1724,7 @@ fn sampled_engine_frame(
         separation_m: separation,
         closure_rate_mps: closure,
         line_of_sight_rate_rad_s: los_rate,
-        observer_states: observer_states(states, scenario, time, scenario.fixed_step_seconds),
+        observer_states,
     }
 }
 
@@ -1517,6 +1883,10 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
     let mut mass_margin = f64::INFINITY;
     let sample_every = (0.25 / scenario.fixed_step_seconds).round().max(1.0) as u64;
     let mut event_journal = SimulationEventJournal::default();
+    let mut track_stores = HashMap::new();
+    let mut prior_track_receipts = HashMap::new();
+    let mut current_observer_states = Vec::new();
+    let mut last_observer_tick: Option<u64> = None;
     let mut recorded_entity_states = 0_u64;
     loop {
         let tick = steps;
@@ -1558,6 +1928,20 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 state.definition.kind,
                 state.lifecycle,
             ))?;
+        }
+        if last_observer_tick != Some(tick) {
+            if let Some(observer_states) = update_observer_runtime(
+                &states,
+                &scenario,
+                tick,
+                terminal_tick,
+                &mut track_stores,
+                &mut prior_track_receipts,
+                &mut event_journal,
+            )? {
+                current_observer_states = observer_states;
+                last_observer_tick = Some(tick);
+            }
         }
         let relative_position = states[target_index]
             .position
@@ -1641,7 +2025,15 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 )));
             }
             frames.push(sampled_engine_frame(
-                &states, &scenario, time, &weapon_id, &target_id, separation, closure, los_rate,
+                &states,
+                &scenario,
+                time,
+                &weapon_id,
+                &target_id,
+                separation,
+                closure,
+                los_rate,
+                current_observer_states.clone(),
             ));
             recorded_entity_states += visible_states;
             if event_journal.has_pending() {
@@ -1651,7 +2043,6 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
         if completed_this_tick {
             break;
         }
-
         let before_updates: Vec<EntityLifecycle> =
             states.iter().map(|state| state.lifecycle).collect();
         for state in states.iter_mut() {
@@ -1724,6 +2115,20 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 termination,
             ))?;
         }
+        if !completed_this_tick && last_observer_tick != Some(steps) {
+            if let Some(observer_states) = update_observer_runtime(
+                &states,
+                &scenario,
+                steps,
+                terminal_tick,
+                &mut track_stores,
+                &mut prior_track_receipts,
+                &mut event_journal,
+            )? {
+                current_observer_states = observer_states;
+                last_observer_tick = Some(steps);
+            }
+        }
         let activation_at_next_boundary = states.iter().any(|state| {
             state.lifecycle == EntityLifecycle::Stowed
                 && state
@@ -1771,6 +2176,7 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 post_separation,
                 post_closure,
                 post_los_rate,
+                current_observer_states.clone(),
             ));
             recorded_entity_states += visible_states;
             if event_journal.has_pending() {
@@ -2006,6 +2412,7 @@ mod tests {
                     id: "vector.intended-use.geometry-teaching".to_string(),
                     version: "1.0.0".to_string(),
                 },
+                runtime_digest: None,
                 observer_sensors: Vec::new(),
                 scenario_patches: Vec::new(),
             },

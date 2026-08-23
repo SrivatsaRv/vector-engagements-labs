@@ -21,7 +21,7 @@ Primary references:
 | `compiled.json` | immutable engine input with resolved catalog IDs, compiled model-pack digest, model indexes, scenario-local patches, and model revisions |
 | `entities.json` | stable entity identities, affiliation, class, labels, lifecycle and presentation references |
 | `frames.arrow` | columnar time-addressed state for every active entity |
-| `events.jsonl` | authoritative typed simulation events; the current producer set records run and entity lifecycle boundaries |
+| `events.jsonl` | authoritative typed simulation events; the current producer set records run/entity lifecycle and generic verification track transitions |
 | `pictures.jsonl` | optional IAF, PAF or other observer-specific track states; Model Truth remains in frames |
 | `sources.json` | cited public facts, model assumptions, user overrides and confidence state |
 | `report.json` | frozen report content and analyst notes |
@@ -47,7 +47,7 @@ current study-area catalogue, its default weather, or a newer pack version.
 
 Basemap tiles are referenced by provider and style revision, not silently embedded. A portable export may include explicitly licensed terrain or static assets. Missing optional assets must degrade to class silhouettes and a neutral terrain surface without changing telemetry.
 
-Each `pictures.jsonl` entry uses the required `vector.pictures.v3` schema and
+Each new `pictures.jsonl` entry uses the required `vector.pictures.v4` schema and
 its member hash is bound by `manifest.json`. It carries `modelTimeSeconds`, the model-clock identity
 of that observer-picture sample. Consumers select it by that exact frame time,
 not by array order, last-update time, or a rendered interpolation. A missing
@@ -100,10 +100,13 @@ The manifest records SHA-256 hashes for the canonical scenario, compiled engine 
 `events.jsonl` is the direct serialization of the engine-owned
 `vector.simulation-event.v2` stream. It is not rebuilt from sampled frames and
 does not contain display-ready English. The current closed producer set is
-`RUN_STARTED`, `ENTITY_ENTERED_WORLD`, `ENTITY_LIFECYCLE_CHANGED`, and
-`RUN_COMPLETED`. Sensor, track, launch-decision, guidance, support, and weapon
-termination events remain unavailable until their owning simulation contracts
-produce them; the record and browser may not infer them.
+`RUN_STARTED`, `ENTITY_ENTERED_WORLD`, `ENTITY_LIFECYCLE_CHANGED`,
+`TRACK_STATE_CHANGED`, and `RUN_COMPLETED`. `TRACK_STATE_CHANGED` is available
+only for the source-authored generic engine-verification model and records an
+opaque side-owned track transition with exact source sequence/time and typed
+cause. Launch-decision, guidance, support, and weapon-termination events remain
+unavailable until their owning contracts produce them; the record and browser
+may not infer them.
 
 The `vector.simulation-event.v2` envelope is immutable. Each payload variant
 carries a separate `vector.simulation-event-payload.<family>.vN` identity.
@@ -189,7 +192,7 @@ read model is sufficient for the existing map, Three.js, telemetry, RASP,
 explanation, and report consumers.
 
 `frames.arrow` currently contains the versioned VECTOR columnar codec
-`vector.frames.columnar.v4`: string/lifecycle and installed-store identity
+`vector.frames.columnar.v5`: string/lifecycle and installed-store identity
 metadata is encoded once in a
 canonical header and all numerical entity fields are stored as contiguous f64
 columns, including total installed-store mass. The historical path is retained
@@ -198,10 +201,13 @@ implementation is not Apache Arrow IPC. An Arrow IPC adapter and downloadable
 ZIP container remain follow-up interoperability work; changing the frame codec
 requires a new member schema version and fixture migration.
 
-Version 4 also records the canonical tick-owned observer state. Its
-`pictures.jsonl` member is currently `vector.pictures.v3`, which can preserve
-an admitted non-positional sensor PLOT but rejects any reconstructed position,
-observed world identity, or truth position during replay. The requested
+Version 5 records exhaustive observer state v2 and v3. Its
+`pictures.jsonl` member is `vector.pictures.v4`, which can preserve the generic
+verification observation, uncertainty, and side-owned track without a world
+entity identity. The reader keeps the prior frames-v4/pictures-v3 pair as a
+read-only v2-only format and rejects v3 state in those legacy members. Both
+formats reject any reconstructed observed-world identity or truth position.
+The requested
 steering-acceleration vector remains a recorded pre-limit route-controller
 demand, not an aerodynamic capability claim. A prior record is rejected with
 an explicit incomplete-observer-state error; it must be regenerated from its
@@ -213,8 +219,8 @@ producer identity, every canonical participant, knowledge scope, correlation,
 producer-stable local key, and causal receipt. Text comparison uses unsigned
 UTF-8 byte order in both TypeScript and Rust. Current run/lifecycle producers
 have semantic TypeScript/Rust parity and carry no causal edges; serialized
-cause-byte parity remains required when #26, #28, or #38 lands its first causal
-producer. Events then receive monotonically increasing IDs and sequences. Record identity is
+the generic #26 track producer now proves exact TypeScript/Rust cause-byte
+parity across ticks. Events then receive monotonically increasing IDs and sequences. Record identity is
 derived from member content digests, so wall-clock creation metadata cannot
 masquerade as simulation identity. Reusable transport capacity is not part of
 the record bytes or content identity.

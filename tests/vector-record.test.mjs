@@ -5,9 +5,13 @@ import {
   decodeColumnarFrames,
   encodeColumnarFrames,
   LEGACY_VECTOR_EVENT_SCHEMA,
+  LEGACY_VECTOR_FRAME_SCHEMA,
+  LEGACY_VECTOR_PICTURE_SCHEMA,
   openVectorSimulationRecord,
   serializeVectorRecord,
   VECTOR_EVENT_SCHEMA,
+  VECTOR_FRAME_SCHEMA,
+  VECTOR_PICTURE_SCHEMA,
 } from "../lib/record/vector-record.ts";
 import { canonicalJson } from "../lib/canonical-json.ts";
 import { sha256Bytes } from "../lib/runtime/digest.ts";
@@ -20,6 +24,7 @@ import {
 import { runEngineBackend } from "../lib/engine/backend.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
+import { bindVerificationTrackModelPack } from "../lib/engine/verification-track-fixture.ts";
 import {
   assertPhaseAEnvironmentPack,
   environmentPackBinding,
@@ -30,6 +35,7 @@ const textEncoder = new TextEncoder();
 const jsonBytes = (value) => textEncoder.encode(canonicalJson(value));
 
 async function replaceRecordMember(record, path, schemaVersion, bytes) {
+  const replacedSchemaVersion = record.members.find((member) => member.path === path)?.schemaVersion;
   const replacement = {
     ...record.members.find((member) => member.path === path),
     schemaVersion,
@@ -59,9 +65,7 @@ async function replaceRecordMember(record, path, schemaVersion, bytes) {
     ...priorManifest,
     recordId,
     requiredViewerFeatures: priorManifest.requiredViewerFeatures.map((feature) =>
-      feature === VECTOR_EVENT_SCHEMA || feature === LEGACY_VECTOR_EVENT_SCHEMA
-        ? schemaVersion
-        : feature,
+      feature === replacedSchemaVersion ? schemaVersion : feature,
     ),
     members,
   };
@@ -207,6 +211,85 @@ test("VSR content identity and stable event ordering are deterministic", async (
   assert.equal(reused.byteLength, allocated.byteLength);
 });
 
+test("VSR retains read-only compatibility with the last observer frame and picture schemas", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const result = simulate(scenario);
+  const record = await createVectorSimulationRecord(prepareSimulation(scenario), result, createdAt);
+  const frameMember = record.members.find((member) => member.path === "frames.arrow");
+  const pictureMember = record.members.find((member) => member.path === "pictures.jsonl");
+  assert.ok(frameMember && pictureMember);
+  const legacyFrameBytes = frameMember.bytes.slice();
+  const currentSchema = new TextEncoder().encode(VECTOR_FRAME_SCHEMA);
+  const offset = legacyFrameBytes.findIndex((_, index) =>
+    currentSchema.every((value, inner) => legacyFrameBytes[index + inner] === value),
+  );
+  assert.ok(offset > 0);
+  legacyFrameBytes[offset + currentSchema.length - 1] = "4".charCodeAt(0);
+  let legacy = await replaceRecordMember(
+    record,
+    "frames.arrow",
+    LEGACY_VECTOR_FRAME_SCHEMA,
+    legacyFrameBytes,
+  );
+  legacy = await replaceRecordMember(
+    legacy,
+    "pictures.jsonl",
+    LEGACY_VECTOR_PICTURE_SCHEMA,
+    pictureMember.bytes,
+  );
+  const serialized = serializeVectorRecord(legacy);
+  const opened = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+  assert.deepEqual(opened.result.frames, result.frames);
+  assert.ok(opened.pictures.every((picture) => picture.schemaVersion === "vector.observer-state.v2"));
+});
+
+test("VSR rejects tampered side-owned track state and track-event history", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const base = prepareSimulation(scenario);
+  const binding = await bindVerificationTrackModelPack(base.engineScenario);
+  const capabilityManifest = createVerificationDeploymentCapabilities("typescript", ["A2A"], [binding.pack.digest]);
+  const prepared = { ...base, engineScenario: binding.scenario, capabilityManifest };
+  const engineRun = runEngineBackend(binding.scenario, "typescript");
+  const result = buildSimulationResult(prepared, engineRun);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+
+  const pictureMember = record.members.find((member) => member.path === "pictures.jsonl");
+  assert.ok(pictureMember);
+  const pictures = new TextDecoder().decode(pictureMember.bytes).trim().split("\n").map(JSON.parse);
+  const tracked = pictures.find((picture) => picture.schemaVersion === "vector.observer-state.v3" && picture.tracks.length > 0);
+  assert.ok(tracked);
+  tracked.tracks[0].truthEntityId = "red-object-1";
+  let corrupt = await replaceRecordMember(
+    record,
+    "pictures.jsonl",
+    VECTOR_PICTURE_SCHEMA,
+    textEncoder.encode(pictures.map((picture) => canonicalJson(picture)).join("\n")),
+  );
+  let serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /unsupported or missing|truth/i,
+  );
+
+  const eventMember = record.members.find((member) => member.path === "events.jsonl");
+  assert.ok(eventMember);
+  const events = new TextDecoder().decode(eventMember.bytes).trim().split("\n").map(JSON.parse);
+  const transition = events.find((event) => event.payload.kind === "TRACK_STATE_CHANGED");
+  assert.ok(transition);
+  transition.payload.sourceSequence += 1;
+  corrupt = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+  serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /ownership|frame state|transition/i,
+  );
+});
+
 test("VSR rejects corruption before exposing replay data", async () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const record = await createVectorSimulationRecord(
@@ -243,7 +326,7 @@ test("VSR rejects an observer-picture member with an unadmitted schema", async (
     ...record,
     members: record.members.map((member) =>
       member.path === "pictures.jsonl"
-        ? { ...member, schemaVersion: "vector.pictures.v4" }
+        ? { ...member, schemaVersion: "vector.pictures.v5" }
         : member,
     ),
   };
@@ -476,7 +559,7 @@ test("VSR rejects valid-state events moved away from their transition boundaries
 test("columnar frame decoder rejects an unsupported member schema", () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const bytes = encodeColumnarFrames(simulate(scenario).engineRun.frames);
-  const encodedSchema = new TextEncoder().encode("vector.frames.columnar.v4");
+  const encodedSchema = new TextEncoder().encode(VECTOR_FRAME_SCHEMA);
   const offset = bytes.findIndex((_, index) =>
     encodedSchema.every((value, inner) => bytes[index + inner] === value),
   );
@@ -487,12 +570,12 @@ test("columnar frame decoder rejects an unsupported member schema", () => {
 
 test("columnar frame decoder rejects v3 records because canonical observer state is absent", () => {
   const bytes = encodeColumnarFrames(simulate(SCENARIO_LIBRARY[0].scenario).engineRun.frames);
-  const encodedSchema = new TextEncoder().encode("vector.frames.columnar.v4");
+  const encodedSchema = new TextEncoder().encode(VECTOR_FRAME_SCHEMA);
   const offset = bytes.findIndex((_, index) =>
     encodedSchema.every((value, inner) => bytes[index + inner] === value),
   );
   assert.ok(offset > 0);
-  bytes[offset + encodedSchema.length - 1] = "2".charCodeAt(0);
+  bytes[offset + encodedSchema.length - 1] = "3".charCodeAt(0);
   assert.throws(
     () => decodeColumnarFrames(bytes),
     /omits canonical observer state/,

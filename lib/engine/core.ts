@@ -4,6 +4,7 @@ import type {
   EngineEntityDefinition,
   EngineEntityFrame,
   EngineObserverState,
+  ObserverPerspective,
   EngineRun,
   EngineScenario,
   WeaponFlightState,
@@ -34,6 +35,15 @@ import {
   assertPhaseAEnvironmentPack,
   environmentPackBinding,
 } from "../geospatial/environment-pack.ts";
+import { assertRuntimeModelPackDigest } from "./runtime-model-pack.ts";
+import {
+  assertNoTruthIdentity,
+  assertVerificationTrackModel,
+  createVerificationObservation,
+  TrackStore,
+} from "./track-store.ts";
+import type { SimulationEventReceipt } from "./simulation-events.ts";
+import type { TrackTransitionCommit } from "./contracts.ts";
 
 type RuntimeState = {
   definition: EngineEntityDefinition;
@@ -114,9 +124,13 @@ function assertObserverSensorBoundToModelPack(
   const sensor = scenario.modelPack.observerSensors.find((candidate) =>
     candidate.modelId === admission.modelId,
   );
+  assertNoTruthIdentity(admission, `Observer sensor ${entity.id}`);
+  if (sensor) assertNoTruthIdentity(sensor, `Observer sensor binding ${sensor.modelId}`);
   const sameEvidence = sensor !== undefined &&
     sensor.evidenceRefIds.length === admission.evidenceRefIds.length &&
     sensor.evidenceRefIds.every((id, index) => id === admission.evidenceRefIds[index]);
+  const sameTrackModel = JSON.stringify(sensor?.verificationTrackModel ?? null) ===
+    JSON.stringify(admission.verificationTrackModel ?? null);
   if (
     !sensor ||
     admission.modelPackDigest !== scenario.modelPack.digest ||
@@ -127,18 +141,26 @@ function assertObserverSensorBoundToModelPack(
     admission.minimumRangeM !== sensor.minimumRangeM ||
     admission.scanPeriodS !== sensor.scanPeriodS ||
     admission.azimuthFieldOfViewRad !== sensor.azimuthFieldOfViewRad ||
-    admission.elevationFieldOfViewRad !== sensor.elevationFieldOfViewRad
+    admission.elevationFieldOfViewRad !== sensor.elevationFieldOfViewRad ||
+    !sameTrackModel
   ) {
     throw new Error(`Observer sensor ${entity.id} is not bound to an admitted compiled sensor model.`);
   }
 }
+
+type ObserverTickResult = {
+  state: EngineObserverState;
+  sensorEntityId?: string;
+  transitions: TrackTransitionCommit[];
+};
 
 function observerStates(
   states: readonly RuntimeState[],
   scenario: EngineScenario,
   time: number,
   dt: number,
-): EngineObserverState[] {
+  trackStores: Map<ObserverPerspective, TrackStore>,
+): ObserverTickResult[] {
   if (scenario.domain !== "A2A") return [];
   return ([
     ["IAF", "BLUE"],
@@ -155,10 +177,10 @@ function observerStates(
       state.lifecycle === "ACTIVE",
     );
     const sensor = observer?.definition.observerSensor;
-    if (!observer || !target || !sensor) return unavailableObserverState(perspective);
+    if (!observer || !target || !sensor) return { state: unavailableObserverState(perspective), transitions: [] };
     if (
       sensor.modelPackDigest !== scenario.modelPack.digest ||
-      sensor.schemaVersion !== "vector.observer-sensor-admission.v1" ||
+      !["vector.observer-sensor-admission.v1", "vector.observer-sensor-admission.v2"].includes(sensor.schemaVersion) ||
       !sensor.modelId || !sensor.modelVersion || !sensor.evidenceRefIds.length ||
       !Number.isFinite(sensor.detectionRangeM) || sensor.detectionRangeM <= 0 ||
       !Number.isFinite(sensor.minimumRangeM) || sensor.minimumRangeM < 0 ||
@@ -166,8 +188,13 @@ function observerStates(
       !Number.isFinite(sensor.scanPeriodS) || sensor.scanPeriodS <= 0 ||
       !Number.isFinite(sensor.azimuthFieldOfViewRad) || sensor.azimuthFieldOfViewRad <= 0 || sensor.azimuthFieldOfViewRad > Math.PI * 2 ||
       !Number.isFinite(sensor.elevationFieldOfViewRad) || sensor.elevationFieldOfViewRad <= 0 || sensor.elevationFieldOfViewRad > Math.PI
-    ) return unavailableObserverState(perspective, "The admitted sensor inputs are incomplete or inconsistent with the compiled model pack.");
-    if (sensor.mode === "OFF") return {
+    ) return { state: unavailableObserverState(perspective, "The admitted sensor inputs are incomplete or inconsistent with the compiled model pack."), transitions: [] };
+    if (sensor.schemaVersion === "vector.observer-sensor-admission.v2") {
+      assertVerificationTrackModel(sensor.verificationTrackModel, scenario.modelPack.intendedUse.id);
+    } else if (sensor.verificationTrackModel !== undefined) {
+      throw new Error(`Observer sensor ${observer.definition.id} cannot attach a track model to admission v1.`);
+    }
+    if (sensor.mode === "OFF") return { state: {
       schemaVersion: "vector.observer-state.v2",
       perspective,
       sensorState: "OFF",
@@ -178,9 +205,57 @@ function observerStates(
       effectScope: "AIR_PICTURE_ONLY",
       stateExplanation: "The admitted sensor is off. No observation or track is emitted.",
       sensorModelId: sensor.modelId,
+    }, sensorEntityId: observer.definition.id, transitions: [] };
+    const source = {
+      modelPackDigest: sensor.modelPackDigest,
+      sensorModelId: sensor.modelId,
+      sensorModelVersion: sensor.modelVersion,
+    };
+    let store = trackStores.get(perspective);
+    if (sensor.verificationTrackModel && !store) {
+      store = new TrackStore(
+        { owner: perspective, source },
+        sensor.verificationTrackModel,
+        scenario.modelPack.intendedUse.id,
+      );
+      trackStores.set(perspective, store);
+    }
+    const trackedState = (
+      availabilityReason: "SCAN_NOT_DUE" | "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME" | "OBSERVATION_ADMITTED",
+      explanation: string,
+      observation?: import("./contracts.ts").EngineObservation,
+    ): ObserverTickResult => {
+      if (!store) throw new Error("Verification track admission has no TrackStore.");
+      const update = store.update(time, observation);
+      const tracks = update.snapshot.track ? [update.snapshot.track] : [];
+      const state = update.snapshot.track?.state ?? "NONE";
+      const derivedReason = state === "COASTING"
+        ? "TRACK_COASTING" as const
+        : state === "LOST"
+          ? "TRACK_LOST" as const
+          : availabilityReason;
+      return {
+        state: {
+          schemaVersion: "vector.observer-state.v3",
+          perspective,
+          sensorState: "SEARCH",
+          observationCount: observation ? 1 : 0,
+          trackState: state,
+          visible: state === "CONFIRMED" || state === "COASTING",
+          availabilityReason: derivedReason,
+          effectScope: "AIR_PICTURE_ONLY",
+          stateExplanation: explanation,
+          sensorModelId: sensor.modelId,
+          observations: observation ? [observation] : [],
+          tracks,
+        },
+        sensorEntityId: observer.definition.id,
+        transitions: update.transitions,
+      };
     };
     const due = Math.abs(time / sensor.scanPeriodS - Math.round(time / sensor.scanPeriodS)) <= dt / sensor.scanPeriodS / 2 + 1e-9;
-    if (!due) return {
+    if (!due && store) return trackedState("SCAN_NOT_DUE", "No admitted scan is due at this model time.");
+    if (!due) return { state: {
       schemaVersion: "vector.observer-state.v2",
       perspective,
       sensorState: "SEARCH",
@@ -191,7 +266,7 @@ function observerStates(
       effectScope: "AIR_PICTURE_ONLY",
       stateExplanation: "No admitted scan is due at this model time.",
       sensorModelId: sensor.modelId,
-    };
+    }, sensorEntityId: observer.definition.id, transitions: [] };
     const relative = subtract(target.position, observer.position);
     const range = magnitude(relative);
     const horizontal = Math.hypot(relative.x, relative.y);
@@ -200,9 +275,14 @@ function observerStates(
       ? Math.acos(Math.max(-1, Math.min(1, (relative.x * forward.x + relative.y * forward.y) / horizontal)))
       : 0;
     const elevation = range > 0 ? Math.asin(Math.max(-1, Math.min(1, relative.z / range))) : 0;
-    const detected = range >= sensor.minimumRangeM && range <= sensor.detectionRangeM &&
+    const verificationWindowOpen = sensor.verificationTrackModel === undefined ||
+      sensor.verificationTrackModel.observationWindowsSeconds.some(
+        (window) => time >= window.start && time <= window.end,
+      );
+    const detected = verificationWindowOpen && range >= sensor.minimumRangeM && range <= sensor.detectionRangeM &&
       azimuth <= sensor.azimuthFieldOfViewRad / 2 && Math.abs(elevation) <= sensor.elevationFieldOfViewRad / 2;
-    if (!detected) return {
+    if (!detected && store) return trackedState("TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME", "The due verification scan produced no observation.");
+    if (!detected) return { state: {
       schemaVersion: "vector.observer-state.v2",
       perspective,
       sensorState: "SEARCH",
@@ -213,8 +293,24 @@ function observerStates(
       effectScope: "AIR_PICTURE_ONLY",
       stateExplanation: "The opposing aircraft is outside the admitted range or field of view at the due scan.",
       sensorModelId: sensor.modelId,
-    };
-    return {
+    }, sensorEntityId: observer.definition.id, transitions: [] };
+    if (sensor.verificationTrackModel) {
+      const observation = createVerificationObservation({
+        identity: source,
+        owner: perspective,
+        sourceSequence: Math.round(time / sensor.scanPeriodS) + 1,
+        sourceTimeSeconds: time,
+        measuredPositionM: target.position,
+        measuredVelocityMps: target.velocity,
+        model: sensor.verificationTrackModel,
+      });
+      return trackedState(
+        "OBSERVATION_ADMITTED",
+        "One source-authored generic verification observation updated this side-owned track.",
+        observation,
+      );
+    }
+    return { state: {
       schemaVersion: "vector.observer-state.v2",
       perspective,
       sensorState: "SEARCH",
@@ -225,7 +321,7 @@ function observerStates(
       effectScope: "AIR_PICTURE_ONLY",
       stateExplanation: "One due scan satisfied the admitted range and field-of-view conditions. This plot has no position estimate or weapon-support authority.",
       sensorModelId: sensor.modelId,
-    };
+    }, sensorEntityId: observer.definition.id, transitions: [] };
   });
 }
 
@@ -721,6 +817,8 @@ export class EngineSession {
   private readonly primaryTarget?: RuntimeState;
   private readonly frames: EngineRun["frames"] = [];
   private readonly eventJournal = new SimulationEventJournal();
+  private readonly observerTrackStores = new Map<ObserverPerspective, TrackStore>();
+  private readonly priorTrackReceipt = new Map<ObserverPerspective, SimulationEventReceipt>();
   private readonly sampleEvery: number;
   private readonly terminalTick: number;
   private readonly recordingOrigin: EngineScenario["geospatial"]["origin"];
@@ -732,9 +830,17 @@ export class EngineSession {
   private minimumMassMarginKg = Number.POSITIVE_INFINITY;
   private completed = false;
   private recordedEntityStates = 0;
+  private currentObserverStates: EngineObserverState[] = [];
+  private lastObserverTick = -1;
 
   constructor(scenario: EngineScenario) {
     this.scenario = scenario;
+    const hasVerificationTrackModel = (scenario.modelPack.observerSensors ?? []).some(
+      (sensor) => sensor.verificationTrackModel !== undefined,
+    );
+    if (scenario.modelPack.runtimeDigest !== undefined || hasVerificationTrackModel) {
+      assertRuntimeModelPackDigest(scenario.modelPack);
+    }
     this.terminalTick = firstFixedStepTickAtOrAfter(
       scenario.durationSeconds,
       scenario.fixedStepSeconds,
@@ -881,7 +987,7 @@ export class EngineSession {
       if (!sensor) continue;
       assertObserverSensorBoundToModelPack(entity, scenario);
       if (
-        sensor.schemaVersion !== "vector.observer-sensor-admission.v1" ||
+        !["vector.observer-sensor-admission.v1", "vector.observer-sensor-admission.v2"].includes(sensor.schemaVersion) ||
         sensor.modelPackDigest !== scenario.modelPack.digest ||
         !sensor.modelId ||
         !sensor.modelVersion ||
@@ -895,6 +1001,14 @@ export class EngineSession {
         !Number.isFinite(sensor.elevationFieldOfViewRad) || sensor.elevationFieldOfViewRad <= 0 || sensor.elevationFieldOfViewRad > Math.PI
       ) {
         throw new Error(`Observer sensor ${entity.id} has no valid compiled admission.`);
+      }
+      if (sensor.schemaVersion === "vector.observer-sensor-admission.v2") {
+        assertVerificationTrackModel(
+          sensor.verificationTrackModel,
+          scenario.modelPack.intendedUse.id,
+        );
+      } else if (sensor.verificationTrackModel !== undefined) {
+        throw new Error(`Observer sensor ${entity.id} cannot attach a track model to admission v1.`);
       }
     }
     for (const aircraft of scenario.entities.filter(
@@ -955,6 +1069,55 @@ export class EngineSession {
     }
   }
 
+  private updateObserverState(tick: number, modelTimeSeconds: number) {
+    if (this.lastObserverTick === tick || tick >= this.terminalTick) return;
+    const results = observerStates(
+      [...this.states.values()],
+      this.scenario,
+      modelTimeSeconds,
+      this.scenario.fixedStepSeconds,
+      this.observerTrackStores,
+    );
+    this.currentObserverStates = results.map((item) => item.state);
+    this.lastObserverTick = tick;
+    for (const result of results) {
+      if (!result.sensorEntityId) continue;
+      for (const transition of result.transitions) {
+        const prior = this.priorTrackReceipt.get(transition.owner);
+        const ownerAffiliation = transition.owner === "IAF" ? "BLUE" : "RED";
+        const receipt = this.eventJournal.emit({
+          localKey: transition.localKey,
+          tick,
+          modelTimeSeconds,
+          phase: "TRACKING",
+          producer: { subsystem: "SENSOR_TRACK", entityId: result.sensorEntityId },
+          ownerAffiliation,
+          knowledgeScope: "SIDE_OWNED",
+          participants: [{ entityId: result.sensorEntityId, role: "SENSOR" }],
+          causes: prior ? [{ kind: "EVENT_RECEIPT", receipt: prior }] : [],
+          correlationId: transition.trackId,
+          payload: {
+            kind: "TRACK_STATE_CHANGED",
+            schemaVersion: SIMULATION_EVENT_PAYLOAD_SCHEMAS.TRACK_STATE_CHANGED,
+            perspective: transition.owner,
+            trackId: transition.trackId,
+            from: transition.from,
+            to: transition.to,
+            cause: transition.cause,
+            sensorModelId: transition.source.sensorModelId,
+            sensorModelVersion: transition.source.sensorModelVersion,
+            modelPackDigest: transition.source.modelPackDigest,
+            sourceSequence: transition.sourceSequence,
+            sourceTimeSeconds: transition.sourceTimeSeconds,
+            estimateValueState: "ESTIMATED",
+            uncertaintyValueState: "ESTIMATED",
+          },
+        });
+        this.priorTrackReceipt.set(transition.owner, receipt);
+      }
+    }
+  }
+
   private captureFrame(modelTimeSeconds: number) {
     const primaryWeapon = this.primaryWeapon!;
     const primaryTarget = this.primaryTarget!;
@@ -985,12 +1148,7 @@ export class EngineSession {
       separationM,
       closureRateMps,
       lineOfSightRateRadS,
-      observerStates: observerStates(
-        [...this.states.values()],
-        this.scenario,
-        modelTimeSeconds,
-        this.scenario.fixedStepSeconds,
-      ),
+      observerStates: structuredClone(this.currentObserverStates),
     });
     this.recordedEntityStates += visibleStates.length;
     return { frameIndex, separationM };
@@ -1076,6 +1234,7 @@ export class EngineSession {
           },
         });
       }
+      this.updateObserverState(tick, eventTime);
       const relativePosition = subtract(primaryTarget.position, primaryWeapon.position);
       const separationM = magnitude(relativePosition);
       this.closestApproachM = Math.min(this.closestApproachM, separationM);
@@ -1223,6 +1382,9 @@ export class EngineSession {
             termination: this.termination,
           },
         });
+      }
+      if (!this.completed) {
+        this.updateObserverState(this.integratedSteps, nextEventTime);
       }
       const activationAtNextBoundary = [...this.states.values()].some((state) => {
         const launchTimeSeconds = state.definition.weapon?.launchTimeSeconds;

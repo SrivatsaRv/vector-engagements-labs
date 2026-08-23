@@ -187,6 +187,27 @@ because the current Worker protocol cannot inject an arbitrary scenario and the
 Rust/WASM ABI is whole-run. Existing Worker cancellation tests remain separate.
 Both omissions are acceptance work for #25, not successful measurements.
 
+## 100-track TrackStore verification gate
+
+`npm run performance:track-store:verify` defines the bounded #26 workload: 100
+independent side-owned tracks (50 per side), 20 update boundaries per second,
+five seconds of model time, 10,100 update attempts, and six lifecycle
+transitions per track covering confirmation, coast, loss, and reacquisition.
+It records runtime/CPU context, p50/p95/p99/maximum wall time, maximum process
+heap delta, recorded-state JSON bytes, transition count, and a repeat digest.
+Serialization used to measure recorded-state growth is outside the timed
+TrackStore interval; output snapshot construction remains inside it.
+
+The regression gate is p95 below 75 ms for the complete workload and heap
+growth below 64 MiB across at least two repeats. On 2026-08-23, Node v24.3.0 on
+an Apple M5 arm64 (10 logical cores, 16 GiB) measured seven runs at 23.727 ms
+p50 and 27.446 ms p95/maximum, with 32,377,128 bytes maximum heap delta,
+6,822,506 bytes of recorded-state JSON, 600 transitions, and repeat digest
+`81d0a3f8a91af7fbfcc17826be7b0405bb11731d77056d218dc387e952516b9e`.
+This is a local generic TrackStore regression result, not the combined Worker
+tick target, browser rendering proof, x86-64 capacity result, or named-sensor
+performance claim.
+
 ## Required performance test matrix
 
 | Test | Purpose |

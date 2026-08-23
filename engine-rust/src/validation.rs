@@ -1,3 +1,6 @@
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::collections::HashSet;
 
 use crate::simulation_events::MAX_SIMULATION_EVENTS;
@@ -26,6 +29,112 @@ const MAX_FIXED_STEP_SECONDS: f64 = 1.0;
 
 fn invalid(message: impl Into<String>) -> EngineError {
     EngineError::InvalidScenario(message.into())
+}
+
+fn canonicalize(value: Value) -> Value {
+    match value {
+        Value::Array(values) => Value::Array(values.into_iter().map(canonicalize).collect()),
+        Value::Object(values) => {
+            let mut sorted = BTreeMap::new();
+            for (key, value) in values {
+                sorted.insert(key, canonicalize(value));
+            }
+            Value::Object(sorted.into_iter().collect())
+        }
+        Value::Number(number) => {
+            // JavaScript's JSON.stringify emits integral finite numbers without a
+            // decimal point (including -0). Normalise typed Rust f64 values to the
+            // same representation before hashing the shared runtime projection.
+            match number.as_f64() {
+                Some(0.0) => Value::Number(0.into()),
+                Some(value) if value.fract() == 0.0 && value.abs() <= 9_007_199_254_740_991.0 => {
+                    Value::Number((value as i64).into())
+                }
+                _ => Value::Number(number),
+            }
+        }
+        other => other,
+    }
+}
+
+fn verify_runtime_model_pack_digest(scenario: &EngineScenario) -> Result<(), EngineError> {
+    let has_verification = scenario
+        .model_pack
+        .observer_sensors
+        .iter()
+        .any(|sensor| sensor.verification_track_model.is_some());
+    if scenario.model_pack.runtime_digest.is_none() && !has_verification {
+        return Ok(());
+    }
+    let expected = scenario
+        .model_pack
+        .runtime_digest
+        .as_deref()
+        .ok_or_else(|| {
+            invalid("modelPack.runtimeDigest is required for a verification track model")
+        })?;
+    sha256_digest("modelPack.runtimeDigest", expected)?;
+    let mut value = serde_json::to_value(&scenario.model_pack)
+        .map_err(|error| invalid(format!("could not encode runtime model pack: {error}")))?;
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| invalid("modelPack must be an object"))?;
+    object.remove("runtimeDigest");
+    let bytes = serde_json::to_vec(&canonicalize(value)).map_err(|error| {
+        invalid(format!(
+            "could not canonicalize runtime model pack: {error}"
+        ))
+    })?;
+    let actual = format!("{:x}", Sha256::digest(bytes));
+    if actual != expected {
+        return Err(invalid(format!(
+            "modelPack.runtimeDigest does not match its content: expected {expected}, computed {actual}"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_verification_track_model(
+    model: &crate::ObserverTrackModel,
+    intended_use_id: &str,
+) -> Result<(), EngineError> {
+    let finite = |value: Vec3| value.x.is_finite() && value.y.is_finite() && value.z.is_finite();
+    let positive = |value: Vec3| finite(value) && value.x > 0.0 && value.y > 0.0 && value.z > 0.0;
+    let windows_valid = !model.observation_windows_seconds.is_empty()
+        && model
+            .observation_windows_seconds
+            .iter()
+            .enumerate()
+            .all(|(index, window)| {
+                window.start.is_finite()
+                    && window.end.is_finite()
+                    && window.start >= 0.0
+                    && window.end >= window.start
+                    && (index == 0
+                        || window.start > model.observation_windows_seconds[index - 1].end)
+            });
+    if intended_use_id != "vector.intended-use.engine-verification"
+        || model.schema_version != "vector.generic-track-model.v1"
+        || model.value_state != "TEST_FIXTURE"
+        || model.intended_use != "ENGINE_VERIFICATION_ONLY"
+        || !finite(model.position_bias_m)
+        || !finite(model.velocity_bias_mps)
+        || !positive(model.position_standard_deviation_m)
+        || !positive(model.velocity_standard_deviation_mps)
+        || model.confirmation_observations < 2
+        || !model.maximum_observation_age_seconds.is_finite()
+        || model.maximum_observation_age_seconds < 0.0
+        || !model.coast_after_seconds.is_finite()
+        || model.coast_after_seconds <= 0.0
+        || !model.lost_after_seconds.is_finite()
+        || model.lost_after_seconds <= model.coast_after_seconds
+        || !windows_valid
+    {
+        return Err(invalid(
+            "generic track model is admitted only for engine verification",
+        ));
+    }
+    Ok(())
 }
 
 fn finite(path: &str, value: f64) -> Result<(), EngineError> {
@@ -274,7 +383,10 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
         )?;
     }
     if let Some(sensor) = &entity.observer_sensor {
-        if sensor.schema_version != "vector.observer-sensor-admission.v1" {
+        if !matches!(
+            sensor.schema_version.as_str(),
+            "vector.observer-sensor-admission.v1" | "vector.observer-sensor-admission.v2"
+        ) {
             return Err(invalid(format!(
                 "{root}.observerSensor.schemaVersion is unsupported"
             )));
@@ -458,6 +570,7 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
     identifier("modelPack.id", &scenario.model_pack.id)?;
     identifier("modelPack.version", &scenario.model_pack.version)?;
     sha256_digest("modelPack.digest", &scenario.model_pack.digest)?;
+    verify_runtime_model_pack_digest(scenario)?;
     identifier(
         "modelPack.intendedUse.id",
         &scenario.model_pack.intended_use.id,
@@ -613,10 +726,25 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
                     && sensor.scan_period_s == admission.scan_period_s
                     && sensor.azimuth_field_of_view_rad == admission.azimuth_field_of_view_rad
                     && sensor.elevation_field_of_view_rad == admission.elevation_field_of_view_rad
+                    && sensor.verification_track_model == admission.verification_track_model
             });
             if !exact_match {
                 return Err(invalid(format!(
                     "observer sensor {} is not bound to an admitted compiled sensor model",
+                    entity.id
+                )));
+            }
+            if let Some(model) = &admission.verification_track_model {
+                if admission.schema_version != "vector.observer-sensor-admission.v2" {
+                    return Err(invalid(format!(
+                        "observer sensor {} verification track model requires admission v2",
+                        entity.id
+                    )));
+                }
+                validate_verification_track_model(model, &scenario.model_pack.intended_use.id)?;
+            } else if admission.schema_version != "vector.observer-sensor-admission.v1" {
+                return Err(invalid(format!(
+                    "observer sensor {} has an unsupported admission schema",
                     entity.id
                 )));
             }

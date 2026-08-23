@@ -24,10 +24,12 @@ import {
 } from "../geospatial/environment-pack.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
-export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v4" as const;
+export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v5" as const;
+export const LEGACY_VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v4" as const;
 export const VECTOR_EVENT_SCHEMA = SIMULATION_EVENT_SCHEMA;
 export const LEGACY_VECTOR_EVENT_SCHEMA = "vector.events.v1" as const;
-export const VECTOR_PICTURE_SCHEMA = "vector.pictures.v3" as const;
+export const VECTOR_PICTURE_SCHEMA = "vector.pictures.v4" as const;
+export const LEGACY_VECTOR_PICTURE_SCHEMA = "vector.pictures.v3" as const;
 export const MAX_VECTOR_RECORD_BYTES = 64 * 1024 * 1024;
 
 const RECORD_MAGIC = new TextEncoder().encode("VECTOR1\0");
@@ -335,11 +337,15 @@ export function decodeColumnarFrames(bytes: Uint8Array): EngineFrame[] {
     );
   }
   if (
-    header.schemaVersion !== VECTOR_FRAME_SCHEMA ||
+    ![VECTOR_FRAME_SCHEMA, LEGACY_VECTOR_FRAME_SCHEMA].includes(header.schemaVersion as typeof VECTOR_FRAME_SCHEMA) ||
     canonicalJson(header.columns) !== canonicalJson(FRAME_COLUMNS)
   ) {
     throw new Error("VECTOR frame schema is unsupported.");
   }
+  if (
+    header.schemaVersion === LEGACY_VECTOR_FRAME_SCHEMA &&
+    header.frames.some((frame) => frame.observerStates.some((state) => state.schemaVersion !== "vector.observer-state.v2"))
+  ) throw new Error("Legacy VECTOR frame schema cannot contain observer state v3.");
   const valueCount = header.entities.length * FRAME_COLUMNS.length;
   const expectedLength = 12 + headerLength + valueCount * Float64Array.BYTES_PER_ELEMENT;
   if (bytes.byteLength !== expectedLength) {
@@ -690,11 +696,19 @@ export async function openVectorSimulationRecord(
       throw new Error(`Required VECTOR record member ${item.path} does not match its manifest.`);
     }
   }
+  const frameMember = header.members.find((candidate) => candidate.path === "frames.arrow");
+  if (
+    !frameMember ||
+    ![VECTOR_FRAME_SCHEMA, LEGACY_VECTOR_FRAME_SCHEMA].includes(frameMember.schemaVersion as typeof VECTOR_FRAME_SCHEMA) ||
+    !manifest.requiredViewerFeatures.includes(frameMember.schemaVersion)
+  ) throw new Error("VECTOR record does not admit a supported frame schema.");
   const pictureMember = header.members.find((candidate) => candidate.path === "pictures.jsonl");
   if (
     !pictureMember ||
-    pictureMember.schemaVersion !== VECTOR_PICTURE_SCHEMA ||
-    !manifest.requiredViewerFeatures.includes(VECTOR_PICTURE_SCHEMA)
+    ![VECTOR_PICTURE_SCHEMA, LEGACY_VECTOR_PICTURE_SCHEMA].includes(
+      pictureMember.schemaVersion as typeof VECTOR_PICTURE_SCHEMA,
+    ) ||
+    !manifest.requiredViewerFeatures.includes(pictureMember.schemaVersion)
   ) {
     throw new Error("VECTOR record does not admit the required observer-picture schema.");
   }
@@ -732,6 +746,10 @@ export async function openVectorSimulationRecord(
   if (report.schemaVersion !== "vector.report.v1") throw new Error("VECTOR report schema is unsupported.");
   const decodedFrames = decodeColumnarFrames(required("frames.arrow"));
   const pictures = jsonLines<RaspTrack>(required("pictures.jsonl"));
+  if (
+    pictureMember.schemaVersion === LEGACY_VECTOR_PICTURE_SCHEMA &&
+    pictures.some((picture) => picture.schemaVersion !== "vector.observer-state.v2")
+  ) throw new Error("Legacy VECTOR picture schema cannot contain observer state v3.");
   const events: SimulationEventStream = eventMember.schemaVersion === VECTOR_EVENT_SCHEMA
     ? {
         state: "AVAILABLE",

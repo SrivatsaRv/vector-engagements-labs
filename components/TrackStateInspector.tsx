@@ -55,7 +55,7 @@ export function TrackStateInspector({
             <div><dt>Owner</dt><dd>{track.perspective}</dd></div>
             <div><dt>Lifecycle</dt><dd>{track.trackState.replaceAll("_", " ")}</dd></div>
             <div><dt>Freshness</dt><dd>{track.ageSeconds.toFixed(1)} s old</dd></div>
-            <div><dt>Uncertainty</dt><dd>{track.visible ? `${Math.round(track.uncertaintyMeters)} m` : "Unavailable"}</dd></div>
+            <div><dt>Uncertainty</dt><dd>{track.visible && track.uncertaintyMeters !== null ? `${Math.round(track.uncertaintyMeters)} m` : "Unavailable"}</dd></div>
             <div><dt>Source</dt><dd>{track.source}</dd></div>
             <div><dt>Cause</dt><dd>{track.availabilityReason.replaceAll("_", " ")}</dd></div>
           </dl>

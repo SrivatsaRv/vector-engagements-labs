@@ -54,6 +54,7 @@ export const SIMULATION_EVENT_PAYLOAD_SCHEMAS = {
   ENTITY_ENTERED_WORLD: "vector.simulation-event-payload.entity-entered-world.v1",
   ENTITY_LIFECYCLE_CHANGED: "vector.simulation-event-payload.entity-lifecycle-changed.v1",
   RUN_COMPLETED: "vector.simulation-event-payload.run-completed.v1",
+  TRACK_STATE_CHANGED: "vector.simulation-event-payload.track-state-changed.v1",
 } as const;
 
 export type SimulationEventParticipantRole =
@@ -82,7 +83,9 @@ export type ObserverSensorKind = "RADAR" | "INFRARED" | "VISUAL";
  * substitute.
  */
 export type ObserverSensorAdmission = {
-  schemaVersion: "vector.observer-sensor-admission.v1";
+  schemaVersion:
+    | "vector.observer-sensor-admission.v1"
+    | "vector.observer-sensor-admission.v2";
   modelPackDigest: string;
   modelId: string;
   modelVersion: string;
@@ -94,25 +97,151 @@ export type ObserverSensorAdmission = {
   scanPeriodS: number;
   azimuthFieldOfViewRad: number;
   elevationFieldOfViewRad: number;
+  verificationTrackModel?: ObserverTrackModel;
 };
 
-export type EngineObserverState = {
-  schemaVersion: "vector.observer-state.v2";
+export type ObserverTrackModel = {
+  schemaVersion: "vector.generic-track-model.v1";
+  valueState: "TEST_FIXTURE";
+  intendedUse: "ENGINE_VERIFICATION_ONLY";
+  positionBiasM: Vec3;
+  velocityBiasMps: Vec3;
+  positionStandardDeviationM: Vec3;
+  velocityStandardDeviationMps: Vec3;
+  confirmationObservations: number;
+  maximumObservationAgeSeconds: number;
+  coastAfterSeconds: number;
+  lostAfterSeconds: number;
+  observationWindowsSeconds: Array<{ start: number; end: number }>;
+};
+
+export type TrackEstimate =
+  | { valueState: "UNAVAILABLE"; reason: "NON_POSITIONAL_OBSERVATION" }
+  | { valueState: "ESTIMATED"; positionM: Vec3; velocityMps: Vec3 };
+
+export type TrackUncertainty =
+  | { valueState: "UNAVAILABLE"; reason: "UNCERTAINTY_MODEL_UNAVAILABLE" }
+  | {
+      valueState: "ESTIMATED";
+      positionStandardDeviationM: Vec3;
+      velocityStandardDeviationMps: Vec3;
+    };
+
+export type EngineObservation = {
+  schemaVersion: "vector.observation.v1";
+  id: string;
+  owner: ObserverPerspective;
+  source: {
+    modelPackDigest: string;
+    sensorModelId: string;
+    sensorModelVersion: string;
+  };
+  sourceSequence: number;
+  sourceTimeSeconds: number;
+  estimate: TrackEstimate;
+  uncertainty: TrackUncertainty;
+};
+
+export type EngineTrackLifecycle = "TENTATIVE" | "CONFIRMED" | "COASTING" | "LOST";
+
+export type EngineTrack = {
+  schemaVersion: "vector.track.v1";
+  trackId: string;
+  owner: ObserverPerspective;
+  source: EngineObservation["source"];
+  sourceSequence: number;
+  sourceTimeSeconds: number;
+  state: EngineTrackLifecycle;
+  estimate: Extract<TrackEstimate, { valueState: "ESTIMATED" }>;
+  uncertainty: Extract<TrackUncertainty, { valueState: "ESTIMATED" }>;
+  updateCount: number;
+  ageSeconds: number;
+  freshUntilSeconds: number;
+  expiresAtSeconds: number;
+};
+
+export type TrackTransitionCause =
+  | "INITIAL_OBSERVATION"
+  | "CONFIRMATION_THRESHOLD_MET"
+  | "FRESHNESS_EXPIRED"
+  | "OBSERVATION_REACQUIRED"
+  | "TRACK_EXPIRED";
+
+export type TrackTransitionCommit = {
+  localKey: string;
+  trackId: string;
+  owner: ObserverPerspective;
+  from: "NONE" | EngineTrackLifecycle;
+  to: EngineTrackLifecycle;
+  cause: TrackTransitionCause;
+  source: EngineObservation["source"];
+  sourceSequence: number;
+  sourceTimeSeconds: number;
+  observationId?: string;
+};
+
+type EngineObserverStateBase = {
   perspective: ObserverPerspective;
-  sensorState: "UNSUPPORTED" | "OFF" | "SEARCH";
-  observationCount: number;
-  trackState: "UNSUPPORTED" | "NONE" | "PLOT";
-  visible: false;
-  availabilityReason:
-    | "SENSOR_MODEL_UNAVAILABLE"
-    | "SENSOR_OFF"
-    | "SCAN_NOT_DUE"
-    | "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME"
-    | "OBSERVATION_ADMITTED";
   effectScope: "AIR_PICTURE_ONLY";
   stateExplanation: string;
-  sensorModelId?: string;
 };
+
+export type EngineObserverStateV2 = EngineObserverStateBase & (
+  | {
+      schemaVersion: "vector.observer-state.v2";
+      sensorState: "UNSUPPORTED";
+      observationCount: 0;
+      trackState: "UNSUPPORTED";
+      visible: false;
+      availabilityReason: "SENSOR_MODEL_UNAVAILABLE";
+    }
+  | {
+      schemaVersion: "vector.observer-state.v2";
+      sensorState: "OFF";
+      observationCount: 0;
+      trackState: "NONE";
+      visible: false;
+      availabilityReason: "SENSOR_OFF";
+      sensorModelId: string;
+    }
+  | {
+      schemaVersion: "vector.observer-state.v2";
+      sensorState: "SEARCH";
+      observationCount: 0;
+      trackState: "NONE";
+      visible: false;
+      availabilityReason: "SCAN_NOT_DUE" | "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME";
+      sensorModelId: string;
+    }
+  | {
+      schemaVersion: "vector.observer-state.v2";
+      sensorState: "SEARCH";
+      observationCount: 1;
+      trackState: "PLOT";
+      visible: false;
+      availabilityReason: "OBSERVATION_ADMITTED";
+      sensorModelId: string;
+    }
+);
+
+export type EngineObserverStateV3 = EngineObserverStateBase & {
+  schemaVersion: "vector.observer-state.v3";
+  sensorState: "SEARCH";
+  observationCount: 0 | 1;
+  trackState: "NONE" | EngineTrackLifecycle;
+  visible: boolean;
+  availabilityReason:
+    | "SCAN_NOT_DUE"
+    | "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME"
+    | "OBSERVATION_ADMITTED"
+    | "TRACK_COASTING"
+    | "TRACK_LOST";
+  sensorModelId: string;
+  observations: EngineObservation[];
+  tracks: EngineTrack[];
+};
+
+export type EngineObserverState = EngineObserverStateV2 | EngineObserverStateV3;
 export type EntityLifecycle =
   | "STOWED"
   | "ACTIVE"
@@ -158,6 +287,22 @@ export type SimulationEventPayload =
       kind: "RUN_COMPLETED";
       schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_COMPLETED;
       termination: EngineTermination;
+    }
+  | {
+      kind: "TRACK_STATE_CHANGED";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.TRACK_STATE_CHANGED;
+      perspective: ObserverPerspective;
+      trackId: string;
+      from: "NONE" | EngineTrackLifecycle;
+      to: EngineTrackLifecycle;
+      cause: TrackTransitionCause;
+      sensorModelId: string;
+      sensorModelVersion: string;
+      modelPackDigest: string;
+      sourceSequence: number;
+      sourceTimeSeconds: number;
+      estimateValueState: "ESTIMATED";
+      uncertaintyValueState: "ESTIMATED";
     };
 
 export type SimulationEventV2 = {
@@ -177,7 +322,7 @@ export type SimulationEventV2 = {
     | "WEAPON"
     | "TERMINATION";
   producer: {
-    subsystem: "RUN_COORDINATOR" | "ENTITY_LIFECYCLE";
+    subsystem: "RUN_COORDINATOR" | "ENTITY_LIFECYCLE" | "SENSOR_TRACK";
     entityId?: string;
   };
   ownerAffiliation?: Affiliation;
@@ -320,6 +465,8 @@ export type EngineScenario = {
     version: string;
     digest: string;
     intendedUse: { id: string; version: string };
+    /** SHA-256 of this compact runtime projection, excluding this field. */
+    runtimeDigest?: string;
     observerSensors: Array<{
       modelId: string;
       modelVersion: string;
@@ -331,6 +478,7 @@ export type EngineScenario = {
       scanPeriodS: number;
       azimuthFieldOfViewRad: number;
       elevationFieldOfViewRad: number;
+      verificationTrackModel?: ObserverTrackModel;
     }>;
     scenarioPatches: ScenarioModelPatch[];
   };

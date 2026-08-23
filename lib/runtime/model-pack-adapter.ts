@@ -5,6 +5,7 @@ import {
 } from "./deployment-capabilities.ts";
 import type { PreparedSimulation } from "../simulation.ts";
 import type { RuntimeModelPackAdapter } from "./protocol.ts";
+import { assertRuntimeModelPackDigest } from "../engine/runtime-model-pack.ts";
 
 export async function adaptPreparedSimulation(
   prepared: PreparedSimulation,
@@ -37,6 +38,10 @@ export async function admitRuntimeModelPack(
   const manifest = admitWorkerCapabilityManifest(
     pack.prepared.capabilityManifest,
   );
+  assertRuntimeModelPackDigest(pack.prepared.engineScenario.modelPack);
+  if (!manifest.admittedModelPackDigests.includes(pack.prepared.engineScenario.modelPack.digest)) {
+    throw new Error("The runtime model-pack digest is not admitted by this deployment.");
+  }
   return {
     schemaVersion: manifest.schemaVersion,
     digest: manifest.digest,

@@ -161,9 +161,9 @@ export type RaspTrack = EngineObserverState & {
   source: string;
   lastUpdateSeconds: number;
   ageSeconds: number;
-  confidence: number;
-  uncertaintyMeters: number;
-  status: "NO_TRACK" | "PLOT";
+  confidence: number | null;
+  uncertaintyMeters: number | null;
+  status: "NO_TRACK" | "PLOT" | "TENTATIVE" | "CONFIRMED" | "COASTING" | "LOST";
 };
 
 export type TerminationCode =

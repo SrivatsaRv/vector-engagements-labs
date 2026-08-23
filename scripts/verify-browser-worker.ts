@@ -15,6 +15,7 @@ import { createPhaseAEnvironmentPack } from "../lib/geospatial/environment-pack.
 import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import { getStudyArea, getWeatherPreset } from "../lib/study-areas.ts";
 import { resolveBrowserWorkerAssets } from "./browser-worker-assets.ts";
+import { bindVerificationTrackModelPack } from "../lib/engine/verification-track-fixture.ts";
 
 type RuntimeMessage = {
   type: string;
@@ -39,6 +40,7 @@ type WorkerVerificationResult = {
   wallMs: number;
   frameCount: number;
   staleAdmissionError: string;
+  verificationAdmissionError: string;
   transferredByteLength: number;
   detachedAfterRecycle: boolean;
 };
@@ -85,6 +87,17 @@ const stalePack = await adaptPreparedSimulation(
     createVerificationDeploymentCapabilities(DEPLOYMENT_CAPABILITIES.engine.id),
   ),
 );
+const verificationBase = prepareSimulation(scenario, scenario.profile, DEPLOYMENT_CAPABILITIES);
+const verificationBinding = await bindVerificationTrackModelPack(verificationBase.engineScenario);
+const verificationPack = await adaptPreparedSimulation({
+  ...verificationBase,
+  engineScenario: verificationBinding.scenario,
+  capabilityManifest: createVerificationDeploymentCapabilities(
+    DEPLOYMENT_CAPABILITIES.engine.id,
+    ["A2A"],
+    [verificationBinding.pack.digest],
+  ),
+});
 const phaseAArea = getStudyArea("north-punjab");
 const phaseAPack = createPhaseAEnvironmentPack({
   studyArea: phaseAArea,
@@ -130,7 +143,7 @@ try {
   assert.equal(environmentSamples[0]?.terrain.elevation.datum, "MSL");
   assert.equal(environmentSamples[0]?.terrain.elevation.valueM, phaseAArea.surfaceElevationM);
   const result: WorkerVerificationResult = await page.evaluate(
-      async ({ pack: selectedPack, stalePack: rejectedPack, workerUrl }) => {
+      async ({ pack: selectedPack, stalePack: rejectedPack, verificationPack: rejectedVerificationPack, workerUrl }) => {
         const protocol = "vector.browser-runtime.v1";
         const worker = new Worker(workerUrl, { name: "vector-simulation-runtime" });
         const states: string[] = [];
@@ -179,6 +192,14 @@ try {
         send({ requestId: "stale-load", type: "load-model-pack", pack: rejectedPack });
         const staleAdmissionError = await staleAdmission.then(
           () => "unexpected model-pack admission",
+          (error: Error) => error.message,
+        );
+        const verificationAdmission = waitFor(
+          (message) => message.type === "model-pack-loaded",
+        );
+        send({ requestId: "verification-load", type: "load-model-pack", pack: rejectedVerificationPack });
+        const verificationAdmissionError = await verificationAdmission.then(
+          () => "unexpected verification-pack admission",
           (error: Error) => error.message,
         );
         const loaded = waitFor((message) => message.type === "model-pack-loaded");
@@ -267,11 +288,12 @@ try {
           wallMs: performance.now() - startedAt,
           frameCount: frameHeader.frames.length,
           staleAdmissionError,
+          verificationAdmissionError,
           transferredByteLength,
           detachedAfterRecycle,
         };
       },
-      { pack, stalePack, workerUrl: `${origin}/assets/${workerName}` },
+      { pack, stalePack, verificationPack, workerUrl: `${origin}/assets/${workerName}` },
     );
 
   assert.match(result.recordId, /^[a-f0-9]{64}$/);
@@ -287,6 +309,7 @@ try {
   assert.ok(result.boundaryCalls > 1);
   assert.ok(result.states.includes("failed"));
   assert.match(result.staleAdmissionError, /capability-manifest-stale/);
+  assert.match(result.verificationAdmissionError, /capability-manifest-stale/);
 
   const cancellation = await page.evaluate(
     async ({ pack, workerUrl }) => {

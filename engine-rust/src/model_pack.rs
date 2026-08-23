@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use crate::EngineError;
+use crate::{EngineError, ObserverTrackModel};
 
 const COMPILED_SCHEMA: &str = "vector.compiled-model-pack.v1";
 const AIRCRAFT_EVIDENCE_REGISTRY: &str =
@@ -111,6 +111,8 @@ pub struct SensorModel {
     pub scan_period_s: f64,
     pub azimuth_field_of_view_rad: f64,
     pub elevation_field_of_view_rad: f64,
+    #[serde(default)]
+    pub verification_track_model: Option<ObserverTrackModel>,
     pub validity_domain: ValidityDomain,
 }
 
@@ -619,6 +621,12 @@ fn validate_sensor_evidence_admission(
     evidence: &[EvidenceReference],
 ) -> Result<(), EngineError> {
     if sensor.sensor_kind == "DECLARED_ENVELOPE" {
+        if sensor.verification_track_model.is_some() {
+            return Err(invalid(format!(
+                "sensor model {} cannot attach a verification track model to a declared envelope",
+                sensor.id
+            )));
+        }
         return Ok(());
     }
     if !matches!(sensor.sensor_kind.as_str(), "RADAR" | "INFRARED" | "VISUAL") {
@@ -702,6 +710,48 @@ fn validate_sensor_evidence_admission(
             "sensor model {} has unknown or unvalidated positive-sensor evidence coverage",
             sensor.id
         )));
+    }
+    if let Some(model) = &sensor.verification_track_model {
+        validate_verification_track_model(model)?;
+    }
+    Ok(())
+}
+
+fn validate_verification_track_model(model: &ObserverTrackModel) -> Result<(), EngineError> {
+    let finite =
+        |value: crate::Vec3| value.x.is_finite() && value.y.is_finite() && value.z.is_finite();
+    let positive =
+        |value: crate::Vec3| finite(value) && value.x > 0.0 && value.y > 0.0 && value.z > 0.0;
+    let windows_valid = !model.observation_windows_seconds.is_empty()
+        && model
+            .observation_windows_seconds
+            .iter()
+            .enumerate()
+            .all(|(index, window)| {
+                window.start.is_finite()
+                    && window.end.is_finite()
+                    && window.start >= 0.0
+                    && window.end >= window.start
+                    && (index == 0
+                        || window.start > model.observation_windows_seconds[index - 1].end)
+            });
+    if model.schema_version != "vector.generic-track-model.v1"
+        || model.value_state != "TEST_FIXTURE"
+        || model.intended_use != "ENGINE_VERIFICATION_ONLY"
+        || !finite(model.position_bias_m)
+        || !finite(model.velocity_bias_mps)
+        || !positive(model.position_standard_deviation_m)
+        || !positive(model.velocity_standard_deviation_mps)
+        || model.confirmation_observations < 2
+        || !model.maximum_observation_age_seconds.is_finite()
+        || model.maximum_observation_age_seconds < 0.0
+        || !model.coast_after_seconds.is_finite()
+        || model.coast_after_seconds <= 0.0
+        || !model.lost_after_seconds.is_finite()
+        || model.lost_after_seconds <= model.coast_after_seconds
+        || !windows_valid
+    {
+        return Err(invalid("generic verification track model is invalid"));
     }
     Ok(())
 }
@@ -905,6 +955,17 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
             model.elevation_field_of_view_rad,
         )?;
         validate_sensor_evidence_admission(model, &pack.evidence)?;
+        if model.verification_track_model.is_some()
+            && !pack
+                .intended_uses
+                .iter()
+                .any(|item| item.id == "vector.intended-use.engine-verification")
+        {
+            return Err(invalid(format!(
+                "sensor model {} verification track model requires engine-verification intended use",
+                model.id
+            )));
+        }
     }
     for model in &pack.aircraft {
         validate_validity_domain(
