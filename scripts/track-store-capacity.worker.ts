@@ -1,33 +1,20 @@
-import type { EngineFrame, EngineObserverStateV3, EngineTrack, ObserverPerspective, ObserverTrackModel } from "../lib/engine/contracts.ts";
+import type { EngineFrame, EngineObserverStateV3, EngineTrack, ObserverPerspective } from "../lib/engine/contracts.ts";
 import { createVerificationObservation, TrackStore } from "../lib/engine/track-store.ts";
 import { assertEngineObserverState, assertRecordedSidePictures, attachRecordedObserverStates, projectObserverStates } from "../lib/information-state.ts";
 import { decodeColumnarFrames, encodeColumnarFrames } from "../lib/record/vector-record.ts";
+import {
+  TRACK_STORE_CAPACITY_MODEL as model,
+  TRACK_STORE_CAPACITY_SIDES as SIDES,
+  TRACK_STORE_CAPACITY_SOURCE as source,
+  TRACK_STORE_CAPACITY_WORKLOAD as WORKLOAD,
+  trackStoreCapacityObservationDue,
+} from "../lib/validation/track-store-capacity.ts";
 
-const SIDES = ["IAF", "PAF"] as const;
-const TRACKS_PER_SIDE = 50;
-const model: ObserverTrackModel = {
-  schemaVersion: "vector.generic-track-model.v1",
-  valueState: "TEST_FIXTURE",
-  intendedUse: "ENGINE_VERIFICATION_ONLY",
-  positionBiasM: { x: 5, y: -2, z: 1 },
-  velocityBiasMps: { x: 0.5, y: -0.25, z: 0 },
-  positionStandardDeviationM: { x: 40, y: 40, z: 60 },
-  velocityStandardDeviationMps: { x: 3, y: 3, z: 4 },
-  confirmationObservations: 2,
-  maximumObservationAgeSeconds: 0.1,
-  coastAfterSeconds: 0.1,
-  lostAfterSeconds: 0.2,
-  observationWindowsSeconds: [{ start: 0, end: 5 }],
-};
-const source = {
-  modelPackDigest: "7".repeat(64),
-  sensorModelId: "generic-verification-sensor",
-  sensorModelVersion: "1.0.0",
-};
+const TRACKS_PER_SIDE = WORKLOAD.tracksPerSide;
 let generation = 0;
 
 function observation(owner: ObserverPerspective, index: number, tick: number) {
-  const time = tick / 20;
+  const time = tick / WORKLOAD.updateRateHz;
   return createVerificationObservation({
     identity: source,
     owner,
@@ -59,8 +46,8 @@ function start(runId: string) {
       postMessage({ type: "cancelled", runId });
       return;
     }
-    const time = tick / 20;
-    const due = tick <= 1 || tick >= 7;
+    const time = tick / WORKLOAD.updateRateHz;
+    const due = trackStoreCapacityObservationDue(tick);
     for (const [sideIndex, owner] of SIDES.entries()) {
       const observations = due
         ? Array.from({ length: TRACKS_PER_SIDE }, (_, index) => observation(owner, index, tick))
@@ -74,7 +61,7 @@ function start(runId: string) {
       ].join("|"));
     }
     postMessage({ type: "progress", runId, tick });
-    if (tick < 100) {
+    if (tick < WORKLOAD.ticks - 1) {
       tick += 1;
       setTimeout(advance, 0);
       return;
@@ -82,7 +69,7 @@ function start(runId: string) {
     let retainedTracks = 0;
     const tracksBySide = new Map<ObserverPerspective, EngineTrack[]>();
     for (const [sideIndex, store] of stores.entries()) {
-      const tracks = store.update(5).snapshot.tracks;
+      const tracks = store.update(WORKLOAD.durationSeconds).snapshot.tracks;
       retainedTracks += tracks.length;
       tracksBySide.set(SIDES[sideIndex]!, tracks);
     }
@@ -116,7 +103,7 @@ function start(runId: string) {
       ].join("|"));
     }
     const capacityFrame = {
-      t: 5,
+      t: WORKLOAD.durationSeconds,
       entities: [],
       geographicPositions: [],
       primaryWeaponId: "verification-weapon",
@@ -143,6 +130,8 @@ function start(runId: string) {
     postMessage({
       type: "completed",
       runId,
+      workloadId: WORKLOAD.id,
+      workloadVersion: WORKLOAD.version,
       retainedTracks,
       transitionCount,
       parityDigest: await digest(parityLines),

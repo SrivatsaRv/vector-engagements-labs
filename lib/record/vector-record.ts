@@ -8,7 +8,10 @@ import type {
   SimulationEventV2,
 } from "../engine/contracts.ts";
 import { SIMULATION_EVENT_SCHEMA } from "../engine/contracts.ts";
-import { assertSimulationEventStream } from "../engine/simulation-events.ts";
+import {
+  assertSimulationEventStream,
+  compareCanonicalText,
+} from "../engine/simulation-events.ts";
 import { sha256Bytes } from "../runtime/digest.ts";
 import {
   buildSimulationResult,
@@ -491,6 +494,20 @@ export async function createVectorSimulationRecord(
     result.engineRun.termination,
   );
   const pictures = result.pictures;
+  const canonicalEngineScenario = {
+    ...prepared.engineScenario,
+    entities: [...prepared.engineScenario.entities]
+      .sort((left, right) => compareCanonicalText(left.id, right.id)),
+  };
+  const canonicalEntityManifest = [...result.entityManifest]
+    .sort((left, right) => compareCanonicalText(left.id, right.id));
+  const canonicalFrames = result.engineRun.frames.map((frame) => ({
+    ...frame,
+    entities: [...frame.entities]
+      .sort((left, right) => compareCanonicalText(left.id, right.id)),
+    geographicPositions: [...frame.geographicPositions]
+      .sort((left, right) => compareCanonicalText(left.entityId, right.entityId)),
+  }));
   const nonManifest = await Promise.all([
     member("scenario.json", "vector.scenario.v2", "application/json", true, jsonBytes(prepared.scenario)),
     member(
@@ -502,16 +519,16 @@ export async function createVectorSimulationRecord(
         capabilityManifest: prepared.capabilityManifest,
         profileId: prepared.profileId,
         profile: prepared.profile,
-        engineScenario: prepared.engineScenario,
+        engineScenario: canonicalEngineScenario,
       }),
     ),
-    member("entities.json", "vector.entities.v1", "application/json", true, jsonBytes(result.entityManifest)),
+    member("entities.json", "vector.entities.v1", "application/json", true, jsonBytes(canonicalEntityManifest)),
     member(
       "frames.arrow",
       VECTOR_FRAME_SCHEMA,
       "application/vnd.vector.frames+columnar",
       true,
-      encodeColumnarFrames(result.engineRun.frames),
+      encodeColumnarFrames(canonicalFrames),
     ),
     member(
       "events.jsonl",
@@ -533,7 +550,7 @@ export async function createVectorSimulationRecord(
       "application/json",
       true,
       jsonBytes(
-        prepared.engineScenario.entities.map((entity) => ({
+        canonicalEngineScenario.entities.map((entity) => ({
           entityId: entity.id,
           provenance: entity.provenance,
         })),

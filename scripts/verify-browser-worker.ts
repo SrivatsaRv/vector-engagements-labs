@@ -17,6 +17,7 @@ import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import { getStudyArea, getWeatherPreset } from "../lib/study-areas.ts";
 import { resolveBrowserWorkerAssets } from "./browser-worker-assets.ts";
 import { bindVerificationTrackModelPack } from "../lib/engine/verification-track-fixture.ts";
+import { TRACK_STORE_CAPACITY_WORKLOAD } from "../lib/validation/track-store-capacity.ts";
 
 type RuntimeMessage = {
   type: string;
@@ -419,14 +420,16 @@ try {
     worker.terminate();
     return result;
   }, { workerUrl: `${origin}/assets/track-store-capacity.worker.js` });
-  assert.equal(trackStoreCapacity.retainedTracks, 100);
-  assert.equal(trackStoreCapacity.transitionCount, 600);
+  assert.equal(trackStoreCapacity.workloadId, TRACK_STORE_CAPACITY_WORKLOAD.id);
+  assert.equal(trackStoreCapacity.workloadVersion, TRACK_STORE_CAPACITY_WORKLOAD.version);
+  assert.equal(trackStoreCapacity.retainedTracks, TRACK_STORE_CAPACITY_WORKLOAD.expected.retainedTracks);
+  assert.equal(trackStoreCapacity.transitionCount, TRACK_STORE_CAPACITY_WORKLOAD.expected.lifecycleTransitions);
   assert.equal(trackStoreCapacity.canonicalPictures, 2);
-  assert.deepEqual(trackStoreCapacity.tracksPerPicture, [50, 50]);
+  assert.deepEqual(trackStoreCapacity.tracksPerPicture, TRACK_STORE_CAPACITY_WORKLOAD.sides.map(() => TRACK_STORE_CAPACITY_WORKLOAD.tracksPerSide));
   const canonicalFrameBytes = trackStoreCapacity.canonicalFrameBytes;
   if (typeof canonicalFrameBytes !== "number") throw new Error("TrackStore Worker omitted canonical frame bytes.");
   assert.ok(canonicalFrameBytes > 0);
-  assert.equal(trackStoreCapacity.parityDigest, "e70a8290091d554c28a7b192eaaab3cac531a227770fad27de346b2424a3ecd2");
+  assert.equal(trackStoreCapacity.parityDigest, TRACK_STORE_CAPACITY_WORKLOAD.expected.parityDigest);
 
   process.stdout.write(
     `${JSON.stringify({ workerAsset: workerName, environmentWorkerAsset: environmentWorkerName, backend: result, cancellation, trackStoreCapacity })}\n`,

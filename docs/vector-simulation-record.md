@@ -34,6 +34,17 @@ required replay member and carries a content digest. Opening verifies bounds,
 duplicate paths, SHA-256, required members, schema versions, backend provenance,
 and frozen report/frame agreement before returning replay data.
 
+Entity definition order is not a semantic input. Both engine backends admit
+compiled entities in unsigned UTF-8 ID order, and the record writer repeats
+that canonicalization for `compiled.json`, `entities.json`, each frame's entity
+and geographic-position arrays, and `sources.json`. Consequently, permuting
+same-side entity definitions without changing their fields produces identical
+engine frames, events, pictures, member hashes, manifest, record ID, and full
+VSR bytes. Entity IDs and producer-local semantic IDs are preserved; they are
+not renumbered by insertion position. Ordered authored controls such as route
+points, model tables, and event causal sequences retain their declared order.
+The reader still accepts prior valid records and does not rewrite their bytes.
+
 `compiled.json` also contains the complete
 `vector.deployment-capabilities.v1` manifest. `manifest.json` binds its schema
 and SHA-256 digest beside the selected engine identity. Replay rejects a record

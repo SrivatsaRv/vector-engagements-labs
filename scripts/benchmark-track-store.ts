@@ -1,43 +1,28 @@
 import { createHash } from "node:crypto";
 import { arch, cpus, platform, release, totalmem } from "node:os";
 import { performance } from "node:perf_hooks";
-import type { EngineFrame, EngineObserverStateV3, EngineTrack, ObserverPerspective, ObserverTrackModel } from "../lib/engine/contracts.ts";
+import type { EngineFrame, EngineObserverStateV3, EngineTrack, ObserverPerspective } from "../lib/engine/contracts.ts";
 import { createVerificationObservation, TrackStore } from "../lib/engine/track-store.ts";
 import { canonicalJson } from "../lib/canonical-json.ts";
 import { assertEngineObserverState, assertRecordedSidePictures, attachRecordedObserverStates, projectObserverStates } from "../lib/information-state.ts";
 import { decodeColumnarFrames, encodeColumnarFrames } from "../lib/record/vector-record.ts";
+import {
+  TRACK_STORE_CAPACITY_MODEL as model,
+  TRACK_STORE_CAPACITY_SIDES as SIDES,
+  TRACK_STORE_CAPACITY_SOURCE as source,
+  TRACK_STORE_CAPACITY_WORKLOAD as WORKLOAD,
+  trackStoreCapacityObservationDue,
+} from "../lib/validation/track-store-capacity.ts";
 
-const SIDES = ["IAF", "PAF"] as const;
-const TRACKS_PER_SIDE = 50;
+const TRACKS_PER_SIDE = WORKLOAD.tracksPerSide;
 const TRACKS = SIDES.length * TRACKS_PER_SIDE;
-const UPDATE_RATE_HZ = 20;
-const DURATION_SECONDS = 5;
-const TICKS = DURATION_SECONDS * UPDATE_RATE_HZ + 1;
+const UPDATE_RATE_HZ = WORKLOAD.updateRateHz;
+const DURATION_SECONDS = WORKLOAD.durationSeconds;
+const TICKS = WORKLOAD.ticks;
 const RUNS = Number(process.env.VECTOR_TRACK_STORE_RUNS ?? 7);
 const MAXIMUM_P95_MS = Number(process.env.VECTOR_TRACK_STORE_MAX_P95_MS ?? 75);
 const MAXIMUM_HEAP_DELTA_BYTES = Number(process.env.VECTOR_TRACK_STORE_MAX_HEAP_DELTA_BYTES ?? 64 * 1024 * 1024);
 if (!Number.isSafeInteger(RUNS) || RUNS < 2) throw new Error("VECTOR_TRACK_STORE_RUNS must be at least two.");
-
-const model: ObserverTrackModel = {
-  schemaVersion: "vector.generic-track-model.v1",
-  valueState: "TEST_FIXTURE",
-  intendedUse: "ENGINE_VERIFICATION_ONLY",
-  positionBiasM: { x: 5, y: -2, z: 1 },
-  velocityBiasMps: { x: 0.5, y: -0.25, z: 0 },
-  positionStandardDeviationM: { x: 40, y: 40, z: 60 },
-  velocityStandardDeviationMps: { x: 3, y: 3, z: 4 },
-  confirmationObservations: 2,
-  maximumObservationAgeSeconds: 0.1,
-  coastAfterSeconds: 0.1,
-  lostAfterSeconds: 0.2,
-  observationWindowsSeconds: [{ start: 0, end: DURATION_SECONDS }],
-};
-const digest = "7".repeat(64);
-const source = {
-  modelPackDigest: digest,
-  sensorModelId: "generic-verification-sensor",
-  sensorModelVersion: "1.0.0",
-};
 
 function associationId(owner: ObserverPerspective, index: number) {
   return `${owner}-SOURCE-${(index + 1).toString().padStart(4, "0")}`;
@@ -96,7 +81,7 @@ function measuredRun() {
   const startedAt = performance.now();
   for (let tick = 0; tick < TICKS; tick += 1) {
     const time = tick / UPDATE_RATE_HZ;
-    const observationDue = tick <= 1 || tick >= 7;
+    const observationDue = trackStoreCapacityObservationDue(tick);
     const tickState: unknown[] = [];
     for (const owner of SIDES) {
       const store = stores.get(owner)!;
@@ -116,7 +101,7 @@ function measuredRun() {
       }
       tickState.push({ owner, tracks: update.snapshot.tracks });
 
-      if (observationDue && tick > 0 && tick % 10 === 0) {
+      if (observationDue && tick > 0 && tick % WORKLOAD.invalidProbeIntervalTicks === 0) {
         try {
           store.update(time, [observation(owner, 0, tick, time)]);
           throw new Error("TrackStore admitted a duplicate capacity probe.");
@@ -225,9 +210,27 @@ const parityDigests = new Set(samples.map((sample) => sample.parityDigest));
 const transitionCounts = new Set(samples.map((sample) => sample.transitionCount));
 if (digests.size !== 1) throw new Error("TrackStore workload is not deterministic across repeats.");
 if (parityDigests.size !== 1) throw new Error("TrackStore parity workload is not deterministic across repeats.");
-if (transitionCounts.size !== 1 || !transitionCounts.has(TRACKS * 6)) throw new Error("TrackStore workload did not exercise six lifecycle transitions per track.");
+if (transitionCounts.size !== 1 || !transitionCounts.has(WORKLOAD.expected.lifecycleTransitions)) throw new Error("TrackStore workload did not exercise the declared lifecycle transitions.");
 if (samples.some((sample) => sample.retainedTracks !== TRACKS || sample.rejectedDuplicateAttempts === 0 || sample.rejectedOutOfOrderAttempts === 0)) {
   throw new Error("TrackStore workload omitted retained tracks or invalid-input contrasts.");
+}
+for (const sample of samples) {
+  const measured = {
+    activeSourceAssociations: TRACKS,
+    validUpdateAttempts: sample.validUpdateAttempts,
+    rejectedDuplicateAttempts: sample.rejectedDuplicateAttempts,
+    rejectedOutOfOrderAttempts: sample.rejectedOutOfOrderAttempts,
+    lifecycleTransitions: sample.transitionCount,
+    retainedTracks: sample.retainedTracks,
+    canonicalFrameBytes: sample.canonicalFrameBytes,
+    canonicalPictureBytes: sample.canonicalPictureBytes,
+    transitionJsonBytes: sample.transitionBytes,
+    repeatDigest: sample.repeatDigest,
+    parityDigest: sample.parityDigest,
+  };
+  if (canonicalJson(measured) !== canonicalJson(WORKLOAD.expected)) {
+    throw new Error("TrackStore measurement does not match the governed workload expectations.");
+  }
 }
 const p95Ms = percentile(0.95);
 const maxHeapDeltaBytes = Math.max(...samples.map((sample) => sample.heapDeltaBytes));
@@ -246,6 +249,8 @@ process.stdout.write(`${JSON.stringify({
     memoryBytes: totalmem(),
   },
   workload: {
+    artifactId: WORKLOAD.id,
+    artifactVersion: WORKLOAD.version,
     intendedUse: "ENGINE_VERIFICATION_ONLY",
     activeSourceAssociations: TRACKS,
     sideOwnedStores: SIDES.length,

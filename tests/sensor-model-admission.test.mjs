@@ -188,10 +188,19 @@ test("same-side observer selection is stable across definition order in both eng
         backend,
         run,
         replay,
+        serializedBytes: new Uint8Array(serialized.buffer, 0, serialized.byteLength),
         eventBytes: record.members.find((member) => member.path === "events.jsonl")?.bytes,
         pictureBytes: record.members.find((member) => member.path === "pictures.jsonl")?.bytes,
       });
     }
+  }
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const [original, reversed] = results.filter((candidate) => candidate.backend === backend);
+    assert.deepEqual(
+      reversed.serializedBytes,
+      original.serializedBytes,
+      `${backend} must produce identical full VSR bytes for semantically identical entity definitions`,
+    );
   }
   const baseline = results[0];
   assert.ok(baseline?.eventBytes && baseline.pictureBytes);

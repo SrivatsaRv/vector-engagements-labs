@@ -34,10 +34,11 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 function exactKeys(value: Record<string, unknown>, expected: readonly string[], label: string) {
-  const expectedSet = new Set(expected);
-  const extra = Object.keys(value).find((key) => !expectedSet.has(key));
+  const keys = Object.keys(value);
   const missing = expected.find((key) => !Object.hasOwn(value, key));
-  if (extra || missing) throw new Error(`${label} has an unsupported or missing field.`);
+  if (keys.length !== expected.length || missing) {
+    throw new Error(`${label} has an unsupported or missing field.`);
+  }
 }
 
 function finiteVector(value: unknown): value is Vec3 {
@@ -171,6 +172,10 @@ function cloneTrack(track: EngineTrack): EngineTrack {
   };
 }
 
+function compareOpaqueId(left: string, right: string) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 export class TrackStore {
   readonly owner: ObserverPerspective;
   readonly source: EngineObservation["source"];
@@ -211,7 +216,6 @@ export class TrackStore {
   }
 
   #assertObservation(value: unknown, currentTimeSeconds: number): asserts value is EstimatedObservation {
-    assertNoTruthIdentity(value, "Observation");
     if (!record(value)) throw new Error("Observation is invalid.");
     exactKeys(value, [
       "schemaVersion", "id", "owner", "sourceAssociationId", "source", "sourceSequence",
@@ -226,7 +230,12 @@ export class TrackStore {
       !OPAQUE_ASSOCIATION_ID.test(observation.sourceAssociationId) ||
       !observation.sourceAssociationId.startsWith(`${this.owner}-`)
     ) throw new Error("Observation owner, association, or schema is invalid for this TrackStore.");
-    assertTrackSourceIdentity(observation.source, "Observation source");
+    if (!record(observation.source)) throw new Error("Observation source is invalid.");
+    exactKeys(
+      observation.source,
+      ["modelPackDigest", "sensorModelId", "sensorModelVersion"],
+      "Observation source",
+    );
     if (
       observation.source.modelPackDigest !== this.source.modelPackDigest ||
       observation.source.sensorModelId !== this.source.sensorModelId ||
@@ -264,7 +273,8 @@ export class TrackStore {
     observations.sort((left, right) => {
       const a = left as EstimatedObservation;
       const b = right as EstimatedObservation;
-      return a.sourceAssociationId.localeCompare(b.sourceAssociationId) || a.sourceSequence - b.sourceSequence || a.id.localeCompare(b.id);
+      return compareOpaqueId(a.sourceAssociationId, b.sourceAssociationId) ||
+        a.sourceSequence - b.sourceSequence || compareOpaqueId(a.id, b.id);
     });
     const batchAssociations = new Set<string>();
     for (const observation of observations as EstimatedObservation[]) {
@@ -318,8 +328,12 @@ export class TrackStore {
       if (state !== previous) transitions.push(this.#transition(track, previous, state, state === "COASTING" ? "FRESHNESS_EXPIRED" : "TRACK_EXPIRED"));
     }
 
-    const tracks = [...this.#tracks.values()].sort((left, right) => left.trackId.localeCompare(right.trackId)).map(cloneTrack);
-    transitions.sort((left, right) => left.trackId.localeCompare(right.trackId) || left.localKey.localeCompare(right.localKey));
+    const tracks = [...this.#tracks.values()]
+      .sort((left, right) => compareOpaqueId(left.trackId, right.trackId))
+      .map(cloneTrack);
+    transitions.sort((left, right) =>
+      compareOpaqueId(left.trackId, right.trackId) || compareOpaqueId(left.localKey, right.localKey),
+    );
     this.#lastUpdateTimeSeconds = currentTimeSeconds;
     return { snapshot: { tracks }, transitions };
   }
@@ -327,7 +341,7 @@ export class TrackStore {
   snapshot() {
     return {
       tracks: [...this.#tracks.values()]
-        .sort((left, right) => left.trackId.localeCompare(right.trackId))
+        .sort((left, right) => compareOpaqueId(left.trackId, right.trackId))
         .map(cloneTrack),
     };
   }

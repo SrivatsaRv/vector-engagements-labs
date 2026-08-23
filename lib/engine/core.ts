@@ -837,6 +837,11 @@ export class EngineSession {
   private lastObserverTick = -1;
 
   constructor(scenario: EngineScenario) {
+    scenario = {
+      ...scenario,
+      entities: [...scenario.entities]
+        .sort((left, right) => compareCanonicalText(left.id, right.id)),
+    };
     this.scenario = scenario;
     const hasVerificationTrackModel = (scenario.modelPack.observerSensors ?? []).some(
       (sensor) => sensor.verificationTrackModel !== undefined,

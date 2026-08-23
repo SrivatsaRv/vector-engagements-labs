@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   createVerificationObservation,
   TrackStore,
 } from "../lib/engine/track-store.ts";
+import {
+  assertTrackStoreCapacityWorkload,
+  TRACK_STORE_CAPACITY_WORKLOAD,
+} from "../lib/validation/track-store-capacity.ts";
 
 const DIGEST = "7".repeat(64);
 const SOURCE = {
@@ -25,6 +31,22 @@ const MODEL = {
   lostAfterSeconds: 0.2,
   observationWindowsSeconds: [{ start: 0, end: 5 }],
 };
+
+test("capacity workload is an immutable exact contract shared by benchmark and Worker", () => {
+  const bytes = readFileSync(new URL("../fixtures/performance/track-store-capacity-workload.v1.json", import.meta.url));
+  assert.equal(createHash("sha256").update(bytes).digest("hex"), "44c402b8c1bb89f6ae435783eb49474bf1af533ea7c4df909423dce0f244afe4");
+  assert.doesNotThrow(() => assertTrackStoreCapacityWorkload(structuredClone(TRACK_STORE_CAPACITY_WORKLOAD)));
+  assert.throws(() => assertTrackStoreCapacityWorkload({ ...structuredClone(TRACK_STORE_CAPACITY_WORKLOAD), invented: true }), /unsupported|missing/i);
+  assert.throws(() => assertTrackStoreCapacityWorkload({ ...structuredClone(TRACK_STORE_CAPACITY_WORKLOAD), ticks: 100 }), /dimensions/i);
+  assert.throws(() => assertTrackStoreCapacityWorkload({
+    ...structuredClone(TRACK_STORE_CAPACITY_WORKLOAD),
+    expected: { ...TRACK_STORE_CAPACITY_WORKLOAD.expected, parityDigest: "not-a-digest" },
+  }), /digest/i);
+  assert.throws(() => assertTrackStoreCapacityWorkload({
+    ...structuredClone(TRACK_STORE_CAPACITY_WORKLOAD),
+    trackModel: { ...TRACK_STORE_CAPACITY_WORKLOAD.trackModel, intendedUse: "OPERATIONAL" },
+  }), /engine verification/i);
+});
 
 function observation(owner, sequence, time, sourceAssociationId = `${owner}-SOURCE-0001`) {
   return createVerificationObservation({

@@ -189,7 +189,10 @@ Both omissions are acceptance work for #25, not successful measurements.
 
 ## 100-track TrackStore verification gate
 
-`npm run performance:track-store:verify` defines the bounded #26 workload: two
+`npm run performance:track-store:verify` consumes the immutable bounded #26
+workload in
+`fixtures/performance/track-store-capacity-workload.v1.json` (SHA-256
+`44c402b8c1bb89f6ae435783eb49474bf1af533ea7c4df909423dce0f244afe4`): two
 side-owned stores retaining 50 tracks each, 20 update boundaries per second,
 five seconds of model time, 9,600 admitted update attempts, 20 duplicate and 20
 out-of-order rejected attempts, and six lifecycle transitions per track
@@ -202,14 +205,26 @@ pictures JSONL decode, exact side-picture validation, and replay attachment.
 Serialization used only to measure the complete 101-tick state-history growth
 remains outside the timed interval.
 
+Run this wall-clock regression on an otherwise idle host: concurrent builds,
+benchmarks, browser suites, or OS scheduling pressure contaminate a capacity
+sample and must be recorded separately rather than used to claim a regression.
+The governed 75 ms ceiling is not relaxed for host load. The workload artifact
+also pins every expected count, canonical member size, and digest; the command
+fails if its measured semantics drift even when elapsed time remains below the
+ceiling.
+
 The regression gate is p95 below 75 ms for the complete workload and heap
 growth below 64 MiB across at least two repeats. On 2026-08-23, Node v24.3.0 on
-an Apple M5 arm64 (10 logical cores, 16 GiB) measured seven runs at 37.122 ms
-p50 and 41.967 ms p95/maximum, with 40,561,928 bytes maximum heap delta,
+an Apple M5 arm64 (10 logical cores, 16 GiB) measured seven uncontaminated runs
+at 23.790 ms p50 and 33.053 ms p95/maximum, with 61,663,000 bytes maximum heap delta,
 7,136,313 bytes of recorded-state JSON, a 71,181-byte canonical frame member,
 a 70,357-byte pictures member, 269,801 bytes of transition JSON, 600
 transitions, and repeat digest
 `eb5f2cf3306fb47ec0e347a7db176aed8ca38540484368d80bab0c07511ad8d2`.
+Five immediately following isolated seven-run invocations all passed without a
+threshold override; their p95 values ranged from 34.476 to 71.874 ms. This
+spread is why host scheduling remains evidence context rather than a reason to
+raise the gate.
 The shared capacity digest
 `e70a8290091d554c28a7b192eaaab3cac531a227770fad27de346b2424a3ecd2`
 is independently reproduced by TypeScript, native Rust, and an actual browser

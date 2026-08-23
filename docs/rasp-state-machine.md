@@ -133,6 +133,7 @@ or Su-30MKI/F-16 radar claims. Parent issue #26 remains open.
 `tests/sensor-model-admission.test.mjs` proves production fail-closed behavior,
 source-pack determinism, exact TypeScript/Rust-WASM whole-state and event parity,
 two simultaneous mixed-lifecycle tracks, mixed-batch invariance, VSR round-trip,
+full VSR byte identity under reversed same-side entity definitions,
 observation-cause retention, and contradictory/extra/truth-leaking
 state rejection. `tests/track-store.test.mjs` covers transition, multi-track
 association, transactionality, and admission causes.
@@ -145,3 +146,13 @@ has a shared TypeScript/Rust digest; an actual browser Worker proves the same
 50-track-per-side canonical frame/picture round trip, cancellation, and
 same-Worker recovery. Component/selector tests preserve and display every
 retained track while continuing to prevent Model Truth fallback.
+
+The capacity inputs and exact expected counts, member sizes, and TypeScript/Rust/
+Worker digest are owned by the immutable
+`fixtures/performance/track-store-capacity-workload.v1.json` artifact. Its
+byte hash is pinned by the TrackStore regression test; both benchmark and
+browser Worker import that artifact instead of maintaining parallel constants.
+Compiled entity admission is canonical by entity ID in TypeScript and Rust,
+and VSR serialization defensively canonicalizes entity/frame/source projections.
+Reversing same-side definitions must therefore preserve the full VSR bytes,
+not merely a sorted test projection.

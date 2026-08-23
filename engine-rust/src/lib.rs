@@ -2051,8 +2051,11 @@ pub(crate) fn first_fixed_step_tick_at_or_after(
 }
 
 /// Run a validated deterministic scenario and return a replayable engine record.
-pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError> {
+pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineError> {
     validate_scenario(&scenario)?;
+    scenario
+        .entities
+        .sort_by(|left, right| left.id.cmp(&right.id));
     let terminal_tick =
         first_fixed_step_tick_at_or_after(scenario.duration_seconds, scenario.fixed_step_seconds);
     let mut states: Vec<RuntimeState> = scenario.entities.iter().map(RuntimeState::new).collect();
