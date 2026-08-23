@@ -59,18 +59,32 @@ position/velocity, and explicit
 uncertainty. Inputs with the wrong side, stale or duplicate sequence/time,
 wrong source digest, non-positional/non-finite values, or any truth identity
 fail closed. Track IDs (`IAF-TRACK-NNNN` / `PAF-TRACK-NNNN`) do not encode the
-world entity identity. One store retains multiple tracks keyed by that opaque
+world entity identity. The generic verification engine assigns stable opaque
+source slots from deterministic compiled opposing-aircraft order, including
+inactive entries so lifecycle changes cannot renumber a surviving track;
+side-owned output never carries the internal world-entity association. One store retains
+multiple tracks keyed by that opaque
 association; a rejected batch is transactional and cannot partially update
 another track. `vector.track.v1` moves exhaustively through
 `TENTATIVE`, `CONFIRMED`, `COASTING`, `LOST`, and reacquisition. Confirmation
 and coasting may be visible in a side-owned picture; tentative and lost tracks
 are not. No confidence scalar is invented.
 
+`vector.observer-state.v3` is one complete side/frame picture. It retains every
+observation and track plus exact observation, retained-track, and visible-track
+counts. It has one scan-level reason but no scalar track lifecycle, visibility,
+or availability summary. Mixed `TENTATIVE`, `CONFIRMED`, `COASTING`, and
+`LOST` tracks therefore coexist without selecting `tracks[0]`; visibility is
+derived independently for every retained track.
+
 Every lifecycle transition is committed at its exact tick through the shared
 `vector.simulation-event.v2` journal as `TRACK_STATE_CHANGED`. Events carry
 typed transition facts and journal receipts, never presentation text or a
 parallel transition stream. The frame referenced by the event must contain the
-same side-owned track state, and each later transition cites the prior event for
+same side-owned track state. Payload
+`vector.simulation-event-payload.track-state-changed.v3` carries the exact
+opaque observation ID for observation-driven transitions and `null` for
+freshness/expiry transitions. Each later transition cites the prior event for
 that opaque track.
 
 `lib/engine/core.ts` and `engine-rust/src/lib.rs` emit this state. The browser
@@ -94,6 +108,9 @@ observer state v2. A legacy member cannot carry v3 tracks. Cross-paired,
 missing, extra, or future frame/picture versions fail closed. Observation,
 track, and event source identities must also match the exact compiled scenario
 sensor projection; a valid pack digest beside a forged model ID is rejected.
+The capacity gate round-trips 50 retained tracks per side through the columnar
+frame member, pictures JSONL, exact picture validation, and replay attachment;
+truncating either side fails the gate.
 
 ## Deferred contract
 
@@ -108,7 +125,8 @@ or Su-30MKI/F-16 radar claims. Parent issue #26 remains open.
 
 `tests/sensor-model-admission.test.mjs` proves production fail-closed behavior,
 source-pack determinism, exact TypeScript/Rust-WASM whole-state and event parity,
-mixed-batch invariance, VSR round-trip, and contradictory/extra/truth-leaking
+two simultaneous mixed-lifecycle tracks, mixed-batch invariance, VSR round-trip,
+observation-cause retention, and contradictory/extra/truth-leaking
 state rejection. `tests/track-store.test.mjs` covers transition, multi-track
 association, transactionality, and admission causes.
 `tests/vector-record.test.mjs` covers new/legacy reads, schema-pair admission,
@@ -116,6 +134,7 @@ and consistent all-member source forgery.
 `npm run performance:track-store:verify` gates two side-owned stores retaining
 50 tracks each at 20 Hz for five seconds below 75 ms p95 with bounded heap, a
 brute-force association oracle, and repeat digest. The same 100-track fixture
-has a shared TypeScript/Rust digest; an actual browser Worker proves
-cancellation and same-Worker recovery. Component/selector tests continue to
-prevent Model Truth fallback.
+has a shared TypeScript/Rust digest; an actual browser Worker proves the same
+50-track-per-side canonical frame/picture round trip, cancellation, and
+same-Worker recovery. Component/selector tests preserve and display every
+retained track while continuing to prevent Model Truth fallback.

@@ -766,6 +766,7 @@ pub struct TrackTransitionCommit {
     pub source: TrackSourceIdentity,
     pub source_sequence: u64,
     pub source_time_seconds: f64,
+    pub observation_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -774,10 +775,19 @@ pub struct ObserverState {
     pub schema_version: &'static str,
     pub perspective: &'static str,
     pub sensor_state: &'static str,
-    pub observation_count: u8,
-    pub track_state: &'static str,
-    pub visible: bool,
-    pub availability_reason: &'static str,
+    pub observation_count: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub track_state: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visible: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub availability_reason: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub track_count: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visible_track_count: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scan_reason: Option<&'static str>,
     pub effect_scope: &'static str,
     pub state_explanation: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -840,6 +850,7 @@ impl TrackStore {
         to: &'static str,
         cause: &'static str,
         track: &EngineTrack,
+        observation_id: Option<&str>,
     ) -> TrackTransitionCommit {
         TrackTransitionCommit {
             local_key: format!(
@@ -855,6 +866,7 @@ impl TrackStore {
             source: track.source.clone(),
             source_sequence: track.source_sequence,
             source_time_seconds: track.source_time_seconds,
+            observation_id: observation_id.map(str::to_string),
         }
     }
 
@@ -937,6 +949,7 @@ impl TrackStore {
         }
         let mut transitions = Vec::new();
         for observation in observations {
+            let observation_id = observation.id.clone();
             let previous_track = self
                 .tracks
                 .iter()
@@ -987,13 +1000,20 @@ impl TrackStore {
                 self.tracks.push(track.clone());
             }
             if previous == "NONE" {
-                transitions.push(self.transition(previous, state, "INITIAL_OBSERVATION", &track));
+                transitions.push(self.transition(
+                    previous,
+                    state,
+                    "INITIAL_OBSERVATION",
+                    &track,
+                    Some(&observation_id),
+                ));
             } else if previous == "LOST" || previous == "COASTING" {
                 transitions.push(self.transition(
                     previous,
                     state,
                     "OBSERVATION_REACQUIRED",
                     &track,
+                    Some(&observation_id),
                 ));
             } else if previous == "TENTATIVE" && state == "CONFIRMED" {
                 transitions.push(self.transition(
@@ -1001,6 +1021,7 @@ impl TrackStore {
                     state,
                     "CONFIRMATION_THRESHOLD_MET",
                     &track,
+                    Some(&observation_id),
                 ));
             }
         }
@@ -1042,7 +1063,7 @@ impl TrackStore {
                 } else {
                     "TRACK_EXPIRED"
                 };
-                transitions.push(self.transition(previous, state, cause, &track));
+                transitions.push(self.transition(previous, state, cause, &track, None));
             }
         }
         transitions.sort_by(|left, right| {
@@ -1072,9 +1093,12 @@ fn unavailable_observer_state(
         perspective,
         sensor_state: "UNSUPPORTED",
         observation_count: 0,
-        track_state: "UNSUPPORTED",
-        visible: false,
-        availability_reason: "SENSOR_MODEL_UNAVAILABLE",
+        track_state: Some("UNSUPPORTED"),
+        visible: Some(false),
+        availability_reason: Some("SENSOR_MODEL_UNAVAILABLE"),
+        track_count: None,
+        visible_track_count: None,
+        scan_reason: None,
         effect_scope: "AIR_PICTURE_ONLY",
         state_explanation: explanation,
         sensor_model_id: None,
@@ -1101,15 +1125,12 @@ fn observer_states(
                     && state.definition.kind == EntityKind::Aircraft
                     && state.lifecycle == EntityLifecycle::Active
             });
-            let target = states.iter().find(|state| {
+            let mut target_candidates = states.iter().filter(|state| {
                 state.definition.affiliation != affiliation
                     && state.definition.kind == EntityKind::Aircraft
-                    && state.lifecycle == EntityLifecycle::Active
-            });
+            }).collect::<Vec<_>>();
+            target_candidates.sort_by(|left, right| left.definition.id.cmp(&right.definition.id));
             let Some(observer) = observer else {
-                return ObserverTickResult { state: unavailable_observer_state(perspective, "No admitted sensor model pack is bound to this run."), sensor_entity_id: None, transitions: Vec::new() };
-            };
-            let Some(target) = target else {
                 return ObserverTickResult { state: unavailable_observer_state(perspective, "No admitted sensor model pack is bound to this run."), sensor_entity_id: None, transitions: Vec::new() };
             };
             let Some(sensor) = observer.definition.observer_sensor.as_ref() else {
@@ -1138,9 +1159,12 @@ fn observer_states(
                     perspective,
                     sensor_state: "OFF",
                     observation_count: 0,
-                    track_state: "NONE",
-                    visible: false,
-                    availability_reason: "SENSOR_OFF",
+                    track_state: Some("NONE"),
+                    visible: Some(false),
+                    availability_reason: Some("SENSOR_OFF"),
+                    track_count: None,
+                    visible_track_count: None,
+                    scan_reason: None,
                     effect_scope: "AIR_PICTURE_ONLY",
                     state_explanation: "The admitted sensor is off. No observation or track is emitted.",
                     sensor_model_id,
@@ -1164,19 +1188,10 @@ fn observer_states(
             let tracked = |store: &mut TrackStore,
                            reason: &'static str,
                            explanation: &'static str,
-                           observation: Option<EngineObservation>| {
-                let observation_count = u8::from(observation.is_some());
-                let observations = observation.clone().into_iter().collect::<Vec<_>>();
+                           observations: Vec<EngineObservation>| {
+                let observation_count = observations.len() as u16;
                 let Ok((tracks, transitions)) = store.update(time, observations.clone()) else {
                     return ObserverTickResult { state: unavailable_observer_state(perspective, "The admitted verification TrackStore rejected its observation boundary."), sensor_entity_id: None, transitions: Vec::new() };
-                };
-                let track_state = tracks.first().map_or("NONE", |item| item.state);
-                let availability_reason = if track_state == "COASTING" {
-                    "TRACK_COASTING"
-                } else if track_state == "LOST" {
-                    "TRACK_LOST"
-                } else {
-                    reason
                 };
                 ObserverTickResult {
                     state: ObserverState {
@@ -1184,9 +1199,12 @@ fn observer_states(
                         perspective,
                         sensor_state: "SEARCH",
                         observation_count,
-                        track_state,
-                        visible: matches!(track_state, "CONFIRMED" | "COASTING"),
-                        availability_reason,
+                        track_state: None,
+                        visible: None,
+                        availability_reason: None,
+                        track_count: Some(tracks.len() as u16),
+                        visible_track_count: Some(tracks.iter().filter(|track| matches!(track.state, "CONFIRMED" | "COASTING")).count() as u16),
+                        scan_reason: Some(reason),
                         effect_scope: "AIR_PICTURE_ONLY",
                         state_explanation: explanation,
                         sensor_model_id: Some(sensor.model_id.clone()),
@@ -1201,16 +1219,19 @@ fn observer_states(
                 <= dt / sensor.scan_period_s / 2.0 + 1e-9;
             if !due {
                 if let Some(store) = track_stores.get_mut(perspective) {
-                    return tracked(store, "SCAN_NOT_DUE", "No admitted scan is due at this model time.", None);
+                    return tracked(store, "SCAN_NOT_DUE", "No admitted scan is due at this model time.", Vec::new());
                 }
                 return ObserverTickResult { state: ObserverState {
                     schema_version: "vector.observer-state.v2",
                     perspective,
                     sensor_state: "SEARCH",
                     observation_count: 0,
-                    track_state: "NONE",
-                    visible: false,
-                    availability_reason: "SCAN_NOT_DUE",
+                    track_state: Some("NONE"),
+                    visible: Some(false),
+                    availability_reason: Some("SCAN_NOT_DUE"),
+                    track_count: None,
+                    visible_track_count: None,
+                    scan_reason: None,
                     effect_scope: "AIR_PICTURE_ONLY",
                     state_explanation: "No admitted scan is due at this model time.",
                     sensor_model_id,
@@ -1218,32 +1239,40 @@ fn observer_states(
                     tracks: None,
                 }, sensor_entity_id: Some(observer.definition.id.clone()), transitions: Vec::new() };
             }
-            let relative = target.position.subtract(observer.position);
-            let range = relative.magnitude();
-            let horizontal = (relative.x * relative.x + relative.y * relative.y).sqrt();
             let forward = Vec3 { x: observer.heading_rad.cos(), y: observer.heading_rad.sin(), z: 0.0 };
-            let azimuth = if horizontal > 0.0 {
-                ((relative.x * forward.x + relative.y * forward.y) / horizontal).clamp(-1.0, 1.0).acos()
-            } else { 0.0 };
-            let elevation = if range > 0.0 { (relative.z / range).clamp(-1.0, 1.0).asin() } else { 0.0 };
             let verification_window_open = sensor.verification_track_model.as_ref().is_none_or(|model| {
                 model.observation_windows_seconds.iter().any(|window| time >= window.start && time <= window.end)
             });
-            let detected = verification_window_open && range >= sensor.minimum_range_m && range <= sensor.detection_range_m
-                && azimuth <= sensor.azimuth_field_of_view_rad / 2.0
-                && elevation.abs() <= sensor.elevation_field_of_view_rad / 2.0;
-            if !detected {
+            let detected_targets = target_candidates.iter().enumerate().filter(|(_, target)| {
+                if target.lifecycle != EntityLifecycle::Active {
+                    return false;
+                }
+                let relative = target.position.subtract(observer.position);
+                let range = relative.magnitude();
+                let horizontal = (relative.x * relative.x + relative.y * relative.y).sqrt();
+                let azimuth = if horizontal > 0.0 {
+                    ((relative.x * forward.x + relative.y * forward.y) / horizontal).clamp(-1.0, 1.0).acos()
+                } else { 0.0 };
+                let elevation = if range > 0.0 { (relative.z / range).clamp(-1.0, 1.0).asin() } else { 0.0 };
+                verification_window_open && range >= sensor.minimum_range_m && range <= sensor.detection_range_m
+                    && azimuth <= sensor.azimuth_field_of_view_rad / 2.0
+                    && elevation.abs() <= sensor.elevation_field_of_view_rad / 2.0
+            }).collect::<Vec<_>>();
+            if detected_targets.is_empty() {
                 if let Some(store) = track_stores.get_mut(perspective) {
-                    return tracked(store, "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME", "The due verification scan produced no observation.", None);
+                    return tracked(store, "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME", "The due verification scan produced no observations.", Vec::new());
                 }
                 return ObserverTickResult { state: ObserverState {
                     schema_version: "vector.observer-state.v2",
                     perspective,
                     sensor_state: "SEARCH",
                     observation_count: 0,
-                    track_state: "NONE",
-                    visible: false,
-                    availability_reason: "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME",
+                    track_state: Some("NONE"),
+                    visible: Some(false),
+                    availability_reason: Some("TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME"),
+                    track_count: None,
+                    visible_track_count: None,
+                    scan_reason: None,
                     effect_scope: "AIR_PICTURE_ONLY",
                     state_explanation: "The opposing aircraft is outside the admitted range or field of view at the due scan.",
                     sensor_model_id,
@@ -1253,33 +1282,33 @@ fn observer_states(
             }
             if let Some(model) = sensor.verification_track_model.as_ref() {
                 let stable = |value: f64| (value * 1_000_000.0).round() / 1_000_000.0;
-                let observation = EngineObservation {
-                    schema_version: "vector.observation.v1",
-                    id: format!("{perspective}-OBS-0001-{:08}", (time / sensor.scan_period_s).round() as u64 + 1),
-                    owner: perspective,
-                    source_association_id: format!("{perspective}-SOURCE-0001"),
-                    source: source.clone(),
-                    source_sequence: (time / sensor.scan_period_s).round() as u64 + 1,
-                    source_time_seconds: time,
-                    estimate: TrackEstimate {
-                        value_state: "ESTIMATED",
-                        position_m: {
-                            let value = target.position.add(model.position_bias_m);
-                            Vec3 { x: stable(value.x), y: stable(value.y), z: stable(value.z) }
+                let observations = detected_targets.into_iter().map(|(target_index, target)| EngineObservation {
+                        schema_version: "vector.observation.v1",
+                        id: format!("{perspective}-OBS-{:04}-{:08}", target_index + 1, (time / sensor.scan_period_s).round() as u64 + 1),
+                        owner: perspective,
+                        source_association_id: format!("{perspective}-SOURCE-{:04}", target_index + 1),
+                        source: source.clone(),
+                        source_sequence: (time / sensor.scan_period_s).round() as u64 + 1,
+                        source_time_seconds: time,
+                        estimate: TrackEstimate {
+                            value_state: "ESTIMATED",
+                            position_m: {
+                                let value = target.position.add(model.position_bias_m);
+                                Vec3 { x: stable(value.x), y: stable(value.y), z: stable(value.z) }
+                            },
+                            velocity_mps: {
+                                let value = target.velocity.add(model.velocity_bias_mps);
+                                Vec3 { x: stable(value.x), y: stable(value.y), z: stable(value.z) }
+                            },
                         },
-                        velocity_mps: {
-                            let value = target.velocity.add(model.velocity_bias_mps);
-                            Vec3 { x: stable(value.x), y: stable(value.y), z: stable(value.z) }
+                        uncertainty: TrackUncertainty {
+                            value_state: "ESTIMATED",
+                            position_standard_deviation_m: model.position_standard_deviation_m,
+                            velocity_standard_deviation_mps: model.velocity_standard_deviation_mps,
                         },
-                    },
-                    uncertainty: TrackUncertainty {
-                        value_state: "ESTIMATED",
-                        position_standard_deviation_m: model.position_standard_deviation_m,
-                        velocity_standard_deviation_mps: model.velocity_standard_deviation_mps,
-                    },
-                };
+                    }).collect::<Vec<_>>();
                 if let Some(store) = track_stores.get_mut(perspective) {
-                    return tracked(store, "OBSERVATION_ADMITTED", "One source-authored generic verification observation updated this side-owned track.", Some(observation));
+                    return tracked(store, "OBSERVATION_ADMITTED", "Source-authored generic verification observations updated this side-owned TrackStore.", observations);
                 }
                 return ObserverTickResult { state: unavailable_observer_state(perspective, "The admitted verification TrackStore is unavailable."), sensor_entity_id: None, transitions: Vec::new() };
             }
@@ -1288,9 +1317,12 @@ fn observer_states(
                 perspective,
                 sensor_state: "SEARCH",
                 observation_count: 1,
-                track_state: "PLOT",
-                visible: false,
-                availability_reason: "OBSERVATION_ADMITTED",
+                track_state: Some("PLOT"),
+                visible: Some(false),
+                availability_reason: Some("OBSERVATION_ADMITTED"),
+                track_count: None,
+                visible_track_count: None,
+                scan_reason: None,
                 effect_scope: "AIR_PICTURE_ONLY",
                 state_explanation: "One due scan satisfied the admitted range and field-of-view conditions. This plot has no position estimate or weapon-support authority.",
                 sensor_model_id,
@@ -1307,7 +1339,7 @@ fn update_observer_runtime(
     tick: u64,
     terminal_tick: u64,
     stores: &mut HashMap<&'static str, TrackStore>,
-    prior_receipts: &mut HashMap<&'static str, SimulationEventReceipt>,
+    prior_receipts: &mut HashMap<String, SimulationEventReceipt>,
     journal: &mut SimulationEventJournal,
 ) -> Result<Option<Vec<ObserverState>>, EngineError> {
     if tick >= terminal_tick {
@@ -1321,6 +1353,7 @@ fn update_observer_runtime(
             continue;
         };
         for transition in result.transitions {
+            let prior_key = format!("{}\0{}", transition.owner, transition.track_id);
             let owner_affiliation = if transition.owner == "IAF" {
                 Affiliation::Blue
             } else {
@@ -1332,9 +1365,9 @@ fn update_observer_runtime(
                 &sensor_entity_id,
                 owner_affiliation,
                 &transition,
-                prior_receipts.get(transition.owner).cloned(),
+                prior_receipts.get(&prior_key).cloned(),
             ))?;
-            prior_receipts.insert(transition.owner, receipt);
+            prior_receipts.insert(prior_key, receipt);
         }
     }
     Ok(Some(observer_states))
@@ -3210,9 +3243,44 @@ mod tests {
             }
         }
         assert_eq!(transition_count, 600);
+        let mut final_snapshots = Vec::new();
         for store in &mut stores {
             let (tracks, _) = store.update(5.0, Vec::new())?;
             assert_eq!(tracks.len(), 50);
+            final_snapshots.push((store.owner, tracks));
+        }
+        for (owner, tracks) in &final_snapshots {
+            let visible_track_count = tracks
+                .iter()
+                .filter(|track| matches!(track.state, "CONFIRMED" | "COASTING"))
+                .count();
+            parity_lines.push(format!("P|{owner}|{}|{visible_track_count}", tracks.len()));
+            let state = ObserverState {
+                schema_version: "vector.observer-state.v3",
+                perspective: owner,
+                sensor_state: "SEARCH",
+                observation_count: 0,
+                track_state: None,
+                visible: None,
+                availability_reason: None,
+                track_count: Some(tracks.len() as u16),
+                visible_track_count: Some(visible_track_count as u16),
+                scan_reason: Some("SCAN_NOT_DUE"),
+                effect_scope: "AIR_PICTURE_ONLY",
+                state_explanation:
+                    "Capacity verification retains the complete side-owned TrackStore snapshot.",
+                sensor_model_id: Some(source.sensor_model_id.clone()),
+                observations: Some(Vec::new()),
+                tracks: Some(tracks.clone()),
+            };
+            let encoded = serde_json::to_value(state).map_err(|error| {
+                EngineError::Serialization(format!(
+                    "could not encode capacity observer state: {error}"
+                ))
+            })?;
+            assert_eq!(encoded["tracks"].as_array().map(Vec::len), Some(50));
+        }
+        for (_, tracks) in final_snapshots {
             for track in tracks {
                 parity_lines.push(format!(
                     "T|{}|{}|{}|{}|{}|{:.6}|{:.6}|{:.6}|{:.6}|{}",
@@ -3232,7 +3300,7 @@ mod tests {
         let digest = format!("{:x}", Sha256::digest(parity_lines.join("\n").as_bytes()));
         assert_eq!(
             digest,
-            "c564c998bfda3a52ac416e0fff4737eb266e27598b613b6a28fefa438c39621f"
+            "e70a8290091d554c28a7b192eaaab3cac531a227770fad27de346b2424a3ecd2"
         );
         Ok(())
     }

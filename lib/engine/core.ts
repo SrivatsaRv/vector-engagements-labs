@@ -13,6 +13,7 @@ import { SIMULATION_EVENT_PAYLOAD_SCHEMAS } from "./contracts.ts";
 import { SIMULATION_EVENT_SCHEMA } from "./contracts.ts";
 import {
   assertSimulationEventStream,
+  compareCanonicalText,
   firstFixedStepTickAtOrAfter,
   MAX_SIMULATION_EVENTS,
   modelTimeAtTick,
@@ -171,13 +172,15 @@ function observerStates(
       state.definition.kind === "AIRCRAFT" &&
       state.lifecycle === "ACTIVE",
     );
-    const target = states.find((state) =>
+    const targetCandidates = states.filter((state) =>
       state.definition.affiliation !== affiliation &&
-      state.definition.kind === "AIRCRAFT" &&
-      state.lifecycle === "ACTIVE",
-    );
+      state.definition.kind === "AIRCRAFT",
+    ).sort((left, right) => compareCanonicalText(left.definition.id, right.definition.id));
+    const targets = targetCandidates
+      .map((target, targetIndex) => ({ target, targetIndex }))
+      .filter(({ target }) => target.lifecycle === "ACTIVE");
     const sensor = observer?.definition.observerSensor;
-    if (!observer || !target || !sensor) return { state: unavailableObserverState(perspective), transitions: [] };
+    if (!observer || !sensor) return { state: unavailableObserverState(perspective), transitions: [] };
     if (
       sensor.modelPackDigest !== scenario.modelPack.digest ||
       !["vector.observer-sensor-admission.v1", "vector.observer-sensor-admission.v2"].includes(sensor.schemaVersion) ||
@@ -221,32 +224,26 @@ function observerStates(
       trackStores.set(perspective, store);
     }
     const trackedState = (
-      availabilityReason: "SCAN_NOT_DUE" | "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME" | "OBSERVATION_ADMITTED",
+      scanReason: "SCAN_NOT_DUE" | "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME" | "OBSERVATION_ADMITTED",
       explanation: string,
-      observation?: import("./contracts.ts").EngineObservation,
+      observations: import("./contracts.ts").EngineObservation[] = [],
     ): ObserverTickResult => {
       if (!store) throw new Error("Verification track admission has no TrackStore.");
-      const update = store.update(time, observation ? [observation] : []);
+      const update = store.update(time, observations);
       const tracks = update.snapshot.tracks;
-      const state = tracks[0]?.state ?? "NONE";
-      const derivedReason = state === "COASTING"
-        ? "TRACK_COASTING" as const
-        : state === "LOST"
-          ? "TRACK_LOST" as const
-          : availabilityReason;
       return {
         state: {
           schemaVersion: "vector.observer-state.v3",
           perspective,
           sensorState: "SEARCH",
-          observationCount: observation ? 1 : 0,
-          trackState: state,
-          visible: state === "CONFIRMED" || state === "COASTING",
-          availabilityReason: derivedReason,
+          observationCount: observations.length,
+          trackCount: tracks.length,
+          visibleTrackCount: tracks.filter((track) => track.state === "CONFIRMED" || track.state === "COASTING").length,
+          scanReason,
           effectScope: "AIR_PICTURE_ONLY",
           stateExplanation: explanation,
           sensorModelId: sensor.modelId,
-          observations: observation ? [observation] : [],
+          observations,
           tracks,
         },
         sensorEntityId: observer.definition.id,
@@ -267,22 +264,24 @@ function observerStates(
       stateExplanation: "No admitted scan is due at this model time.",
       sensorModelId: sensor.modelId,
     }, sensorEntityId: observer.definition.id, transitions: [] };
-    const relative = subtract(target.position, observer.position);
-    const range = magnitude(relative);
-    const horizontal = Math.hypot(relative.x, relative.y);
     const forward = { x: Math.cos(observer.headingRad), y: Math.sin(observer.headingRad), z: 0 };
-    const azimuth = horizontal > 0
-      ? Math.acos(Math.max(-1, Math.min(1, (relative.x * forward.x + relative.y * forward.y) / horizontal)))
-      : 0;
-    const elevation = range > 0 ? Math.asin(Math.max(-1, Math.min(1, relative.z / range))) : 0;
     const verificationWindowOpen = sensor.verificationTrackModel === undefined ||
       sensor.verificationTrackModel.observationWindowsSeconds.some(
         (window) => time >= window.start && time <= window.end,
       );
-    const detected = verificationWindowOpen && range >= sensor.minimumRangeM && range <= sensor.detectionRangeM &&
-      azimuth <= sensor.azimuthFieldOfViewRad / 2 && Math.abs(elevation) <= sensor.elevationFieldOfViewRad / 2;
-    if (!detected && store) return trackedState("TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME", "The due verification scan produced no observation.");
-    if (!detected) return { state: {
+    const detectedTargets = targets.filter(({ target }) => {
+      const relative = subtract(target.position, observer.position);
+      const range = magnitude(relative);
+      const horizontal = Math.hypot(relative.x, relative.y);
+      const azimuth = horizontal > 0
+        ? Math.acos(Math.max(-1, Math.min(1, (relative.x * forward.x + relative.y * forward.y) / horizontal)))
+        : 0;
+      const elevation = range > 0 ? Math.asin(Math.max(-1, Math.min(1, relative.z / range))) : 0;
+      return verificationWindowOpen && range >= sensor.minimumRangeM && range <= sensor.detectionRangeM &&
+        azimuth <= sensor.azimuthFieldOfViewRad / 2 && Math.abs(elevation) <= sensor.elevationFieldOfViewRad / 2;
+    });
+    if (detectedTargets.length === 0 && store) return trackedState("TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME", "The due verification scan produced no observations.");
+    if (detectedTargets.length === 0) return { state: {
       schemaVersion: "vector.observer-state.v2",
       perspective,
       sensorState: "SEARCH",
@@ -295,20 +294,22 @@ function observerStates(
       sensorModelId: sensor.modelId,
     }, sensorEntityId: observer.definition.id, transitions: [] };
     if (sensor.verificationTrackModel) {
-      const observation = createVerificationObservation({
-        identity: source,
-        owner: perspective,
-        sourceAssociationId: `${perspective}-SOURCE-0001`,
-        sourceSequence: Math.round(time / sensor.scanPeriodS) + 1,
-        sourceTimeSeconds: time,
-        measuredPositionM: target.position,
-        measuredVelocityMps: target.velocity,
-        model: sensor.verificationTrackModel,
+      const observations = detectedTargets.map(({ target, targetIndex }) => {
+        return createVerificationObservation({
+          identity: source,
+          owner: perspective,
+          sourceAssociationId: `${perspective}-SOURCE-${(targetIndex + 1).toString().padStart(4, "0")}`,
+          sourceSequence: Math.round(time / sensor.scanPeriodS) + 1,
+          sourceTimeSeconds: time,
+          measuredPositionM: target.position,
+          measuredVelocityMps: target.velocity,
+          model: sensor.verificationTrackModel!,
+        });
       });
       return trackedState(
         "OBSERVATION_ADMITTED",
-        "One source-authored generic verification observation updated this side-owned track.",
-        observation,
+        "Source-authored generic verification observations updated this side-owned TrackStore.",
+        observations,
       );
     }
     return { state: {
@@ -1112,6 +1113,7 @@ export class EngineSession {
             sourceAssociationId: transition.sourceAssociationId,
             sourceSequence: transition.sourceSequence,
             sourceTimeSeconds: transition.sourceTimeSeconds,
+            observationId: transition.observationId ?? null,
             estimateValueState: "ESTIMATED",
             uncertaintyValueState: "ESTIMATED",
           },

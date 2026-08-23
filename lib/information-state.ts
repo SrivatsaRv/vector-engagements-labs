@@ -15,28 +15,24 @@ export function projectObserverStates(frames: readonly ObserverStateFrame[]): Ra
   return frames.flatMap((frame) =>
     frame.observerStates.map((state) => {
       assertEngineObserverState(state);
-      const track = state.schemaVersion === "vector.observer-state.v3" ? state.tracks[0] : undefined;
+      if (state.schemaVersion === "vector.observer-state.v3") {
+        return { ...state, modelTimeSeconds: frame.t };
+      }
       const sensorModelId = "sensorModelId" in state ? state.sensorModelId : undefined;
       return {
         ...state,
         modelTimeSeconds: frame.t,
-        trackId: track?.trackId ?? (state.trackState === "PLOT"
+        trackId: state.trackState === "PLOT"
           ? `${state.perspective}:${sensorModelId}:plot`
-          : "UNAVAILABLE"),
-        classification: state.trackState === "PLOT" || track ? "UNKNOWN" as const : "UNAVAILABLE" as const,
+          : "UNAVAILABLE",
+        classification: state.trackState === "PLOT" ? "UNKNOWN" as const : "UNAVAILABLE" as const,
         identification: "UNKNOWN" as const,
         source: sensorModelId ?? "No admitted sensor model",
-        lastUpdateSeconds: track?.sourceTimeSeconds ?? frame.t,
-        ageSeconds: track?.ageSeconds ?? 0,
+        lastUpdateSeconds: frame.t,
+        ageSeconds: 0,
         confidence: null,
-        uncertaintyMeters: track
-          ? Math.max(
-              track.uncertainty.positionStandardDeviationM.x,
-              track.uncertainty.positionStandardDeviationM.y,
-              track.uncertainty.positionStandardDeviationM.z,
-            )
-          : null,
-        status: track?.state ?? (state.trackState === "PLOT" ? "PLOT" as const : "NO_TRACK" as const),
+        uncertaintyMeters: null,
+        status: state.trackState === "PLOT" ? "PLOT" as const : "NO_TRACK" as const,
       };
     }),
   );
@@ -145,6 +141,9 @@ export function assertEngineObserverState(value: unknown): asserts value is Engi
   assertNoTruthIdentity(value, "Observer state");
   const state = value as Record<string, unknown>;
   const base = [
+    "schemaVersion", "perspective", "effectScope", "stateExplanation",
+  ];
+  const v2State = [
     "schemaVersion", "perspective", "sensorState", "observationCount", "trackState",
     "visible", "availabilityReason", "effectScope", "stateExplanation",
   ];
@@ -155,7 +154,7 @@ export function assertEngineObserverState(value: unknown): asserts value is Engi
     throw new Error("Observer state explanation must be a non-empty string or null.");
   }
   if (state.schemaVersion === "vector.observer-state.v2") {
-    exactKeys(state, base, ["sensorModelId"]);
+    exactKeys(state, v2State, ["sensorModelId"]);
     const unsupported = state.sensorState === "UNSUPPORTED" && state.observationCount === 0 &&
       state.trackState === "UNSUPPORTED" && state.visible === false &&
       state.availabilityReason === "SENSOR_MODEL_UNAVAILABLE" && state.sensorModelId === undefined;
@@ -171,18 +170,36 @@ export function assertEngineObserverState(value: unknown): asserts value is Engi
       typeof state.sensorModelId === "string";
     if (!(unsupported || off || noTrack || plot)) throw new Error("Observer state v2 is contradictory.");
   } else if (state.schemaVersion === "vector.observer-state.v3") {
-    exactKeys(state, [...base, "sensorModelId", "observations", "tracks"]);
+    exactKeys(state, [
+      ...base, "sensorState", "observationCount", "trackCount", "visibleTrackCount",
+      "scanReason", "sensorModelId", "observations", "tracks",
+    ]);
     if (
       state.sensorState !== "SEARCH" ||
       !Array.isArray(state.observations) || !Array.isArray(state.tracks) ||
-      state.observations.length !== state.observationCount || state.observations.length > 1 ||
-      state.tracks.length > 1 || typeof state.sensorModelId !== "string"
+      !Number.isSafeInteger(state.observationCount) || (state.observationCount as number) < 0 ||
+      !Number.isSafeInteger(state.trackCount) || (state.trackCount as number) < 0 ||
+      !Number.isSafeInteger(state.visibleTrackCount) || (state.visibleTrackCount as number) < 0 ||
+      state.observations.length !== state.observationCount ||
+      state.tracks.length !== state.trackCount || typeof state.sensorModelId !== "string" ||
+      !["SCAN_NOT_DUE", "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME", "OBSERVATION_ADMITTED"].includes(String(state.scanReason))
     ) throw new Error("Observer state v3 is contradictory.");
-    const track = state.tracks[0] as Record<string, unknown> | undefined;
     state.observations.forEach((observation) => assertObservation(observation, state.perspective, state.sensorModelId));
     state.tracks.forEach((candidate) => assertTrack(candidate, state.perspective, state.sensorModelId));
-    if (state.observations[0] && track) {
-      const observation = state.observations[0] as Record<string, unknown>;
+    const observations = state.observations as Record<string, unknown>[];
+    const tracks = state.tracks as Record<string, unknown>[];
+    const associationIds = tracks.map((track) => track.sourceAssociationId as string);
+    const trackIds = tracks.map((track) => track.trackId as string);
+    const observationIds = observations.map((observation) => observation.id as string);
+    if (
+      new Set(associationIds).size !== associationIds.length ||
+      new Set(trackIds).size !== trackIds.length ||
+      new Set(observationIds).size !== observationIds.length ||
+      canonicalJson(associationIds) !== canonicalJson([...associationIds].sort())
+    ) throw new Error("Observer state v3 repeats or misorders an opaque track identity.");
+    for (const observation of observations) {
+      const track = tracks.find((candidate) => candidate.sourceAssociationId === observation.sourceAssociationId);
+      if (!track) throw new Error("Observation has no matching retained side-owned track.");
       if (
         observation.sourceSequence !== track.sourceSequence || observation.sourceTimeSeconds !== track.sourceTimeSeconds ||
         canonicalJson(observation.source) !== canonicalJson(track.source) ||
@@ -190,25 +207,14 @@ export function assertEngineObserverState(value: unknown): asserts value is Engi
         canonicalJson(observation.uncertainty) !== canonicalJson(track.uncertainty)
       ) throw new Error("Observation and updated track do not share one admitted estimate.");
     }
-    const expectedTrackState = track?.state ?? "NONE";
-    const expectedVisible = expectedTrackState === "CONFIRMED" || expectedTrackState === "COASTING";
-    if (state.trackState !== expectedTrackState || state.visible !== expectedVisible) {
-      throw new Error("Observer state v3 track visibility is contradictory.");
+    const visibleTrackCount = tracks.filter((track) => ["CONFIRMED", "COASTING"].includes(String(track.state))).length;
+    if (state.visibleTrackCount !== visibleTrackCount) {
+      throw new Error("Observer state v3 visible-track count is contradictory.");
     }
-    const observation = state.observations[0] as Record<string, unknown> | undefined;
-    if (observation && track && observation.sourceAssociationId !== track.sourceAssociationId) {
-      throw new Error("Observation and track source association are contradictory.");
-    }
-    const noTrack = !track && state.observations.length === 0 && state.trackState === "NONE" && state.visible === false &&
-      ["SCAN_NOT_DUE", "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME"].includes(String(state.availabilityReason));
-    const updated = track !== undefined && observation !== undefined && state.availabilityReason === "OBSERVATION_ADMITTED";
-    const retained = track !== undefined && observation === undefined && (
-      (track.state === "COASTING" && state.availabilityReason === "TRACK_COASTING") ||
-      (track.state === "LOST" && state.availabilityReason === "TRACK_LOST") ||
-      (["TENTATIVE", "CONFIRMED"].includes(String(track.state)) &&
-        ["SCAN_NOT_DUE", "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME"].includes(String(state.availabilityReason)))
-    );
-    if (!(noTrack || updated || retained)) {
+    if (
+      (observations.length > 0 && state.scanReason !== "OBSERVATION_ADMITTED") ||
+      (observations.length === 0 && state.scanReason === "OBSERVATION_ADMITTED")
+    ) {
       throw new Error("Observer state v3 availability, observations, and tracks are contradictory.");
     }
   } else {
@@ -244,9 +250,9 @@ function observerStateFromPicture(picture: RaspTrack): EngineObserverState {
       perspective: picture.perspective,
       sensorState: "SEARCH",
       observationCount: picture.observationCount,
-      trackState: picture.trackState,
-      visible: picture.visible,
-      availabilityReason: picture.availabilityReason,
+      trackCount: picture.trackCount,
+      visibleTrackCount: picture.visibleTrackCount,
+      scanReason: picture.scanReason,
       effectScope: "AIR_PICTURE_ONLY",
       stateExplanation: picture.stateExplanation,
       sensorModelId: picture.sensorModelId,

@@ -288,6 +288,24 @@ test("VSR rejects tampered side-owned track state and track-event history", asyn
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
     /ownership|frame state|transition/i,
   );
+
+  const observationEvents = new TextDecoder().decode(eventMember.bytes).trim().split("\n").map(JSON.parse);
+  const observationTransition = observationEvents.find((event) =>
+    event.payload.kind === "TRACK_STATE_CHANGED" && event.payload.observationId !== null
+  );
+  assert.ok(observationTransition);
+  observationTransition.payload.observationId = `${observationTransition.payload.perspective}-OBS-9999-99999999`;
+  corrupt = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(observationEvents.map((event) => canonicalJson(event)).join("\n")),
+  );
+  serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /observation cause/i,
+  );
 });
 
 test("VSR rejects consistently forged track sources beside the admitted pack digest", async () => {
@@ -337,7 +355,7 @@ test("VSR rejects consistently forged track sources beside the admitted pack dig
   const serialized = serializeVectorRecord(corrupt);
   await assert.rejects(
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
-    /compiled scenario|admitted scenario/i,
+    /compiled scenario|admitted scenario|canonical tick state/i,
   );
 });
 

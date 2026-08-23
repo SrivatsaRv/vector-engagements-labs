@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
 import { arch, cpus, platform, release, totalmem } from "node:os";
 import { performance } from "node:perf_hooks";
-import type { EngineTrack, ObserverPerspective, ObserverTrackModel } from "../lib/engine/contracts.ts";
+import type { EngineFrame, EngineObserverStateV3, EngineTrack, ObserverPerspective, ObserverTrackModel } from "../lib/engine/contracts.ts";
 import { createVerificationObservation, TrackStore } from "../lib/engine/track-store.ts";
 import { canonicalJson } from "../lib/canonical-json.ts";
+import { assertEngineObserverState, assertRecordedSidePictures, attachRecordedObserverStates, projectObserverStates } from "../lib/information-state.ts";
+import { decodeColumnarFrames, encodeColumnarFrames } from "../lib/record/vector-record.ts";
 
 const SIDES = ["IAF", "PAF"] as const;
 const TRACKS_PER_SIDE = 50;
@@ -88,6 +90,7 @@ function measuredRun() {
   const transitionFacts: unknown[] = [];
   const parityLines: string[] = [];
   let finalTracks: EngineTrack[] = [];
+  const finalTracksBySide = new Map<ObserverPerspective, EngineTrack[]>();
   const recordedStates: unknown[] = [];
   const heapBefore = process.memoryUsage().heapUsed;
   const startedAt = performance.now();
@@ -136,7 +139,52 @@ function measuredRun() {
     const snapshot = stores.get(owner)!.update(DURATION_SECONDS).snapshot;
     if (snapshot.tracks.length !== TRACKS_PER_SIDE) throw new Error(`${owner} TrackStore did not retain 50 tracks.`);
     assertBruteForceAssociation(owner, TICKS - 1, snapshot.tracks);
+    finalTracksBySide.set(owner, snapshot.tracks);
     finalTracks.push(...snapshot.tracks);
+  }
+  const observerStates: EngineObserverStateV3[] = SIDES.map((owner) => {
+    const tracks = finalTracksBySide.get(owner)!;
+    const state: EngineObserverStateV3 = {
+      schemaVersion: "vector.observer-state.v3",
+      perspective: owner,
+      sensorState: "SEARCH",
+      observationCount: 0,
+      trackCount: tracks.length,
+      visibleTrackCount: tracks.filter((track) => track.state === "CONFIRMED" || track.state === "COASTING").length,
+      scanReason: "SCAN_NOT_DUE",
+      effectScope: "AIR_PICTURE_ONLY",
+      stateExplanation: "Capacity verification retains the complete side-owned TrackStore snapshot.",
+      sensorModelId: source.sensorModelId,
+      observations: [],
+      tracks,
+    };
+    assertEngineObserverState(state);
+    parityLines.push(["P", owner, state.trackCount, state.visibleTrackCount].join("|"));
+    return state;
+  });
+  const capacityFrame = {
+    t: DURATION_SECONDS,
+    entities: [],
+    geographicPositions: [],
+    primaryWeaponId: "verification-weapon",
+    primaryTargetId: "verification-target",
+    separationM: 0,
+    closureRateMps: 0,
+    lineOfSightRateRadS: 0,
+    observerStates,
+  } satisfies EngineFrame;
+  const encodedFrames = encodeColumnarFrames([capacityFrame]);
+  const decodedFrame = decodeColumnarFrames(encodedFrames)[0]!;
+  const canonicalPictures = projectObserverStates([decodedFrame]);
+  const pictureJsonl = canonicalPictures.map((picture) => canonicalJson(picture)).join("\n");
+  const decodedPictures = pictureJsonl.split("\n").map((line) => JSON.parse(line));
+  assertRecordedSidePictures([decodedFrame], decodedPictures);
+  const replayFrame = attachRecordedObserverStates([{ ...decodedFrame, observerStates: [] }], decodedPictures)[0]!;
+  if (
+    decodedPictures.some((picture) => picture.schemaVersion !== "vector.observer-state.v3" || picture.tracks.length !== TRACKS_PER_SIDE) ||
+    replayFrame.observerStates.some((state) => state.schemaVersion !== "vector.observer-state.v3" || state.tracks.length !== TRACKS_PER_SIDE)
+  ) {
+    throw new Error("Canonical frame/picture round trip truncated the 50-track side-owned state.");
   }
   finalTracks = finalTracks.sort((left, right) => left.owner.localeCompare(right.owner) || left.trackId.localeCompare(right.trackId));
   for (const track of finalTracks) {
@@ -160,6 +208,8 @@ function measuredRun() {
     retainedTracks: finalTracks.length,
     retainedObservations: 0,
     recordedStateBytes: Buffer.byteLength(canonicalJson(recordedStates)),
+    canonicalFrameBytes: encodedFrames.byteLength,
+    canonicalPictureBytes: Buffer.byteLength(pictureJsonl),
     transitionBytes: Buffer.byteLength(canonicalJson(transitionFacts)),
     repeatDigest: createHash("sha256").update(canonicalState).digest("hex"),
     parityDigest: createHash("sha256").update(parityLines.join("\n")).digest("hex"),
@@ -222,6 +272,8 @@ process.stdout.write(`${JSON.stringify({
     retainedTracks: samples[0]!.retainedTracks,
     retainedEvents: samples[0]!.transitionCount,
     recordedStateJsonBytes: samples[0]!.recordedStateBytes,
+    canonicalFrameBytes: samples[0]!.canonicalFrameBytes,
+    canonicalPictureBytes: samples[0]!.canonicalPictureBytes,
     transitionJsonBytes: samples[0]!.transitionBytes,
     repeatDigest: samples[0]!.repeatDigest,
     typescriptParityDigest: samples[0]!.parityDigest,

@@ -16,7 +16,7 @@ import {
 import { EngineSession, runEngine } from "../lib/engine/core.ts";
 import { compileModelPack } from "../lib/model-pack.ts";
 import { adaptPreparedSimulation, admitRuntimeModelPack } from "../lib/runtime/model-pack-adapter.ts";
-import { assertEngineObserverState } from "../lib/information-state.ts";
+import { assertEngineObserverState, projectObserverStates } from "../lib/information-state.ts";
 import { bindRuntimeModelPackDigest } from "../lib/engine/runtime-model-pack.ts";
 import { assertSimulationEventStream } from "../lib/engine/simulation-events.ts";
 
@@ -41,6 +41,106 @@ function forgedScenario({ mode = "SEARCH", rangeM = 120_000, digest } = {}) {
   };
   return { prepared: { ...prepared, engineScenario }, engineScenario };
 }
+
+async function twoTargetVerificationScenario() {
+  const prepared = prepareSimulation(DEFAULT_SCENARIO);
+  const binding = await bindVerificationTrackModelPack(prepared.engineScenario);
+  const scenario = structuredClone(binding.scenario);
+  const observer = scenario.entities.find((entity) => entity.id === "blue-platform-1");
+  const firstTarget = scenario.entities.find((entity) => entity.id === "red-object-1");
+  assert.ok(observer && firstTarget);
+  const secondTarget = structuredClone(firstTarget);
+  const start = {
+    x: observer.initial.position.x + 199_999,
+    y: observer.initial.position.y,
+    z: observer.initial.position.z,
+  };
+  secondTarget.id = "verification-red-object-2";
+  secondTarget.rddfId = "rddf://verification/aircraft/generic-red-2";
+  secondTarget.designation = "Generic verification target 2";
+  secondTarget.callsign = "VERIFY 2";
+  secondTarget.initial.position = start;
+  secondTarget.initial.velocity = { x: 400, y: 0, z: 0 };
+  secondTarget.initial.headingRad = 0;
+  secondTarget.initial.massKg = secondTarget.aircraft.emptyMassKg + secondTarget.initial.fuelKg;
+  secondTarget.route = [start, { x: start.x + 20_000, y: start.y, z: start.z }];
+  secondTarget.routePlan = {
+    schemaVersion: "vector.route-plan.v2",
+    waypointAcceptanceRadiiM: [1, 500],
+    waypointTransitions: ["START", "FLY_BY"],
+  };
+  scenario.entities.push(secondTarget);
+  return { prepared, ...binding, scenario };
+}
+
+test("observer-state v3 preserves multiple mixed-lifecycle tracks without a scalar summary", async () => {
+  const { scenario, pack, prepared } = await twoTargetVerificationScenario();
+  const runs = Object.fromEntries(
+    ["typescript", "rust-wasm"].map((backend) => [backend, runEngineBackend(scenario, backend)]),
+  );
+  const run = runs.typescript;
+  const mixed = run.frames.find((frame) => {
+    const state = frame.observerStates.find((candidate) => candidate.perspective === "IAF");
+    return state?.schemaVersion === "vector.observer-state.v3" &&
+      new Set(state.tracks.map((track) => track.state)).size > 1;
+  });
+  assert.ok(mixed, "the verification scenario must retain two concurrent tracks in different lifecycle states");
+  const state = mixed.observerStates.find((candidate) => candidate.perspective === "IAF");
+  assert.equal(state.schemaVersion, "vector.observer-state.v3");
+  assert.equal(state.tracks.length, 2);
+  assert.doesNotThrow(() => assertEngineObserverState(state));
+  const pictures = projectObserverStates([{ t: mixed.t, observerStates: [state] }]);
+  assert.equal(pictures.length, 1, "one side/frame picture owns all retained tracks");
+  assert.deepEqual(pictures[0].tracks, state.tracks);
+  assert.equal(new Set(pictures[0].tracks.map((track) => track.state)).size, 2);
+  assert.doesNotMatch(JSON.stringify(pictures), /truthEntityId|targetEntityId|observedEntityId|truthPosition/);
+  assert.deepEqual(
+    runs["rust-wasm"].frames.map((frame) => frame.observerStates),
+    run.frames.map((frame) => frame.observerStates),
+    "Rust/WASM must preserve the complete mixed multi-track state",
+  );
+  assert.deepEqual(runs["rust-wasm"].events, run.events);
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const capabilityManifest = createVerificationDeploymentCapabilities(backend, ["A2A"], [pack.digest]);
+    const recordedPrepared = { ...prepared, engineScenario: scenario, capabilityManifest };
+    const result = buildSimulationResult(recordedPrepared, runs[backend]);
+    const record = await createVectorSimulationRecord(recordedPrepared, result, "2026-08-23T00:00:00.000Z");
+    const serialized = serializeVectorRecord(record);
+    const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+    const replayPicture = replay.pictures.find((picture) =>
+      picture.schemaVersion === "vector.observer-state.v3" &&
+      picture.perspective === "IAF" && picture.modelTimeSeconds === mixed.t
+    );
+    assert.ok(replayPicture);
+    assert.deepEqual(replayPicture.tracks, state.tracks);
+    assert.equal(new Set(replayPicture.tracks.map((track) => track.state)).size, 2);
+  }
+});
+
+test("opaque source associations remain bound to the compiled opposing-aircraft order", async () => {
+  const prepared = prepareSimulation(DEFAULT_SCENARIO);
+  const binding = await bindVerificationTrackModelPack(prepared.engineScenario);
+  const scenario = structuredClone(binding.scenario);
+  const activeTarget = scenario.entities.find((entity) => entity.id === "red-object-1");
+  assert.ok(activeTarget);
+  const inactivePredecessor = structuredClone(activeTarget);
+  inactivePredecessor.id = "aaa-inactive-verification-target";
+  inactivePredecessor.rddfId = "rddf://verification/aircraft/inactive-predecessor";
+  inactivePredecessor.designation = "Inactive generic verification target";
+  inactivePredecessor.callsign = "INACTIVE";
+  inactivePredecessor.lifecycle = "TERMINATED";
+  inactivePredecessor.initial.massKg = inactivePredecessor.aircraft.emptyMassKg + inactivePredecessor.initial.fuelKg;
+  scenario.entities.push(inactivePredecessor);
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const run = runEngineBackend(scenario, backend);
+    const observation = run.frames
+      .flatMap((frame) => frame.observerStates)
+      .find((state) => state.schemaVersion === "vector.observer-state.v3" && state.perspective === "IAF")
+      ?.observations[0];
+    assert.equal(observation?.sourceAssociationId, "IAF-SOURCE-0002");
+  }
+});
 
 test("an entity admission cannot manufacture a sensor plot beside a valid pack digest", () => {
   const { engineScenario } = forgedScenario();
@@ -128,7 +228,13 @@ test("a source-authored engine-verification pack drives exact side-owned TrackSt
     assert.equal(frame.t, event.modelTimeSeconds);
     const observer = frame.observerStates.find((item) => item.perspective === event.payload.perspective);
     assert.equal(observer.schemaVersion, "vector.observer-state.v3");
-    assert.equal(observer.tracks[0].state, event.payload.to);
+    assert.equal(observer.tracks.find((track) => track.trackId === event.payload.trackId)?.state, event.payload.to);
+    if (["INITIAL_OBSERVATION", "CONFIRMATION_THRESHOLD_MET", "OBSERVATION_REACQUIRED"].includes(event.payload.cause)) {
+      assert.match(event.payload.observationId, new RegExp(`^${event.payload.perspective}-OBS-`));
+      assert.ok(observer.observations.some((observation) => observation.id === event.payload.observationId));
+    } else {
+      assert.equal(event.payload.observationId, null);
+    }
   }
   assert.doesNotMatch(
     JSON.stringify({ frames: run.frames, events: trackEvents }),
@@ -200,10 +306,9 @@ test("observer-state v2/v3 admission rejects contradictory, extra-field, and tru
     state.tracks[0].owner = "PAF";
     assert.throws(() => assertEngineObserverState(state), /ownership/i);
     state.tracks[0].owner = "IAF";
-    state.visible = false;
-    state.trackState = "CONFIRMED";
     state.tracks[0].state = "CONFIRMED";
-    assert.throws(() => assertEngineObserverState(state), /visibility/i);
+    state.visibleTrackCount = 0;
+    assert.throws(() => assertEngineObserverState(state), /visible-track/i);
   });
 });
 

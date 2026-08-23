@@ -54,7 +54,7 @@ export const SIMULATION_EVENT_PAYLOAD_SCHEMAS = {
   ENTITY_ENTERED_WORLD: "vector.simulation-event-payload.entity-entered-world.v1",
   ENTITY_LIFECYCLE_CHANGED: "vector.simulation-event-payload.entity-lifecycle-changed.v1",
   RUN_COMPLETED: "vector.simulation-event-payload.run-completed.v1",
-  TRACK_STATE_CHANGED: "vector.simulation-event-payload.track-state-changed.v2",
+  TRACK_STATE_CHANGED: "vector.simulation-event-payload.track-state-changed.v3",
 } as const;
 
 export type SimulationEventParticipantRole =
@@ -231,15 +231,13 @@ export type EngineObserverStateV2 = EngineObserverStateBase & (
 export type EngineObserverStateV3 = EngineObserverStateBase & {
   schemaVersion: "vector.observer-state.v3";
   sensorState: "SEARCH";
-  observationCount: 0 | 1;
-  trackState: "NONE" | EngineTrackLifecycle;
-  visible: boolean;
-  availabilityReason:
+  observationCount: number;
+  trackCount: number;
+  visibleTrackCount: number;
+  scanReason:
     | "SCAN_NOT_DUE"
     | "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME"
-    | "OBSERVATION_ADMITTED"
-    | "TRACK_COASTING"
-    | "TRACK_LOST";
+    | "OBSERVATION_ADMITTED";
   sensorModelId: string;
   observations: EngineObservation[];
   tracks: EngineTrack[];
@@ -306,6 +304,7 @@ export type SimulationEventPayload =
       sourceAssociationId: string;
       sourceSequence: number;
       sourceTimeSeconds: number;
+      observationId: string | null;
       estimateValueState: "ESTIMATED";
       uncertaintyValueState: "ESTIMATED";
     };

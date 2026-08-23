@@ -197,21 +197,25 @@ covering confirmation, coast, loss, and reacquisition. A brute-force
 nearest-estimate oracle independently checks every final opaque association.
 It records runtime/CPU context, p50/p95/p99/maximum wall time, maximum process
 heap delta, recorded-state JSON bytes, transition count, and a repeat digest.
-Serialization used to measure recorded-state growth is outside the timed
-TrackStore interval; output snapshot construction remains inside it.
+The timed interval includes final canonical columnar-frame encode/decode,
+pictures JSONL decode, exact side-picture validation, and replay attachment.
+Serialization used only to measure the complete 101-tick state-history growth
+remains outside the timed interval.
 
 The regression gate is p95 below 75 ms for the complete workload and heap
 growth below 64 MiB across at least two repeats. On 2026-08-23, Node v24.3.0 on
-an Apple M5 arm64 (10 logical cores, 16 GiB) measured seven runs at 30.563 ms
-p50 and 36.192 ms p95/maximum, with 33,034,616 bytes maximum heap delta,
-7,136,313 bytes of recorded-state JSON, 269,801 bytes of transition JSON, 600
+an Apple M5 arm64 (10 logical cores, 16 GiB) measured seven runs at 37.122 ms
+p50 and 41.967 ms p95/maximum, with 40,561,928 bytes maximum heap delta,
+7,136,313 bytes of recorded-state JSON, a 71,181-byte canonical frame member,
+a 70,357-byte pictures member, 269,801 bytes of transition JSON, 600
 transitions, and repeat digest
 `eb5f2cf3306fb47ec0e347a7db176aed8ca38540484368d80bab0c07511ad8d2`.
 The shared capacity digest
-`c564c998bfda3a52ac416e0fff4737eb266e27598b613b6a28fefa438c39621f`
+`e70a8290091d554c28a7b192eaaab3cac531a227770fad27de346b2424a3ecd2`
 is independently reproduced by TypeScript, native Rust, and an actual browser
-Worker. The browser fixture also proves cooperative cancellation followed by a
-successful same-Worker recovery. This is a local generic TrackStore regression
+Worker. Both side pictures retain all 50 tracks after the record/replay member
+round trip. The browser fixture also proves cooperative cancellation followed
+by a successful same-Worker recovery. This is a local generic TrackStore regression
 result, not the combined 100-entity 8 ms Worker tick target, browser rendering
 proof, x86-64 capacity result, or named-sensor performance claim.
 

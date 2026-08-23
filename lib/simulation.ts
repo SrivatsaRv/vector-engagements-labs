@@ -8,6 +8,8 @@ import type {
   EngineEntityDefinition,
   EngineEntityFrame,
   EngineObserverState,
+  EngineObserverStateV2,
+  EngineObserverStateV3,
   EngineRun,
   EngineScenario,
 } from "./engine/contracts.ts";
@@ -46,7 +48,9 @@ export type TrackSource =
   | "DATALINK"
   | "AIRBORNE_EARLY_WARNING"
   | "VISUAL";
-export type RaspAvailabilityReason = EngineObserverState["availabilityReason"];
+export type RaspAvailabilityReason =
+  | EngineObserverStateV2["availabilityReason"]
+  | EngineObserverStateV3["scanReason"];
 
 export const RASP_SOURCE_CONTRACTS: Record<
   TrackSource,
@@ -151,7 +155,7 @@ export type Frame = {
   observerStates: EngineObserverState[];
 };
 
-export type RaspTrack = EngineObserverState & {
+type LegacyRaspPicture = EngineObserverStateV2 & {
   perspective: "IAF" | "PAF";
   /** Model-clock identity of this observer-picture sample. */
   modelTimeSeconds: number;
@@ -165,6 +169,12 @@ export type RaspTrack = EngineObserverState & {
   uncertaintyMeters: number | null;
   status: "NO_TRACK" | "PLOT" | "TENTATIVE" | "CONFIRMED" | "COASTING" | "LOST";
 };
+
+export type RaspTrack = LegacyRaspPicture | (EngineObserverStateV3 & {
+  perspective: "IAF" | "PAF";
+  /** Model-clock identity of this complete side-owned picture sample. */
+  modelTimeSeconds: number;
+});
 
 export type TerminationCode =
   | "threshold_reached"
@@ -692,7 +702,13 @@ export function evaluateRaspSourceAvailability(
   perspective: "IAF" | "PAF",
 ): { available: boolean; reason: RaspAvailabilityReason; explanation: string } {
   const state = frame.observerStates.find((item) => item.perspective === perspective);
-  return state
+  return state?.schemaVersion === "vector.observer-state.v3"
+    ? {
+        available: state.visibleTrackCount > 0,
+        reason: state.scanReason,
+        explanation: state.stateExplanation ?? "No observer-state explanation was recorded.",
+      }
+    : state
     ? { available: false, reason: state.availabilityReason, explanation: state.stateExplanation ?? "No observer-state explanation was recorded." }
     : { available: false, reason: "SENSOR_MODEL_UNAVAILABLE", explanation: "No observer state was recorded for this frame." };
 }

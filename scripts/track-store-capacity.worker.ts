@@ -1,5 +1,7 @@
-import type { ObserverPerspective, ObserverTrackModel } from "../lib/engine/contracts.ts";
+import type { EngineFrame, EngineObserverStateV3, EngineTrack, ObserverPerspective, ObserverTrackModel } from "../lib/engine/contracts.ts";
 import { createVerificationObservation, TrackStore } from "../lib/engine/track-store.ts";
+import { assertEngineObserverState, assertRecordedSidePictures, attachRecordedObserverStates, projectObserverStates } from "../lib/information-state.ts";
+import { decodeColumnarFrames, encodeColumnarFrames } from "../lib/record/vector-record.ts";
 
 const SIDES = ["IAF", "PAF"] as const;
 const TRACKS_PER_SIDE = 50;
@@ -78,9 +80,34 @@ function start(runId: string) {
       return;
     }
     let retainedTracks = 0;
-    for (const store of stores) {
+    const tracksBySide = new Map<ObserverPerspective, EngineTrack[]>();
+    for (const [sideIndex, store] of stores.entries()) {
       const tracks = store.update(5).snapshot.tracks;
       retainedTracks += tracks.length;
+      tracksBySide.set(SIDES[sideIndex]!, tracks);
+    }
+    const observerStates: EngineObserverStateV3[] = SIDES.map((owner) => {
+      const tracks = tracksBySide.get(owner)!;
+      const state: EngineObserverStateV3 = {
+        schemaVersion: "vector.observer-state.v3",
+        perspective: owner,
+        sensorState: "SEARCH",
+        observationCount: 0,
+        trackCount: tracks.length,
+        visibleTrackCount: tracks.filter((track) => track.state === "CONFIRMED" || track.state === "COASTING").length,
+        scanReason: "SCAN_NOT_DUE",
+        effectScope: "AIR_PICTURE_ONLY",
+        stateExplanation: "Capacity verification retains the complete side-owned TrackStore snapshot.",
+        sensorModelId: source.sensorModelId,
+        observations: [],
+        tracks,
+      };
+      assertEngineObserverState(state);
+      parityLines.push(["P", owner, state.trackCount, state.visibleTrackCount].join("|"));
+      return state;
+    });
+    for (const owner of SIDES) {
+      const tracks = tracksBySide.get(owner)!;
       for (const track of tracks) parityLines.push([
         "T", track.owner, track.sourceAssociationId, track.trackId, track.state,
         track.sourceSequence, track.sourceTimeSeconds.toFixed(6),
@@ -88,12 +115,40 @@ function start(runId: string) {
         track.estimate.positionM.z.toFixed(6), track.updateCount,
       ].join("|"));
     }
+    const capacityFrame = {
+      t: 5,
+      entities: [],
+      geographicPositions: [],
+      primaryWeaponId: "verification-weapon",
+      primaryTargetId: "verification-target",
+      separationM: 0,
+      closureRateMps: 0,
+      lineOfSightRateRadS: 0,
+      observerStates,
+    } satisfies EngineFrame;
+    const encodedFrames = encodeColumnarFrames([capacityFrame]);
+    const decodedFrame = decodeColumnarFrames(encodedFrames)[0]!;
+    const pictures = projectObserverStates([decodedFrame]);
+    const pictureJsonl = pictures.map((picture) => JSON.stringify(picture)).join("\n");
+    const decodedPictures = pictureJsonl.split("\n").map((line) => JSON.parse(line));
+    assertRecordedSidePictures([decodedFrame], decodedPictures);
+    const replayFrame = attachRecordedObserverStates([{ ...decodedFrame, observerStates: [] }], decodedPictures)[0]!;
+    const tracksPerPicture = decodedPictures.map((picture) => picture.schemaVersion === "vector.observer-state.v3" ? picture.tracks.length : 0);
+    if (tracksPerPicture.some((count) => count !== TRACKS_PER_SIDE)) {
+      throw new Error("Canonical browser frame/picture round trip truncated retained tracks.");
+    }
+    if (replayFrame.observerStates.some((state) => state.schemaVersion !== "vector.observer-state.v3" || state.tracks.length !== TRACKS_PER_SIDE)) {
+      throw new Error("Canonical browser replay attachment truncated retained tracks.");
+    }
     postMessage({
       type: "completed",
       runId,
       retainedTracks,
       transitionCount,
       parityDigest: await digest(parityLines),
+      canonicalPictures: pictures.length,
+      tracksPerPicture,
+      canonicalFrameBytes: encodedFrames.byteLength,
     });
   };
   void advance();

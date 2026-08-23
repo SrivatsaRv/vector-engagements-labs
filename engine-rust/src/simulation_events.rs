@@ -12,7 +12,7 @@ pub const LIFECYCLE_CHANGED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.entity-lifecycle-changed.v1";
 pub const RUN_COMPLETED_PAYLOAD_SCHEMA: &str = "vector.simulation-event-payload.run-completed.v1";
 pub const TRACK_CHANGED_PAYLOAD_SCHEMA: &str =
-    "vector.simulation-event-payload.track-state-changed.v2";
+    "vector.simulation-event-payload.track-state-changed.v3";
 pub const MAX_SIMULATION_EVENTS: usize = 100_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -166,6 +166,8 @@ pub enum SimulationEventPayload {
         source_sequence: u64,
         #[serde(rename = "sourceTimeSeconds")]
         source_time_seconds: f64,
+        #[serde(rename = "observationId")]
+        observation_id: Option<Box<str>>,
         #[serde(rename = "estimateValueState")]
         estimate_value_state: &'static str,
         #[serde(rename = "uncertaintyValueState")]
@@ -262,6 +264,7 @@ impl SimulationEventPayload {
                 source_association_id,
                 source_sequence,
                 source_time_seconds,
+                observation_id,
                 estimate_value_state,
                 uncertainty_value_state,
             } => {
@@ -279,6 +282,7 @@ impl SimulationEventPayload {
                     source_association_id,
                     source_sequence,
                     source_time_seconds,
+                    observation_id,
                     estimate_value_state,
                     uncertainty_value_state,
                 ]))
@@ -527,6 +531,10 @@ impl SimulationEventDraft {
                 source_association_id: transition.source_association_id.clone(),
                 source_sequence: transition.source_sequence,
                 source_time_seconds: transition.source_time_seconds,
+                observation_id: transition
+                    .observation_id
+                    .clone()
+                    .map(String::into_boxed_str),
                 estimate_value_state: "ESTIMATED",
                 uncertainty_value_state: "ESTIMATED",
             },

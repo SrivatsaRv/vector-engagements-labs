@@ -56,6 +56,11 @@ position, confidence, freshness, or uncertainty. A replay validates one unique
 side/frame sample per admitted A2A frame, finite telemetry, and the absence of
 a hidden truth position before exposing the record.
 
+An observer-state v3 picture is a side-owned collection, not a selected track.
+It retains all observations and tracks for that side/frame with exact counts
+and a scan-level reason. Per-track lifecycle and visibility remain on each
+track; no scalar summary may discard or misrepresent mixed lifecycles.
+
 Browser playback first resolves one `SelectedDisplayFrame` from a requested
 scrub position. Map, 3D, timeline-linked telemetry, observer-picture selection,
 and visible model-time labels consume that same recorded frame identity and its
@@ -104,7 +109,9 @@ does not contain display-ready English. The current closed producer set is
 `TRACK_STATE_CHANGED`, and `RUN_COMPLETED`. `TRACK_STATE_CHANGED` is available
 only for the source-authored generic engine-verification model and records an
 opaque side-owned track transition with exact source sequence/time and typed
-cause. Launch-decision, guidance, support, and weapon-termination events remain
+cause. Payload v3 retains the exact opaque observation ID for
+observation-driven transitions and `null` for coast/loss transitions.
+Launch-decision, guidance, support, and weapon-termination events remain
 unavailable until their owning contracts produce them; the record and browser
 may not infer them.
 

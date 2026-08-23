@@ -111,7 +111,7 @@ function member<T extends string>(value: unknown, values: readonly T[], label: s
   }
 }
 
-function compareText(left: string, right: string) {
+export function compareCanonicalText(left: string, right: string) {
   if (left === right) return 0;
   const leftBytes = UTF8_ENCODER.encode(left);
   const rightBytes = UTF8_ENCODER.encode(right);
@@ -174,7 +174,7 @@ function normalizeParticipants(
     byKey.set(key, { entityId: participant.entityId, role: participant.role });
   }
   return [...byKey.values()].sort((left, right) =>
-    compareText(left.entityId, right.entityId) || compareText(left.role, right.role)
+    compareCanonicalText(left.entityId, right.entityId) || compareCanonicalText(left.role, right.role)
   );
 }
 
@@ -187,7 +187,7 @@ function participantKey(participants: readonly SimulationEventParticipant[]) {
 function causeDraftKey(causes: readonly SimulationEventCauseReference[]) {
   return [...causes]
     .map((cause) => `RECEIPT:${cause.receipt.tick}:${cause.receipt.localKey}`)
-    .sort(compareText)
+    .sort(compareCanonicalText)
     .join("|");
 }
 
@@ -240,12 +240,12 @@ function canonicalCommittedSortKey(event: SimulationEventV2) {
     event.ownerAffiliation ?? "",
     event.correlationId ?? "",
     event.localKey,
-    [...event.causeEventIds].sort(compareText).join("|"),
+    [...event.causeEventIds].sort(compareCanonicalText).join("|"),
   ].join("\u0001");
 }
 
 function compareDrafts(left: SimulationEventDraft, right: SimulationEventDraft) {
-  return compareText(canonicalDraftSortKey(left), canonicalDraftSortKey(right));
+  return compareCanonicalText(canonicalDraftSortKey(left), canonicalDraftSortKey(right));
 }
 
 function assertPayload(value: unknown, index: number): asserts value is SimulationEventPayload {
@@ -276,7 +276,7 @@ function assertPayload(value: unknown, index: number): asserts value is Simulati
     exactKeys(value, [
       "kind", "schemaVersion", "perspective", "trackId", "from", "to", "cause",
       "sensorModelId", "sensorModelVersion", "modelPackDigest", "sourceSequence",
-      "sourceAssociationId", "sourceTimeSeconds", "estimateValueState", "uncertaintyValueState",
+      "sourceAssociationId", "sourceTimeSeconds", "observationId", "estimateValueState", "uncertaintyValueState",
     ], [], `Simulation event ${index} payload`);
     if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.TRACK_STATE_CHANGED) {
       throw new Error(`Simulation event ${index} payload schema is unsupported.`);
@@ -298,6 +298,9 @@ function assertPayload(value: unknown, index: number): asserts value is Simulati
     }
     if (!Number.isFinite(value.sourceTimeSeconds) || (value.sourceTimeSeconds as number) < 0) {
       throw new Error(`Simulation event ${index} source time is invalid.`);
+    }
+    if (!(value.observationId === null || (typeof value.observationId === "string" && value.observationId.length > 0))) {
+      throw new Error(`Simulation event ${index} observation identity is invalid.`);
     }
     if (value.estimateValueState !== "ESTIMATED" || value.uncertaintyValueState !== "ESTIMATED") {
       throw new Error(`Simulation event ${index} track value state is invalid.`);
@@ -564,7 +567,7 @@ export function assertSimulationEventStream(
     const transitionKey = canonicalJson({ tick: event.tick, producer: event.producer, participants: event.participants, payload: event.payload });
     if (seenTransitions.has(transitionKey)) throw new Error("Simulation event stream contains a duplicate transition.");
     seenTransitions.add(transitionKey);
-    if (prior && (event.tick < prior.tick || event.frameIndex < prior.frameIndex || (event.tick === prior.tick && compareText(canonicalCommittedSortKey(event), canonicalCommittedSortKey(prior)) < 0))) throw new Error(`Simulation event ${event.id} violates canonical order.`);
+    if (prior && (event.tick < prior.tick || event.frameIndex < prior.frameIndex || (event.tick === prior.tick && compareCanonicalText(canonicalCommittedSortKey(event), canonicalCommittedSortKey(prior)) < 0))) throw new Error(`Simulation event ${event.id} violates canonical order.`);
 
     const frame = frames[event.frameIndex]!;
     if (event.payload.kind === "RUN_STARTED") {
@@ -579,6 +582,9 @@ export function assertSimulationEventStream(
       const observer = frame.observerStates.find((item) => item.perspective === payload.perspective);
       const track = observer?.schemaVersion === "vector.observer-state.v3"
         ? observer.tracks.find((item) => item.trackId === payload.trackId)
+        : undefined;
+      const observation = observer?.schemaVersion === "vector.observer-state.v3" && payload.observationId !== null
+        ? observer.observations.find((item) => item.id === payload.observationId)
         : undefined;
       if (
         event.phase !== "TRACKING" ||
@@ -627,6 +633,18 @@ export function assertSimulationEventStream(
         ((payload.from === "TENTATIVE" || payload.from === "CONFIRMED" || payload.from === "COASTING") &&
           payload.to === "LOST" && payload.cause === "TRACK_EXPIRED");
       if (!validCause) throw new Error(`Simulation event ${event.id} has an invalid track transition cause.`);
+      const observationDriven = ["INITIAL_OBSERVATION", "CONFIRMATION_THRESHOLD_MET", "OBSERVATION_REACQUIRED"].includes(payload.cause);
+      if (
+        observationDriven !== (payload.observationId !== null) ||
+        (observationDriven && (
+          !observation ||
+          observation.owner !== payload.perspective ||
+          observation.sourceAssociationId !== payload.sourceAssociationId ||
+          observation.sourceSequence !== payload.sourceSequence ||
+          observation.sourceTimeSeconds !== payload.sourceTimeSeconds ||
+          canonicalJson(observation.source) !== canonicalJson(track.source)
+        ))
+      ) throw new Error(`Simulation event ${event.id} has an invalid observation cause.`);
       consumedFrameTransitionsByTrack.set(key, transitionIndex + 1);
       lastEventIdByTrack.set(key, event.id);
     } else {

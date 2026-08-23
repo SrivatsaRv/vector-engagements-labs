@@ -421,7 +421,12 @@ try {
   }, { workerUrl: `${origin}/assets/track-store-capacity.worker.js` });
   assert.equal(trackStoreCapacity.retainedTracks, 100);
   assert.equal(trackStoreCapacity.transitionCount, 600);
-  assert.equal(trackStoreCapacity.parityDigest, "c564c998bfda3a52ac416e0fff4737eb266e27598b613b6a28fefa438c39621f");
+  assert.equal(trackStoreCapacity.canonicalPictures, 2);
+  assert.deepEqual(trackStoreCapacity.tracksPerPicture, [50, 50]);
+  const canonicalFrameBytes = trackStoreCapacity.canonicalFrameBytes;
+  if (typeof canonicalFrameBytes !== "number") throw new Error("TrackStore Worker omitted canonical frame bytes.");
+  assert.ok(canonicalFrameBytes > 0);
+  assert.equal(trackStoreCapacity.parityDigest, "e70a8290091d554c28a7b192eaaab3cac531a227770fad27de346b2424a3ecd2");
 
   process.stdout.write(
     `${JSON.stringify({ workerAsset: workerName, environmentWorkerAsset: environmentWorkerName, backend: result, cancellation, trackStoreCapacity })}\n`,
