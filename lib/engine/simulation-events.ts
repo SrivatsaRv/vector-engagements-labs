@@ -478,8 +478,13 @@ export function assertSimulationEventStream(
           const expectedLaunchTick = launchTimeSeconds === null || launchTimeSeconds === undefined
             ? undefined
             : firstFixedStepTickAtOrAfter(launchTimeSeconds, scenario.fixedStepSeconds);
+          const terminalTick = firstFixedStepTickAtOrAfter(
+            scenario.durationSeconds,
+            scenario.fixedStepSeconds,
+          );
           if (
             expectedLaunchTick === undefined ||
+            expectedLaunchTick >= terminalTick ||
             event.tick !== expectedLaunchTick ||
             event.frameIndex !== firstFrameIndexByEntity.get(entityId!)
           ) {

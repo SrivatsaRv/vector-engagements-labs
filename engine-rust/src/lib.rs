@@ -1098,7 +1098,12 @@ fn route_transition(plan: &RoutePlan, index: usize) -> Result<&str, EngineError>
     }
 }
 
-fn activate_weapons(states: &mut [RuntimeState], tick: u64, scenario: &EngineScenario) {
+fn activate_weapons(
+    states: &mut [RuntimeState],
+    tick: u64,
+    terminal_tick: u64,
+    scenario: &EngineScenario,
+) {
     for index in 0..states.len() {
         let Some(weapon) = states[index].definition.weapon.clone() else {
             continue;
@@ -1106,9 +1111,12 @@ fn activate_weapons(states: &mut [RuntimeState], tick: u64, scenario: &EngineSce
         let Some(launch_time) = weapon.launch_time_seconds else {
             continue;
         };
+        let activation_tick =
+            first_fixed_step_tick_at_or_after(launch_time, scenario.fixed_step_seconds);
         if states[index].lifecycle != EntityLifecycle::Stowed
             || launch_time > scenario.duration_seconds
-            || tick < first_fixed_step_tick_at_or_after(launch_time, scenario.fixed_step_seconds)
+            || activation_tick >= terminal_tick
+            || tick < activation_tick
         {
             continue;
         }
@@ -1434,7 +1442,10 @@ fn recorded_model_time_at_tick(tick: u64, fixed_step_seconds: f64) -> f64 {
     (model_time_at_tick(tick, fixed_step_seconds) * 1_000_000.0).round() / 1_000_000.0
 }
 
-fn first_fixed_step_tick_at_or_after(model_time_seconds: f64, fixed_step_seconds: f64) -> u64 {
+pub(crate) fn first_fixed_step_tick_at_or_after(
+    model_time_seconds: f64,
+    fixed_step_seconds: f64,
+) -> u64 {
     let mut candidate = (model_time_seconds / fixed_step_seconds).ceil() as u64;
     while candidate > 0
         && model_time_at_tick(candidate - 1, fixed_step_seconds) >= model_time_seconds
@@ -1450,6 +1461,8 @@ fn first_fixed_step_tick_at_or_after(model_time_seconds: f64, fixed_step_seconds
 /// Run a validated deterministic scenario and return a replayable engine record.
 pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError> {
     validate_scenario(&scenario)?;
+    let terminal_tick =
+        first_fixed_step_tick_at_or_after(scenario.duration_seconds, scenario.fixed_step_seconds);
     let mut states: Vec<RuntimeState> = scenario.entities.iter().map(RuntimeState::new).collect();
     for store in &scenario.entities {
         let Some(weapon) = store.weapon.as_ref() else {
@@ -1531,7 +1544,7 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
         }
         let before_activation: Vec<EntityLifecycle> =
             states.iter().map(|state| state.lifecycle).collect();
-        activate_weapons(&mut states, tick, &scenario);
+        activate_weapons(&mut states, tick, terminal_tick, &scenario);
         for (index, state) in states.iter().enumerate() {
             if before_activation[index] != EntityLifecycle::Stowed
                 || state.lifecycle == EntityLifecycle::Stowed
@@ -1589,7 +1602,7 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
         } else if separation <= scenario.completion.distance_meters {
             termination = Termination::ThresholdReached;
             completed_this_tick = true;
-        } else if time >= scenario.duration_seconds - 1e-9 {
+        } else if tick >= terminal_tick {
             termination = Termination::TimeLimit;
             completed_this_tick = true;
         } else {
@@ -1699,7 +1712,7 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
             {
                 termination = Termination::EnergyDepleted;
                 completed_this_tick = true;
-            } else if next_time >= scenario.duration_seconds - 1e-9 {
+            } else if next_tick >= terminal_tick {
                 termination = Termination::TimeLimit;
                 completed_this_tick = true;
             }
@@ -1719,11 +1732,11 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                     .as_ref()
                     .and_then(|weapon| weapon.launch_time_seconds)
                     .is_some_and(|launch_time| {
-                        launch_time <= scenario.duration_seconds
-                            && first_fixed_step_tick_at_or_after(
-                                launch_time,
-                                scenario.fixed_step_seconds,
-                            ) == steps
+                        let activation_tick = first_fixed_step_tick_at_or_after(
+                            launch_time,
+                            scenario.fixed_step_seconds,
+                        );
+                        activation_tick < terminal_tick && activation_tick == steps
                     })
         });
         if event_journal.has_pending()
@@ -2138,6 +2151,62 @@ mod tests {
                     if message.contains("launches after scenario duration")
             ));
         }
+        Ok(())
+    }
+
+    #[test]
+    fn terminal_boundary_is_a_half_open_launch_window() -> Result<(), Box<dyn std::error::Error>> {
+        for (fixed_step, duration, launch_time) in [
+            (0.05, 0.2, 0.2),
+            (0.05, 0.201, 0.201),
+            (0.05, 0.22, 0.219),
+            (0.05, 0.200_000_000_001, 0.200_000_000_001),
+        ] {
+            let mut input = scenario();
+            input.fixed_step_seconds = fixed_step;
+            input.duration_seconds = duration;
+            let weapon = input
+                .entities
+                .iter_mut()
+                .find(|entity| entity.id == "blue-weapon")
+                .and_then(|entity| entity.weapon.as_mut())
+                .ok_or("scenario has no scheduled weapon")?;
+            weapon.launch_time_seconds = Some(launch_time);
+            assert!(matches!(
+                try_run_engine(input),
+                Err(EngineError::InvalidScenario(message))
+                    if message.contains("launches outside the executable run window")
+            ));
+        }
+
+        let mut input = scenario();
+        input.fixed_step_seconds = 0.05;
+        input.duration_seconds = 0.22;
+        let weapon = input
+            .entities
+            .iter_mut()
+            .find(|entity| entity.id == "blue-weapon")
+            .and_then(|entity| entity.weapon.as_mut())
+            .ok_or("scenario has no scheduled weapon")?;
+        weapon.launch_time_seconds = Some(0.2);
+        let run = try_run_engine(input)?;
+        assert_eq!(run.termination, Termination::TimeLimit);
+        assert_eq!(run.diagnostics.integrated_steps, 5);
+        assert_eq!(run.frames.last().map(|frame| frame.t), Some(0.25));
+        let entry = run
+            .events
+            .items
+            .iter()
+            .find(|event| {
+                event.producer.entity_id.as_deref() == Some("blue-weapon")
+                    && matches!(
+                        &event.payload,
+                        simulation_events::SimulationEventPayload::EntityEnteredWorld { .. }
+                    )
+            })
+            .ok_or("run has no weapon world-entry event")?;
+        assert_eq!(entry.tick, 4);
+        assert_eq!(entry.model_time_seconds, 0.2);
         Ok(())
     }
 

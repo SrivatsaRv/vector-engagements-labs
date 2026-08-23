@@ -367,6 +367,54 @@ test("finite schedules outside the executable run window fail admission before q
   }
 });
 
+test("terminal fixed-step boundary is a half-open launch window in both engines", () => {
+  const rejected = [
+    { fixedStepSeconds: 0.05, durationSeconds: 0.2, launchTimeSeconds: 0.2 },
+    { fixedStepSeconds: 0.05, durationSeconds: 0.201, launchTimeSeconds: 0.201 },
+    { fixedStepSeconds: 0.05, durationSeconds: 0.22, launchTimeSeconds: 0.219 },
+    {
+      fixedStepSeconds: 0.05,
+      durationSeconds: 0.200000000001,
+      launchTimeSeconds: 0.200000000001,
+    },
+  ];
+  for (const boundary of rejected) {
+    const scenario = admittedScenario();
+    scenario.fixedStepSeconds = boundary.fixedStepSeconds;
+    scenario.durationSeconds = boundary.durationSeconds;
+    const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
+    weapon.weapon!.launchTimeSeconds = boundary.launchTimeSeconds;
+    for (const backend of ["typescript", "rust-wasm"] as const) {
+      assert.throws(
+        () => runEngineBackend(structuredClone(scenario), backend),
+        /launches outside the executable run window/,
+        `${backend} must reject terminal activation ${JSON.stringify(boundary)}`,
+      );
+    }
+  }
+
+  const executable = admittedScenario();
+  executable.fixedStepSeconds = 0.05;
+  executable.durationSeconds = 0.22;
+  const weapon = executable.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
+  weapon.weapon!.launchTimeSeconds = 0.2;
+  for (const backend of ["typescript", "rust-wasm"] as const) {
+    const run = runEngineBackend(structuredClone(executable), backend);
+    assert.equal(run.termination, "time_limit");
+    assert.equal(run.diagnostics.integratedSteps, 5);
+    assert.equal(run.frames.at(-1)?.t, 0.25);
+    assert.equal(run.events.state, "AVAILABLE");
+    const entry = run.events.items.find(
+      (event) =>
+        event.payload.kind === "ENTITY_ENTERED_WORLD" &&
+        event.producer.entityId === weapon.id,
+    );
+    assert.equal(entry?.tick, 4, `${backend} last executable pre-terminal launch`);
+    assert.equal(entry?.modelTimeSeconds, 0.2);
+    assertSimulationEventStream(run.events.items, run.frames, run.scenario, run.termination);
+  }
+});
+
 test("runtime decoding fails closed for unknown variants, payload versions, fields, and lifecycle states", () => {
   const scenario = admittedScenario();
   scenario.durationSeconds = 1;

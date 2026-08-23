@@ -342,7 +342,8 @@ test("fuel exhaustion preserves empty mass and all installed store mass before r
   const scenario = admitTestAircraft(testScenario());
   const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
   const weapon = scenario.entities.find((entity) => entity.id === "weapon-blue");
-  weapon.weapon.launchTimeSeconds = scenario.durationSeconds;
+  weapon.weapon.launchTimeSeconds =
+    scenario.durationSeconds - scenario.fixedStepSeconds;
   blue.initial.fuelKg = 1;
   blue.initial.massKg = testAircraftModel.emptyMassKg + 1 + weapon.weapon.launchMassKg;
   blue.aircraft.fuelFlowByThrottle.values = [1, 1];
@@ -350,7 +351,7 @@ test("fuel exhaustion preserves empty mass and all installed store mass before r
   const run = runEngine(scenario);
   const finalAircraft = [...run.frames]
     .reverse()
-    .find((frame) => frame.t < scenario.durationSeconds)
+    .find((frame) => frame.t < weapon.weapon.launchTimeSeconds)
     .entities.find((entity) => entity.id === blue.id);
   assert.equal(finalAircraft.fuelKg, 0);
   assert.equal(finalAircraft.storeMassKg, weapon.weapon.launchMassKg);

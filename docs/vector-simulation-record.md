@@ -148,9 +148,14 @@ The integer tick owns model time: each boundary is derived as `tick × fixed
 step`; neither engine accumulates a floating model clock. Scheduled activation
 starts from the quotient estimate and then compares the adjacent tick-derived
 boundaries directly, so grid, off-grid and near-grid values use the same rule in
-the producer and validator. A finite schedule after the admitted run duration
-fails admission before clock quantization; it is not accepted as an inert
-control. Frames represent state committed at that boundary.
+the producer and validator. The terminal tick is the first fixed-step boundary
+at or after the declared duration. The executable interval is half-open: a
+scheduled activation tick must be strictly earlier than the terminal tick.
+Exact-terminal and off-grid schedules that quantize to that boundary fail
+admission rather than becoming inert controls. A finite schedule after the
+declared duration fails before clock quantization. The terminal tick records run
+completion and admits no new tactical action. Frames represent state committed
+at that boundary.
 Initial and store-world-entry events are captured before the following
 integration step; post-integration lifecycle and run-terminal transitions use
 the next boundary time. An event frame therefore cannot show an entity already

@@ -425,16 +425,19 @@ function activateWeapon(
   states: Map<string, RuntimeState>,
   tick: number,
   scenario: EngineScenario,
+  terminalTick: number,
 ) {
   const weapon = state.definition.weapon;
   if (!weapon || weapon.launchTimeSeconds === null) return;
+  const activationTick = firstFixedStepTickAtOrAfter(
+    weapon.launchTimeSeconds,
+    scenario.fixedStepSeconds,
+  );
   if (
     state.lifecycle !== "STOWED" ||
     weapon.launchTimeSeconds > scenario.durationSeconds ||
-    tick < firstFixedStepTickAtOrAfter(
-      weapon.launchTimeSeconds,
-      scenario.fixedStepSeconds,
-    )
+    activationTick >= terminalTick ||
+    tick < activationTick
   ) return;
   const launcher = states.get(weapon.launchPlatformId);
   if (launcher) {
@@ -719,6 +722,7 @@ export class EngineSession {
   private readonly frames: EngineRun["frames"] = [];
   private readonly eventJournal = new SimulationEventJournal();
   private readonly sampleEvery: number;
+  private readonly terminalTick: number;
   private readonly recordingOrigin: EngineScenario["geospatial"]["origin"];
   private termination: EngineRun["termination"] = "time_limit";
   private closestApproachM = Number.POSITIVE_INFINITY;
@@ -731,7 +735,11 @@ export class EngineSession {
 
   constructor(scenario: EngineScenario) {
     this.scenario = scenario;
-    const maximumTicks = Math.ceil(scenario.durationSeconds / scenario.fixedStepSeconds);
+    this.terminalTick = firstFixedStepTickAtOrAfter(
+      scenario.durationSeconds,
+      scenario.fixedStepSeconds,
+    );
+    const maximumTicks = this.terminalTick;
     const regularFrames = Math.ceil(scenario.durationSeconds / 0.25) + 1;
     const eventForcedFrames = Math.min(maximumTicks + 1, MAX_SIMULATION_EVENTS);
     const admittedFrames = Math.min(maximumTicks + 1, regularFrames + eventForcedFrames);
@@ -845,6 +853,13 @@ export class EngineSession {
       const launchTimeSeconds = entity.weapon.launchTimeSeconds;
       if (launchTimeSeconds !== null && launchTimeSeconds > scenario.durationSeconds) {
         throw new Error(`Weapon ${entity.id} launches after scenario duration.`);
+      }
+      if (
+        launchTimeSeconds !== null &&
+        firstFixedStepTickAtOrAfter(launchTimeSeconds, scenario.fixedStepSeconds) >=
+          this.terminalTick
+      ) {
+        throw new Error(`Weapon ${entity.id} launches outside the executable run window.`);
       }
       const admission = entity.weapon.admission;
       if (
@@ -1037,7 +1052,7 @@ export class EngineSession {
         [...this.states.values()].map((state) => [state.definition.id, state.lifecycle]),
       );
       for (const state of this.states.values())
-        activateWeapon(state, this.states, tick, scenario);
+        activateWeapon(state, this.states, tick, scenario, this.terminalTick);
       for (const state of this.states.values()) {
         const prior = beforeActivation.get(state.definition.id)!;
         if (prior !== "STOWED" || state.lifecycle === "STOWED") continue;
@@ -1090,7 +1105,7 @@ export class EngineSession {
       } else if (separationM <= scenario.completion.distanceMeters) {
         this.termination = "threshold_reached";
         this.completed = true;
-      } else if (time >= scenario.durationSeconds - 1e-9) {
+      } else if (tick >= this.terminalTick) {
         this.termination = "time_limit";
         this.completed = true;
       } else {
@@ -1187,7 +1202,7 @@ export class EngineSession {
         ) {
           this.termination = "energy_depleted";
           this.completed = true;
-        } else if (nextTime >= scenario.durationSeconds - 1e-9) {
+        } else if (nextTick >= this.terminalTick) {
           this.termination = "time_limit";
           this.completed = true;
         }
@@ -1214,7 +1229,10 @@ export class EngineSession {
         return state.lifecycle === "STOWED" &&
           launchTimeSeconds !== null &&
           launchTimeSeconds !== undefined &&
-          launchTimeSeconds <= scenario.durationSeconds &&
+          firstFixedStepTickAtOrAfter(
+            launchTimeSeconds,
+            scenario.fixedStepSeconds,
+          ) < this.terminalTick &&
           firstFixedStepTickAtOrAfter(
             launchTimeSeconds,
             scenario.fixedStepSeconds,
