@@ -27,6 +27,9 @@
       "hashReviewState": "VERIFIED",
       "licenseReviewState": "REVIEWED",
       "admissionUse": "REFERENCE_ONLY",
+      "subjectClaimIds": [],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS"],
       "scope": "NASA NESC F-16 DAVE-ML verification model; not an IAF Su-30MKI or PAF Peace Drive I F-16C/D model."
     },
     {
@@ -39,6 +42,9 @@
       "hashReviewState": "VERIFIED",
       "licenseReviewState": "REVIEWED",
       "admissionUse": "REFERENCE_ONLY",
+      "subjectClaimIds": [],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS"],
       "scope": "One 180-second subsonic wings-level trim trajectory; not a manoeuvre, sensor, store, or operational validation corpus."
     },
     {
@@ -52,6 +58,9 @@
       "hashReviewState": "VERIFIED",
       "licenseReviewState": "REVIEWED",
       "admissionUse": "REFERENCE_ONLY",
+      "subjectClaimIds": [],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS"],
       "derivedFromArtifactIds": [
         "nasa-nesc-2015-f16-daveml-source",
         "nasa-nesc-2015-atmos11-sim04-validation"
@@ -68,6 +77,9 @@
       "hashReviewState": "VERIFIED",
       "licenseReviewState": "PENDING",
       "admissionUse": "CATALOG_CONTEXT_ONLY",
+      "subjectClaimIds": ["su-30mki-performance"],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["PROPULSION", "MASS_AND_STORES"],
       "scope": "Categorical Su-30MKI identity, roles, two AL-31FP engines and 12 hardpoints only; no admitted performance tables or loadout authority."
     },
     {
@@ -80,6 +92,9 @@
       "hashReviewState": "PENDING",
       "licenseReviewState": "PENDING",
       "admissionUse": "CATALOG_CONTEXT_ONLY",
+      "subjectClaimIds": ["su-30mki-performance"],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["SENSORS"],
       "scope": "Dynamic public product locator supports a categorical RLSU-30MK PESA association only; no immutable artifact or sensor-performance admission."
     },
     {
@@ -92,6 +107,9 @@
       "hashReviewState": "PENDING",
       "licenseReviewState": "PENDING",
       "admissionUse": "CATALOG_CONTEXT_ONLY",
+      "subjectClaimIds": ["su-30mki-performance"],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["MASS_AND_STORES"],
       "scope": "Categorical Astra Mk-I and Su-30MKI integration statement; no station, loadout, guidance, sensor-support, or weapon-performance authority."
     },
     {
@@ -99,12 +117,15 @@
       "kind": "SOURCE",
       "authority": "Lockheed Martin",
       "uri": "https://news.lockheedmartin.com/2009-10-13-Lockheed-Martin-Unveils-First-New-F-16-for-Pakistan-in-Ceremony-Attended-by-Air-Force-Chiefs",
-      "sha256": "5119b61b57912e124eab20d97881cef0c61abcaeeb93e1d0446f72648ee54e84",
+      "sha256": null,
       "retrievalState": "DECLARED_REMOTE",
-      "hashReviewState": "VERIFIED",
+      "hashReviewState": "PENDING",
       "licenseReviewState": "PENDING",
       "admissionUse": "CATALOG_CONTEXT_ONLY",
-      "scope": "Peace Drive I programme identity, 12 F-16C, 6 F-16D, and F100-PW-229 categorical association; no performance-map or mission authority."
+      "subjectClaimIds": ["f-16c-block52-paf-performance", "f-16d-block52-paf-performance"],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["PROPULSION"],
+      "scope": "Peace Drive I programme identity, 12 F-16C, 6 F-16D, and F100-PW-229 categorical association; no performance-map or mission authority. The mutable current locator returned bytes that did not match the previously reviewed digest, so immutable hash review is pending."
     },
     {
       "id": "federal-register-paf-f16-2006",
@@ -116,6 +137,9 @@
       "hashReviewState": "VERIFIED",
       "licenseReviewState": "REVIEWED",
       "admissionUse": "CATALOG_CONTEXT_ONLY",
+      "subjectClaimIds": ["f-16c-block52-paf-performance", "f-16d-block52-paf-performance"],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["MASS_AND_STORES", "SENSORS"],
       "scope": "Requested programme association with APG-68(V)9, Link 16, AIM-120C-5 and LAU-129/A; no final delivered-fit or runtime authority."
     },
     {
@@ -128,6 +152,9 @@
       "hashReviewState": "VERIFIED",
       "licenseReviewState": "REVIEWED",
       "admissionUse": "CATALOG_CONTEXT_ONLY",
+      "subjectClaimIds": ["f-16c-block52-paf-performance", "f-16d-block52-paf-performance"],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["MASS_AND_STORES"],
       "publishedAt": "2008-09-16",
       "scope": "F-16C/D Block 52 programme and AIM-120C-5 association only; no station, loadout, guidance, or weapon-performance authority."
     },
@@ -141,6 +168,9 @@
       "hashReviewState": "PENDING",
       "licenseReviewState": "PENDING",
       "admissionUse": "INELIGIBLE",
+      "subjectClaimIds": [],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": ["MASS_AND_STORES", "SENSORS"],
       "transactionState": "EXPIRED_WITHOUT_ACCEPTANCE",
       "scope": "Separate 2016 proposed sale. It is not Peace Drive I delivered-fit evidence and cannot support any catalog fit or runtime admission."
     },
@@ -154,6 +184,9 @@
       "hashReviewState": "PENDING",
       "licenseReviewState": "PENDING",
       "admissionUse": "GOVERNANCE_CONTEXT_ONLY",
+      "subjectClaimIds": [],
+      "eligibleClaimIds": [],
+      "capabilityCoverage": [],
       "retrievedAt": "2026-08-23",
       "scope": "Dynamic transaction-history locator used to quarantine the 2016 proposal. Pending immutable hash; never runtime evidence."
     }
@@ -167,6 +200,7 @@
       "programme": null,
       "seatConfiguration": "TWO_SEAT",
       "deliveredQuantity": null,
+      "performanceClaimId": "su-30mki-performance",
       "scenarioSelectable": true
     },
     {
@@ -177,6 +211,7 @@
       "programme": "Peace Drive I",
       "seatConfiguration": "SINGLE_SEAT",
       "deliveredQuantity": 12,
+      "performanceClaimId": "f-16c-block52-paf-performance",
       "scenarioSelectable": true
     },
     {
@@ -187,6 +222,7 @@
       "programme": "Peace Drive I",
       "seatConfiguration": "TWO_SEAT",
       "deliveredQuantity": 6,
+      "performanceClaimId": "f-16d-block52-paf-performance",
       "scenarioSelectable": false
     }
   ],

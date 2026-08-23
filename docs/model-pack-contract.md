@@ -174,6 +174,11 @@ PAF F-16C Block 52 Peace Drive I, and catalog-only PAF F-16D Block 52 Peace
 Drive I claims are deliberately unsupported; the NASA NESC F-16 trim asset is
 not an interchangeable Peace Drive I performance model. Categorical engine,
 radar, data-link, weapon, or hardpoint associations supply no runtime authority.
+For an admitted claim, TypeScript and Rust additionally require every referenced
+pack evidence row to match the governed artifact ID, evidence kind, immutable
+SHA-256, exact subject claim, admission eligibility, and declared capability
+coverage. A digest-valid pack cannot substitute C/D, NASA-reference, or
+cross-capability evidence under a familiar ID.
 
 Catalog admission checks that every aircraft carries this boundary before the
 catalog API returns a validated template. The API exposes the state and reason

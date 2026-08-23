@@ -64,6 +64,14 @@ All current station compatibility and two-store defaults are `UNVERIFIED` or
 evidence panel displays that assumption label beside the two-store teaching
 default at every supported viewport.
 
+Catalog seeding is also a forward reconciliation step for this owned fixture.
+Before inserting the current deterministic fact rows it removes only prior
+`<platform-id>-fact-*` rows for that exact managed platform, then explicitly
+retires subsystem ID `alq-211v9` after fitted references have been cleared.
+`db:aircraft-upgrade:verify` creates the legacy ALQ/DSCA `ACCEPTED` state in
+PostGIS, reruns the current seed, and proves the retired subsystem, old
+assertions, and fitted columns are absent while current context assertions remain.
+
 PostGIS is canonical for installation geometry. Map markers, study-area origin selectors, and future KML/GeoJSON exports derive from `installations.location`; VECTOR does not maintain an independent hand-edited KML truth file. Coordinate order is longitude, latitude in EPSG:4326.
 
 The eight existing weapon identities now include public-source records for Astra Mk-I, AIM-120C-5, MICA IR, Kh-31P, SPICE 2000, Akash, the historical S-200 reference case, and BRAHMOS Block-I. Public identity, guidance class, or conditional manufacturer figures do not turn VECTOR's thrust, drag, mass, seeker, or terminal-behavior coefficients into sourced facts. Those remain separately labeled `MODEL_ASSUMPTION`.

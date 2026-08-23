@@ -17,6 +17,8 @@ flight controls, mass and stores, and sensors — an `ADMITTED` claim needs:
 - at least one different immutable `VALIDATION` artifact;
 - completed hash and license review;
 - explicit eligibility for the named-performance source or validation role;
+- an artifact-level `subjectClaimIds` binding to that exact governed claim;
+- artifact-level coverage of the capability being admitted;
 - explicit capability coverage and validity limits; and
 - a model-pack evidence set that exactly matches the governed claim.
 
@@ -26,7 +28,10 @@ separation. It also rejects pending hashes, context-only rows, expired proposals
 and ineligible artifacts when they are placed into an admission claim.
 `compileModelPack` invokes the governed admission check in TypeScript and Rust.
 A synthetic pair of `SOURCE`/`VALIDATION` rows in a pack cannot promote a named
-aircraft.
+aircraft. Both implementations compare the model-pack evidence row's ID, kind,
+and SHA-256 against the exact registry artifact; matching an ID alone is not
+sufficient. Evidence bound to the F-16C, F-16D, generic NASA reference, or a
+different capability cannot be reused for the Su-30MKI, and vice versa.
 
 ## Exact current subjects
 
@@ -55,8 +60,11 @@ association and has a pending immutable hash. The Astra integration statement
 does not supply station, loadout, guidance, sensor-support, or weapon-performance
 authority.
 
-Lockheed's Peace Drive I release supports 12 F-16C, 6 F-16D and a categorical
-F100-PW-229 association. The 2006 Federal Register artifact supports requested
+The reviewed Lockheed Peace Drive I page provides context for 12 F-16C, 6 F-16D
+and a categorical F100-PW-229 association. Its current mutable bytes do not
+match the previously reviewed digest, so the registry records a null digest and
+`PENDING` hash review rather than claiming an immutable artifact. The 2006
+Federal Register artifact supports requested
 programme associations for APG-68(V)9, Link 16, AIM-120C-5 and LAU-129/A only.
 It does not prove final delivered fit. The separate 2016 DSCA proposal expired
 without acceptance and is `INELIGIBLE`; the dynamic CRS locator that supports

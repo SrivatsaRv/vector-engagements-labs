@@ -122,6 +122,16 @@ try {
     FROM subsystems
     WHERE id='alq-211v9' OR designation ILIKE '%ALQ-211%'`;
   assert.equal(alqClaims[0].count, 0);
+  const retiredAuthority = await sql`SELECT count(*)::int AS count
+    FROM source_assertions
+    WHERE entity_type='PLATFORM'
+      AND entity_id IN ('f-16c-block52-paf', 'f-16d-block52-paf')
+      AND (
+        source_id='dsca-pakistan-15-80'
+        OR condition_text='Defensive EW'
+        OR value_text ILIKE '%ALQ-211%'
+      )`;
+  assert.equal(retiredAuthority[0].count, 0);
   const compatibilityAuthority = await sql`SELECT platform_id, weapon_id, status
     FROM platform_weapon_compatibility
     WHERE platform_id IN ('su-30mki', 'f-16c-block52-paf')`;

@@ -19,7 +19,7 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function artifactMap(registry, isV2) {
+function artifactMap(registry, isV2, declaredClaimIds = new Set()) {
   const ids = new Set();
   for (const artifact of registry.artifacts) {
     assert(typeof artifact.id === "string" && artifact.id.length > 0, "Evidence artifact requires an id.");
@@ -44,6 +44,28 @@ function artifactMap(registry, isV2) {
       );
       assert(["VERIFIED", "PENDING"].includes(artifact.hashReviewState), `${artifact.id} has an unsupported hash review state.`);
       assert(["REVIEWED", "PENDING"].includes(artifact.licenseReviewState), `${artifact.id} has an unsupported license review state.`);
+      assert(Array.isArray(artifact.subjectClaimIds), `${artifact.id} requires subjectClaimIds.`);
+      assert(Array.isArray(artifact.eligibleClaimIds), `${artifact.id} requires eligibleClaimIds.`);
+      assert(Array.isArray(artifact.capabilityCoverage), `${artifact.id} requires capabilityCoverage.`);
+      assert(new Set(artifact.subjectClaimIds).size === artifact.subjectClaimIds.length, `${artifact.id} repeats a subject claim.`);
+      assert(new Set(artifact.eligibleClaimIds).size === artifact.eligibleClaimIds.length, `${artifact.id} repeats an eligible claim.`);
+      assert(new Set(artifact.capabilityCoverage).size === artifact.capabilityCoverage.length, `${artifact.id} repeats capability coverage.`);
+      for (const claimId of artifact.subjectClaimIds) {
+        assert(declaredClaimIds.has(claimId), `${artifact.id} references unknown subject claim ${claimId}.`);
+      }
+      for (const claimId of artifact.eligibleClaimIds) {
+        assert(artifact.subjectClaimIds.includes(claimId), `${artifact.id} eligibility for ${claimId} escapes its exact subject binding.`);
+      }
+      for (const capability of artifact.capabilityCoverage) {
+        assert(REQUIRED_CAPABILITIES.includes(capability), `${artifact.id} has unsupported capability coverage ${capability}.`);
+      }
+      const namedPerformanceUse = artifact.admissionUse.startsWith("NAMED_PERFORMANCE");
+      if (namedPerformanceUse) {
+        assert(artifact.eligibleClaimIds.length > 0, `${artifact.id} named-performance evidence requires an eligible claim binding.`);
+        assert(artifact.capabilityCoverage.length > 0, `${artifact.id} named-performance evidence requires capability coverage.`);
+      } else {
+        assert(artifact.eligibleClaimIds.length === 0, `${artifact.id} non-admission evidence cannot declare eligible claims.`);
+      }
       if (artifact.hashReviewState === "VERIFIED") {
         assert(SHA256.test(artifact.sha256), `${artifact.id} requires an immutable SHA-256 artifact digest.`);
       } else {
@@ -72,7 +94,7 @@ function artifactMap(registry, isV2) {
   return new Map(registry.artifacts.map((artifact) => [artifact.id, artifact]));
 }
 
-function assertV2SubjectsAndAssertions(registry, artifacts) {
+function assertV2SubjectsAndAssertions(registry, artifacts, declaredClaimIds) {
   assert(Array.isArray(registry.subjects) && registry.subjects.length > 0, "Aircraft evidence registry v2 requires exact subjects.");
   const subjectIds = new Set();
   const subjectCatalogIds = new Set();
@@ -88,6 +110,7 @@ function assertV2SubjectsAndAssertions(registry, artifacts) {
     assert(["SINGLE_SEAT", "TWO_SEAT"].includes(subject.seatConfiguration), `${subject.id} has an unsupported seat configuration.`);
     assert(subject.deliveredQuantity === null || Number.isInteger(subject.deliveredQuantity) && subject.deliveredQuantity > 0, `${subject.id} delivered quantity is invalid.`);
     assert(typeof subject.scenarioSelectable === "boolean", `${subject.id} requires scenario-selectable state.`);
+    assert(declaredClaimIds.has(subject.performanceClaimId), `${subject.id} references unknown performance claim ${subject.performanceClaimId}.`);
   }
 
   assert(Array.isArray(registry.catalogAssertions), "Aircraft evidence registry v2 requires catalog assertions.");
@@ -116,6 +139,11 @@ function assertV2SubjectsAndAssertions(registry, artifacts) {
           ["CATALOG_CONTEXT_ONLY", "GOVERNANCE_CONTEXT_ONLY", "REFERENCE_ONLY"].includes(artifact.admissionUse),
           `${item.id} cannot cite ${artifactId} as catalog context.`,
         );
+        const subject = registry.subjects.find((candidate) => candidate.id === item.subjectId);
+        assert(
+          artifact.subjectClaimIds.includes(subject.performanceClaimId),
+          `${item.id} context artifact ${artifactId} is not bound to exact subject claim ${subject.performanceClaimId}.`,
+        );
       }
     }
   }
@@ -133,6 +161,9 @@ function assertV2AdmissionArtifact(artifact, role, claimId, capability) {
     SHA256.test(artifact.sha256) && artifact.hashReviewState === "VERIFIED" && artifact.licenseReviewState === "REVIEWED",
     `${claimId} ${capability} ${artifact.id} lacks immutable SHA-256 and completed license review.`,
   );
+  assert(artifact.subjectClaimIds.includes(claimId), `${claimId} ${capability} ${artifact.id} is bound to a different subject.`);
+  assert(artifact.eligibleClaimIds.includes(claimId), `${claimId} ${capability} ${artifact.id} is not eligible for this claim.`);
+  assert(artifact.capabilityCoverage.includes(capability), `${claimId} ${capability} ${artifact.id} lacks capability coverage.`);
 }
 
 export function validateAircraftEvidenceRegistry(registry, { rootDirectory = process.cwd(), verifyLocalArtifacts = true } = {}) {
@@ -142,7 +173,10 @@ export function validateAircraftEvidenceRegistry(registry, { rootDirectory = pro
     assert(registry.supersedes?.schemaVersion === V1_SCHEMA, "Aircraft evidence registry v2 must preserve the v1 predecessor.");
   }
   assert(registry.programmeGate === "#66" && registry.ownerIssue === "#64", "Aircraft evidence registry must remain governed by #64 and #66.");
-  const artifacts = artifactMap(registry, isV2);
+  assert(Array.isArray(registry.claims), "Aircraft evidence registry requires claims.");
+  const declaredClaimIds = new Set(registry.claims.map((claim) => claim.id));
+  assert(declaredClaimIds.size === registry.claims.length, "Aircraft evidence registry has duplicate claim ids.");
+  const artifacts = artifactMap(registry, isV2, declaredClaimIds);
   for (const artifact of artifacts.values()) {
     for (const parentId of artifact.derivedFromArtifactIds ?? []) {
       assert(artifacts.has(parentId), `${artifact.id} references missing source artifact ${parentId}.`);
@@ -154,7 +188,7 @@ export function validateAircraftEvidenceRegistry(registry, { rootDirectory = pro
       assert(actual === artifact.sha256, `${artifact.id} local artifact SHA-256 does not match the registry.`);
     }
   }
-  const subjects = isV2 ? assertV2SubjectsAndAssertions(registry, artifacts) : undefined;
+  const subjects = isV2 ? assertV2SubjectsAndAssertions(registry, artifacts, declaredClaimIds) : undefined;
   const claimIds = new Set();
   const catalogIds = new Set();
   for (const claim of registry.claims) {
@@ -166,6 +200,7 @@ export function validateAircraftEvidenceRegistry(registry, { rootDirectory = pro
       const subject = subjects.get(claim.subjectId);
       assert(subject, `${claim.id} references unknown subject ${claim.subjectId}.`);
       assert(subject.catalogObjectId === claim.catalogObjectId, `${claim.id} subject and catalog identity do not match.`);
+      assert(subject.performanceClaimId === claim.id, `${claim.id} does not match subject ${claim.subjectId}'s governed claim binding.`);
     }
     assert(["ADMITTED", "UNSUPPORTED"].includes(claim.state), `${claim.id} has an invalid state.`);
     assert(Array.isArray(claim.capabilities) && claim.capabilities.length === REQUIRED_CAPABILITIES.length, `${claim.id} must account for every performance capability.`);

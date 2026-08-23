@@ -30,6 +30,7 @@ compose-up-candidate: compose-pull
 
 integration-local: compose-up
 	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector npm run db:verify
+	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector VECTOR_DB_FIXTURE_MODE=aircraft-evidence-v1-upgrade npm run db:aircraft-upgrade:verify
 	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector npm run db:credibility:verify
 	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector npm run test:admission:integration
 	DATABASE_URL=postgres://vector:vector@127.0.0.1:55433/vector VECTOR_URL=http://127.0.0.1:4317 npm run app:verify
@@ -40,6 +41,7 @@ integration-ci:
 	npm run db:governed-data:verify
 	npm run db:seed
 	npm run db:verify
+	VECTOR_DB_FIXTURE_MODE=aircraft-evidence-v1-upgrade npm run db:aircraft-upgrade:verify
 	npm run db:credibility:verify
 	npm run test:admission:integration
 	node scripts/run-managed-server.mjs

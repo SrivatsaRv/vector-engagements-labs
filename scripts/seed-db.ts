@@ -23,6 +23,7 @@ if (!connectionString) throw new Error("DATABASE_URL is required");
 const sql = postgres(connectionString, { max: 1 });
 
 const json = (value: unknown) => sql.json(value as never);
+const RETIRED_SUBSYSTEM_IDS = ["alq-211v9"] as const;
 const modelPackSource = createCurrentModelPackSource();
 const modelPackBundle = await compileModelPack(modelPackSource);
 const modelPackSourceHash = createHash("sha256")
@@ -124,6 +125,10 @@ try {
       await tx`INSERT INTO platform_variants (id,service,country,family,variant,display_name,role,crew,engine_ids,radar_id,ew_id,datalink_id,rwr_id,countermeasure_id,domains,default_loadout,source_ids,data_status)
         VALUES (${item.id},${item.service},${item.country},${item.family},${item.variant},${item.designation},${item.role},${item.crew ?? null},${json(item.engineIds)},${item.radarId ?? null},${item.ewId ?? null},${item.datalinkId ?? null},${item.rwrId ?? null},${item.countermeasureId ?? null},${json(item.domains)},${json(item.defaultLoadout)},${json(item.sourceIds)},${item.status})
         ON CONFLICT (id) DO UPDATE SET service=EXCLUDED.service,country=EXCLUDED.country,family=EXCLUDED.family,variant=EXCLUDED.variant,display_name=EXCLUDED.display_name,role=EXCLUDED.role,crew=EXCLUDED.crew,engine_ids=EXCLUDED.engine_ids,radar_id=EXCLUDED.radar_id,ew_id=EXCLUDED.ew_id,datalink_id=EXCLUDED.datalink_id,rwr_id=EXCLUDED.rwr_id,countermeasure_id=EXCLUDED.countermeasure_id,domains=EXCLUDED.domains,default_loadout=EXCLUDED.default_loadout,source_ids=EXCLUDED.source_ids,data_status=EXCLUDED.data_status`;
+      await tx`DELETE FROM source_assertions
+        WHERE entity_type='PLATFORM'
+          AND entity_id=${item.id}
+          AND id LIKE ${`${item.id}-fact-%`}`;
       for (const weaponId of item.compatibleWeaponIds) {
         await tx`INSERT INTO platform_weapon_compatibility (platform_id,weapon_id,station_group,source_ids,status)
           VALUES (${item.id},${weaponId},'CATALOGED_LOADOUT',${json(item.sourceIds)},'UNVERIFIED')
@@ -136,6 +141,9 @@ try {
             ON CONFLICT (id) DO UPDATE SET value_text=EXCLUDED.value_text,source_id=EXCLUDED.source_id,confidence=EXCLUDED.confidence,review_state=EXCLUDED.review_state`;
         }
       }
+    }
+    for (const retiredSubsystemId of RETIRED_SUBSYSTEM_IDS) {
+      await tx`DELETE FROM subsystems WHERE id=${retiredSubsystemId}`;
     }
     for (const item of WEAPON_SIMULATION_MODELS) {
       await tx`INSERT INTO simulation_models (id,weapon_id,version,domains,propulsion_kind,launch_mass_kg,dry_mass_kg,powered_flight_seconds,thrust_newtons,thrust_taper_speed_mps,reference_area_m2,drag_coefficient,navigation_constant,maximum_command_g,seeker_activation_range_m,datalink_update_seconds,value_state,rationale)

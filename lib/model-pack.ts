@@ -1089,7 +1089,7 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
       limitationsById,
     );
     try {
-      assertGovernedAircraftEvidenceAdmission(item.catalogObjectId, item.performanceAdmission);
+      assertGovernedAircraftEvidenceAdmission(item.catalogObjectId, item.performanceAdmission, evidenceById);
     } catch (error) {
       issues.push(`aircraft[${index}].performanceAdmission ${error instanceof Error ? error.message : String(error)}`);
     }
