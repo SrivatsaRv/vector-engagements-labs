@@ -1120,11 +1120,12 @@ fn observer_states(
     [("IAF", Affiliation::Blue), ("PAF", Affiliation::Red)]
         .into_iter()
         .map(|(perspective, affiliation)| {
-            let observer = states.iter().find(|state| {
+            let observer = states.iter().filter(|state| {
                 state.definition.affiliation == affiliation
                     && state.definition.kind == EntityKind::Aircraft
                     && state.lifecycle == EntityLifecycle::Active
-            });
+                    && state.definition.observer_sensor.is_some()
+            }).min_by(|left, right| left.definition.id.cmp(&right.definition.id));
             let mut target_candidates = states.iter().filter(|state| {
                 state.definition.affiliation != affiliation
                     && state.definition.kind == EntityKind::Aircraft

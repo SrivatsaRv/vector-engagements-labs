@@ -167,11 +167,12 @@ function observerStates(
     ["IAF", "BLUE"],
     ["PAF", "RED"],
   ] as const).map(([perspective, affiliation]) => {
-    const observer = states.find((state) =>
+    const observer = states.filter((state) =>
       state.definition.affiliation === affiliation &&
       state.definition.kind === "AIRCRAFT" &&
-      state.lifecycle === "ACTIVE",
-    );
+      state.lifecycle === "ACTIVE" &&
+      state.definition.observerSensor !== undefined,
+    ).sort((left, right) => compareCanonicalText(left.definition.id, right.definition.id))[0];
     const targetCandidates = states.filter((state) =>
       state.definition.affiliation !== affiliation &&
       state.definition.kind === "AIRCRAFT",

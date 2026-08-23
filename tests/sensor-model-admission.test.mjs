@@ -73,6 +73,28 @@ async function twoTargetVerificationScenario() {
   return { prepared, ...binding, scenario };
 }
 
+async function sameSideObserverPermutationScenarios() {
+  const prepared = prepareSimulation(DEFAULT_SCENARIO);
+  const binding = await bindVerificationTrackModelPack(prepared.engineScenario);
+  const scenario = structuredClone(binding.scenario);
+  scenario.durationSeconds = 0.6;
+  const originalObserver = scenario.entities.find((entity) => entity.id === "blue-platform-1");
+  assert.ok(originalObserver?.observerSensor && originalObserver.aircraft);
+  const stableObserver = structuredClone(originalObserver);
+  stableObserver.id = "aaa-verification-observer";
+  stableObserver.rddfId = "rddf://verification/aircraft/stable-observer";
+  stableObserver.designation = "Stable generic verification observer";
+  stableObserver.callsign = "STABLE";
+  stableObserver.initial.massKg = stableObserver.aircraft.emptyMassKg + stableObserver.initial.fuelKg;
+  scenario.entities.push(stableObserver);
+  const stableFirst = structuredClone(scenario);
+  stableFirst.entities = [
+    stableFirst.entities.find((entity) => entity.id === stableObserver.id),
+    ...stableFirst.entities.filter((entity) => entity.id !== stableObserver.id),
+  ];
+  return { prepared, ...binding, originalFirst: scenario, stableFirst };
+}
+
 test("observer-state v3 preserves multiple mixed-lifecycle tracks without a scalar summary", async () => {
   const { scenario, pack, prepared } = await twoTargetVerificationScenario();
   const runs = Object.fromEntries(
@@ -139,6 +161,53 @@ test("opaque source associations remain bound to the compiled opposing-aircraft 
       .find((state) => state.schemaVersion === "vector.observer-state.v3" && state.perspective === "IAF")
       ?.observations[0];
     assert.equal(observation?.sourceAssociationId, "IAF-SOURCE-0002");
+  }
+});
+
+test("same-side observer selection is stable across definition order in both engines and VSR", async () => {
+  const { prepared, pack, originalFirst, stableFirst } = await sameSideObserverPermutationScenarios();
+  const results = [];
+  for (const backend of ["typescript", "rust-wasm"]) {
+    for (const scenario of [originalFirst, stableFirst]) {
+      const run = runEngineBackend(structuredClone(scenario), backend);
+      const trackEvents = run.events.items.filter((event) =>
+        event.payload.kind === "TRACK_STATE_CHANGED" && event.payload.perspective === "IAF",
+      );
+      assert.ok(trackEvents.length > 0);
+      assert.ok(
+        trackEvents.every((event) => event.producer.entityId === "aaa-verification-observer"),
+        `${backend} must use the stable sensor-capable producer`,
+      );
+      const capabilityManifest = createVerificationDeploymentCapabilities(backend, ["A2A"], [pack.digest]);
+      const recordedPrepared = { ...prepared, engineScenario: scenario, capabilityManifest };
+      const result = buildSimulationResult(recordedPrepared, run);
+      const record = await createVectorSimulationRecord(recordedPrepared, result, "2026-08-24T00:00:00.000Z");
+      const serialized = serializeVectorRecord(record);
+      const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+      results.push({
+        backend,
+        run,
+        replay,
+        eventBytes: record.members.find((member) => member.path === "events.jsonl")?.bytes,
+        pictureBytes: record.members.find((member) => member.path === "pictures.jsonl")?.bytes,
+      });
+    }
+  }
+  const baseline = results[0];
+  assert.ok(baseline?.eventBytes && baseline.pictureBytes);
+  for (const candidate of results.slice(1)) {
+    assert.deepEqual(
+      candidate.run.frames.map((frame) => frame.observerStates),
+      baseline.run.frames.map((frame) => frame.observerStates),
+    );
+    assert.deepEqual(candidate.run.events, baseline.run.events);
+    assert.deepEqual(candidate.eventBytes, baseline.eventBytes);
+    assert.deepEqual(candidate.pictureBytes, baseline.pictureBytes);
+    assert.deepEqual(
+      candidate.replay.result.frames.map((frame) => frame.observerStates),
+      baseline.replay.result.frames.map((frame) => frame.observerStates),
+    );
+    assert.deepEqual(candidate.replay.events, baseline.replay.events);
   }
 });
 

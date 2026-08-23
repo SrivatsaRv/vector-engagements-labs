@@ -77,6 +77,13 @@ or availability summary. Mixed `TENTATIVE`, `CONFIRMED`, `COASTING`, and
 `LOST` tracks therefore coexist without selecting `tracks[0]`; visibility is
 derived independently for every retained track.
 
+The bounded verification slice admits one sensor producer per side. When more
+than one active aircraft on a side carries an admitted observer sensor, the
+engine selects the aircraft with the lowest stable entity ID in unsigned UTF-8
+order. Scenario insertion order therefore cannot change the producer, side
+picture, events, or record. Per-sensor TrackStores, association and fusion are
+future #26 work; this deterministic selection is not a fusion substitute.
+
 Every lifecycle transition is committed at its exact tick through the shared
 `vector.simulation-event.v2` journal as `TRACK_STATE_CHANGED`. Events carry
 typed transition facts and journal receipts, never presentation text or a
