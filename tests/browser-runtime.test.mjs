@@ -177,3 +177,28 @@ for (const batchTicks of [1, 7, 128, 2_048]) {
     );
   });
 }
+
+test("completed Worker batch time uses the canonical off-grid terminal boundary", () => {
+  const prepared = prepareSimulation(SCENARIO_LIBRARY[0].scenario);
+  const scenario = structuredClone(prepared.engineScenario);
+  scenario.fixedStepSeconds = 0.05;
+  scenario.durationSeconds = 0.22;
+  const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON");
+  weapon.weapon.launchTimeSeconds = 0.2;
+
+  for (const batchTicks of [1, 2, 128]) {
+    const session = new EngineSession(structuredClone(scenario));
+    let completedBatch = session.runTicks(batchTicks);
+    while (!completedBatch.completed) completedBatch = session.runTicks(batchTicks);
+    const run = session.result();
+    const completed = run.events.items.find(
+      (event) => event.payload.kind === "RUN_COMPLETED",
+    );
+    const canonicalTerminalTime =
+      completedBatch.integratedSteps * scenario.fixedStepSeconds;
+    assert.equal(completedBatch.modelTimeSeconds, canonicalTerminalTime);
+    assert.equal(completedBatch.progress, 1);
+    assert.equal(run.frames.at(-1).t, canonicalTerminalTime);
+    assert.equal(completed.modelTimeSeconds, canonicalTerminalTime);
+  }
+});

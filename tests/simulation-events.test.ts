@@ -400,10 +400,17 @@ test("terminal fixed-step boundary is a half-open launch window in both engines"
   weapon.weapon!.launchTimeSeconds = 0.2;
   for (const backend of ["typescript", "rust-wasm"] as const) {
     const run = runEngineBackend(structuredClone(executable), backend);
+    const canonicalTerminalTime =
+      run.diagnostics.integratedSteps * executable.fixedStepSeconds;
     assert.equal(run.termination, "time_limit");
     assert.equal(run.diagnostics.integratedSteps, 5);
-    assert.equal(run.frames.at(-1)?.t, 0.25);
+    assert.equal(run.frames.at(-1)?.t, canonicalTerminalTime);
     assert.equal(run.events.state, "AVAILABLE");
+    const completed = run.events.items.find(
+      (event) => event.payload.kind === "RUN_COMPLETED",
+    );
+    assert.equal(completed?.modelTimeSeconds, canonicalTerminalTime);
+    assert.equal(run.frames[completed!.frameIndex]?.t, canonicalTerminalTime);
     const entry = run.events.items.find(
       (event) =>
         event.payload.kind === "ENTITY_ENTERED_WORLD" &&
@@ -412,6 +419,23 @@ test("terminal fixed-step boundary is a half-open launch window in both engines"
     assert.equal(entry?.tick, 4, `${backend} last executable pre-terminal launch`);
     assert.equal(entry?.modelTimeSeconds, 0.2);
     assertSimulationEventStream(run.events.items, run.frames, run.scenario, run.termination);
+  }
+
+  for (const batchSize of [1, 2, 128]) {
+    const session = new EngineSession(structuredClone(executable));
+    let completedBatch = session.runTicks(batchSize);
+    while (!completedBatch.completed) completedBatch = session.runTicks(batchSize);
+    const run = session.result();
+    if (run.events.state !== "AVAILABLE") throw new Error("event stream unavailable");
+    const completed = run.events.items.find(
+      (event) => event.payload.kind === "RUN_COMPLETED",
+    );
+    const canonicalTerminalTime =
+      completedBatch.integratedSteps * executable.fixedStepSeconds;
+    assert.equal(completedBatch.modelTimeSeconds, canonicalTerminalTime);
+    assert.equal(completedBatch.progress, 1);
+    assert.equal(run.frames.at(-1)?.t, canonicalTerminalTime);
+    assert.equal(completed?.modelTimeSeconds, canonicalTerminalTime);
   }
 });
 

@@ -1257,7 +1257,7 @@ export class EngineSession {
     return {
       completed: this.completed,
       integratedSteps: this.integratedSteps,
-      modelTimeSeconds: Math.min(modelTimeSeconds, this.scenario.durationSeconds),
+      modelTimeSeconds,
       progress:
         this.scenario.durationSeconds > 0
           ? Math.min(1, modelTimeSeconds / this.scenario.durationSeconds)

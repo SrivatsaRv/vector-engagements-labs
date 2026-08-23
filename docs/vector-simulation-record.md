@@ -155,7 +155,12 @@ Exact-terminal and off-grid schedules that quantize to that boundary fail
 admission rather than becoming inert controls. A finite schedule after the
 declared duration fails before clock quantization. The terminal tick records run
 completion and admits no new tactical action. Frames represent state committed
-at that boundary.
+at that boundary. A completed TypeScript `EngineBatch` reports this same
+tick-derived boundary time, even when it is later than an off-grid declared
+duration; only its dimensionless progress value is clamped to one. The current
+Rust/WASM ABI returns the whole run rather than an incremental batch, so its
+final frame, `RUN_COMPLETED` event and integrated-step diagnostic provide the
+equivalent canonical time.
 Initial and store-world-entry events are captured before the following
 integration step; post-integration lifecycle and run-terminal transitions use
 the next boundary time. An event frame therefore cannot show an entity already
