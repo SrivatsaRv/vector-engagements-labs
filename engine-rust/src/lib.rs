@@ -5,6 +5,7 @@ mod error;
 mod model_pack;
 mod public_aircraft_reference;
 mod simulation_events;
+mod sixdof_foundation;
 mod validation;
 mod wasm_abi;
 
@@ -18,6 +19,10 @@ pub use public_aircraft_reference::{
 };
 use simulation_events::{SimulationEventDraft, SimulationEventJournal};
 pub use simulation_events::{SimulationEventStream, SimulationEventV2};
+pub use sixdof_foundation::{
+    run_sixdof_verification, run_sixdof_verification_json, SixDofVerificationInput,
+    SixDofVerificationRun,
+};
 pub use validation::{
     validate_scenario, MAX_ENTITIES, MAX_EVENTS, MAX_INPUT_BYTES, MAX_INTEGRATED_STEPS,
     MAX_RECORDED_ENTITY_STATES, MAX_ROUTE_POINTS_PER_ENTITY,

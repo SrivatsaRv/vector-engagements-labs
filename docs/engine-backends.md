@@ -86,3 +86,12 @@ The Rust JSON ABI remains supported until a typed batch ABI reproduces the full
 parity corpus. Its manifest provenance includes the selected backend, ABI name,
 and committed WASM artifact SHA-256. Loading, execution, record creation, or
 replay fails closed when those identities disagree.
+
+## Isolated six-degree-of-freedom verification ABI
+
+`vector_sixdof_verification_run_json` exposes the exact-key
+`vector.sixdof-verification-input.v1` kernel through the same bounded linear-memory
+transport. This operation is an ABI and numerical conformance surface, not an
+`EngineScenario` backend selection. It does not emit production frames/events,
+enter a Worker or VSR, or silently substitute for the deployed 3DOF engine. See
+[`sixdof-numerical-foundation.md`](sixdof-numerical-foundation.md).

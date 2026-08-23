@@ -17,6 +17,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-
 - [`engine-backends.md`](engine-backends.md): TypeScript and Rust/WASM interface, provenance, parity, and backend selection.
 - [`deployment-capabilities.md`](deployment-capabilities.md): deployment-owned domain, engine, model-pack and optional-capability admission.
 - [`physics-model.md`](physics-model.md): equations, atmosphere, guidance, termination, numerical limits, and declared assumptions.
+- [`sixdof-numerical-foundation.md`](sixdof-numerical-foundation.md): isolated generic rigid-body schema, equations, rejection, parity, numerical evidence, and explicit #134 nonclaims.
 - [`public-aircraft-reference.md`](public-aircraft-reference.md): NASA NESC aircraft check-case evidence, SI-normalized trim propagation, tolerances, parity, measurements, and limits.
 - [`aircraft-evidence-registry.md`](aircraft-evidence-registry.md): governed public-artifact inventory, per-capability named-aircraft admission, and explicit evidence gaps.
 - [`scenario-builder.md`](scenario-builder.md): authoring journey, state ownership, map controls, and validation.

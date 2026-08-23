@@ -2,6 +2,12 @@
 
 Vector currently uses a deterministic three-dimensional point-mass reference engine intended for inspectable sensitivity research, not verified prediction of named-system performance.
 
+The repository also contains an isolated, generic 6DOF numerical verification
+kernel with a strict TypeScript/Rust-WASM contract. It proves rigid-body equation,
+quaternion, conservation, convergence, rejection, and parity foundations only;
+it is not wired to the production scenario engine and does not upgrade aircraft
+fidelity. See [`sixdof-numerical-foundation.md`](sixdof-numerical-foundation.md).
+
 ## Integrated model
 
 - fixed 50 ms integration step and sampled immutable frames;
