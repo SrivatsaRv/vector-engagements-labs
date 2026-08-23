@@ -181,10 +181,10 @@ for (const batchTicks of [1, 7, 128, 2_048]) {
 test("completed Worker batch time uses the canonical off-grid terminal boundary", () => {
   const prepared = prepareSimulation(SCENARIO_LIBRARY[0].scenario);
   const scenario = structuredClone(prepared.engineScenario);
-  scenario.fixedStepSeconds = 0.05;
-  scenario.durationSeconds = 0.22;
+  scenario.fixedStepSeconds = 0.003;
+  scenario.durationSeconds = 0.008;
   const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON");
-  weapon.weapon.launchTimeSeconds = 0.2;
+  weapon.weapon.launchTimeSeconds = 0.006;
 
   for (const batchTicks of [1, 2, 128]) {
     const session = new EngineSession(structuredClone(scenario));
@@ -194,11 +194,10 @@ test("completed Worker batch time uses the canonical off-grid terminal boundary"
     const completed = run.events.items.find(
       (event) => event.payload.kind === "RUN_COMPLETED",
     );
-    const canonicalTerminalTime =
-      completedBatch.integratedSteps * scenario.fixedStepSeconds;
-    assert.equal(completedBatch.modelTimeSeconds, canonicalTerminalTime);
+    assert.equal(completedBatch.integratedSteps, 3);
+    assert.equal(completedBatch.modelTimeSeconds, 0.009);
     assert.equal(completedBatch.progress, 1);
-    assert.equal(run.frames.at(-1).t, canonicalTerminalTime);
-    assert.equal(completed.modelTimeSeconds, canonicalTerminalTime);
+    assert.equal(run.frames.at(-1).t, completedBatch.modelTimeSeconds);
+    assert.equal(completed.modelTimeSeconds, completedBatch.modelTimeSeconds);
   }
 });

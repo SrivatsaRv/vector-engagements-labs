@@ -1250,7 +1250,7 @@ export class EngineSession {
       }
     }
 
-    const modelTimeSeconds = modelTimeAtTick(
+    const modelTimeSeconds = recordedModelTimeAtTick(
       this.integratedSteps,
       this.scenario.fixedStepSeconds,
     );

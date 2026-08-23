@@ -439,6 +439,42 @@ test("terminal fixed-step boundary is a half-open launch window in both engines"
   }
 });
 
+test("recorded terminal time is canonical across batch, frame, event, and engine interfaces", () => {
+  const scenario = admittedScenario();
+  scenario.fixedStepSeconds = 0.003;
+  scenario.durationSeconds = 0.008;
+  const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
+  weapon.weapon!.launchTimeSeconds = 0.006;
+
+  for (const backend of ["typescript", "rust-wasm"] as const) {
+    const run = runEngineBackend(structuredClone(scenario), backend);
+    if (run.events.state !== "AVAILABLE") throw new Error("event stream unavailable");
+    const completed = run.events.items.find(
+      (event) => event.payload.kind === "RUN_COMPLETED",
+    );
+    assert.equal(run.diagnostics.integratedSteps, 3);
+    assert.equal(run.frames.at(-1)?.t, 0.009);
+    assert.equal(completed?.modelTimeSeconds, 0.009);
+    assert.equal(run.frames[completed!.frameIndex]?.t, 0.009);
+  }
+
+  for (const batchSize of [1, 2, 128]) {
+    const session = new EngineSession(structuredClone(scenario));
+    let completedBatch = session.runTicks(batchSize);
+    while (!completedBatch.completed) completedBatch = session.runTicks(batchSize);
+    const run = session.result();
+    if (run.events.state !== "AVAILABLE") throw new Error("event stream unavailable");
+    const completed = run.events.items.find(
+      (event) => event.payload.kind === "RUN_COMPLETED",
+    );
+    assert.equal(completedBatch.integratedSteps, 3);
+    assert.equal(completedBatch.modelTimeSeconds, 0.009);
+    assert.equal(completedBatch.progress, 1);
+    assert.equal(run.frames.at(-1)?.t, completedBatch.modelTimeSeconds);
+    assert.equal(completed?.modelTimeSeconds, completedBatch.modelTimeSeconds);
+  }
+});
+
 test("runtime decoding fails closed for unknown variants, payload versions, fields, and lifecycle states", () => {
   const scenario = admittedScenario();
   scenario.durationSeconds = 1;
