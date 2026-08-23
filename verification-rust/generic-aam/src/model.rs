@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::EngineError;
 
 const SOURCE_SHA256: &str = "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa";
-const CORPUS_SHA256: &str = "fad3f712102ad6172c09e68c0c5445842c5ea170323e873f1a7bc409079e788c";
+const CORPUS_SHA256: &str = "e4d0b37e08aff711d0f7260d0ba10d8ee73b0b6ef84ad81616116988eae3a7a7";
 const DECISION_SHA256: &str = "884bca829ac1b94f959ecff1be6b9cf9847512810c7010f36d8b78cf6cef22f2";
 
 const MAX_TICKS: u32 = 7_680;
@@ -170,10 +171,143 @@ pub struct GenericAamVerificationRun {
     pub corpus_sha256: String,
     pub decision_sha256: String,
     pub input_sha256: String,
+    pub output_sha256: String,
+    pub content_sha256: String,
     pub case_role: String,
     pub frames: Vec<GenericAamVerificationFrame>,
     pub terminal: GenericAamTerminal,
     pub limitations: [&'static str; 4],
+}
+
+fn canonical(value: &Value) -> String {
+    match value {
+        Value::Null | Value::Bool(_) | Value::String(_) => value.to_string(),
+        Value::Number(number) => {
+            if let Some(value) = number.as_f64() {
+                Value::String(format!("f64:{:016x}", value.to_bits())).to_string()
+            } else {
+                number.to_string()
+            }
+        }
+        Value::Array(values) => format!(
+            "[{}]",
+            values.iter().map(canonical).collect::<Vec<_>>().join(",")
+        ),
+        Value::Object(values) => {
+            let mut keys = values.keys().collect::<Vec<_>>();
+            keys.sort();
+            format!(
+                "{{{}}}",
+                keys.iter()
+                    .map(|key| format!(
+                        "{}:{}",
+                        Value::String((*key).clone()),
+                        canonical(&values[*key])
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
+        }
+    }
+}
+
+fn digest_value(value: &Value) -> String {
+    format!("{:x}", Sha256::digest(canonical(value).as_bytes()))
+}
+
+fn push_number(bytes: &mut Vec<u8>, value: f64) {
+    bytes.extend_from_slice(&value.to_be_bytes());
+}
+
+fn push_vec(bytes: &mut Vec<u8>, value: GenericAamVec3) {
+    push_number(bytes, value.x);
+    push_number(bytes, value.y);
+    push_number(bytes, value.z);
+}
+
+fn state_code(state: &str) -> u8 {
+    match state {
+        "TRACKING" => 0,
+        "HIT" => 1,
+        "MISS_SEEKER_LIMIT" => 2,
+        "MISS_OPENING_AFTER_BURN" => 3,
+        "MISS_GROUND_OR_ZERO_SPEED" => 4,
+        "MISS_ZERO_RELATIVE_SPEED" => 5,
+        "TIME_LIMIT" => 6,
+        _ => u8::MAX,
+    }
+}
+
+fn cause_code(cause: &str) -> u8 {
+    match cause {
+        "EXACT_ZERO_RANGE" => 1,
+        "CPA_HIT" => 2,
+        "SEEKER_HIT" => 3,
+        "OPENING_HIT" => 4,
+        "SEEKER_LIMIT" => 5,
+        "POST_BURN_OPEN" => 6,
+        "GROUND_ZERO" => 7,
+        "EXACT_ZERO_RELATIVE_SPEED" => 8,
+        "TIME_LIMIT" => 9,
+        _ => u8::MAX,
+    }
+}
+
+fn output_digest(run: &GenericAamVerificationRun) -> String {
+    const NUMBERS_PER_FRAME: usize = 31;
+    let mut bytes = Vec::with_capacity(4 + run.frames.len() * (NUMBERS_PER_FRAME * 8 + 1) + 10);
+    bytes.extend_from_slice(&(run.frames.len() as u32).to_be_bytes());
+    for frame in &run.frames {
+        for value in [
+            f64::from(frame.tick),
+            frame.time_seconds,
+            frame.speed_mps,
+            frame.pitch_rad,
+            frame.yaw_rad,
+            frame.pitch_rate_rad_s,
+            frame.yaw_rate_rad_s,
+            frame.pitch_signal_mps2,
+            frame.yaw_signal_mps2,
+            frame.mass_kg,
+            frame.thrust_n,
+            frame.drag_n,
+            frame.range_m,
+            frame.seeker_angle_rad,
+            frame.closing_velocity_mps,
+            frame.pitch_command_mps2,
+            frame.yaw_command_mps2,
+            frame.closest_approach_time_s,
+            frame.closest_approach_distance_m,
+        ] {
+            push_number(&mut bytes, value);
+        }
+        push_vec(&mut bytes, frame.missile_position_m);
+        push_vec(&mut bytes, frame.target_position_m);
+        push_vec(&mut bytes, frame.relative_position_m);
+        push_vec(&mut bytes, frame.los_rate_rad_s);
+        bytes.push(state_code(frame.state));
+    }
+    push_number(&mut bytes, f64::from(run.terminal.tick));
+    bytes.push(state_code(run.terminal.state));
+    bytes.push(cause_code(run.terminal.cause));
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn content_digest(run: &GenericAamVerificationRun) -> String {
+    digest_value(&serde_json::json!({
+        "schemaVersion": run.schema_version,
+        "subjectId": run.subject_id,
+        "intendedUse": run.intended_use,
+        "semantics": run.semantics,
+        "backend": run.backend,
+        "sourceSha256": run.source_sha256,
+        "corpusSha256": run.corpus_sha256,
+        "decisionSha256": run.decision_sha256,
+        "inputSha256": run.input_sha256,
+        "outputSha256": run.output_sha256,
+        "caseRole": run.case_role,
+        "limitations": run.limitations,
+    }))
 }
 
 fn valid_constants(input: &GenericAamVerificationInput) -> bool {
@@ -593,8 +727,8 @@ pub fn run_generic_aam_verification(
         }
     }
     let terminal = terminal.ok_or_else(|| EngineError::InvalidScenario("terminal".to_string()))?;
-    Ok(GenericAamVerificationRun {
-        schema_version: "vector.generic-aam-verification-run.v2",
+    let mut run = GenericAamVerificationRun {
+        schema_version: "vector.generic-aam-verification-run.v3",
         subject_id: input.subject_id,
         intended_use: input.intended_use,
         semantics: input.semantics,
@@ -603,6 +737,8 @@ pub fn run_generic_aam_verification(
         corpus_sha256: input.corpus_sha256,
         decision_sha256: input.decision_sha256,
         input_sha256,
+        output_sha256: String::new(),
+        content_sha256: String::new(),
         case_role: input.case_role,
         frames,
         terminal,
@@ -612,7 +748,10 @@ pub fn run_generic_aam_verification(
             "FIGURES_NOT_VALIDATION",
             "NOT_FORTRAN_BIT_REPRODUCTION",
         ],
-    })
+    };
+    run.output_sha256 = output_digest(&run);
+    run.content_sha256 = content_digest(&run);
+    Ok(run)
 }
 
 pub fn run_generic_aam_verification_json(input: &str) -> Result<String, EngineError> {
@@ -679,13 +818,13 @@ mod tests {
     }
 
     #[test]
-    fn generic_reference_native_path_emits_the_closed_v2_contract(
+    fn generic_reference_native_path_emits_the_closed_v3_contract(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let output = run_generic_aam_verification_json(&serde_json::to_string(&valid_input())?)?;
         let decoded: serde_json::Value = serde_json::from_str(&output)?;
         assert_eq!(
             decoded["schemaVersion"],
-            "vector.generic-aam-verification-run.v2"
+            "vector.generic-aam-verification-run.v3"
         );
         assert_eq!(decoded["frames"].as_array().map(Vec::len), Some(1));
         Ok(())

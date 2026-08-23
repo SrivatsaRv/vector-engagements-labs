@@ -21,9 +21,8 @@ sha2 = "0.10.9"
 [profile.release]
 codegen-units = 1
 lto = true
-# Verification-only ABIs retain full frame contracts; optimize the single
-# browser artifact for code size so product and reference exports stay below
-# the unchanged 500 kB admission gate.
+# The production browser engine remains below its unchanged 500 kB gate.
+# Verification-only evaluators are owned by separate crates and artifacts.
 opt-level = "z"
 overflow-checks = true
 panic = "abort"

@@ -1,5 +1,5 @@
-import corpus from "../../governance/nasa-tm-109057-generic-aam-verification-corpus.v2.json" with { type: "json" };
-import { sha256HexBytesSync, sha256Utf8HexSync } from "../geospatial/digest.ts";
+import corpus from "../../governance/nasa-tm-109057-generic-aam-verification-corpus.v3.json" with { type: "json" };
+import { createHash } from "node:crypto";
 
 type Vec3 = { x: number; y: number; z: number };
 
@@ -88,7 +88,7 @@ export type GenericAamVerificationFrame = {
 };
 
 export type GenericAamVerificationRun = {
-  schemaVersion: "vector.generic-aam-verification-run.v2";
+  schemaVersion: "vector.generic-aam-verification-run.v3";
   subjectId: "NASA_TM_109057_GENERIC_AAM_REFERENCE";
   intendedUse: "ENGINE_VERIFICATION_ONLY";
   semantics: "TM_109057_PRINTED_LISTING_BINARY64_V1";
@@ -97,6 +97,8 @@ export type GenericAamVerificationRun = {
   corpusSha256: string;
   decisionSha256: string;
   inputSha256: string;
+  outputSha256: string;
+  contentSha256: string;
   caseRole: GenericAamVerificationInput["caseRole"];
   frames: GenericAamVerificationFrame[];
   terminal: { state: GenericAamTerminalState; tick: number; cause: string };
@@ -121,7 +123,7 @@ const MISSILE_KEYS = ["speedMps", "pitchRateRadS", "pitchSignalMps2", "yawRateRa
 const TARGET_KEYS = ["previousPositionM", "positionM", "velocityMps"];
 const CONSTANT_KEYS = ["navigationConstant", "gravityMps2", "maximumPitchG", "maximumYawG", "hitRangeM", "operationalSpeedMps", "motorThrustN", "coastThrustN", "burnSeconds", "launchMassKg", "burnoutMassKg", "dragK1", "dragK2", "controlTimeConstantS"];
 const VEC_KEYS = ["x", "y", "z"];
-const RUN_KEYS = ["schemaVersion", "subjectId", "intendedUse", "semantics", "backend", "sourceSha256", "corpusSha256", "decisionSha256", "inputSha256", "caseRole", "frames", "terminal", "limitations"];
+const RUN_KEYS = ["schemaVersion", "subjectId", "intendedUse", "semantics", "backend", "sourceSha256", "corpusSha256", "decisionSha256", "inputSha256", "outputSha256", "contentSha256", "caseRole", "frames", "terminal", "limitations"];
 const FRAME_KEYS = ["tick", "timeSeconds", "missilePositionM", "targetPositionM", "speedMps", "pitchRad", "yawRad", "pitchRateRadS", "yawRateRadS", "pitchSignalMps2", "yawSignalMps2", "massKg", "thrustN", "dragN", "relativePositionM", "rangeM", "seekerAngleRad", "losRateRadS", "closingVelocityMps", "pitchCommandMps2", "yawCommandMps2", "closestApproachTimeS", "closestApproachDistanceM", "state"];
 const TERMINAL_KEYS = ["state", "tick", "cause"];
 const FRAME_NUMERIC_KEYS = FRAME_KEYS.filter((key) => !["missilePositionM", "targetPositionM", "relativePositionM", "losRateRadS", "state"].includes(key));
@@ -151,12 +153,87 @@ function canonical(value: unknown): string {
 }
 
 function sha256(value: string | Uint8Array) {
-  return typeof value === "string" ? sha256Utf8HexSync(value) : sha256HexBytesSync(value);
+  return createHash("sha256").update(value).digest("hex");
 }
 
-export const GENERIC_AAM_CORPUS = corpus;
-export const GENERIC_AAM_CORPUS_SHA256 = sha256(canonical(corpus));
-export const GENERIC_AAM_DECISION_SHA256 = sha256(canonical(corpus.decisions));
+const FRAME_VECTORS = ["missilePositionM", "targetPositionM", "relativePositionM", "losRateRadS"] as const;
+const STATE_CODES: Record<GenericAamVerificationFrame["state"], number> = {
+  TRACKING: 0, HIT: 1, MISS_SEEKER_LIMIT: 2, MISS_OPENING_AFTER_BURN: 3,
+  MISS_GROUND_OR_ZERO_SPEED: 4, MISS_ZERO_RELATIVE_SPEED: 5, TIME_LIMIT: 6,
+};
+const CAUSE_CODES: Record<string, number> = {
+  EXACT_ZERO_RANGE: 1, CPA_HIT: 2, SEEKER_HIT: 3, OPENING_HIT: 4,
+  SEEKER_LIMIT: 5, POST_BURN_OPEN: 6, GROUND_ZERO: 7,
+  EXACT_ZERO_RELATIVE_SPEED: 8, TIME_LIMIT: 9,
+};
+
+function outputDigestBytes(frames: GenericAamVerificationFrame[], terminal: GenericAamVerificationRun["terminal"]) {
+  const bytesPerFrame = (FRAME_NUMERIC_KEYS.length + FRAME_VECTORS.length * 3) * 8 + 1;
+  const bytes = new Uint8Array(4 + frames.length * bytesPerFrame + 10);
+  const view = new DataView(bytes.buffer);
+  let offset = 0;
+  view.setUint32(offset, frames.length, false);
+  offset += 4;
+  for (const frame of frames) {
+    for (const key of FRAME_NUMERIC_KEYS) {
+      view.setFloat64(offset, frame[key as keyof GenericAamVerificationFrame] as number, false);
+      offset += 8;
+    }
+    for (const vector of FRAME_VECTORS) {
+      for (const component of VEC_KEYS) {
+        view.setFloat64(offset, frame[vector][component as keyof Vec3], false);
+        offset += 8;
+      }
+    }
+    bytes[offset] = STATE_CODES[frame.state];
+    offset += 1;
+  }
+  view.setFloat64(offset, terminal.tick, false);
+  offset += 8;
+  bytes[offset] = STATE_CODES[terminal.state];
+  bytes[offset + 1] = CAUSE_CODES[terminal.cause];
+  return bytes;
+}
+
+function runContentIdentity(record: Omit<GenericAamVerificationRun, "contentSha256">) {
+  return {
+    schemaVersion: record.schemaVersion,
+    subjectId: record.subjectId,
+    intendedUse: record.intendedUse,
+    semantics: record.semantics,
+    backend: record.backend,
+    sourceSha256: record.sourceSha256,
+    corpusSha256: record.corpusSha256,
+    decisionSha256: record.decisionSha256,
+    inputSha256: record.inputSha256,
+    outputSha256: record.outputSha256,
+    caseRole: record.caseRole,
+    limitations: record.limitations,
+  };
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  }
+  return value;
+}
+
+const COMPILED_SOURCE_SHA256 = "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa";
+export const GENERIC_AAM_CORPUS_SHA256 = "e4d0b37e08aff711d0f7260d0ba10d8ee73b0b6ef84ad81616116988eae3a7a7";
+export const GENERIC_AAM_DECISION_SHA256 = "884bca829ac1b94f959ecff1be6b9cf9847512810c7010f36d8b78cf6cef22f2";
+const TRUSTED_CORPUS = deepFreeze(structuredClone(corpus));
+const TRUSTED_CORPUS_CANONICAL = canonical(TRUSTED_CORPUS);
+if (sha256(TRUSTED_CORPUS_CANONICAL) !== GENERIC_AAM_CORPUS_SHA256
+  || sha256(canonical(TRUSTED_CORPUS.decisions)) !== GENERIC_AAM_DECISION_SHA256
+  || TRUSTED_CORPUS.artifact.sha256 !== COMPILED_SOURCE_SHA256) {
+  throw new Error("The private generic-AAM corpus bytes do not match compiled identities.");
+}
+
+export function genericAamCorpusView() {
+  return deepFreeze(structuredClone(TRUSTED_CORPUS));
+}
 
 export function verifyGenericAamCorpus(candidate: unknown, sourceBytes: Uint8Array) {
   exactKeys(candidate, ROOT_KEYS, "corpus");
@@ -173,7 +250,7 @@ export function verifyGenericAamCorpus(candidate: unknown, sourceBytes: Uint8Arr
   if (!Array.isArray(candidate.claims) || !Array.isArray(candidate.decisions)) throw new Error("Claims and decisions must be arrays.");
   for (const claim of candidate.claims) exactKeys(claim, CLAIM_KEYS, "claim");
   for (const decision of candidate.decisions) exactKeys(decision, DECISION_KEYS, "decision");
-  if (canonical(candidate) !== canonical(corpus)) throw new Error("Corpus content or descendant conflicts with the reviewed immutable record.");
+  if (canonical(candidate) !== TRUSTED_CORPUS_CANONICAL) throw new Error("Corpus content or descendant conflicts with the reviewed immutable record.");
   const ids = [...candidate.claims, ...candidate.decisions].map((item) => item.id);
   if (new Set(ids).size !== ids.length) throw new Error("Corpus contains duplicate claim or decision IDs.");
   if (candidate.subject.id !== "NASA_TM_109057_GENERIC_AAM_REFERENCE" || candidate.subject.intendedUse !== "ENGINE_VERIFICATION_ONLY") throw new Error("Corpus subject binding is invalid.");
@@ -183,9 +260,9 @@ export function verifyGenericAamCorpus(candidate: unknown, sourceBytes: Uint8Arr
   if (sha256(sourceBytes) !== candidate.artifact.sha256) throw new Error("NASA source digest mismatch.");
   return {
     schemaVersion: "vector.weapon-verification-corpus-report.v1" as const,
-    corpusId: corpus.id,
-    sourceSha256: corpus.artifact.sha256,
-    byteLength: corpus.artifact.byteLength,
+    corpusId: TRUSTED_CORPUS.id,
+    sourceSha256: COMPILED_SOURCE_SHA256,
+    byteLength: TRUSTED_CORPUS.artifact.byteLength,
     state: "VERIFIED" as const,
   };
 }
@@ -204,10 +281,10 @@ export function verifyGenericAamWorkload(candidate: unknown, workloadBytes: Uint
     const literal = seekerLiteral(entry.seekerHalfAngleDeg);
     if (![32, 64, 128].includes(entry.tickRateHz) || entry.seekerHalfAngleRad !== literal || entry.maxTicks !== entry.tickRateHz * 30 || !Object.keys(TERMINAL_CAUSES).includes(entry.expectedTerminal) || !Number.isInteger(entry.expectedTick) || entry.expectedTick <= 0 || entry.expectedTick > entry.maxTicks || !/^[a-f0-9]{64}$/.test(entry.typescriptRunSha256) || !/^[a-f0-9]{64}$/.test(entry.rustWasmRunSha256)) throw new Error("Workload case bounds or expected result are invalid.");
   }
-  if (workload.schemaVersion !== "vector.generic-aam-verification-workload.v2" || workload.id !== "nasa-tm-109057-appendix-b-bounded-sweep.v2" || workload.sourceSha256 !== corpus.artifact.sha256 || workload.caseCount !== 15 || workload.cases.length !== workload.caseCount || !/^[a-f0-9]{64}$/.test(workload.expectedBatchSha256)) throw new Error("Workload identity or count is invalid.");
+  if (workload.schemaVersion !== "vector.generic-aam-verification-workload.v3" || workload.id !== "nasa-tm-109057-appendix-b-bounded-sweep.v3" || workload.sourceSha256 !== COMPILED_SOURCE_SHA256 || workload.caseCount !== 15 || workload.cases.length !== workload.caseCount || !/^[a-f0-9]{64}$/.test(workload.expectedBatchSha256)) throw new Error("Workload identity or count is invalid.");
   const decoded = JSON.parse(new TextDecoder().decode(workloadBytes));
   if (canonical(candidate) !== canonical(decoded)) throw new Error("Workload object does not match supplied bytes.");
-  const governed = corpus.derivedFixtures[0];
+  const governed = TRUSTED_CORPUS.derivedFixtures[0];
   if (workloadBytes.byteLength !== governed.byteLength || sha256(workloadBytes) !== governed.sha256) throw new Error("Workload bytes failed governed digest verification.");
   const ids = workload.cases.map((entry) => entry.id);
   if (new Set(ids).size !== ids.length) throw new Error("Workload case IDs must be unique.");
@@ -237,7 +314,7 @@ const PRINTED_CONSTANTS: GenericAamVerificationInput["constants"] = {
 };
 
 function seekerLiteral(degrees: number): GenericAamVerificationInput["seekerHalfAngleRad"] {
-  const binding = corpus.evaluator.seekerHalfAngles.find((entry) => entry.degrees === degrees);
+  const binding = TRUSTED_CORPUS.evaluator.seekerHalfAngles.find((entry) => entry.degrees === degrees);
   if (!binding) throw new Error("Generic AAM seeker case is not bound to a printed radian literal.");
   return binding.printedRadians as GenericAamVerificationInput["seekerHalfAngleRad"];
 }
@@ -250,7 +327,7 @@ export function genericAamVerificationInput(
     subjectId: "NASA_TM_109057_GENERIC_AAM_REFERENCE",
     intendedUse: "ENGINE_VERIFICATION_ONLY",
     semantics: "TM_109057_PRINTED_LISTING_BINARY64_V1",
-    sourceSha256: corpus.artifact.sha256,
+    sourceSha256: COMPILED_SOURCE_SHA256,
     corpusSha256: GENERIC_AAM_CORPUS_SHA256,
     decisionSha256: GENERIC_AAM_DECISION_SHA256,
     caseRole: "PRINTED_LISTING_REPRODUCTION",
@@ -311,14 +388,14 @@ function validateInput(input: GenericAamVerificationInput) {
   exactKeys(input.target.positionM, VEC_KEYS, "target.positionM");
   exactKeys(input.target.velocityMps, VEC_KEYS, "target.velocityMps");
   if (input.schemaVersion !== "vector.generic-aam-verification-input.v2" || input.subjectId !== "NASA_TM_109057_GENERIC_AAM_REFERENCE" || input.intendedUse !== "ENGINE_VERIFICATION_ONLY" || input.semantics !== "TM_109057_PRINTED_LISTING_BINARY64_V1") throw new Error("Generic AAM verification identity is invalid.");
-  if (input.sourceSha256 !== corpus.artifact.sha256 || input.corpusSha256 !== GENERIC_AAM_CORPUS_SHA256 || input.decisionSha256 !== GENERIC_AAM_DECISION_SHA256) throw new Error("Generic AAM verification digest binding is invalid.");
+  if (input.sourceSha256 !== COMPILED_SOURCE_SHA256 || input.corpusSha256 !== GENERIC_AAM_CORPUS_SHA256 || input.decisionSha256 !== GENERIC_AAM_DECISION_SHA256) throw new Error("Generic AAM verification digest binding is invalid.");
   if (input.axisConvention !== "EARTH_X_FORWARD_Y_RIGHT_Z_DOWN" || input.units !== "SI") throw new Error("Generic AAM axes or units are invalid.");
-  const estimatedOperations = input.maxTicks * corpus.evaluator.safeInputBounds.estimatedScalarOperationsPerTick;
-  if (![32, 64, 128, 256].includes(input.tickRateHz) || !Number.isInteger(input.maxTicks) || input.maxTicks <= 0 || input.maxTicks > corpus.evaluator.maximumTicks || estimatedOperations > corpus.evaluator.maximumEstimatedScalarOperations || input.seekerHalfAngleRad !== seekerLiteral(input.seekerHalfAngleDeg)) throw new Error("Generic AAM work or seeker bounds are invalid.");
+  const estimatedOperations = input.maxTicks * TRUSTED_CORPUS.evaluator.safeInputBounds.estimatedScalarOperationsPerTick;
+  if (![32, 64, 128, 256].includes(input.tickRateHz) || !Number.isInteger(input.maxTicks) || input.maxTicks <= 0 || input.maxTicks > TRUSTED_CORPUS.evaluator.maximumTicks || estimatedOperations > TRUSTED_CORPUS.evaluator.maximumEstimatedScalarOperations || input.seekerHalfAngleRad !== seekerLiteral(input.seekerHalfAngleDeg)) throw new Error("Generic AAM work or seeker bounds are invalid.");
   const { positionM: missilePosition, ...missileScalars } = input.missile;
   if (!finiteRecord(missileScalars) || !finiteRecord(missilePosition) || !finiteRecord(input.target.previousPositionM) || !finiteRecord(input.target.positionM) || !finiteRecord(input.target.velocityMps) || !finiteRecord(input.constants)) throw new Error("Generic AAM numeric input must be finite.");
   const target = input.target.positionM;
-  const bounds = corpus.evaluator.safeInputBounds;
+  const bounds = TRUSTED_CORPUS.evaluator.safeInputBounds;
   const missileScalarsWithinBounds = input.missile.speedMps >= bounds.missileSpeedMinMps
     && input.missile.speedMps <= bounds.missileSpeedMaxMps
     && Math.abs(input.missile.pitchRateRadS) <= bounds.angularRateAbsMaxRadS
@@ -350,7 +427,7 @@ const add = (left: Vec3, right: Vec3): Vec3 => ({ x: left.x + right.x, y: left.y
 const dot = (left: Vec3, right: Vec3) => left.x * right.x + left.y * right.y + left.z * right.z;
 
 function assertFiniteStage(label: string, ...values: Array<number | Vec3>) {
-  const bound = corpus.evaluator.safeInputBounds.dynamicScalarAbsMax;
+  const bound = TRUSTED_CORPUS.evaluator.safeInputBounds.dynamicScalarAbsMax;
   for (const value of values) {
     if (typeof value === "number") {
       if (!Number.isFinite(value) || Math.abs(value) > bound) throw new Error(`Generic AAM ${label} stage exceeded its finite safe bound.`);
@@ -394,7 +471,8 @@ export function assertGenericAamVerificationRun(
   const record = run as unknown as GenericAamVerificationRun;
   exactKeys(record.terminal, TERMINAL_KEYS, "terminal");
   if (!Array.isArray(record.frames) || !Array.isArray(record.limitations)) throw new Error("Generic AAM run arrays are invalid.");
-  if (record.schemaVersion !== "vector.generic-aam-verification-run.v2" || record.subjectId !== input.subjectId || record.intendedUse !== input.intendedUse || record.semantics !== input.semantics || record.backend !== backend || record.sourceSha256 !== input.sourceSha256 || record.corpusSha256 !== input.corpusSha256 || record.decisionSha256 !== input.decisionSha256 || record.inputSha256 !== sha256(JSON.stringify(input)) || record.caseRole !== input.caseRole || canonical(record.limitations) !== canonical(LIMITATIONS)) throw new Error("Generic AAM run identity, digest or limitation binding is invalid.");
+  if (record.schemaVersion !== "vector.generic-aam-verification-run.v3" || record.subjectId !== input.subjectId || record.intendedUse !== input.intendedUse || record.semantics !== input.semantics || record.backend !== backend || record.sourceSha256 !== input.sourceSha256 || record.corpusSha256 !== input.corpusSha256 || record.decisionSha256 !== input.decisionSha256 || record.inputSha256 !== sha256(JSON.stringify(input)) || record.caseRole !== input.caseRole || canonical(record.limitations) !== canonical(LIMITATIONS)) throw new Error("Generic AAM run identity, digest or limitation binding is invalid.");
+  if (!/^[a-f0-9]{64}$/.test(record.outputSha256) || !/^[a-f0-9]{64}$/.test(record.contentSha256)) throw new Error("Generic AAM run digests are invalid.");
   const terminals = Object.keys(TERMINAL_CAUSES) as GenericAamTerminalState[];
   if (!terminals.includes(record.terminal.state) || !Number.isInteger(record.terminal.tick) || record.terminal.tick <= 0 || record.terminal.tick > input.maxTicks || !TERMINAL_CAUSES[record.terminal.state].includes(record.terminal.cause) || record.frames.length !== record.terminal.tick) throw new Error("Generic AAM terminal contract is invalid.");
   for (const [index, frame] of record.frames.entries()) {
@@ -413,7 +491,20 @@ export function assertGenericAamVerificationRun(
       && exactFiniteVec(frame.losRateRadS, "frame.losRateRadS");
     const knownState = frame.state === "TRACKING" || terminals.includes(frame.state as GenericAamTerminalState);
     if (!finiteScalars || !finiteVectors || frame.tick !== index + 1 || frame.timeSeconds !== frame.tick / input.tickRateHz || !knownState || (index < record.frames.length - 1 && frame.state !== "TRACKING") || (index === record.frames.length - 1 && frame.state !== record.terminal.state)) throw new Error("Generic AAM frame contract is invalid.");
+    const expectedRelative = subtract(frame.targetPositionM, frame.missilePositionM);
+    const tolerance = (left: number, right: number) => Math.abs(left - right) <= Math.max(1, Math.abs(left), Math.abs(right)) * Number.EPSILON * 32;
+    if (!tolerance(frame.relativePositionM.x, expectedRelative.x)
+      || !tolerance(frame.relativePositionM.y, expectedRelative.y)
+      || !tolerance(frame.relativePositionM.z, expectedRelative.z)
+      || !tolerance(frame.rangeM, magnitude(frame.relativePositionM))) {
+      throw new Error("Generic AAM frame geometry is internally inconsistent.");
+    }
   }
+  const outputSha256 = sha256(outputDigestBytes(record.frames, record.terminal));
+  const { contentSha256: ignored, ...content } = record;
+  void ignored;
+  const contentSha256 = sha256(canonical(runContentIdentity(content)));
+  if (record.outputSha256 !== outputSha256 || record.contentSha256 !== contentSha256) throw new Error("Generic AAM run content digest mismatch.");
 }
 
 export function decodeGenericAamVerificationRunJson(
@@ -530,12 +621,12 @@ export function runGenericAamVerification(input: GenericAamVerificationInput): G
     }
   }
   if (!terminal) throw new Error("Generic AAM evaluator failed to produce an exhaustive terminal state.");
-  const run: GenericAamVerificationRun = {
-    schemaVersion: "vector.generic-aam-verification-run.v2",
+  const runWithoutDigests = {
+    schemaVersion: "vector.generic-aam-verification-run.v3" as const,
     subjectId: input.subjectId,
     intendedUse: input.intendedUse,
     semantics: input.semantics,
-    backend: "typescript",
+    backend: "typescript" as const,
     sourceSha256: input.sourceSha256,
     corpusSha256: input.corpusSha256,
     decisionSha256: input.decisionSha256,
@@ -545,5 +636,8 @@ export function runGenericAamVerification(input: GenericAamVerificationInput): G
     terminal,
     limitations: [...LIMITATIONS],
   };
+  const outputSha256 = sha256(outputDigestBytes(frames, terminal));
+  const contentSha256 = sha256(canonical(runContentIdentity({ ...runWithoutDigests, outputSha256 })));
+  const run: GenericAamVerificationRun = { ...runWithoutDigests, outputSha256, contentSha256 };
   return run;
 }

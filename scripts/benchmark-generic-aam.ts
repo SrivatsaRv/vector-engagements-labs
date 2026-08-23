@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { cpus, totalmem } from "node:os";
 import { performance } from "node:perf_hooks";
 
-import { runRustWasmGenericAamVerification } from "../lib/engine/backend.ts";
+import { runRustWasmGenericAamVerification } from "../lib/validation/generic-aam-verification-wasm.ts";
 import {
   genericAamVerificationInput,
   runGenericAamVerification,
@@ -17,7 +17,7 @@ type WorkloadCase = {
 };
 
 const workload = JSON.parse(
-  readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v2.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v3.json", import.meta.url), "utf8"),
 ) as { id: string; cases: WorkloadCase[] };
 const inputs = workload.cases.map((entry) => {
   const input = genericAamVerificationInput({

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 
-import { runRustWasmGenericAamVerification } from "../lib/engine/backend.ts";
+import { runRustWasmGenericAamVerification } from "../lib/validation/generic-aam-verification-wasm.ts";
 import {
   genericAamVerificationInput,
   runGenericAamVerification,
@@ -11,7 +11,7 @@ if (!process.argv.includes("--write")) {
   throw new Error("Refusing to rewrite the governed workload without --write.");
 }
 
-const workloadUrl = new URL("../fixtures/public-reference/nasa-tm-109057/workload.v2.json", import.meta.url);
+const workloadUrl = new URL("../fixtures/public-reference/nasa-tm-109057/workload.v3.json", import.meta.url);
 const workload = JSON.parse(readFileSync(workloadUrl, "utf8"));
 const digest = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const runDigest = (run) => digest({

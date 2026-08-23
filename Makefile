@@ -98,6 +98,7 @@ ci-quality:
 	npm run models:verify
 	npm run reference-aircraft:verify
 	npm run reference-aam:verify
+	npm run reference-aam:rust:fmt
 	npm run engine:rust:fmt
 	npm run lint
 	npm run typecheck
@@ -105,6 +106,10 @@ ci-quality:
 ci-tests:
 	npm run engine:rust:clippy
 	npm run engine:rust:verify
+	npm run reference-aam:rust:clippy
+	npm run reference-aam:rust:verify
+	npm run reference-aam:rust:test
+	npm run reference-aam:rust:doc
 	npm run engine:rust:test
 	npm run engine:rust:doc
 	npm test

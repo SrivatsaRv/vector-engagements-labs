@@ -53,7 +53,6 @@ function verifyModule(bytes, label) {
     "vector_max_input_len",
     "vector_output_len",
     "vector_output_ptr",
-    "vector_generic_aam_run_json",
     "vector_reference_run_json",
     "vector_run_json",
   ]) {

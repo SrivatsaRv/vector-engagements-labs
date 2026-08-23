@@ -1,0 +1,250 @@
+{
+  "schemaVersion": "vector.generic-aam-verification-workload.v3",
+  "id": "nasa-tm-109057-appendix-b-bounded-sweep.v3",
+  "sourceSha256": "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa",
+  "caseCount": 15,
+  "cases": [
+    {
+      "id": "RATE32_SEEKER15",
+      "tickRateHz": 32,
+      "seekerHalfAngleDeg": 15,
+      "seekerHalfAngleRad": 0.261798,
+      "maxTicks": 960,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 0,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 491,
+      "typescriptRunSha256": "e00dfef47e7e1d82fedcc987bbe6a0a3d6bd680c978d6b0c5013c178c3af92c8",
+      "rustWasmRunSha256": "5a93a1a44afbaea7daa8e0a2bec013c6606f8996e81258854b77b70e7a752414"
+    },
+    {
+      "id": "RATE32_SEEKER20",
+      "tickRateHz": 32,
+      "seekerHalfAngleDeg": 20,
+      "seekerHalfAngleRad": 0.349064,
+      "maxTicks": 960,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 1000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 492,
+      "typescriptRunSha256": "a2dd3f9ea2b6af41721ec2596b788a8f7adbd7b20055659d8c2f1fcfe075d1e7",
+      "rustWasmRunSha256": "dbb13f65d344e28502d62e0683ade3117d21aee0e70018c3cbde9400a79a04c9"
+    },
+    {
+      "id": "RATE32_SEEKER30",
+      "tickRateHz": 32,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 960,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 2000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 496,
+      "typescriptRunSha256": "7d26a555742d6ad0c1b9c02a2c63f0b197c0288f0ff64bd5ab7b23db8ee72c7a",
+      "rustWasmRunSha256": "f51a0fdb96d7fac5217c3269bd2f9d8f18fb3476aed8ce343e8a7e811e46e4c6"
+    },
+    {
+      "id": "RATE64_SEEKER15",
+      "tickRateHz": 64,
+      "seekerHalfAngleDeg": 15,
+      "seekerHalfAngleRad": 0.261798,
+      "maxTicks": 1920,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 0,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 982,
+      "typescriptRunSha256": "301a5c44fde168d15fb6af1005a783e8ab03d69f0227a4691f54064846cf7d37",
+      "rustWasmRunSha256": "1e0ca659756870214b37904348ef010e357314d83882ee17f014b2623ff4c199"
+    },
+    {
+      "id": "RATE64_SEEKER20",
+      "tickRateHz": 64,
+      "seekerHalfAngleDeg": 20,
+      "seekerHalfAngleRad": 0.349064,
+      "maxTicks": 1920,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 1000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 984,
+      "typescriptRunSha256": "46dbbea096d72458963b40b0dd7b67ac52ee038c0cfc2c06f9a8a903337f9ec1",
+      "rustWasmRunSha256": "55e9e647c80e946a48afa4ba1dbe4894eaf28ff53aada978bf1745fc021acd45"
+    },
+    {
+      "id": "RATE64_SEEKER30",
+      "tickRateHz": 64,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 1920,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 2000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 992,
+      "typescriptRunSha256": "bd354a8cec918cad9363897f68a997e4f91aa6845379c8b49f425d20e418e58d",
+      "rustWasmRunSha256": "1e065a25f42bec28b30f6c5437c917957f39ca74a81cae8350009954471d9b00"
+    },
+    {
+      "id": "RATE128_SEEKER15",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 15,
+      "seekerHalfAngleRad": 0.261798,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 0,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 1964,
+      "typescriptRunSha256": "4a99594421be31b954e4da24dc5fee127bf50dc3512e0d8dd09d2d27116be7c7",
+      "rustWasmRunSha256": "2f83b08dceba64f843259412e46e2b9727015ac0e711f1e4806b0f01c579c72c"
+    },
+    {
+      "id": "RATE128_SEEKER20",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 20,
+      "seekerHalfAngleRad": 0.349064,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 1000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 1968,
+      "typescriptRunSha256": "afb85021d2f6864042ad3f4348b6e76f4c2c5bb92518af84e68e1c9d0d99e891",
+      "rustWasmRunSha256": "675c8ebeb966d9cec78bf38ec8aa234051050b9444bc77358c56a2889950a7ee"
+    },
+    {
+      "id": "RATE128_SEEKER30",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 2000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 1983,
+      "typescriptRunSha256": "7dc13d4afe7c40fcfb7db2959e7f010c4a5f9750235cb5eab852abd537ab20a1",
+      "rustWasmRunSha256": "f909da492e75231fdcf4cbe464648da383fe4ddb3fb11ad7c3fe5c4be32bff61"
+    },
+    {
+      "id": "BOUND_X_MIN",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 0,
+        "y": 100,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_SEEKER_LIMIT",
+      "expectedTick": 1,
+      "typescriptRunSha256": "abb7c6b75577ad9e6fe0edca1aa84b8ce2c97240cce890eed82a0207d1af33a8",
+      "rustWasmRunSha256": "f7ce75f7149d184de3ceaf988690566c97493bcd6bdfb6be75f7dd0547fbd229"
+    },
+    {
+      "id": "BOUND_Y_MIN",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": -4000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_SEEKER_LIMIT",
+      "expectedTick": 1,
+      "typescriptRunSha256": "64249420c93c799a4535551482d09a972563752b5bc35866cae0f42e2f656c4a",
+      "rustWasmRunSha256": "9448cea9808f1d2f7362ccc967fcf42c8dfc509f19880d5308940964a071f2d0"
+    },
+    {
+      "id": "BOUND_Y_MAX",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 4000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_SEEKER_LIMIT",
+      "expectedTick": 1,
+      "typescriptRunSha256": "f5e59319c953b703f8a9dd6c34c8c5a34bd7178ed726e960290200f5bada488d",
+      "rustWasmRunSha256": "07d946563d6008a1d2f9abde353b9dc202f28dec48248eb69520c057d800d903"
+    },
+    {
+      "id": "BOUND_ALT_MIN",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 0,
+        "z": -2000
+      },
+      "expectedTerminal": "MISS_SEEKER_LIMIT",
+      "expectedTick": 1,
+      "typescriptRunSha256": "56e31cffa5cbc19a7bb3350a27f679acbbc95ef8e415d6b9cc13afb3148dca31",
+      "rustWasmRunSha256": "56d6b9230916ece9261842bc18ca1f95ce1d58d824ee2905d8fe7e352f9e27fa"
+    },
+    {
+      "id": "BOUND_ALT_MAX",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 0,
+        "z": -12000
+      },
+      "expectedTerminal": "MISS_SEEKER_LIMIT",
+      "expectedTick": 1,
+      "typescriptRunSha256": "bddb23c2cc86a0b3094a0fde40c8fd8d8ae0e20aabaecea6e35d983c4ac60e83",
+      "rustWasmRunSha256": "8f266451f310f3b2deb5b3c9ce4a01e2904c6ceea6020f86b6989bfc0ea25ef8"
+    },
+    {
+      "id": "CONFLICT_THRUST",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 2000,
+        "z": -6000
+      },
+      "caseRole": "TABLE_THRUST_CONFLICT_SENSITIVITY",
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 1788,
+      "typescriptRunSha256": "84b07f3b03c807eea16a8423b34f14fc3472a8869028c264cfa11a5e8bf2a014",
+      "rustWasmRunSha256": "a0f854f81d6c6356a3cb9c1fe0bcbcbbbf2da442a7072e9b91f1eed1fe42b0a9"
+    }
+  ],
+  "expectedBatchSha256": "4e9a8c39cc19e21a9d988ccd3c68f4f5c51d5a628c23b06b148957f7fa805e7c"
+}

@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { runRustWasmGenericAamVerification } from "../lib/engine/backend.ts";
+import { runRustWasmGenericAamVerification } from "../lib/validation/generic-aam-verification-wasm.ts";
 import {
-  GENERIC_AAM_CORPUS,
+  genericAamCorpusView,
   assertGenericAamVerificationRun,
   decodeGenericAamVerificationRunJson,
   genericAamClosestApproach,
@@ -19,9 +19,10 @@ import {
 } from "../lib/validation/generic-aam-verification.ts";
 
 const source = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/19940031931.pdf", import.meta.url));
-const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v2.json", import.meta.url));
+const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v3.json", import.meta.url));
 const workload = JSON.parse(workloadBytes);
 const clone = (value) => structuredClone(value);
+const corpus = () => clone(genericAamCorpusView());
 
 test("every governed corpus field family has a table-driven tamper falsifier", () => {
   const mutations = [
@@ -47,7 +48,7 @@ test("every governed corpus field family has a table-driven tamper falsifier", (
     ["runtime promotion", (value) => { value.promotion.prohibitedSurfaces = []; }],
   ];
   for (const [name, mutate] of mutations) {
-    const candidate = clone(GENERIC_AAM_CORPUS);
+    const candidate = corpus();
     mutate(candidate);
     assert.throws(() => verifyGenericAamCorpus(candidate, source), undefined, name);
   }
@@ -324,7 +325,7 @@ test("exact seeker equality is admitted, epsilon outside rejects, and terminal p
 test("governed workload bytes, exact coverage and limits reject tamper", () => {
   const report = verifyGenericAamWorkload(workload, workloadBytes);
   assert.equal(report.cases, 15);
-  assert.equal(report.sha256, "0e9dd8b658f60476c8ab99c97bbd20b2ed42f3b54c3c5648e51f53b37a1592d7");
+  assert.equal(report.sha256, "0b7f7ba1395ff58629c26aaa62e46c239121d37e4197a2246e1064aa8caeb556");
   const changedBytes = Buffer.from(workloadBytes);
   changedBytes[changedBytes.length - 2] = 0x20;
   assert.throws(() => verifyGenericAamWorkload(workload, changedBytes));
@@ -391,8 +392,18 @@ test("run-contract forgery, unknown fields, nonfinite output and terminal enum t
   const valid = runGenericAamVerification(input);
   assert.doesNotThrow(() => assertGenericAamVerificationRun(valid, input, "typescript"));
   const mutations = [
+    (run) => { run.schemaVersion = "vector.generic-aam-verification-run.v2"; },
+    (run) => { run.subjectId = "AIM_120"; },
+    (run) => { run.intendedUse = "PRODUCTION"; },
+    (run) => { run.semantics = "UNREVIEWED"; },
     (run) => { run.backend = "rust-wasm"; },
+    (run) => { run.sourceSha256 = "0".repeat(64); },
+    (run) => { run.corpusSha256 = "0".repeat(64); },
+    (run) => { run.decisionSha256 = "0".repeat(64); },
     (run) => { run.inputSha256 = "0".repeat(64); },
+    (run) => { run.outputSha256 = "0".repeat(64); },
+    (run) => { run.contentSha256 = "0".repeat(64); },
+    (run) => { run.caseRole = "NAMED_WEAPON"; },
     (run) => { run.terminal.state = "DETONATED"; },
     (run) => { run.frames[0].rangeM = Number.NaN; },
     (run) => { run.frames[0].rangeM = null; },
