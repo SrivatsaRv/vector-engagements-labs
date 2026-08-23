@@ -469,7 +469,7 @@ export async function createVectorSimulationRecord(
       diagnostics: result.engineRun.diagnostics,
     },
     limitations: [
-      "Educational deterministic point-mass model; not verified named-system prediction.",
+      "Educational deterministic point-mass model; named-aircraft performance remains unsupported and no catalog association supplies runtime authority.",
       "Observer state is recorded from the canonical fail-closed tick boundary.",
     ],
   };

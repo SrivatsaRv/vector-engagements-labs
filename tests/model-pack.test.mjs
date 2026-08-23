@@ -17,12 +17,16 @@ import {
   createCurrentModelPackSource,
 } from "../lib/reference-model-pack.ts";
 import { resolveCompiledWeaponAdmission } from "../lib/engine/weapon-admission.ts";
+import { assertGovernedAircraftEvidenceAdmissionForRegistry } from "../lib/aircraft-evidence-registry.ts";
 
 const fixture = JSON.parse(
   await readFile(
     new URL("../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json", import.meta.url),
     "utf8",
   ),
+);
+const aircraftEvidenceRegistry = JSON.parse(
+  await readFile(new URL("../governance/aircraft-evidence-registry.v2.json", import.meta.url), "utf8"),
 );
 
 const cloneSource = () => structuredClone(createCurrentModelPackSource());
@@ -246,6 +250,73 @@ test("named-aircraft performance is unavailable until every capability has separ
   await assert.rejects(
     compileModelPack(unhashedValidation),
     /must carry an immutable SHA-256 artifact digest/,
+  );
+});
+
+test("governed named-aircraft admission binds model-pack evidence identity, digest, subject, and capability", () => {
+  const governed = structuredClone(aircraftEvidenceRegistry);
+  const claim = governed.claims.find((item) => item.id === "su-30mki-performance");
+  const capabilities = ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS", "MASS_AND_STORES", "SENSORS"];
+  const sourceArtifact = {
+    id: "su30-exact-source",
+    kind: "SOURCE",
+    sha256: "a".repeat(64),
+    hashReviewState: "VERIFIED",
+    licenseReviewState: "REVIEWED",
+    admissionUse: "NAMED_PERFORMANCE_SOURCE",
+    subjectClaimIds: [claim.id],
+    eligibleClaimIds: [claim.id],
+    capabilityCoverage: capabilities,
+  };
+  const validationArtifact = {
+    ...sourceArtifact,
+    id: "su30-exact-validation",
+    kind: "VALIDATION",
+    sha256: "b".repeat(64),
+    admissionUse: "NAMED_PERFORMANCE_VALIDATION",
+  };
+  governed.artifacts.push(sourceArtifact, validationArtifact);
+  claim.state = "ADMITTED";
+  claim.capabilities = capabilities.map((capability) => ({
+    capability,
+    sourceArtifactIds: [sourceArtifact.id],
+    validationArtifactIds: [validationArtifact.id],
+  }));
+  const admission = {
+    state: "ADMITTED",
+    capabilities: capabilities.map((capability) => ({
+      capability,
+      sourceEvidenceRefIds: [sourceArtifact.id],
+      validationEvidenceRefIds: [validationArtifact.id],
+    })),
+  };
+  const evidence = new Map([
+    [sourceArtifact.id, { id: sourceArtifact.id, kind: "SOURCE", contentSha256: sourceArtifact.sha256 }],
+    [validationArtifact.id, { id: validationArtifact.id, kind: "VALIDATION", contentSha256: validationArtifact.sha256 }],
+  ]);
+  assert.doesNotThrow(() =>
+    assertGovernedAircraftEvidenceAdmissionForRegistry(governed, "su-30mki", admission, evidence),
+  );
+
+  const wrongDigest = new Map(evidence);
+  wrongDigest.set(sourceArtifact.id, { ...wrongDigest.get(sourceArtifact.id), contentSha256: "c".repeat(64) });
+  assert.throws(
+    () => assertGovernedAircraftEvidenceAdmissionForRegistry(governed, "su-30mki", admission, wrongDigest),
+    /identity or SHA-256/,
+  );
+
+  sourceArtifact.subjectClaimIds = ["f-16c-block52-paf-performance"];
+  sourceArtifact.eligibleClaimIds = ["f-16c-block52-paf-performance"];
+  assert.throws(
+    () => assertGovernedAircraftEvidenceAdmissionForRegistry(governed, "su-30mki", admission, evidence),
+    /different subject or claim/,
+  );
+  sourceArtifact.subjectClaimIds = [claim.id];
+  sourceArtifact.eligibleClaimIds = [claim.id];
+  sourceArtifact.capabilityCoverage = ["PROPULSION"];
+  assert.throws(
+    () => assertGovernedAircraftEvidenceAdmissionForRegistry(governed, "su-30mki", admission, evidence),
+    /capability coverage/,
   );
 });
 

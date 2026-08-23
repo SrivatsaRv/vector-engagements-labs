@@ -59,7 +59,41 @@ try {
   const catalogResponse = await fetch(`${baseUrl}/api/catalog`);
   assert.equal(catalogResponse.status, 200);
   const catalog = await catalogResponse.json();
-  assert.equal(catalog.platforms.length, 3);
+  assert.equal(catalog.platforms.length, 4);
+  assert.deepEqual(
+    catalog.platforms
+      .filter((item) => ["f-16c-block52-paf", "f-16d-block52-paf"].includes(item.id))
+      .map((item) => ({
+        id: item.id,
+        variant: item.variant,
+        crew: item.crew,
+        dataStatus: item.data_status,
+        radarId: item.radar_id,
+        ewId: item.ew_id,
+        datalinkId: item.datalink_id,
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id)),
+    [
+      {
+        id: "f-16c-block52-paf",
+        variant: "F-16C Block 52 Peace Drive I",
+        crew: 1,
+        dataStatus: "PARTIAL",
+        radarId: null,
+        ewId: null,
+        datalinkId: null,
+      },
+      {
+        id: "f-16d-block52-paf",
+        variant: "F-16D Block 52 Peace Drive I",
+        crew: 2,
+        dataStatus: "PARTIAL",
+        radarId: null,
+        ewId: null,
+        datalinkId: null,
+      },
+    ],
+  );
   assert.equal(catalog.weapons.length, 8);
   assert.equal(catalog.simulationModels.length, 8);
   assert.ok(catalog.compiledModelPacks.length >= 1);

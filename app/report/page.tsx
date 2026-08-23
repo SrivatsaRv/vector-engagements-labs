@@ -14,6 +14,7 @@ import {
 import { ReportReplay } from "@/components/ReportReplay";
 import { findPlatform, findWeapon, getSource } from "@/lib/capability-data";
 import { getCatalogObject } from "@/lib/object-catalog";
+import { getGovernedAircraftEvidenceClaim } from "@/lib/aircraft-evidence-registry";
 import { DEFAULT_SCENARIO_DEFINITION } from "@/lib/scenarios";
 import {
   buildReportExport,
@@ -182,6 +183,10 @@ export default function ReportPage() {
   const studyArea = getStudyArea(scenario.studyAreaId);
   const weatherPreset = getWeatherPreset(studyArea, scenario.weatherPresetId);
   const driver = `${scenario.guidance} trajectory and initial range`;
+  const namedAircraftClaims = [
+    getGovernedAircraftEvidenceClaim(scenario.bluePlatformId),
+    getGovernedAircraftEvidenceClaim(scenario.redObjectId),
+  ].filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   const printReport = () => {
     setPrintState("preparing");
@@ -575,6 +580,12 @@ export default function ReportPage() {
                   <dd>{scenario.seed}</dd>
                   <dt>Catalog state</dt>
                   <dd>PostgreSQL / PostGIS source catalog</dd>
+                  <dt>Named-aircraft performance</dt>
+                  <dd>
+                    {namedAircraftClaims.length > 0 && namedAircraftClaims.every((item) => item.state === "UNSUPPORTED")
+                      ? "UNSUPPORTED"
+                      : "No governed claim recorded"}
+                  </dd>
                 </dl>
                 {data.packageProvenance?.credibilityManifest?.limitations.map(
                   (limitation) => (
@@ -595,7 +606,9 @@ export default function ReportPage() {
                         rel="noreferrer"
                       >
                         <strong>{source!.publisher}</strong>
-                        <span>{source!.title}</span>
+                        <span>
+                          {source!.title} · {source!.evidenceUse === "INELIGIBLE" ? "ineligible" : "catalog context only"}
+                        </span>
                       </Link>
                     ))}
                 </div>

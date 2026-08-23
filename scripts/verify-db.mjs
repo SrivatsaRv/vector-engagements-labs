@@ -23,7 +23,7 @@ try {
     (SELECT count(*)::int FROM installations) AS installations,
     (SELECT count(*)::int FROM study_areas) AS study_areas,
     (SELECT count(*)::int FROM scenario_templates WHERE status='VALIDATED') AS scenarios`;
-  assert.equal(counts.platforms, 3);
+  assert.equal(counts.platforms, 4);
   assert.equal(counts.weapons, 8);
   assert.equal(counts.models, 8);
   assert.ok(counts.compiled_model_packs >= 1, "current model pack is missing");
@@ -81,6 +81,62 @@ try {
       OR model_pack_digest <> ${CURRENT_MODEL_PACK_DIGEST}
       OR package IS NULL`;
   assert.equal(invalidPackages.length, 0);
+
+  const peaceDrive = await sql`SELECT id, variant, crew, data_status, engine_ids, radar_id, ew_id, datalink_id
+    FROM platform_variants
+    WHERE id IN ('f-16c-block52-paf', 'f-16d-block52-paf')
+    ORDER BY id`;
+  assert.deepEqual(peaceDrive.map((item) => ({
+    id: item.id,
+    variant: item.variant,
+    crew: item.crew,
+    data_status: item.data_status,
+    ew_id: item.ew_id,
+  })), [
+    {
+      id: "f-16c-block52-paf",
+      variant: "F-16C Block 52 Peace Drive I",
+      crew: 1,
+      data_status: "PARTIAL",
+      ew_id: null,
+    },
+    {
+      id: "f-16d-block52-paf",
+      variant: "F-16D Block 52 Peace Drive I",
+      crew: 2,
+      data_status: "PARTIAL",
+      ew_id: null,
+    },
+  ]);
+  assert.ok(peaceDrive.every((item) => item.engine_ids.includes("f100-pw-229")));
+  assert.ok(peaceDrive.every((item) => item.radar_id === null && item.datalink_id === null));
+
+  const contextAssertions = await sql`SELECT entity_id, condition_text, review_state
+    FROM source_assertions
+    WHERE entity_id IN ('f-16c-block52-paf', 'f-16d-block52-paf')
+      AND condition_text IN ('Engine', 'Radar', 'Datalink', 'AIM-120C-5')`;
+  assert.ok(contextAssertions.length >= 6);
+  assert.ok(contextAssertions.every((item) => item.review_state === "CONTEXT_ONLY"));
+  assert.equal(contextAssertions.filter((item) => item.review_state === "ACCEPTED").length, 0);
+  const alqClaims = await sql`SELECT count(*)::int AS count
+    FROM subsystems
+    WHERE id='alq-211v9' OR designation ILIKE '%ALQ-211%'`;
+  assert.equal(alqClaims[0].count, 0);
+  const retiredAuthority = await sql`SELECT count(*)::int AS count
+    FROM source_assertions
+    WHERE entity_type='PLATFORM'
+      AND entity_id IN ('f-16c-block52-paf', 'f-16d-block52-paf')
+      AND (
+        source_id='dsca-pakistan-15-80'
+        OR condition_text='Defensive EW'
+        OR value_text ILIKE '%ALQ-211%'
+      )`;
+  assert.equal(retiredAuthority[0].count, 0);
+  const compatibilityAuthority = await sql`SELECT platform_id, weapon_id, status
+    FROM platform_weapon_compatibility
+    WHERE platform_id IN ('su-30mki', 'f-16c-block52-paf')`;
+  assert.ok(compatibilityAuthority.length > 0);
+  assert.ok(compatibilityAuthority.every((item) => item.status === "UNVERIFIED"));
 
   const versionDuplicates = await sql`SELECT id, version, count(*)::int AS copies
     FROM scenario_templates

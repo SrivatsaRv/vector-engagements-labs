@@ -164,13 +164,21 @@ governed separately by the intended-use contract; it does not become a
 named-platform performance claim because a familiar catalog label appears in a
 scenario.
 
-Evidence rows also must exactly match a governed claim in the
+Evidence rows also must exactly match a governed claim in the current v2
 [`aircraft evidence registry`](aircraft-evidence-registry.md). The registry
 checks immutable artifact identity, capability coverage, source/validation
-separation, and the exact aircraft/variant subject. A pack cannot self-admit a
-named platform by adding arbitrary hashed rows. Current Su-30MKI and PAF F-16C
-Block 52 claims are deliberately unsupported; the NASA NESC F-16 trim asset is
-not an interchangeable F-16C Block 52 performance model.
+separation, completed license review, admission eligibility, and the exact
+aircraft/variant subject. A pack cannot self-admit a named platform by adding
+arbitrary hashed rows or reclassifying a catalog source. Current IAF Su-30MKI,
+PAF F-16C Block 52 Peace Drive I, and catalog-only PAF F-16D Block 52 Peace
+Drive I claims are deliberately unsupported; the NASA NESC F-16 trim asset is
+not an interchangeable Peace Drive I performance model. Categorical engine,
+radar, data-link, weapon, or hardpoint associations supply no runtime authority.
+For an admitted claim, TypeScript and Rust additionally require every referenced
+pack evidence row to match the governed artifact ID, evidence kind, immutable
+SHA-256, exact subject claim, admission eligibility, and declared capability
+coverage. A digest-valid pack cannot substitute C/D, NASA-reference, or
+cross-capability evidence under a familiar ID.
 
 Catalog admission checks that every aircraft carries this boundary before the
 catalog API returns a validated template. The API exposes the state and reason

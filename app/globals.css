@@ -4509,6 +4509,12 @@ button:disabled,
   font-size: 9px;
   overflow-wrap: anywhere;
 }
+.platform-systems dl small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 7px;
+}
 .platform-facts {
   border-top: 1px solid var(--line2);
 }
@@ -4536,6 +4542,12 @@ button:disabled,
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 9px;
+}
+.platform-evidence-limitation {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 7px;
+  line-height: 1.45;
 }
 .platform-systems footer a {
   font-size: 7px;

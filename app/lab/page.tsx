@@ -35,6 +35,7 @@ import { ViewportTelemetry } from "@/components/ViewportTelemetry";
 import { TrackStateInspector } from "@/components/TrackStateInspector";
 import { CurrentGeometry } from "@/components/CurrentGeometry";
 import { RouteTransitionInspector } from "@/components/RouteTransitionInspector";
+import { PlatformEvidence } from "@/components/PlatformEvidence";
 import { applyTacticalLabelPolicy, presentTacticalSymbol } from "@/lib/tactical-symbol-contract";
 import {
   canConduct,
@@ -52,7 +53,6 @@ import {
   findWeapon,
   getCompatibleWeapons,
   getSource,
-  getSubsystem,
 } from "@/lib/capability-data";
 import {
   getScenarioDefinition,
@@ -1978,73 +1978,7 @@ function ResultsWorkspace({
   );
 }
 
-function PlatformSystems({ platformId }: { platformId: string }) {
-  const platform = findPlatform(platformId);
-  if (!platform) return null;
-  const engineNames = [
-    ...new Set(
-      platform.engineIds
-        .map((id) => getSubsystem(id)?.designation)
-        .filter(Boolean),
-    ),
-  ];
-  const systems = [
-    [
-      "Engine",
-      engineNames.length
-        ? `${platform.engineIds.length} × ${engineNames.join(" / ")}`
-        : "Not established",
-    ],
-    ["Radar", getSubsystem(platform.radarId)?.designation ?? "Not established"],
-    [
-      "Defensive EW",
-      getSubsystem(platform.ewId)?.designation ?? "Not established",
-    ],
-    [
-      "Data link",
-      getSubsystem(platform.datalinkId)?.designation ?? "Not established",
-    ],
-  ];
-  const sourceLinks = platform.sourceIds.map(getSource).filter(Boolean);
-  return (
-    <details className="platform-systems">
-      <summary>
-        Aircraft systems and sources <span>{platform.status}</span>
-      </summary>
-      <dl>
-        {systems.map(([label, value]) => (
-          <div key={label}>
-            <dt>{label}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-      </dl>
-      <div className="platform-facts">
-        {platform.publicFacts.map((fact) => (
-          <div key={fact.label}>
-            <span>{fact.label}</span>
-            <strong>{fact.value}</strong>
-            <em>{fact.status}</em>
-          </div>
-        ))}
-      </div>
-      {sourceLinks.length > 0 && (
-        <footer>
-          {sourceLinks.map((source) => (
-            <Link
-              key={source!.id}
-              href={source!.url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {source!.publisher}
-            </Link>
-          ))}
-        </footer>
-      )}
-    </details>
-  );
-}
+const PlatformSystems = PlatformEvidence;
 
 function WeaponDetails({ weaponId }: { weaponId: string }) {
   const weapon = findWeapon(weaponId);

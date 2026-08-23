@@ -8,7 +8,7 @@ use crate::EngineError;
 
 const COMPILED_SCHEMA: &str = "vector.compiled-model-pack.v1";
 const AIRCRAFT_EVIDENCE_REGISTRY: &str =
-    include_str!("../../governance/aircraft-evidence-registry.v1.json");
+    include_str!("../../governance/aircraft-evidence-registry.v2.json");
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -433,6 +433,7 @@ fn same_ids(left: &[String], mut right: Vec<String>) -> bool {
 fn validate_governed_aircraft_evidence_admission(
     catalog_object_id: &str,
     admission: &AircraftPerformanceAdmission,
+    evidence: &[EvidenceReference],
 ) -> Result<(), EngineError> {
     if admission.state != "ADMITTED" {
         return Ok(());
@@ -442,6 +443,97 @@ fn validate_governed_aircraft_evidence_admission(
             "governed aircraft evidence registry is invalid: {error}"
         ))
     })?;
+    validate_governed_aircraft_evidence_admission_against_registry(
+        &registry,
+        catalog_object_id,
+        admission,
+        evidence,
+    )
+}
+
+fn validate_governed_artifact_identity(
+    registry: &Value,
+    evidence: &[EvidenceReference],
+    artifact_id: &str,
+    expected_kind: &str,
+    claim_id: &str,
+    capability: &str,
+) -> Result<(), EngineError> {
+    let artifact = registry
+        .get("artifacts")
+        .and_then(Value::as_array)
+        .and_then(|artifacts| {
+            artifacts
+                .iter()
+                .find(|item| item.get("id").and_then(Value::as_str) == Some(artifact_id))
+        })
+        .ok_or_else(|| {
+            invalid(format!(
+                "{claim_id} {capability} references missing governed artifact {artifact_id}"
+            ))
+        })?;
+    let expected_use = if expected_kind == "SOURCE" {
+        "NAMED_PERFORMANCE_SOURCE"
+    } else {
+        "NAMED_PERFORMANCE_VALIDATION"
+    };
+    let digest = artifact
+        .get("sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            invalid(format!(
+                "{claim_id} {capability} artifact {artifact_id} lacks an immutable SHA-256"
+            ))
+        })?;
+    if artifact.get("kind").and_then(Value::as_str) != Some(expected_kind)
+        || artifact.get("admissionUse").and_then(Value::as_str) != Some(expected_use)
+        || artifact.get("hashReviewState").and_then(Value::as_str) != Some("VERIFIED")
+        || artifact.get("licenseReviewState").and_then(Value::as_str) != Some("REVIEWED")
+    {
+        return Err(invalid(format!(
+            "{claim_id} {capability} artifact {artifact_id} is not eligible immutable evidence"
+        )));
+    }
+    let subject_claim_ids = registry_ids(artifact, "subjectClaimIds")?;
+    let eligible_claim_ids = registry_ids(artifact, "eligibleClaimIds")?;
+    if !subject_claim_ids.iter().any(|item| item == claim_id)
+        || !eligible_claim_ids.iter().any(|item| item == claim_id)
+    {
+        return Err(invalid(format!(
+            "{claim_id} {capability} artifact {artifact_id} is bound to a different subject or claim"
+        )));
+    }
+    if !registry_ids(artifact, "capabilityCoverage")?
+        .iter()
+        .any(|item| item == capability)
+    {
+        return Err(invalid(format!(
+            "{claim_id} {capability} artifact {artifact_id} lacks exact capability coverage"
+        )));
+    }
+    let pack_evidence = evidence
+        .iter()
+        .find(|item| item.id == artifact_id)
+        .ok_or_else(|| invalid(format!("model-pack evidence {artifact_id} is missing")))?;
+    if pack_evidence.kind != expected_kind
+        || pack_evidence.content_sha256.as_deref() != Some(digest)
+    {
+        return Err(invalid(format!(
+            "{claim_id} {capability} model-pack evidence {artifact_id} identity or SHA-256 does not match the governed registry"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_governed_aircraft_evidence_admission_against_registry(
+    registry: &Value,
+    catalog_object_id: &str,
+    admission: &AircraftPerformanceAdmission,
+    evidence: &[EvidenceReference],
+) -> Result<(), EngineError> {
+    if admission.state != "ADMITTED" {
+        return Ok(());
+    }
     let claim = registry
         .get("claims")
         .and_then(Value::as_array)
@@ -455,6 +547,11 @@ fn validate_governed_aircraft_evidence_admission(
                 "named aircraft {catalog_object_id} has no governed evidence-registry claim"
             ))
         })?;
+    let claim_id = claim.get("id").and_then(Value::as_str).ok_or_else(|| {
+        invalid(format!(
+            "named aircraft {catalog_object_id} governed claim lacks id"
+        ))
+    })?;
     if claim.get("state").and_then(Value::as_str) != Some("ADMITTED") {
         return Err(invalid(format!(
             "named aircraft {catalog_object_id} is unsupported by the governed evidence registry"
@@ -492,6 +589,26 @@ fn validate_governed_aircraft_evidence_admission(
                 "named aircraft {catalog_object_id} {} evidence does not exactly match the governed registry",
                 capability.capability
             )));
+        }
+        for artifact_id in &capability.source_evidence_ref_ids {
+            validate_governed_artifact_identity(
+                registry,
+                evidence,
+                artifact_id,
+                "SOURCE",
+                claim_id,
+                &capability.capability,
+            )?;
+        }
+        for artifact_id in &capability.validation_evidence_ref_ids {
+            validate_governed_artifact_identity(
+                registry,
+                evidence,
+                artifact_id,
+                "VALIDATION",
+                claim_id,
+                &capability.capability,
+            )?;
         }
     }
     Ok(())
@@ -804,6 +921,7 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
         validate_governed_aircraft_evidence_admission(
             &model.catalog_object_id,
             &model.performance_admission,
+            &pack.evidence,
         )?;
         if model.aerodynamic_model_index >= pack.aerodynamics.len()
             || model.loadout_model_index >= pack.loadouts.len()
@@ -941,6 +1059,195 @@ pub fn validate_model_pack_json(input: &str) -> Result<CompiledModelPack, Engine
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn aircraft_evidence_registry_v2_preserves_v1_and_denies_context_runtime_authority(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let v1: Value = serde_json::from_str(include_str!(
+            "../../governance/aircraft-evidence-registry.v1.json"
+        ))?;
+        let v2: Value = serde_json::from_str(AIRCRAFT_EVIDENCE_REGISTRY)?;
+        assert_eq!(
+            v1["schemaVersion"],
+            Value::from("vector.aircraft-evidence-registry.v1")
+        );
+        assert_eq!(v2["supersedes"]["schemaVersion"], v1["schemaVersion"]);
+        assert_eq!(v2["subjects"].as_array().map(Vec::len), Some(3));
+        assert!(v2["claims"]
+            .as_array()
+            .is_some_and(|claims| claims.iter().all(|claim| claim["state"] == "UNSUPPORTED")));
+        assert!(v2["catalogAssertions"]
+            .as_array()
+            .is_some_and(|items| items.iter().all(|item| item["runtimeAuthority"] == "NONE")));
+        assert!(v2["artifacts"]
+            .as_array()
+            .is_some_and(
+                |items| items.iter().all(|item| item["subjectClaimIds"].is_array()
+                    && item["eligibleClaimIds"].is_array()
+                    && item["capabilityCoverage"].is_array())
+            ));
+        let proposal = v2["artifacts"]
+            .as_array()
+            .and_then(|items| {
+                items
+                    .iter()
+                    .find(|item| item["id"] == "dsca-pakistan-15-80-proposal")
+            })
+            .ok_or("missing quarantined proposal")?;
+        assert_eq!(proposal["admissionUse"], "INELIGIBLE");
+        assert_eq!(proposal["transactionState"], "EXPIRED_WITHOUT_ACCEPTANCE");
+        let lockheed = v2["artifacts"]
+            .as_array()
+            .and_then(|items| {
+                items
+                    .iter()
+                    .find(|item| item["id"] == "lockheed-peace-drive-i-2009")
+            })
+            .ok_or("missing mutable Lockheed locator")?;
+        assert_eq!(lockheed["hashReviewState"], "PENDING");
+        assert!(lockheed["sha256"].is_null());
+        Ok(())
+    }
+
+    #[test]
+    fn governed_admission_binds_pack_digest_subject_and_capability(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut registry: Value = serde_json::from_str(AIRCRAFT_EVIDENCE_REGISTRY)?;
+        let capabilities = [
+            "AERODYNAMICS",
+            "PROPULSION",
+            "FLIGHT_CONTROLS",
+            "MASS_AND_STORES",
+            "SENSORS",
+        ];
+        let claim = registry["claims"]
+            .as_array_mut()
+            .and_then(|claims| {
+                claims
+                    .iter_mut()
+                    .find(|item| item["id"] == "su-30mki-performance")
+            })
+            .ok_or("missing Su-30MKI claim")?;
+        claim["state"] = Value::from("ADMITTED");
+        claim["capabilities"] = Value::Array(
+            capabilities
+                .iter()
+                .map(|capability| {
+                    serde_json::json!({
+                        "capability": capability,
+                        "sourceArtifactIds": ["su30-exact-source"],
+                        "validationArtifactIds": ["su30-exact-validation"]
+                    })
+                })
+                .collect(),
+        );
+        registry["artifacts"]
+            .as_array_mut()
+            .ok_or("missing artifacts")?
+            .extend([
+                serde_json::json!({
+                    "id": "su30-exact-source",
+                    "kind": "SOURCE",
+                    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "hashReviewState": "VERIFIED",
+                    "licenseReviewState": "REVIEWED",
+                    "admissionUse": "NAMED_PERFORMANCE_SOURCE",
+                    "subjectClaimIds": ["su-30mki-performance"],
+                    "eligibleClaimIds": ["su-30mki-performance"],
+                    "capabilityCoverage": capabilities
+                }),
+                serde_json::json!({
+                    "id": "su30-exact-validation",
+                    "kind": "VALIDATION",
+                    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "hashReviewState": "VERIFIED",
+                    "licenseReviewState": "REVIEWED",
+                    "admissionUse": "NAMED_PERFORMANCE_VALIDATION",
+                    "subjectClaimIds": ["su-30mki-performance"],
+                    "eligibleClaimIds": ["su-30mki-performance"],
+                    "capabilityCoverage": capabilities
+                }),
+            ]);
+        let admission: AircraftPerformanceAdmission = serde_json::from_value(serde_json::json!({
+            "state": "ADMITTED",
+            "capabilities": capabilities.iter().map(|capability| serde_json::json!({
+                "capability": capability,
+                "sourceEvidenceRefIds": ["su30-exact-source"],
+                "validationEvidenceRefIds": ["su30-exact-validation"]
+            })).collect::<Vec<_>>()
+        }))?;
+        let evidence = vec![
+            EvidenceReference {
+                id: "su30-exact-source".into(),
+                kind: "SOURCE".into(),
+                content_sha256: Some(
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                ),
+            },
+            EvidenceReference {
+                id: "su30-exact-validation".into(),
+                kind: "VALIDATION".into(),
+                content_sha256: Some(
+                    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+                ),
+            },
+        ];
+        validate_governed_aircraft_evidence_admission_against_registry(
+            &registry, "su-30mki", &admission, &evidence,
+        )?;
+
+        let mut wrong_digest = evidence.clone();
+        wrong_digest[0].content_sha256 =
+            Some("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".into());
+        assert!(
+            validate_governed_aircraft_evidence_admission_against_registry(
+                &registry,
+                "su-30mki",
+                &admission,
+                &wrong_digest,
+            )
+            .is_err()
+        );
+
+        {
+            let source = registry["artifacts"]
+                .as_array_mut()
+                .and_then(|items| {
+                    items
+                        .iter_mut()
+                        .find(|item| item["id"] == "su30-exact-source")
+                })
+                .ok_or("missing test source")?;
+            source["subjectClaimIds"] = serde_json::json!(["f-16c-block52-paf-performance"]);
+            source["eligibleClaimIds"] = serde_json::json!(["f-16c-block52-paf-performance"]);
+        }
+        assert!(
+            validate_governed_aircraft_evidence_admission_against_registry(
+                &registry, "su-30mki", &admission, &evidence,
+            )
+            .is_err()
+        );
+        {
+            let source = registry["artifacts"]
+                .as_array_mut()
+                .and_then(|items| {
+                    items
+                        .iter_mut()
+                        .find(|item| item["id"] == "su30-exact-source")
+                })
+                .ok_or("missing test source")?;
+            source["subjectClaimIds"] = serde_json::json!(["su-30mki-performance"]);
+            source["eligibleClaimIds"] = serde_json::json!(["su-30mki-performance"]);
+            source["capabilityCoverage"] = serde_json::json!(["PROPULSION"]);
+        }
+        assert!(
+            validate_governed_aircraft_evidence_admission_against_registry(
+                &registry, "su-30mki", &admission, &evidence,
+            )
+            .is_err()
+        );
+        Ok(())
+    }
 
     fn fixture_pack_json() -> Result<String, Box<dyn std::error::Error>> {
         let bundle: Value = serde_json::from_str(include_str!(

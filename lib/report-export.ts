@@ -1,5 +1,6 @@
 import type { Scenario, SimulationResult } from "./simulation.ts";
 import { findPlatform, findWeapon, getSource } from "./capability-data.ts";
+import { getGovernedAircraftEvidenceClaim } from "./aircraft-evidence-registry.ts";
 import { getCatalogObject } from "./object-catalog.ts";
 import { findWeaponSimulationModel } from "./simulation-models.ts";
 
@@ -88,6 +89,10 @@ export function buildReportExport(
       ...(redWeapon?.sourceIds ?? []),
     ]),
   ];
+  const namedAircraftPerformance = [
+    getGovernedAircraftEvidenceClaim(data.scenario.bluePlatformId),
+    getGovernedAircraftEvidenceClaim(data.scenario.redObjectId),
+  ].filter((item): item is NonNullable<typeof item> => Boolean(item));
   return {
     schema: "vector.engagement-report.v2",
     export: {
@@ -236,6 +241,11 @@ export function buildReportExport(
       profileLibrary: data.profileVersion,
       scenarioLibrary: `${library.id}@${library.version}`,
       sourceClass: "public / official-source-first",
+      namedAircraftPerformance: namedAircraftPerformance.map((item) => ({
+        catalogObjectId: item.catalogObjectId,
+        state: item.state,
+        reason: item.reason,
+      })),
       sources: sourceIds
         .map(getSource)
         .filter(Boolean)
@@ -245,6 +255,7 @@ export function buildReportExport(
           title: source!.title,
           url: source!.url,
           sourceClass: source!.sourceClass,
+          evidenceUse: source!.evidenceUse ?? "CATALOG_CONTEXT",
         })),
       reviewState: "public-study",
       syntheticEnvironment:

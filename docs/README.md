@@ -35,7 +35,8 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-
 - [`product-language.md`](product-language.md): canonical workflow and human-readable military terminology.
 - [`repository-governance.md`](repository-governance.md): protected branches, CI/CD, releases, tags, ownership, and repository status.
 - [`../governance/runtime-stub-ledger.v1.json`](../governance/runtime-stub-ledger.v1.json): executable inventory of causal stubs, assumptions, fallbacks, evidence paths, and owning issues.
-- [`../governance/aircraft-evidence-registry.v1.json`](../governance/aircraft-evidence-registry.v1.json): immutable-artifact registry that blocks unsupported named-aircraft performance claims.
+- [`../governance/aircraft-evidence-registry.v2.json`](../governance/aircraft-evidence-registry.v2.json): current exact-subject registry separating catalog context, ineligible proposals, unknowns, assumptions, and named-performance admission.
+- [`../governance/aircraft-evidence-registry.v1.json`](../governance/aircraft-evidence-registry.v1.json): preserved predecessor for compatibility verification.
 - [`../governance/environment-sources/`](../governance/environment-sources): immutable, checksum-verified offline source artifacts. Point-only source snapshots are ingestion evidence, not runtime regional environment packs.
 - [`container-release.md`](container-release.md): authoritative Compose topology, immutable GHCR images, promotion, rollback, backup, and restore.
 - [`blog-publishing.md`](blog-publishing.md): markdown frontmatter, thumbnail assets, canonical metadata, and ops publishing flow.
