@@ -8,10 +8,13 @@ import { getScenarioDefinition } from "@/lib/scenarios";
 const result = createReferencePreview(
   getScenarioDefinition("a2a-crossing-intercept")!.scenario,
 );
+const routeControlTime = result.frames.find((frame) =>
+  frame.entities.some((entity) => entity.id === "blue-platform-1" && entity.aircraftControl)
+)!.t;
 
 describe("RouteTransitionInspector", () => {
   it("renders the selected-frame transition from the compiled route without changing the record", () => {
-    const selected = selectDisplayFrame(result, 0);
+    const selected = selectDisplayFrame(result, routeControlTime);
     const originalFrame = structuredClone(selected.frame);
     render(<RouteTransitionInspector transitions={selectRouteTransitionStates(result, selected)} />);
 
@@ -24,7 +27,7 @@ describe("RouteTransitionInspector", () => {
   });
 
   it("names legacy semantics and makes incomplete compiled control explicit", () => {
-    const selected = selectDisplayFrame(result, 0);
+    const selected = selectDisplayFrame(result, routeControlTime);
     const transitions = selectRouteTransitionStates(result, selected).map((item, index) => index === 0 && item.state === "ACTIVE"
       ? { ...item, semantics: "LEGACY_ALL_FLY_BY" as const }
       : item);

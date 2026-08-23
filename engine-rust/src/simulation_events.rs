@@ -1,27 +1,32 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
 
 use crate::{Affiliation, EngineError, EntityKind, EntityLifecycle, Termination};
 
 pub const SIMULATION_EVENT_SCHEMA: &str = "vector.simulation-event.v2";
+pub const RUN_STARTED_PAYLOAD_SCHEMA: &str = "vector.simulation-event-payload.run-started.v1";
+pub const ENTITY_ENTERED_PAYLOAD_SCHEMA: &str =
+    "vector.simulation-event-payload.entity-entered-world.v1";
+pub const LIFECYCLE_CHANGED_PAYLOAD_SCHEMA: &str =
+    "vector.simulation-event-payload.entity-lifecycle-changed.v1";
+pub const RUN_COMPLETED_PAYLOAD_SCHEMA: &str = "vector.simulation-event-payload.run-completed.v1";
 pub const MAX_SIMULATION_EVENTS: usize = 100_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum SimulationEventPhase {
     #[serde(rename = "LIFECYCLE")]
     Lifecycle,
+    #[serde(rename = "SENSING")]
+    Sensing,
+    #[serde(rename = "TRACKING")]
+    Tracking,
+    #[serde(rename = "MISSION")]
+    Mission,
+    #[serde(rename = "WEAPON")]
+    Weapon,
     #[serde(rename = "TERMINATION")]
     Termination,
-}
-
-impl SimulationEventPhase {
-    fn rank(self) -> u8 {
-        match self {
-            Self::Lifecycle => 0,
-            Self::Termination => 1,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -30,6 +35,15 @@ pub enum SimulationEventSubsystem {
     RunCoordinator,
     #[serde(rename = "ENTITY_LIFECYCLE")]
     EntityLifecycle,
+}
+
+impl SimulationEventSubsystem {
+    fn key(self) -> &'static str {
+        match self {
+            Self::RunCoordinator => "RUN_COORDINATOR",
+            Self::EntityLifecycle => "ENTITY_LIFECYCLE",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -42,8 +56,28 @@ pub struct SimulationEventProducer {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum SimulationEventParticipantRole {
+    #[serde(rename = "ACTOR")]
+    Actor,
     #[serde(rename = "SUBJECT")]
     Subject,
+    #[serde(rename = "LAUNCHER")]
+    Launcher,
+    #[serde(rename = "WEAPON")]
+    Weapon,
+    #[serde(rename = "SENSOR")]
+    Sensor,
+}
+
+impl SimulationEventParticipantRole {
+    fn key(self) -> &'static str {
+        match self {
+            Self::Actor => "ACTOR",
+            Self::Subject => "SUBJECT",
+            Self::Launcher => "LAUNCHER",
+            Self::Weapon => "WEAPON",
+            Self::Sensor => "SENSOR",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -59,11 +93,19 @@ pub enum SimulationEventKnowledgeScope {
     World,
 }
 
+impl SimulationEventKnowledgeScope {
+    fn key(self) -> &'static str {
+        "WORLD"
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "kind")]
 pub enum SimulationEventPayload {
     #[serde(rename = "RUN_STARTED")]
     RunStarted {
+        #[serde(rename = "schemaVersion")]
+        schema_version: &'static str,
         #[serde(rename = "scenarioId")]
         scenario_id: String,
         #[serde(rename = "scenarioVersion")]
@@ -71,19 +113,59 @@ pub enum SimulationEventPayload {
     },
     #[serde(rename = "ENTITY_ENTERED_WORLD")]
     EntityEnteredWorld {
+        #[serde(rename = "schemaVersion")]
+        schema_version: &'static str,
         #[serde(rename = "entityKind")]
         entity_kind: EntityKind,
         lifecycle: EntityLifecycle,
     },
     #[serde(rename = "ENTITY_LIFECYCLE_CHANGED")]
     EntityLifecycleChanged {
+        #[serde(rename = "schemaVersion")]
+        schema_version: &'static str,
         #[serde(rename = "entityKind")]
         entity_kind: EntityKind,
         from: EntityLifecycle,
         to: EntityLifecycle,
     },
     #[serde(rename = "RUN_COMPLETED")]
-    RunCompleted { termination: Termination },
+    RunCompleted {
+        #[serde(rename = "schemaVersion")]
+        schema_version: &'static str,
+        termination: Termination,
+    },
+}
+
+fn entity_kind_key(value: EntityKind) -> &'static str {
+    match value {
+        EntityKind::Aircraft => "AIRCRAFT",
+        EntityKind::GuidedWeapon => "GUIDED_WEAPON",
+        EntityKind::AirDefenceSystem => "AIR_DEFENCE_SYSTEM",
+        EntityKind::Radar => "RADAR",
+        EntityKind::SurfaceLauncher => "SURFACE_LAUNCHER",
+        EntityKind::Base => "BASE",
+        EntityKind::FixedObjective => "FIXED_OBJECTIVE",
+    }
+}
+
+fn lifecycle_key(value: EntityLifecycle) -> &'static str {
+    match value {
+        EntityLifecycle::Stowed => "STOWED",
+        EntityLifecycle::Active => "ACTIVE",
+        EntityLifecycle::Tracking => "TRACKING",
+        EntityLifecycle::Engaging => "ENGAGING",
+        EntityLifecycle::Terminated => "TERMINATED",
+    }
+}
+
+fn termination_key(value: Termination) -> &'static str {
+    match value {
+        Termination::ThresholdReached => "threshold_reached",
+        Termination::EnergyDepleted => "energy_depleted",
+        Termination::TargetUnavailable => "target_unavailable",
+        Termination::TimeLimit => "time_limit",
+        Termination::InvalidScenario => "invalid_scenario",
+    }
 }
 
 impl SimulationEventPayload {
@@ -95,6 +177,47 @@ impl SimulationEventPayload {
             Self::RunCompleted { .. } => 3,
         }
     }
+
+    fn sort_key(&self) -> Result<String, EngineError> {
+        let values: Vec<&str> = match self {
+            Self::RunStarted {
+                schema_version,
+                scenario_id,
+                scenario_version,
+            } => vec!["0", schema_version, scenario_id, scenario_version],
+            Self::EntityEnteredWorld {
+                schema_version,
+                entity_kind,
+                lifecycle,
+            } => vec![
+                "1",
+                schema_version,
+                entity_kind_key(*entity_kind),
+                lifecycle_key(*lifecycle),
+            ],
+            Self::EntityLifecycleChanged {
+                schema_version,
+                entity_kind,
+                from,
+                to,
+            } => vec![
+                "2",
+                schema_version,
+                entity_kind_key(*entity_kind),
+                lifecycle_key(*from),
+                lifecycle_key(*to),
+            ],
+            Self::RunCompleted {
+                schema_version,
+                termination,
+            } => vec!["3", schema_version, termination_key(*termination)],
+        };
+        serde_json::to_string(&values).map_err(|error| {
+            EngineError::Serialization(format!(
+                "could not encode simulation event payload key: {error}"
+            ))
+        })
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -103,6 +226,7 @@ pub struct SimulationEventV2 {
     pub schema_version: &'static str,
     pub id: String,
     pub sequence: usize,
+    pub local_key: String,
     pub tick: u64,
     pub model_time_seconds: f64,
     pub frame_index: usize,
@@ -136,24 +260,40 @@ impl SimulationEventStream {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SimulationEventDraftReference {
+    pub tick: u64,
+    pub local_key: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+// The delivered lifecycle producers have no causal edge yet. These variants
+// are exercised by the journal contract tests and are consumed by #26/#28/#38.
+#[allow(dead_code)]
+pub enum SimulationEventCauseReference {
+    CommittedEvent(String),
+    SameTickEvent(SimulationEventDraftReference),
+}
+
+#[derive(Clone, Debug)]
 pub struct SimulationEventDraft {
+    pub local_key: String,
     pub tick: u64,
     pub model_time_seconds: f64,
     pub phase: SimulationEventPhase,
     pub producer: SimulationEventProducer,
     pub knowledge_scope: SimulationEventKnowledgeScope,
     pub participants: Vec<SimulationEventParticipant>,
-    pub cause_event_ids: Vec<String>,
+    pub causes: Vec<SimulationEventCauseReference>,
+    pub correlation_id: Option<String>,
     pub payload: SimulationEventPayload,
-    #[serde(skip)]
     pub local_ordinal: u32,
 }
 
 impl SimulationEventDraft {
     pub fn run_started(tick: u64, time: f64, scenario_id: &str, version: &str) -> Self {
         Self {
+            local_key: "run-started".to_string(),
             tick,
             model_time_seconds: time,
             phase: SimulationEventPhase::Lifecycle,
@@ -163,8 +303,10 @@ impl SimulationEventDraft {
             },
             knowledge_scope: SimulationEventKnowledgeScope::World,
             participants: Vec::new(),
-            cause_event_ids: Vec::new(),
+            causes: Vec::new(),
+            correlation_id: None,
             payload: SimulationEventPayload::RunStarted {
+                schema_version: RUN_STARTED_PAYLOAD_SCHEMA,
                 scenario_id: scenario_id.to_string(),
                 scenario_version: version.to_string(),
             },
@@ -180,6 +322,7 @@ impl SimulationEventDraft {
         lifecycle: EntityLifecycle,
     ) -> Self {
         Self {
+            local_key: format!("entity-entered:{entity_id}"),
             tick,
             model_time_seconds: time,
             phase: SimulationEventPhase::Lifecycle,
@@ -192,8 +335,10 @@ impl SimulationEventDraft {
                 entity_id: entity_id.to_string(),
                 role: SimulationEventParticipantRole::Subject,
             }],
-            cause_event_ids: Vec::new(),
+            causes: Vec::new(),
+            correlation_id: None,
             payload: SimulationEventPayload::EntityEnteredWorld {
+                schema_version: ENTITY_ENTERED_PAYLOAD_SCHEMA,
                 entity_kind,
                 lifecycle,
             },
@@ -210,6 +355,11 @@ impl SimulationEventDraft {
         to: EntityLifecycle,
     ) -> Self {
         Self {
+            local_key: format!(
+                "entity-lifecycle:{entity_id}:{}:{}",
+                lifecycle_key(from),
+                lifecycle_key(to)
+            ),
             tick,
             model_time_seconds: time,
             phase: if to == EntityLifecycle::Terminated {
@@ -226,8 +376,10 @@ impl SimulationEventDraft {
                 entity_id: entity_id.to_string(),
                 role: SimulationEventParticipantRole::Subject,
             }],
-            cause_event_ids: Vec::new(),
+            causes: Vec::new(),
+            correlation_id: None,
             payload: SimulationEventPayload::EntityLifecycleChanged {
+                schema_version: LIFECYCLE_CHANGED_PAYLOAD_SCHEMA,
                 entity_kind,
                 from,
                 to,
@@ -238,6 +390,7 @@ impl SimulationEventDraft {
 
     pub fn run_completed(tick: u64, time: f64, termination: Termination) -> Self {
         Self {
+            local_key: "run-completed".to_string(),
             tick,
             model_time_seconds: time,
             phase: SimulationEventPhase::Termination,
@@ -247,35 +400,106 @@ impl SimulationEventDraft {
             },
             knowledge_scope: SimulationEventKnowledgeScope::World,
             participants: Vec::new(),
-            cause_event_ids: Vec::new(),
-            payload: SimulationEventPayload::RunCompleted { termination },
+            causes: Vec::new(),
+            correlation_id: None,
+            payload: SimulationEventPayload::RunCompleted {
+                schema_version: RUN_COMPLETED_PAYLOAD_SCHEMA,
+                termination,
+            },
             local_ordinal: 0,
         }
     }
 }
 
+fn normalize_participants(participants: &mut Vec<SimulationEventParticipant>) {
+    participants.sort_by(|left, right| {
+        left.entity_id
+            .cmp(&right.entity_id)
+            .then_with(|| left.role.key().cmp(right.role.key()))
+    });
+    participants
+        .dedup_by(|left, right| left.entity_id == right.entity_id && left.role == right.role);
+}
+
+fn participants_key(participants: &[SimulationEventParticipant]) -> String {
+    participants
+        .iter()
+        .map(|participant| format!("{}:{}", participant.entity_id, participant.role.key()))
+        .collect::<Vec<_>>()
+        .join("|")
+}
+
+fn causes_key(causes: &[SimulationEventCauseReference]) -> String {
+    let mut values = causes
+        .iter()
+        .map(|cause| match cause {
+            SimulationEventCauseReference::CommittedEvent(event_id) => {
+                format!("COMMITTED:{event_id}")
+            }
+            SimulationEventCauseReference::SameTickEvent(reference) => {
+                format!("SAME_TICK:{}:{}", reference.tick, reference.local_key)
+            }
+        })
+        .collect::<Vec<_>>();
+    values.sort();
+    values.join("|")
+}
+
+fn draft_sort_key(draft: &SimulationEventDraft) -> Result<String, EngineError> {
+    Ok([
+        (draft.phase as u8).to_string(),
+        draft.payload.rank().to_string(),
+        draft.payload.sort_key()?,
+        draft.producer.subsystem.key().to_string(),
+        draft.producer.entity_id.clone().unwrap_or_default(),
+        participants_key(&draft.participants),
+        draft.knowledge_scope.key().to_string(),
+        String::new(),
+        draft.correlation_id.clone().unwrap_or_default(),
+        draft.local_key.clone(),
+        format!("{:010}", draft.local_ordinal),
+        causes_key(&draft.causes),
+    ]
+    .join("\u{1}"))
+}
+
 #[derive(Default)]
 pub struct SimulationEventJournal {
     committed: Vec<SimulationEventV2>,
-    committed_ids: HashSet<String>,
+    committed_sequence_by_id: HashMap<String, usize>,
     pending: Vec<SimulationEventDraft>,
 }
 
 impl SimulationEventJournal {
-    pub fn emit(&mut self, event: SimulationEventDraft) -> Result<(), EngineError> {
-        if !event.model_time_seconds.is_finite() || event.model_time_seconds < 0.0 {
+    pub fn emit(
+        &mut self,
+        mut event: SimulationEventDraft,
+    ) -> Result<SimulationEventDraftReference, EngineError> {
+        if !event.model_time_seconds.is_finite()
+            || event.model_time_seconds < 0.0
+            || event.local_key.is_empty()
+        {
             return Err(EngineError::InvalidScenario(
-                "simulation event model time must be finite and non-negative".to_string(),
+                "simulation event time and local key must be valid".to_string(),
             ));
         }
-        if event.cause_event_ids.iter().collect::<HashSet<_>>().len() != event.cause_event_ids.len()
-        {
+        normalize_participants(&mut event.participants);
+        let unique_causes = event
+            .causes
+            .iter()
+            .map(|cause| format!("{cause:?}"))
+            .collect::<HashSet<_>>();
+        if unique_causes.len() != event.causes.len() {
             return Err(EngineError::InvalidScenario(
                 "simulation event causal references must be unique".to_string(),
             ));
         }
+        let reference = SimulationEventDraftReference {
+            tick: event.tick,
+            local_key: event.local_key.clone(),
+        };
         self.pending.push(event);
-        Ok(())
+        Ok(reference)
     }
 
     pub fn has_pending(&self) -> bool {
@@ -302,68 +526,96 @@ impl SimulationEventJournal {
                 "simulation event tick commit does not match its pending event time".to_string(),
             ));
         }
-        let mut pending = std::mem::take(&mut self.pending);
-        pending.sort_by(|left, right| {
-            left.phase
-                .rank()
-                .cmp(&right.phase.rank())
-                .then_with(|| left.payload.rank().cmp(&right.payload.rank()))
-                .then_with(|| {
-                    left.producer
-                        .entity_id
-                        .as_deref()
-                        .unwrap_or("")
-                        .cmp(right.producer.entity_id.as_deref().unwrap_or(""))
-                })
-                .then_with(|| {
-                    let left_participant = left
-                        .participants
-                        .first()
-                        .map(|participant| participant.entity_id.as_str())
-                        .unwrap_or("");
-                    let right_participant = right
-                        .participants
-                        .first()
-                        .map(|participant| participant.entity_id.as_str())
-                        .unwrap_or("");
-                    left_participant.cmp(right_participant)
-                })
-                .then_with(|| left.local_ordinal.cmp(&right.local_ordinal))
-        });
-        let mut duplicate_keys = HashSet::new();
-        for draft in pending {
+        let mut keyed = std::mem::take(&mut self.pending)
+            .into_iter()
+            .map(|event| {
+                let key = draft_sort_key(&event)?;
+                Ok((key, event))
+            })
+            .collect::<Result<Vec<_>, EngineError>>()?;
+        keyed.sort_by(|left, right| left.0.cmp(&right.0));
+        let mut local_index = HashMap::new();
+        let mut duplicate_transitions = HashSet::new();
+        for (index, (_, event)) in keyed.iter().enumerate() {
+            if local_index.insert(event.local_key.clone(), index).is_some() {
+                return Err(EngineError::InvalidScenario(format!(
+                    "simulation event tick repeats local key {}",
+                    event.local_key
+                )));
+            }
             let duplicate_key = serde_json::to_string(&(
-                draft.tick,
-                &draft.producer,
-                &draft.participants,
-                &draft.payload,
+                event.tick,
+                &event.producer,
+                &event.participants,
+                &event.payload,
             ))
             .map_err(|error| {
                 EngineError::Serialization(format!(
                     "could not encode simulation event duplicate key: {error}"
                 ))
             })?;
-            if !duplicate_keys.insert(duplicate_key) {
+            if !duplicate_transitions.insert(duplicate_key) {
                 return Err(EngineError::InvalidScenario(
                     "simulation event stream contains a duplicate transition".to_string(),
                 ));
             }
-            if draft
-                .cause_event_ids
-                .iter()
-                .any(|cause_id| !self.committed_ids.contains(cause_id))
-            {
+        }
+        let committed_base = self.committed.len();
+        for (index, (_, draft)) in keyed.into_iter().enumerate() {
+            let mut cause_sequences = Vec::new();
+            for cause in &draft.causes {
+                let sequence = match cause {
+                    SimulationEventCauseReference::CommittedEvent(event_id) => {
+                        *self.committed_sequence_by_id.get(event_id).ok_or_else(|| {
+                            EngineError::InvalidScenario(
+                                "simulation event causal reference does not precede its response"
+                                    .to_string(),
+                            )
+                        })?
+                    }
+                    SimulationEventCauseReference::SameTickEvent(reference) => {
+                        if reference.tick != tick {
+                            return Err(EngineError::InvalidScenario(
+                                "same-tick simulation event reference uses a different tick"
+                                    .to_string(),
+                            ));
+                        }
+                        let cause_index =
+                            *local_index.get(&reference.local_key).ok_or_else(|| {
+                                EngineError::InvalidScenario(
+                                    "same-tick simulation event reference is missing".to_string(),
+                                )
+                            })?;
+                        if cause_index >= index {
+                            return Err(EngineError::InvalidScenario(
+                                "same-tick simulation event reference is future or cyclic"
+                                    .to_string(),
+                            ));
+                        }
+                        committed_base + cause_index
+                    }
+                };
+                cause_sequences.push(sequence);
+            }
+            cause_sequences.sort_unstable();
+            cause_sequences.dedup();
+            if cause_sequences.len() != draft.causes.len() {
                 return Err(EngineError::InvalidScenario(
-                    "simulation event causal reference does not precede its response".to_string(),
+                    "simulation event causal references resolve to a duplicate event".to_string(),
                 ));
             }
+            let cause_event_ids = cause_sequences
+                .iter()
+                .map(|sequence| format!("event-{sequence:06}"))
+                .collect();
             let sequence = self.committed.len();
             let id = format!("event-{sequence:06}");
-            self.committed_ids.insert(id.clone());
+            self.committed_sequence_by_id.insert(id.clone(), sequence);
             self.committed.push(SimulationEventV2 {
                 schema_version: SIMULATION_EVENT_SCHEMA,
                 id,
                 sequence,
+                local_key: draft.local_key,
                 tick,
                 model_time_seconds: time,
                 frame_index,
@@ -372,8 +624,8 @@ impl SimulationEventJournal {
                 owner_affiliation: None,
                 knowledge_scope: draft.knowledge_scope,
                 participants: draft.participants,
-                cause_event_ids: draft.cause_event_ids,
-                correlation_id: None,
+                cause_event_ids,
+                correlation_id: draft.correlation_id,
                 payload: draft.payload,
             });
         }
@@ -387,5 +639,80 @@ impl SimulationEventJournal {
             ));
         }
         Ok(self.committed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn participants_are_canonical_and_same_tick_causes_resolve() -> Result<(), EngineError> {
+        let mut journal = SimulationEventJournal::default();
+        let mut start = SimulationEventDraft::run_started(0, 0.0, "scenario", "1");
+        start.participants = vec![
+            SimulationEventParticipant {
+                entity_id: "z".to_string(),
+                role: SimulationEventParticipantRole::Subject,
+            },
+            SimulationEventParticipant {
+                entity_id: "z".to_string(),
+                role: SimulationEventParticipantRole::Actor,
+            },
+            SimulationEventParticipant {
+                entity_id: "a".to_string(),
+                role: SimulationEventParticipantRole::Actor,
+            },
+            SimulationEventParticipant {
+                entity_id: "z".to_string(),
+                role: SimulationEventParticipantRole::Subject,
+            },
+        ];
+        let reference = journal.emit(start)?;
+        let mut completed = SimulationEventDraft::run_completed(0, 0.0, Termination::TimeLimit);
+        completed
+            .causes
+            .push(SimulationEventCauseReference::SameTickEvent(reference));
+        journal.emit(completed)?;
+        journal.commit_tick(0, 0.0, 0)?;
+        let events = journal.into_items()?;
+        assert_eq!(events[0].participants.len(), 3);
+        assert_eq!(
+            events[0].participants[1].role,
+            SimulationEventParticipantRole::Actor
+        );
+        assert_eq!(
+            events[0].participants[2].role,
+            SimulationEventParticipantRole::Subject
+        );
+        assert_eq!(events[1].cause_event_ids, vec!["event-000000"]);
+        Ok(())
+    }
+
+    #[test]
+    fn future_and_cyclic_same_tick_causes_fail_closed() -> Result<(), EngineError> {
+        let mut journal = SimulationEventJournal::default();
+        let mut start = SimulationEventDraft::run_started(0, 0.0, "scenario", "1");
+        start
+            .causes
+            .push(SimulationEventCauseReference::SameTickEvent(
+                SimulationEventDraftReference {
+                    tick: 0,
+                    local_key: "run-completed".to_string(),
+                },
+            ));
+        journal.emit(start)?;
+        let mut completed = SimulationEventDraft::run_completed(0, 0.0, Termination::TimeLimit);
+        completed
+            .causes
+            .push(SimulationEventCauseReference::SameTickEvent(
+                SimulationEventDraftReference {
+                    tick: 0,
+                    local_key: "run-started".to_string(),
+                },
+            ));
+        journal.emit(completed)?;
+        assert!(journal.commit_tick(0, 0.0, 0).is_err());
+        Ok(())
     }
 }

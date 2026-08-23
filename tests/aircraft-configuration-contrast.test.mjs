@@ -121,7 +121,9 @@ function summarize(run, aircraftId) {
     speedChangeMps: Math.hypot(last.velocity.x, last.velocity.y, last.velocity.z) -
       Math.hypot(first.velocity.x, first.velocity.y, first.velocity.z),
     fuelBurnKg: first.fuelKg - last.fuelKg,
-    maximumAcceptedAccelerationMps2: Math.max(...frames.map((frame) => Math.hypot(
+    maximumAcceptedAccelerationMps2: Math.max(...frames
+      .filter((frame) => frame.aircraftControl)
+      .map((frame) => Math.hypot(
       frame.aircraftControl.acceptedSteeringAccelerationMps2.x,
       frame.aircraftControl.acceptedSteeringAccelerationMps2.y,
       frame.aircraftControl.acceptedSteeringAccelerationMps2.z,

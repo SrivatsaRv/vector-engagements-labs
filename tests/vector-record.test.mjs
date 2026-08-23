@@ -309,6 +309,35 @@ test("VSR rejects unsupported, reordered, and causally corrupt v2 event streams"
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
     /missing or future causal reference/,
   );
+
+  const unknownPayloadItems = structuredClone(result.engineRun.events.items);
+  unknownPayloadItems[0].payload.kind = "TYPO_EVENT";
+  const unknownPayload = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    encodeEvents(unknownPayloadItems),
+  );
+  serialized = serializeVectorRecord(unknownPayload);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /payload kind is unsupported/,
+  );
+
+  const futurePayloadVersionItems = structuredClone(result.engineRun.events.items);
+  futurePayloadVersionItems[0].payload.schemaVersion =
+    "vector.simulation-event-payload.run-started.v2";
+  const futurePayloadVersion = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    encodeEvents(futurePayloadVersionItems),
+  );
+  serialized = serializeVectorRecord(futurePayloadVersion);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /payload schema is unsupported/,
+  );
 });
 
 test("columnar frame decoder rejects an unsupported member schema", () => {

@@ -396,7 +396,11 @@ test("both engines terminate an admitted weapon when its assigned target is unav
   for (const [name, run] of [["TypeScript", typescript], ["Rust/WASM", rust]]) {
     assert.equal(run.termination, "target_unavailable", `${name} termination`);
     assert.equal(run.diagnostics.integratedSteps, 1, `${name} must not continue a dead weapon`);
-    const weapon = run.frames[0].entities.find(
+    const releasedWeapon = run.frames[0].entities.find(
+      (entity) => entity.id === run.primaryWeaponId,
+    );
+    assert.equal(releasedWeapon?.lifecycle, "ACTIVE", `${name} launch-frame lifecycle`);
+    const weapon = run.frames.at(-1).entities.find(
       (entity) => entity.id === run.primaryWeaponId,
     );
     assert.equal(weapon?.lifecycle, "TERMINATED", `${name} weapon lifecycle`);
@@ -405,7 +409,7 @@ test("both engines terminate an admitted weapon when its assigned target is unav
       "TARGET_UNAVAILABLE",
       `${name} weapon state`,
     );
-    const replayWeapon = decodeColumnarFrames(encodeColumnarFrames(run.frames))[0]
+    const replayWeapon = decodeColumnarFrames(encodeColumnarFrames(run.frames)).at(-1)
       .entities.find((entity) => entity.id === run.primaryWeaponId);
     assert.equal(
       replayWeapon?.weaponFlightState,

@@ -49,6 +49,13 @@ export type ObserverPerspective = "IAF" | "PAF";
 
 export const SIMULATION_EVENT_SCHEMA = "vector.simulation-event.v2" as const;
 
+export const SIMULATION_EVENT_PAYLOAD_SCHEMAS = {
+  RUN_STARTED: "vector.simulation-event-payload.run-started.v1",
+  ENTITY_ENTERED_WORLD: "vector.simulation-event-payload.entity-entered-world.v1",
+  ENTITY_LIFECYCLE_CHANGED: "vector.simulation-event-payload.entity-lifecycle-changed.v1",
+  RUN_COMPLETED: "vector.simulation-event-payload.run-completed.v1",
+} as const;
+
 export type SimulationEventParticipantRole =
   | "ACTOR"
   | "SUBJECT"
@@ -121,29 +128,35 @@ export type EngineTermination =
   | "invalid_scenario";
 
 /**
- * Closed output-event union delivered by the current runtime. #26, #28, and
- * #38 extend this union only when their owning causal state machines exist.
+ * Closed output-event union delivered by the current runtime. The v2 envelope
+ * is immutable. Every payload family has its own schema identity, so #26, #28,
+ * and #38 can add governed variants only with an explicit payload version and
+ * older readers reject the unknown family instead of partially accepting it.
  * Engine events contain typed facts, never presentation text.
  */
 export type SimulationEventPayload =
   | {
       kind: "RUN_STARTED";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_STARTED;
       scenarioId: string;
       scenarioVersion: string;
     }
   | {
       kind: "ENTITY_ENTERED_WORLD";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.ENTITY_ENTERED_WORLD;
       entityKind: EntityKind;
-      lifecycle: Exclude<EntityLifecycle, "STOWED">;
+      lifecycle: Exclude<EntityLifecycle, "STOWED" | "TERMINATED">;
     }
   | {
       kind: "ENTITY_LIFECYCLE_CHANGED";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.ENTITY_LIFECYCLE_CHANGED;
       entityKind: EntityKind;
       from: EntityLifecycle;
       to: EntityLifecycle;
     }
   | {
       kind: "RUN_COMPLETED";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_COMPLETED;
       termination: EngineTermination;
     };
 
@@ -151,10 +164,18 @@ export type SimulationEventV2 = {
   schemaVersion: typeof SIMULATION_EVENT_SCHEMA;
   id: string;
   sequence: number;
+  /** Producer-stable identity within one tick; never derived from call order. */
+  localKey: string;
   tick: number;
   modelTimeSeconds: number;
   frameIndex: number;
-  phase: "LIFECYCLE" | "TERMINATION";
+  phase:
+    | "LIFECYCLE"
+    | "SENSING"
+    | "TRACKING"
+    | "MISSION"
+    | "WEAPON"
+    | "TERMINATION";
   producer: {
     subsystem: "RUN_COORDINATOR" | "ENTITY_LIFECYCLE";
     entityId?: string;

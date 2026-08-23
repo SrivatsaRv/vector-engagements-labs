@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use crate::simulation_events::MAX_SIMULATION_EVENTS;
 use crate::{EngineError, EngineScenario, EntityDefinition, Table1d, Vec3};
 
 /// Maximum JSON payload accepted by the browser WASM ABI.
@@ -515,7 +516,10 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         return Err(invalid(format!("events exceeds {MAX_EVENTS} definitions")));
     }
     let sampled_frames = (scenario.duration_seconds / 0.25).ceil() as u64 + 1;
-    let recorded_states = sampled_frames.saturating_mul(scenario.entities.len() as u64);
+    let event_forced_frames = (MAX_SIMULATION_EVENTS as u64).min(integrated_steps + 1);
+    let admitted_frames =
+        (integrated_steps + 1).min(sampled_frames.saturating_add(event_forced_frames));
+    let recorded_states = admitted_frames.saturating_mul(scenario.entities.len() as u64);
     if recorded_states > MAX_RECORDED_ENTITY_STATES {
         return Err(invalid(format!(
             "scenario would retain {recorded_states} entity states; maximum is {MAX_RECORDED_ENTITY_STATES}"

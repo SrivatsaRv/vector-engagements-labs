@@ -1479,9 +1479,10 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
     let mut non_finite = 0_u64;
     let mut mass_margin = f64::INFINITY;
     let sample_every = (0.25 / scenario.fixed_step_seconds).round().max(1.0) as u64;
-    let mut time = 0.0;
+    let mut time: f64 = 0.0;
     let mut event_journal = SimulationEventJournal::default();
-    while time <= scenario.duration_seconds + 1e-9 {
+    let mut recorded_entity_states = 0_u64;
+    loop {
         let tick = steps;
         let event_time = (time * 1_000_000.0).round() / 1_000_000.0;
         if tick == 0 {
@@ -1521,35 +1522,6 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 state.lifecycle,
             ))?;
         }
-        let before_updates: Vec<EntityLifecycle> =
-            states.iter().map(|state| state.lifecycle).collect();
-        for state in states.iter_mut() {
-            update_aircraft(state, &scenario, time, scenario.fixed_step_seconds)?;
-        }
-        for index in 0..states.len() {
-            update_weapon(
-                index,
-                &mut states,
-                &scenario,
-                time,
-                scenario.fixed_step_seconds,
-            );
-        }
-        for (index, state) in states.iter().enumerate() {
-            let prior = before_updates[index];
-            if prior == state.lifecycle {
-                continue;
-            }
-            event_journal.emit(SimulationEventDraft::lifecycle_changed(
-                tick,
-                event_time,
-                &state.definition.id,
-                state.definition.kind,
-                prior,
-                state.lifecycle,
-            ))?;
-        }
-        steps += 1;
         let relative_position = states[target_index]
             .position
             .subtract(states[weapon_index].position);
@@ -1593,6 +1565,9 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
         } else if separation <= scenario.completion.distance_meters {
             termination = Termination::ThresholdReached;
             completed_this_tick = true;
+        } else if time >= scenario.duration_seconds - 1e-9 {
+            termination = Termination::TimeLimit;
+            completed_this_tick = true;
         } else {
             let speed = states[weapon_index].velocity.magnitude();
             let Some(weapon) = states[weapon_index].definition.weapon.as_ref() else {
@@ -1609,10 +1584,6 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
             }
         }
         let next_time = time + scenario.fixed_step_seconds;
-        if !completed_this_tick && next_time > scenario.duration_seconds + 1e-9 {
-            termination = Termination::TimeLimit;
-            completed_this_tick = true;
-        }
         if completed_this_tick {
             event_journal.emit(SimulationEventDraft::run_completed(
                 tick,
@@ -1620,11 +1591,21 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 termination,
             ))?;
         }
-        if steps % sample_every == 1 || steps == 1 || event_journal.has_pending() {
+        if tick == 0 || event_journal.has_pending() {
             let frame_index = frames.len();
+            let visible_states = states
+                .iter()
+                .filter(|state| state.lifecycle != EntityLifecycle::Stowed)
+                .count() as u64;
+            if recorded_entity_states.saturating_add(visible_states) > MAX_RECORDED_ENTITY_STATES {
+                return Err(EngineError::InvalidScenario(format!(
+                    "event-preserving frames exceed {MAX_RECORDED_ENTITY_STATES} recorded entity states"
+                )));
+            }
             frames.push(sampled_engine_frame(
                 &states, &scenario, time, &weapon_id, &target_id, separation, closure, los_rate,
             ));
+            recorded_entity_states += visible_states;
             if event_journal.has_pending() {
                 event_journal.commit_tick(tick, event_time, frame_index)?;
             }
@@ -1632,7 +1613,130 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
         if completed_this_tick {
             break;
         }
+
+        let before_updates: Vec<EntityLifecycle> =
+            states.iter().map(|state| state.lifecycle).collect();
+        for state in states.iter_mut() {
+            update_aircraft(state, &scenario, time, scenario.fixed_step_seconds)?;
+        }
+        for index in 0..states.len() {
+            update_weapon(
+                index,
+                &mut states,
+                &scenario,
+                time,
+                scenario.fixed_step_seconds,
+            );
+        }
+        steps += 1;
         time = next_time;
+        let next_event_time = (next_time * 1_000_000.0).round() / 1_000_000.0;
+        for (index, state) in states.iter().enumerate() {
+            let prior = before_updates[index];
+            if prior == state.lifecycle {
+                continue;
+            }
+            event_journal.emit(SimulationEventDraft::lifecycle_changed(
+                steps,
+                next_event_time,
+                &state.definition.id,
+                state.definition.kind,
+                prior,
+                state.lifecycle,
+            ))?;
+        }
+        let post_relative_position = states[target_index]
+            .position
+            .subtract(states[weapon_index].position);
+        let post_separation = post_relative_position.magnitude();
+        closest = closest.min(post_separation);
+        if states[weapon_index].weapon_flight_state == Some(WeaponFlightState::TargetUnavailable) {
+            termination = Termination::TargetUnavailable;
+            completed_this_tick = true;
+        } else if post_separation <= scenario.completion.distance_meters {
+            termination = Termination::ThresholdReached;
+            completed_this_tick = true;
+        } else {
+            let speed = states[weapon_index].velocity.magnitude();
+            let weapon = states[weapon_index]
+                .definition
+                .weapon
+                .as_ref()
+                .ok_or_else(|| {
+                    EngineError::InvalidScenario(
+                        "primary weapon lost its model during integration".to_string(),
+                    )
+                })?;
+            let since_launch = next_time - weapon.launch_time_seconds.unwrap_or(0.0);
+            if (since_launch > weapon.burn_seconds + 2.0
+                && speed < 80.0
+                && post_separation > 1000.0)
+                || (states[weapon_index].position.z <= 0.0 && next_time > 1.0)
+            {
+                termination = Termination::EnergyDepleted;
+                completed_this_tick = true;
+            } else if next_time >= scenario.duration_seconds - 1e-9 {
+                termination = Termination::TimeLimit;
+                completed_this_tick = true;
+            }
+        }
+        if completed_this_tick {
+            event_journal.emit(SimulationEventDraft::run_completed(
+                steps,
+                next_event_time,
+                termination,
+            ))?;
+        }
+        let activation_at_next_boundary = states.iter().any(|state| {
+            state.lifecycle == EntityLifecycle::Stowed
+                && state
+                    .definition
+                    .weapon
+                    .as_ref()
+                    .and_then(|weapon| weapon.launch_time_seconds)
+                    .is_some_and(|launch_time| (launch_time - next_time).abs() <= 1e-9)
+        });
+        if event_journal.has_pending()
+            || steps == 1
+            || (steps % sample_every == 0 && !activation_at_next_boundary)
+        {
+            let post_relative_velocity = states[target_index]
+                .velocity
+                .subtract(states[weapon_index].velocity);
+            let post_los = post_relative_position.normalize();
+            let post_closure = -post_relative_velocity.dot(post_los);
+            let post_los_rate = post_relative_position
+                .cross(post_relative_velocity)
+                .magnitude()
+                / (post_separation * post_separation).max(1.0);
+            let frame_index = frames.len();
+            let visible_states = states
+                .iter()
+                .filter(|state| state.lifecycle != EntityLifecycle::Stowed)
+                .count() as u64;
+            if recorded_entity_states.saturating_add(visible_states) > MAX_RECORDED_ENTITY_STATES {
+                return Err(EngineError::InvalidScenario(format!(
+                    "event-preserving frames exceed {MAX_RECORDED_ENTITY_STATES} recorded entity states"
+                )));
+            }
+            frames.push(sampled_engine_frame(
+                &states,
+                &scenario,
+                next_event_time,
+                &weapon_id,
+                &target_id,
+                post_separation,
+                post_closure,
+                post_los_rate,
+            ));
+            recorded_entity_states += visible_states;
+            if event_journal.has_pending() {
+                event_journal.commit_tick(steps, next_event_time, frame_index)?;
+            }
+        }
+        if completed_this_tick {
+            break;
+        }
     }
     let events = SimulationEventStream::available(event_journal.into_items()?);
     Ok(EngineRun {
@@ -1944,7 +2048,7 @@ mod tests {
         assert_eq!(run.diagnostics.integrated_steps, 1);
         let weapon = run
             .frames
-            .first()
+            .last()
             .and_then(|frame| {
                 frame
                     .entities

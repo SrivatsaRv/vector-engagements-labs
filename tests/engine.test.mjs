@@ -470,9 +470,9 @@ test("aircraft records the guidance request separately from its load-factor-limi
   ];
   red.routePlan = { schemaVersion: "vector.route-plan.v1", waypointAcceptanceRadiiM: [1, 25] };
 
-  const frame = runEngine(scenario).frames[0].entities.find(
-    (entity) => entity.id === red.id,
-  );
+  const frame = runEngine(scenario).frames
+    .flatMap((sample) => sample.entities)
+    .find((entity) => entity.id === red.id && entity.aircraftControl);
 
   assert.ok(frame?.aircraftControl);
   // Independent kinematic oracle: a 90-degree route request at the initial

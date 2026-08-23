@@ -144,8 +144,9 @@ message is a presentation projection from one authoritative
 `vector.simulation-event.v2` event at the selected observer boundary; it is not
 itself simulation truth and it may not mutate playback or engine state.
 
-The canonical event carries identities, exact model time and frame, typed
-payload, lifecycle phase, participants, and causal references. The presentation
+The canonical event carries identities, exact committed model-time frame,
+versioned typed payload, lifecycle phase, canonical participants, and causal
+references. The presentation
 adapter owns wording, severity, grouping, icon, filtering, and localization.
 This split permits one simulation event to produce different messages for Model
 Truth, IAF, or PAF only when the selected view is allowed to know it. A hidden

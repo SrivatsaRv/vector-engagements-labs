@@ -105,15 +105,34 @@ does not contain display-ready English. The current closed producer set is
 termination events remain unavailable until their owning simulation contracts
 produce them; the record and browser may not infer them.
 
+The `vector.simulation-event.v2` envelope is immutable. Each payload variant
+carries a separate `vector.simulation-event-payload.<family>.vN` identity.
+Adding a producer under #26, #28, or #38 therefore requires a governed payload
+schema and exhaustive TypeScript/Rust/read-boundary support. An older v2 reader
+must reject an unknown kind, an unknown payload-family version, or an extra
+field; it may not accept the known envelope and ignore unfamiliar semantics.
+Changing envelope fields requires a new event-envelope version.
+
 Every available event has a monotonically assigned ID and sequence, exact
 fixed-step model time, the corresponding retained frame index, producer and
-participant identities, typed payload, phase, and causal references. A
+participant identities, typed payload, phase, producer-stable local key, and
+causal references. A
 per-tick journal orders drafts by canonical event semantics rather than call or
 entity insertion order, retains an exact frame for every event-bearing tick,
-and rejects duplicate semantic transitions, missing or forward causal
-references, and configured capacity overflow. VSR opening repeats schema,
+sorts and deduplicates participants, and rejects duplicate semantic
+transitions, missing/forward/cyclic causal references, and configured capacity
+overflow. Producers may reference an already canonical earlier phase in the
+same tick through its stable local key; final sequence IDs remain journal-owned.
+The admission bound includes both regular samples and event-forced frames, so a
+future high-rate #26 producer cannot bypass the recorded-state budget. VSR opening repeats schema,
 ordering, frame, ownership, lifecycle, and causal-integrity validation before
 exposing the stream.
+
+Frames represent state committed at their stated fixed-step boundary. Initial
+and store-world-entry events are captured before the following integration
+step; post-integration lifecycle and run-terminal transitions use the next
+boundary time. An event frame therefore cannot show an entity already moved
+beyond the transition it records.
 
 Historical `vector.events.v1` members remain readable only as an explicit
 `UNAVAILABLE / LEGACY_EVENT_SCHEMA` state. Their frames remain replayable, but
