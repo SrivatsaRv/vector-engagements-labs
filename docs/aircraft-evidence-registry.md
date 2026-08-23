@@ -144,6 +144,17 @@ legacy fact and its exact digest. It does not claim that all derivatives are
 forbidden; it requires a new, explicit licence and ancestry review before any
 additional descendant is committed or promoted.
 
+The standalone verifier treats the three published Case 11 registry records as
+one immutable projection: the DAVE-ML source, Sim 04 comparison and committed
+descendant must retain their complete IDs, digests, locations, authorities,
+kinds, review states, admission uses, capability coverage, scopes and descendant
+ancestry. Broad registry-schema validity is not sufficient. The standalone
+DAVE-ML record is also cross-bound to the registry source by ID, authority, URI,
+SHA-256 and capability set. Its reviewed `ENGINE_VERIFICATION_ONLY` use and
+new-derivative restriction remain stricter standalone decisions; registry
+`REFERENCE_ONLY` never grants permission to create another derivative. The
+registry v2 file itself remains byte-identical.
+
 Consequently the normalized derivative is deliberately `WITHHELD`: there are
 no committed Case 13.2 coefficient, propulsion, inertia, control or trajectory
 tables and no production evaluator. The NESC trajectories remain a comparison
@@ -158,7 +169,9 @@ also hashes locally retained source bytes offline; expected filenames are
 Research-candidate table validation is not allowed to trust a caller-supplied
 corpus by shape or artifact ID alone. `validateResearchDerivative` requires the
 published aircraft registry and re-runs the full standalone-corpus validation,
-including the local Case 11 descendant digest, before it evaluates derivative
-ancestry or table content. A changed corpus subject, authority, admission state,
-artifact identity, licence, role, page capability or output therefore fails
-before a restricted DAVE-ML artifact can masquerade as a permitted NTRS report.
+including the complete three-record Case 11 projection and local descendant
+digest, before it evaluates derivative ancestry or table content. A changed
+corpus subject, authority, admission state, artifact identity, licence, role,
+page capability or output—or a semantically valid but different registry
+record—therefore fails before a restricted DAVE-ML artifact can masquerade as a
+permitted NTRS report.

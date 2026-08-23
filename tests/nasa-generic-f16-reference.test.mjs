@@ -17,9 +17,11 @@ const manifest = JSON.parse(
     "utf8",
   ),
 );
-const aircraftRegistry = JSON.parse(
-  await readFile(new URL("../governance/aircraft-evidence-registry.v2.json", import.meta.url), "utf8"),
+const aircraftRegistryText = await readFile(
+  new URL("../governance/aircraft-evidence-registry.v2.json", import.meta.url),
+  "utf8",
 );
+const aircraftRegistry = JSON.parse(aircraftRegistryText);
 const runtimeSurfaces = await Promise.all(
   [
     "../lib/reference-model-pack.ts",
@@ -96,6 +98,10 @@ test("published named-aircraft registry remains byte-compatible with its v2 cont
   assert.equal(aircraftRegistry.artifacts.length, 11);
   assert.equal(aircraftRegistry.claims.length, 3);
   assert.equal("verificationCorpora" in aircraftRegistry, false);
+  assert.equal(
+    createHash("sha256").update(aircraftRegistryText).digest("hex"),
+    "16a555b953c84e412ca674575659e4a1a6a1df88777415d6e6b8b11ad3028204",
+  );
 });
 
 test("corpus rejects unknown keys at every governed manifest layer", () => {
@@ -209,6 +215,17 @@ test("legacy Case 11 descendant is reconciled without allowing a new derivative"
     manifest.legacyCase11.newDerivativePolicy,
     "EXPLICIT_LICENCE_AND_ANCESTRY_REVIEW_REQUIRED",
   );
+  const corpusDave = manifest.artifacts.find(
+    (item) => item.id === manifest.legacyCase11.sourceArtifactId,
+  );
+  const registryDave = aircraftRegistry.artifacts.find(
+    (item) => item.id === manifest.legacyCase11.sourceArtifactId,
+  );
+  assert.deepEqual(corpusDave.capabilities, registryDave.capabilityCoverage);
+  assert.deepEqual(
+    [corpusDave.id, corpusDave.authority, corpusDave.uri, corpusDave.sha256],
+    [registryDave.id, registryDave.authority, registryDave.uri, registryDave.sha256],
+  );
 
   const conflict = structuredClone(manifest);
   conflict.legacyCase11.derivativeSha256 = "a".repeat(64);
@@ -224,6 +241,58 @@ test("legacy Case 11 descendant is reconciled without allowing a new derivative"
     () => validateNasaGenericF16Reference(blanketBan, { aircraftRegistry }),
     /licence decision|legacy|descendant/i,
   );
+});
+
+test("legacy Case 11 registry projection rejects every identity and policy mutation", () => {
+  const artifact = (registry, id) => registry.artifacts.find((item) => item.id === id);
+  const sourceId = "nasa-nesc-2015-f16-daveml-source";
+  const comparisonId = "nasa-nesc-2015-atmos11-sim04-validation";
+  const derivativeId = "vector-nesc-case11-derived-fixture";
+  const mutations = [
+    ["source authority", (value) => (artifact(value, sourceId).authority = "NASA NESC REVIEW")],
+    ["source URI", (value) => (artifact(value, sourceId).uri = "https://example.invalid/source.zip")],
+    ["source SHA", (value) => (artifact(value, sourceId).sha256 = "a".repeat(64))],
+    ["source kind", (value) => (artifact(value, sourceId).kind = "VALIDATION")],
+    ["source licence", (value) => (artifact(value, sourceId).licenseReviewState = "PENDING")],
+    ["source admission", (value) => (artifact(value, sourceId).admissionUse = "GOVERNANCE_CONTEXT_ONLY")],
+    ["source capability", (value) => (artifact(value, sourceId).capabilityCoverage = ["AERODYNAMICS"])],
+    ["source scope", (value) => (artifact(value, sourceId).scope = "altered source scope")],
+    ["source subject claim", (value) => (artifact(value, sourceId).subjectClaimIds = ["su-30mki-performance"])],
+    ["source hash state", (value) => {
+      artifact(value, sourceId).hashReviewState = "PENDING";
+      artifact(value, sourceId).sha256 = null;
+    }],
+    ["comparison authority", (value) => (artifact(value, comparisonId).authority = "NASA NESC REVIEW")],
+    ["comparison URI", (value) => (artifact(value, comparisonId).uri = "https://example.invalid/comparison.csv")],
+    ["comparison SHA", (value) => (artifact(value, comparisonId).sha256 = "b".repeat(64))],
+    ["comparison kind", (value) => (artifact(value, comparisonId).kind = "SOURCE")],
+    ["comparison licence", (value) => (artifact(value, comparisonId).licenseReviewState = "PENDING")],
+    ["comparison admission", (value) => (artifact(value, comparisonId).admissionUse = "GOVERNANCE_CONTEXT_ONLY")],
+    ["comparison capability", (value) => (artifact(value, comparisonId).capabilityCoverage = ["AERODYNAMICS"])],
+    ["comparison scope", (value) => (artifact(value, comparisonId).scope = "altered comparison scope")],
+    ["comparison subject claim", (value) => (artifact(value, comparisonId).subjectClaimIds = ["f-16c-block52-paf-performance"])],
+    ["comparison hash state", (value) => {
+      artifact(value, comparisonId).hashReviewState = "PENDING";
+      artifact(value, comparisonId).sha256 = null;
+    }],
+    ["derivative authority", (value) => (artifact(value, derivativeId).authority = "VECTOR REVIEW")],
+    ["derivative URI", (value) => (artifact(value, derivativeId).uri = "fixtures/public-reference/renamed.json")],
+    ["derivative licence", (value) => (artifact(value, derivativeId).licenseReviewState = "PENDING")],
+    ["derivative capability", (value) => (artifact(value, derivativeId).capabilityCoverage = ["AERODYNAMICS"])],
+    ["derivative scope", (value) => (artifact(value, derivativeId).scope = "altered derivative scope")],
+    ["derivative subject claim", (value) => (artifact(value, derivativeId).subjectClaimIds = ["f-16d-block52-paf-performance"])],
+    ["derivative local path", (value) => (artifact(value, derivativeId).localPath = "fixtures/public-reference/renamed.json")],
+  ];
+
+  for (const [name, mutate] of mutations) {
+    const registry = structuredClone(aircraftRegistry);
+    mutate(registry);
+    assert.throws(
+      () => validateNasaGenericF16Reference(manifest, { aircraftRegistry: registry, verifyLocalArtifacts: false }),
+      /legacy|Case 11|registry|identity|policy/i,
+      name,
+    );
+  }
 });
 
 test("page claims have exact capability, outputs and immutable ancestry", () => {

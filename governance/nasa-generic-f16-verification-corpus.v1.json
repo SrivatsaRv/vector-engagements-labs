@@ -79,7 +79,7 @@
       "licenceDecision": "NEW_DERIVATIVE_REQUIRES_EXPLICIT_REVIEW",
       "subjectId": "NASA_NESC_GENERIC_F16_REFERENCE",
       "intendedUse": "ENGINE_VERIFICATION_ONLY",
-      "capabilities": ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS", "MASS_AND_INERTIA"],
+      "capabilities": ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS"],
       "ancestry": {
         "state": "COMMON_MODEL_REFERENCE_WITH_MIXED_ANCESTRY",
         "sourceArtifactIds": [

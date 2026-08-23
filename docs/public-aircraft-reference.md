@@ -88,6 +88,16 @@ in aircraft evidence registry v2. The corpus binds that legacy fixture to its
 published digest and ancestry while denying it runtime authority. It permits no
 new Case 13.2 or DAVE-ML descendant by implication.
 
+That reconciliation is exact rather than schema-shaped. The verifier pins the
+complete registry records for the Case 11 DAVE-ML source, Sim 04 comparison and
+committed descendant, including their identities, review/admission decisions,
+capability coverage, scope and ancestry. It cross-checks the standalone DAVE-ML
+record against the registry source. The shared capability boundary is
+aerodynamics, propulsion and flight controls; published mass properties remain
+owned by the separately hashed NASA reports in this corpus. The standalone
+`ENGINE_VERIFICATION_ONLY` and new-derivative restrictions coexist with registry
+`REFERENCE_ONLY`; neither is runtime or derivative authority.
+
 The offline gate `npm run policy:nasa-generic-f16:verify` verifies exact source
 identities, source-versus-comparison roles, licence decisions, page ancestry,
 the withheld derivative state, candidate-table hashes, closed units/axes, and
@@ -95,5 +105,6 @@ fail-closed interpolation. It performs no network access and changes no
 production aircraft, TypeScript/Rust runtime, Worker, VSR, UI or report claim.
 The exported research-derivative validator requires the published aircraft
 registry and fully validates this exact standalone corpus before consuming any
-caller-supplied derivative; an unvalidated or mutated corpus cannot confer
-ancestry, licence or runtime authority by reusing an expected artifact ID.
+caller-supplied derivative; an unvalidated or mutated corpus or a broadly valid
+but mismatched Case 11 registry projection cannot confer ancestry, licence or
+runtime authority by reusing an expected artifact ID.

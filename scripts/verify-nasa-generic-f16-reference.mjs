@@ -72,7 +72,7 @@ const EXPECTED_ARTIFACTS = Object.freeze({
     sha256: "20c60f615ae8e87d81c9d98b54fff45a2832840201499cbcfe3f45a60ef3e5b2",
     licenceReviewState: "REVIEWED_WITH_NEW_DERIVATIVE_RESTRICTION",
     licenceDecision: "NEW_DERIVATIVE_REQUIRES_EXPLICIT_REVIEW",
-    capabilities: ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS", "MASS_AND_INERTIA"],
+    capabilities: ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS"],
     ancestry: {
       state: "COMMON_MODEL_REFERENCE_WITH_MIXED_ANCESTRY",
       sourceArtifactIds: [
@@ -101,6 +101,59 @@ const EXPECTED_ARTIFACTS = Object.freeze({
       externalLineage: [],
     },
     scopeCode: "CASE13P2_IMPLEMENTATION_COMPARISON_NOT_PHYSICAL_VALIDATION",
+  }),
+});
+
+const EXPECTED_LEGACY_CASE11_REGISTRY_ARTIFACTS = Object.freeze({
+  "nasa-nesc-2015-f16-daveml-source": Object.freeze({
+    id: "nasa-nesc-2015-f16-daveml-source",
+    kind: "SOURCE",
+    authority: "NASA NESC",
+    uri: "https://nescacademy.nasa.gov/workshop/FlightSim/2015/models/F16_package.zip",
+    sha256: "20c60f615ae8e87d81c9d98b54fff45a2832840201499cbcfe3f45a60ef3e5b2",
+    retrievalState: "DECLARED_REMOTE",
+    hashReviewState: "VERIFIED",
+    licenseReviewState: "REVIEWED",
+    admissionUse: "REFERENCE_ONLY",
+    subjectClaimIds: [],
+    eligibleClaimIds: [],
+    capabilityCoverage: ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS"],
+    scope: "NASA NESC F-16 DAVE-ML verification model; not an IAF Su-30MKI or PAF Peace Drive I F-16C/D model.",
+  }),
+  "nasa-nesc-2015-atmos11-sim04-validation": Object.freeze({
+    id: "nasa-nesc-2015-atmos11-sim04-validation",
+    kind: "VALIDATION",
+    authority: "NASA NESC",
+    uri: "https://nescacademy.nasa.gov/workshop/FlightSim/2015/atmos_scn_11/Atmos_11_sim_04.csv",
+    sha256: "c6b8c1210c31fa440d271297ad219b5ad89264f4bb8a25f636c14f53d9b04a07",
+    retrievalState: "DECLARED_REMOTE",
+    hashReviewState: "VERIFIED",
+    licenseReviewState: "REVIEWED",
+    admissionUse: "REFERENCE_ONLY",
+    subjectClaimIds: [],
+    eligibleClaimIds: [],
+    capabilityCoverage: ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS"],
+    scope: "One 180-second subsonic wings-level trim trajectory; not a manoeuvre, sensor, store, or operational validation corpus.",
+  }),
+  "vector-nesc-case11-derived-fixture": Object.freeze({
+    id: "vector-nesc-case11-derived-fixture",
+    kind: "DERIVED_FIXTURE",
+    authority: "VECTOR",
+    uri: "fixtures/public-reference/nasa-nesc-2015-f16-case11.json",
+    sha256: "85f14b1d28e0d839f6f75cc03e1ff7d577c181809f38d1b30a2f5f83e3bd3602",
+    localPath: "fixtures/public-reference/nasa-nesc-2015-f16-case11.json",
+    retrievalState: "COMMITTED_DERIVATIVE",
+    hashReviewState: "VERIFIED",
+    licenseReviewState: "REVIEWED",
+    admissionUse: "REFERENCE_ONLY",
+    subjectClaimIds: [],
+    eligibleClaimIds: [],
+    capabilityCoverage: ["AERODYNAMICS", "PROPULSION", "FLIGHT_CONTROLS"],
+    derivedFromArtifactIds: [
+      "nasa-nesc-2015-f16-daveml-source",
+      "nasa-nesc-2015-atmos11-sim04-validation",
+    ],
+    scope: "SI-normalized NESC Case 11 checkpoints used only by the isolated public-reference verifier.",
   }),
 });
 
@@ -315,7 +368,7 @@ function findRegistryArtifact(registry, id) {
   return matches[0];
 }
 
-function validateLegacyCase11(legacy, aircraftRegistry) {
+function validateLegacyCase11(legacy, aircraftRegistry, corpusDaveArtifact) {
   assertExactKeys(
     legacy,
     [
@@ -351,12 +404,37 @@ function validateLegacyCase11(legacy, aircraftRegistry) {
   const source = findRegistryArtifact(aircraftRegistry, legacy.sourceArtifactId);
   const comparison = findRegistryArtifact(aircraftRegistry, legacy.comparisonArtifactId);
   const derivative = findRegistryArtifact(aircraftRegistry, legacy.derivativeArtifactId);
-  assert(derivative.sha256 === legacy.derivativeSha256, "Legacy Case 11 descendant SHA-256 conflicts with the published registry.");
-  assert(derivative.kind === "DERIVED_FIXTURE" && derivative.admissionUse === "REFERENCE_ONLY", "Legacy Case 11 descendant role conflicts with the published registry.");
-  assertExactArray(
-    derivative.derivedFromArtifactIds,
-    [source.id, comparison.id],
-    "Legacy Case 11 descendant ancestry",
+  for (const artifact of [source, comparison, derivative]) {
+    assertExactValue(
+      artifact,
+      EXPECTED_LEGACY_CASE11_REGISTRY_ARTIFACTS[artifact.id],
+      `Legacy Case 11 immutable registry projection ${artifact.id}`,
+    );
+  }
+  assertExactValue(
+    {
+      id: corpusDaveArtifact.id,
+      role: corpusDaveArtifact.role,
+      authority: corpusDaveArtifact.authority,
+      uri: corpusDaveArtifact.uri,
+      sha256: corpusDaveArtifact.sha256,
+      intendedUse: corpusDaveArtifact.intendedUse,
+      licenceReviewState: corpusDaveArtifact.licenceReviewState,
+      licenceDecision: corpusDaveArtifact.licenceDecision,
+      capabilities: corpusDaveArtifact.capabilities,
+    },
+    {
+      id: source.id,
+      role: "COMMON_MODEL_REFERENCE",
+      authority: source.authority,
+      uri: source.uri,
+      sha256: source.sha256,
+      intendedUse: "ENGINE_VERIFICATION_ONLY",
+      licenceReviewState: "REVIEWED_WITH_NEW_DERIVATIVE_RESTRICTION",
+      licenceDecision: "NEW_DERIVATIVE_REQUIRES_EXPLICIT_REVIEW",
+      capabilities: source.capabilityCoverage,
+    },
+    "Legacy Case 11 standalone DAVE and published registry source identity",
   );
 }
 
@@ -458,7 +536,11 @@ export function validateNasaGenericF16Reference(
     "Case 13.2 specification, command, comparison role and physical validation",
   );
 
-  validateLegacyCase11(corpus.legacyCase11, aircraftRegistry);
+  validateLegacyCase11(
+    corpus.legacyCase11,
+    aircraftRegistry,
+    corpus.artifacts.find((artifact) => artifact.id === corpus.legacyCase11.sourceArtifactId),
+  );
   assertExactKeys(
     corpus.derivativeAdmission,
     ["state", "decisionCode", "requiredLongitudinalFields", "blockerCodes"],
