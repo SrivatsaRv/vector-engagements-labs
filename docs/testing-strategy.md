@@ -71,6 +71,25 @@ cancelled, timed-out, action-required or unexpectedly skipped selected jobs all
 fail the gate. Workflow-level path exclusions are not used because they can
 strand a required check.
 
+The classifier names the tracked contract locations rather than legacy logical
+names. `lib/record/**`, mission and spatial admission, the canonical frontend
+selectors, browser Worker protocols, runtime security adapters, compiled model
+packs, and `governance/environment-sources/**` each select their actual
+consumers. The quality job runs the environment-source, aircraft-evidence, and
+public-aircraft-reference validators as well as generated model and symbol
+checks. An unclassified evidence artifact still fails closed through the full
+matrix; it is not silently treated as documentation.
+
+`make integration-ci` uses the tracked managed-server runner. The runner writes
+the built application output to `outputs/integration/application.log`, stops and
+awaits the complete server process group after success, verifier failure, early
+server exit, or cancellation, and returns the verifier status. CI retains that
+directory on failure. The policy regression deliberately fails a verifier,
+checks that the log remains readable, and binds the same port again to prove
+cleanup. This process evidence is separate from Playwright, which already owns
+its built-server lifecycle and retains traces, screenshots, and video under
+`outputs/` on failure.
+
 ## Framework decision
 
 Node's built-in test runner and Cargo remain the domain and engine runners.

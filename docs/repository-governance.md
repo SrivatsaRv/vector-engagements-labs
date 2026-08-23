@@ -53,10 +53,23 @@ Compose, runtime-binding, dependency, and workflow changes add an image rebuild
 and the integration gates. Unknown paths run everything until ownership is
 declared in `scripts/classify-ci-changes.mjs`.
 
+Tracked record, mission/spatial-admission, frontend-selector, runtime-security,
+compiled-model, governed-environment-source, Worker, and VSR paths have explicit
+classifier ownership. A path alias for a file that does not exist is not gate
+coverage. Policy regressions use the repository's real paths and verify that
+every classifier output is represented by the Required PR Gate.
+
 `make clean-clone-local` proves the documented release context slice resolves
 from a new clone, installs the locked dependencies, then runs the deterministic
 baseline and `worker-local`. It therefore verifies the production-built Worker
 without relying on stale assets in the source checkout.
+
+The live application inside `make integration-ci` is owned by
+`scripts/run-managed-server.mjs`. It retains server output under
+`outputs/integration/`, terminates and awaits the server process group on every
+exit path, and propagates verifier failure. The integration workflow uploads
+that directory on failure. Playwright retains its separate trace, screenshot,
+video, and HTML evidence under `outputs/`.
 
 The gate implementation is a tracked, unit-tested script rather than inline
 workflow shell. It accepts only explicit `true` or `false` selections, requires

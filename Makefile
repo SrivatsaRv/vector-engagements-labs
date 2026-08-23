@@ -42,11 +42,7 @@ integration-ci:
 	npm run db:verify
 	npm run db:credibility:verify
 	npm run test:admission:integration
-	@set -eu; \
-		npx wrangler dev --config dist/server/wrangler.json --ip 127.0.0.1 --port "$${PORT:-4317}" > /tmp/vector-integration.log 2>&1 & \
-		app_pid=$$!; \
-		trap 'kill "$$app_pid" >/dev/null 2>&1 || true' EXIT INT TERM; \
-		npm run app:verify
+	node scripts/run-managed-server.mjs
 
 observability-local: compose-up
 	npm run observability:verify

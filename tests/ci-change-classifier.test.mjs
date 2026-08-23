@@ -71,52 +71,126 @@ test("runtime and engine changes execute the built Worker browser verifier", () 
   }
 });
 
-test("public aircraft evidence changes receive web and Rust parity gates", () => {
-  assert.deepEqual(
-    selected(["fixtures/public-reference/nasa-nesc-2015-f16-case11.json"]),
-    ["policy", "web_tests", "rust_tests"],
-  );
-});
-
-test("shared Air-runtime contracts select web and Rust parity", () => {
+test("actual mission, spatial, recording, and frontend contracts select their consumers", () => {
   for (const file of [
-    "lib/scenario-contract.ts",
-    "lib/scenario-draft.ts",
-    "lib/simulation-contract.ts",
-    "lib/vector-record.ts",
+    "lib/mission-admission.ts",
+    "lib/scenario-spatial.ts",
+    "lib/record/vector-record.ts",
   ]) {
     assert.deepEqual(selected([file]), [
       "policy",
       "quality",
       "security_js",
       "web_tests",
+      "browser_tests",
       "rust_tests",
+      "integration",
     ]);
   }
-  assert.deepEqual(selected(["worker/protocol.ts"]), [
+  assert.deepEqual(selected(["lib/frontend/selectors.ts"]), [
     "policy",
     "quality",
     "security_js",
     "web_tests",
-    "rust_tests",
+    "browser_tests",
+  ]);
+});
+
+test("runtime security boundaries select the built integration evidence they govern", () => {
+  for (const file of [
+    "lib/security/saved-run-admission.ts",
+    "lib/security/basemap-tiles.ts",
+  ]) {
+    assert.deepEqual(selected([file]), [
+      "policy",
+      "quality",
+      "security_js",
+      "web_tests",
+      "integration",
+    ]);
+  }
+  for (const file of [
+    "lib/security/admission-policy.ts",
+    "lib/security/runtime.ts",
+  ]) {
+    assert.deepEqual(selected([file]), [
+      "policy",
+      "quality",
+      "security_js",
+      "web_tests",
+      "integration",
+      "container",
+    ]);
+  }
+  assert.deepEqual(selected(["lib/security/browser-response.ts"]), [
+    "policy",
+    "quality",
+    "security_js",
+    "web_tests",
+    "browser_tests",
+  ]);
+});
+
+test("governed environment sources and actual model-pack fixtures select validators", () => {
+  assert.deepEqual(
+    selected([
+      "governance/environment-sources/nasa-power-hourly-20200115/punjab-anchor.raw.json",
+    ]),
+    ["policy", "quality", "web_tests", "rust_tests", "integration"],
+  );
+  assert.deepEqual(
+    selected(["fixtures/model-packs/vector-scalar-study-v0.8.compiled.json"]),
+    [
+      "policy",
+      "quality",
+      "web_tests",
+      "browser_tests",
+      "rust_tests",
+      "integration",
+    ],
+  );
+});
+
+test("public aircraft evidence changes receive web and Rust parity gates", () => {
+  assert.deepEqual(
+    selected(["fixtures/public-reference/nasa-nesc-2015-f16-case11.json"]),
+    ["policy", "quality", "web_tests", "rust_tests"],
+  );
+});
+
+test("shared Air-runtime contracts select web and Rust parity", () => {
+  for (const file of [
+    "lib/scenario-draft.ts",
+    "lib/scenario-package.ts",
+    "lib/simulation.ts",
+    "lib/record/vector-record.ts",
+  ]) {
+    const gates = selected([file]);
+    assert.equal(gates.includes("rust_tests"), true, `${file} must select parity`);
+    assert.equal(gates.includes("browser_tests"), true, `${file} must select built-browser evidence`);
+  }
+  assert.deepEqual(selected(["worker/index.ts"]), [
+    "policy",
+    "quality",
+    "security_js",
+    "web_tests",
     "integration",
     "container",
   ]);
 });
 
 test("environment and model fixtures select validation, parity, and integration", () => {
-  for (const file of [
-    "fixtures/environment/north-punjab.json",
-    "fixtures/model-pack/fighter.json",
-  ]) {
-    assert.deepEqual(selected([file]), [
+  assert.deepEqual(
+    selected(["fixtures/model-packs/vector-scalar-study-v0.8.compiled.json"]),
+    [
       "policy",
       "quality",
       "web_tests",
+      "browser_tests",
       "rust_tests",
       "integration",
-    ]);
-  }
+    ],
+  );
   assert.deepEqual(selected(["scripts/verify-governed-catalog-data.ts"]), [
     "policy",
     "quality",
@@ -147,12 +221,13 @@ test("saved-run admission always selects database and API integration", () => {
 
 test("combined contracts take the union of their required gates", () => {
   assert.deepEqual(
-    selected(["lib/simulation-contract.ts", "db/migrations/009_example.sql"]),
+    selected(["lib/simulation.ts", "db/migrations/009_example.sql"]),
     [
       "policy",
       "quality",
       "security_js",
       "web_tests",
+      "browser_tests",
       "rust_tests",
       "integration",
     ],

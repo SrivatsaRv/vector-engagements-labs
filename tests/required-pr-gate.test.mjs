@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { classifyChanges } from "../scripts/classify-ci-changes.mjs";
 import { REQUIRED_GATES, verifyRequiredGates } from "../scripts/verify-required-gates.mjs";
 
 const successfulEnvironment = () => {
@@ -57,4 +58,13 @@ test("the required gate rejects an invalid PR review classification", () => {
   const environment = successfulEnvironment();
   environment.PR_REVIEW_KIND = "unknown";
   assert.throws(() => verifyRequiredGates(environment), /PR review kind must be/i);
+});
+
+test("every change-selected job is owned by the Required PR Gate", () => {
+  const classifierOutputs = Object.keys(classifyChanges(["unknown-runtime/input.bin"]))
+    .filter((key) => key !== "files" && key !== "policy")
+    .sort();
+  const requiredOutputs = REQUIRED_GATES.map((gate) => gate.key.replaceAll("-", "_"))
+    .sort();
+  assert.deepEqual(requiredOutputs, classifierOutputs);
 });
