@@ -8,7 +8,7 @@ use crate::EngineError;
 
 const COMPILED_SCHEMA: &str = "vector.compiled-model-pack.v1";
 const AIRCRAFT_EVIDENCE_REGISTRY: &str =
-    include_str!("../../governance/aircraft-evidence-registry.v1.json");
+    include_str!("../../governance/aircraft-evidence-registry.v2.json");
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -941,6 +941,38 @@ pub fn validate_model_pack_json(input: &str) -> Result<CompiledModelPack, Engine
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn aircraft_evidence_registry_v2_preserves_v1_and_denies_context_runtime_authority(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let v1: Value = serde_json::from_str(include_str!(
+            "../../governance/aircraft-evidence-registry.v1.json"
+        ))?;
+        let v2: Value = serde_json::from_str(AIRCRAFT_EVIDENCE_REGISTRY)?;
+        assert_eq!(
+            v1["schemaVersion"],
+            Value::from("vector.aircraft-evidence-registry.v1")
+        );
+        assert_eq!(v2["supersedes"]["schemaVersion"], v1["schemaVersion"]);
+        assert_eq!(v2["subjects"].as_array().map(Vec::len), Some(3));
+        assert!(v2["claims"]
+            .as_array()
+            .is_some_and(|claims| claims.iter().all(|claim| claim["state"] == "UNSUPPORTED")));
+        assert!(v2["catalogAssertions"]
+            .as_array()
+            .is_some_and(|items| items.iter().all(|item| item["runtimeAuthority"] == "NONE")));
+        let proposal = v2["artifacts"]
+            .as_array()
+            .and_then(|items| {
+                items
+                    .iter()
+                    .find(|item| item["id"] == "dsca-pakistan-15-80-proposal")
+            })
+            .ok_or("missing quarantined proposal")?;
+        assert_eq!(proposal["admissionUse"], "INELIGIBLE");
+        assert_eq!(proposal["transactionState"], "EXPIRED_WITHOUT_ACCEPTANCE");
+        Ok(())
+    }
 
     fn fixture_pack_json() -> Result<String, Box<dyn std::error::Error>> {
         let bundle: Value = serde_json::from_str(include_str!(

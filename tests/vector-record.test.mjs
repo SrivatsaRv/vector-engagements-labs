@@ -142,6 +142,10 @@ for (const backend of ["typescript", "rust-wasm"]) {
     assert.equal(opened.events.state, "AVAILABLE");
     assert.ok(opened.events.items.length > 0);
     assert.deepEqual(opened.events, result.engineRun.events);
+    assert.match(
+      opened.report.limitations.join(" "),
+      /named-aircraft performance remains unsupported.*no catalog association supplies runtime authority/i,
+    );
     assert.ok(opened.pictures.length > 0, "tick-owned observer state must be recorded");
     assert.deepEqual(
       opened.result.pictures,

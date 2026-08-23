@@ -1,4 +1,4 @@
-import registry from "../governance/aircraft-evidence-registry.v1.json" with { type: "json" };
+import registry from "../governance/aircraft-evidence-registry.v2.json" with { type: "json" };
 
 import type { AircraftPerformanceAdmissionSource } from "./model-pack.ts";
 
@@ -16,6 +16,10 @@ type RegistryClaim = {
   capabilities: GovernedCapability[];
 };
 
+export function getGovernedAircraftEvidenceClaim(catalogObjectId: string) {
+  return registry.claims.find((item) => item.catalogObjectId === catalogObjectId) as RegistryClaim | undefined;
+}
+
 /**
  * A model-pack evidence row is necessary but not sufficient for a named-aircraft
  * claim. The governed registry is the separate admission authority that records
@@ -26,7 +30,7 @@ export function assertGovernedAircraftEvidenceAdmission(
   admission: AircraftPerformanceAdmissionSource,
 ) {
   if (admission.state !== "ADMITTED") return;
-  const claim = registry.claims.find((item) => item.catalogObjectId === catalogObjectId) as RegistryClaim | undefined;
+  const claim = getGovernedAircraftEvidenceClaim(catalogObjectId);
   if (!claim) {
     throw new Error(`Named aircraft ${catalogObjectId} has no governed evidence-registry claim.`);
   }

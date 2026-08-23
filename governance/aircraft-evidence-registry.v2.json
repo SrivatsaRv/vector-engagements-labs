@@ -1,0 +1,260 @@
+{
+  "schemaVersion": "vector.aircraft-evidence-registry.v2",
+  "version": "2.0.0",
+  "supersedes": {
+    "schemaVersion": "vector.aircraft-evidence-registry.v1",
+    "version": "1.0.0",
+    "path": "governance/aircraft-evidence-registry.v1.json"
+  },
+  "programmeGate": "#66",
+  "ownerIssue": "#64",
+  "dependentIssues": ["#26", "#28", "#60"],
+  "policy": {
+    "admission": "A named-aircraft performance admission needs one exact registry claim for each required capability. Every source and validation artifact must be explicitly eligible for that named-performance role, immutable, license-reviewed, exact-subject evidence. Catalog context, a proposal, a familiar designation, or a model-pack evidence row cannot qualify.",
+    "catalogContext": "CONTEXT_ONLY assertions may identify a programme or categorical association. They grant no aerodynamic, propulsion-map, control, sensor, weapon, station, loadout, mission, guidance, or outcome authority.",
+    "proposal": "A proposed sale is not delivered configuration evidence. An expired proposal is INELIGIBLE and remains quarantined even when it names equipment.",
+    "remoteArtifact": "A remote hash records reviewed content identity. It does not prove ingestion or coefficient extraction. A dynamic locator without an approved hash is context only and cannot support admission.",
+    "localArtifact": "A committed derivative fixture must hash to the registry value. A changed fixture needs a new registry version and a new review. No copyrighted source bytes are committed by this registry."
+  },
+  "artifacts": [
+    {
+      "id": "nasa-nesc-2015-f16-daveml-source",
+      "kind": "SOURCE",
+      "authority": "NASA NESC",
+      "uri": "https://nescacademy.nasa.gov/workshop/FlightSim/2015/models/F16_package.zip",
+      "sha256": "20c60f615ae8e87d81c9d98b54fff45a2832840201499cbcfe3f45a60ef3e5b2",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "REVIEWED",
+      "admissionUse": "REFERENCE_ONLY",
+      "scope": "NASA NESC F-16 DAVE-ML verification model; not an IAF Su-30MKI or PAF Peace Drive I F-16C/D model."
+    },
+    {
+      "id": "nasa-nesc-2015-atmos11-sim04-validation",
+      "kind": "VALIDATION",
+      "authority": "NASA NESC",
+      "uri": "https://nescacademy.nasa.gov/workshop/FlightSim/2015/atmos_scn_11/Atmos_11_sim_04.csv",
+      "sha256": "c6b8c1210c31fa440d271297ad219b5ad89264f4bb8a25f636c14f53d9b04a07",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "REVIEWED",
+      "admissionUse": "REFERENCE_ONLY",
+      "scope": "One 180-second subsonic wings-level trim trajectory; not a manoeuvre, sensor, store, or operational validation corpus."
+    },
+    {
+      "id": "vector-nesc-case11-derived-fixture",
+      "kind": "DERIVED_FIXTURE",
+      "authority": "VECTOR",
+      "uri": "fixtures/public-reference/nasa-nesc-2015-f16-case11.json",
+      "sha256": "85f14b1d28e0d839f6f75cc03e1ff7d577c181809f38d1b30a2f5f83e3bd3602",
+      "localPath": "fixtures/public-reference/nasa-nesc-2015-f16-case11.json",
+      "retrievalState": "COMMITTED_DERIVATIVE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "REVIEWED",
+      "admissionUse": "REFERENCE_ONLY",
+      "derivedFromArtifactIds": [
+        "nasa-nesc-2015-f16-daveml-source",
+        "nasa-nesc-2015-atmos11-sim04-validation"
+      ],
+      "scope": "SI-normalized NESC Case 11 checkpoints used only by the isolated public-reference verifier."
+    },
+    {
+      "id": "hal-su30mki-company-brochure-2024",
+      "kind": "SOURCE",
+      "authority": "Hindustan Aeronautics Limited",
+      "uri": "https://hal-india.co.in/backend/wp-content/uploads/2024/02/HAL_CO_Broucher-Full.pdf",
+      "sha256": "4472ee343fde713d23de7567c2e53cad499af65fdd4ae518a4e4b680e04d35ac",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "PENDING",
+      "admissionUse": "CATALOG_CONTEXT_ONLY",
+      "scope": "Categorical Su-30MKI identity, roles, two AL-31FP engines and 12 hardpoints only; no admitted performance tables or loadout authority."
+    },
+    {
+      "id": "hal-rlsu-30mk-product-page",
+      "kind": "CONTEXT",
+      "authority": "Hindustan Aeronautics Limited",
+      "uri": "https://hal-india.co.in/product/air-borne-secondary-radar",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "PENDING",
+      "admissionUse": "CATALOG_CONTEXT_ONLY",
+      "scope": "Dynamic public product locator supports a categorical RLSU-30MK PESA association only; no immutable artifact or sensor-performance admission."
+    },
+    {
+      "id": "pib-astra-su30-integration-2022",
+      "kind": "CONTEXT",
+      "authority": "Press Information Bureau, Government of India",
+      "uri": "https://www.pib.gov.in/Pressreleaseshare.aspx?PRID=1829750&lang=2&reg=3",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "PENDING",
+      "admissionUse": "CATALOG_CONTEXT_ONLY",
+      "scope": "Categorical Astra Mk-I and Su-30MKI integration statement; no station, loadout, guidance, sensor-support, or weapon-performance authority."
+    },
+    {
+      "id": "lockheed-peace-drive-i-2009",
+      "kind": "SOURCE",
+      "authority": "Lockheed Martin",
+      "uri": "https://news.lockheedmartin.com/2009-10-13-Lockheed-Martin-Unveils-First-New-F-16-for-Pakistan-in-Ceremony-Attended-by-Air-Force-Chiefs",
+      "sha256": "5119b61b57912e124eab20d97881cef0c61abcaeeb93e1d0446f72648ee54e84",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "PENDING",
+      "admissionUse": "CATALOG_CONTEXT_ONLY",
+      "scope": "Peace Drive I programme identity, 12 F-16C, 6 F-16D, and F100-PW-229 categorical association; no performance-map or mission authority."
+    },
+    {
+      "id": "federal-register-paf-f16-2006",
+      "kind": "SOURCE",
+      "authority": "United States Federal Register / Government Publishing Office",
+      "uri": "https://www.govinfo.gov/content/pkg/FR-2006-07-11/pdf/FR-2006-07-11.pdf",
+      "sha256": "c1ae8db1c414fa3263316d04b0bf451a5f72c7228268c74cee9a412ad3a9f8ef",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "REVIEWED",
+      "admissionUse": "CATALOG_CONTEXT_ONLY",
+      "scope": "Requested programme association with APG-68(V)9, Link 16, AIM-120C-5 and LAU-129/A; no final delivered-fit or runtime authority."
+    },
+    {
+      "id": "govinfo-paf-f16-hearing-2008",
+      "kind": "SOURCE",
+      "authority": "United States House of Representatives / Government Publishing Office",
+      "uri": "https://www.govinfo.gov/content/pkg/GOVPUB-Y4_F76_1-PURL-LPS106730/pdf/GOVPUB-Y4_F76_1-PURL-LPS106730.pdf",
+      "sha256": "7557082f3d9ca8338a8e7d412d124355869b85b30d7fa0267e895e81d22183b8",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "REVIEWED",
+      "admissionUse": "CATALOG_CONTEXT_ONLY",
+      "publishedAt": "2008-09-16",
+      "scope": "F-16C/D Block 52 programme and AIM-120C-5 association only; no station, loadout, guidance, or weapon-performance authority."
+    },
+    {
+      "id": "dsca-pakistan-15-80-proposal",
+      "kind": "CONTEXT",
+      "authority": "Defense Security Cooperation Agency",
+      "uri": "https://www.dsca.mil/Press-Media/Major-Arms-Sales/Major-Arms-Sales-Library/igphoto/2003606313",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "PENDING",
+      "admissionUse": "INELIGIBLE",
+      "transactionState": "EXPIRED_WITHOUT_ACCEPTANCE",
+      "scope": "Separate 2016 proposed sale. It is not Peace Drive I delivered-fit evidence and cannot support any catalog fit or runtime admission."
+    },
+    {
+      "id": "crs-pakistan-f16-rl31675",
+      "kind": "CONTEXT",
+      "authority": "Congressional Research Service",
+      "uri": "https://www.congress.gov/crs_external_products/RL/HTML/RL31675.web.html",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "PENDING",
+      "admissionUse": "GOVERNANCE_CONTEXT_ONLY",
+      "retrievedAt": "2026-08-23",
+      "scope": "Dynamic transaction-history locator used to quarantine the 2016 proposal. Pending immutable hash; never runtime evidence."
+    }
+  ],
+  "subjects": [
+    {
+      "id": "iaf-su-30mki",
+      "catalogObjectId": "su-30mki",
+      "operator": "IAF",
+      "designation": "Su-30MKI",
+      "programme": null,
+      "seatConfiguration": "TWO_SEAT",
+      "deliveredQuantity": null,
+      "scenarioSelectable": true
+    },
+    {
+      "id": "paf-f-16c-block52-peace-drive-i",
+      "catalogObjectId": "f-16c-block52-paf",
+      "operator": "PAF",
+      "designation": "F-16C Block 52",
+      "programme": "Peace Drive I",
+      "seatConfiguration": "SINGLE_SEAT",
+      "deliveredQuantity": 12,
+      "scenarioSelectable": true
+    },
+    {
+      "id": "paf-f-16d-block52-peace-drive-i",
+      "catalogObjectId": "f-16d-block52-paf",
+      "operator": "PAF",
+      "designation": "F-16D Block 52",
+      "programme": "Peace Drive I",
+      "seatConfiguration": "TWO_SEAT",
+      "deliveredQuantity": 6,
+      "scenarioSelectable": false
+    }
+  ],
+  "catalogAssertions": [
+    { "id": "su30-identity-role", "subjectId": "iaf-su-30mki", "field": "identity.role", "value": "IAF Su-30MKI multirole fighter", "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["hal-su30mki-company-brochure-2024"] },
+    { "id": "su30-engine-association", "subjectId": "iaf-su-30mki", "field": "propulsion.engineFamily", "value": "2 × AL-31FP", "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["hal-su30mki-company-brochure-2024"] },
+    { "id": "su30-hardpoint-count", "subjectId": "iaf-su-30mki", "field": "stores.hardpointCount", "value": 12, "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["hal-su30mki-company-brochure-2024"] },
+    { "id": "su30-radar-association", "subjectId": "iaf-su-30mki", "field": "sensor.radar", "value": "RLSU-30MK PESA association", "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["hal-rlsu-30mk-product-page"] },
+    { "id": "su30-astra-association", "subjectId": "iaf-su-30mki", "field": "weapon.programmeAssociation", "value": "Astra Mk-I integration", "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["pib-astra-su30-integration-2022"] },
+    { "id": "su30-default-store-assumption", "subjectId": "iaf-su-30mki", "field": "stores.defaultLoadout", "value": "2 × Astra Mk-I", "evidenceState": "MODEL_ASSUMPTION", "runtimeAuthority": "NONE", "evidenceArtifactIds": [] },
+
+    { "id": "f16c-delivered-identity", "subjectId": "paf-f-16c-block52-peace-drive-i", "field": "identity.deliveredQuantity", "value": 12, "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["lockheed-peace-drive-i-2009"] },
+    { "id": "f16c-engine-association", "subjectId": "paf-f-16c-block52-peace-drive-i", "field": "propulsion.engineFamily", "value": "F100-PW-229", "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["lockheed-peace-drive-i-2009"] },
+    { "id": "f16c-radar-association", "subjectId": "paf-f-16c-block52-peace-drive-i", "field": "sensor.radar", "value": "AN/APG-68(V)9 requested-programme association", "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["federal-register-paf-f16-2006"] },
+    { "id": "f16c-link16-association", "subjectId": "paf-f-16c-block52-peace-drive-i", "field": "datalink.system", "value": "Link 16 requested-programme association", "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["federal-register-paf-f16-2006"] },
+    { "id": "f16c-amraam-association", "subjectId": "paf-f-16c-block52-peace-drive-i", "field": "weapon.programmeAssociation", "value": "AIM-120C-5 programme association", "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["federal-register-paf-f16-2006", "govinfo-paf-f16-hearing-2008"] },
+    { "id": "f16c-ew-unknown", "subjectId": "paf-f-16c-block52-peace-drive-i", "field": "defensiveEw.fittedSystem", "value": null, "evidenceState": "UNKNOWN", "runtimeAuthority": "NONE", "evidenceArtifactIds": [] },
+    { "id": "f16c-default-store-assumption", "subjectId": "paf-f-16c-block52-peace-drive-i", "field": "stores.defaultLoadout", "value": "2 × AIM-120C-5", "evidenceState": "MODEL_ASSUMPTION", "runtimeAuthority": "NONE", "evidenceArtifactIds": [] },
+
+    { "id": "f16d-delivered-identity", "subjectId": "paf-f-16d-block52-peace-drive-i", "field": "identity.deliveredQuantity", "value": 6, "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["lockheed-peace-drive-i-2009"] },
+    { "id": "f16d-engine-association", "subjectId": "paf-f-16d-block52-peace-drive-i", "field": "propulsion.engineFamily", "value": "F100-PW-229", "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["lockheed-peace-drive-i-2009"] },
+    { "id": "f16d-radar-association", "subjectId": "paf-f-16d-block52-peace-drive-i", "field": "sensor.radar", "value": "AN/APG-68(V)9 requested-programme association", "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["federal-register-paf-f16-2006"] },
+    { "id": "f16d-link16-association", "subjectId": "paf-f-16d-block52-peace-drive-i", "field": "datalink.system", "value": "Link 16 requested-programme association", "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["federal-register-paf-f16-2006"] },
+    { "id": "f16d-amraam-association", "subjectId": "paf-f-16d-block52-peace-drive-i", "field": "weapon.programmeAssociation", "value": "AIM-120C-5 programme association", "evidenceState": "CONTEXT_ONLY", "runtimeAuthority": "NONE", "evidenceArtifactIds": ["federal-register-paf-f16-2006", "govinfo-paf-f16-hearing-2008"] },
+    { "id": "f16d-ew-unknown", "subjectId": "paf-f-16d-block52-peace-drive-i", "field": "defensiveEw.fittedSystem", "value": null, "evidenceState": "UNKNOWN", "runtimeAuthority": "NONE", "evidenceArtifactIds": [] }
+  ],
+  "claims": [
+    {
+      "id": "su-30mki-performance",
+      "subjectId": "iaf-su-30mki",
+      "catalogObjectId": "su-30mki",
+      "state": "UNSUPPORTED",
+      "reason": "Categorical identity and subsystem associations do not provide independently validated Su-30MKI aerodynamic, propulsion, control, mass/stores, or sensor models.",
+      "capabilities": [
+        { "capability": "AERODYNAMICS", "contextArtifactIds": ["hal-su30mki-company-brochure-2024"], "missingReason": "No admitted Su-30MKI aerodynamic tables and independent validation corpus." },
+        { "capability": "PROPULSION", "contextArtifactIds": ["hal-su30mki-company-brochure-2024"], "missingReason": "AL-31FP categorical association is not an engine map or independent validation corpus." },
+        { "capability": "FLIGHT_CONTROLS", "contextArtifactIds": [], "missingReason": "No admitted Su-30MKI flight-control authority or independent validation corpus." },
+        { "capability": "MASS_AND_STORES", "contextArtifactIds": ["hal-su30mki-company-brochure-2024"], "missingReason": "A hardpoint count is not a mass, station, compatibility, or validated stores model." },
+        { "capability": "SENSORS", "contextArtifactIds": ["hal-rlsu-30mk-product-page"], "missingReason": "Categorical radar association is not an admitted scan, detection, measurement, or track model." }
+      ]
+    },
+    {
+      "id": "f-16c-block52-paf-performance",
+      "subjectId": "paf-f-16c-block52-peace-drive-i",
+      "catalogObjectId": "f-16c-block52-paf",
+      "state": "UNSUPPORTED",
+      "reason": "Peace Drive I identity and programme associations do not provide independently validated F-16C Block 52 performance, sensor, station, loadout, or mission models. The NASA NESC F-16 reference is a different subject.",
+      "capabilities": [
+        { "capability": "AERODYNAMICS", "contextArtifactIds": [], "missingReason": "No admitted Peace Drive I F-16C aerodynamic tables and independent validation corpus." },
+        { "capability": "PROPULSION", "contextArtifactIds": ["lockheed-peace-drive-i-2009"], "missingReason": "F100-PW-229 categorical association is not an engine map or independent validation corpus." },
+        { "capability": "FLIGHT_CONTROLS", "contextArtifactIds": [], "missingReason": "No admitted Peace Drive I F-16C flight-control authority or independent validation corpus." },
+        { "capability": "MASS_AND_STORES", "contextArtifactIds": ["federal-register-paf-f16-2006", "govinfo-paf-f16-hearing-2008"], "missingReason": "Programme weapon associations are not station, loadout, mass, or independent validation evidence." },
+        { "capability": "SENSORS", "contextArtifactIds": ["federal-register-paf-f16-2006"], "missingReason": "Requested radar and data-link associations are not delivered-fit, sensor-performance, or independent validation evidence." }
+      ]
+    },
+    {
+      "id": "f-16d-block52-paf-performance",
+      "subjectId": "paf-f-16d-block52-peace-drive-i",
+      "catalogObjectId": "f-16d-block52-paf",
+      "state": "UNSUPPORTED",
+      "reason": "Peace Drive I identity and programme associations do not provide independently validated F-16D Block 52 performance, sensor, station, loadout, or mission models. This catalog-only subject is not scenario-selectable.",
+      "capabilities": [
+        { "capability": "AERODYNAMICS", "contextArtifactIds": [], "missingReason": "No admitted Peace Drive I F-16D aerodynamic tables and independent validation corpus." },
+        { "capability": "PROPULSION", "contextArtifactIds": ["lockheed-peace-drive-i-2009"], "missingReason": "F100-PW-229 categorical association is not an engine map or independent validation corpus." },
+        { "capability": "FLIGHT_CONTROLS", "contextArtifactIds": [], "missingReason": "No admitted Peace Drive I F-16D flight-control authority or independent validation corpus." },
+        { "capability": "MASS_AND_STORES", "contextArtifactIds": ["federal-register-paf-f16-2006", "govinfo-paf-f16-hearing-2008"], "missingReason": "Programme weapon associations are not station, loadout, mass, or independent validation evidence." },
+        { "capability": "SENSORS", "contextArtifactIds": ["federal-register-paf-f16-2006"], "missingReason": "Requested radar and data-link associations are not delivered-fit, sensor-performance, or independent validation evidence." }
+      ]
+    }
+  ]
+}

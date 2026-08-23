@@ -36,7 +36,8 @@ frozen environment-pack binding and never query either source.
 
 ## Fixed development fixture
 
-This slice deliberately remains **3 platforms, 8 weapons, 8 model sets, 21
+This slice deliberately remains **4 catalog platforms, 3 scenario-selectable
+platforms, 8 weapons, 8 model sets, 21
 public-reference installations, and 8 scenario templates**. The installation
 catalogue contains six IAF context points and all 15 PAF points present in
 SHIELD's `apps/backend/data/paf_orbat.json` seed. It is explicitly
@@ -47,6 +48,21 @@ current force disposition. Positional uncertainty is `null` where the source
 has not published a reviewed value. The database verifier fails if the catalog
 count, ICAO coverage, SRID, provenance, or the Nur Khan coordinate regression
 drifts.
+
+The PAF Peace Drive I catalog records keep the 12 single-seat F-16C Block 52
+and 6 two-seat F-16D Block 52 subjects separate. Only the already model-bound
+F-16C identity is scenario-selectable; F-16D is catalog-only. Lockheed's
+programme statement supports the delivered counts and a categorical
+F100-PW-229 association. The 2006 Federal Register notice supports only
+requested-programme context for APG-68(V)9, Link 16, AIM-120C-5 and LAU-129/A;
+it does not prove final fit, so the F-16C/D database rows leave the fitted radar,
+data-link, and defensive-EW columns null and publish those associations only as
+`CONTEXT_ONLY` assertions. The separate 2016 DSCA proposal expired without
+acceptance and is `INELIGIBLE`. No ALQ-211(V)9 fitted-system assertion remains.
+All current station compatibility and two-store defaults are `UNVERIFIED` or
+`MODEL_ASSUMPTION`, never catalog-derived runtime authority. The aircraft
+evidence panel displays that assumption label beside the two-store teaching
+default at every supported viewport.
 
 PostGIS is canonical for installation geometry. Map markers, study-area origin selectors, and future KML/GeoJSON exports derive from `installations.location`; VECTOR does not maintain an independent hand-edited KML truth file. Coordinate order is longitude, latitude in EPSG:4326.
 

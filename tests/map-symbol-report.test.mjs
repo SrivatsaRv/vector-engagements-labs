@@ -231,6 +231,15 @@ test("report export binds the exact run configuration, frames and source state",
   assert.equal(report.telemetry.samples.length, result.frames.length);
   assert.equal(report.provenance.scenarioContentHash, "a".repeat(64));
   assert.equal(report.provenance.frameHash, "b".repeat(64));
+  assert.deepEqual(
+    report.provenance.namedAircraftPerformance.map((item) => [item.catalogObjectId, item.state]),
+    [
+      ["su-30mki", "UNSUPPORTED"],
+      ["f-16c-block52-paf", "UNSUPPORTED"],
+    ],
+  );
+  assert.ok(report.provenance.sources.every((source) => source.evidenceUse !== "INELIGIBLE"));
+  assert.ok(report.provenance.sources.some((source) => source.evidenceUse === "CATALOG_CONTEXT"));
   assert.equal(report.scenario.configuration.information.blueTrackSource, definition.scenario.blueTrackSource);
   assert.equal(report.scenario.configuration.environment.visibility.value, definition.scenario.visibilityKm);
   assert.equal(report.result.outcome, result.outcome);

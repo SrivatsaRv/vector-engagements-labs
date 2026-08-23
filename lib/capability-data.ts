@@ -1,6 +1,12 @@
 import type { EngagementDomain } from "./simulation.ts";
 
-export type DataStatus = "SOURCED" | "PARTIAL" | "MODEL_ASSUMPTION" | "UNKNOWN";
+export type DataStatus =
+  | "SOURCED"
+  | "PARTIAL"
+  | "CONTEXT_ONLY"
+  | "INELIGIBLE"
+  | "MODEL_ASSUMPTION"
+  | "UNKNOWN";
 export type Service = "IAF" | "PAF" | "OTHER";
 export type SubsystemKind =
   | "ENGINE"
@@ -24,6 +30,7 @@ export type SourceRecord = {
   url: string;
   publishedAt?: string;
   sourceClass: "OFFICIAL" | "MANUFACTURER" | "SECONDARY";
+  evidenceUse?: "CATALOG_CONTEXT" | "INELIGIBLE";
   note: string;
 };
 
@@ -75,6 +82,8 @@ export type PlatformRecord = {
   variant: string;
   name: string;
   role: string;
+  deliveredQuantity?: number;
+  scenarioSelectable: boolean;
   domains: EngagementDomain[];
   crew?: number;
   engineIds: string[];
@@ -84,7 +93,11 @@ export type PlatformRecord = {
   rwrId?: string;
   countermeasureId?: string;
   compatibleWeaponIds: string[];
-  defaultLoadout: Array<{ weaponId: string; quantity: number }>;
+  defaultLoadout: Array<{
+    weaponId: string;
+    quantity: number;
+    status: "MODEL_ASSUMPTION";
+  }>;
   publicFacts: Array<{
     label: string;
     value: string;
@@ -104,6 +117,7 @@ export const SOURCES: SourceRecord[] = [
     publishedAt: "2022-05-31",
     sourceClass: "OFFICIAL",
     note: "Confirms the IAF procurement and full integration of Astra Mk-I on Su-30MKI.",
+    evidenceUse: "CATALOG_CONTEXT",
   },
   {
     id: "drdo-astra-2019",
@@ -123,6 +137,7 @@ export const SOURCES: SourceRecord[] = [
     publishedAt: "2024-09-09",
     sourceClass: "OFFICIAL",
     note: "Confirms AL-31FP engine association with the IAF Su-30MKI fleet.",
+    evidenceUse: "CATALOG_CONTEXT",
   },
   {
     id: "lockheed-paf-f16-2009",
@@ -131,7 +146,18 @@ export const SOURCES: SourceRecord[] = [
     url: "https://news.lockheedmartin.com/2009-10-13-Lockheed-Martin-Unveils-First-New-F-16-for-Pakistan-in-Ceremony-Attended-by-Air-Force-Chiefs",
     publishedAt: "2009-10-13",
     sourceClass: "MANUFACTURER",
-    note: "Confirms delivery context and the Pakistan Air Force F-16 Block 52 configuration.",
+    evidenceUse: "CATALOG_CONTEXT",
+    note: "Identifies Peace Drive I as 12 F-16C and 6 F-16D Block 52 aircraft and associates the programme with F100-PW-229 engines. It is categorical catalog context, not performance evidence.",
+  },
+  {
+    id: "federal-register-paf-f16-2006",
+    title: "Pakistan F-16C/D Block 50/52 aircraft programme notice",
+    publisher: "United States Federal Register / Government Publishing Office",
+    url: "https://www.govinfo.gov/content/pkg/FR-2006-07-11/pdf/FR-2006-07-11.pdf",
+    publishedAt: "2006-07-11",
+    sourceClass: "OFFICIAL",
+    evidenceUse: "CATALOG_CONTEXT",
+    note: "Associates the requested programme with APG-68(V)9, Link 16, AIM-120C-5 and LAU-129/A. It does not prove final delivered fit or supply runtime authority.",
   },
   {
     id: "dsca-pakistan-15-80",
@@ -140,7 +166,17 @@ export const SOURCES: SourceRecord[] = [
     url: "https://www.dsca.mil/Press-Media/Major-Arms-Sales/Major-Arms-Sales-Library/igphoto/2003606313",
     publishedAt: "2016-02-12",
     sourceClass: "OFFICIAL",
-    note: "Identifies F100-PW-229 engines, AN/APG-68(V)9 radar, ALQ-211(V)9 AIDEWS, and Link 16 in the proposed configuration.",
+    evidenceUse: "INELIGIBLE",
+    note: "Separate 2016 proposed sale that expired without acceptance. It is quarantined and cannot establish delivered Peace Drive I fit or runtime authority.",
+  },
+  {
+    id: "crs-pakistan-f16-rl31675",
+    title: "Pakistan-U.S. relations and F-16 transaction history",
+    publisher: "Congressional Research Service",
+    url: "https://www.congress.gov/crs_external_products/RL/HTML/RL31675.web.html",
+    sourceClass: "OFFICIAL",
+    evidenceUse: "CATALOG_CONTEXT",
+    note: "Reviewed as the transaction-state basis for quarantining the 2016 proposal. The dynamic locator has no approved immutable artifact hash and cannot support runtime admission.",
   },
   {
     id: "usaf-f16-factsheet",
@@ -155,10 +191,11 @@ export const SOURCES: SourceRecord[] = [
     id: "us-congress-paf-amraam-2008",
     title: "Pakistan F-16 program status and munitions package",
     publisher: "United States Congress / U.S. Government Publishing Office",
-    url: "https://www.congress.gov/110/chrg/CHRG-110hhrg44526/CHRG-110hhrg44526.pdf",
-    publishedAt: "2008-04-16",
+    url: "https://www.govinfo.gov/content/pkg/GOVPUB-Y4_F76_1-PURL-LPS106730/pdf/GOVPUB-Y4_F76_1-PURL-LPS106730.pdf",
+    publishedAt: "2008-09-16",
     sourceClass: "OFFICIAL",
-    note: "Records the F-16C/D Block 52 program and the AIM-120C-5 AMRAAM quantity in the associated munitions package.",
+    evidenceUse: "CATALOG_CONTEXT",
+    note: "Records the F-16C/D Block 52 programme and AIM-120C-5 association. It is categorical programme context, not station, loadout, guidance, or performance authority.",
   },
   {
     id: "mbda-mica-2022",
@@ -237,7 +274,7 @@ export const SUBSYSTEMS: SubsystemRecord[] = [
     kind: "ENGINE",
     designation: "AL-31FP",
     description: "Twin-engine installation on the Su-30MKI.",
-    status: "SOURCED",
+    status: "CONTEXT_ONLY",
     sourceIds: ["pib-su30-engine-2024"],
   },
   {
@@ -263,8 +300,8 @@ export const SUBSYSTEMS: SubsystemRecord[] = [
     kind: "DATALINK",
     designation: "Weapon-update data link",
     description:
-      "Modeled as available when supporting Astra mid-course updates.",
-    status: "PARTIAL",
+      "Astra integration context does not establish an admitted aircraft data-link model.",
+    status: "CONTEXT_ONLY",
     sourceIds: ["drdo-astra-2019"],
   },
   {
@@ -273,36 +310,27 @@ export const SUBSYSTEMS: SubsystemRecord[] = [
     designation: "F100-PW-229",
     manufacturer: "Pratt & Whitney",
     description:
-      "Engine identified for the proposed Pakistan F-16 Block 52 configuration.",
-    status: "SOURCED",
-    sourceIds: ["dsca-pakistan-15-80"],
+      "F100-PW-229 is associated categorically with the delivered Peace Drive I programme; no engine map or performance authority is admitted.",
+    status: "CONTEXT_ONLY",
+    sourceIds: ["lockheed-paf-f16-2009"],
   },
   {
     id: "apg-68v9",
     kind: "RADAR",
     designation: "AN/APG-68(V)9",
     description:
-      "Multimode fire-control radar identified in the proposed Pakistan package.",
-    status: "SOURCED",
-    sourceIds: ["dsca-pakistan-15-80"],
-  },
-  {
-    id: "alq-211v9",
-    kind: "EW",
-    designation: "AN/ALQ-211(V)9 AIDEWS",
-    description:
-      "Defensive electronic-warfare suite identified in the proposed Pakistan package.",
-    status: "SOURCED",
-    sourceIds: ["dsca-pakistan-15-80"],
+      "APG-68(V)9 appears in the 2006 requested programme context; final delivered fit and sensor performance are not established.",
+    status: "CONTEXT_ONLY",
+    sourceIds: ["federal-register-paf-f16-2006"],
   },
   {
     id: "link-16",
     kind: "DATALINK",
     designation: "Link 16",
     description:
-      "Tactical data link identified in the proposed Pakistan package.",
-    status: "SOURCED",
-    sourceIds: ["dsca-pakistan-15-80"],
+      "Link 16 appears in the 2006 requested programme context; final delivered fit and data-link behavior are not established.",
+    status: "CONTEXT_ONLY",
+    sourceIds: ["federal-register-paf-f16-2006"],
   },
 ];
 
@@ -551,6 +579,7 @@ export const PLATFORMS: PlatformRecord[] = [
     variant: "MKI",
     name: "Multirole fighter",
     role: "Blue fighter / launch platform",
+    scenarioSelectable: true,
     domains: ["A2A", "A2G"],
     crew: 2,
     engineIds: ["al-31fp", "al-31fp"],
@@ -558,18 +587,18 @@ export const PLATFORMS: PlatformRecord[] = [
     ewId: "su30-ew",
     datalinkId: "su30-datalink",
     compatibleWeaponIds: ["astra-mk1"],
-    defaultLoadout: [{ weaponId: "astra-mk1", quantity: 2 }],
+    defaultLoadout: [{ weaponId: "astra-mk1", quantity: 2, status: "MODEL_ASSUMPTION" }],
     publicFacts: [
       {
         label: "Astra integration",
         value: "Fully integrated on Su-30MKI",
-        status: "SOURCED",
+        status: "CONTEXT_ONLY",
         sourceIds: ["pib-astra-contract-2022"],
       },
       {
         label: "Engine installation",
         value: "2 × AL-31FP",
-        status: "SOURCED",
+        status: "CONTEXT_ONLY",
         sourceIds: ["pib-su30-engine-2024"],
       },
       {
@@ -588,55 +617,99 @@ export const PLATFORMS: PlatformRecord[] = [
     country: "Pakistan",
     designation: "F-16C Block 52",
     family: "F-16",
-    variant: "C Block 52",
+    variant: "F-16C Block 52 Peace Drive I",
     name: "Fighting Falcon",
     role: "Red fighter / opposing track",
+    deliveredQuantity: 12,
+    scenarioSelectable: true,
     domains: ["A2A", "A2G", "G2A"],
     crew: 1,
     engineIds: ["f100-pw-229"],
-    radarId: "apg-68v9",
-    ewId: "alq-211v9",
-    datalinkId: "link-16",
     compatibleWeaponIds: ["aim-120c5"],
-    defaultLoadout: [{ weaponId: "aim-120c5", quantity: 2 }],
+    defaultLoadout: [{ weaponId: "aim-120c5", quantity: 2, status: "MODEL_ASSUMPTION" }],
     publicFacts: [
       {
-        label: "PAF configuration",
-        value: "F-16C/D Block 52 program",
+        label: "Peace Drive I identity",
+        value: "12 delivered single-seat aircraft",
         status: "SOURCED",
-        sourceIds: ["lockheed-paf-f16-2009", "us-congress-paf-amraam-2008"],
+        sourceIds: ["lockheed-paf-f16-2009"],
       },
       {
         label: "Engine",
-        value: "F100-PW-229",
-        status: "SOURCED",
-        sourceIds: ["dsca-pakistan-15-80"],
+        value: "F100-PW-229 programme association",
+        status: "CONTEXT_ONLY",
+        sourceIds: ["lockheed-paf-f16-2009"],
       },
       {
         label: "Radar",
-        value: "AN/APG-68(V)9",
-        status: "SOURCED",
-        sourceIds: ["dsca-pakistan-15-80"],
-      },
-      {
-        label: "Defensive EW",
-        value: "AN/ALQ-211(V)9 AIDEWS",
-        status: "SOURCED",
-        sourceIds: ["dsca-pakistan-15-80"],
+        value: "AN/APG-68(V)9 requested-programme association only",
+        status: "CONTEXT_ONLY",
+        sourceIds: ["federal-register-paf-f16-2006"],
       },
       {
         label: "Datalink",
-        value: "Link 16",
-        status: "SOURCED",
-        sourceIds: ["dsca-pakistan-15-80"],
+        value: "Link 16 requested-programme association only",
+        status: "CONTEXT_ONLY",
+        sourceIds: ["federal-register-paf-f16-2006"],
+      },
+      {
+        label: "AIM-120C-5",
+        value: "Programme association only; station and loadout not admitted",
+        status: "CONTEXT_ONLY",
+        sourceIds: ["us-congress-paf-amraam-2008", "federal-register-paf-f16-2006"],
       },
     ],
-    status: "SOURCED",
+    status: "PARTIAL",
     sourceIds: [
       "lockheed-paf-f16-2009",
-      "dsca-pakistan-15-80",
+      "federal-register-paf-f16-2006",
       "us-congress-paf-amraam-2008",
     ],
+  },
+  {
+    id: "f-16d-block52-paf",
+    service: "PAF",
+    country: "Pakistan",
+    designation: "F-16D Block 52",
+    family: "F-16",
+    variant: "F-16D Block 52 Peace Drive I",
+    name: "Fighting Falcon",
+    role: "Public-reference catalog only; not scenario-selectable",
+    deliveredQuantity: 6,
+    scenarioSelectable: false,
+    domains: ["A2A", "A2G", "G2A"],
+    crew: 2,
+    engineIds: ["f100-pw-229"],
+    compatibleWeaponIds: [],
+    defaultLoadout: [],
+    publicFacts: [
+      {
+        label: "Peace Drive I identity",
+        value: "6 delivered two-seat aircraft",
+        status: "SOURCED",
+        sourceIds: ["lockheed-paf-f16-2009"],
+      },
+      {
+        label: "Engine",
+        value: "F100-PW-229 programme association",
+        status: "CONTEXT_ONLY",
+        sourceIds: ["lockheed-paf-f16-2009"],
+      },
+      {
+        label: "Radar",
+        value: "AN/APG-68(V)9 requested-programme association only",
+        status: "CONTEXT_ONLY",
+        sourceIds: ["federal-register-paf-f16-2006"],
+      },
+      {
+        label: "Datalink",
+        value: "Link 16 requested-programme association only",
+        status: "CONTEXT_ONLY",
+        sourceIds: ["federal-register-paf-f16-2006"],
+      },
+    ],
+    status: "PARTIAL",
+    sourceIds: ["lockheed-paf-f16-2009", "federal-register-paf-f16-2006"],
   },
   {
     id: "mirage-2000h",
@@ -647,10 +720,11 @@ export const PLATFORMS: PlatformRecord[] = [
     variant: "H",
     name: "Multirole fighter",
     role: "Blue fighter",
+    scenarioSelectable: true,
     domains: ["A2A", "A2G"],
     engineIds: [],
     compatibleWeaponIds: ["mica-ir"],
-    defaultLoadout: [{ weaponId: "mica-ir", quantity: 2 }],
+    defaultLoadout: [{ weaponId: "mica-ir", quantity: 2, status: "MODEL_ASSUMPTION" }],
     publicFacts: [
       {
         label: "Catalog depth",
@@ -683,3 +757,18 @@ export const getCompatibleWeapons = (platformId: string) => {
     platform.compatibleWeaponIds.includes(weapon.id),
   );
 };
+
+export type CatalogReviewState =
+  | "ACCEPTED"
+  | "CONTEXT_ONLY"
+  | "INELIGIBLE"
+  | "MODEL_ASSUMPTION"
+  | "UNKNOWN";
+
+export function catalogReviewState(status: DataStatus): CatalogReviewState {
+  if (status === "SOURCED") return "ACCEPTED";
+  if (status === "CONTEXT_ONLY" || status === "PARTIAL") return "CONTEXT_ONLY";
+  if (status === "INELIGIBLE") return "INELIGIBLE";
+  if (status === "MODEL_ASSUMPTION") return "MODEL_ASSUMPTION";
+  return "UNKNOWN";
+}
