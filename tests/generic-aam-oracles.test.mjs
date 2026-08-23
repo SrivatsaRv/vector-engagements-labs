@@ -23,7 +23,7 @@ import {
 } from "../lib/validation/generic-aam-verification.ts";
 
 const source = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/19940031931.pdf", import.meta.url));
-const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v4.json", import.meta.url));
+const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v5.json", import.meta.url));
 const workload = JSON.parse(workloadBytes);
 const clone = (value) => structuredClone(value);
 const corpus = () => clone(genericAamCorpusView());
@@ -57,6 +57,12 @@ test("every governed corpus field family has a table-driven tamper falsifier", (
     ["DCS laundering", (value) => { value.artifact.authority = "NASA_NTRS_DCS_EXPORT"; }],
     ["War Thunder laundering", (value) => { value.artifact.id = "WAR_THUNDER_NASA_COPY"; }],
     ["runtime promotion", (value) => { value.promotion.prohibitedSurfaces = []; }],
+    ["unknown parity policy field", (value) => { value.evaluator.parityPolicy.extra = true; }],
+    ["parity formula", (value) => { value.evaluator.parityPolicy.formula = "abs(ts-rust) <= absoluteTolerance"; }],
+    ["duplicate parity field", (value) => { value.evaluator.parityPolicy.defaultTolerance.fields.push("speedMps"); }],
+    ["negative parity tolerance", (value) => { value.evaluator.parityPolicy.overrides[0].relativeTolerance = -1; }],
+    ["ungoverned parity override", (value) => { value.evaluator.parityPolicy.overrides[0].field = "missDistanceM"; }],
+    ["parity host provenance", (value) => { value.evaluator.parityPolicy.evidence.hosts[1].runtime = "unknown"; }],
   ];
   for (const [name, mutate] of mutations) {
     const candidate = corpus();
@@ -336,7 +342,7 @@ test("exact seeker equality is admitted, epsilon outside rejects, and terminal p
 test("governed workload bytes, exact coverage and limits reject tamper", () => {
   const report = verifyGenericAamWorkload(workload, workloadBytes);
   assert.equal(report.cases, 15);
-  assert.equal(report.sha256, "9df2c63309e22931deed24c2ee267b7efed2fc7783061ad84b2628f8e577012d");
+  assert.equal(report.sha256, "b1f2092dc810909ffa0b4c9c1b2cf33102ca02f0a10a9bbb24d653ed2bc7c4be");
   const changedBytes = Buffer.from(workloadBytes);
   changedBytes[changedBytes.length - 2] = 0x20;
   assert.throws(() => verifyGenericAamWorkload(workload, changedBytes));

@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { runRustWasmGenericAamVerification } from "../lib/validation/generic-aam-verification-wasm.ts";
 import {
+  assertGenericAamFullFrameParity,
   genericAamSemanticBatchSha256,
   genericAamSemanticOutcome,
   genericAamSemanticOutcomeSha256,
@@ -13,13 +14,13 @@ if (!process.argv.includes("--write")) {
   throw new Error("Refusing to rewrite the governed workload without --write.");
 }
 
-const previousWorkloadUrl = new URL("../fixtures/public-reference/nasa-tm-109057/workload.v3.json", import.meta.url);
-const workloadUrl = new URL("../fixtures/public-reference/nasa-tm-109057/workload.v4.json", import.meta.url);
+const previousWorkloadUrl = new URL("../fixtures/public-reference/nasa-tm-109057/workload.v4.json", import.meta.url);
+const workloadUrl = new URL("../fixtures/public-reference/nasa-tm-109057/workload.v5.json", import.meta.url);
 const previous = JSON.parse(readFileSync(previousWorkloadUrl, "utf8"));
 const workload = {
   ...previous,
-  schemaVersion: "vector.generic-aam-verification-workload.v4",
-  id: "nasa-tm-109057-appendix-b-bounded-sweep.v4",
+  schemaVersion: "vector.generic-aam-verification-workload.v5",
+  id: "nasa-tm-109057-appendix-b-bounded-sweep.v5",
   cases: previous.cases.map((entry) => Object.fromEntries(
     Object.entries(entry).filter(([key]) => !["typescriptRunSha256", "rustWasmRunSha256"].includes(key)),
   )),
@@ -43,6 +44,7 @@ const normalizedResults = workload.cases.map((entry) => {
   }
   const typescript = runGenericAamVerification(input);
   const rust = runRustWasmGenericAamVerification(input);
+  assertGenericAamFullFrameParity(typescript, rust);
   entry.expectedTerminal = typescript.terminal.state;
   entry.expectedTick = typescript.terminal.tick;
   entry.expectedCause = typescript.terminal.cause;

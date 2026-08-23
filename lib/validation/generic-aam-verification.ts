@@ -1,4 +1,4 @@
-import corpus from "../../governance/nasa-tm-109057-generic-aam-verification-corpus.v4.json" with { type: "json" };
+import corpus from "../../governance/nasa-tm-109057-generic-aam-verification-corpus.v5.json" with { type: "json" };
 import { createHash } from "node:crypto";
 
 type Vec3 = { x: number; y: number; z: number };
@@ -122,7 +122,7 @@ export type GenericAamWorkloadCase = {
 
 export type GenericAamSemanticOutcome = {
   schemaVersion: "vector.generic-aam-semantic-outcome.v1";
-  quantization: { scheme: "ROUND_TO_NEAREST_INTEGER_BIN"; quantum: 0.000001; parityTolerance: 0.000000001 };
+  quantization: { scheme: "ROUND_TO_NEAREST_INTEGER_BIN"; quantum: 0.000001; parityPolicyId: "TM109057_TS_RUST_PARITY_V1" };
   id: string;
   caseRole: GenericAamVerificationInput["caseRole"];
   tickRateHz: number;
@@ -156,9 +156,17 @@ const SUBJECT_KEYS = ["id", "intendedUse", "capabilities", "prohibitedBindings"]
 const ARTIFACT_KEYS = ["id", "authority", "citationId", "reportNumber", "title", "publicationDate", "recordModifiedAt", "pageCount", "recordUri", "pdfUri", "localPath", "byteLength", "sha256", "documentState", "dissemination", "curationState", "copyrightDecision", "exportControl", "ear", "itar"];
 const CLAIM_KEYS = ["id", "role", "pages", "ancestry", "permits", "prohibits"];
 const DECISION_KEYS = ["id", "sourceConflict", "decision", "executableValue", "limitation"];
-const EVALUATOR_KEYS = ["semantics", "axisConvention", "units", "reportTickRatesHz", "convergenceTickRatesHz", "seekerHalfAngles", "caseRoles", "maximumTicks", "maximumEstimatedScalarOperations", "safeInputBounds", "terminalPrecedence"];
+const EVALUATOR_KEYS = ["semantics", "axisConvention", "units", "reportTickRatesHz", "convergenceTickRatesHz", "seekerHalfAngles", "caseRoles", "maximumTicks", "maximumEstimatedScalarOperations", "safeInputBounds", "terminalPrecedence", "parityPolicy"];
 const SEEKER_ANGLE_KEYS = ["degrees", "printedRadians"];
 const SAFE_BOUND_KEYS = ["missilePositionAbsMaxM", "missileSpeedMinMps", "missileSpeedMaxMps", "angularRateAbsMaxRadS", "controlSignalAbsMaxMps2", "pitchAbsMaxRad", "yawAbsMaxRad", "dynamicScalarAbsMax", "estimatedScalarOperationsPerTick"];
+const PARITY_POLICY_KEYS = ["id", "comparator", "formula", "prerequisites", "defaultTolerance", "overrides", "rationale", "evidence"];
+const PARITY_TOLERANCE_KEYS = ["absoluteTolerance", "relativeTolerance", "fields"];
+const PARITY_OVERRIDE_KEYS = ["field", "absoluteTolerance", "relativeTolerance"];
+const PARITY_EVIDENCE_KEYS = ["hosts", "defaultToleranceExceedances", "exceedanceCountsByCase", "maximaByField", "maximaByRateAndSeeker"];
+const PARITY_HOST_KEYS = ["runtime", "platform", "architecture"];
+const PARITY_CASE_COUNT_KEYS = ["caseId", "count"];
+const PARITY_FIELD_MAXIMUM_KEYS = ["field", "caseId", "tick", "typescriptValue", "rustWasmValue", "absoluteDelta", "relativeDelta"];
+const PARITY_MATRIX_KEYS = ["tickRateHz", "seekerHalfAngleDeg", "field", "tick", "absoluteDelta"];
 const POLICY_KEYS = ["eligibleAuthorities", "ineligibleKinds"];
 const DERIVED_FIXTURE_KEYS = ["id", "path", "sha256", "byteLength", "role", "evidenceRole"];
 const PROMOTION_KEYS = ["runtimeAuthority", "prohibitedSurfaces"];
@@ -168,11 +176,28 @@ const INPUT_KEYS = ["schemaVersion", "subjectId", "intendedUse", "semantics", "s
 const MISSILE_KEYS = ["speedMps", "pitchRateRadS", "pitchSignalMps2", "yawRateRadS", "yawSignalMps2", "pitchRad", "yawRad", "positionM", "massKg"];
 const TARGET_KEYS = ["previousPositionM", "positionM", "velocityMps"];
 const CONSTANT_KEYS = ["navigationConstant", "gravityMps2", "maximumPitchG", "maximumYawG", "hitRangeM", "operationalSpeedMps", "motorThrustN", "coastThrustN", "burnSeconds", "launchMassKg", "burnoutMassKg", "dragK1", "dragK2", "controlTimeConstantS"];
-const VEC_KEYS = ["x", "y", "z"];
+const VEC_KEYS = ["x", "y", "z"] as const;
 const RUN_KEYS = ["schemaVersion", "subjectId", "intendedUse", "semantics", "backend", "sourceSha256", "corpusSha256", "decisionSha256", "inputSha256", "outputSha256", "contentSha256", "caseRole", "frames", "terminal", "limitations"];
 const FRAME_KEYS = ["tick", "timeSeconds", "missilePositionM", "targetPositionM", "speedMps", "pitchRad", "yawRad", "pitchRateRadS", "yawRateRadS", "pitchSignalMps2", "yawSignalMps2", "massKg", "thrustN", "dragN", "relativePositionM", "rangeM", "seekerAngleRad", "losRateRadS", "closingVelocityMps", "pitchCommandMps2", "yawCommandMps2", "closestApproachTimeS", "closestApproachDistanceM", "state"];
 const TERMINAL_KEYS = ["state", "tick", "cause"];
 const FRAME_NUMERIC_KEYS = FRAME_KEYS.filter((key) => !["missilePositionM", "targetPositionM", "relativePositionM", "losRateRadS", "state"].includes(key));
+const PARITY_DEFAULT_FIELDS = [
+  "timeSeconds", "speedMps", "pitchRad", "yawRad", "pitchRateRadS", "yawRateRadS",
+  "pitchSignalMps2", "yawSignalMps2", "massKg", "thrustN", "dragN", "rangeM",
+  "seekerAngleRad", "closingVelocityMps", "pitchCommandMps2", "yawCommandMps2",
+  "missilePositionM.x", "missilePositionM.y", "missilePositionM.z",
+  "targetPositionM.x", "targetPositionM.y", "targetPositionM.z",
+  "relativePositionM.x", "relativePositionM.y", "relativePositionM.z",
+  "losRateRadS.x", "losRateRadS.y", "losRateRadS.z",
+] as const;
+const PARITY_OVERRIDE_FIELDS = ["closestApproachTimeS", "closestApproachDistanceM"] as const;
+const PARITY_SCALAR_FIELDS = [
+  "timeSeconds", "speedMps", "pitchRad", "yawRad", "pitchRateRadS", "yawRateRadS",
+  "pitchSignalMps2", "yawSignalMps2", "massKg", "thrustN", "dragN", "rangeM",
+  "seekerAngleRad", "closingVelocityMps", "pitchCommandMps2", "yawCommandMps2",
+  ...PARITY_OVERRIDE_FIELDS,
+] as const;
+const PARITY_VECTOR_FIELDS = ["missilePositionM", "targetPositionM", "relativePositionM", "losRateRadS"] as const;
 const TERMINAL_CAUSES: Record<GenericAamTerminalState, readonly string[]> = {
   HIT: ["EXACT_ZERO_RANGE", "CPA_HIT", "SEEKER_HIT", "OPENING_HIT"],
   MISS_SEEKER_LIMIT: ["SEEKER_LIMIT"],
@@ -183,7 +208,7 @@ const TERMINAL_CAUSES: Record<GenericAamTerminalState, readonly string[]> = {
 };
 const LIMITATIONS = ["GENERIC_VERIFICATION_ONLY", "LITERAL_PITCH_AMBIGUITY", "FIGURES_NOT_VALIDATION", "NOT_FORTRAN_BIT_REPRODUCTION"];
 
-function exactKeys(value: unknown, keys: string[], label: string): asserts value is Record<string, unknown> {
+function exactKeys(value: unknown, keys: readonly string[], label: string): asserts value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object.`);
   if (Object.keys(value).length !== keys.length || keys.some((key) => !Object.hasOwn(value, key))) {
     throw new Error(`${label} has missing or unknown fields.`);
@@ -214,7 +239,7 @@ function compareUtf8(left: string, right: string) {
 }
 
 export const GENERIC_AAM_SEMANTIC_QUANTUM = 0.000001 as const;
-export const GENERIC_AAM_PARITY_TOLERANCE = 0.000000001 as const;
+export const GENERIC_AAM_PARITY_POLICY_ID = "TM109057_TS_RUST_PARITY_V1" as const;
 
 export function genericAamSemanticBin(value: number) {
   if (!Number.isFinite(value)) throw new Error("Generic AAM semantic projection requires finite trajectory values.");
@@ -230,7 +255,7 @@ export function genericAamSemanticOutcome(
   const sampleIndexes = [...new Set([0, Math.floor((run.frames.length - 1) / 2), run.frames.length - 1])];
   return {
     schemaVersion: "vector.generic-aam-semantic-outcome.v1",
-    quantization: { scheme: "ROUND_TO_NEAREST_INTEGER_BIN", quantum: GENERIC_AAM_SEMANTIC_QUANTUM, parityTolerance: GENERIC_AAM_PARITY_TOLERANCE },
+    quantization: { scheme: "ROUND_TO_NEAREST_INTEGER_BIN", quantum: GENERIC_AAM_SEMANTIC_QUANTUM, parityPolicyId: GENERIC_AAM_PARITY_POLICY_ID },
     id: entry.id,
     caseRole: entry.caseRole ?? "PRINTED_LISTING_REPRODUCTION",
     tickRateHz: entry.tickRateHz,
@@ -348,7 +373,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 const COMPILED_SOURCE_SHA256 = "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa";
-export const GENERIC_AAM_CORPUS_SHA256 = "2b7c3ea5199a2d4b07990f29f9c8209769bd782a99b7d484d02d39abda6c16a1";
+export const GENERIC_AAM_CORPUS_SHA256 = "e799212813fba8b635ee4b8bce114af842ba6a38ef0fb3fbcf21f32b4be55420";
 export const GENERIC_AAM_DECISION_SHA256 = "884bca829ac1b94f959ecff1be6b9cf9847512810c7010f36d8b78cf6cef22f2";
 const TRUSTED_CORPUS = deepFreeze(structuredClone(corpus));
 const TRUSTED_CORPUS_CANONICAL = canonical(TRUSTED_CORPUS);
@@ -362,6 +387,58 @@ export function genericAamCorpusView() {
   return deepFreeze(structuredClone(TRUSTED_CORPUS));
 }
 
+export function genericAamParityWithinTolerance(field: string, typescriptValue: number, rustWasmValue: number) {
+  if (!Number.isFinite(typescriptValue) || !Number.isFinite(rustWasmValue)) {
+    throw new Error("Generic AAM parity comparison requires finite values.");
+  }
+  const policy = TRUSTED_CORPUS.evaluator.parityPolicy;
+  const override = policy.overrides.find((entry) => entry.field === field);
+  const tolerance = override ?? (policy.defaultTolerance.fields.includes(field as typeof policy.defaultTolerance.fields[number])
+    ? policy.defaultTolerance
+    : undefined);
+  if (!tolerance) throw new Error(`Generic AAM parity field ${field} is not governed.`);
+  const absoluteDelta = Math.abs(typescriptValue - rustWasmValue);
+  const bound = tolerance.absoluteTolerance
+    + tolerance.relativeTolerance * Math.max(Math.abs(typescriptValue), Math.abs(rustWasmValue));
+  return absoluteDelta <= bound;
+}
+
+export function assertGenericAamFullFrameParity(
+  typescript: GenericAamVerificationRun,
+  rustWasm: GenericAamVerificationRun,
+) {
+  if (canonical(typescript.terminal) !== canonical(rustWasm.terminal)) throw new Error("Generic AAM parity requires an exact terminal match.");
+  if (typescript.frames.length !== rustWasm.frames.length) throw new Error("Generic AAM parity requires an exact frame-count match.");
+  let numericComparisons = 0;
+  for (let index = 0; index < typescript.frames.length; index += 1) {
+    const typescriptFrame = typescript.frames[index];
+    const rustWasmFrame = rustWasm.frames[index];
+    if (!typescriptFrame || !rustWasmFrame || typescriptFrame.tick !== rustWasmFrame.tick || typescriptFrame.state !== rustWasmFrame.state) {
+      throw new Error(`Generic AAM parity requires exact tick/state at frame ${index}.`);
+    }
+    for (const field of PARITY_SCALAR_FIELDS) {
+      const typescriptValue = typescriptFrame[field];
+      const rustWasmValue = rustWasmFrame[field];
+      if (!genericAamParityWithinTolerance(field, typescriptValue, rustWasmValue)) {
+        throw new Error(`Generic AAM parity exceeded the governed ${field} tolerance at tick ${typescriptFrame.tick}.`);
+      }
+      numericComparisons += 1;
+    }
+    for (const vectorField of PARITY_VECTOR_FIELDS) {
+      for (const component of VEC_KEYS) {
+        const field = `${vectorField}.${component}`;
+        const typescriptValue = typescriptFrame[vectorField][component];
+        const rustWasmValue = rustWasmFrame[vectorField][component];
+        if (!genericAamParityWithinTolerance(field, typescriptValue, rustWasmValue)) {
+          throw new Error(`Generic AAM parity exceeded the governed ${field} tolerance at tick ${typescriptFrame.tick}.`);
+        }
+        numericComparisons += 1;
+      }
+    }
+  }
+  return { framesCompared: typescript.frames.length, numericComparisons };
+}
+
 export function verifyGenericAamCorpus(candidate: unknown, sourceBytes: Uint8Array) {
   exactKeys(candidate, ROOT_KEYS, "corpus");
   exactKeys(candidate.subject, SUBJECT_KEYS, "subject");
@@ -370,6 +447,31 @@ export function verifyGenericAamCorpus(candidate: unknown, sourceBytes: Uint8Arr
   if (!Array.isArray(candidate.evaluator.seekerHalfAngles)) throw new Error("Seeker literal bindings must be an array.");
   for (const binding of candidate.evaluator.seekerHalfAngles) exactKeys(binding, SEEKER_ANGLE_KEYS, "seekerHalfAngle");
   exactKeys(candidate.evaluator.safeInputBounds, SAFE_BOUND_KEYS, "safeInputBounds");
+  exactKeys(candidate.evaluator.parityPolicy, PARITY_POLICY_KEYS, "parityPolicy");
+  const parityPolicy = candidate.evaluator.parityPolicy;
+  exactKeys(parityPolicy.defaultTolerance, PARITY_TOLERANCE_KEYS, "parityDefaultTolerance");
+  if (!Array.isArray(parityPolicy.prerequisites) || !Array.isArray(parityPolicy.defaultTolerance.fields) || !Array.isArray(parityPolicy.overrides)) throw new Error("Parity policy fields must be arrays.");
+  for (const override of parityPolicy.overrides) exactKeys(override, PARITY_OVERRIDE_KEYS, "parityOverride");
+  exactKeys(parityPolicy.evidence, PARITY_EVIDENCE_KEYS, "parityEvidence");
+  if (!Array.isArray(parityPolicy.evidence.hosts) || !Array.isArray(parityPolicy.evidence.exceedanceCountsByCase) || !Array.isArray(parityPolicy.evidence.maximaByField) || !Array.isArray(parityPolicy.evidence.maximaByRateAndSeeker)) throw new Error("Parity evidence fields must be arrays.");
+  for (const host of parityPolicy.evidence.hosts) exactKeys(host, PARITY_HOST_KEYS, "parityHost");
+  for (const entry of parityPolicy.evidence.exceedanceCountsByCase) exactKeys(entry, PARITY_CASE_COUNT_KEYS, "parityCaseCount");
+  for (const entry of parityPolicy.evidence.maximaByField) exactKeys(entry, PARITY_FIELD_MAXIMUM_KEYS, "parityFieldMaximum");
+  for (const entry of parityPolicy.evidence.maximaByRateAndSeeker) exactKeys(entry, PARITY_MATRIX_KEYS, "parityMatrixEntry");
+  const defaultTolerance = parityPolicy.defaultTolerance as unknown as { absoluteTolerance: number; relativeTolerance: number; fields: string[] };
+  const overrides = parityPolicy.overrides as Array<{ field: string; absoluteTolerance: number; relativeTolerance: number }>;
+  const allParityFields = [...defaultTolerance.fields, ...overrides.map(({ field }) => field)];
+  const tolerances = [defaultTolerance, ...overrides];
+  if (parityPolicy.id !== GENERIC_AAM_PARITY_POLICY_ID
+    || parityPolicy.comparator !== "ABS_PLUS_RELATIVE_MAX_MAGNITUDE"
+    || parityPolicy.formula !== "abs(ts-rust) <= absoluteTolerance + relativeTolerance*max(abs(ts),abs(rust))"
+    || canonical(parityPolicy.prerequisites) !== canonical(["FINITE_VALUES", "EXACT_TERMINAL", "EXACT_FRAME_COUNT", "EXACT_TICK", "EXACT_STATE"])
+    || canonical(defaultTolerance.fields) !== canonical(PARITY_DEFAULT_FIELDS)
+    || canonical(overrides.map(({ field }) => field)) !== canonical(PARITY_OVERRIDE_FIELDS)
+    || new Set(allParityFields).size !== allParityFields.length
+    || tolerances.some(({ absoluteTolerance, relativeTolerance }) => !Number.isFinite(absoluteTolerance) || !Number.isFinite(relativeTolerance) || absoluteTolerance < 0 || relativeTolerance < 0)) {
+    throw new Error("Generic AAM parity policy is malformed or incomplete.");
+  }
   exactKeys(candidate.evidencePolicy, POLICY_KEYS, "evidencePolicy");
   if (!Array.isArray(candidate.derivedFixtures)) throw new Error("Derived fixtures must be an array.");
   for (const fixture of candidate.derivedFixtures) exactKeys(fixture, DERIVED_FIXTURE_KEYS, "derivedFixture");
@@ -409,7 +511,7 @@ export function verifyGenericAamWorkload(candidate: unknown, workloadBytes: Uint
     const role = entry.caseRole ?? "PRINTED_LISTING_REPRODUCTION";
     if (!/^[A-Z0-9_]+$/.test(entry.id) || !["PRINTED_LISTING_REPRODUCTION", "TABLE_THRUST_CONFLICT_SENSITIVITY", "COMMAND_LIMIT_SENSITIVITY"].includes(role) || ![32, 64, 128].includes(entry.tickRateHz) || entry.seekerHalfAngleRad !== literal || entry.maxTicks !== entry.tickRateHz * 30 || !Object.keys(TERMINAL_CAUSES).includes(entry.expectedTerminal) || !TERMINAL_CAUSES[entry.expectedTerminal].includes(entry.expectedCause) || !Number.isInteger(entry.expectedTick) || entry.expectedTick <= 0 || entry.expectedTick > entry.maxTicks || entry.expectedFrameCount !== entry.expectedTick || !/^[a-f0-9]{64}$/.test(entry.semanticOutcomeSha256)) throw new Error("Workload case bounds or expected result are invalid.");
   }
-  if (workload.schemaVersion !== "vector.generic-aam-verification-workload.v4" || workload.id !== "nasa-tm-109057-appendix-b-bounded-sweep.v4" || workload.sourceSha256 !== COMPILED_SOURCE_SHA256 || workload.caseCount !== 15 || workload.cases.length !== workload.caseCount || !/^[a-f0-9]{64}$/.test(workload.expectedBatchSha256)) throw new Error("Workload identity or count is invalid.");
+  if (workload.schemaVersion !== "vector.generic-aam-verification-workload.v5" || workload.id !== "nasa-tm-109057-appendix-b-bounded-sweep.v5" || workload.sourceSha256 !== COMPILED_SOURCE_SHA256 || workload.caseCount !== 15 || workload.cases.length !== workload.caseCount || !/^[a-f0-9]{64}$/.test(workload.expectedBatchSha256)) throw new Error("Workload identity or count is invalid.");
   const decoded = JSON.parse(new TextDecoder().decode(workloadBytes));
   if (canonical(candidate) !== canonical(decoded)) throw new Error("Workload object does not match supplied bytes.");
   const governed = TRUSTED_CORPUS.derivedFixtures[0];

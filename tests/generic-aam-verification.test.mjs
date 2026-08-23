@@ -5,20 +5,26 @@ import test from "node:test";
 
 import { runRustWasmGenericAamVerification } from "../lib/validation/generic-aam-verification-wasm.ts";
 import {
+  assertGenericAamFullFrameParity,
   genericAamCorpusView,
+  genericAamParityWithinTolerance,
   genericAamVerificationInput,
   runGenericAamVerification,
   verifyGenericAamCorpus,
 } from "../lib/validation/generic-aam-verification.ts";
 
 const corpusPath = new URL(
-  "../governance/nasa-tm-109057-generic-aam-verification-corpus.v4.json",
+  "../governance/nasa-tm-109057-generic-aam-verification-corpus.v5.json",
   import.meta.url,
 );
 const sourcePath = new URL(
   "../fixtures/public-reference/nasa-tm-109057/19940031931.pdf",
   import.meta.url,
 );
+const workload = JSON.parse(readFileSync(new URL(
+  "../fixtures/public-reference/nasa-tm-109057/workload.v5.json",
+  import.meta.url,
+)));
 
 const clone = (value) => structuredClone(value);
 const corpus = () => clone(genericAamCorpusView());
@@ -49,7 +55,7 @@ test("the exact NASA artifact and verification-only corpus verify offline", () =
   );
   assert.deepEqual(report, {
     schemaVersion: "vector.weapon-verification-corpus-report.v1",
-    corpusId: "nasa-tm-109057-generic-aam-verification-corpus.v4",
+    corpusId: "nasa-tm-109057-generic-aam-verification-corpus.v5",
     sourceSha256: "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa",
     byteLength: 2606172,
     state: "VERIFIED",
@@ -66,7 +72,7 @@ test("the exact NASA artifact and verification-only corpus verify offline", () =
   ]);
 });
 
-test("immutable v3 corpus and workload bytes remain retained beside the v4 successor", () => {
+test("immutable v3 and v4 corpus/workload bytes remain retained beside the v5 successor", () => {
   const v3Corpus = readFileSync(new URL(
     "../governance/nasa-tm-109057-generic-aam-verification-corpus.v3.json",
     import.meta.url,
@@ -75,10 +81,22 @@ test("immutable v3 corpus and workload bytes remain retained beside the v4 succe
     "../fixtures/public-reference/nasa-tm-109057/workload.v3.json",
     import.meta.url,
   ));
+  const v4Corpus = readFileSync(new URL(
+    "../governance/nasa-tm-109057-generic-aam-verification-corpus.v4.json",
+    import.meta.url,
+  ));
+  const v4Workload = readFileSync(new URL(
+    "../fixtures/public-reference/nasa-tm-109057/workload.v4.json",
+    import.meta.url,
+  ));
   assert.equal(v3Corpus.byteLength, 7456);
   assert.equal(sha256(v3Corpus), "57af85c0bafdb47563e4bd09cce08d329f4044b52adbf50c6e1a072e228d81b3");
   assert.equal(v3Workload.byteLength, 8223);
   assert.equal(sha256(v3Workload), "0b7f7ba1395ff58629c26aaa62e46c239121d37e4197a2246e1064aa8caeb556");
+  assert.equal(v4Corpus.byteLength, 7456);
+  assert.equal(sha256(v4Corpus), "7d680b9417e074757f0ab7426ff46bb773e8000191c501a99d386a4d023061a5");
+  assert.equal(v4Workload.byteLength, 7922);
+  assert.equal(sha256(v4Workload), "9df2c63309e22931deed24c2ee267b7efed2fc7783061ad84b2628f8e577012d");
 });
 
 test("corpus admission fails closed for tamper, extra keys, duplicate decisions, and laundering", () => {
@@ -248,6 +266,98 @@ test("TypeScript and Rust-WASM preserve terminal and every numeric frame field",
         assertCloseStructure(rust.frames[index], typescript.frames[index], `frame ${index}`);
       }
     }
+  }
+});
+
+test("TypeScript and Rust-WASM preserve full governed workload frame parity", () => {
+  const scalarKeys = [
+    "timeSeconds", "speedMps", "pitchRad", "yawRad", "pitchRateRadS", "yawRateRadS",
+    "pitchSignalMps2", "yawSignalMps2", "massKg", "thrustN", "dragN", "rangeM",
+    "seekerAngleRad", "closingVelocityMps", "pitchCommandMps2", "yawCommandMps2",
+    "closestApproachTimeS", "closestApproachDistanceM",
+  ];
+  const vectorKeys = ["missilePositionM", "targetPositionM", "relativePositionM", "losRateRadS"];
+  for (const entry of workload.cases) {
+    const input = genericAamVerificationInput({
+      tickRateHz: entry.tickRateHz,
+      maxTicks: entry.maxTicks,
+      seekerHalfAngleDeg: entry.seekerHalfAngleDeg,
+      caseRole: entry.caseRole ?? "PRINTED_LISTING_REPRODUCTION",
+      target: {
+        previousPositionM: entry.targetPositionM,
+        positionM: entry.targetPositionM,
+        velocityMps: { x: 234.375, y: 0, z: 0 },
+      },
+    });
+    if (input.caseRole === "TABLE_THRUST_CONFLICT_SENSITIVITY") {
+      input.constants.motorThrustN = 690 * 4.4482216152605;
+    }
+    const typescript = runGenericAamVerification(input);
+    const rust = runRustWasmGenericAamVerification(input);
+    assert.deepEqual(rust.terminal, typescript.terminal, `${entry.id} terminal`);
+    assert.equal(rust.frames.length, typescript.frames.length, `${entry.id} frame count`);
+    for (let index = 0; index < typescript.frames.length; index += 1) {
+      const tsFrame = typescript.frames[index];
+      const rustFrame = rust.frames[index];
+      assert.equal(rustFrame.tick, tsFrame.tick, `${entry.id} frame ${index} tick`);
+      assert.equal(rustFrame.state, tsFrame.state, `${entry.id} frame ${index} state`);
+      for (const key of scalarKeys) {
+        assert.ok(genericAamParityWithinTolerance(key, tsFrame[key], rustFrame[key]), `${entry.id} tick ${tsFrame.tick} ${key}`);
+      }
+      for (const key of vectorKeys) {
+        for (const component of ["x", "y", "z"]) {
+          const field = `${key}.${component}`;
+          assert.ok(genericAamParityWithinTolerance(field, tsFrame[key][component], rustFrame[key][component]), `${entry.id} tick ${tsFrame.tick} ${field}`);
+        }
+      }
+    }
+  }
+});
+
+test("field-specific parity comparator closes exact boundaries and rejects ungoverned values", () => {
+  assert.equal(genericAamParityWithinTolerance("speedMps", 0, 0), true);
+  assert.equal(genericAamParityWithinTolerance("speedMps", -0, 0), true);
+  assert.equal(genericAamParityWithinTolerance("speedMps", 0, 0.999999e-9), true);
+  assert.equal(genericAamParityWithinTolerance("speedMps", 0, 1e-9), true);
+  assert.equal(genericAamParityWithinTolerance("speedMps", 0, 1.000001e-9), false);
+  assert.equal(genericAamParityWithinTolerance("speedMps", -1e8, -1e8 + 1e-9), true);
+
+  for (const [field, scale, relativeTolerance] of [
+    ["closestApproachTimeS", 2000, 5e-12],
+    ["closestApproachDistanceM", 2000, 3e-11],
+  ]) {
+    const equalityDelta = (1e-9 + relativeTolerance * scale) / (1 - relativeTolerance);
+    assert.equal(genericAamParityWithinTolerance(field, scale, scale + equalityDelta * 0.9999), true, `${field} just inside`);
+    assert.equal(genericAamParityWithinTolerance(field, scale, scale + equalityDelta * 1.0001), false, `${field} just outside`);
+    assert.equal(genericAamParityWithinTolerance(field, -scale, -scale - equalityDelta * 0.9999), true, `${field} negative`);
+    assert.equal(genericAamParityWithinTolerance(field, 0, 0.999999e-9), true, `${field} small inside`);
+    assert.equal(genericAamParityWithinTolerance(field, 0, 1.000001e-9), false, `${field} small outside`);
+    const observedBound = 1e-9 + relativeTolerance * scale;
+    assert.equal(genericAamParityWithinTolerance(field, scale, scale + observedBound * 2), false, `${field} two-times-bound mutation`);
+  }
+  assert.throws(() => genericAamParityWithinTolerance("unknown", 0, 0), /not governed/);
+  assert.throws(() => genericAamParityWithinTolerance("rangeM", Number.NaN, 0), /finite/);
+  assert.throws(() => genericAamParityWithinTolerance("rangeM", 0, Number.POSITIVE_INFINITY), /finite/);
+
+  const input = genericAamVerificationInput({ maxTicks: 1 });
+  const typescript = runGenericAamVerification(input);
+  const rust = runRustWasmGenericAamVerification(input);
+  assert.deepEqual(assertGenericAamFullFrameParity(typescript, rust), { framesCompared: 1, numericComparisons: 30 });
+  const twoTimesBound = clone(rust);
+  const baseDistance = typescript.frames[0].closestApproachDistanceM;
+  const distanceBound = 1e-9 + 3e-11 * Math.max(Math.abs(baseDistance), Math.abs(rust.frames[0].closestApproachDistanceM));
+  twoTimesBound.frames[0].closestApproachDistanceM = baseDistance + 2 * distanceBound;
+  assert.throws(() => assertGenericAamFullFrameParity(typescript, twoTimesBound), /closestApproachDistanceM/);
+  for (const mutate of [
+    (run) => { run.terminal.tick += 1; },
+    (run) => { run.frames.pop(); },
+    (run) => { run.frames[0].tick += 1; },
+    (run) => { run.frames[0].state = "TRACKING"; },
+    (run) => { run.frames[0].rangeM = Number.NaN; },
+  ]) {
+    const forged = clone(rust);
+    mutate(forged);
+    assert.throws(() => assertGenericAamFullFrameParity(typescript, forged));
   }
 });
 

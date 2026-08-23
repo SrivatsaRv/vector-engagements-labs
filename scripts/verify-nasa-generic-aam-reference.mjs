@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { runRustWasmGenericAamVerification } from "../lib/validation/generic-aam-verification-wasm.ts";
 import {
   genericAamCorpusView,
+  assertGenericAamFullFrameParity,
   assertGenericAamVerificationRun,
   genericAamSemanticBatchSha256,
   genericAamSemanticOutcome,
@@ -17,7 +18,7 @@ const root = new URL("../", import.meta.url);
 const corpus = genericAamCorpusView();
 const source = readFileSync(new URL(corpus.artifact.localPath, root));
 const report = verifyGenericAamCorpus(corpus, source);
-const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v4.json", import.meta.url));
+const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v5.json", import.meta.url));
 const workload = JSON.parse(workloadBytes);
 verifyGenericAamWorkload(workload, workloadBytes);
 const results = workload.cases.map((entry) => {
@@ -39,6 +40,7 @@ const results = workload.cases.map((entry) => {
   const rust = runRustWasmGenericAamVerification(base);
   assertGenericAamVerificationRun(typescript, base, "typescript");
   assertGenericAamVerificationRun(rust, base, "rust-wasm");
+  const parity = assertGenericAamFullFrameParity(typescript, rust);
   const typescriptOutcome = genericAamSemanticOutcome(entry, typescript);
   const rustOutcome = genericAamSemanticOutcome(entry, rust);
   if (JSON.stringify(typescriptOutcome) !== JSON.stringify(rustOutcome)) {
@@ -47,6 +49,7 @@ const results = workload.cases.map((entry) => {
   return {
     outcome: typescriptOutcome,
     sha256: genericAamSemanticOutcomeSha256(entry, typescript),
+    parity,
   };
 });
 const batchSha256 = genericAamSemanticBatchSha256(results.map(({ outcome }) => outcome));
@@ -66,5 +69,10 @@ process.stdout.write(`${JSON.stringify({
   workloadId: workload.id,
   cases: results.length,
   batchSha256,
+  parity: {
+    policyId: corpus.evaluator.parityPolicy.id,
+    framesCompared: results.reduce((total, result) => total + result.parity.framesCompared, 0),
+    numericComparisons: results.reduce((total, result) => total + result.parity.numericComparisons, 0),
+  },
   environment: { runtime: process.version, platform: process.platform, architecture: process.arch },
 })}\n`);

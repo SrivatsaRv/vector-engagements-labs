@@ -63,7 +63,8 @@ Generic-missile arithmetic verification additionally runs
 and successor workload ownership, private-corpus mutation resistance, input/output falsifiers,
 independent arithmetic and convergence oracles, forward/reversed workload
 digests, a cross-platform quantized semantic identity with sampled and aggregate
-trajectory values, half-bin/overflow/tamper falsifiers, printed-radian boundary flips, D09 exceptional semantics, exhaustive
+trajectory values, full-to-terminal comparison of all 30 numeric frame leaves under the governed default/CPA-specific absolute-plus-relative parity policy,
+half-bin/overflow/policy-tamper falsifiers, printed-radian boundary flips, D09 exceptional semantics, exhaustive
 finite content-addressed run decoding, isolated production-bundle scans, exact numeric-boundary sweeps, and complete TypeScript/actual-WASM frame parity. The separate
 `reference-aam:performance` target reports a 15-case Node-hosted workload under
 explicit p95 limits and makes no Worker or product-capacity claim. See

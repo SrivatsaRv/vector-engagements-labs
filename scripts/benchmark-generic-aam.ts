@@ -17,7 +17,7 @@ type WorkloadCase = {
 };
 
 const workload = JSON.parse(
-  readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v4.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v5.json", import.meta.url), "utf8"),
 ) as { id: string; cases: WorkloadCase[] };
 const inputs = workload.cases.map((entry) => {
   const input = genericAamVerificationInput({
