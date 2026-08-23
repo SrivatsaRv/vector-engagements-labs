@@ -72,7 +72,7 @@ frontend-local:
 
 browser-local:
 	npm run test:component
-	npm run test:browser
+	npm run test:browser:ci
 
 air-reference-local: reference-aircraft-local
 
