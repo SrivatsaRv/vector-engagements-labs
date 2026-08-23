@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
 import { chromium } from "playwright-core";
+import { buildSync } from "esbuild";
 import { adaptPreparedSimulation } from "../lib/runtime/model-pack-adapter.ts";
 import { prepareSimulation } from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
@@ -52,10 +53,19 @@ const {
 } = resolveBrowserWorkerAssets();
 const workerBytes = readFileSync(resolve(assetDirectory, workerName));
 const environmentWorkerBytes = readFileSync(resolve(assetDirectory, environmentWorkerName));
+const trackStoreWorkerBytes = buildSync({
+  entryPoints: [resolve("scripts/track-store-capacity.worker.ts")],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "browser",
+  target: "es2022",
+}).outputFiles[0]!.contents;
 const server = createServer((request, response) => {
   const assets = new Map([
     [`/assets/${workerName}`, workerBytes],
     [`/assets/${environmentWorkerName}`, environmentWorkerBytes],
+    ["/assets/track-store-capacity.worker.js", trackStoreWorkerBytes],
   ]);
   const bytes = assets.get(request.url ?? "");
   if (bytes) {
@@ -385,8 +395,36 @@ try {
   assert.ok(cancellation.messages.includes("state"));
   assert.ok(cancellation.messages.includes("cancelled"));
 
+  const trackStoreCapacity = await page.evaluate(async ({ workerUrl }) => {
+    const worker = new Worker(workerUrl, { type: "module" });
+    const receive = (type: string, runId: string) => new Promise<Record<string, unknown>>((resolveWait, rejectWait) => {
+      const timeout = setTimeout(() => rejectWait(new Error(`TrackStore Worker ${type} timed out.`)), 10_000);
+      const listener = (event: MessageEvent<Record<string, unknown>>) => {
+        if (event.data.type !== type || event.data.runId !== runId) return;
+        clearTimeout(timeout);
+        worker.removeEventListener("message", listener);
+        resolveWait(event.data);
+      };
+      worker.addEventListener("message", listener);
+    });
+    const firstProgress = receive("progress", "cancel-capacity");
+    worker.postMessage({ type: "run", runId: "cancel-capacity" });
+    await firstProgress;
+    const cancelled = receive("cancelled", "cancel-capacity");
+    worker.postMessage({ type: "cancel", runId: "cancel-capacity" });
+    await cancelled;
+    const completed = receive("completed", "recover-capacity");
+    worker.postMessage({ type: "run", runId: "recover-capacity" });
+    const result = await completed;
+    worker.terminate();
+    return result;
+  }, { workerUrl: `${origin}/assets/track-store-capacity.worker.js` });
+  assert.equal(trackStoreCapacity.retainedTracks, 100);
+  assert.equal(trackStoreCapacity.transitionCount, 600);
+  assert.equal(trackStoreCapacity.parityDigest, "c564c998bfda3a52ac416e0fff4737eb266e27598b613b6a28fefa438c39621f");
+
   process.stdout.write(
-    `${JSON.stringify({ workerAsset: workerName, environmentWorkerAsset: environmentWorkerName, backend: result, cancellation })}\n`,
+    `${JSON.stringify({ workerAsset: workerName, environmentWorkerAsset: environmentWorkerName, backend: result, cancellation, trackStoreCapacity })}\n`,
   );
 } finally {
   await browser.close();

@@ -693,7 +693,7 @@ export function evaluateRaspSourceAvailability(
 ): { available: boolean; reason: RaspAvailabilityReason; explanation: string } {
   const state = frame.observerStates.find((item) => item.perspective === perspective);
   return state
-    ? { available: false, reason: state.availabilityReason, explanation: state.stateExplanation }
+    ? { available: false, reason: state.availabilityReason, explanation: state.stateExplanation ?? "No observer-state explanation was recorded." }
     : { available: false, reason: "SENSOR_MODEL_UNAVAILABLE", explanation: "No observer state was recorded for this frame." };
 }
 

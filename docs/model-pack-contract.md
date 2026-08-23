@@ -103,11 +103,13 @@ compiled and content-addressed through the same model-pack path as every other
 model; it is not an entity-level test mutation or a weapon/sensor-name heuristic.
 
 The engine scenario also binds a SHA-256 digest over the compact runtime
-model-pack projection. TypeScript and Rust recompute it before constructing
-runtime state, using the same canonical object-key and integral-number
-representation. A changed projection, missing digest, wrong intended use, or
-unknown field fails admission. The production deployment manifest does not
-admit this pack, so the browser Worker rejects it. This contract proves generic
+model-pack projection. `vector.runtime-model-pack-digest.v2` hashes a closed,
+ordered binary projection: length-prefixed UTF-8 strings, fixed-width unsigned
+integers, and exact big-endian IEEE-754 bits. TypeScript and Rust recompute the
+same bytes before constructing runtime state. A changed projection, missing
+digest, wrong intended use, or unknown field fails admission. The production
+deployment manifest does not admit this pack, so the browser Worker rejects it.
+This contract proves generic
 TrackStore mechanics only; no named aircraft sensor is thereby available.
 
 ## Compilation and digest

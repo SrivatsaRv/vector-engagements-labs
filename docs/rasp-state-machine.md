@@ -54,11 +54,14 @@ use, unknown fields, missing evidence, or a projection-digest mismatch.
 
 Each side owns an independent tick-local `TrackStore`. Inputs are opaque
 `vector.observation.v1` values containing source pack/model identity, source
-sequence and model time, an estimated position/velocity, and explicit
+sequence and model time, an opaque source-local association ID, an estimated
+position/velocity, and explicit
 uncertainty. Inputs with the wrong side, stale or duplicate sequence/time,
 wrong source digest, non-positional/non-finite values, or any truth identity
 fail closed. Track IDs (`IAF-TRACK-NNNN` / `PAF-TRACK-NNNN`) do not encode the
-world entity identity. `vector.track.v1` moves exhaustively through
+world entity identity. One store retains multiple tracks keyed by that opaque
+association; a rejected batch is transactional and cannot partially update
+another track. `vector.track.v1` moves exhaustively through
 `TENTATIVE`, `CONFIRMED`, `COASTING`, `LOST`, and reacquisition. Confirmation
 and coasting may be visible in a side-owned picture; tentative and lost tracks
 are not. No confidence scalar is invented.
@@ -87,7 +90,10 @@ truth position. It verifies byte-for-byte equivalence to the tick projection;
 therefore a PLOT cannot be promoted by replay into an estimate or a renderable
 target. The reader retains explicit read-only compatibility with the previous
 `vector.frames.columnar.v4` / `vector.pictures.v3` pair, which may contain only
-observer state v2. A legacy member cannot carry v3 tracks.
+observer state v2. A legacy member cannot carry v3 tracks. Cross-paired,
+missing, extra, or future frame/picture versions fail closed. Observation,
+track, and event source identities must also match the exact compiled scenario
+sensor projection; a valid pack digest beside a forged model ID is rejected.
 
 ## Deferred contract
 
@@ -103,9 +109,13 @@ or Su-30MKI/F-16 radar claims. Parent issue #26 remains open.
 `tests/sensor-model-admission.test.mjs` proves production fail-closed behavior,
 source-pack determinism, exact TypeScript/Rust-WASM whole-state and event parity,
 mixed-batch invariance, VSR round-trip, and contradictory/extra/truth-leaking
-state rejection. `tests/track-store.test.mjs` covers transition and admission
-causes. `tests/vector-record.test.mjs` covers new/legacy reads and tamper
-rejection. `npm run performance:track-store:verify` gates the declared 100-track,
-20 Hz, five-second verification workload below 75 ms p95 with bounded heap and
-a repeat digest. Component/selector tests continue to prevent Model Truth
-fallback.
+state rejection. `tests/track-store.test.mjs` covers transition, multi-track
+association, transactionality, and admission causes.
+`tests/vector-record.test.mjs` covers new/legacy reads, schema-pair admission,
+and consistent all-member source forgery.
+`npm run performance:track-store:verify` gates two side-owned stores retaining
+50 tracks each at 20 Hz for five seconds below 75 ms p95 with bounded heap, a
+brute-force association oracle, and repeat digest. The same 100-track fixture
+has a shared TypeScript/Rust digest; an actual browser Worker proves
+cancellation and same-Worker recovery. Component/selector tests continue to
+prevent Model Truth fallback.

@@ -1,6 +1,7 @@
 import type { EngineFrame, EngineObserverState } from "./engine/contracts.ts";
 import type { RaspTrack } from "./simulation.ts";
 import { canonicalJson } from "./canonical-json.ts";
+import { assertNoTruthIdentity } from "./engine/track-store.ts";
 
 /**
  * Projects the observer state emitted by the simulation tick for display and
@@ -98,11 +99,13 @@ function assertUncertainty(value: unknown) {
 function assertObservation(value: unknown, perspective: unknown, sensorModelId: unknown) {
   const observation = object(value, "Observation");
   exactKeys(observation, [
-    "schemaVersion", "id", "owner", "source", "sourceSequence", "sourceTimeSeconds", "estimate", "uncertainty",
+    "schemaVersion", "id", "owner", "sourceAssociationId", "source", "sourceSequence", "sourceTimeSeconds", "estimate", "uncertainty",
   ]);
   if (
     observation.schemaVersion !== "vector.observation.v1" || observation.owner !== perspective ||
     typeof observation.id !== "string" || !observation.id.startsWith(`${String(perspective)}-OBS-`) ||
+    typeof observation.sourceAssociationId !== "string" ||
+    !new RegExp(`^${String(perspective)}-SOURCE-[0-9]{4,8}$`).test(observation.sourceAssociationId) ||
     !Number.isSafeInteger(observation.sourceSequence) || (observation.sourceSequence as number) < 1 ||
     typeof observation.sourceTimeSeconds !== "number" || !Number.isFinite(observation.sourceTimeSeconds) ||
     observation.sourceTimeSeconds < 0
@@ -115,12 +118,14 @@ function assertObservation(value: unknown, perspective: unknown, sensorModelId: 
 function assertTrack(value: unknown, perspective: unknown, sensorModelId: unknown) {
   const track = object(value, "Track");
   exactKeys(track, [
-    "schemaVersion", "trackId", "owner", "source", "sourceSequence", "sourceTimeSeconds", "state",
+    "schemaVersion", "trackId", "owner", "sourceAssociationId", "source", "sourceSequence", "sourceTimeSeconds", "state",
     "estimate", "uncertainty", "updateCount", "ageSeconds", "freshUntilSeconds", "expiresAtSeconds",
   ]);
   if (
     track.schemaVersion !== "vector.track.v1" || track.owner !== perspective ||
     typeof track.trackId !== "string" || !track.trackId.startsWith(`${String(perspective)}-TRACK-`) ||
+    typeof track.sourceAssociationId !== "string" ||
+    !new RegExp(`^${String(perspective)}-SOURCE-[0-9]{4,8}$`).test(track.sourceAssociationId) ||
     !["TENTATIVE", "CONFIRMED", "COASTING", "LOST"].includes(String(track.state)) ||
     !Number.isSafeInteger(track.sourceSequence) || (track.sourceSequence as number) < 1 ||
     !Number.isSafeInteger(track.updateCount) || (track.updateCount as number) < 1 ||
@@ -137,11 +142,18 @@ function assertTrack(value: unknown, perspective: unknown, sensorModelId: unknow
 
 export function assertEngineObserverState(value: unknown): asserts value is EngineObserverState {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Observer state must be an object.");
+  assertNoTruthIdentity(value, "Observer state");
   const state = value as Record<string, unknown>;
   const base = [
     "schemaVersion", "perspective", "sensorState", "observationCount", "trackState",
     "visible", "availabilityReason", "effectScope", "stateExplanation",
   ];
+  if (!(["IAF", "PAF"] as unknown[]).includes(state.perspective) || state.effectScope !== "AIR_PICTURE_ONLY") {
+    throw new Error("Observer state ownership or effect scope is invalid.");
+  }
+  if (!(state.stateExplanation === null || (typeof state.stateExplanation === "string" && state.stateExplanation.length > 0))) {
+    throw new Error("Observer state explanation must be a non-empty string or null.");
+  }
   if (state.schemaVersion === "vector.observer-state.v2") {
     exactKeys(state, base, ["sensorModelId"]);
     const unsupported = state.sensorState === "UNSUPPORTED" && state.observationCount === 0 &&
@@ -183,15 +195,24 @@ export function assertEngineObserverState(value: unknown): asserts value is Engi
     if (state.trackState !== expectedTrackState || state.visible !== expectedVisible) {
       throw new Error("Observer state v3 track visibility is contradictory.");
     }
-    const encoded = JSON.stringify(state);
-    if (/observedEntityId|targetEntityId|truthEntityId|truthPosition/.test(encoded)) {
-      throw new Error("Observer state v3 leaks prohibited truth identity.");
+    const observation = state.observations[0] as Record<string, unknown> | undefined;
+    if (observation && track && observation.sourceAssociationId !== track.sourceAssociationId) {
+      throw new Error("Observation and track source association are contradictory.");
+    }
+    const noTrack = !track && state.observations.length === 0 && state.trackState === "NONE" && state.visible === false &&
+      ["SCAN_NOT_DUE", "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME"].includes(String(state.availabilityReason));
+    const updated = track !== undefined && observation !== undefined && state.availabilityReason === "OBSERVATION_ADMITTED";
+    const retained = track !== undefined && observation === undefined && (
+      (track.state === "COASTING" && state.availabilityReason === "TRACK_COASTING") ||
+      (track.state === "LOST" && state.availabilityReason === "TRACK_LOST") ||
+      (["TENTATIVE", "CONFIRMED"].includes(String(track.state)) &&
+        ["SCAN_NOT_DUE", "TARGET_OUTSIDE_ADMITTED_SENSOR_VOLUME"].includes(String(state.availabilityReason)))
+    );
+    if (!(noTrack || updated || retained)) {
+      throw new Error("Observer state v3 availability, observations, and tracks are contradictory.");
     }
   } else {
     throw new Error("Observer state schema is unsupported.");
-  }
-  if (!["IAF", "PAF"].includes(String(state.perspective)) || state.effectScope !== "AIR_PICTURE_ONLY") {
-    throw new Error("Observer state ownership or effect scope is invalid.");
   }
 }
 
@@ -268,6 +289,7 @@ export function assertRecordedSidePictures(
   }
   const seen = new Set<string>();
   for (const picture of pictures) {
+    observerStateFromPicture(picture);
     const key = `${picture.perspective}:${picture.modelTimeSeconds}`;
     if (seen.has(key)) throw new Error("Recorded observer picture has a duplicate side/frame identity.");
     seen.add(key);

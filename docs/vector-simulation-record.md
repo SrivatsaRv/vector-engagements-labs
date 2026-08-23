@@ -205,7 +205,9 @@ Version 5 records exhaustive observer state v2 and v3. Its
 `pictures.jsonl` member is `vector.pictures.v4`, which can preserve the generic
 verification observation, uncertainty, and side-owned track without a world
 entity identity. The reader keeps the prior frames-v4/pictures-v3 pair as a
-read-only v2-only format and rejects v3 state in those legacy members. Both
+read-only v2-only format and rejects v3 state in those legacy members. The
+reader admits only the v5/v4 and v4/v3 pairs; every cross-pair or missing/extra
+version fails before replay. Both
 formats reject any reconstructed observed-world identity or truth position.
 The requested
 steering-acceleration vector remains a recorded pre-limit route-controller

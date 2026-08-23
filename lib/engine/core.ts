@@ -226,9 +226,9 @@ function observerStates(
       observation?: import("./contracts.ts").EngineObservation,
     ): ObserverTickResult => {
       if (!store) throw new Error("Verification track admission has no TrackStore.");
-      const update = store.update(time, observation);
-      const tracks = update.snapshot.track ? [update.snapshot.track] : [];
-      const state = update.snapshot.track?.state ?? "NONE";
+      const update = store.update(time, observation ? [observation] : []);
+      const tracks = update.snapshot.tracks;
+      const state = tracks[0]?.state ?? "NONE";
       const derivedReason = state === "COASTING"
         ? "TRACK_COASTING" as const
         : state === "LOST"
@@ -298,6 +298,7 @@ function observerStates(
       const observation = createVerificationObservation({
         identity: source,
         owner: perspective,
+        sourceAssociationId: `${perspective}-SOURCE-0001`,
         sourceSequence: Math.round(time / sensor.scanPeriodS) + 1,
         sourceTimeSeconds: time,
         measuredPositionM: target.position,
@@ -818,7 +819,7 @@ export class EngineSession {
   private readonly frames: EngineRun["frames"] = [];
   private readonly eventJournal = new SimulationEventJournal();
   private readonly observerTrackStores = new Map<ObserverPerspective, TrackStore>();
-  private readonly priorTrackReceipt = new Map<ObserverPerspective, SimulationEventReceipt>();
+  private readonly priorTrackReceipt = new Map<string, SimulationEventReceipt>();
   private readonly sampleEvery: number;
   private readonly terminalTick: number;
   private readonly recordingOrigin: EngineScenario["geospatial"]["origin"];
@@ -1083,7 +1084,8 @@ export class EngineSession {
     for (const result of results) {
       if (!result.sensorEntityId) continue;
       for (const transition of result.transitions) {
-        const prior = this.priorTrackReceipt.get(transition.owner);
+        const priorKey = `${transition.owner}\u0000${transition.trackId}`;
+        const prior = this.priorTrackReceipt.get(priorKey);
         const ownerAffiliation = transition.owner === "IAF" ? "BLUE" : "RED";
         const receipt = this.eventJournal.emit({
           localKey: transition.localKey,
@@ -1107,13 +1109,14 @@ export class EngineSession {
             sensorModelId: transition.source.sensorModelId,
             sensorModelVersion: transition.source.sensorModelVersion,
             modelPackDigest: transition.source.modelPackDigest,
+            sourceAssociationId: transition.sourceAssociationId,
             sourceSequence: transition.sourceSequence,
             sourceTimeSeconds: transition.sourceTimeSeconds,
             estimateValueState: "ESTIMATED",
             uncertaintyValueState: "ESTIMATED",
           },
         });
-        this.priorTrackReceipt.set(transition.owner, receipt);
+        this.priorTrackReceipt.set(priorKey, receipt);
       }
     }
   }

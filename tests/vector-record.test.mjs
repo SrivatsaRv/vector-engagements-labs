@@ -290,6 +290,57 @@ test("VSR rejects tampered side-owned track state and track-event history", asyn
   );
 });
 
+test("VSR rejects consistently forged track sources beside the admitted pack digest", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const base = prepareSimulation(scenario);
+  const binding = await bindVerificationTrackModelPack(base.engineScenario);
+  const capabilityManifest = createVerificationDeploymentCapabilities("typescript", ["A2A"], [binding.pack.digest]);
+  const prepared = { ...base, engineScenario: binding.scenario, capabilityManifest };
+  const engineRun = runEngineBackend(binding.scenario, "typescript");
+  const result = buildSimulationResult(prepared, engineRun);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const forgedModelId = "forged-valid-digest-model";
+
+  const frameMember = record.members.find((member) => member.path === "frames.arrow");
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  for (const frame of frames) for (const state of frame.observerStates) {
+    if (state.schemaVersion !== "vector.observer-state.v3") continue;
+    state.sensorModelId = forgedModelId;
+    for (const value of [...state.observations, ...state.tracks]) value.source.sensorModelId = forgedModelId;
+  }
+  let corrupt = await replaceRecordMember(record, "frames.arrow", VECTOR_FRAME_SCHEMA, encodeColumnarFrames(frames));
+
+  const pictureMember = corrupt.members.find((member) => member.path === "pictures.jsonl");
+  const pictures = new TextDecoder().decode(pictureMember.bytes).trim().split("\n").map(JSON.parse);
+  for (const state of pictures) {
+    if (state.schemaVersion !== "vector.observer-state.v3") continue;
+    state.sensorModelId = forgedModelId;
+    state.source = forgedModelId;
+    for (const value of [...state.observations, ...state.tracks]) value.source.sensorModelId = forgedModelId;
+  }
+  corrupt = await replaceRecordMember(
+    corrupt,
+    "pictures.jsonl",
+    VECTOR_PICTURE_SCHEMA,
+    textEncoder.encode(pictures.map((picture) => canonicalJson(picture)).join("\n")),
+  );
+
+  const eventMember = corrupt.members.find((member) => member.path === "events.jsonl");
+  const events = new TextDecoder().decode(eventMember.bytes).trim().split("\n").map(JSON.parse);
+  for (const event of events) if (event.payload.kind === "TRACK_STATE_CHANGED") event.payload.sensorModelId = forgedModelId;
+  corrupt = await replaceRecordMember(
+    corrupt,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /compiled scenario|admitted scenario/i,
+  );
+});
+
 test("VSR rejects corruption before exposing replay data", async () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const record = await createVectorSimulationRecord(
@@ -335,6 +386,20 @@ test("VSR rejects an observer-picture member with an unadmitted schema", async (
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
     /does not admit the required observer-picture schema/,
   );
+});
+
+test("VSR admits only the governed frame/picture schema pairs", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const record = await createVectorSimulationRecord(prepareSimulation(scenario), simulate(scenario), createdAt);
+  for (const [frameSchema, pictureSchema] of [
+    [VECTOR_FRAME_SCHEMA, LEGACY_VECTOR_PICTURE_SCHEMA],
+    [LEGACY_VECTOR_FRAME_SCHEMA, VECTOR_PICTURE_SCHEMA],
+  ]) {
+    let corrupt = await replaceRecordMember(record, "frames.arrow", frameSchema, record.members.find((member) => member.path === "frames.arrow").bytes);
+    corrupt = await replaceRecordMember(corrupt, "pictures.jsonl", pictureSchema, record.members.find((member) => member.path === "pictures.jsonl").bytes);
+    const serialized = serializeVectorRecord(corrupt);
+    await assert.rejects(openVectorSimulationRecord(serialized.buffer, serialized.byteLength), /frame.*picture|schema pair/i);
+  }
 });
 
 test("VSR opens legacy v1 events only as an explicit unavailable stream", async () => {

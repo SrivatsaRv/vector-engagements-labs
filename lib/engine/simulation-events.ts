@@ -1,4 +1,5 @@
 import { canonicalJson } from "../canonical-json.ts";
+import { assertEngineObserverState } from "../information-state.ts";
 import type {
   EngineFrame,
   EngineScenario,
@@ -275,7 +276,7 @@ function assertPayload(value: unknown, index: number): asserts value is Simulati
     exactKeys(value, [
       "kind", "schemaVersion", "perspective", "trackId", "from", "to", "cause",
       "sensorModelId", "sensorModelVersion", "modelPackDigest", "sourceSequence",
-      "sourceTimeSeconds", "estimateValueState", "uncertaintyValueState",
+      "sourceAssociationId", "sourceTimeSeconds", "estimateValueState", "uncertaintyValueState",
     ], [], `Simulation event ${index} payload`);
     if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.TRACK_STATE_CHANGED) {
       throw new Error(`Simulation event ${index} payload schema is unsupported.`);
@@ -288,6 +289,7 @@ function assertPayload(value: unknown, index: number): asserts value is Simulati
     if (value.from === value.to) throw new Error(`Simulation event ${index} records an unchanged track state.`);
     nonEmptyString(value.sensorModelId, `Simulation event ${index} sensor model ID`);
     nonEmptyString(value.sensorModelVersion, `Simulation event ${index} sensor model version`);
+    nonEmptyString(value.sourceAssociationId, `Simulation event ${index} source association ID`);
     if (typeof value.modelPackDigest !== "string" || !/^[a-f0-9]{64}$/.test(value.modelPackDigest)) {
       throw new Error(`Simulation event ${index} model-pack digest is invalid.`);
     }
@@ -444,6 +446,32 @@ export function assertSimulationEventStream(
   >();
   const priorTrackState = new Map<string, "TENTATIVE" | "CONFIRMED" | "COASTING" | "LOST">();
   for (const [frameIndex, frame] of frames.entries()) {
+    for (const state of frame.observerStates) {
+      assertEngineObserverState(state);
+      const owner = state.perspective === "IAF" ? "BLUE" : "RED";
+      const admitted = "sensorModelId" in state
+        ? scenario.modelPack.observerSensors.find((sensor) => sensor.modelId === state.sensorModelId)
+        : undefined;
+      if ("sensorModelId" in state && !admitted) {
+        throw new Error("Observer state source is not bound to the compiled scenario sensor projection.");
+      }
+      if (state.schemaVersion === "vector.observer-state.v3") {
+        const producer = scenario.entities.find((entity) =>
+          entity.kind === "AIRCRAFT" && entity.affiliation === owner &&
+          entity.observerSensor?.modelId === state.sensorModelId &&
+          entity.observerSensor.modelVersion === admitted?.modelVersion &&
+          entity.observerSensor.modelPackDigest === scenario.modelPack.digest,
+        );
+        if (!producer) throw new Error("Observer state source is not bound to an admitted scenario sensor.");
+        for (const value of [...state.observations, ...state.tracks]) {
+          if (
+            value.source.modelPackDigest !== scenario.modelPack.digest ||
+            value.source.sensorModelId !== admitted?.modelId ||
+            value.source.sensorModelVersion !== admitted?.modelVersion
+          ) throw new Error("Observer observation or track source is not bound to the compiled scenario.");
+        }
+      }
+    }
     for (const entity of frame.entities) {
       if (!firstFrameIndexByEntity.has(entity.id)) {
         firstFrameIndexByEntity.set(entity.id, frameIndex);
@@ -565,6 +593,11 @@ export function assertSimulationEventStream(
         track.source.modelPackDigest !== payload.modelPackDigest ||
         track.source.sensorModelId !== payload.sensorModelId ||
         track.source.sensorModelVersion !== payload.sensorModelVersion ||
+        track.sourceAssociationId !== payload.sourceAssociationId ||
+        payload.modelPackDigest !== scenario.modelPack.digest ||
+        !scenario.modelPack.observerSensors.some((sensor) =>
+          sensor.modelId === payload.sensorModelId && sensor.modelVersion === payload.sensorModelVersion
+        ) ||
         track.sourceSequence !== payload.sourceSequence ||
         track.sourceTimeSeconds !== payload.sourceTimeSeconds
       ) throw new Error(`Simulation track event ${event.id} has invalid ownership, source, or frame state.`);

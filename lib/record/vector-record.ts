@@ -17,7 +17,8 @@ import {
   type Scenario,
   type SimulationResult,
 } from "../simulation.ts";
-import { attachRecordedObserverStates } from "../information-state.ts";
+import { assertRecordedSidePictures, attachRecordedObserverStates } from "../information-state.ts";
+import { assertRuntimeModelPackDigest } from "../engine/runtime-model-pack.ts";
 import {
   assertPhaseAEnvironmentPack,
   environmentPackBinding,
@@ -712,6 +713,12 @@ export async function openVectorSimulationRecord(
   ) {
     throw new Error("VECTOR record does not admit the required observer-picture schema.");
   }
+  const supportedObserverPair =
+    (frameMember.schemaVersion === VECTOR_FRAME_SCHEMA && pictureMember.schemaVersion === VECTOR_PICTURE_SCHEMA) ||
+    (frameMember.schemaVersion === LEGACY_VECTOR_FRAME_SCHEMA && pictureMember.schemaVersion === LEGACY_VECTOR_PICTURE_SCHEMA);
+  if (!supportedObserverPair) {
+    throw new Error("VECTOR record frame and picture schema pair is unsupported.");
+  }
   const eventMember = header.members.find((candidate) => candidate.path === "events.jsonl");
   if (
     !eventMember ||
@@ -726,6 +733,9 @@ export async function openVectorSimulationRecord(
     PreparedSimulation,
     "scenario"
   >;
+  if (compiled.engineScenario.modelPack.runtimeDigest !== undefined) {
+    assertRuntimeModelPackDigest(compiled.engineScenario.modelPack);
+  }
   const environmentPack = compiled.engineScenario.geospatial?.environmentPack;
   if (!environmentPack) {
     throw new Error("VECTOR record has no admitted environment pack.");
@@ -750,6 +760,7 @@ export async function openVectorSimulationRecord(
     pictureMember.schemaVersion === LEGACY_VECTOR_PICTURE_SCHEMA &&
     pictures.some((picture) => picture.schemaVersion !== "vector.observer-state.v2")
   ) throw new Error("Legacy VECTOR picture schema cannot contain observer state v3.");
+  assertRecordedSidePictures(decodedFrames, pictures);
   const events: SimulationEventStream = eventMember.schemaVersion === VECTOR_EVENT_SCHEMA
     ? {
         state: "AVAILABLE",

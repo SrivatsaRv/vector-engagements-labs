@@ -54,7 +54,7 @@ export const SIMULATION_EVENT_PAYLOAD_SCHEMAS = {
   ENTITY_ENTERED_WORLD: "vector.simulation-event-payload.entity-entered-world.v1",
   ENTITY_LIFECYCLE_CHANGED: "vector.simulation-event-payload.entity-lifecycle-changed.v1",
   RUN_COMPLETED: "vector.simulation-event-payload.run-completed.v1",
-  TRACK_STATE_CHANGED: "vector.simulation-event-payload.track-state-changed.v1",
+  TRACK_STATE_CHANGED: "vector.simulation-event-payload.track-state-changed.v2",
 } as const;
 
 export type SimulationEventParticipantRole =
@@ -131,6 +131,8 @@ export type EngineObservation = {
   schemaVersion: "vector.observation.v1";
   id: string;
   owner: ObserverPerspective;
+  /** Opaque source-local association; it is never a world entity identity. */
+  sourceAssociationId: string;
   source: {
     modelPackDigest: string;
     sensorModelId: string;
@@ -148,6 +150,7 @@ export type EngineTrack = {
   schemaVersion: "vector.track.v1";
   trackId: string;
   owner: ObserverPerspective;
+  sourceAssociationId: string;
   source: EngineObservation["source"];
   sourceSequence: number;
   sourceTimeSeconds: number;
@@ -174,6 +177,7 @@ export type TrackTransitionCommit = {
   from: "NONE" | EngineTrackLifecycle;
   to: EngineTrackLifecycle;
   cause: TrackTransitionCause;
+  sourceAssociationId: string;
   source: EngineObservation["source"];
   sourceSequence: number;
   sourceTimeSeconds: number;
@@ -183,7 +187,7 @@ export type TrackTransitionCommit = {
 type EngineObserverStateBase = {
   perspective: ObserverPerspective;
   effectScope: "AIR_PICTURE_ONLY";
-  stateExplanation: string;
+  stateExplanation: string | null;
 };
 
 export type EngineObserverStateV2 = EngineObserverStateBase & (
@@ -299,6 +303,7 @@ export type SimulationEventPayload =
       sensorModelId: string;
       sensorModelVersion: string;
       modelPackDigest: string;
+      sourceAssociationId: string;
       sourceSequence: number;
       sourceTimeSeconds: number;
       estimateValueState: "ESTIMATED";

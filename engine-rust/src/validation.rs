@@ -1,11 +1,10 @@
-use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
 use std::collections::HashSet;
 
 use crate::simulation_events::MAX_SIMULATION_EVENTS;
 use crate::{
-    first_fixed_step_tick_at_or_after, EngineError, EngineScenario, EntityDefinition, Table1d, Vec3,
+    first_fixed_step_tick_at_or_after, valid_verification_track_model, EngineError, EngineScenario,
+    EntityDefinition, Table1d, Vec3,
 };
 
 /// Maximum JSON payload accepted by the browser WASM ABI.
@@ -31,29 +30,32 @@ fn invalid(message: impl Into<String>) -> EngineError {
     EngineError::InvalidScenario(message.into())
 }
 
-fn canonicalize(value: Value) -> Value {
-    match value {
-        Value::Array(values) => Value::Array(values.into_iter().map(canonicalize).collect()),
-        Value::Object(values) => {
-            let mut sorted = BTreeMap::new();
-            for (key, value) in values {
-                sorted.insert(key, canonicalize(value));
-            }
-            Value::Object(sorted.into_iter().collect())
-        }
-        Value::Number(number) => {
-            // JavaScript's JSON.stringify emits integral finite numbers without a
-            // decimal point (including -0). Normalise typed Rust f64 values to the
-            // same representation before hashing the shared runtime projection.
-            match number.as_f64() {
-                Some(0.0) => Value::Number(0.into()),
-                Some(value) if value.fract() == 0.0 && value.abs() <= 9_007_199_254_740_991.0 => {
-                    Value::Number((value as i64).into())
-                }
-                _ => Value::Number(number),
-            }
-        }
-        other => other,
+fn hash_string(hash: &mut Sha256, value: &str) {
+    hash.update(b"s");
+    hash.update((value.len() as u64).to_be_bytes());
+    hash.update(value.as_bytes());
+}
+
+fn hash_integer(hash: &mut Sha256, value: usize) {
+    hash.update(b"i");
+    hash.update((value as u64).to_be_bytes());
+}
+
+fn hash_number(hash: &mut Sha256, value: f64) {
+    hash.update(b"f");
+    hash.update(value.to_bits().to_be_bytes());
+}
+
+fn hash_vector(hash: &mut Sha256, value: Vec3) {
+    hash_number(hash, value.x);
+    hash_number(hash, value.y);
+    hash_number(hash, value.z);
+}
+
+fn hash_strings(hash: &mut Sha256, values: &[String]) {
+    hash_integer(hash, values.len());
+    for value in values {
+        hash_string(hash, value);
     }
 }
 
@@ -74,18 +76,65 @@ fn verify_runtime_model_pack_digest(scenario: &EngineScenario) -> Result<(), Eng
             invalid("modelPack.runtimeDigest is required for a verification track model")
         })?;
     sha256_digest("modelPack.runtimeDigest", expected)?;
-    let mut value = serde_json::to_value(&scenario.model_pack)
-        .map_err(|error| invalid(format!("could not encode runtime model pack: {error}")))?;
-    let object = value
-        .as_object_mut()
-        .ok_or_else(|| invalid("modelPack must be an object"))?;
-    object.remove("runtimeDigest");
-    let bytes = serde_json::to_vec(&canonicalize(value)).map_err(|error| {
-        invalid(format!(
-            "could not canonicalize runtime model pack: {error}"
-        ))
-    })?;
-    let actual = format!("{:x}", Sha256::digest(bytes));
+    let pack = &scenario.model_pack;
+    let mut hash = Sha256::new();
+    hash_string(&mut hash, "vector.runtime-model-pack-digest.v2");
+    hash_string(&mut hash, &pack.schema_version);
+    hash_string(&mut hash, &pack.id);
+    hash_string(&mut hash, &pack.version);
+    hash_string(&mut hash, &pack.digest);
+    hash_string(&mut hash, &pack.intended_use.id);
+    hash_string(&mut hash, &pack.intended_use.version);
+    hash_integer(&mut hash, pack.observer_sensors.len());
+    for sensor in &pack.observer_sensors {
+        hash_string(&mut hash, &sensor.model_id);
+        hash_string(&mut hash, &sensor.model_version);
+        hash_strings(&mut hash, &sensor.evidence_ref_ids);
+        hash_string(&mut hash, &sensor.sensor_kind);
+        hash_number(&mut hash, sensor.detection_range_m);
+        hash_number(&mut hash, sensor.minimum_range_m);
+        hash_number(&mut hash, sensor.scan_period_s);
+        hash_number(&mut hash, sensor.azimuth_field_of_view_rad);
+        hash_number(&mut hash, sensor.elevation_field_of_view_rad);
+        hash_integer(
+            &mut hash,
+            usize::from(sensor.verification_track_model.is_some()),
+        );
+        if let Some(model) = &sensor.verification_track_model {
+            hash_string(&mut hash, &model.schema_version);
+            hash_string(&mut hash, &model.value_state);
+            hash_string(&mut hash, &model.intended_use);
+            hash_vector(&mut hash, model.position_bias_m);
+            hash_vector(&mut hash, model.velocity_bias_mps);
+            hash_vector(&mut hash, model.position_standard_deviation_m);
+            hash_vector(&mut hash, model.velocity_standard_deviation_mps);
+            hash_integer(&mut hash, model.confirmation_observations as usize);
+            hash_number(&mut hash, model.maximum_observation_age_seconds);
+            hash_number(&mut hash, model.coast_after_seconds);
+            hash_number(&mut hash, model.lost_after_seconds);
+            hash_integer(&mut hash, model.observation_windows_seconds.len());
+            for window in &model.observation_windows_seconds {
+                hash_number(&mut hash, window.start);
+                hash_number(&mut hash, window.end);
+            }
+        }
+    }
+    hash_integer(&mut hash, pack.scenario_patches.len());
+    for patch in &pack.scenario_patches {
+        hash_string(&mut hash, &patch.schema_version);
+        hash_string(&mut hash, &patch.id);
+        hash_string(&mut hash, &patch.model_pack_digest);
+        hash_string(&mut hash, &patch.model_id);
+        hash_string(&mut hash, &patch.field_path);
+        hash_number(&mut hash, patch.old_value);
+        hash_number(&mut hash, patch.new_value);
+        hash_string(&mut hash, &patch.unit);
+        hash_string(&mut hash, &patch.reason);
+        hash_string(&mut hash, &patch.provenance.author_id);
+        hash_string(&mut hash, &patch.provenance.authored_at);
+        hash_strings(&mut hash, &patch.provenance.evidence_ref_ids);
+    }
+    let actual = format!("{:x}", hash.finalize());
     if actual != expected {
         return Err(invalid(format!(
             "modelPack.runtimeDigest does not match its content: expected {expected}, computed {actual}"
@@ -98,37 +147,8 @@ fn validate_verification_track_model(
     model: &crate::ObserverTrackModel,
     intended_use_id: &str,
 ) -> Result<(), EngineError> {
-    let finite = |value: Vec3| value.x.is_finite() && value.y.is_finite() && value.z.is_finite();
-    let positive = |value: Vec3| finite(value) && value.x > 0.0 && value.y > 0.0 && value.z > 0.0;
-    let windows_valid = !model.observation_windows_seconds.is_empty()
-        && model
-            .observation_windows_seconds
-            .iter()
-            .enumerate()
-            .all(|(index, window)| {
-                window.start.is_finite()
-                    && window.end.is_finite()
-                    && window.start >= 0.0
-                    && window.end >= window.start
-                    && (index == 0
-                        || window.start > model.observation_windows_seconds[index - 1].end)
-            });
     if intended_use_id != "vector.intended-use.engine-verification"
-        || model.schema_version != "vector.generic-track-model.v1"
-        || model.value_state != "TEST_FIXTURE"
-        || model.intended_use != "ENGINE_VERIFICATION_ONLY"
-        || !finite(model.position_bias_m)
-        || !finite(model.velocity_bias_mps)
-        || !positive(model.position_standard_deviation_m)
-        || !positive(model.velocity_standard_deviation_mps)
-        || model.confirmation_observations < 2
-        || !model.maximum_observation_age_seconds.is_finite()
-        || model.maximum_observation_age_seconds < 0.0
-        || !model.coast_after_seconds.is_finite()
-        || model.coast_after_seconds <= 0.0
-        || !model.lost_after_seconds.is_finite()
-        || model.lost_after_seconds <= model.coast_after_seconds
-        || !windows_valid
+        || !valid_verification_track_model(model)
     {
         return Err(invalid(
             "generic track model is admitted only for engine verification",

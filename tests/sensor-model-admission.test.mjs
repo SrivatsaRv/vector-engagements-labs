@@ -18,6 +18,7 @@ import { compileModelPack } from "../lib/model-pack.ts";
 import { adaptPreparedSimulation, admitRuntimeModelPack } from "../lib/runtime/model-pack-adapter.ts";
 import { assertEngineObserverState } from "../lib/information-state.ts";
 import { bindRuntimeModelPackDigest } from "../lib/engine/runtime-model-pack.ts";
+import { assertSimulationEventStream } from "../lib/engine/simulation-events.ts";
 
 function forgedScenario({ mode = "SEARCH", rangeM = 120_000, digest } = {}) {
   const capabilities = createVerificationDeploymentCapabilities("typescript");
@@ -185,6 +186,9 @@ test("observer-state v2/v3 admission rejects contradictory, extra-field, and tru
   assert.doesNotThrow(() => assertEngineObserverState(unsupported));
   assert.throws(() => assertEngineObserverState({ ...unsupported, visible: true }), /contradictory/i);
   assert.throws(() => assertEngineObserverState({ ...unsupported, invented: true }), /unsupported or missing/i);
+  assert.throws(() => assertEngineObserverState({ ...unsupported, availabilityReason: "MAYBE" }), /contradictory|availability/i);
+  assert.throws(() => assertEngineObserverState({ ...unsupported, stateExplanation: 7 }), /explanation/i);
+  assert.throws(() => assertEngineObserverState({ ...unsupported, nested: { truthEntityId: "red-object-1" } }), /truth/i);
 
   const prepared = prepareSimulation(DEFAULT_SCENARIO);
   return bindVerificationTrackModelPack(prepared.engineScenario).then(({ scenario }) => {
@@ -258,4 +262,23 @@ test("both engines reject mutated and unknown-field verification projections", a
   for (const backend of ["typescript", "rust-wasm"]) {
     assert.throws(() => runEngineBackend(unknown, backend), /unsupported or missing field|unknown field/i);
   }
+});
+
+test("both engines reject observation, track, and event sources forged beside a valid digest", async () => {
+  const prepared = prepareSimulation(DEFAULT_SCENARIO);
+  const { scenario } = await bindVerificationTrackModelPack(prepared.engineScenario);
+  const forged = structuredClone(runEngine(scenario));
+  const frame = forged.frames.find((item) => item.observerStates.some((state) => state.schemaVersion === "vector.observer-state.v3" && state.tracks.length));
+  const state = frame.observerStates.find((item) => item.schemaVersion === "vector.observer-state.v3" && item.tracks.length);
+  state.sensorModelId = "forged-valid-digest-model";
+  state.tracks[0].source.sensorModelId = "forged-valid-digest-model";
+  state.observations[0].source.sensorModelId = "forged-valid-digest-model";
+  const event = forged.events.items.find((item) => item.payload.kind === "TRACK_STATE_CHANGED");
+  event.payload.sensorModelId = "forged-valid-digest-model";
+  assert.throws(() => assertSimulationEventStream(
+    forged.events.items,
+    forged.frames,
+    scenario,
+    forged.termination,
+  ), /compiled scenario|admitted scenario/i);
 });
