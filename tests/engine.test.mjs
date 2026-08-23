@@ -338,19 +338,21 @@ test("aircraft admission rejects an initial mass that omits installed stores", (
   );
 });
 
-test("fuel exhaustion preserves empty mass and all installed store mass", () => {
+test("fuel exhaustion preserves empty mass and all installed store mass before release", () => {
   const scenario = admitTestAircraft(testScenario());
   const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
   const weapon = scenario.entities.find((entity) => entity.id === "weapon-blue");
-  weapon.weapon.launchTimeSeconds = scenario.durationSeconds + 1;
+  weapon.weapon.launchTimeSeconds =
+    scenario.durationSeconds - scenario.fixedStepSeconds;
   blue.initial.fuelKg = 1;
   blue.initial.massKg = testAircraftModel.emptyMassKg + 1 + weapon.weapon.launchMassKg;
   blue.aircraft.fuelFlowByThrottle.values = [1, 1];
 
   const run = runEngine(scenario);
-  const finalAircraft = run.frames.at(-1).entities.find(
-    (entity) => entity.id === blue.id,
-  );
+  const finalAircraft = [...run.frames]
+    .reverse()
+    .find((frame) => frame.t < weapon.weapon.launchTimeSeconds)
+    .entities.find((entity) => entity.id === blue.id);
   assert.equal(finalAircraft.fuelKg, 0);
   assert.equal(finalAircraft.storeMassKg, weapon.weapon.launchMassKg);
   assert.ok(
@@ -470,9 +472,9 @@ test("aircraft records the guidance request separately from its load-factor-limi
   ];
   red.routePlan = { schemaVersion: "vector.route-plan.v1", waypointAcceptanceRadiiM: [1, 25] };
 
-  const frame = runEngine(scenario).frames[0].entities.find(
-    (entity) => entity.id === red.id,
-  );
+  const frame = runEngine(scenario).frames
+    .flatMap((sample) => sample.entities)
+    .find((entity) => entity.id === red.id && entity.aircraftControl);
 
   assert.ok(frame?.aircraftControl);
   // Independent kinematic oracle: a 90-degree route request at the initial

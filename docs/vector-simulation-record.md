@@ -2,7 +2,7 @@
 
 Status: browser implementation available, schema name `vector.record.v1`.
 
-The VECTOR Simulation Record (VSR) is VECTOR's equivalent of an ACMI recording. It is a portable, immutable analysis artifact, not a second simulation engine. A viewer must be able to open one VSR and reproduce the same entity list, event timeline, map/3D playback, telemetry, RASP views, explanation, and report without rerunning physics.
+The VECTOR Simulation Record (VSR) is VECTOR's equivalent of an ACMI recording. It is a portable, immutable analysis artifact, not a second simulation engine. A viewer must be able to open one VSR and reproduce the same entity list, Situation Log inputs, map/3D playback, telemetry, RASP views, explanation, and report without rerunning physics.
 
 Tacview's ACMI 2.x format establishes the useful separation: a producer records time-addressed object properties and a viewer renders and analyzes them. Tacview also prefers recorded advanced telemetry over calculated fallback values and recommends object-class-specific export rates to control size. VECTOR adopts those principles while retaining additional scenario, model, source, and integrity records required by the workbench.
 
@@ -21,7 +21,7 @@ Primary references:
 | `compiled.json` | immutable engine input with resolved catalog IDs, compiled model-pack digest, model indexes, scenario-local patches, and model revisions |
 | `entities.json` | stable entity identities, affiliation, class, labels, lifecycle and presentation references |
 | `frames.arrow` | columnar time-addressed state for every active entity |
-| `events.jsonl` | launches, detections, track changes, guidance phases, terminations and annotations |
+| `events.jsonl` | authoritative typed simulation events; the current producer set records run and entity lifecycle boundaries |
 | `pictures.jsonl` | optional IAF, PAF or other observer-specific track states; Model Truth remains in frames |
 | `sources.json` | cited public facts, model assumptions, user overrides and confidence state |
 | `report.json` | frozen report content and analyst notes |
@@ -95,6 +95,84 @@ Weapons remain loadout inventory before launch. Aircraft frames preserve the ins
 
 The manifest records SHA-256 hashes for the canonical scenario, compiled engine input, compiled model pack, frames, events, sources and optional assets. It also records intended-use and credibility-manifest identities. Saving a run is complete only after all required hashes and a terminal run state exist. Editing a scenario creates a new draft revision; it cannot mutate a saved VSR.
 
+### Simulation event stream
+
+`events.jsonl` is the direct serialization of the engine-owned
+`vector.simulation-event.v2` stream. It is not rebuilt from sampled frames and
+does not contain display-ready English. The current closed producer set is
+`RUN_STARTED`, `ENTITY_ENTERED_WORLD`, `ENTITY_LIFECYCLE_CHANGED`, and
+`RUN_COMPLETED`. Sensor, track, launch-decision, guidance, support, and weapon
+termination events remain unavailable until their owning simulation contracts
+produce them; the record and browser may not infer them.
+
+The `vector.simulation-event.v2` envelope is immutable. Each payload variant
+carries a separate `vector.simulation-event-payload.<family>.vN` identity.
+Adding a producer under #26, #28, or #38 therefore requires a governed payload
+schema and exhaustive TypeScript/Rust/read-boundary support. An older v2 reader
+must reject an unknown kind, an unknown payload-family version, or an extra
+field; it may not accept the known envelope and ignore unfamiliar semantics.
+Changing envelope fields requires a new event-envelope version.
+
+Every available event has a monotonically assigned ID and sequence, exact
+fixed-step model time, the corresponding retained frame index, producer and
+participant identities, typed payload, phase, producer-stable local key, and
+causal references. A
+per-tick journal orders drafts by canonical event semantics rather than call or
+entity insertion order, retains an exact frame for every event-bearing tick,
+sorts and deduplicates participants, and rejects duplicate semantic
+transitions, duplicate causes, missing/forward/cyclic causal receipts, and
+configured capacity overflow. `emit` returns a journal-issued receipt keyed by
+tick and stable local key. Producers pass that receipt across phases or later
+ticks; they never infer an `event-NNN` ID. The journal resolves the receipt only
+after its event commits and rejects every unresolved receipt.
+The admission bound includes both regular samples and event-forced frames, so a
+future high-rate #26 producer cannot bypass the recorded-state budget. VSR opening repeats schema,
+ordering, frame, ownership, lifecycle, and causal-integrity validation before
+exposing the stream.
+
+The read boundary replays each entity's lifecycle history from its compiled
+initial state. Initial non-stowed entries must match that state, later world
+entries must activate a previously `STOWED` entity, and every lifecycle
+transition's `from` value must equal the prior canonical lifecycle. The replayed
+history must reach the lifecycle in the final retained frame. A syntactically
+valid enum cannot therefore falsify the recorded transition history.
+
+World entry for a scheduled stowed weapon is bound to the first fixed-step
+integration boundary at or after its declared launch time and the first retained
+frame containing that entity. A later lifecycle event is
+bound to the first retained frame that changes from its prior canonical state,
+and `RUN_COMPLETED` is bound to the final retained frame. Referencing any other
+frame fails even when that frame contains the same lifecycle value.
+
+The integer tick owns model time: each boundary is derived as `tick × fixed
+step`; neither engine accumulates a floating model clock. Scheduled activation
+starts from the quotient estimate and then compares the adjacent tick-derived
+boundaries directly, so grid, off-grid and near-grid values use the same rule in
+the producer and validator. The terminal tick is the first fixed-step boundary
+at or after the declared duration. The executable interval is half-open: a
+scheduled activation tick must be strictly earlier than the terminal tick.
+Exact-terminal and off-grid schedules that quantize to that boundary fail
+admission rather than becoming inert controls. A finite schedule after the
+declared duration fails before clock quantization. The terminal tick records run
+completion and admits no new tactical action. Frames represent state committed
+at that boundary. Frames, events and TypeScript `EngineBatch` expose the same
+canonical six-decimal recorded representation of that tick-derived time; raw
+IEEE multiplication does not leak through the Worker boundary. A completed
+batch reports this boundary even when it is later than an off-grid declared
+duration; only its dimensionless progress value is clamped to one. The current
+Rust/WASM ABI returns the whole run rather than an incremental batch, so its
+final frame, `RUN_COMPLETED` event and integrated-step diagnostic provide the
+equivalent canonical time.
+Initial and store-world-entry events are captured before the following
+integration step; post-integration lifecycle and run-terminal transitions use
+the next boundary time. An event frame therefore cannot show an entity already
+moved beyond the transition it records.
+
+Historical `vector.events.v1` members remain readable only as an explicit
+`UNAVAILABLE / LEGACY_EVENT_SCHEMA` state. Their frames remain replayable, but
+the viewer must not upgrade legacy free-text or frame-derived events into the
+authoritative v2 stream.
+
 ## Browser and interoperability boundary
 
 VSR is designed for browser production and playback. Frames use a transferable columnar buffer so a Web Worker, TypeScript engine or Rust/WASM engine can produce the same record contract. An ACMI 2.2 exporter can be added as an interoperability adapter; ACMI is not used as VECTOR's internal source of model truth because it does not carry VECTOR's full coefficient, provenance and scenario contracts.
@@ -102,7 +180,8 @@ VSR is designed for browser production and playback. Frames use a transferable c
 ## Implemented replay boundary
 
 `createVectorSimulationRecord` freezes the authored scenario, compiled adapter,
-entity manifest, engine frames, stable lifecycle/input events, both observer
+entity manifest, engine frames, the direct authoritative simulation-event
+stream, both observer
 pictures for A2A runs, provenance, limitations, and report outcome. The
 `openVectorSimulationRecord` path reconstructs the existing `SimulationResult`
 from recorded frames and metadata without calling either physics backend. That
@@ -129,8 +208,13 @@ an explicit incomplete-observer-state error; it must be regenerated from its
 immutable scenario with a v4-capable runtime. VECTOR
 does not synthesize a missing requested command during replay.
 
-Stable events are ordered by model timestamp, event-class rank, entity ID, and
-detail, then assigned monotonically increasing sequence numbers. Record identity
-is derived from member content digests, so wall-clock creation metadata cannot
-masquerade as simulation identity. Reusable transport capacity is not part of the
-record bytes or content identity.
+Authoritative events are ordered within each tick by phase, typed payload,
+producer identity, every canonical participant, knowledge scope, correlation,
+producer-stable local key, and causal receipt. Text comparison uses unsigned
+UTF-8 byte order in both TypeScript and Rust. Current run/lifecycle producers
+have semantic TypeScript/Rust parity and carry no causal edges; serialized
+cause-byte parity remains required when #26, #28, or #38 lands its first causal
+producer. Events then receive monotonically increasing IDs and sequences. Record identity is
+derived from member content digests, so wall-clock creation metadata cannot
+masquerade as simulation identity. Reusable transport capacity is not part of
+the record bytes or content identity.

@@ -63,7 +63,7 @@ Invoke a persona with the `$skill-name` shown above. Each persona follows `$vect
 | Enter | Choose a template, blank scenario, weapon-led study, or Red-vs-Blue study |
 | Construct | Engagement type, entities, placement, loadouts, environment, assumptions |
 | Simulate | Deterministic detailed run; uncertainty batches follow the same package contract |
-| Observe | Synchronized map/3D playback, event timeline, air picture, and telemetry |
+| Observe | Synchronized map/3D playback, Situation Log, air picture, and telemetry |
 | Explain | Outcome, causes, value state, confidence, and influential variables |
 | Compare | Controlled Variant A/Variant B comparison |
 | Report | Save, replay, print/PDF, JSON/telemetry export, and research citations |

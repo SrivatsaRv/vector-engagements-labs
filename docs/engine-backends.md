@@ -1,6 +1,6 @@
 # Simulation engine backends
 
-VECTOR has one engine contract and two browser implementations. The authored scenario compiler produces the same immutable `EngineScenario` for either backend. Both return the same `EngineRun` frame, envelope, termination, and diagnostic contract.
+VECTOR has one engine contract and two browser implementations. The authored scenario compiler produces the same immutable `EngineScenario` for either backend. Both return the same `EngineRun` frame, authoritative simulation-event, envelope, termination, and diagnostic contract.
 
 ## Rust / WebAssembly
 
@@ -56,7 +56,8 @@ committed, integrity-checked artifact and does not install a compiler at runtime
 - `npm run engine:rust:clippy` runs strict Clippy across every target and feature.
 - `npm run engine:rust:test` runs native Rust tests.
 - `npm run engine:rust:doc` builds rustdoc with warnings denied.
-- `tests/engine-backends.test.mjs` runs all eight calibrated scenarios through both implementations and compares termination, frame count, entity lifecycle, sampled telemetry, closest approach, time of flight, speed, demand, and finite-state diagnostics.
+- `tests/engine-backends.test.mjs` runs all eight calibrated scenarios through both implementations and compares termination, frame count, entity lifecycle, the complete authoritative event stream, sampled telemetry, closest approach, time of flight, speed, demand, and finite-state diagnostics.
+- `tests/simulation-events.test.ts` proves insertion-order-independent event ordering, arbitrary-entity coverage, exact off-cadence event frames, duplicate and causal-reference rejection, and the absence of authoritative English strings.
 - `tests/model-pack.test.mjs` plus Rust `model_pack` tests verify the shared compiled object-data contract and committed digest fixture.
 - `npm run performance:verify` measures cold initialization and warm-run p50/p95 for both backends.
 

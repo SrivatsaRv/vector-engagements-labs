@@ -1,6 +1,6 @@
 # VECTOR analysis-display visual subset
 
-Status: mandatory product contract, version 0.3.
+Status: mandatory product contract, version 0.4.
 
 VECTOR implements a deliberately small Tacview-style analysis-display subset. “Tacview-style” means synchronized, time-addressable tracks with recognisable object silhouettes, altitude cues, sensor volumes, event markers, labels, and telemetry. It does **not** claim Tacview file compatibility, NATO APP-6 compliance, MIL-STD-2525 compliance, or reproduction of Tacview artwork.
 
@@ -134,3 +134,28 @@ selector changes browser presentation only; it cannot change a run or record.
 This first inspector intentionally does not render radar volumes, seeker state,
 weapon support, or inferred observations. Those require the remaining #26 and
 #28 contracts.
+
+## Situation Log contract
+
+The Observe workspace reserves an edge-panel **Situation Log** for concise,
+time-addressed operational messages. It is distinct from diagnostic telemetry,
+model provenance, compiler admission, and Explain inspectors. A Situation Log
+message is a presentation projection from one authoritative
+`vector.simulation-event.v2` event at the selected observer boundary; it is not
+itself simulation truth and it may not mutate playback or engine state.
+
+The canonical event carries identities, exact committed model-time frame,
+versioned typed payload, lifecycle phase, canonical participants, and causal
+references. The presentation
+adapter owns wording, severity, grouping, icon, filtering, and localization.
+This split permits one simulation event to produce different messages for Model
+Truth, IAF, or PAF only when the selected view is allowed to know it. A hidden
+truth event must not leak through a message, count, search result, or tooltip.
+
+The current engine foundation produces only run and entity-lifecycle events.
+The Situation Log UI, observer-safe message projection, sensor/track messages,
+launch/guidance/support messages, selection/scrub interaction, and dense-log
+performance remain follow-up #41 slices gated by their owning #26, #28, and #38
+contracts. Until those slices land, the product must show an explicit
+unavailable or empty state rather than synthesize a combat narrative from
+frames.

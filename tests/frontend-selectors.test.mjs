@@ -77,7 +77,11 @@ test("recorded track selection returns the exact unavailable tick state", () => 
 });
 
 test("route-transition state consumes the selected frame and immutable compiled v2 plan", () => {
-  const selected = selectDisplayFrame(result, 0);
+  const controlFrame = result.frames.find((frame) =>
+    frame.entities.some((entity) => entity.id === "blue-platform-1" && entity.aircraftControl)
+  );
+  assert.ok(controlFrame);
+  const selected = selectDisplayFrame(result, controlFrame.t);
   const transitions = selectRouteTransitionStates(result, selected);
   const blue = transitions.find((transition) => transition.entityId === "blue-platform-1");
   assert.ok(blue);
@@ -99,7 +103,11 @@ test("route-transition state exposes legacy v1 semantics and fails closed when c
     schemaVersion: "vector.route-plan.v1",
     waypointAcceptanceRadiiM: [...blue.routePlan.waypointAcceptanceRadiiM],
   };
-  const selected = selectDisplayFrame(legacy, 0);
+  const controlFrame = legacy.frames.find((frame) =>
+    frame.entities.some((entity) => entity.id === "blue-platform-1" && entity.aircraftControl)
+  );
+  assert.ok(controlFrame);
+  const selected = selectDisplayFrame(legacy, controlFrame.t);
   const transition = selectRouteTransitionStates(legacy, selected).find((item) => item.entityId === "blue-platform-1");
   assert.ok(transition && transition.state === "ACTIVE");
   assert.equal(transition.semantics, "LEGACY_ALL_FLY_BY");

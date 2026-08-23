@@ -1,0 +1,552 @@
+import { canonicalJson } from "../canonical-json.ts";
+import type {
+  EngineFrame,
+  EngineScenario,
+  EntityLifecycle,
+  EngineTermination,
+  SimulationEventParticipant,
+  SimulationEventPayload,
+  SimulationEventV2,
+} from "./contracts.ts";
+import {
+  SIMULATION_EVENT_PAYLOAD_SCHEMAS,
+  SIMULATION_EVENT_SCHEMA,
+} from "./contracts.ts";
+
+export const MAX_SIMULATION_EVENTS = 100_000;
+
+export type SimulationEventReceipt = {
+  tick: number;
+  localKey: string;
+};
+
+export type SimulationEventCauseReference = {
+  kind: "EVENT_RECEIPT";
+  receipt: SimulationEventReceipt;
+};
+
+export type SimulationEventDraft = Omit<
+  SimulationEventV2,
+  "schemaVersion" | "id" | "sequence" | "frameIndex" | "causeEventIds"
+> & {
+  causes: SimulationEventCauseReference[];
+};
+
+const PHASES = [
+  "LIFECYCLE",
+  "SENSING",
+  "TRACKING",
+  "MISSION",
+  "WEAPON",
+  "TERMINATION",
+] as const;
+const phaseRank = Object.fromEntries(PHASES.map((phase, index) => [phase, index]));
+const PAYLOAD_KINDS = [
+  "RUN_STARTED",
+  "ENTITY_ENTERED_WORLD",
+  "ENTITY_LIFECYCLE_CHANGED",
+  "RUN_COMPLETED",
+] as const;
+const payloadRank = Object.fromEntries(PAYLOAD_KINDS.map((kind, index) => [kind, index]));
+const ENTITY_KINDS = [
+  "AIRCRAFT",
+  "GUIDED_WEAPON",
+  "AIR_DEFENCE_SYSTEM",
+  "RADAR",
+  "SURFACE_LAUNCHER",
+  "BASE",
+  "FIXED_OBJECTIVE",
+] as const;
+const LIFECYCLES = ["STOWED", "ACTIVE", "TRACKING", "ENGAGING", "TERMINATED"] as const;
+const ACTIVE_LIFECYCLES = ["ACTIVE", "TRACKING", "ENGAGING"] as const;
+const TERMINATIONS = [
+  "threshold_reached",
+  "energy_depleted",
+  "target_unavailable",
+  "time_limit",
+  "invalid_scenario",
+] as const;
+const PARTICIPANT_ROLES = ["ACTOR", "SUBJECT", "LAUNCHER", "WEAPON", "SENSOR"] as const;
+const UTF8_ENCODER = new TextEncoder();
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function exactKeys(
+  value: Record<string, unknown>,
+  required: readonly string[],
+  optional: readonly string[] = [],
+  label = "Simulation event",
+) {
+  const allowed = new Set([...required, ...optional]);
+  for (const key of required) {
+    if (!(key in value)) throw new Error(`${label} is missing ${key}.`);
+  }
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) throw new Error(`${label} contains unsupported field ${key}.`);
+  }
+}
+
+function nonEmptyString(value: unknown, label: string): asserts value is string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`${label} must be a non-empty string.`);
+  }
+}
+
+function member<T extends string>(value: unknown, values: readonly T[], label: string): asserts value is T {
+  if (typeof value !== "string" || !values.includes(value as T)) {
+    throw new Error(`${label} is unsupported.`);
+  }
+}
+
+function compareText(left: string, right: string) {
+  if (left === right) return 0;
+  const leftBytes = UTF8_ENCODER.encode(left);
+  const rightBytes = UTF8_ENCODER.encode(right);
+  const length = Math.min(leftBytes.length, rightBytes.length);
+  for (let index = 0; index < length; index += 1) {
+    if (leftBytes[index] !== rightBytes[index]) return leftBytes[index]! - rightBytes[index]!;
+  }
+  return leftBytes.length - rightBytes.length;
+}
+
+function receiptKey(receipt: SimulationEventReceipt) {
+  return `${receipt.tick}\u0000${receipt.localKey}`;
+}
+
+export function modelTimeAtTick(tick: number, fixedStepSeconds: number) {
+  return tick * fixedStepSeconds;
+}
+
+export function recordedModelTimeAtTick(tick: number, fixedStepSeconds: number) {
+  return Number(modelTimeAtTick(tick, fixedStepSeconds).toFixed(6));
+}
+
+export function firstFixedStepTickAtOrAfter(
+  modelTimeSeconds: number,
+  fixedStepSeconds: number,
+) {
+  if (
+    !Number.isFinite(modelTimeSeconds) ||
+    modelTimeSeconds < 0 ||
+    !Number.isFinite(fixedStepSeconds) ||
+    fixedStepSeconds <= 0
+  ) {
+    throw new Error("Fixed-step activation boundary requires finite non-negative time and a positive step.");
+  }
+  let candidate = Math.ceil(modelTimeSeconds / fixedStepSeconds);
+  if (!Number.isSafeInteger(candidate)) {
+    throw new Error("Fixed-step activation boundary exceeds the safe tick range.");
+  }
+  while (
+    candidate > 0 &&
+    modelTimeAtTick(candidate - 1, fixedStepSeconds) >= modelTimeSeconds
+  ) {
+    candidate -= 1;
+  }
+  while (modelTimeAtTick(candidate, fixedStepSeconds) < modelTimeSeconds) {
+    candidate += 1;
+    if (!Number.isSafeInteger(candidate)) {
+      throw new Error("Fixed-step activation boundary exceeds the safe tick range.");
+    }
+  }
+  return candidate;
+}
+
+function normalizeParticipants(
+  participants: readonly SimulationEventParticipant[],
+): SimulationEventParticipant[] {
+  const byKey = new Map<string, SimulationEventParticipant>();
+  for (const participant of participants) {
+    const key = `${participant.entityId}\u0000${participant.role}`;
+    byKey.set(key, { entityId: participant.entityId, role: participant.role });
+  }
+  return [...byKey.values()].sort((left, right) =>
+    compareText(left.entityId, right.entityId) || compareText(left.role, right.role)
+  );
+}
+
+function participantKey(participants: readonly SimulationEventParticipant[]) {
+  return normalizeParticipants(participants)
+    .map(({ entityId, role }) => `${entityId}:${role}`)
+    .join("|");
+}
+
+function causeDraftKey(causes: readonly SimulationEventCauseReference[]) {
+  return [...causes]
+    .map((cause) => `RECEIPT:${cause.receipt.tick}:${cause.receipt.localKey}`)
+    .sort(compareText)
+    .join("|");
+}
+
+function payloadSortKey(payload: SimulationEventPayload) {
+  if (payload.kind === "RUN_STARTED") {
+    return canonicalJson(["0", payload.schemaVersion, payload.scenarioId, payload.scenarioVersion]);
+  }
+  if (payload.kind === "ENTITY_ENTERED_WORLD") {
+    return canonicalJson(["1", payload.schemaVersion, payload.entityKind, payload.lifecycle]);
+  }
+  if (payload.kind === "ENTITY_LIFECYCLE_CHANGED") {
+    return canonicalJson(["2", payload.schemaVersion, payload.entityKind, payload.from, payload.to]);
+  }
+  return canonicalJson(["3", payload.schemaVersion, payload.termination]);
+}
+
+function canonicalDraftSortKey(event: SimulationEventDraft) {
+  return [
+    String(phaseRank[event.phase] ?? 999),
+    String(payloadRank[event.payload.kind] ?? 999),
+    payloadSortKey(event.payload),
+    event.producer.subsystem,
+    event.producer.entityId ?? "",
+    participantKey(event.participants),
+    event.knowledgeScope,
+    event.ownerAffiliation ?? "",
+    event.correlationId ?? "",
+    event.localKey,
+    causeDraftKey(event.causes),
+  ].join("\u0001");
+}
+
+function canonicalCommittedSortKey(event: SimulationEventV2) {
+  return [
+    String(phaseRank[event.phase] ?? 999),
+    String(payloadRank[event.payload.kind] ?? 999),
+    payloadSortKey(event.payload),
+    event.producer.subsystem,
+    event.producer.entityId ?? "",
+    participantKey(event.participants),
+    event.knowledgeScope,
+    event.ownerAffiliation ?? "",
+    event.correlationId ?? "",
+    event.localKey,
+    [...event.causeEventIds].sort(compareText).join("|"),
+  ].join("\u0001");
+}
+
+function compareDrafts(left: SimulationEventDraft, right: SimulationEventDraft) {
+  return compareText(canonicalDraftSortKey(left), canonicalDraftSortKey(right));
+}
+
+function assertPayload(value: unknown, index: number): asserts value is SimulationEventPayload {
+  if (!isRecord(value)) throw new Error(`Simulation event ${index} payload must be an object.`);
+  member(value.kind, PAYLOAD_KINDS, `Simulation event ${index} payload kind`);
+  if (value.kind === "RUN_STARTED") {
+    exactKeys(value, ["kind", "schemaVersion", "scenarioId", "scenarioVersion"], [], `Simulation event ${index} payload`);
+    if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_STARTED) throw new Error(`Simulation event ${index} payload schema is unsupported.`);
+    nonEmptyString(value.scenarioId, `Simulation event ${index} scenario ID`);
+    nonEmptyString(value.scenarioVersion, `Simulation event ${index} scenario version`);
+  } else if (value.kind === "ENTITY_ENTERED_WORLD") {
+    exactKeys(value, ["kind", "schemaVersion", "entityKind", "lifecycle"], [], `Simulation event ${index} payload`);
+    if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.ENTITY_ENTERED_WORLD) throw new Error(`Simulation event ${index} payload schema is unsupported.`);
+    member(value.entityKind, ENTITY_KINDS, `Simulation event ${index} entity kind`);
+    member(value.lifecycle, ACTIVE_LIFECYCLES, `Simulation event ${index} world-entry lifecycle`);
+  } else if (value.kind === "ENTITY_LIFECYCLE_CHANGED") {
+    exactKeys(value, ["kind", "schemaVersion", "entityKind", "from", "to"], [], `Simulation event ${index} payload`);
+    if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.ENTITY_LIFECYCLE_CHANGED) throw new Error(`Simulation event ${index} payload schema is unsupported.`);
+    member(value.entityKind, ENTITY_KINDS, `Simulation event ${index} entity kind`);
+    member(value.from, LIFECYCLES, `Simulation event ${index} prior lifecycle`);
+    member(value.to, LIFECYCLES, `Simulation event ${index} next lifecycle`);
+    if (value.from === value.to) throw new Error(`Simulation event ${index} records an unchanged lifecycle.`);
+  } else {
+    exactKeys(value, ["kind", "schemaVersion", "termination"], [], `Simulation event ${index} payload`);
+    if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_COMPLETED) throw new Error(`Simulation event ${index} payload schema is unsupported.`);
+    member(value.termination, TERMINATIONS, `Simulation event ${index} termination`);
+  }
+}
+
+function assertDraftShape(event: SimulationEventDraft) {
+  if (!Number.isSafeInteger(event.tick) || event.tick < 0) throw new Error("Simulation event tick must be a non-negative safe integer.");
+  if (!Number.isFinite(event.modelTimeSeconds) || event.modelTimeSeconds < 0) throw new Error("Simulation event model time must be finite and non-negative.");
+  nonEmptyString(event.localKey, "Simulation event local key");
+  if (!Array.isArray(event.causes)) throw new Error("Simulation event causes must be an array.");
+  for (const [index, cause] of event.causes.entries()) {
+    if (!isRecord(cause)) throw new Error(`Simulation event cause ${index} must be an object.`);
+    exactKeys(cause, ["kind", "receipt"], [], `Simulation event cause ${index}`);
+    member(cause.kind, ["EVENT_RECEIPT"], `Simulation event cause ${index} kind`);
+    if (!isRecord(cause.receipt)) throw new Error(`Simulation event cause ${index} receipt must be an object.`);
+    exactKeys(cause.receipt, ["tick", "localKey"], [], `Simulation event cause ${index} receipt`);
+    if (!Number.isSafeInteger(cause.receipt.tick) || (cause.receipt.tick as number) < 0) throw new Error(`Simulation event cause ${index} receipt tick must be a non-negative safe integer.`);
+    nonEmptyString(cause.receipt.localKey, `Simulation event cause ${index} receipt local key`);
+  }
+  if (new Set(event.causes.map((cause) => canonicalJson(cause))).size !== event.causes.length) throw new Error("Simulation event causal references must be unique.");
+  event.participants = normalizeParticipants(event.participants);
+}
+
+/** Deterministic per-tick journal. It records committed transitions; it never drives them. */
+export class SimulationEventJournal {
+  private readonly committed: SimulationEventV2[] = [];
+  private readonly committedSequenceByReceipt = new Map<string, number>();
+  private pending: SimulationEventDraft[] = [];
+
+  emit(event: SimulationEventDraft): SimulationEventReceipt {
+    const copy = structuredClone(event);
+    assertDraftShape(copy);
+    this.pending.push(copy);
+    return { tick: copy.tick, localKey: copy.localKey };
+  }
+
+  hasPending() {
+    return this.pending.length > 0;
+  }
+
+  resolveReceipt(receipt: SimulationEventReceipt) {
+    const sequence = this.committedSequenceByReceipt.get(receiptKey(receipt));
+    if (sequence === undefined) throw new Error("Simulation event receipt is unresolved.");
+    return `event-${sequence.toString().padStart(6, "0")}`;
+  }
+
+  commitTick(tick: number, modelTimeSeconds: number, frameIndex: number) {
+    if (!Number.isSafeInteger(frameIndex) || frameIndex < 0) throw new Error("Simulation event frame index must be a non-negative safe integer.");
+    if (this.committed.length + this.pending.length > MAX_SIMULATION_EVENTS) throw new Error(`Simulation event stream exceeds ${MAX_SIMULATION_EVENTS} events.`);
+    for (const event of this.pending) {
+      if (event.tick !== tick || event.modelTimeSeconds !== modelTimeSeconds) throw new Error("Simulation event tick commit does not match its pending event time.");
+    }
+    const ordered = [...this.pending].sort(compareDrafts);
+    const indexByLocalKey = new Map<string, number>();
+    const duplicateTransitions = new Set<string>();
+    const committedBase = this.committed.length;
+    for (const [index, event] of ordered.entries()) {
+      if (indexByLocalKey.has(event.localKey)) throw new Error(`Simulation event tick repeats local key ${event.localKey}.`);
+      indexByLocalKey.set(event.localKey, index);
+      const key = canonicalJson({ tick: event.tick, producer: event.producer, participants: event.participants, payload: event.payload });
+      if (duplicateTransitions.has(key)) throw new Error("Simulation event stream contains a duplicate transition.");
+      duplicateTransitions.add(key);
+    }
+    for (const [index, event] of ordered.entries()) {
+      const causeSequences: number[] = [];
+      for (const cause of event.causes) {
+        const receipt = cause.receipt;
+        if (receipt.tick > tick) {
+          throw new Error(`Simulation event receipt ${receipt.localKey} is future or cyclic.`);
+        }
+        if (receipt.tick < tick) {
+          const sequence = this.committedSequenceByReceipt.get(receiptKey(receipt));
+          if (sequence === undefined) throw new Error(`Simulation event receipt ${receipt.localKey} is unresolved.`);
+          causeSequences.push(sequence);
+        } else {
+          const causeIndex = indexByLocalKey.get(receipt.localKey);
+          if (causeIndex === undefined) throw new Error(`Simulation event receipt ${receipt.localKey} is unresolved.`);
+          if (causeIndex >= index) throw new Error(`Simulation event receipt ${receipt.localKey} is future or cyclic.`);
+          causeSequences.push(committedBase + causeIndex);
+        }
+      }
+      const causeEventIds = [...new Set(causeSequences)]
+        .sort((left, right) => left - right)
+        .map((sequence) => `event-${sequence.toString().padStart(6, "0")}`);
+      if (causeEventIds.length !== event.causes.length) throw new Error("Simulation event causal references resolve to a duplicate event.");
+      const sequence = this.committed.length;
+      const committed: SimulationEventV2 = {
+        schemaVersion: SIMULATION_EVENT_SCHEMA,
+        id: `event-${sequence.toString().padStart(6, "0")}`,
+        sequence,
+        localKey: event.localKey,
+        tick,
+        modelTimeSeconds,
+        frameIndex,
+        phase: event.phase,
+        producer: structuredClone(event.producer),
+        ...(event.ownerAffiliation ? { ownerAffiliation: event.ownerAffiliation } : {}),
+        knowledgeScope: event.knowledgeScope,
+        participants: normalizeParticipants(event.participants),
+        causeEventIds,
+        ...(event.correlationId ? { correlationId: event.correlationId } : {}),
+        payload: structuredClone(event.payload),
+      };
+      this.committed.push(committed);
+      this.committedSequenceByReceipt.set(
+        receiptKey({ tick: committed.tick, localKey: committed.localKey }),
+        committed.sequence,
+      );
+    }
+    this.pending = [];
+  }
+
+  items() {
+    if (this.pending.length > 0) throw new Error("Simulation event journal has uncommitted tick events.");
+    return structuredClone(this.committed);
+  }
+}
+
+export function assertSimulationEventStream(
+  values: readonly unknown[],
+  frames: readonly EngineFrame[],
+  scenario: EngineScenario,
+  termination: EngineTermination,
+): asserts values is readonly SimulationEventV2[] {
+  if (values.length > MAX_SIMULATION_EVENTS) throw new Error(`Simulation event stream exceeds ${MAX_SIMULATION_EVENTS} events.`);
+  const entityById = new Map(scenario.entities.map((entity) => [entity.id, entity]));
+  const lifecycleByEntity = new Map<string, EntityLifecycle>(
+    scenario.entities.map((entity) => [entity.id, entity.lifecycle]),
+  );
+  const enteredEntityIds = new Set<string>();
+  const firstFrameIndexByEntity = new Map<string, number>();
+  const finalLifecycleByEntity = new Map<string, EntityLifecycle>();
+  const frameTransitionsByEntity = new Map<
+    string,
+    Array<{ frameIndex: number; from: EntityLifecycle; to: EntityLifecycle }>
+  >();
+  for (const [frameIndex, frame] of frames.entries()) {
+    for (const entity of frame.entities) {
+      if (!firstFrameIndexByEntity.has(entity.id)) {
+        firstFrameIndexByEntity.set(entity.id, frameIndex);
+      }
+      const priorLifecycle = finalLifecycleByEntity.get(entity.id);
+      if (priorLifecycle !== undefined && priorLifecycle !== entity.lifecycle) {
+        const transitions = frameTransitionsByEntity.get(entity.id) ?? [];
+        transitions.push({ frameIndex, from: priorLifecycle, to: entity.lifecycle });
+        frameTransitionsByEntity.set(entity.id, transitions);
+      }
+      finalLifecycleByEntity.set(entity.id, entity.lifecycle);
+    }
+  }
+  const consumedFrameTransitionsByEntity = new Map<string, number>();
+  const seenIds = new Set<string>();
+  const seenTransitions = new Set<string>();
+  const seenLocalKeysByTick = new Map<number, Set<string>>();
+  let prior: SimulationEventV2 | undefined;
+  for (const [index, raw] of values.entries()) {
+    if (!isRecord(raw)) throw new Error(`Simulation event ${index} must be an object.`);
+    exactKeys(raw, ["schemaVersion", "id", "sequence", "localKey", "tick", "modelTimeSeconds", "frameIndex", "phase", "producer", "knowledgeScope", "participants", "causeEventIds", "payload"], ["ownerAffiliation", "correlationId"], `Simulation event ${index}`);
+    if (raw.schemaVersion !== SIMULATION_EVENT_SCHEMA) throw new Error(`Simulation event ${index} has an unsupported schema.`);
+    nonEmptyString(raw.localKey, `Simulation event ${index} local key`);
+    if (raw.sequence !== index || raw.id !== `event-${index.toString().padStart(6, "0")}`) throw new Error(`Simulation event ${index} has an invalid sequence or ID.`);
+    if (!Number.isSafeInteger(raw.tick) || (raw.tick as number) < 0) throw new Error(`Simulation event ${index} has an invalid tick.`);
+    const expectedTime = recordedModelTimeAtTick(raw.tick as number, scenario.fixedStepSeconds);
+    if (raw.modelTimeSeconds !== expectedTime) throw new Error(`Simulation event ${index} does not match its fixed-step tick.`);
+    if (!Number.isSafeInteger(raw.frameIndex) || (raw.frameIndex as number) < 0 || (raw.frameIndex as number) >= frames.length) throw new Error(`Simulation event ${index} references a missing frame.`);
+    if (!Number.isFinite(raw.modelTimeSeconds) || frames[raw.frameIndex as number]!.t !== raw.modelTimeSeconds) throw new Error(`Simulation event ${index} does not reference its exact model-time frame.`);
+    member(raw.phase, PHASES, `Simulation event ${index} phase`);
+    if (!isRecord(raw.producer)) throw new Error(`Simulation event ${index} producer must be an object.`);
+    exactKeys(raw.producer, ["subsystem"], ["entityId"], `Simulation event ${index} producer`);
+    member(raw.producer.subsystem, ["RUN_COORDINATOR", "ENTITY_LIFECYCLE"], `Simulation event ${index} producer subsystem`);
+    if (raw.producer.entityId !== undefined) nonEmptyString(raw.producer.entityId, `Simulation event ${index} producer entity`);
+    member(raw.knowledgeScope, ["WORLD", "SIDE_OWNED"], `Simulation event ${index} knowledge scope`);
+    if (raw.ownerAffiliation !== undefined) member(raw.ownerAffiliation, ["BLUE", "RED", "NEUTRAL"], `Simulation event ${index} owner affiliation`);
+    if (raw.correlationId !== undefined) nonEmptyString(raw.correlationId, `Simulation event ${index} correlation ID`);
+    if (!Array.isArray(raw.participants)) throw new Error(`Simulation event ${index} participants must be an array.`);
+    const participants: SimulationEventParticipant[] = raw.participants.map((participant, participantIndex) => {
+      if (!isRecord(participant)) throw new Error(`Simulation event ${index} participant ${participantIndex} must be an object.`);
+      exactKeys(participant, ["entityId", "role"], [], `Simulation event ${index} participant ${participantIndex}`);
+      nonEmptyString(participant.entityId, `Simulation event ${index} participant entity`);
+      member(participant.role, PARTICIPANT_ROLES, `Simulation event ${index} participant role`);
+      return { entityId: participant.entityId, role: participant.role };
+    });
+    if (canonicalJson(participants) !== canonicalJson(normalizeParticipants(participants))) throw new Error(`Simulation event ${index} participants are not canonical and unique.`);
+    if (!Array.isArray(raw.causeEventIds) || raw.causeEventIds.some((cause) => typeof cause !== "string")) throw new Error(`Simulation event ${index} causal references must be strings.`);
+    const causeEventIds = raw.causeEventIds as string[];
+    if (new Set(causeEventIds).size !== causeEventIds.length) throw new Error(`Simulation event ${raw.id} repeats a causal reference.`);
+    const causeSequences = causeEventIds.map((causeId) => {
+      if (!seenIds.has(causeId) || causeId === raw.id) throw new Error(`Simulation event ${raw.id} has a missing or future causal reference.`);
+      return Number(causeId.slice("event-".length));
+    });
+    if (causeSequences.some((value, causeIndex) => causeIndex > 0 && value <= causeSequences[causeIndex - 1]!)) throw new Error(`Simulation event ${raw.id} causal references are not canonical.`);
+    assertPayload(raw.payload, index);
+    if (causeEventIds.length !== 0) throw new Error(`Simulation event ${raw.id} payload family does not admit causal references.`);
+    const event = raw as unknown as SimulationEventV2;
+    const tickLocalKeys = seenLocalKeysByTick.get(event.tick) ?? new Set<string>();
+    if (tickLocalKeys.has(event.localKey)) {
+      throw new Error(`Simulation event tick ${event.tick} repeats local key ${event.localKey}.`);
+    }
+    tickLocalKeys.add(event.localKey);
+    seenLocalKeysByTick.set(event.tick, tickLocalKeys);
+    if (seenIds.has(event.id)) throw new Error(`Duplicate simulation event ID ${event.id}.`);
+    seenIds.add(event.id);
+    if (event.knowledgeScope !== "WORLD" || event.ownerAffiliation !== undefined) throw new Error(`Simulation event ${event.id} violates the delivered world-event boundary.`);
+    const transitionKey = canonicalJson({ tick: event.tick, producer: event.producer, participants: event.participants, payload: event.payload });
+    if (seenTransitions.has(transitionKey)) throw new Error("Simulation event stream contains a duplicate transition.");
+    seenTransitions.add(transitionKey);
+    if (prior && (event.tick < prior.tick || event.frameIndex < prior.frameIndex || (event.tick === prior.tick && compareText(canonicalCommittedSortKey(event), canonicalCommittedSortKey(prior)) < 0))) throw new Error(`Simulation event ${event.id} violates canonical order.`);
+
+    const frame = frames[event.frameIndex]!;
+    if (event.payload.kind === "RUN_STARTED") {
+      if (index !== 0 || event.tick !== 0 || event.frameIndex !== 0 || event.phase !== "LIFECYCLE" || event.producer.subsystem !== "RUN_COORDINATOR" || event.producer.entityId !== undefined || event.participants.length !== 0 || event.payload.scenarioId !== scenario.id || event.payload.scenarioVersion !== scenario.version) throw new Error("RUN_STARTED event is inconsistent with its scenario boundary.");
+    } else if (event.payload.kind === "RUN_COMPLETED") {
+      if (index !== values.length - 1 || event.frameIndex !== frames.length - 1 || event.phase !== "TERMINATION" || event.producer.subsystem !== "RUN_COORDINATOR" || event.producer.entityId !== undefined || event.participants.length !== 0 || event.payload.termination !== termination) throw new Error("RUN_COMPLETED event does not reference the final retained frame or run termination.");
+    } else {
+      const entityId = event.producer.entityId;
+      const entity = entityId ? entityById.get(entityId) : undefined;
+      const frameEntity = entityId ? frame.entities.find((candidate) => candidate.id === entityId) : undefined;
+      if (event.producer.subsystem !== "ENTITY_LIFECYCLE" || !entity || event.participants.length !== 1 || event.participants[0]?.entityId !== entityId || event.participants[0]?.role !== "SUBJECT" || event.payload.entityKind !== entity.kind || !frameEntity) throw new Error(`Simulation entity event ${event.id} has invalid ownership or frame state.`);
+      if (event.payload.kind === "ENTITY_ENTERED_WORLD") {
+        if (event.phase !== "LIFECYCLE" || frameEntity.lifecycle !== event.payload.lifecycle) throw new Error(`Simulation event ${event.id} has an invalid world-entry state.`);
+        if (enteredEntityIds.has(entityId!)) throw new Error(`Simulation event ${event.id} repeats world entry for ${entityId}.`);
+        const priorLifecycle = lifecycleByEntity.get(entityId!);
+        if (priorLifecycle === "STOWED") {
+          const launchTimeSeconds = entity.weapon?.launchTimeSeconds;
+          const expectedLaunchTick = launchTimeSeconds === null || launchTimeSeconds === undefined
+            ? undefined
+            : firstFixedStepTickAtOrAfter(launchTimeSeconds, scenario.fixedStepSeconds);
+          const terminalTick = firstFixedStepTickAtOrAfter(
+            scenario.durationSeconds,
+            scenario.fixedStepSeconds,
+          );
+          if (
+            expectedLaunchTick === undefined ||
+            expectedLaunchTick >= terminalTick ||
+            event.tick !== expectedLaunchTick ||
+            event.frameIndex !== firstFrameIndexByEntity.get(entityId!)
+          ) {
+            throw new Error(`Simulation event ${event.id} does not match the declared launch boundary.`);
+          }
+          lifecycleByEntity.set(entityId!, event.payload.lifecycle);
+        } else if (
+          event.tick !== 0 ||
+          event.frameIndex !== 0 ||
+          firstFrameIndexByEntity.get(entityId!) !== 0 ||
+          priorLifecycle === "TERMINATED" ||
+          priorLifecycle !== event.payload.lifecycle
+        ) {
+          throw new Error(`Simulation event ${event.id} does not match the entity's canonical pre-world lifecycle.`);
+        }
+        enteredEntityIds.add(entityId!);
+      } else {
+        const expectedPhase = event.payload.to === "TERMINATED" ? "TERMINATION" : "LIFECYCLE";
+        if (event.phase !== expectedPhase || frameEntity.lifecycle !== event.payload.to) throw new Error(`Simulation event ${event.id} has an invalid lifecycle phase or frame state.`);
+        if (!enteredEntityIds.has(entityId!)) throw new Error(`Simulation event ${event.id} changes lifecycle before world entry.`);
+        if (lifecycleByEntity.get(entityId!) !== event.payload.from) {
+          throw new Error(`Simulation event ${event.id} does not match the entity's prior canonical lifecycle.`);
+        }
+        const transitionIndex = consumedFrameTransitionsByEntity.get(entityId!) ?? 0;
+        const frameTransition = frameTransitionsByEntity.get(entityId!)?.[transitionIndex];
+        if (
+          frameTransition?.frameIndex !== event.frameIndex ||
+          frameTransition.from !== event.payload.from ||
+          frameTransition.to !== event.payload.to
+        ) {
+          throw new Error(`Simulation event ${event.id} does not reference the first retained frame for its lifecycle transition.`);
+        }
+        consumedFrameTransitionsByEntity.set(entityId!, transitionIndex + 1);
+        lifecycleByEntity.set(entityId!, event.payload.to);
+      }
+    }
+    prior = event;
+  }
+  if (frames.length > 0) {
+    const typed = values as readonly SimulationEventV2[];
+    if (typed[0]?.payload.kind !== "RUN_STARTED") throw new Error("Simulation event stream is missing RUN_STARTED.");
+    if (typed.at(-1)?.payload.kind !== "RUN_COMPLETED") throw new Error("Simulation event stream is missing RUN_COMPLETED.");
+    for (const entity of scenario.entities) {
+      if (
+        entity.lifecycle !== "STOWED" &&
+        entity.lifecycle !== "TERMINATED" &&
+        !enteredEntityIds.has(entity.id)
+      ) {
+        throw new Error(`Simulation event stream is missing initial world entry for ${entity.id}.`);
+      }
+      const finalLifecycle = finalLifecycleByEntity.get(entity.id);
+      if (
+        finalLifecycle &&
+        lifecycleByEntity.get(entity.id) !== finalLifecycle
+      ) {
+        throw new Error(`Simulation event stream does not reach the final canonical lifecycle for ${entity.id}.`);
+      }
+      const consumedTransitions = consumedFrameTransitionsByEntity.get(entity.id) ?? 0;
+      const retainedTransitions = frameTransitionsByEntity.get(entity.id)?.length ?? 0;
+      if (consumedTransitions !== retainedTransitions) {
+        throw new Error(`Simulation event stream is missing a retained lifecycle transition for ${entity.id}.`);
+      }
+    }
+  }
+}

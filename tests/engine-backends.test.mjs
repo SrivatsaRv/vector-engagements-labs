@@ -75,6 +75,11 @@ for (const definition of SCENARIO_LIBRARY) {
     assert.equal(rust.termination, typescript.termination);
     assert.equal(rust.outcome, typescript.outcome);
     assert.equal(rust.frames.length, typescript.frames.length);
+    assert.deepEqual(
+      rust.engineRun.events,
+      typescript.engineRun.events,
+      "delivered run/lifecycle events must preserve TypeScript/Rust ordering and payload parity",
+    );
     if (definition.scenario.domain === "A2A") {
       assert.ok(typescript.pictures.length > 0, "A2A ticks must publish canonical observer state");
       assert.ok(typescript.pictures.every((picture) => picture.trackState === "UNSUPPORTED" && !picture.visible && !("position" in picture)));
@@ -391,7 +396,11 @@ test("both engines terminate an admitted weapon when its assigned target is unav
   for (const [name, run] of [["TypeScript", typescript], ["Rust/WASM", rust]]) {
     assert.equal(run.termination, "target_unavailable", `${name} termination`);
     assert.equal(run.diagnostics.integratedSteps, 1, `${name} must not continue a dead weapon`);
-    const weapon = run.frames[0].entities.find(
+    const releasedWeapon = run.frames[0].entities.find(
+      (entity) => entity.id === run.primaryWeaponId,
+    );
+    assert.equal(releasedWeapon?.lifecycle, "ACTIVE", `${name} launch-frame lifecycle`);
+    const weapon = run.frames.at(-1).entities.find(
       (entity) => entity.id === run.primaryWeaponId,
     );
     assert.equal(weapon?.lifecycle, "TERMINATED", `${name} weapon lifecycle`);
@@ -400,7 +409,7 @@ test("both engines terminate an admitted weapon when its assigned target is unav
       "TARGET_UNAVAILABLE",
       `${name} weapon state`,
     );
-    const replayWeapon = decodeColumnarFrames(encodeColumnarFrames(run.frames))[0]
+    const replayWeapon = decodeColumnarFrames(encodeColumnarFrames(run.frames)).at(-1)
       .entities.find((entity) => entity.id === run.primaryWeaponId);
     assert.equal(
       replayWeapon?.weaponFlightState,

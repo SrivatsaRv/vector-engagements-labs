@@ -56,8 +56,8 @@ for (const backend of ["typescript", "rust-wasm"] as const) {
     const measurement = measureCapacityBaseline(backend, 2);
     assert.equal(measurement.movedAircraft, 98);
     assert.equal(measurement.observerState, "UNSUPPORTED");
-    // The fixed-step session samples the inclusive 0 s and 5 s boundaries.
-    assert.equal(measurement.integratedSteps, 101);
+    // Boundary frames include 0 s and 5 s; integration covers the 100 intervals between them.
+    assert.equal(measurement.integratedSteps, 100);
     assert.ok(measurement.sampledFrames > 1);
     assert.match(measurement.deterministicDigest, /^[a-f0-9]{64}$/);
   });

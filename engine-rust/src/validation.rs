@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use crate::{EngineError, EngineScenario, EntityDefinition, Table1d, Vec3};
+use crate::simulation_events::MAX_SIMULATION_EVENTS;
+use crate::{
+    first_fixed_step_tick_at_or_after, EngineError, EngineScenario, EntityDefinition, Table1d, Vec3,
+};
 
 /// Maximum JSON payload accepted by the browser WASM ABI.
 pub const MAX_INPUT_BYTES: usize = 1_048_576;
@@ -500,7 +503,8 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
             "fixedStepSeconds must be between {MIN_FIXED_STEP_SECONDS} and {MAX_FIXED_STEP_SECONDS}"
         )));
     }
-    let integrated_steps = (scenario.duration_seconds / scenario.fixed_step_seconds).ceil() as u64;
+    let integrated_steps =
+        first_fixed_step_tick_at_or_after(scenario.duration_seconds, scenario.fixed_step_seconds);
     if integrated_steps > MAX_INTEGRATED_STEPS {
         return Err(invalid(format!(
             "scenario requires {integrated_steps} integration steps; maximum is {MAX_INTEGRATED_STEPS}"
@@ -515,7 +519,10 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         return Err(invalid(format!("events exceeds {MAX_EVENTS} definitions")));
     }
     let sampled_frames = (scenario.duration_seconds / 0.25).ceil() as u64 + 1;
-    let recorded_states = sampled_frames.saturating_mul(scenario.entities.len() as u64);
+    let event_forced_frames = (MAX_SIMULATION_EVENTS as u64).min(integrated_steps + 1);
+    let admitted_frames =
+        (integrated_steps + 1).min(sampled_frames.saturating_add(event_forced_frames));
+    let recorded_states = admitted_frames.saturating_mul(scenario.entities.len() as u64);
     if recorded_states > MAX_RECORDED_ENTITY_STATES {
         return Err(invalid(format!(
             "scenario would retain {recorded_states} entity states; maximum is {MAX_RECORDED_ENTITY_STATES}"
@@ -651,6 +658,14 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
             if launch_time > scenario.duration_seconds {
                 return Err(invalid(format!(
                     "weapon {} launches after scenario duration",
+                    entity.id
+                )));
+            }
+            if first_fixed_step_tick_at_or_after(launch_time, scenario.fixed_step_seconds)
+                >= integrated_steps
+            {
+                return Err(invalid(format!(
+                    "weapon {} launches outside the executable run window",
                     entity.id
                 )));
             }

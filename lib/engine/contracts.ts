@@ -47,6 +47,27 @@ export type Affiliation = "BLUE" | "RED" | "NEUTRAL";
 export type EngineBackendId = "typescript" | "rust-wasm";
 export type ObserverPerspective = "IAF" | "PAF";
 
+export const SIMULATION_EVENT_SCHEMA = "vector.simulation-event.v2" as const;
+
+export const SIMULATION_EVENT_PAYLOAD_SCHEMAS = {
+  RUN_STARTED: "vector.simulation-event-payload.run-started.v1",
+  ENTITY_ENTERED_WORLD: "vector.simulation-event-payload.entity-entered-world.v1",
+  ENTITY_LIFECYCLE_CHANGED: "vector.simulation-event-payload.entity-lifecycle-changed.v1",
+  RUN_COMPLETED: "vector.simulation-event-payload.run-completed.v1",
+} as const;
+
+export type SimulationEventParticipantRole =
+  | "ACTOR"
+  | "SUBJECT"
+  | "LAUNCHER"
+  | "WEAPON"
+  | "SENSOR";
+
+export type SimulationEventParticipant = {
+  entityId: string;
+  role: SimulationEventParticipantRole;
+};
+
 /**
  * Tick-owned information state. The current deployment has no admitted sensor
  * model pack, so it can only emit this explicit fail-closed state.
@@ -98,6 +119,86 @@ export type EntityLifecycle =
   | "TRACKING"
   | "ENGAGING"
   | "TERMINATED";
+
+export type EngineTermination =
+  | "threshold_reached"
+  | "energy_depleted"
+  | "target_unavailable"
+  | "time_limit"
+  | "invalid_scenario";
+
+/**
+ * Closed output-event union delivered by the current runtime. The v2 envelope
+ * is immutable. Every payload family has its own schema identity, so #26, #28,
+ * and #38 can add governed variants only with an explicit payload version and
+ * older readers reject the unknown family instead of partially accepting it.
+ * Engine events contain typed facts, never presentation text.
+ */
+export type SimulationEventPayload =
+  | {
+      kind: "RUN_STARTED";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_STARTED;
+      scenarioId: string;
+      scenarioVersion: string;
+    }
+  | {
+      kind: "ENTITY_ENTERED_WORLD";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.ENTITY_ENTERED_WORLD;
+      entityKind: EntityKind;
+      lifecycle: Exclude<EntityLifecycle, "STOWED" | "TERMINATED">;
+    }
+  | {
+      kind: "ENTITY_LIFECYCLE_CHANGED";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.ENTITY_LIFECYCLE_CHANGED;
+      entityKind: EntityKind;
+      from: EntityLifecycle;
+      to: EntityLifecycle;
+    }
+  | {
+      kind: "RUN_COMPLETED";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_COMPLETED;
+      termination: EngineTermination;
+    };
+
+export type SimulationEventV2 = {
+  schemaVersion: typeof SIMULATION_EVENT_SCHEMA;
+  id: string;
+  sequence: number;
+  /** Producer-stable identity within one tick; never derived from call order. */
+  localKey: string;
+  tick: number;
+  modelTimeSeconds: number;
+  frameIndex: number;
+  phase:
+    | "LIFECYCLE"
+    | "SENSING"
+    | "TRACKING"
+    | "MISSION"
+    | "WEAPON"
+    | "TERMINATION";
+  producer: {
+    subsystem: "RUN_COORDINATOR" | "ENTITY_LIFECYCLE";
+    entityId?: string;
+  };
+  ownerAffiliation?: Affiliation;
+  knowledgeScope: "WORLD" | "SIDE_OWNED";
+  participants: SimulationEventParticipant[];
+  causeEventIds: string[];
+  correlationId?: string;
+  payload: SimulationEventPayload;
+};
+
+export type SimulationEventStream =
+  | {
+      state: "AVAILABLE";
+      schemaVersion: typeof SIMULATION_EVENT_SCHEMA;
+      items: SimulationEventV2[];
+    }
+  | {
+      state: "UNAVAILABLE";
+      sourceSchemaVersion: "vector.events.v1";
+      reason: "LEGACY_EVENT_SCHEMA";
+    };
 
 /** Achieved propulsion/guidance stage; not a seeker or support claim. */
 export type WeaponFlightState =
@@ -341,15 +442,11 @@ export type EngineFrame = {
 export type EngineRun = {
   scenario: EngineScenario;
   frames: EngineFrame[];
+  events: SimulationEventStream;
   envelopes: CoverageEnvelope[];
   primaryWeaponId: string;
   primaryTargetId: string;
-  termination:
-    | "threshold_reached"
-    | "energy_depleted"
-    | "target_unavailable"
-    | "time_limit"
-    | "invalid_scenario";
+  termination: EngineTermination;
   closestApproachM: number;
   peakCommandG: number;
   diagnostics: {

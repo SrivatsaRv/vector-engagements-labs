@@ -4,6 +4,7 @@
 mod error;
 mod model_pack;
 mod public_aircraft_reference;
+mod simulation_events;
 mod validation;
 mod wasm_abi;
 
@@ -15,6 +16,8 @@ pub use public_aircraft_reference::{
     run_public_aircraft_reference, run_public_aircraft_reference_json,
     PublicAircraftReferenceInput, PublicAircraftReferenceRun,
 };
+use simulation_events::{SimulationEventDraft, SimulationEventJournal};
+pub use simulation_events::{SimulationEventStream, SimulationEventV2};
 pub use validation::{
     validate_scenario, MAX_ENTITIES, MAX_EVENTS, MAX_INPUT_BYTES, MAX_INTEGRATED_STEPS,
     MAX_RECORDED_ENTITY_STATES, MAX_ROUTE_POINTS_PER_ENTITY,
@@ -809,6 +812,7 @@ pub struct Diagnostics {
 pub struct EngineRun {
     pub scenario: EngineScenario,
     pub frames: Vec<EngineFrame>,
+    pub events: SimulationEventStream,
     pub envelopes: Vec<CoverageEnvelope>,
     pub primary_weapon_id: String,
     pub primary_target_id: String,
@@ -1094,7 +1098,12 @@ fn route_transition(plan: &RoutePlan, index: usize) -> Result<&str, EngineError>
     }
 }
 
-fn activate_weapons(states: &mut [RuntimeState], time: f64) {
+fn activate_weapons(
+    states: &mut [RuntimeState],
+    tick: u64,
+    terminal_tick: u64,
+    scenario: &EngineScenario,
+) {
     for index in 0..states.len() {
         let Some(weapon) = states[index].definition.weapon.clone() else {
             continue;
@@ -1102,7 +1111,13 @@ fn activate_weapons(states: &mut [RuntimeState], time: f64) {
         let Some(launch_time) = weapon.launch_time_seconds else {
             continue;
         };
-        if states[index].lifecycle != EntityLifecycle::Stowed || time < launch_time {
+        let activation_tick =
+            first_fixed_step_tick_at_or_after(launch_time, scenario.fixed_step_seconds);
+        if states[index].lifecycle != EntityLifecycle::Stowed
+            || launch_time > scenario.duration_seconds
+            || activation_tick >= terminal_tick
+            || tick < activation_tick
+        {
             continue;
         }
         let launcher_id = weapon.launch_platform_id;
@@ -1320,6 +1335,33 @@ fn entity_frame(state: &RuntimeState, scenario: &EngineScenario) -> EntityFrame 
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn sampled_engine_frame(
+    states: &[RuntimeState],
+    scenario: &EngineScenario,
+    time: f64,
+    weapon_id: &str,
+    target_id: &str,
+    separation: f64,
+    closure: f64,
+    los_rate: f64,
+) -> EngineFrame {
+    EngineFrame {
+        t: (time * 1_000_000.0).round() / 1_000_000.0,
+        entities: states
+            .iter()
+            .filter(|state| state.lifecycle != EntityLifecycle::Stowed)
+            .map(|state| entity_frame(state, scenario))
+            .collect(),
+        primary_weapon_id: weapon_id.to_string(),
+        primary_target_id: target_id.to_string(),
+        separation_m: separation,
+        closure_rate_mps: closure,
+        line_of_sight_rate_rad_s: los_rate,
+        observer_states: observer_states(states, scenario, time, scenario.fixed_step_seconds),
+    }
+}
+
 fn envelopes(scenario: &EngineScenario) -> Vec<CoverageEnvelope> {
     scenario
         .entities
@@ -1374,6 +1416,7 @@ fn envelopes(scenario: &EngineScenario) -> Vec<CoverageEnvelope> {
 fn invalid_run(scenario: EngineScenario) -> EngineRun {
     EngineRun {
         frames: Vec::new(),
+        events: SimulationEventStream::available(Vec::new()),
         envelopes: envelopes(&scenario),
         primary_weapon_id: String::new(),
         primary_target_id: String::new(),
@@ -1391,9 +1434,35 @@ fn invalid_run(scenario: EngineScenario) -> EngineRun {
     }
 }
 
+fn model_time_at_tick(tick: u64, fixed_step_seconds: f64) -> f64 {
+    tick as f64 * fixed_step_seconds
+}
+
+fn recorded_model_time_at_tick(tick: u64, fixed_step_seconds: f64) -> f64 {
+    (model_time_at_tick(tick, fixed_step_seconds) * 1_000_000.0).round() / 1_000_000.0
+}
+
+pub(crate) fn first_fixed_step_tick_at_or_after(
+    model_time_seconds: f64,
+    fixed_step_seconds: f64,
+) -> u64 {
+    let mut candidate = (model_time_seconds / fixed_step_seconds).ceil() as u64;
+    while candidate > 0
+        && model_time_at_tick(candidate - 1, fixed_step_seconds) >= model_time_seconds
+    {
+        candidate -= 1;
+    }
+    while model_time_at_tick(candidate, fixed_step_seconds) < model_time_seconds {
+        candidate += 1;
+    }
+    candidate
+}
+
 /// Run a validated deterministic scenario and return a replayable engine record.
 pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError> {
     validate_scenario(&scenario)?;
+    let terminal_tick =
+        first_fixed_step_tick_at_or_after(scenario.duration_seconds, scenario.fixed_step_seconds);
     let mut states: Vec<RuntimeState> = scenario.entities.iter().map(RuntimeState::new).collect();
     for store in &scenario.entities {
         let Some(weapon) = store.weapon.as_ref() else {
@@ -1447,22 +1516,49 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
     let mut non_finite = 0_u64;
     let mut mass_margin = f64::INFINITY;
     let sample_every = (0.25 / scenario.fixed_step_seconds).round().max(1.0) as u64;
-    let mut time = 0.0;
-    while time <= scenario.duration_seconds + 1e-9 {
-        activate_weapons(&mut states, time);
-        for state in states.iter_mut() {
-            update_aircraft(state, &scenario, time, scenario.fixed_step_seconds)?;
+    let mut event_journal = SimulationEventJournal::default();
+    let mut recorded_entity_states = 0_u64;
+    loop {
+        let tick = steps;
+        let time = model_time_at_tick(tick, scenario.fixed_step_seconds);
+        let event_time = recorded_model_time_at_tick(tick, scenario.fixed_step_seconds);
+        if tick == 0 {
+            event_journal.emit(SimulationEventDraft::run_started(
+                tick,
+                event_time,
+                &scenario.id,
+                &scenario.version,
+            ))?;
+            for state in states.iter().filter(|state| {
+                state.lifecycle != EntityLifecycle::Stowed
+                    && state.lifecycle != EntityLifecycle::Terminated
+            }) {
+                event_journal.emit(SimulationEventDraft::entity_entered(
+                    tick,
+                    event_time,
+                    &state.definition.id,
+                    state.definition.kind,
+                    state.lifecycle,
+                ))?;
+            }
         }
-        for index in 0..states.len() {
-            update_weapon(
-                index,
-                &mut states,
-                &scenario,
-                time,
-                scenario.fixed_step_seconds,
-            );
+        let before_activation: Vec<EntityLifecycle> =
+            states.iter().map(|state| state.lifecycle).collect();
+        activate_weapons(&mut states, tick, terminal_tick, &scenario);
+        for (index, state) in states.iter().enumerate() {
+            if before_activation[index] != EntityLifecycle::Stowed
+                || state.lifecycle == EntityLifecycle::Stowed
+            {
+                continue;
+            }
+            event_journal.emit(SimulationEventDraft::entity_entered(
+                tick,
+                event_time,
+                &state.definition.id,
+                state.definition.kind,
+                state.lifecycle,
+            ))?;
         }
-        steps += 1;
         let relative_position = states[target_index]
             .position
             .subtract(states[weapon_index].position);
@@ -1499,55 +1595,197 @@ pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError
                 non_finite += 1;
             }
         }
-        if steps % sample_every == 1 || steps == 1 {
-            frames.push(EngineFrame {
-                t: (time * 1_000_000.0).round() / 1_000_000.0,
-                entities: states
-                    .iter()
-                    .filter(|state| state.lifecycle != EntityLifecycle::Stowed)
-                    .map(|state| entity_frame(state, &scenario))
-                    .collect(),
-                primary_weapon_id: weapon_id.clone(),
-                primary_target_id: target_id.clone(),
-                separation_m: separation,
-                closure_rate_mps: closure,
-                line_of_sight_rate_rad_s: los_rate,
-                observer_states: observer_states(
-                    &states,
-                    &scenario,
-                    time,
-                    scenario.fixed_step_seconds,
-                ),
-            });
-        }
+        let mut completed_this_tick = false;
         if states[weapon_index].weapon_flight_state == Some(WeaponFlightState::TargetUnavailable) {
             termination = Termination::TargetUnavailable;
-            break;
-        }
-        if separation <= scenario.completion.distance_meters {
+            completed_this_tick = true;
+        } else if separation <= scenario.completion.distance_meters {
             termination = Termination::ThresholdReached;
-            break;
+            completed_this_tick = true;
+        } else if tick >= terminal_tick {
+            termination = Termination::TimeLimit;
+            completed_this_tick = true;
+        } else {
+            let speed = states[weapon_index].velocity.magnitude();
+            let Some(weapon) = states[weapon_index].definition.weapon.as_ref() else {
+                return Err(EngineError::InvalidScenario(
+                    "primary weapon lost its model during integration".to_string(),
+                ));
+            };
+            let since_launch = time - weapon.launch_time_seconds.unwrap_or(0.0);
+            if (since_launch > weapon.burn_seconds + 2.0 && speed < 80.0 && separation > 1000.0)
+                || (states[weapon_index].position.z <= 0.0 && time > 1.0)
+            {
+                termination = Termination::EnergyDepleted;
+                completed_this_tick = true;
+            }
         }
-        let speed = states[weapon_index].velocity.magnitude();
-        let Some(weapon) = states[weapon_index].definition.weapon.as_ref() else {
-            return Err(EngineError::InvalidScenario(
-                "primary weapon lost its model during integration".to_string(),
+        let next_tick = tick + 1;
+        let next_time = model_time_at_tick(next_tick, scenario.fixed_step_seconds);
+        if completed_this_tick {
+            event_journal.emit(SimulationEventDraft::run_completed(
+                tick,
+                event_time,
+                termination,
+            ))?;
+        }
+        if tick == 0 || event_journal.has_pending() {
+            let frame_index = frames.len();
+            let visible_states = states
+                .iter()
+                .filter(|state| state.lifecycle != EntityLifecycle::Stowed)
+                .count() as u64;
+            if recorded_entity_states.saturating_add(visible_states) > MAX_RECORDED_ENTITY_STATES {
+                return Err(EngineError::InvalidScenario(format!(
+                    "event-preserving frames exceed {MAX_RECORDED_ENTITY_STATES} recorded entity states"
+                )));
+            }
+            frames.push(sampled_engine_frame(
+                &states, &scenario, time, &weapon_id, &target_id, separation, closure, los_rate,
             ));
-        };
-        let since_launch = time - weapon.launch_time_seconds.unwrap_or(0.0);
-        if since_launch > weapon.burn_seconds + 2.0 && speed < 80.0 && separation > 1000.0 {
-            termination = Termination::EnergyDepleted;
+            recorded_entity_states += visible_states;
+            if event_journal.has_pending() {
+                event_journal.commit_tick(tick, event_time, frame_index)?;
+            }
+        }
+        if completed_this_tick {
             break;
         }
-        if states[weapon_index].position.z <= 0.0 && time > 1.0 {
-            termination = Termination::EnergyDepleted;
+
+        let before_updates: Vec<EntityLifecycle> =
+            states.iter().map(|state| state.lifecycle).collect();
+        for state in states.iter_mut() {
+            update_aircraft(state, &scenario, time, scenario.fixed_step_seconds)?;
+        }
+        for index in 0..states.len() {
+            update_weapon(
+                index,
+                &mut states,
+                &scenario,
+                time,
+                scenario.fixed_step_seconds,
+            );
+        }
+        steps = next_tick;
+        let next_event_time = recorded_model_time_at_tick(next_tick, scenario.fixed_step_seconds);
+        for (index, state) in states.iter().enumerate() {
+            let prior = before_updates[index];
+            if prior == state.lifecycle {
+                continue;
+            }
+            event_journal.emit(SimulationEventDraft::lifecycle_changed(
+                steps,
+                next_event_time,
+                &state.definition.id,
+                state.definition.kind,
+                prior,
+                state.lifecycle,
+            ))?;
+        }
+        let post_relative_position = states[target_index]
+            .position
+            .subtract(states[weapon_index].position);
+        let post_separation = post_relative_position.magnitude();
+        closest = closest.min(post_separation);
+        if states[weapon_index].weapon_flight_state == Some(WeaponFlightState::TargetUnavailable) {
+            termination = Termination::TargetUnavailable;
+            completed_this_tick = true;
+        } else if post_separation <= scenario.completion.distance_meters {
+            termination = Termination::ThresholdReached;
+            completed_this_tick = true;
+        } else {
+            let speed = states[weapon_index].velocity.magnitude();
+            let weapon = states[weapon_index]
+                .definition
+                .weapon
+                .as_ref()
+                .ok_or_else(|| {
+                    EngineError::InvalidScenario(
+                        "primary weapon lost its model during integration".to_string(),
+                    )
+                })?;
+            let since_launch = next_time - weapon.launch_time_seconds.unwrap_or(0.0);
+            if (since_launch > weapon.burn_seconds + 2.0
+                && speed < 80.0
+                && post_separation > 1000.0)
+                || (states[weapon_index].position.z <= 0.0 && next_time > 1.0)
+            {
+                termination = Termination::EnergyDepleted;
+                completed_this_tick = true;
+            } else if next_tick >= terminal_tick {
+                termination = Termination::TimeLimit;
+                completed_this_tick = true;
+            }
+        }
+        if completed_this_tick {
+            event_journal.emit(SimulationEventDraft::run_completed(
+                steps,
+                next_event_time,
+                termination,
+            ))?;
+        }
+        let activation_at_next_boundary = states.iter().any(|state| {
+            state.lifecycle == EntityLifecycle::Stowed
+                && state
+                    .definition
+                    .weapon
+                    .as_ref()
+                    .and_then(|weapon| weapon.launch_time_seconds)
+                    .is_some_and(|launch_time| {
+                        let activation_tick = first_fixed_step_tick_at_or_after(
+                            launch_time,
+                            scenario.fixed_step_seconds,
+                        );
+                        activation_tick < terminal_tick && activation_tick == steps
+                    })
+        });
+        if event_journal.has_pending()
+            || steps == 1
+            || (steps % sample_every == 0 && !activation_at_next_boundary)
+        {
+            let post_relative_velocity = states[target_index]
+                .velocity
+                .subtract(states[weapon_index].velocity);
+            let post_los = post_relative_position.normalize();
+            let post_closure = -post_relative_velocity.dot(post_los);
+            let post_los_rate = post_relative_position
+                .cross(post_relative_velocity)
+                .magnitude()
+                / (post_separation * post_separation).max(1.0);
+            let frame_index = frames.len();
+            let visible_states = states
+                .iter()
+                .filter(|state| state.lifecycle != EntityLifecycle::Stowed)
+                .count() as u64;
+            if recorded_entity_states.saturating_add(visible_states) > MAX_RECORDED_ENTITY_STATES {
+                return Err(EngineError::InvalidScenario(format!(
+                    "event-preserving frames exceed {MAX_RECORDED_ENTITY_STATES} recorded entity states"
+                )));
+            }
+            frames.push(sampled_engine_frame(
+                &states,
+                &scenario,
+                next_event_time,
+                &weapon_id,
+                &target_id,
+                post_separation,
+                post_closure,
+                post_los_rate,
+            ));
+            recorded_entity_states += visible_states;
+            if event_journal.has_pending() {
+                event_journal.commit_tick(steps, next_event_time, frame_index)?;
+            }
+        }
+        if completed_this_tick {
             break;
         }
-        time += scenario.fixed_step_seconds;
     }
+    let events = SimulationEventStream::available(event_journal.into_items()?);
     Ok(EngineRun {
         scenario: scenario.clone(),
         frames,
+        events,
         envelopes: envelopes(&scenario),
         primary_weapon_id: weapon_id,
         primary_target_id: target_id,
@@ -1831,6 +2069,148 @@ mod tests {
     }
 
     #[test]
+    fn off_grid_launch_uses_the_first_fixed_step_boundary() -> Result<(), Box<dyn std::error::Error>>
+    {
+        for (fixed_step, launch_time, expected_tick, expected_time) in [
+            (0.05, 2.03, 41, 2.05),
+            (0.05, 2.050_000_000_001, 42, 2.1),
+            (0.001, 1.008, 1008, 1.008),
+        ] {
+            let mut input = scenario();
+            input.fixed_step_seconds = fixed_step;
+            let weapon = input
+                .entities
+                .iter_mut()
+                .find(|entity| entity.id == "blue-weapon")
+                .and_then(|entity| entity.weapon.as_mut())
+                .ok_or("scenario has no scheduled weapon")?;
+            weapon.launch_time_seconds = Some(launch_time);
+
+            let run = try_run_engine(input)?;
+            let entry = run
+                .events
+                .items
+                .iter()
+                .find(|event| {
+                    event.producer.entity_id.as_deref() == Some("blue-weapon")
+                        && matches!(
+                            &event.payload,
+                            simulation_events::SimulationEventPayload::EntityEnteredWorld { .. }
+                        )
+                })
+                .ok_or("run has no weapon world-entry event")?;
+            assert_eq!(entry.tick, expected_tick);
+            assert_eq!(entry.model_time_seconds, expected_time);
+            assert_eq!(run.frames[entry.frame_index].t, expected_time);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn activation_boundary_correction_covers_the_admitted_step_range() {
+        for fixed_step in [0.001, 0.003, 0.01, 0.05, 0.2, 1.0] {
+            for grid_tick in [0_u64, 1, 7, 257, 1008] {
+                let boundary = model_time_at_tick(grid_tick, fixed_step);
+                let near_grid_delta =
+                    (f64::EPSILON * boundary.abs().max(1.0) * 4.0).max(fixed_step * 1e-12);
+                for launch_time in [
+                    boundary,
+                    boundary + fixed_step * 0.37,
+                    boundary + near_grid_delta,
+                ] {
+                    let mut expected_tick = 0_u64;
+                    while model_time_at_tick(expected_tick, fixed_step) < launch_time {
+                        expected_tick += 1;
+                    }
+                    let actual_tick = first_fixed_step_tick_at_or_after(launch_time, fixed_step);
+                    assert_eq!(actual_tick, expected_tick);
+                    assert!(model_time_at_tick(actual_tick, fixed_step) >= launch_time);
+                    if actual_tick > 0 {
+                        assert!(model_time_at_tick(actual_tick - 1, fixed_step) < launch_time);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn post_duration_weapon_schedule_fails_before_clock_quantization(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for launch_time in [3.001, f64::MAX] {
+            let mut input = scenario();
+            let weapon = input
+                .entities
+                .iter_mut()
+                .find(|entity| entity.id == "blue-weapon")
+                .and_then(|entity| entity.weapon.as_mut())
+                .ok_or("scenario has no scheduled weapon")?;
+            weapon.launch_time_seconds = Some(launch_time);
+            assert!(matches!(
+                try_run_engine(input),
+                Err(EngineError::InvalidScenario(message))
+                    if message.contains("launches after scenario duration")
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn terminal_boundary_is_a_half_open_launch_window() -> Result<(), Box<dyn std::error::Error>> {
+        for (fixed_step, duration, launch_time) in [
+            (0.05, 0.2, 0.2),
+            (0.05, 0.201, 0.201),
+            (0.05, 0.22, 0.219),
+            (0.05, 0.200_000_000_001, 0.200_000_000_001),
+        ] {
+            let mut input = scenario();
+            input.fixed_step_seconds = fixed_step;
+            input.duration_seconds = duration;
+            let weapon = input
+                .entities
+                .iter_mut()
+                .find(|entity| entity.id == "blue-weapon")
+                .and_then(|entity| entity.weapon.as_mut())
+                .ok_or("scenario has no scheduled weapon")?;
+            weapon.launch_time_seconds = Some(launch_time);
+            assert!(matches!(
+                try_run_engine(input),
+                Err(EngineError::InvalidScenario(message))
+                    if message.contains("launches outside the executable run window")
+            ));
+        }
+
+        let mut input = scenario();
+        input.fixed_step_seconds = 0.05;
+        input.duration_seconds = 0.22;
+        let weapon = input
+            .entities
+            .iter_mut()
+            .find(|entity| entity.id == "blue-weapon")
+            .and_then(|entity| entity.weapon.as_mut())
+            .ok_or("scenario has no scheduled weapon")?;
+        weapon.launch_time_seconds = Some(0.2);
+        let run = try_run_engine(input)?;
+        assert_eq!(run.termination, Termination::TimeLimit);
+        assert_eq!(run.diagnostics.integrated_steps, 5);
+        assert_eq!(run.frames.last().map(|frame| frame.t), Some(0.25));
+        let entry = run
+            .events
+            .items
+            .iter()
+            .find(|event| {
+                event.producer.entity_id.as_deref() == Some("blue-weapon")
+                    && matches!(
+                        &event.payload,
+                        simulation_events::SimulationEventPayload::EntityEnteredWorld { .. }
+                    )
+            })
+            .ok_or("run has no weapon world-entry event")?;
+        assert_eq!(entry.tick, 4);
+        assert_eq!(entry.model_time_seconds, 0.2);
+        Ok(())
+    }
+
+    #[test]
     fn unavailable_assigned_target_terminates_the_weapon_without_continuation(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut unavailable_target = scenario();
@@ -1853,7 +2233,7 @@ mod tests {
         assert_eq!(run.diagnostics.integrated_steps, 1);
         let weapon = run
             .frames
-            .first()
+            .last()
             .and_then(|frame| {
                 frame
                     .entities
@@ -1866,6 +2246,27 @@ mod tests {
             weapon.weapon_flight_state,
             Some(WeaponFlightState::TargetUnavailable)
         );
+        let transition = run
+            .events
+            .items
+            .iter()
+            .find(|event| {
+                event.producer.entity_id.as_deref() == Some("blue-weapon")
+                    && matches!(
+                        &event.payload,
+                        simulation_events::SimulationEventPayload::EntityLifecycleChanged { .. }
+                    )
+            })
+            .ok_or("run has no weapon lifecycle transition")?;
+        match &transition.payload {
+            simulation_events::SimulationEventPayload::EntityLifecycleChanged {
+                from, to, ..
+            } => {
+                assert_eq!(*from, EntityLifecycle::Active);
+                assert_eq!(*to, EntityLifecycle::Terminated);
+            }
+            _ => return Err("weapon lifecycle event has the wrong payload".into()),
+        }
         Ok(())
     }
 

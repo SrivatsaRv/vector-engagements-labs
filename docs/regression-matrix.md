@@ -5,6 +5,7 @@ This matrix is the minimum proof required before a feature milestone is committe
 | Surface | Automated proof | Live-stack proof |
 | --- | --- | --- |
 | Engine and lifecycle | Determinism, arbitrary entity count, stowed/launch/active lifecycle, finite state, fuel/mass/force telemetry, eight-scenario TypeScript/Rust-WASM parity, embedded-WASM integrity, fail-closed backend selection | Cold initialization and warm-run p50/p95 for both browser backends |
+| Simulation events | Immutable `vector.simulation-event.v2` envelope plus versioned payload families, exhaustive fail-closed decoding, exact transition-boundary event/frame identity, cross-tick journal receipts, UTF-8 canonical text order, canonical participant bytes, insertion-order independence, event-aware capacity admission, arbitrary-entity coverage, current cause-free producer semantic TypeScript/Rust parity, direct VSR persistence, corruption rejection and explicit legacy-unavailable state | Situation Log remains unavailable until its observer-safe presentation slice; no frame-derived narrative is shown |
 | Public aircraft reference | Content-bound NASA NESC Case 11 fixture; position, speed, altitude, attitude, rates, forces, moments, Mach, pressure, energy and trim residual within declared tolerances; malformed/bounded input rejection; 1×10⁻⁹ TypeScript/Rust-WASM parity | `/math` reports the admitted case, measured errors, pass state and named-aircraft limitation |
 | Environment | Study-area preset propagation, east/north wind physics, visual-range boundary, standard atmosphere | Saved run preserves area and weather |
 | RASP | 128 source-state rows, both perspectives, dependency isolation, and truth invariance | RASP display and run event inspection |
@@ -18,6 +19,24 @@ This matrix is the minimum proof required before a feature milestone is committe
 | Responsive layout | CSS ownership for builder scroll/footer, fluid task-width tokens and six telemetry panels | Headless system-Chrome checks at 390×844, 430×932, 1280×720, 1366×768, 1440×900, 1536×864, 1920×1080, 2560×1440 and 3840×2160; phone stacking, QHD/4K proportional expansion, non-zero authoring and Observe canvases, no horizontal overflow or action overlap, readable maneuver cards and distinct Blue/Red RASP ownership |
 
 ## Commit gates
+
+### Canonical simulation-event foundation (#41A)
+
+- `tests/simulation-events.test.ts` proves deterministic per-tick ordering,
+  canonical participant order, same-tick and cross-tick receipt resolution,
+  duplicate and invalid/unresolved/future/cyclic-cause rejection, exhaustive kind/payload-version/field
+  decoding, exact pre-integration and off-cadence frame retention,
+  event-forced-frame capacity admission, arbitrary-entity lifecycle emission,
+  and no authoritative English strings.
+- `tests/engine-backends.test.mjs` proves complete event-stream parity for every
+  calibrated TypeScript and Rust/WASM scenario.
+- `tests/vector-record.test.mjs` proves direct `events.jsonl` persistence,
+  ordering and causal corruption rejection, unknown payload kind/version
+  rejection, unsupported envelope rejection, and explicit read-only
+  unavailability for legacy v1 events.
+- No browser chronology is claimed by this slice. Situation Log projection,
+  observer boundaries, interaction, visual, accessibility, and dense-log tests
+  remain required before #41 may close.
 
 ### Selected track-state inspector (#41 slice)
 
