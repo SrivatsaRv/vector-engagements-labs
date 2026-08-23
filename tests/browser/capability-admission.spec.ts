@@ -14,7 +14,16 @@ test("a disabled domain link cannot fall through to the A2A workbench", async ({
 });
 
 test("Peace Drive I evidence is visibly context-only and fitted EW remains unknown", async ({ page }) => {
+  // Stage 2D has no database. Exercise the deterministic static catalogue
+  // fallback without leaving an in-flight Hyperdrive request behind when this
+  // page closes; that failure can tear down the one built Wrangler process.
+  await page.route("**/api/catalog", (route) => route.fulfill({
+    status: 503,
+    contentType: "application/json",
+    body: JSON.stringify({ error: "service_unavailable" }),
+  }));
   await page.goto("/workbench?scenario=a2a-crossing-intercept");
+  await expect(page.locator(".catalog-state.error")).toHaveText("Catalog unavailable");
   const forcesStep = page.getByRole("button", { name: /Forces & loadouts/i });
   if (await forcesStep.isVisible()) await forcesStep.click();
   else await page.getByRole("button", { name: "Edit forces" }).click();
