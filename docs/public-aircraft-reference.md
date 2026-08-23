@@ -93,3 +93,7 @@ identities, source-versus-comparison roles, licence decisions, page ancestry,
 the withheld derivative state, candidate-table hashes, closed units/axes, and
 fail-closed interpolation. It performs no network access and changes no
 production aircraft, TypeScript/Rust runtime, Worker, VSR, UI or report claim.
+The exported research-derivative validator requires the published aircraft
+registry and fully validates this exact standalone corpus before consuming any
+caller-supplied derivative; an unvalidated or mutated corpus cannot confer
+ancestry, licence or runtime authority by reusing an expected artifact ID.

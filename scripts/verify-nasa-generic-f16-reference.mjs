@@ -570,7 +570,20 @@ function validateTable(corpus, table) {
   }
 }
 
-export function validateResearchDerivative(corpus, derivative) {
+export function validateResearchDerivative(
+  corpus,
+  derivative,
+  { aircraftRegistry, rootDirectory = process.cwd() } = {},
+) {
+  assert(
+    aircraftRegistry,
+    "Research derivative validation requires the published aircraft registry.",
+  );
+  validateNasaGenericF16Reference(corpus, {
+    aircraftRegistry,
+    rootDirectory,
+    verifyLocalArtifacts: true,
+  });
   assertExactKeys(
     derivative,
     [

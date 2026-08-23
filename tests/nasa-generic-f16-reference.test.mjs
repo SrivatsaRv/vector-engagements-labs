@@ -76,6 +76,10 @@ function withDigest(derivative) {
   return derivative;
 }
 
+function validateDerivative(corpus, derivative) {
+  return validateResearchDerivative(corpus, derivative, { aircraftRegistry });
+}
+
 test("separate NASA generic F-16 verification corpus is exact and withheld", () => {
   assert.deepEqual(validateNasaGenericF16Reference(manifest, { aircraftRegistry }), {
     artifacts: 4,
@@ -293,7 +297,7 @@ test("research derivative rejects unknown fields at every nested layer", () => {
     mutate(derivative);
     withDigest(derivative);
     assert.throws(
-      () => validateResearchDerivative(manifest, derivative),
+      () => validateDerivative(manifest, derivative),
       /unknown|exact keys|validity domain/i,
     );
   }
@@ -303,27 +307,73 @@ test("research derivative rejects subject, capability and source-role laundering
   const wrongSubject = candidateDerivative();
   wrongSubject.subjectId = "PAF_F16C_BLOCK52_PEACE_DRIVE_I";
   withDigest(wrongSubject);
-  assert.throws(() => validateResearchDerivative(manifest, wrongSubject), /subject/i);
+  assert.throws(() => validateDerivative(manifest, wrongSubject), /subject/i);
 
   const sensors = candidateDerivative();
   sensors.capabilityBindings = ["SENSORS"];
   sensors.tables[0].capability = "SENSORS";
   withDigest(sensors);
-  assert.throws(() => validateResearchDerivative(manifest, sensors), /capabilit|sensor/i);
+  assert.throws(() => validateDerivative(manifest, sensors), /capabilit|sensor/i);
 
   const comparisonSource = candidateDerivative();
   comparisonSource.sourceArtifactIds = ["nasa-nesc-2015-f16-daveml-source"];
   comparisonSource.tables[0].sourceArtifactId = "nasa-nesc-2015-f16-daveml-source";
   withDigest(comparisonSource);
   assert.throws(
-    () => validateResearchDerivative(manifest, comparisonSource),
+    () => validateDerivative(manifest, comparisonSource),
     /comparison|source report|ancestry/i,
+  );
+});
+
+test("research derivative rejects every caller-mutated corpus trust input", () => {
+  assert.throws(
+    () => validateResearchDerivative(manifest, candidateDerivative()),
+    /published aircraft registry/i,
+  );
+
+  const mutations = [
+    (value) => (value.subject.id = "PAF_F16C_BLOCK52_PEACE_DRIVE_I"),
+    (value) => (value.subject.runtimeAuthority = "PRODUCTION"),
+    (value) => (value.derivativeAdmission.state = "ADMITTED"),
+    (value) => (value.artifacts[0].id = "nasa-nesc-2015-f16-daveml-source"),
+    (value) => (value.artifacts[0].uri = value.artifacts[2].uri),
+    (value) => (value.artifacts[0].fileName = value.artifacts[2].fileName),
+    (value) => (value.artifacts[0].sha256 = value.artifacts[2].sha256),
+    (value) =>
+      (value.artifacts[0].licenceDecision = "NEW_DERIVATIVE_REQUIRES_EXPLICIT_REVIEW"),
+    (value) => (value.artifacts[0].role = "COMMON_MODEL_REFERENCE"),
+    (value) => (value.artifacts[0].subjectId = "PAF_F16C_BLOCK52_PEACE_DRIVE_I"),
+    (value) => value.sourcePageClaims[1].capabilities.push("SENSORS"),
+    (value) => value.sourcePageClaims[1].publishedOutputs.push("SENSOR_RANGE_M"),
+  ];
+
+  for (const mutate of mutations) {
+    const tampered = structuredClone(manifest);
+    mutate(tampered);
+    assert.throws(() => validateDerivative(tampered, candidateDerivative()));
+  }
+
+  const daveMasquerade = structuredClone(manifest);
+  const dave = daveMasquerade.artifacts[2];
+  Object.assign(daveMasquerade.artifacts[0], {
+    authority: dave.authority,
+    uri: dave.uri,
+    fileName: dave.fileName,
+    sha256: dave.sha256,
+    licenceReviewState: dave.licenceReviewState,
+    licenceDecision: dave.licenceDecision,
+    ancestry: structuredClone(dave.ancestry),
+    scopeCode: dave.scopeCode,
+  });
+  assert.throws(
+    () => validateDerivative(daveMasquerade, candidateDerivative()),
+    /artifact|identity|licence|ancestry/i,
   );
 });
 
 test("research derivative rejects duplicate table and axis IDs", () => {
   const duplicateTable = candidateDerivative([candidateTable(), candidateTable()]);
-  assert.throws(() => validateResearchDerivative(manifest, duplicateTable), /duplicate table/i);
+  assert.throws(() => validateDerivative(manifest, duplicateTable), /duplicate table/i);
 
   const duplicateAxis = candidateDerivative();
   duplicateAxis.tables[0].axes.push({
@@ -333,47 +383,47 @@ test("research derivative rejects duplicate table and axis IDs", () => {
   });
   duplicateAxis.tables[0].output.values = [-0.02, -0.03, -0.04, -0.05];
   withDigest(duplicateAxis);
-  assert.throws(() => validateResearchDerivative(manifest, duplicateAxis), /duplicate axis/i);
+  assert.throws(() => validateDerivative(manifest, duplicateAxis), /duplicate axis/i);
 });
 
 test("candidate table digest, units, axes, outputs and page ancestry fail closed", () => {
-  assert.doesNotThrow(() => validateResearchDerivative(manifest, candidateDerivative()));
+  assert.doesNotThrow(() => validateDerivative(manifest, candidateDerivative()));
 
   const digestTamper = candidateDerivative();
   digestTamper.tables[0].output.values[0] = 99;
-  assert.throws(() => validateResearchDerivative(manifest, digestTamper), /digest/i);
+  assert.throws(() => validateDerivative(manifest, digestTamper), /digest/i);
 
   const unitTamper = candidateDerivative();
   unitTamper.tables[0].axes[0].unit = "rad";
   withDigest(unitTamper);
-  assert.throws(() => validateResearchDerivative(manifest, unitTamper), /unit/i);
+  assert.throws(() => validateDerivative(manifest, unitTamper), /unit/i);
 
   const axisTamper = candidateDerivative();
   axisTamper.tables[0].axes[0].values = [5, 0];
   withDigest(axisTamper);
-  assert.throws(() => validateResearchDerivative(manifest, axisTamper), /strictly increasing/i);
+  assert.throws(() => validateDerivative(manifest, axisTamper), /strictly increasing/i);
 
   const outputTamper = candidateDerivative();
   outputTamper.tables[0].output.id = "SENSOR_RANGE_M";
   withDigest(outputTamper);
-  assert.throws(() => validateResearchDerivative(manifest, outputTamper), /output/i);
+  assert.throws(() => validateDerivative(manifest, outputTamper), /output/i);
 
   const pageTamper = candidateDerivative();
   pageTamper.tables[0].pageAncestry.pdfPage = 50;
   withDigest(pageTamper);
-  assert.throws(() => validateResearchDerivative(manifest, pageTamper), /page ancestry/i);
+  assert.throws(() => validateDerivative(manifest, pageTamper), /page ancestry/i);
 });
 
 test("candidate tables reject non-finite axes and outputs", () => {
   const axis = candidateDerivative();
   axis.tables[0].axes[0].values[1] = Number.NaN;
   withDigest(axis);
-  assert.throws(() => validateResearchDerivative(manifest, axis), /non-finite/i);
+  assert.throws(() => validateDerivative(manifest, axis), /non-finite/i);
 
   const output = candidateDerivative();
   output.tables[0].output.values[0] = Number.POSITIVE_INFINITY;
   withDigest(output);
-  assert.throws(() => validateResearchDerivative(manifest, output), /non-finite/i);
+  assert.throws(() => validateDerivative(manifest, output), /non-finite/i);
 });
 
 test("offline table evaluation rejects out-of-domain and non-finite inputs", () => {

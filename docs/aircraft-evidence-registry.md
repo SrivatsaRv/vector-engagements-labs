@@ -154,3 +154,11 @@ state without accessing the network. Passing `-- --artifact-dir <directory>`
 also hashes locally retained source bytes offline; expected filenames are
 `19800005879.pdf`, `20030013626.pdf`, `F16_package.zip`, and
 `Atmos_13p2_SubsonicAirspeedChangeF16.zip`.
+
+Research-candidate table validation is not allowed to trust a caller-supplied
+corpus by shape or artifact ID alone. `validateResearchDerivative` requires the
+published aircraft registry and re-runs the full standalone-corpus validation,
+including the local Case 11 descendant digest, before it evaluates derivative
+ancestry or table content. A changed corpus subject, authority, admission state,
+artifact identity, licence, role, page capability or output therefore fails
+before a restricted DAVE-ML artifact can masquerade as a permitted NTRS report.
