@@ -97,6 +97,7 @@ ci-quality:
 	npm run policy:runtime-stubs:verify
 	npm run policy:aircraft-evidence:verify
 	npm run policy:nasa-generic-f16:verify
+	npm run policy:nasa-f16-store-source:verify
 	npm run symbols:verify
 	npm run models:verify
 	npm run reference-aircraft:verify

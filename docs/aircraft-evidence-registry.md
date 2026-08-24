@@ -86,6 +86,30 @@ therefore remain `UNSUPPORTED`; the F-16D catalog-only subject is also
 unchanged by this governance correction. TypeScript, Rust/WASM, Worker, VSR,
 catalog, UI and reports retain the same blocking named-performance boundary.
 
+## Historical external-store source freeze
+
+`governance/nasa-historical-f16-store-source/manifest.v1.json` records a
+separate source-only inventory for NASA-TM-74078, NASA-CR-172354, and
+NASA-TM-87766. The subjects are a historical FSD quarter-scale flutter model,
+one decoupler-pylon design and ground-test programme, and one exact FSD F-16A
+flight-test configuration. They are not the PAF F-16C/D Block 52 subjects in
+this registry.
+
+The manifest pins official PDF and metadata identities, source roles, page and
+render identities, rights facts, literal unit semantics, and coordinate gaps.
+It preserves aircraft station numbers, span stations, semi-span fractions,
+fuselage stations, and forward-hook-relative distances as different concepts.
+NASA-CR-172354 Table 2 prints legacy force-times-length-squared inertia units;
+a future mass-inertia conversion must divide the SI numerator by declared
+`g0 = 9.80665 m/s²`. The final assembled-pylon weight is on PDF page 28,
+printed page 24, and remains force.
+
+Reference-use, redistribution, export, and human visual-review decisions are
+still pending. Therefore the PDFs and renders are not committed, no source row
+is admission-eligible, and no aircraft capability changes state. The offline
+verifier can check user-supplied exact bytes and reproduce the page renders; it
+cannot approve them or create model-pack evidence.
+
 ## Change procedure
 
 1. Store or reproducibly retrieve the primary and independent validation

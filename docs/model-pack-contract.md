@@ -201,6 +201,22 @@ SHA-256, exact subject claim, admission eligibility, and declared capability
 coverage. A digest-valid pack cannot substitute C/D, NASA-reference, or
 cross-capability evidence under a familiar ID.
 
+The source-only contract
+`vector.nasa-historical-f16-store-source-manifest.v1` is not a model-pack
+evidence kind. It freezes three historical NASA artifacts and their page/render
+lineage while every human admission decision remains pending. The compiler,
+Rust/WASM loader, Worker, browser, VSR, database, and model-pack fixtures must
+not import its schema, subjects, or values. A matching hash alone cannot promote
+it into `SOURCE` or `VALIDATION` evidence.
+
+The manifest also prevents unit and datum laundering. NASA-CR-172354's printed
+`kN·m²`/`lb·in²` values remain legacy force-times-length-squared quantities; a
+future conversion to `kg·m²` must explicitly divide the SI numerator by
+`g0 = 9.80665 m/s²` and pass an independent unit oracle. Aircraft station
+numbers, span stations, semi-span fractions, fuselage stations, and
+forward-hook-relative distances remain distinct. A complete 3D station datum
+and body-frame transform are unavailable.
+
 Catalog admission checks that every aircraft carries this boundary before the
 catalog API returns a validated template. The API exposes the state and reason
 as provenance for a future capability-specific surface; the current Lab and
