@@ -72,7 +72,7 @@ frontend-local:
 
 browser-local:
 	npm run test:component
-	npm run test:browser
+	npm run test:browser:ci
 
 air-reference-local: reference-aircraft-local
 
@@ -91,6 +91,7 @@ ci-quality:
 	npm run tp1538:sources:verify
 	npm run policy:runtime-stubs:verify
 	npm run policy:aircraft-evidence:verify
+	npm run policy:nasa-generic-f16:verify
 	npm run symbols:verify
 	npm run models:verify
 	npm run reference-aircraft:verify
