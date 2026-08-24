@@ -97,7 +97,9 @@ binds every applicable owning and migration/changelog section to the same exact
 earlier ancestor and content digest.
 
 The classifier and Required PR Gate expose complete, versioned decision
-inventories that their production implementations consume. Their probes bind
+inventories that their production implementations consume. The classifier
+compiles every matcher and applies every gate effect only from its deep-frozen
+inventory; no parallel mutable rule arrays exist. Their probes bind
 those inventories and the exact decision-function identities in addition to
 evaluating the union of base/head tracked paths, registered boundary sentinels,
 add/modify/delete/rename/copy parser classes, every mandatory field, every

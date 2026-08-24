@@ -790,7 +790,10 @@ test("the classifier identity probe binds a new rule even when no tracked path s
   const baseSha = await commit(root, "classifier base");
   await writeFile(
     join(root, "scripts", "classify-ci-changes.mjs"),
-    classifierSource.replace("const POLICY_ONLY = [", "const POLICY_ONLY = [\n  /^future-namespace\\//,"),
+    classifierSource.replace(
+      "patterns: patternInventory(\n        /^\\.codex\\//,",
+      "patterns: patternInventory(\n        /^future-namespace\\//,\n        /^\\.codex\\//,",
+    ),
   );
   const headSha = await commit(root, "silently change an unenumerated classifier boundary");
   const output = execFileSync("node", [
@@ -806,6 +809,75 @@ test("the classifier identity probe binds a new rule even when no tracked path s
   const result = JSON.parse(output);
   assert.equal(result.assertions[0].status, "FAIL");
   assert.notEqual(result.assertions[0].beforeSha256, result.assertions[0].afterSha256);
+});
+
+test("the classifier has no mutable post-snapshot rule authority", async (t) => {
+  const classifierSource = await readFile(resolve("scripts/classify-ci-changes.mjs"), "utf8");
+  const helperSource = await readFile(resolve("scripts/lib/contract-doc-impact.mjs"), "utf8");
+  assert.doesNotMatch(classifierSource, /\bconst POLICY_ONLY\b/);
+
+  for (const [name, injectedMutation] of [
+    ["removed legacy rule array", "POLICY_ONLY.push(/^future-namespace\\//);"],
+    [
+      "deep-frozen rule inventory",
+      "CLASSIFIER_DECISION_CONTRACT.groups[0].patterns.push({ source: '^future-namespace/', flags: '' });",
+    ],
+  ]) {
+    const root = await governanceProbeFixture({
+      "scripts/classify-ci-changes.mjs": classifierSource,
+      "scripts/lib/contract-doc-impact.mjs": helperSource,
+    });
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const baseSha = await commit(root, `${name} base`);
+    const mutatedSource = classifierSource.replace(
+      "export function classifyChanges(inputFiles) {",
+      `${injectedMutation}\n\nexport function classifyChanges(inputFiles) {`,
+    );
+    assert.notEqual(mutatedSource, classifierSource, `${name} mutation must be injected`);
+    await writeFile(join(root, "scripts", "classify-ci-changes.mjs"), mutatedSource);
+    const headSha = await commit(root, `${name} mutation`);
+    assert.throws(() => execFileSync("node", [
+      resolve("scripts/contract-doc-probes/classifier-decision-identity.v1.mjs"),
+      "vector.contract-doc-probe.v1",
+      root,
+      baseSha,
+      headSha,
+      "DELIVERY_CONTRACT_GOVERNANCE",
+      "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V1",
+      "INTERNAL_REFACTOR",
+    ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }), undefined, name);
+  }
+});
+
+test("the classifier rejects an unfrozen decision inventory", async (t) => {
+  const classifierSource = await readFile(resolve("scripts/classify-ci-changes.mjs"), "utf8");
+  const helperSource = await readFile(resolve("scripts/lib/contract-doc-impact.mjs"), "utf8");
+  const root = await governanceProbeFixture({
+    "scripts/classify-ci-changes.mjs": classifierSource,
+    "scripts/lib/contract-doc-impact.mjs": helperSource,
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const baseSha = await commit(root, "frozen classifier base");
+  const mutableSource = classifierSource.replace(
+    "const deepFreeze = (value) => {",
+    "const deepFreeze = (value) => value;\n/*",
+  ).replace(
+    "  return value;\n};\n\nexport const CLASSIFIER_DECISION_CONTRACT",
+    "  return value;\n};\n*/\n\nexport const CLASSIFIER_DECISION_CONTRACT",
+  );
+  assert.notEqual(mutableSource, classifierSource);
+  await writeFile(join(root, "scripts", "classify-ci-changes.mjs"), mutableSource);
+  const headSha = await commit(root, "remove classifier freeze");
+  assert.throws(() => execFileSync("node", [
+    resolve("scripts/contract-doc-probes/classifier-decision-identity.v1.mjs"),
+    "vector.contract-doc-probe.v1",
+    root,
+    baseSha,
+    headSha,
+    "DELIVERY_CONTRACT_GOVERNANCE",
+    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V1",
+    "INTERNAL_REFACTOR",
+  ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }));
 });
 
 test("the required-gate invariant probe binds a newly admitted review kind", async (t) => {
