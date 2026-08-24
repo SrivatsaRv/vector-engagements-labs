@@ -6,10 +6,17 @@ official NASA historical artifacts, their metadata, exact page locations,
 render identities, source roles, unit semantics, coordinate gaps, and prohibited
 inferences.
 
-The PDFs, metadata responses, and page renders are intentionally absent. Local
-reference-use, redistribution, export, and human visual-review decisions are
-still pending. A user may supply the six exact files to the offline verifier,
-but the bundle remains inadmissible and cannot feed a model pack or runtime.
+The PDFs, metadata responses, and page renders are intentionally absent. The
+manifest's `referenceUseDecision`, `redistributionDecision`, and
+`exportReviewDecision` records, plus every human visual-review decision, remain
+pending. A user may supply the six exact files to the offline verifier, but the
+bundle remains inadmissible and cannot feed a model pack or runtime. The local
+render reproduction is also fail closed on Poppler 26.05.0 and Sharp 0.35.0;
+those tool versions are part of the frozen render identity.
+
+Lateral and vertical datums, handedness, a complete body-frame transform, and
+complete station geometry are explicitly `UNAVAILABLE`. The literal Table 2
+inertia labels remain `kN·m²` and `lb·in²`; they are not mass inertia values.
 
 Run the committed contract check with:
 

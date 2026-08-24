@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
+import { gunzipSync } from "node:zlib";
 
 export const MANIFEST_PATH = resolve(
   "governance/nasa-historical-f16-store-source/manifest.v1.json",
@@ -19,10 +20,46 @@ export const MANIFEST_PATH = resolve(
 
 // This is an external anchor for the immutable manifest bytes. Contract changes
 // require both the governed record and this verifier constant to be reviewed.
-const EXPECTED_CANONICAL_DIGEST = "89907ccba7b91487fb7fc3a150062dec7c4695218fc5d33a556ec6d492dfe4f1";
+const EXPECTED_CANONICAL_DIGEST = "ee777c79ec2b2d8a00a152b91a85cfafdedf8db07f94cb6cf2d7524bc574c602";
 const SHA256 = /^[a-f0-9]{64}$/;
 const ROTATIONS = new Set([0, 90, 180, 270]);
-const BANNED_PROMOTION = /\b(?:PAF|Block[ -]?52|Peace Drive|Su-30|stationCompatibility|loadout|dragCoefficient|modelPackParameter|runtimeCapability)\b/i;
+const BANNED_PROMOTION = /\b(?:PAF|Block[ -]?52|Peace Drive|Su-30|DCS|War Thunder|game dump|community dump|stationCompatibility|loadout|dragCoefficient|modelPackParameter|runtimeCapability)\b/i;
+
+const FROZEN_FILE_NAMES = new Set([
+  "TM74078.pdf",
+  "CR172354.pdf",
+  "TM87766.pdf",
+  "19780003061.json",
+  "19870000632.json",
+  "19860022096.json",
+]);
+
+const FROZEN_BINARY_HASHES = new Set([
+  "9daf1a24166a359731b2eb28cf6b7f3eff877de73d964ad4551cc8003ff8da78",
+  "0aa427839db20133fd342f77ed2fa9bbe9907c26360a629c8ce2699921834485",
+  "ce85f3664c03f6f1e1d18b57d645d60d93f19df5fbb7bb5cdaf3c8d2fbaab961",
+  "14293d25ca78af273df30ed1f9891f7acd3f1999bc8af49b33e837662a6423cb",
+  "c826c0626027eeb3e8ae252ac75b97f49602a903befd4bc4cb86a8578c8e03fe",
+  "4274d309f1d150853a16b01a39476e48c846f02beeacd8a9a8f7b33ddd5b9f32",
+  "797a273e0674be196173e685cb95e21f150e4047709fb77b4a322bf47a2374b1",
+  "ad27de9fbb29686693d2636d2193ae2b403fac44aa33787ff09a7c64e9c9c451",
+  "62527e076c7e1f2bdf9a8388f2de19893386364815cb9c1f0647dd3bd968e27b",
+  "be664473efe34ae94903fdb116e9fe302e95066e739dd295c176b589f32cdb9c",
+  "d8b2d9ba39ae9d589f7f0675db223ffa591454381f1bdaef126a8a8c1e4253c7",
+  "509679436ea1b5323aacf0d2e65ca72cd166d8a7173a45dac305bbccc1b79e02",
+  "dc771bc7d367156c6c1c3ab52f377ed784cc9b3e1c9773301bca699269b97ded",
+  "6152ac27165b66cdfa0258c01a8f5662a64c3dd5b4930364e7b95340d3fd13b6",
+  "42dceb040dcedd7951e26440e20e92617a995db8719baf329b47c03b59a95e2d",
+  "02bb41101ead3bb82f5fa67141077f5ee3ff685f402b62a01a103750b4cefdf1",
+  "56748df18ce1f6309b3d45f6856ab36a838239b0ba71bc5ae54c60c146acc7c1",
+  "6f13acf801a84dbe1766d69d66c43cf62f182033d0f63faa47613e7b22337da0",
+  "76f17879b975ed4a901e84a45e1ed3169f283418eb31dabbab1eede27b17c2dd",
+  "bbe830c2e0ee85d4b765696889e0fd04f3481386141184539c87d40cafeb6950",
+  "070df7beb19bfebdf72e957f7d327ce4b0b3bd52976a33da9eb2ebacd1e36a34",
+  "3c559a9690802ad13f35d1e2bb18b28b7735bc85ef9c644ace155a634f13d5fb",
+  "0b3bb921a25bb2e132b9631ccb1c553a30e8056d8bc8469859c1e3e293379707",
+  "d64e130fe486d49b0b3f7998aee25c9338c175588a0de1a096ff5181dc6ae217",
+]);
 
 const TOP_LEVEL_KEYS = [
   "accessDate",
@@ -32,10 +69,12 @@ const TOP_LEVEL_KEYS = [
   "canonicalDigest",
   "conversionPolicy",
   "coordinateConcepts",
-  "decisions",
+  "exportReviewDecision",
   "id",
   "intendedUse",
   "nonclaims",
+  "redistributionDecision",
+  "referenceUseDecision",
   "renderRecipe",
   "schemaVersion",
   "version",
@@ -80,6 +119,7 @@ const PAGE_KEYS = [
   "quantitySemantics",
   "render",
   "sourceOrientationDeg",
+  "uncertaintyQualification",
   "visualQa",
 ];
 
@@ -191,10 +231,15 @@ export function verifyManifest(manifest) {
   if (JSON.stringify(manifest.availabilityStates) !== JSON.stringify(["REFERENCE_ONLY", "UNSUPPORTED", "MODEL_ASSUMPTION", "UNAVAILABLE"])) {
     fail("availability states differ from the closed source-only set");
   }
-  exactKeys(manifest.decisions, ["exportReview", "redistribution", "referenceUse"], "decisions");
-  assertPendingDecision(manifest.decisions.referenceUse, "reference use decision");
-  assertPendingDecision(manifest.decisions.redistribution, "redistribution decision");
-  assertPendingDecision(manifest.decisions.exportReview, "export review decision");
+  assertPendingDecision(manifest.referenceUseDecision, "reference use decision");
+  assertPendingDecision(manifest.redistributionDecision, "redistribution decision");
+  assertPendingDecision(manifest.exportReviewDecision, "export review decision");
+
+  exactKeys(manifest.renderRecipe, ["arguments", "displayRotation", "dpi", "format", "renderer", "rendererVersion"], "renderRecipe");
+  exactKeys(manifest.renderRecipe.displayRotation, ["operation", "pngOptions", "tool", "toolVersion"], "renderRecipe.displayRotation");
+  exactKeys(manifest.renderRecipe.displayRotation.pngOptions, ["compressionLevel", "palette"], "renderRecipe.displayRotation.pngOptions");
+  if (manifest.renderRecipe.renderer !== "pdftoppm" || manifest.renderRecipe.rendererVersion !== "26.05.0" || manifest.renderRecipe.dpi !== 150 || manifest.renderRecipe.format !== "PNG") fail("render recipe identity differs");
+  if (manifest.renderRecipe.displayRotation.tool !== "sharp" || manifest.renderRecipe.displayRotation.toolVersion !== "0.35.0" || manifest.renderRecipe.displayRotation.operation !== "LOSSLESS_PIXEL_ROTATION_WITH_PNG_REENCODE" || manifest.renderRecipe.displayRotation.pngOptions.compressionLevel !== 9 || manifest.renderRecipe.displayRotation.pngOptions.palette !== false) fail("display rotation recipe differs");
 
   if (!Array.isArray(manifest.artifacts) || manifest.artifacts.length !== 3) fail("exactly three artifacts are required");
   const expectedIds = ["nasa-tm-74078", "nasa-cr-172354", "nasa-tm-87766"];
@@ -225,6 +270,7 @@ export function verifyManifest(manifest) {
       if (!Number.isSafeInteger(page.pdfPage) || page.pdfPage < 1 || page.pdfPage > artifact.pdf.pageCount) fail(`${artifact.id}.${page.id} has an invalid PDF page`);
       if (typeof page.printedPage !== "string" || typeof page.anchor !== "string") fail(`${artifact.id}.${page.id} lacks exact page identity`);
       if (!Array.isArray(page.literalUnits) || typeof page.quantitySemantics !== "string" || typeof page.coordinateSemantics !== "string") fail(`${artifact.id}.${page.id} lacks typed units or coordinate semantics`);
+      if (typeof page.uncertaintyQualification !== "string" || page.uncertaintyQualification.length < 20) fail(`${artifact.id}.${page.id} lacks its uncertainty or qualification boundary`);
       assertRender(page, `${artifact.id}.${page.id}`);
       assertVisualQa(page, `${artifact.id}.${page.id}`);
       pageMaps += 1;
@@ -239,15 +285,26 @@ export function verifyManifest(manifest) {
     fail("final assembled-pylon force must map to PDF page 28 / printed page 24 and remain force");
   }
   const table2 = cr.pageMaps.find(({ id }) => id === "cr172354-table2-values");
-  if (!table2 || JSON.stringify(table2.literalUnits) !== JSON.stringify(["kN*m^2", "lb*in^2", "kN", "lb-force", "cm", "in"]) || !table2.quantitySemantics.includes("DIVIDE_BY_G0")) {
+  if (!table2 || JSON.stringify(table2.literalUnits) !== JSON.stringify(["kN·m²", "lb·in²", "kN", "lb", "cm", "in."]) || !table2.quantitySemantics.includes("DIVIDE_BY_G0")) {
     fail("Table 2 must preserve literal force-times-length-squared semantics and the future g0 conversion boundary");
   }
-  exactKeys(manifest.coordinateConcepts, ["aircraftStationNumber", "completeBodyFrameTransform", "forwardHookRelativeDistance", "fuselageStation", "semiSpanFraction", "spanStation"], "coordinateConcepts");
+  if (!pylonForce.eligibleClaim.includes("includes the MAU-12 rack") || !pylonForce.eligibleClaim.includes("excludes the alignment device and damper") || !pylonForce.uncertaintyQualification.includes("final-assembly component scope")) fail("final assembled-pylon source qualification is incomplete");
+  const ejection = manifest.artifacts[2].pageMaps.find(({ id }) => id === "tm87766-single-ejection-p10");
+  for (const required of ["loaded right modified decoupler pylon", "unloaded left decoupler pylon", "AIM-9J stores on both wingtips", "Mach 0.80", "7,500 ft"]) {
+    if (!ejection?.eligibleClaim.includes(required)) fail(`single-ejection qualification omits ${required}`);
+  }
+  exactKeys(manifest.coordinateConcepts, ["aircraftStationNumber", "completeBodyFrameTransform", "completeStationGeometry", "forwardHookRelativeDistance", "fuselageStation", "handedness", "lateralDatum", "semiSpanFraction", "spanStation", "verticalDatum"], "coordinateConcepts");
   for (const [name, concept] of Object.entries(manifest.coordinateConcepts)) {
     exactKeys(concept, ["availability", "sameAs"], `coordinateConcepts.${name}`);
     if (concept.sameAs !== null) fail(`${name} cannot be conflated with another coordinate concept`);
   }
-  if (manifest.conversionPolicy.g0Mps2 !== 9.80665 || manifest.conversionPolicy.currentExecutableConversions !== "NONE") fail("conversion policy must declare g0 and admit no executable conversion");
+  for (const name of ["lateralDatum", "verticalDatum", "handedness", "completeBodyFrameTransform", "completeStationGeometry"]) {
+    if (manifest.coordinateConcepts[name].availability !== "UNAVAILABLE") fail(`${name} must remain UNAVAILABLE`);
+  }
+  exactKeys(manifest.conversionPolicy, ["currentExecutableConversions", "futureMassFromForce", "futureMassInertiaFromLegacyForceLength2", "g0Mps2"], "conversionPolicy");
+  if (manifest.conversionPolicy.g0Mps2 !== 9.80665 || manifest.conversionPolicy.currentExecutableConversions !== "NONE" || manifest.conversionPolicy.futureMassFromForce !== "mass_kg = force_N / g0" || manifest.conversionPolicy.futureMassInertiaFromLegacyForceLength2 !== "I_kg_m2 = I_source_kN_m2 * 1000 / g0") fail("conversion policy must declare the reviewed g0 formulas and admit no executable conversion");
+  exactKeys(manifest.ancestry, ["designSource", "flightObservationSource", "relationship"], "ancestry");
+  if (manifest.ancestry.designSource !== "nasa-cr-172354" || manifest.ancestry.flightObservationSource !== "nasa-tm-87766" || manifest.ancestry.relationship !== "BOUNDED_CONFIGURATION_ANCESTRY_NOT_INDEPENDENT_GENERAL_VALIDATION") fail("source ancestry differs");
 
   return {
     artifacts: manifest.artifacts.length,
@@ -262,9 +319,9 @@ export function verifyManifest(manifest) {
 export function assertSourceAdmissionEligible(manifest) {
   verifyManifest(manifest);
   for (const [label, decision] of [
-    ["reference use", manifest.decisions.referenceUse],
-    ["redistribution", manifest.decisions.redistribution],
-    ["export review", manifest.decisions.exportReview],
+    ["reference use", manifest.referenceUseDecision],
+    ["redistribution", manifest.redistributionDecision],
+    ["export review", manifest.exportReviewDecision],
   ]) {
     if (decision.value === "PENDING") fail(`${label} decision is PENDING`);
   }
@@ -275,6 +332,27 @@ export function assertSourceAdmissionEligible(manifest) {
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+function containsFrozenBinary(bytes) {
+  if (FROZEN_BINARY_HASHES.has(sha256(bytes))) return true;
+  if (bytes.length >= 3 && bytes[0] === 0x1f && bytes[1] === 0x8b && bytes[2] === 0x08) {
+    try {
+      const expanded = gunzipSync(bytes, { maxOutputLength: 25_000_001 });
+      return FROZEN_BINARY_HASHES.has(sha256(expanded));
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function assertToolVersion(command, expected) {
+  const result = spawnSync(command, ["-v"], { encoding: "utf8" });
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  if (result.status !== 0 || !new RegExp(`^${command} version ${expected.replaceAll(".", "\\.")}$`, "m").test(output)) {
+    fail(`${command} must be the governed ${expected} renderer`);
+  }
 }
 
 function assertRegularContainedFile(directory, fileName) {
@@ -296,7 +374,11 @@ function pngDimensions(bytes) {
 async function verifyRenders(manifest, sourceDirectory) {
   const directory = mkdtempSync(join(tmpdir(), "vector-f16-source-render-"));
   try {
+    assertToolVersion("pdftoppm", manifest.renderRecipe.rendererVersion);
     const sharp = (await import("sharp")).default;
+    if (sharp.versions.sharp !== manifest.renderRecipe.displayRotation.toolVersion) {
+      fail(`sharp must be the governed ${manifest.renderRecipe.displayRotation.toolVersion} display renderer`);
+    }
     let renderCount = 0;
     for (const artifact of manifest.artifacts) {
       const pdfPath = assertRegularContainedFile(sourceDirectory, artifact.pdf.fileName);
@@ -331,6 +413,7 @@ async function verifyRenders(manifest, sourceDirectory) {
 
 export async function verifySourceDirectory(manifest, sourceDirectory) {
   verifyManifest(manifest);
+  assertToolVersion("pdfinfo", manifest.renderRecipe.rendererVersion);
   const directoryInfo = lstatSync(sourceDirectory);
   if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) fail("source directory must be a real directory");
   const expectedFiles = manifest.artifacts.flatMap(({ pdf, metadata }) => [pdf.fileName, metadata.fileName]).sort();
@@ -347,7 +430,18 @@ export async function verifySourceDirectory(manifest, sourceDirectory) {
     const authors = [...(metadata.authorAffiliations ?? [])]
       .sort((left, right) => left.sequence - right.sequence)
       .map((entry) => entry.meta?.author?.name);
-    if (String(metadata.id) !== artifact.citationId || metadata.title !== artifact.title || JSON.stringify(authors) !== JSON.stringify(artifact.authors)) fail(`${artifact.metadata.fileName} identity differs from its manifest`);
+    const publicationDates = (metadata.publications ?? []).map(({ publicationDate }) => publicationDate?.slice(0, 10));
+    const reportNumbers = [...new Set((metadata.otherReportNumbers ?? [])
+      .filter((value) => typeof value === "string" && !value.startsWith("Report Number: ")))]
+      .sort();
+    if (
+      String(metadata.id) !== artifact.citationId ||
+      metadata.title !== artifact.title ||
+      JSON.stringify(authors) !== JSON.stringify(artifact.authors) ||
+      publicationDates.length !== 1 ||
+      publicationDates[0] !== artifact.publicationDate ||
+      JSON.stringify(reportNumbers) !== JSON.stringify([...artifact.reportNumbers].sort())
+    ) fail(`${artifact.metadata.fileName} identity differs from its manifest`);
     if (metadata.distribution !== artifact.rightsFacts.distribution || metadata.copyright?.determinationType !== artifact.rightsFacts.determinationType || metadata.copyright?.containsThirdPartyMaterial !== artifact.rightsFacts.containsThirdPartyMaterial || metadata.exportControl?.isExportControl !== artifact.rightsFacts.isExportControl || metadata.exportControl?.ear !== artifact.rightsFacts.ear || metadata.exportControl?.itar !== artifact.rightsFacts.itar) fail(`${artifact.metadata.fileName} rights/export facts differ from its manifest`);
 
     const pdfPath = assertRegularContainedFile(sourceDirectory, artifact.pdf.fileName);
@@ -367,12 +461,13 @@ export async function verifySourceDirectory(manifest, sourceDirectory) {
   };
 }
 
-function walkFiles(directory) {
+function walkFiles(directory, excludedNames = new Set()) {
   if (!statSync(directory).isDirectory()) return [];
   const files = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (excludedNames.has(entry.name)) continue;
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...walkFiles(path));
+    if (entry.isDirectory()) files.push(...walkFiles(path, excludedNames));
     else if (entry.isFile()) files.push(path);
     else if (entry.isSymbolicLink()) fail(`production boundary contains symlink ${path}`);
   }
@@ -381,6 +476,13 @@ function walkFiles(directory) {
 
 export function verifyCommittedInventory(repositoryRoot) {
   const directory = resolve(repositoryRoot, "governance/nasa-historical-f16-store-source");
+  const directoryInfo = lstatSync(directory);
+  if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) {
+    fail("committed source directory must be a real non-symlink directory");
+  }
+  const repositoryReal = realpathSync(repositoryRoot);
+  const directoryReal = realpathSync(directory);
+  if (!directoryReal.startsWith(`${repositoryReal}${sep}`)) fail("committed source directory escapes the repository");
   const files = readdirSync(directory).sort();
   const expected = ["README.md", "manifest.v1.json"];
   if (JSON.stringify(files) !== JSON.stringify(expected)) {
@@ -390,17 +492,33 @@ export function verifyCommittedInventory(repositoryRoot) {
     const info = lstatSync(resolve(directory, file));
     if (!info.isFile() || info.isSymbolicLink()) fail(`committed source member ${file} must be a regular non-symlink file`);
   }
+  const excludedNames = new Set([".git", ".next", ".open-next", ".vercel", ".wrangler", "dist", "build", "out", "node_modules", "target"]);
+  for (const path of walkFiles(repositoryRoot, excludedNames)) {
+    if (path.startsWith(`${directoryReal}${sep}`)) continue;
+    const info = statSync(path);
+    if (FROZEN_FILE_NAMES.has(basename(path))) fail(`raw source or render identity is committed at ${relative(repositoryRoot, path)}`);
+    if (info.size <= 25_000_000 && containsFrozenBinary(readFileSync(path))) {
+      fail(`raw source or render identity is committed at ${relative(repositoryRoot, path)}`);
+    }
+  }
   return { files, rawArtifactsCommitted: 0 };
 }
 
 export function verifyProductionIsolation(repositoryRoot) {
-  const sourceRoots = ["app", "components", "config", "content", "db", "engine-rust", "fixtures", "lib", "public", "server", "worker", "dist"];
+  const sourceRoots = ["app", "components", "config", "content", "db", "engine-rust", "fixtures", "lib", "public", "server", "worker", "dist", ".next", ".open-next", ".vercel/output", "build", "out", ".wrangler"];
   const forbidden = [
     "nasa-historical-f16-store-source",
     "vector.nasa-historical-f16-store-source-manifest.v1",
     "NASA_TM74078_F16_FSD_QUARTER_SCALE_FLUTTER_MODEL",
     "NASA_CR172354_F16_DECOUPLER_PYLON_DESIGN",
     "NASA_TM87766_FSD_F16A_DECOUPLER_FLIGHT_TEST",
+    "NASA-TM-74078",
+    "NASA-CR-172354",
+    "NASA-TM-87766",
+    "19780003061",
+    "19870000632",
+    "19860022096",
+    ...FROZEN_BINARY_HASHES,
   ];
   let filesInspected = 0;
   const references = [];
@@ -413,7 +531,9 @@ export function verifyProductionIsolation(repositoryRoot) {
         const bytes = readFileSync(path);
         filesInspected += 1;
         const text = bytes.toString("utf8");
-        if (forbidden.some((value) => text.includes(value))) references.push(relative(repositoryRoot, path));
+        if (containsFrozenBinary(bytes) || forbidden.some((value) => text.includes(value)) || [...FROZEN_FILE_NAMES].some((value) => text.includes(value))) {
+          references.push(relative(repositoryRoot, path));
+        }
       }
     } catch (error) {
       if (error?.code !== "ENOENT") throw error;
