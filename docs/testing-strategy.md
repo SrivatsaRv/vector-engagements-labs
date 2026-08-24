@@ -116,9 +116,10 @@ orphan, edited, removed, mismatched-target, copied/still-live, cross-inventory,
 new-dormant-probe, new-inert-multi-family, empty-generated-group, and bootstrap
 retirements. A two-hop rename proves historical replacement paths may later
 move under a second independently bound tombstone.
-The generated-only matrix also rejects a deleted/retired output even when the
-registered freshness command succeeds, because output retirement changes the
-governed contract rather than merely refreshing derived bytes.
+The exemption matrix also rejects a deleted/retired output even when the
+registered freshness command or pre-trusted refactor/invariant probes succeed,
+because output retirement changes the governed contract rather than merely
+refreshing derived bytes.
 TEST_ONLY, GENERATED_ARTIFACT_ONLY, INTERNAL_REFACTOR,
 NO_SEMANTIC_CHANGE, and DOCS_ALREADY_CURRENT are mutually exclusive,
 evidence-bearing dispositions; none receives credit merely because an arbitrary

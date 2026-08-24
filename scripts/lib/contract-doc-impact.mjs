@@ -942,6 +942,8 @@ export function verifyContractDocImpact({
     const requiredSections = requiredSectionsForFamily(pathClassifications, family);
     const requiredOwningSections = requiredSections.owningSections;
     const requiredMigrationSections = requiredSections.migrationSections;
+    const retiresGeneratedOutput = validatedRuleRetirements.some((retirement) => retirement.familyId === familyId && retirement.inventory === "GENERATED_OUTPUT");
+    invariant(!retiresGeneratedOutput || item.disposition === "SEMANTIC", `${familyId} generated output retirement requires SEMANTIC disposition.`);
     exactSectionInventory(item.owningSections, requiredOwningSections, `${familyId} owning sections`);
     if (item.disposition !== "SEMANTIC" && item.disposition !== "DOCS_ALREADY_CURRENT") {
       invariant(item.migration.state === "NOT_APPLICABLE" && item.migration.documents.length === 0, `${familyId} non-semantic disposition cannot claim migration documentation.`);
@@ -973,10 +975,6 @@ export function verifyContractDocImpact({
       invariant(JSON.stringify([...item.exemptionEvidence.paths].sort()) === JSON.stringify(familyChangedPaths), `${familyId} TEST_ONLY paths do not exactly cover the changed test paths.`);
     } else if (item.disposition === "GENERATED_ARTIFACT_ONLY") {
       invariant(!policyBootstrap, `${familyId} GENERATED_ARTIFACT_ONLY is unavailable during policy bootstrap.`);
-      invariant(
-        !validatedRuleRetirements.some((retirement) => retirement.familyId === familyId && retirement.inventory === "GENERATED_OUTPUT"),
-        `${familyId} GENERATED_ARTIFACT_ONLY cannot retire a governed generated output.`,
-      );
       const trustedFamily = basePolicy.families.find((candidate) => candidate.id === familyId);
       const group = trustedFamily?.generatedGroups.find((candidate) => candidate.id === item.exemptionEvidence.groupId);
       invariant(group, `${familyId} references an unknown or not-yet-trusted generated group ${item.exemptionEvidence.groupId}.`);

@@ -1301,8 +1301,43 @@ test("GENERATED_ARTIFACT_ONLY cannot conceal retirement of a governed output", a
       headPolicy,
       freshnessRunner: () => true,
     }),
-    /GENERATED_ARTIFACT_ONLY cannot retire a governed generated output/i,
+    /generated output retirement requires SEMANTIC disposition/i,
   );
+
+  for (const disposition of ["INTERNAL_REFACTOR", "NO_SEMANTIC_CHANGE"]) {
+    const probeId = `EXAMPLE_GENERATED_OUTPUT_${disposition}_V1`;
+    const probe = {
+      id: probeId,
+      familyId: "EXAMPLE",
+      disposition,
+      changedPathRules: [retiredRule],
+      adapterPath: "scripts/contract-doc-probes/example.v1.mjs",
+      adapterSha256: fixtureProbeSha256,
+      assertionIds: [disposition === "INTERNAL_REFACTOR" ? "PUBLIC_API_IDENTITY" : "BEHAVIOR_INVARIANT"],
+    };
+    const trustedBasePolicy = structuredClone(basePolicy);
+    trustedBasePolicy.nonSemanticProbes = [probe];
+    const trustedHeadPolicy = structuredClone(headPolicy);
+    trustedHeadPolicy.nonSemanticProbes = [probe];
+    trustedHeadPolicy.ruleRetirements[0].retiredFromPolicySha256 = policySha256(trustedBasePolicy);
+    const probeDeclaration = declaration({
+      disposition,
+      evidence: [{ kind: "TEST", value: "trusted generated-output retirement probe" }],
+      exemptionEvidence: { kind: disposition, probeIds: [probeId] },
+    });
+    assert.throws(
+      () => verifyContractDocImpact({
+        rootDirectory: fixture.root,
+        baseSha: fixture.baseSha,
+        headSha,
+        declaration: probeDeclaration,
+        basePolicy: trustedBasePolicy,
+        headPolicy: trustedHeadPolicy,
+        probeRunner: passingProbeResult,
+      }),
+      /generated output retirement requires SEMANTIC disposition/i,
+    );
+  }
 });
 
 test("registered freshness uses an exact secret-free head archive and rejects tracked mutation", async (t) => {
