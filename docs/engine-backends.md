@@ -75,10 +75,12 @@ compiler at runtime.
   verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
   The local command is closed to the calibrated Apple M5 / Node 24 30/200 ms
   profile. Hosted Stage 2B calls the separate closed Ubuntu 24 x64 / Node 22
-  65/200 ms alias and emits both full sample distributions before failing.
+  65/380 ms alias and emits both full sample distributions before failing.
   Performance report v3 separates exact `boundProfileIdentity` from
   `observedContext`; hosted CPU, core count, memory, and image release are
   observations and cannot select or authorize the hosted profile.
+  The hosted measurement is calibration-only; it makes no Worker, product or
+  entity-capacity, or cross-hardware claim.
   Generic-AAM `:build` and `:verify` use that container, while `:fmt`, `:clippy`,
   `:test`, and `:doc` run on the host with exact repository-pinned Rust 1.97.1.
   Hosted Stage 2B owns all of those commands, full verification, and the bounded

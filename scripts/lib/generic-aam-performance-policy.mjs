@@ -36,7 +36,7 @@ export const GENERIC_AAM_PERFORMANCE_PROFILES = Object.freeze({
   }),
   GITHUB_HOSTED_UBUNTU24_X64_NODE22: Object.freeze({
     id: "GITHUB_HOSTED_UBUNTU24_X64_NODE22",
-    thresholdsP95Ms: Object.freeze({ typescript: 65, "rust-wasm": 200 }),
+    thresholdsP95Ms: Object.freeze({ typescript: 65, "rust-wasm": 380 }),
     boundProfileIdentity: GITHUB_HOSTED_BOUND_PROFILE_IDENTITY,
   }),
 });

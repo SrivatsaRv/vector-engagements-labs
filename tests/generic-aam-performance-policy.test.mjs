@@ -47,7 +47,7 @@ test("generic-AAM performance profiles preserve independently calibrated ceiling
     },
     GITHUB_HOSTED_UBUNTU24_X64_NODE22: {
       id: "GITHUB_HOSTED_UBUNTU24_X64_NODE22",
-      thresholdsP95Ms: { typescript: 65, "rust-wasm": 200 },
+      thresholdsP95Ms: { typescript: 65, "rust-wasm": 380 },
       boundProfileIdentity: {
         runtime: "v22.18.0",
         platform: "linux",
@@ -177,7 +177,7 @@ test("legacy threshold overrides cannot alter either closed performance profile"
   });
   assert.deepEqual(
     resolveGenericAamPerformanceProfile("GITHUB_HOSTED_UBUNTU24_X64_NODE22", hostedEnvironment).thresholdsP95Ms,
-    { typescript: 65, "rust-wasm": 200 },
+    { typescript: 65, "rust-wasm": 380 },
   );
 });
 

@@ -71,8 +71,20 @@ GitHub-hosted Ubuntu 24 x64 / Node v22.18.0 requires the separately selected
 `GITHUB_HOSTED_UBUNTU24_X64_NODE22` profile. Four sequential exact-commit
 diagnostic jobs measured TypeScript p95 at 46.208, 52.163, 45.081, and 34.857
 ms. The resulting hosted TypeScript ceiling is 65 ms, leaving 24.6 percent
-headroom over the largest same-profile calibration sample; Rust-WASM retains
-the existing 200 ms ceiling. These failed calibration jobs are not release evidence.
+headroom over the largest same-profile calibration sample.
+
+Exact candidate `23ee24fea6d44f67cbbc7081a3bfadd0d854097a` produced complete
+hosted backend distributions in superseded job `97509066963` and authoritative
+job `97509842527`. Their TypeScript ranges/p95 were 30.246–51.357/47.492 ms
+and 29.370–48.767/43.440 ms. Their Rust-WASM ranges/p95 were
+288.741–305.220/303.618 ms and 289.709–303.386/300.864 ms. Both jobs had the
+identical bound profile and observed AMD EPYC 9V74, 4-core,
+16,766,414,848-byte, `ImageVersion=20260816.277.1` context. The hosted-only
+Rust-WASM ceiling is therefore 380 ms, 25.16 percent above the largest
+same-profile p95. Apple M5 remains 30/200 ms and hosted TypeScript remains 65
+ms. This evidence calibrates only the Node-hosted evaluator; it is not a Worker,
+product-capacity, entity-capacity, or cross-hardware claim. These failed
+calibration jobs are not release evidence.
 Every v3 benchmark report separates `boundProfileIdentity` from
 `observedContext`, includes all 20 sorted samples for both backends, and is
 emitted before an aggregate threshold failure. The hosted identity binds Node,

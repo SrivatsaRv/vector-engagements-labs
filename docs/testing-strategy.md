@@ -75,16 +75,17 @@ finite content-addressed run decoding, isolated production-bundle scans, exact n
 `reference-aam:performance` reports the 15-case Node-hosted workload under the
 closed Apple M5 / Node 24 30/200 ms profile. Hosted Stage 2B explicitly invokes
 `reference-aam:performance:hosted-linux-x64`, whose Ubuntu 24 x64 / Node 22
-profile uses the independently calibrated 65/200 ms ceilings. Both commands
+profile uses the independently calibrated 65/380 ms ceilings. Both commands
 reject a mismatched environment and measure and emit both complete 20-sample
 backend distributions before aggregate threshold failure. No environment
 variable can override either policy. The v3 report separates exact
 `boundProfileIdentity` from `observedContext`: every Apple M5 host field is
 bound, while hosted CPU, logical-core count, memory, and image release remain
 observations rather than profile authority. Neither target makes a Worker or
-product-capacity claim. `make performance-local` executes this load-sensitive
-M5 baseline before the engine, TrackStore, and capacity workloads so those
-benchmarks cannot pre-contaminate its named host context. See
+product/entity-capacity or cross-hardware claim. `make performance-local`
+executes this load-sensitive M5 baseline before the engine, TrackStore, and
+capacity workloads so those benchmarks cannot pre-contaminate its named host
+context. See
 [`generic-aam-verification.md`](generic-aam-verification.md).
 
 Generic-AAM crate, adapter, generated module, build, benchmark, verification,
