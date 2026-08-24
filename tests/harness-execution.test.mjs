@@ -134,6 +134,32 @@ test("hosted Rust stages own the complete private 6DOF verifier gate", async () 
   );
 });
 
+test("private 6DOF npm aliases resolve to the intended crate and verification commands", async () => {
+  const manifest = JSON.parse(await readFile("package.json", "utf8"));
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(manifest.scripts).filter(([name]) => name.startsWith("sixdof-foundation:")),
+    ),
+    {
+      "sixdof-foundation:verify":
+        "node --import tsx --test tests/sixdof-foundation.test.mjs",
+      "sixdof-foundation:performance": "tsx scripts/benchmark-sixdof-foundation.ts",
+      "sixdof-foundation:rust:build":
+        "node scripts/build-sixdof-foundation-verifier.mjs",
+      "sixdof-foundation:rust:verify":
+        "node scripts/build-sixdof-foundation-verifier.mjs --check",
+      "sixdof-foundation:rust:fmt":
+        "cargo fmt --manifest-path verification-rust/sixdof-foundation/Cargo.toml -- --check",
+      "sixdof-foundation:rust:clippy":
+        "cargo clippy --manifest-path verification-rust/sixdof-foundation/Cargo.toml --locked --all-targets -- -D warnings",
+      "sixdof-foundation:rust:test":
+        "cargo test --manifest-path verification-rust/sixdof-foundation/Cargo.toml --locked --all-targets",
+      "sixdof-foundation:rust:doc":
+        "RUSTDOCFLAGS='-D warnings' cargo doc --manifest-path verification-rust/sixdof-foundation/Cargo.toml --locked --no-deps",
+    },
+  );
+});
+
 test("browser-local uses the governed isolated browser runner", async () => {
   const makefile = await readFile("Makefile", "utf8");
   const browserLocal = makefile.split(/^browser-local:/m)[1]?.split(/^air-reference-local:/m)[0];

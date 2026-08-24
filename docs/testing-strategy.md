@@ -76,14 +76,16 @@ finite content-addressed run decoding, isolated production-bundle scans, exact n
 explicit p95 limits and makes no Worker or product-capacity claim. See
 [`generic-aam-verification.md`](generic-aam-verification.md).
 
-Six-degree-of-freedom foundation changes select the hosted Rust owner; manifest
-and lockfile changes additionally select dependency audit. Stage 2B caches the
-private crate and explicitly
-runs its rustfmt, strict Clippy, rebuild verification, native tests, rustdoc,
-TypeScript/actual-WASM numerical suite, production-isolation falsifiers, and
-bounded 10,000-tick benchmark. Stage 2C audits its independent lockfile. These
-commands preserve the production engine's separate unchanged 500,000-byte
-gate; they do not make the verifier available to the engine, backend, or Worker.
+Six-degree-of-freedom foundation changes select the hosted Rust owner. This
+includes the private crate, TypeScript and WASM adapters, generated verifier,
+build and benchmark scripts, numerical suite, and `package.json` command
+definitions; manifest and lockfile changes additionally select dependency
+audit. Stage 2B caches the private crate and explicitly runs its rustfmt, strict
+Clippy, rebuild verification, native tests, rustdoc, TypeScript/actual-WASM
+numerical suite, production-isolation falsifiers, and bounded 10,000-tick
+benchmark. Stage 2C audits its independent lockfile. These commands preserve
+the production engine's separate unchanged 500,000-byte gate; they do not make
+the verifier available to the engine, backend, or Worker.
 
 GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
 automated gate from changed paths. Repository-policy tests always run, and an

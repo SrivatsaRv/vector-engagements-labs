@@ -58,15 +58,27 @@ test("Rust implementation changes receive parity tests without dependency audit"
   ]);
 });
 
-test("private 6DOF Rust changes select their parity and dependency owners", () => {
-  assert.deepEqual(
-    selected(["verification-rust/sixdof-foundation/src/model.rs"]),
-    ["policy", "web_tests", "rust_tests"],
-  );
-  assert.deepEqual(
-    selected(["verification-rust/sixdof-foundation/Cargo.lock"]),
-    ["policy", "web_tests", "rust_tests", "rust_audit"],
-  );
+test("every private 6DOF owning path selects its Rust and dependency owners", () => {
+  const webAndRust = ["policy", "quality", "security_js", "web_tests", "rust_tests"];
+  const cases = [
+    ["verification-rust/sixdof-foundation/src/model.rs", ["policy", "web_tests", "rust_tests"]],
+    ["verification-rust/sixdof-foundation/Cargo.toml", ["policy", "web_tests", "rust_tests", "rust_audit"]],
+    ["verification-rust/sixdof-foundation/Cargo.lock", ["policy", "web_tests", "rust_tests", "rust_audit"]],
+    ["lib/validation/sixdof-foundation.ts", webAndRust],
+    ["lib/validation/sixdof-foundation-wasm.ts", webAndRust],
+    ["lib/validation/generated/sixdof-foundation-verifier-wasm.ts", webAndRust],
+    ["scripts/build-sixdof-foundation-verifier.mjs", webAndRust],
+    ["scripts/benchmark-sixdof-foundation.ts", webAndRust],
+    ["tests/sixdof-foundation.test.mjs", webAndRust],
+    [
+      "package.json",
+      ["policy", "quality", "security_js", "web_tests", "rust_tests", "integration", "container"],
+    ],
+  ];
+
+  for (const [path, expected] of cases) {
+    assert.deepEqual(selected([path]), expected, path);
+  }
 });
 
 test("runtime and engine changes execute the built Worker browser verifier", () => {

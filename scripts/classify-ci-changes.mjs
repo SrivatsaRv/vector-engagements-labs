@@ -62,9 +62,13 @@ const RUST_CONTRACT = [
   /^verification-rust\/sixdof-foundation\//,
   /^fixtures\/public-reference\//,
   /^lib\/engine\//,
+  /^lib\/validation\/(?:sixdof-foundation(?:-wasm)?|generated\/sixdof-foundation-verifier-wasm)\.ts$/,
   /^lib\/validation\/public-aircraft-reference\.ts$/,
   /^lib\/(?:model-pack|reference-model-pack|simulation-models)\.ts$/,
+  /^package\.json$/,
+  /^scripts\/(?:benchmark-sixdof-foundation\.ts|build-sixdof-foundation-verifier\.mjs)$/,
   /^scripts\/(?:build-rust-engine|generate-model-pack-fixture|verify-public-aircraft-reference)\.mjs$/,
+  /^tests\/sixdof-foundation\.test\.mjs$/,
 ];
 
 const RUST_MANIFEST = [
