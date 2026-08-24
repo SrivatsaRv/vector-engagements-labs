@@ -3,7 +3,7 @@
   "decisionArtifactId": "generic-sensor-source-legal-decisions-v1",
   "subjectManifestId": "generic-sensor-source-freeze-v1",
   "intendedUse": "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE",
-  "authorityBoundary": "ONLY_AN_AUTHORIZED_HUMAN_REVIEWER_MAY_CHANGE_A_DECISION_FROM_PENDING_REVIEW",
+  "authorityBoundary": "APPROVAL_REQUIRES_AN_ALLOWLISTED_HUMAN_AND_AN_EXTERNALLY_ROOTED_DETACHED_ATTESTATION",
   "decisions": [
     {
       "sourceId": "dstl-stone-soup-v1.9.1",

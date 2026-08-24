@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "vector.generic-sensor-verification-legal-authority-registry.v1",
+  "registryId": "generic-sensor-source-legal-authority-registry-v1",
+  "subjectDecisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+  "externalTrustRootRequired": true,
+  "status": "NO_AUTHORIZED_REVIEWERS_OR_DECISION_RECORDS_REGISTERED",
+  "authorizedReviewers": [],
+  "decisionRecords": [],
+  "blockingReason": "AUTHORIZED_HUMAN_ALLOWLIST_AND_EXTERNALLY_ROOTED_DETACHED_ATTESTATION_REQUIRED"
+}

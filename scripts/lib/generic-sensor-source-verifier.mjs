@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, verify as verifySignature } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { inflateRawSync } from "node:zlib";
@@ -6,6 +6,8 @@ import { inflateRawSync } from "node:zlib";
 const MANIFEST_SCHEMA = "vector.generic-sensor-verification-source-manifest.v1";
 const REPORT_SCHEMA = "vector.generic-sensor-verification-source-report.v1";
 const LEGAL_SCHEMA = "vector.generic-sensor-verification-legal-decisions.v1";
+const AUTHORITY_SCHEMA = "vector.generic-sensor-verification-legal-authority-registry.v1";
+const ATTESTATION_SCHEMA = "vector.generic-sensor-verification-legal-attestation-payload.v1";
 const INTENDED_USE = "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE";
 const WITHDRAWN_CR_160557_PREFIX = ["99cc", "854a"].join("");
 const CORRECT_CR_160557_SHA256 = "516547a9ea42ed46b20c348105ebbbbce1628f3e3eb96d6ec517a42647be4456";
@@ -13,6 +15,7 @@ const STONE_ARCHIVE_SHA256 = "728449aeac17bf2a233cd052b42f8306a7742fad26715be3f7
 const STONE_COMMIT = "a4336b920a799cfe0a77ecb05867c5deeb371c7a";
 const FORBIDDEN_CLAIM = /\b(?:DCS|War\s*Thunder|community\s+dump|APG-68|Su-30(?:MKI)?|F-16)\b/i;
 const SHA256 = /^[0-9a-f]{64}$/;
+const APPROVAL_SCOPES = new Set(["REDISTRIBUTE_FROZEN_SOURCE_BYTES", "OFFLINE_REFERENCE_EXECUTION", "ADAPT_SOURCE_FOR_VERIFICATION"]);
 const PRODUCTION_ROOTS = ["app", "components", "db", "dist", "engine-rust", "fixtures/model-packs", "fixtures/vector-record", "lib", "public", "worker"];
 const PRODUCTION_MARKERS = [MANIFEST_SCHEMA, LEGAL_SCHEMA, INTENDED_USE, "generic-sensor-verification-sources", "generic-sensor-source-freeze-v1"];
 const NASA_IDENTITIES = {
@@ -188,11 +191,82 @@ function verifyDecisionField(decision, field) {
   const value = decision[field];
   if (!value || !["PENDING_REVIEW", "APPROVED", "REJECTED", "NOT_APPLICABLE"].includes(value.state)) fail(`invalid ${field} decision for ${decision.sourceId}`);
   if (value.state === "APPROVED") {
-    if (value.reviewer?.kind !== "AUTHORIZED_HUMAN" || !value.reviewer.id) fail(`${field} approval requires an authorized human reviewer`);
-    if (!value.decisionRecordId || !value.decidedOn || !value.jurisdiction || !value.scope?.length || !Array.isArray(value.conditions) || !SHA256.test(value.evidenceSha256 ?? "") || /^0{64}$/.test(value.evidenceSha256)) fail(`${field} approval is incomplete`);
-  } else if (value.reviewer !== null || value.decisionRecordId !== null || value.decidedOn !== null || value.evidenceSha256 !== null) {
+    if (value.reviewer?.kind !== "AUTHORIZED_HUMAN" || !stableId(value.reviewer.id)) fail(`${field} approval requires an authorized human reviewer`);
+    if (!stableId(value.decisionRecordId) || !canonicalDate(value.decidedOn) || !/^[A-Z]{2}$/.test(value.jurisdiction ?? "") || !closedStringArray(value.scope, APPROVAL_SCOPES) || !closedStringArray(value.conditions) || !SHA256.test(value.evidenceSha256 ?? "") || /^0{64}$/.test(value.evidenceSha256)) fail(`${field} approval is incomplete or has an invalid date/scope`);
+  } else if (value.reviewer !== null || value.decisionRecordId !== null || value.decidedOn !== null || value.jurisdiction !== null || !Array.isArray(value.scope) || value.scope.length !== 0 || !Array.isArray(value.conditions) || value.conditions.length !== 0 || value.evidenceSha256 !== null) {
     fail(`${field} non-approval must not carry approval authority`);
   }
+}
+
+function canonicalDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  const year = Number(value.slice(0, 4));
+  return year >= 1900 && !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function stableId(value) {
+  return typeof value === "string" && /^[a-z0-9][a-z0-9._:-]{0,127}$/.test(value);
+}
+
+function closedStringArray(value, allowed) {
+  if (!Array.isArray(value) || value.length === 0 || new Set(value).size !== value.length) return false;
+  return value.every((item) => typeof item === "string" && item.length > 0 && item.length <= 128 && (!allowed || allowed.has(item)));
+}
+
+function approvalPayload(registry, decision, field) {
+  const value = decision[field];
+  return {
+    schemaVersion: ATTESTATION_SCHEMA,
+    registryId: registry.registryId,
+    decisionArtifactId: registry.subjectDecisionArtifactId,
+    decisionRecordId: value.decisionRecordId,
+    sourceId: decision.sourceId,
+    decisionField: field,
+    reviewerId: value.reviewer.id,
+    decidedOn: value.decidedOn,
+    jurisdiction: value.jurisdiction,
+    scope: value.scope,
+    conditions: value.conditions,
+    evidenceSha256: value.evidenceSha256,
+  };
+}
+
+function validateAuthorityRegistryShape(registry) {
+  if (registry?.schemaVersion !== AUTHORITY_SCHEMA || registry.externalTrustRootRequired !== true || !stableId(registry.registryId) || !stableId(registry.subjectDecisionArtifactId) || !Array.isArray(registry.authorizedReviewers) || !Array.isArray(registry.decisionRecords)) fail("wrong legal-authority registry identity");
+  const expectedStatus = registry.authorizedReviewers.length === 0 && registry.decisionRecords.length === 0
+    ? "NO_AUTHORIZED_REVIEWERS_OR_DECISION_RECORDS_REGISTERED"
+    : "ACTIVE_EXTERNALLY_ATTESTED_AUTHORITIES";
+  if (registry.status !== expectedStatus) fail("legal-authority registry status is inconsistent");
+  if (new Set(registry.authorizedReviewers.map((reviewer) => reviewer.reviewerId)).size !== registry.authorizedReviewers.length || new Set(registry.decisionRecords.map((record) => record.decisionRecordId)).size !== registry.decisionRecords.length) fail("duplicate legal authority or decision-record identity");
+  for (const reviewer of registry.authorizedReviewers) {
+    if (!stableId(reviewer.reviewerId) || !canonicalDate(reviewer.validFrom) || !canonicalDate(reviewer.validThrough) || reviewer.validFrom > reviewer.validThrough || !closedStringArray(reviewer.jurisdictions) || !reviewer.jurisdictions.every((jurisdiction) => /^[A-Z]{2}$/.test(jurisdiction)) || !closedStringArray(reviewer.scopes, APPROVAL_SCOPES)) fail("malformed legal reviewer allowlist entry");
+  }
+  return registry;
+}
+
+function verifyTrustedApproval(decision, field, requirement) {
+  const registry = validateAuthorityRegistryShape(requirement.authorityRegistry);
+  const trustedRoots = requirement.trustedAuthorityRoots;
+  if (!(trustedRoots instanceof Map)) fail(`${field} approval requires a separately governed external authority registry`);
+  if (requirement.sourceId && decision.sourceId !== requirement.sourceId) fail(`${field} approval source is out of scope`);
+  const value = decision[field];
+  const reviewer = registry.authorizedReviewers?.find((candidate) => candidate.reviewerId === value.reviewer.id);
+  if (!reviewer) fail(`${field} reviewer is not allowlisted by external authority`);
+  if (!canonicalDate(reviewer.validFrom) || !canonicalDate(reviewer.validThrough) || reviewer.validFrom > value.decidedOn || reviewer.validThrough < value.decidedOn) fail(`${field} reviewer authority date is invalid or out of range`);
+  if (!closedStringArray(reviewer.jurisdictions) || !reviewer.jurisdictions.includes(value.jurisdiction) || !closedStringArray(reviewer.scopes, APPROVAL_SCOPES) || value.scope.some((scope) => !reviewer.scopes.includes(scope))) fail(`${field} reviewer authority jurisdiction or scope is insufficient`);
+  const record = registry.decisionRecords?.find((candidate) => candidate.decisionRecordId === value.decisionRecordId);
+  if (!record) fail(`${field} decision record is not registered`);
+  const payload = approvalPayload(registry, decision, field);
+  const { attestation, ...registeredPayload } = record;
+  if (canonicalJson(registeredPayload) !== canonicalJson(payload)) fail(`${field} decision record/evidence does not match the approval`);
+  const payloadBytes = Buffer.from(canonicalJson(payload));
+  if (attestation?.algorithm !== "Ed25519" || !attestation.keyId || attestation.payloadSha256 !== sha256(payloadBytes)) fail(`${field} detached attestation identity is invalid`);
+  const trustedKey = trustedRoots.get(attestation.keyId);
+  if (!trustedKey) fail(`${field} detached attestation has no external trust root`);
+  const signature = Buffer.from(attestation.signatureBase64 ?? "", "base64");
+  if (!attestation.signatureBase64 || signature.toString("base64") !== attestation.signatureBase64 || !verifySignature(null, payloadBytes, trustedKey, signature)) fail(`${field} detached attestation signature is invalid`);
+  return value;
 }
 
 export function assertAuthorizedDecision(decision, field, requirement = {}) {
@@ -201,7 +275,7 @@ export function assertAuthorizedDecision(decision, field, requirement = {}) {
   if (value.state !== "APPROVED") fail(`${field} decision is ${value.state}`);
   if (requirement.jurisdiction && value.jurisdiction !== requirement.jurisdiction) fail(`${field} approval jurisdiction is out of scope`);
   if (requirement.scope && !value.scope.includes(requirement.scope)) fail(`${field} approval scope is insufficient`);
-  return value;
+  return verifyTrustedApproval(decision, field, requirement);
 }
 
 function walkFiles(path, rootPath, files) {
@@ -267,6 +341,7 @@ function verifyIsolationEvidence(root, manifest, overrides) {
   }
   collect(manifest.visualInspection);
   collect(manifest.legalDecisions);
+  collect(manifest.legalAuthorityRegistry);
   const measuredBytes = [...artifacts.values()].reduce((sum, artifact) => sum + artifact.sizeBytes, 0);
   if (evidence.frozenArtifactCount !== artifacts.size || evidence.frozenArtifactBytes !== measuredBytes) fail("production-isolation size evidence mismatch");
 }
@@ -342,15 +417,31 @@ export function verifyGenericSensorSourceBundle(options = {}) {
   const legalBytes = artifactBytes(root, legalArtifact, options.artifactOverrides);
   const legal = JSON.parse(legalBytes.toString("utf8"));
   if (legal.schemaVersion !== LEGAL_SCHEMA || legal.intendedUse !== INTENDED_USE || legal.subjectManifestId !== manifest.manifestId) fail("wrong legal-decision artifact identity");
+  const authorityArtifact = manifest.legalAuthorityRegistry;
+  const authorityBytes = artifactBytes(root, authorityArtifact, options.artifactOverrides);
+  const authorityRegistry = validateAuthorityRegistryShape(JSON.parse(authorityBytes.toString("utf8")));
+  if (authorityRegistry.subjectDecisionArtifactId !== legal.decisionArtifactId) fail("legal-authority registry is bound to the wrong decision artifact");
   if (legal.decisions?.length !== manifest.sources.length || new Set(legal.decisions.map((decision) => decision.sourceId)).size !== manifest.sources.length) fail("legal decisions do not cover the frozen source set");
+  const approvedCount = legal.decisions.reduce((sum, decision) => sum + ["redistribution", "referenceExecution", "adaptation"].filter((field) => decision[field]?.state === "APPROVED").length, 0);
+  if (authorityRegistry.decisionRecords.length !== approvedCount) fail("legal authority registry does not exactly cover approved decisions");
   for (const source of manifest.sources) {
     const decision = legal.decisions.find((candidate) => candidate.sourceId === source.id);
     if (!decision) fail(`missing legal decision for ${source.id}`);
-    for (const field of ["redistribution", "referenceExecution", "adaptation"]) verifyDecisionField(decision, field);
+    for (const field of ["redistribution", "referenceExecution", "adaptation"]) {
+      verifyDecisionField(decision, field);
+      if (decision[field].state === "APPROVED") assertAuthorizedDecision(decision, field, {
+        sourceId: source.id,
+        authorityRegistry,
+        trustedAuthorityRoots: options.trustedAuthorityRoots ?? new Map(),
+      });
+    }
     const reference = manifest.decisionReferences?.find((candidate) => candidate.sourceId === source.id);
-    if (!reference || reference.decisionArtifactId !== legal.decisionArtifactId || canonicalJson(reference.fields) !== canonicalJson(["redistribution", "referenceExecution", "adaptation"])) fail(`missing per-source legal decision reference for ${source.id}`);
+    if (!reference || reference.decisionArtifactId !== legal.decisionArtifactId || reference.authorityRegistryId !== authorityRegistry.registryId || canonicalJson(reference.fields) !== canonicalJson(["redistribution", "referenceExecution", "adaptation"])) fail(`missing per-source legal decision reference for ${source.id}`);
   }
-  const decisionState = summarizeLegalDecisionState(legal.decisions);
+  const decisionState = summarizeLegalDecisionState(legal.decisions, {
+    authorityRegistry,
+    trustedAuthorityRoots: options.trustedAuthorityRoots ?? new Map(),
+  });
   const frozenArtifactDigests = new Set();
   const collectDigest = (candidate) => {
     if (candidate?.path && SHA256.test(candidate.sha256 ?? "")) frozenArtifactDigests.add(candidate.sha256);
@@ -366,6 +457,7 @@ export function verifyGenericSensorSourceBundle(options = {}) {
   }
   collectDigest(manifest.visualInspection);
   collectDigest(manifest.legalDecisions);
+  collectDigest(manifest.legalAuthorityRegistry);
   collectDigest(manifest.isolationEvidence);
   const exposure = assertNoProductionExposure({ repositoryRoot: resolve(root, "../.."), forbiddenArtifactDigests: frozenArtifactDigests });
   return {
@@ -379,11 +471,24 @@ export function verifyGenericSensorSourceBundle(options = {}) {
   };
 }
 
-export function summarizeLegalDecisionState(decisions) {
+export function summarizeLegalDecisionState(decisions, authority = {}) {
   const states = decisions.flatMap((decision) => ["redistribution", "referenceExecution", "adaptation"].map((field) => decision[field]?.state));
   if (states.includes("REJECTED")) return "BLOCKED_REJECTED";
   if (states.includes("PENDING_REVIEW")) return "BLOCKED_PENDING_HUMAN_REVIEW";
   if (states.includes("NOT_APPLICABLE")) return "BLOCKED_NOT_APPLICABLE";
-  if (states.length > 0 && states.every((state) => state === "APPROVED")) return "AUTHORIZED_DECISIONS_PRESENT";
+  if (states.length > 0 && states.every((state) => state === "APPROVED")) {
+    try {
+      for (const decision of decisions) {
+        for (const field of ["redistribution", "referenceExecution", "adaptation"]) assertAuthorizedDecision(decision, field, {
+          sourceId: decision.sourceId,
+          authorityRegistry: authority.authorityRegistry,
+          trustedAuthorityRoots: authority.trustedAuthorityRoots ?? new Map(),
+        });
+      }
+      return "AUTHORIZED_DECISIONS_PRESENT";
+    } catch {
+      return "BLOCKED_UNTRUSTED_APPROVAL";
+    }
+  }
   return "BLOCKED_MISSING_OR_INVALID_DECISION";
 }

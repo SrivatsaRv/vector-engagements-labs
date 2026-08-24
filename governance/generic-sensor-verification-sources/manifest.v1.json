@@ -60,13 +60,21 @@
     "path": "legal-decisions.v1.json",
     "role": "LEGAL_AND_EXPORT_DECISIONS",
     "state": "REFERENCE_ONLY",
-    "sizeBytes": 5769,
-    "sha256": "546b59bef75c35bb9f9828d71db286f5d5c81849481b33a9ae7497fedd3887f5"
+    "sizeBytes": 5778,
+    "sha256": "76764b0f63ecf7d49ef6aa592a5c583e06f357a891c0552f1ed3b22850df27bc"
+  },
+  "legalAuthorityRegistry": {
+    "path": "legal-authority-registry.v1.json",
+    "role": "EXTERNAL_LEGAL_AUTHORITY_REGISTRY",
+    "state": "REFERENCE_ONLY",
+    "sizeBytes": 495,
+    "sha256": "d40a98911dd581aa500b77cc5a50012bad512ca2a17020b2711e1967de9394a9"
   },
   "decisionReferences": [
     {
       "sourceId": "dstl-stone-soup-v1.9.1",
       "decisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+      "authorityRegistryId": "generic-sensor-source-legal-authority-registry-v1",
       "fields": [
         "redistribution",
         "referenceExecution",
@@ -76,6 +84,7 @@
     {
       "sourceId": "nasa-cr-66097",
       "decisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+      "authorityRegistryId": "generic-sensor-source-legal-authority-registry-v1",
       "fields": [
         "redistribution",
         "referenceExecution",
@@ -85,6 +94,7 @@
     {
       "sourceId": "nasa-cr-151497",
       "decisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+      "authorityRegistryId": "generic-sensor-source-legal-authority-registry-v1",
       "fields": [
         "redistribution",
         "referenceExecution",
@@ -94,6 +104,7 @@
     {
       "sourceId": "nasa-cr-168347",
       "decisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+      "authorityRegistryId": "generic-sensor-source-legal-authority-registry-v1",
       "fields": [
         "redistribution",
         "referenceExecution",
@@ -103,6 +114,7 @@
     {
       "sourceId": "nasa-cr-160557",
       "decisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+      "authorityRegistryId": "generic-sensor-source-legal-authority-registry-v1",
       "fields": [
         "redistribution",
         "referenceExecution",
@@ -115,7 +127,7 @@
     "role": "PRODUCTION_ISOLATION_SIZE_EVIDENCE",
     "state": "REFERENCE_ONLY",
     "sizeBytes": 799,
-    "sha256": "5f9590aee067e1f4717e1e3c0f780b4e65fdbaf2ff181074fa2bc77c3aa00df3"
+    "sha256": "507434245080aed228c8486c1242e71d9f70c946f973c8678c0a6d37f019b347"
   },
   "sources": [
     {
@@ -1329,5 +1341,5 @@
       }
     }
   ],
-  "canonicalManifestDigest": "7463d8ff36b92f5e6820bcdce8cfeef7afddf268f0bd2b1f0922609b30bd5c8b"
+  "canonicalManifestDigest": "840fa2059c6218942a1880bdb898a71a1d2a7adfac04f6c83ae67efd58e56ab4"
 }

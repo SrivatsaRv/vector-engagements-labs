@@ -10,9 +10,13 @@ this directory is imported by production code.
 ## Current authority state
 
 All redistribution, reference-execution, and adaptation decisions are
-`PENDING_REVIEW`. That state fails closed. Only an authorized human reviewer
-with a decision record, date, jurisdiction, scope, conditions, and evidence
-digest may approve a decision. An agent-authored assertion is invalid.
+`PENDING_REVIEW`. That state fails closed. The committed authority registry has
+no authorized reviewer or decision record. An approval requires an allowlisted
+human reviewer, canonical calendar date, closed jurisdiction and scope,
+conditions, evidence digest, and a detached Ed25519 decision attestation
+verified by a trust root supplied outside this bundle. Self-declared reviewer
+kinds, invented records or evidence, agent assertions, and repository-local
+keys cannot create authority.
 
 In particular, this bundle does not authorize executing or importing Stone
 Soup, adapting its code, generating reference vectors, transcribing equations
@@ -26,6 +30,9 @@ identity; it exists only in a rejection regression.
 - `manifest.v1.json` is the canonical, content-addressed source manifest.
 - `legal-decisions.v1.json` preserves the three independent legal decision
   dimensions for every source.
+- `legal-authority-registry.v1.json` is the fail-closed, currently empty
+  reviewer/decision-record registry; trusted public keys are external inputs and
+  are never self-declared by this bundle.
 - `archive-inventory.v1.json` declares every member of the frozen Stone Soup
   archive before bounded extraction.
 - `visual-inspection.v1.json` records the primary full-page visual inspection

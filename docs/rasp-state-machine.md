@@ -170,8 +170,10 @@ manifest, or decision artifacts.
 
 Later generic verification implementation remains blocked until the exact
 source-freeze commit passes independent review and an authorized human approves
-reference execution for the required jurisdiction and scope. Stone Soup
+reference execution for the required jurisdiction and scope through an
+allowlisted record with an externally rooted detached attestation. Stone Soup
 adaptation additionally requires its distinct adaptation approval. Those gates
 still do not admit runtime behavior: #26 must separately implement and validate
-the owned information-state contracts. Pending or rejected decisions continue
-to yield the existing unsupported/no-track behavior, never a fallback.
+the owned information-state contracts. Pending, rejected, self-declared, or
+untrusted decisions continue to yield the existing unsupported/no-track
+behavior, never a fallback.
