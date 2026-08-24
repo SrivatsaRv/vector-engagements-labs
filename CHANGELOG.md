@@ -4,6 +4,51 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## Unreleased
 
+### Contract-family release notes
+
+Each governed contract family records its own release impact below. A change to
+one family must not imply changes to unrelated contracts.
+
+#### Model packs
+
+Model-pack persistence table declarations now live in the domain-owned
+`db/schema/model-pack.ts` module behind the unchanged aggregate Drizzle facade.
+
+#### Database schema
+
+The aggregate `db/schema.ts` facade now re-exports domain-owned schema modules;
+table names, columns, constraints, and migrations are unchanged.
+
+#### Engine ABI
+
+No pending family-specific entry.
+
+#### Generic AAM verification
+
+No pending family-specific entry.
+
+#### Simulation physics
+
+No pending family-specific entry.
+
+#### Browser Worker protocol
+
+No pending family-specific entry.
+
+#### Vector simulation records
+
+Saved-run record and admission tables now have separate domain-owned schema
+modules without changing their persisted representation.
+
+#### Capability descriptors
+
+No pending family-specific entry.
+
+#### Mission scenarios
+
+Scenario-template table declarations now live in `db/schema/scenarios.ts`
+behind the unchanged aggregate schema export.
+
 ### Added
 
 - Governed North Punjab, Ladakh, Rajasthan, North East, Arabian Sea, and coastal

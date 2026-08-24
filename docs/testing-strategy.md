@@ -12,6 +12,7 @@ Testing is part of the implementation contract. An executable action is incomple
 
 - **Unit:** pure math, coordinate transforms, parsers, reducers, validators, compilers, and state machines.
 - **Contract and regression:** schemas, canonical hashes, lifecycle transitions, backend boundaries, saved records, error cases, and every bug fix.
+- **Documentation impact:** base/head policy ownership, rename/copy endpoints, exact owning-section identities, structured dispositions, and hostile declaration inputs.
 - **Engine:** Rust unit/integration tests, TypeScript reference tests, strict lint/Clippy/rustdoc, and deterministic parity fixtures.
 - **Database and API integration:** empty-database migration, upgrade migration, deterministic seed/verifier, route admission, persistence, report replay, and failure paths.
 - **Frontend:** component and interaction tests for builder, maps, playback, reports, keyboard/touch behavior, loading, cancellation and errors.
@@ -24,7 +25,14 @@ Use the smallest complete set for a change. State why any applicable layer was o
 ## Existing baseline
 
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and
-production-audit checks. It first verifies the machine-readable runtime stub
+production-audit checks. It first runs the same contract-documentation impact
+validator used by hosted CI. Governed feature branches must supply an explicit
+declaration file or JSON value; an absent declaration fails as soon as the
+merge-base-to-worktree change set contains a registered family. The verifier
+constructs an isolated temporary Git snapshot for dirty and untracked files,
+so pre-commit validation neither ignores edits nor mutates the real index. The
+post-commit clean-clone run validates the exact immutable candidate and carries
+the declaration path forward. It then verifies the machine-readable runtime stub
 ledger. A new or removed production fallback, temporary adapter, model
 assumption, named-duel identifier, scripted guidance hold, or source-less public
 reference must update its owning ledger entry; an
@@ -77,14 +85,78 @@ explicit p95 limits and makes no Worker or product-capacity claim. See
 [`generic-aam-verification.md`](generic-aam-verification.md).
 
 GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
-automated gate from changed paths. Repository-policy tests always run, and an
-unknown path fails closed through every CI job. Documentation and agent-harness
+automated gate from merge-base-relative `--name-status -z` records. Rename and
+copy records use `--find-copies-harder` and retain both endpoints without
+trimming legal path bytes. Invalid UTF-8, control characters, absolute paths,
+dot segments, backslashes, symlink traversal, and unregistered additions fail
+closed.
+`scripts/verify-contract-doc-impact.mjs` independently maps those endpoints to
+the base and head versions of `governance/contract-doc-ownership.v1.json`,
+validates the one structured declaration, resolves every registered Markdown
+file and heading from exact Git blobs, derives the changed semantic facets, and
+compares only their exact registered sections. Every test path belongs to its
+actual model, engine, evidence, Worker, VSR, UI, security, mission, geospatial,
+content, data, or delivery family rather than a generic test-only owner.
+Regression coverage changes a test and two independent owning sections in one
+fixture, proving the test-selected facet cannot hide the second changed contract
+section; migration headings remain a distinct requirement inventory.
+The template command runs the same analysis without accepting a declaration and
+emits the exact required family/section inventory for the current diff. Hosted
+verification writes the subsequently validated declaration to the visible job
+summary. Regression coverage also proves changelog headings are family-unique,
+the aggregate Drizzle facade has only generic database ownership, and each
+domain schema module selects only its generic plus truthful domain owners.
+Exact-rule retirement regressions reproduce the former delete/rename deadlock
+and then require a bijective, append-only tombstone bound to the merge-base
+commit, canonical base-policy digest, old endpoint, and exact Git operation.
+They cover implementation, test, and generated-rule slots; endpoint-aware
+`TEST_ONLY`; same-family/inventory/facet rename replacement; retained tombstones
+across later revisions; and rejection of prefix, wrong-digest, wrong-revision,
+orphan, edited, removed, mismatched-target, copied/still-live, cross-inventory,
+new-dormant-probe, new-inert-multi-family, empty-generated-group, and bootstrap
+retirements. A two-hop rename proves historical replacement paths may later
+move under a second independently bound tombstone.
+The exemption matrix also rejects a deleted/retired output even when the
+registered freshness command or pre-trusted refactor/invariant probes succeed,
+because output retirement changes the governed contract rather than merely
+refreshing derived bytes.
+TEST_ONLY, GENERATED_ARTIFACT_ONLY, INTERNAL_REFACTOR,
+NO_SEMANTIC_CHANGE, and DOCS_ALREADY_CURRENT are mutually exclusive,
+evidence-bearing dispositions; none receives credit merely because an arbitrary
+document changed. INTERNAL_REFACTOR and NO_SEMANTIC_CHANGE remain unavailable
+unless a versioned adapter already registered and digest-bound by the merge-base
+policy supplies the exact identity or invariant result. The declaration names
+probe IDs only; the family, disposition, changed-path coverage, adapter,
+assertions, revisions, and equal base/head identities are validated outside the
+declaration. Adapters execute twice with a scrubbed environment and bounded
+output. Candidate decision modules execute in a nested observation process and
+return unhashed data; the immutable adapter parent alone hashes Git source,
+decision identities, and evidence. A newly added head-policy probe, malformed result, failed assertion,
+nondeterministic output, or caller-authored hash/command fails closed. The
+classifier refactor probe binds the complete exported rule/effect inventory and
+exact decision-function identity, then compares every base/head tracked path,
+registered boundary sentinel, and add/modify/delete/rename/copy parser case.
+The Required PR Gate invariant probe binds its complete mandatory-field,
+review-kind, state, gate, selection, terminal-result, and decision-function
+identity as well as the positive/negative matrix. An unsampled new rule or
+admitted value therefore changes the identity. Probe evidence still does not
+certify the technical adequacy of the contract. A generated-only disposition executes
+the policy-registered direct argv after
+Stage 0.6 provisions its closed Node or Rust/WASM toolchain;
+it cannot be redirected by editing `package.json`. The command runs against a
+temporary exact-head archive and tracked-file mutation fails. The hosted checkout is the
+exact pull-request head rather than GitHub's synthetic merge tree. Semantic
+schema/storage/VSR facets
+additionally require their registered
+Unreleased migration section. Repository-policy tests always run, and an
+unknown or unclassified tracked path makes policy validation fail. Documentation and agent-harness
 changes do not consume application, Rust, container, or PostGIS runners. Web,
 simulation, database/API, dependency, workflow, and infrastructure paths each
 add their owning gates. Shared mission, scenario, environment, model, Worker and
 Vector Simulation Record contracts select the Rust/parity and integration gates
 that consume them. The single Required PR Gate is always emitted and verifies
-that every selected job passed and every unselected job was skipped. Failed,
+that the documentation-impact job succeeded, every selected job passed, and
+every unselected job was skipped. Failed,
 cancelled, timed-out, action-required or unexpectedly skipped selected jobs all
 fail the gate. Workflow-level path exclusions are not used because they can
 strand a required check.
@@ -97,6 +169,52 @@ consumers. The quality job runs the environment-source, aircraft-evidence, and
 public-aircraft-reference validators as well as generated model and symbol
 checks. An unclassified evidence artifact still fails closed through the full
 matrix; it is not silently treated as documentation.
+
+Regression fixtures distinguish the browser simulation Worker from the
+Cloudflare delivery Worker. They also prove that a change to canonical JSON
+identity selects browser, Rust/parity, and persistence consumers; that every
+generic-AAM verifier source, adapter, generated artifact, generator, and Rust
+crate selects its Rust owner; and that each registered seed, database-upgrade,
+or credibility-catalog executable selects integration. The generic-AAM
+generated-only disposition is available only through its registered Rust
+source, exact generated output, direct generator command, and successful
+freshness reconstruction. Ownership tests additionally keep generic delivery
+harnesses out of the simulation-Worker family, bind the runtime capability
+validator to both descriptor and Worker contracts, and require the public
+aircraft fixture/evaluator/verifier chain to update its numerical-evidence
+contract when that chain changes. They also bind the model-pack compiler to its
+digest/admission/runtime sections, evidence registries to admission and subject
+validity, VSR digest/event sources to every replay consumer, and real
+TypeScript/Rust physics producers to the integrated-model and Rust/WASM proof
+sections. This prevents backend documentation from becoming a substitute for
+the actual physics or recording contract.
+
+Precision regressions also prohibit broad semantic ownership where distinct
+authorities merely share a directory. They bind geospatial datum, environment,
+terrain, source-admission, verification, installation, and scenario-spatial
+paths to different headings; require the built-browser gate for every
+browser-consumed geospatial/catalog producer; and keep offline source admission
+out of that product claim. Generic database migrations prove platform
+migration/provisioning mechanics only. Exact model-pack and saved-run schema,
+migration, seed, verifier, and integration-test paths additionally select their
+respective persistence contracts. Mission tests distinguish authored scenario,
+information-state/replay, spatial, and orchestration facets. Generic-AAM
+source/evaluator/workload changes select their isolated verification family,
+while production engine and capacity changes select only engine/backend and
+performance contracts. Negative assertions prove object-catalog facts cannot
+acquire RASP ownership, catalog admission selects its model/database consumers,
+and saved-run lifecycle admission cannot acquire VSR archive or replay sections.
+The same matrix rejects a broad security-directory owner: exact saved-run,
+basemap relay, browser-response, and delivery paths must resolve only to their
+corresponding security-boundary heading, with declared multiownership for the
+small shared public-admission helpers.
+Replay/current-geometry selector code and its regression test belong to the
+Observe family, while the renderless browser telemetry emitter belongs only to
+operations observability; neither path may force capability-admission or VSR UI
+documentation that it does not implement.
+The anonymous comment route, schema/migration, live client, and mixed boundary
+regression own the blog publishing Notes section and are explicitly excluded
+from the Saved runs family.
 
 `make integration-ci` uses the tracked managed-server runner. The runner writes
 the built application output to `outputs/integration/application.log`, stops and
@@ -183,3 +301,9 @@ still require migration before #62 can close.
 ## Release evidence
 
 The release steward requires passing unit, contract, parity, migration, API, frontend, browser, visual, security, performance, observability, cancellation, recovery, load and soak evidence for the applicable release scope. Targets in [`performance-capacity.md`](performance-capacity.md) remain targets until a reproducible benchmark record marks them measured.
+
+Release evidence must also include the exact contract-documentation declaration,
+base/head/merge-base identities, affected family inventory, and the Stage 0.6
+verdict. A passing policy job does not substitute for that independent result;
+failure, cancellation, skip, missing PR association, or stale section evidence
+must remain visible to the Required PR Gate.

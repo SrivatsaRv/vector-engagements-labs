@@ -14,6 +14,10 @@ Primary references:
 
 ## Archive contents
 
+Saved-run snapshot table declarations are isolated in
+`db/schema/vector-record.ts`; admission quota tables are separately declared in
+`db/schema/saved-run-admission.ts`. Both remain part of one aggregate schema.
+
 | Path | Purpose |
 | --- | --- |
 | `manifest.json` | schema version, record ID, title, timestamps, producer, hashes and required viewer features |
@@ -80,6 +84,9 @@ it is not displayed as if it were a separate model sample.
 
 ## Frame contract
 
+The schema-module split does not change frame, picture, event, or snapshot JSON
+fields.
+
 Each entity sample may carry scenario-local f64 position and an entity-keyed WGS84
 ellipsoid position, orientation, velocity, TAS, IAS, Mach, explicit-datum
 altitudes, vertical speed, angle of attack, load factor, roll rate, turn rate,
@@ -108,6 +115,9 @@ environment dataset.
 Weapons remain loadout inventory before launch. Aircraft frames preserve the installed inventory identities and total store mass while the weapon is stowed. A launch event removes that store and its declared launch mass from the aircraft once, then creates the weapon's first world sample with the launch platform position and inherited velocity. Static objects may omit unchanged samples. The viewer interpolates only properties explicitly declared interpolable.
 
 ## Integrity and replay
+
+Record digests and replay verification are unchanged by the persistence-module
+ownership split.
 
 The manifest records SHA-256 hashes for the canonical scenario, compiled engine input, compiled model pack, frames, events, sources and optional assets. It also records intended-use and credibility-manifest identities. Saving a run is complete only after all required hashes and a terminal run state exist. Editing a scenario creates a new draft revision; it cannot mutate a saved VSR.
 
@@ -196,9 +206,15 @@ authoritative v2 stream.
 
 ## Browser and interoperability boundary
 
+Browser and Worker consumers continue to receive saved records through the
+same aggregate persistence/API contract.
+
 VSR is designed for browser production and playback. Frames use a transferable columnar buffer so a Web Worker, TypeScript engine or Rust/WASM engine can produce the same record contract. An ACMI 2.2 exporter can be added as an interoperability adapter; ACMI is not used as VECTOR's internal source of model truth because it does not carry VECTOR's full coefficient, provenance and scenario contracts.
 
 ## Implemented replay boundary
+
+No replay behavior or supported record version changes with the table-module
+refactor.
 
 `createVectorSimulationRecord` freezes the authored scenario, compiled adapter,
 entity manifest, engine frames, the direct authoritative simulation-event

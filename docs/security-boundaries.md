@@ -5,6 +5,9 @@ callers are treated as attacker controlled before database or upstream work.
 
 ## Saved runs
 
+Saved-run snapshots and saved-run admission counters now have separate
+domain-owned declaration modules behind the unchanged aggregate Drizzle schema.
+
 The browser submits a bounded scenario configuration and validated package
 identity, not authoritative telemetry. The Worker validates each configurable
 field, recomputes the run, hashes server-generated frames, and stores a
@@ -69,6 +72,10 @@ matching Bearer token. Local Compose uses a local scrape token and publishes
 all development ports on `127.0.0.1`.
 
 ## Catalog and basemap relay
+
+The shared public-API rate-window table is declared in
+`db/schema/public-api-admission.ts`; its limiter and relay behavior are
+unchanged.
 
 The catalog is cached for five minutes. The tile relay uses the versioned
 `vector-basemap-tile.v1` tuple: exactly one `mode`, `z`, `x`, and `y`, all

@@ -102,6 +102,9 @@ hides entities while this state is selected.
 
 ## Record and replay
 
+Separating saved-record and admission table declarations does not change RASP
+event, picture, or replay authority.
+
 New records use `vector.frames.columnar.v5` and `vector.pictures.v4`. They are
 the immutable projection of
 the tick boundary. During replay, the verified pictures member is reattached

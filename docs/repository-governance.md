@@ -29,7 +29,7 @@ Repository administrators retain emergency recovery authority but should not use
 ## Continuous integration
 
 `ci.yml` is one change-aware pull-request and `main` pipeline. Stage 0 computes
-the changed files from immutable base and head revisions with the tracked
+the rename/copy-aware change set from the exact merge base and head revisions with the tracked
 classifier and always runs repository-policy regression tests. Independent
 quality, JavaScript supply-chain/CodeQL, web-contract, Rust/WASM/parity,
 RustSec, PostGIS/API, and container-rebuild jobs then run in parallel only when
@@ -37,6 +37,120 @@ their owned paths or an unclassified path changed. Workflow and Dependabot
 changes deliberately fail closed through every gate. Stage 4 retains the one
 stable branch-protection context and fails unless every selected job passed;
 jobs skipped by the classifier are not treated as missing evidence.
+
+Stage 0.6 separately enforces the versioned
+`vector.contract-doc-ownership.v1` policy. Every tracked path is either owned by
+a contract family or belongs to one closed, exact non-contract class; there is
+no blanket documentation or product-runtime escape hatch. Each governed
+change supplies exactly one bounded `vector.contract-doc-impact-declaration.v1`
+block naming every affected family and its exact stable Markdown section IDs.
+Rules carry a closed semantic-facet inventory (`schema`, `unit`, `datum`,
+`evidence`, `admission`, `validity`, `digest`, `runtime`, `vsr`, `ui`,
+`storage`, `delivery`, and `verification`), so only the sections and
+migration/changelog records owned by the affected facets are required. The
+required inventory is the union of sections selected by executable/test facets
+and every independently changed owning section. Migration/changelog sections
+are tracked separately, so they cannot broaden owning-document requirements and
+an executable or test change cannot mask a second changed contract section. The
+validator proves every registered document is a regular Git blob with exactly
+one registered heading, reads section bodies at the merge base and head,
+retains both endpoints of rename/copy records with `--find-copies-harder`, and
+rejects invalid UTF-8, control-bearing paths, whitespace-only changes, and
+unrelated-section churn. For policy changes it
+audits old endpoints under the base policy and new endpoints under the head
+policy; existing ownership cannot be erased by the policy being reviewed. The
+initial #162 landing is the only explicit bootstrap and is bound to exact base
+`661d280699f260e32c53d6a1b0a6f5cf3415dde7`; both the integration tip and the
+merge base must lack the policy. A stale branch whose integration tip already
+has the policy must rebase. Later missing, malformed, weakened, unclassified,
+or unmapped policy state fails closed.
+
+Governed `EXACT` implementation, test, or generated rules may leave the active
+inventory only through an append-only `ruleRetirements` tombstone. The
+tombstone binds the exact merge-base commit, canonical base-policy digest,
+family, rule inventory, facets, and Git delete or rename operation. A deletion
+has no replacement; a rename must add an active exact rule for the new endpoint
+under the same family, generated group where applicable, inventory, and facets.
+Prefix rules, families, sections, generated groups, toolchains, commands, and
+workstreams cannot use this mechanism. Tombstones never classify current paths,
+cannot be edited or removed, and are unavailable during the one-time bootstrap.
+Every active implementation, test, input, output, and generator rule must still
+match a tracked head path; a tombstone never excuses an active rule in the same
+or another inventory. Historical multi-family and probe entries may remain
+inert only when they already existed in the base policy and the same old
+endpoint has a validated tombstone. Newly added inert ledger or probe entries
+reject. Historical rename destinations need not remain tracked forever: a later
+delete or rename is governed by its own new tombstone, preserving the full
+append-only chain without preventing lifecycle evolution.
+Retiring a generated output is always semantic documentation work and cannot
+claim `GENERATED_ARTIFACT_ONLY`, `INTERNAL_REFACTOR`, `NO_SEMANTIC_CHANGE`, or
+another exemption; freshness and probes govern ordinary changes, not removal
+of the output contract itself.
+
+Pull requests obtain the declaration from the single structured template block.
+`npm run --silent policy:contract-docs:template` derives the exact affected
+family, owning-section, and migration-section inventory from the current
+base/head diff; it does not emit an arbitrary first-family example. The hosted
+job copies the exact validated declaration, including rationale and evidence,
+into its visible GitHub step summary so the HTML-comment transport does not
+hide the review record from reviewers or assistive-reading flows.
+An edited body reruns CI. A `main` push resolves exactly one associated merged
+pull request through the read-only GitHub API and binds its merge commit, base
+commit, source-head identity, target branch, and declaration to the push;
+zero, multiple, stale, or revision-mismatched associations fail. Local verification uses the same core and
+an explicit `VECTOR_CONTRACT_DOC_DECLARATION_FILE` or
+`VECTOR_CONTRACT_DOC_DECLARATION_JSON`. A dirty checkout is evaluated through a
+temporary Git index/tree/commit without changing the developer's branch or
+index. Missing local input is accepted only when the exact diff has no governed
+families. The Stage 4 gate requires the independent documentation-impact job to
+finish successfully with `VERIFIED` or `NO_RELEVANT_CHANGES`; cancelled,
+skipped, malformed, or unavailable evidence cannot be aggregated as success.
+
+This mechanism binds paths, identities, registered evidence, and owned section
+changes. It does not certify that prose is technically adequate and cannot
+replace CODEOWNER or human review of a policy that modifies its own verifier.
+Generated-only exemptions invoke the policy's closed direct argv (`node` or the
+job-provisioned Rust/WASM toolchain), never a declaration-provided or mutable
+package script alias. Stage 0.6 checks out the exact pull-request head and
+provisions each registered generated group's closed toolchain before executing
+the same validator used locally and on push. Freshness runs in a temporary
+archive of the exact head commit, with secrets and tool overrides absent, and
+rejects any mutation of tracked head content. Refactor and no-semantic-change
+declarations contain only versioned probe IDs. The merge-base policy—not the
+pull request—owns each adapter path, exact adapter digest, family, disposition,
+path coverage, and assertion inventory. The validator executes the immutable
+base adapter twice in a scrubbed, bounded child process. That trusted adapter
+materializes each exact Git blob and executes candidate decision code only in a
+second child process; the adapter parent computes all source, comparison, and
+evidence digests without importing candidate code. It accepts only an exact,
+deterministic result whose base/head identity digests are equal. A probe
+introduced by a pull request cannot authorize that pull request, probes are
+unavailable during bootstrap, a head-added generated group cannot self-exempt,
+and declaration-authored commands, hashes, or
+prose never become exemption authority. `DOCS_ALREADY_CURRENT` separately
+binds every applicable owning and migration/changelog section to the same exact
+earlier ancestor and content digest.
+
+The classifier and Required PR Gate expose complete, versioned decision
+inventories that their production implementations consume. The classifier
+compiles every matcher and applies every gate effect only from its deep-frozen
+inventory; no parallel mutable rule arrays exist. Their probes bind
+those inventories, the classifier's complete module-source identity, and the
+exact decision-function identities in addition to
+evaluating the union of base/head tracked paths, registered boundary sentinels,
+add/modify/delete/rename/copy parser classes, every mandatory field, every
+selected/unselected gate, and the closed terminal-result classes. Adding an
+unsampled namespace, review kind, state, gate, or hard-coded decision changes
+the identity and cannot use a non-semantic exemption. These probes protect
+their declared decision contracts; they do not replace architectural review of
+technical adequacy.
+
+Classifier and Required PR Gate module identities are computed from exact Git
+blobs before their temporary modules are written or executed. Candidate modules
+run in observation children and return unhashed observations; only the trusted
+adapter parent computes decision and evidence hashes. The parent checks each
+materialized module before execution and again after all decision/parser cases,
+so candidate code cannot replace its source or the adapter's hashing authority.
 
 Documentation, project-skill, and governance-only changes run the classifier,
 policy suite, and final gate without rebuilding the application, Rust engine,
@@ -59,7 +173,71 @@ classifier ownership. A path alias for a file that does not exist is not gate
 coverage. Policy regressions use the repository's real paths and verify that
 every classifier output is represented by the Required PR Gate.
 
-`make clean-clone-local` proves the documented release context slice resolves
+Worker ownership is deliberately split by runtime. `lib/runtime/simulation.worker.ts`
+and its protocol/build/verifier paths belong to the browser simulation-Worker
+contract; `worker/index.ts` is the Cloudflare application Worker and belongs to
+security/delivery integration. The generic managed-server harness and Node
+runtime/admin bundler belong to delivery governance, not the simulation-Worker
+protocol. Shared canonical JSON changes select the
+model-pack, Rust/parity, built-browser Worker, and persistence consumers because
+they can change compiled-pack and VSR identities. Generic-AAM verifier sources,
+unit/datum adapters, the generated verifier module, and its direct generator are
+one governed Rust/WASM verification group. The runtime deployment-capability
+validator is jointly owned by the capability descriptor and Worker contracts.
+Public-aircraft fixtures, evaluators, and verifier commands require their
+numerical-verification section as well as evidence/admission documentation.
+Database seeds and evidence/catalog upgrade verifiers always select the
+database/API integration gate. Model-pack compilation, digest, admission, and
+runtime binding are all explicit facets of the model-pack implementation—not
+schema-only. Evidence-registry revisions select evidence, admission, subject
+validity, and change-procedure documentation. VSR digest and event authorities
+are jointly owned with their engine/Worker producers and select replay,
+integration, parity, and built-browser consumers. Finally, executable
+TypeScript/Rust atmosphere, primitives, dynamics, tracking, and weapon-admission
+producers belong to a dedicated physics-runtime family whose owning contract is
+the integrated physics model rather than the backend-selection document.
+
+Phase-one ownership is intentionally precise rather than prefix-shaped.
+Geospatial transforms, vertical datums, environment-pack schemas, terrain/LOS,
+source admission, installation coverage, and scenario-spatial authoring each
+select only their exact contract sections; browser-consumed geospatial and
+object-catalog authorities additionally select the built-browser gate. Mission
+ownership separately maps information-state/replay, scenario admission,
+authoring, spatial transforms, and simulation orchestration instead of treating
+all mission files as one semantic surface. Generic database mechanics own
+migration/backup, provisioning, and database-test documentation, while only
+the exact model-pack and saved-run tables, migrations, seed/verifier paths, and
+Drizzle representations jointly own their model-pack or VSR persistence
+contracts. The verification-only generic-AAM corpus, private Rust evaluator,
+generated module, workload, oracles, and performance evidence form a dedicated
+family; unrelated production-engine or capacity changes cannot force changes
+to its source-evidence contract. Source-backed object-catalog facts own the
+fixed-fixture documentation, while catalog credibility admission and its API
+projection jointly own model-pack identity, digest, persistence, and geospatial
+installation coverage. Saved-run quota and lifecycle admission select only the
+Saved runs boundary; they do not claim VSR archive, replay, or digest authority.
+Security ownership is exact-path rather than `lib/security/**`: saved-run and
+public-admission code owns Saved runs, basemap relay code owns Catalog and
+basemap relay, response-header code owns Browser response baseline, and release
+scripts/governance own Delivery trust. A shared admission helper may be
+explicitly multi-owned, but a saved-run edit cannot force unrelated basemap,
+response-header, or delivery documentation.
+Anonymous blog-comment routes, persistence schema/migration, and live client
+instead own the blog publishing Notes section; they do not acquire saved-run
+semantics merely because both use bounded public-API helpers.
+Observe replay selectors and their direct regression test share one UI Observe
+owner. The renderless browser telemetry emitter is operations-observability
+only, so neither test-only nor instrumentation-only changes create unrelated
+capability or VSR documentation churn.
+`db/schema.ts` is a stable aggregate export only. Domain-owned table
+definitions live under `db/schema/`, so a comments-table change cannot select
+model-pack, VSR, catalog, or saved-run contracts. Every module still belongs to
+the generic database family and is loaded through the one aggregate Drizzle
+schema; these are ownership boundaries, not parallel schemas. Likewise, each
+changelog-owning family has one distinct heading below `CHANGELOG.md` /
+`Unreleased`, so one contract's release note cannot select unrelated families.
+
+`make clean-clone-local` forwards the same explicit declaration input and proves the documented release context slice resolves
 from a new clone, installs the locked dependencies, then runs the deterministic
 baseline and `worker-local`. It therefore verifies the production-built Worker
 without relying on stale assets in the source checkout.

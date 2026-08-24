@@ -19,34 +19,59 @@ export const REQUIRED_GATES = [
   { key: "container", selected: "CONTAINER_SELECTED", result: "CONTAINER_RESULT" },
 ];
 
-function requireResult(environment, name) {
-  const result = environment[name];
-  if (!result) throw new Error(`Required result ${name} is missing.`);
-  return result;
-}
+const deepFreeze = (value) => {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.values(value).forEach(deepFreeze);
+    Object.freeze(value);
+  }
+  return value;
+};
+
+export const REQUIRED_GATE_CONTRACT = deepFreeze({
+  schemaVersion: "vector.required-pr-gate-decision.v1",
+  mandatorySuccessResults: [
+    { field: "CLASSIFY_RESULT", label: "Classifier" },
+    { field: "POLICY_RESULT", label: "Repository policy" },
+    { field: "CONTRACT_DOCS_RESULT", label: "Contract documentation impact gate" },
+  ],
+  contractDocumentationStates: ["VERIFIED", "NO_RELEVANT_CHANGES"],
+  reviewKinds: ["slice", "completion-review", "not-applicable"],
+  selectionValues: ["true", "false"],
+  selectedTerminalResult: "success",
+  unselectedTerminalResult: "skipped",
+  gates: REQUIRED_GATES,
+});
 
 export function verifyRequiredGates(environment) {
-  if (requireResult(environment, "CLASSIFY_RESULT") !== "success") {
-    throw new Error(`Classifier ended as ${environment.CLASSIFY_RESULT}.`);
+  const requireResult = (name) => {
+    const result = environment[name];
+    if (!result) throw new Error(`Required result ${name} is missing.`);
+    return result;
+  };
+  for (const { field, label } of REQUIRED_GATE_CONTRACT.mandatorySuccessResults) {
+    if (requireResult(field) !== REQUIRED_GATE_CONTRACT.selectedTerminalResult) {
+      throw new Error(`${label} ended as ${environment[field]}.`);
+    }
   }
-  if (requireResult(environment, "POLICY_RESULT") !== "success") {
-    throw new Error(`Repository policy ended as ${environment.POLICY_RESULT}.`);
+  const contractDocsState = requireResult("CONTRACT_DOC_IMPACT_STATE");
+  if (!REQUIRED_GATE_CONTRACT.contractDocumentationStates.includes(contractDocsState)) {
+    throw new Error(`Contract documentation impact state is invalid: ${contractDocsState}.`);
   }
-  const reviewKind = requireResult(environment, "PR_REVIEW_KIND");
-  if (!["slice", "completion-review", "not-applicable"].includes(reviewKind)) {
+  const reviewKind = requireResult("PR_REVIEW_KIND");
+  if (!REQUIRED_GATE_CONTRACT.reviewKinds.includes(reviewKind)) {
     throw new Error(`PR review kind must be slice, completion-review, or not-applicable; received ${reviewKind}.`);
   }
 
-  for (const gate of REQUIRED_GATES) {
+  for (const gate of REQUIRED_GATE_CONTRACT.gates) {
     const selected = environment[gate.selected];
-    const result = requireResult(environment, gate.result);
-    if (selected !== "true" && selected !== "false") {
+    const result = requireResult(gate.result);
+    if (!REQUIRED_GATE_CONTRACT.selectionValues.includes(selected)) {
       throw new Error(`Selection ${gate.selected} must be true or false; received ${selected ?? "missing"}.`);
     }
-    if (selected === "true" && result !== "success") {
+    if (selected === "true" && result !== REQUIRED_GATE_CONTRACT.selectedTerminalResult) {
       throw new Error(`Selected gate ${gate.key} ended as ${result}.`);
     }
-    if (selected === "false" && result !== "skipped") {
+    if (selected === "false" && result !== REQUIRED_GATE_CONTRACT.unselectedTerminalResult) {
       throw new Error(`Unselected gate ${gate.key} ended as ${result}; expected skipped.`);
     }
   }

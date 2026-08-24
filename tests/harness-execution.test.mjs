@@ -80,6 +80,11 @@ test("the pull request template requires layer-specific evidence", async () => {
   assert.match(template, /Closure classification/);
   assert.match(template, /Acceptance criteria addressed/);
   assert.match(template, /Closure verdict/);
+  assert.match(template, /vector-contract-doc-impact/);
+  assert.match(template, /vector\.contract-doc-impact-declaration\.v1/);
+  assert.match(template, /contract-document ownership policy.*governance\/contract-doc-ownership\.v1\.json/i);
+  assert.match(template, /npm run --silent policy:contract-docs:template/);
+  assert.match(template, /DELIVERY_CONTINUOUS_INTEGRATION/);
 });
 
 test("the script-based Required PR Gate checks out the tested revision", async () => {
@@ -93,6 +98,27 @@ test("the script-based Required PR Gate checks out the tested revision", async (
   assert.ok(nodeSetup > checkout, "Required PR Gate does not pin Node after checkout");
   assert.ok(verification > nodeSetup, "Required PR Gate runs before its source and runtime exist");
   assert.match(gate, /PR_REVIEW_KIND/);
+  assert.match(gate, /CONTRACT_DOC_IMPACT_STATE/);
+});
+
+test("local, hosted, and clean-clone gates execute the same documentation-impact validator", async () => {
+  const packageJson = JSON.parse(await readFile("package.json", "utf8"));
+  assert.equal(packageJson.scripts["policy:contract-docs:verify"], "node scripts/verify-contract-doc-impact.mjs");
+  assert.equal(packageJson.scripts["policy:contract-docs:template"], "node scripts/verify-contract-doc-impact.mjs --print-template");
+  const makefile = await readFile("Makefile", "utf8");
+  assert.match(makefile, /npm run policy:contract-docs:verify/);
+  assert.match(makefile, /VECTOR_CONTRACT_DOC_DECLARATION_FILE/);
+  const workflow = await readFile(".github/workflows/ci.yml", "utf8");
+  const contractDocs = workflow.split(/^  contract_docs:/m)[1]?.split(/^  quality:/m)[0];
+  assert.ok(contractDocs, "contract documentation job is missing");
+  assert.match(contractDocs, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
+  assert.match(contractDocs, /actions-rust-lang\/setup-rust-toolchain@/);
+  assert.match(contractDocs, /target: wasm32-unknown-unknown/);
+  assert.match(contractDocs, /Swatinem\/rust-cache@/);
+  assert.match(contractDocs, /workspaces: engine-rust/);
+  assert.ok(contractDocs.indexOf("target: wasm32-unknown-unknown") < contractDocs.indexOf("node scripts/verify-contract-doc-impact.mjs --github-event"));
+  assert.match(contractDocs, /node scripts\/verify-contract-doc-impact\.mjs --github-event/);
+  assert.match(workflow, /contract_docs_state/);
 });
 
 test("selected browser contracts isolate every viewport before verifying the built Worker", async () => {

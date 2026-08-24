@@ -63,6 +63,9 @@ callback links in diagram code.
 
 ## Notes
 
+The persisted comment table is declared in `db/schema/blog-comments.ts` and
+re-exported by the single aggregate `db/schema.ts` Drizzle facade.
+
 - Comments remain persisted through the blog comments API and are independent
   of article content.
 - Comments are still anonymous and public on submission. Moderation, operator

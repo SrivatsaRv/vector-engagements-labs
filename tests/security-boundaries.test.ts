@@ -200,7 +200,7 @@ test("blog comments keep anonymous persistence bounded by shared API guardrails"
   const [route, migration, schema] = await Promise.all([
     readFile(new URL("../app/api/blog-comments/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/migrations/008_blog_post_comments.sql", import.meta.url), "utf8"),
-    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema/blog-comments.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(route, /enforceRateLimit\(request, "PUBLIC_API_RATE_LIMITER"\)/);
@@ -217,4 +217,22 @@ test("blog comments keep anonymous persistence bounded by shared API guardrails"
   assert.match(schema, /pgTable\("blog_post_comments"/);
   assert.match(schema, /displayName: text\("display_name"\)/);
   assert.match(schema, /moderationState: text\("moderation_state"\)/);
+});
+
+test("the aggregate Drizzle schema is exactly the union of its domain-owned modules", async () => {
+  const [aggregate, ...modules] = await Promise.all([
+    import("../db/schema.ts"),
+    import("../db/schema/catalog.ts"),
+    import("../db/schema/model-pack.ts"),
+    import("../db/schema/geospatial.ts"),
+    import("../db/schema/scenarios.ts"),
+    import("../db/schema/vector-record.ts"),
+    import("../db/schema/public-api-admission.ts"),
+    import("../db/schema/saved-run-admission.ts"),
+    import("../db/schema/blog-comments.ts"),
+  ]);
+  const moduleKeys = modules.flatMap((module) => Object.keys(module)).sort();
+  assert.equal(new Set(moduleKeys).size, moduleKeys.length);
+  assert.deepEqual(Object.keys(aggregate).sort(), moduleKeys);
+  assert.equal(moduleKeys.length, 19);
 });

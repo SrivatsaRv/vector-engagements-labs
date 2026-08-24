@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -45,10 +46,13 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${BASE_SHA}" =~ ^0+$ ]]; then
-            git show --pretty= --name-only -z "${HEAD_SHA}"
+            EMPTY_TREE="$(git hash-object -t tree /dev/null)"
+            MERGE_BASE="${EMPTY_TREE}"
           else
-            git diff --name-only -z "${BASE_SHA}" "${HEAD_SHA}"
-          fi | node scripts/classify-ci-changes.mjs --stdin0
+            MERGE_BASE="$(git merge-base "${BASE_SHA}" "${HEAD_SHA}")"
+          fi
+          git diff --name-status -z --find-renames --find-copies --find-copies-harder "${MERGE_BASE}" "${HEAD_SHA}" |
+            node scripts/classify-ci-changes.mjs --name-status0
 
   policy:
     name: "Stage 0.5: Repository Policy"
@@ -79,6 +83,41 @@ jobs:
             tests/required-pr-gate.test.mjs \
             tests/runtime-stub-ledger.test.mjs \
             tests/security-config.test.mjs
+
+  contract_docs:
+    name: "Stage 0.6: Contract Documentation Impact"
+    needs: classify
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      contract_docs_state: ${{ steps.contract_docs.outputs.contract_docs_state }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source and history
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22.18.0
+      - name: Set up Rust/WASM freshness toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+      - name: Cache Rust freshness builds
+        uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16
+        with:
+          workspaces: engine-rust
+      - name: Verify contract documentation ownership and declaration
+        id: contract_docs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/verify-contract-doc-impact.mjs --github-event
 
   quality:
     if: needs.classify.outputs.quality == 'true'
@@ -316,6 +355,7 @@ jobs:
     needs:
       - classify
       - policy
+      - contract_docs
       - quality
       - security_js
       - web_tests
@@ -329,6 +369,8 @@ jobs:
     env:
       CLASSIFY_RESULT: ${{ needs.classify.result }}
       POLICY_RESULT: ${{ needs.policy.result }}
+      CONTRACT_DOCS_RESULT: ${{ needs.contract_docs.result }}
+      CONTRACT_DOC_IMPACT_STATE: ${{ needs.contract_docs.outputs.contract_docs_state }}
       PR_REVIEW_KIND: ${{ needs.policy.outputs.pr_review_kind }}
       QUALITY_SELECTED: ${{ needs.classify.outputs.quality }}
       QUALITY_RESULT: ${{ needs.quality.result }}
