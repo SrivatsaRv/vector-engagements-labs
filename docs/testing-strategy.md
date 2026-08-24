@@ -108,13 +108,14 @@ assertions, revisions, and equal base/head identities are validated outside the
 declaration. Adapters execute twice with a scrubbed environment and bounded
 output; a newly added head-policy probe, malformed result, failed assertion,
 nondeterministic output, or caller-authored hash/command fails closed. The
-classifier refactor probe compares decisions for every base/head tracked path,
-registered boundary sentinels, and add/modify/delete/rename/copy parser cases.
-The Required PR Gate invariant probe covers every mandatory field, allowed and
-forbidden documentation/review state, selected/unselected gate, and terminal
-result class. Changes outside a probe's registered corpus require a new
-base-owned probe version or semantic documentation; finite probe evidence does
-not certify arbitrary code equivalence. A generated-only disposition executes
+classifier refactor probe binds the complete exported rule/effect inventory and
+exact decision-function identity, then compares every base/head tracked path,
+registered boundary sentinel, and add/modify/delete/rename/copy parser case.
+The Required PR Gate invariant probe binds its complete mandatory-field,
+review-kind, state, gate, selection, terminal-result, and decision-function
+identity as well as the positive/negative matrix. An unsampled new rule or
+admitted value therefore changes the identity. Probe evidence still does not
+certify the technical adequacy of the contract. A generated-only disposition executes
 the policy-registered direct argv after
 Stage 0.6 provisions its closed Node or Rust/WASM toolchain;
 it cannot be redirected by editing `package.json`. The command runs against a

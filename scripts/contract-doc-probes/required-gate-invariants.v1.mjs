@@ -50,7 +50,8 @@ async function matrix(modulePath, revision) {
   const implementation = await import(`${pathToFileURL(modulePath).href}?revision=${revision}`);
   const cases = [];
   const add = (id, mutate, expected) => cases.push({ id, mutate, expected });
-  const invalidValues = [undefined, "", "failure", "cancelled", "skipped", "timed_out", "action_required", "arbitrary"];
+  const terminalValues = [undefined, "", "success", "failure", "cancelled", "skipped", "timed_out", "action_required", "arbitrary"];
+  const invalidSuccessValues = terminalValues.filter((value) => value !== "success");
   for (const state of ["VERIFIED", "NO_RELEVANT_CHANGES"]) {
     add(`VALID_DOC_STATE_${state}`, (env) => { env.CONTRACT_DOC_IMPACT_STATE = state; }, true);
   }
@@ -58,7 +59,7 @@ async function matrix(modulePath, revision) {
     add(`VALID_REVIEW_KIND_${kind}`, (env) => { env.PR_REVIEW_KIND = kind; }, true);
   }
   for (const field of ["CLASSIFY_RESULT", "POLICY_RESULT", "CONTRACT_DOCS_RESULT"]) {
-    for (const value of invalidValues) {
+    for (const value of invalidSuccessValues) {
       add(`${field}_${value ?? "MISSING"}`, (env) => {
         if (value === undefined) delete env[field];
         else env[field] = value;
@@ -86,11 +87,13 @@ async function matrix(modulePath, revision) {
         else env[gate.selected] = value;
       }, false);
     }
-    for (const value of invalidValues) {
+    for (const value of invalidSuccessValues) {
       add(`${gate.key}_SELECTED_RESULT_${value ?? "MISSING"}`, (env) => {
         if (value === undefined) delete env[gate.result];
         else env[gate.result] = value;
       }, false);
+    }
+    for (const value of terminalValues) {
       add(`${gate.key}_UNSELECTED_RESULT_${value ?? "MISSING"}`, (env) => {
         env[gate.selected] = "false";
         if (value === undefined) delete env[gate.result];
@@ -109,7 +112,12 @@ async function matrix(modulePath, revision) {
     }
     return { id, accepted, expected, pass: accepted === expected };
   });
-  return { requiredGates: implementation.REQUIRED_GATES, results };
+  return {
+    decisionContract: implementation.REQUIRED_GATE_CONTRACT,
+    decisionImplementationSha256: sha256(implementation.verifyRequiredGates.toString()),
+    requiredGates: implementation.REQUIRED_GATES,
+    results,
+  };
 }
 
 async function main() {

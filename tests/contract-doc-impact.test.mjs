@@ -779,19 +779,18 @@ test("the production probe adapter is digest-bound, deterministic, and revision-
   assert.throws(() => runRegisteredProbe(fixture.root, { ...request, probe: forged }), /adapter digest mismatch/i);
 });
 
-test("the classifier identity probe detects a decision outside the former canned matrix", async (t) => {
+test("the classifier identity probe binds a new rule even when no tracked path samples it", async (t) => {
   const classifierSource = await readFile(resolve("scripts/classify-ci-changes.mjs"), "utf8");
   const helperSource = await readFile(resolve("scripts/lib/contract-doc-impact.mjs"), "utf8");
   const root = await governanceProbeFixture({
     "scripts/classify-ci-changes.mjs": classifierSource,
     "scripts/lib/contract-doc-impact.mjs": helperSource,
-    "custom/unregistered-boundary.ts": "export const boundary = true;\n",
   });
   t.after(() => rm(root, { recursive: true, force: true }));
   const baseSha = await commit(root, "classifier base");
   await writeFile(
     join(root, "scripts", "classify-ci-changes.mjs"),
-    classifierSource.replace("const POLICY_ONLY = [", "const POLICY_ONLY = [\n  /^custom\\//,"),
+    classifierSource.replace("const POLICY_ONLY = [", "const POLICY_ONLY = [\n  /^future-namespace\\//,"),
   );
   const headSha = await commit(root, "silently change an unenumerated classifier boundary");
   const output = execFileSync("node", [
@@ -809,16 +808,44 @@ test("the classifier identity probe detects a decision outside the former canned
   assert.notEqual(result.assertions[0].beforeSha256, result.assertions[0].afterSha256);
 });
 
-test("the required-gate invariant probe detects relaxed review-kind admission", async (t) => {
+test("the required-gate invariant probe binds a newly admitted review kind", async (t) => {
   const gateSource = await readFile(resolve("scripts/verify-required-gates.mjs"), "utf8");
   const root = await governanceProbeFixture({ "scripts/verify-required-gates.mjs": gateSource });
   t.after(() => rm(root, { recursive: true, force: true }));
   const baseSha = await commit(root, "required gate base");
   await writeFile(
     join(root, "scripts", "verify-required-gates.mjs"),
-    gateSource.replace('["slice", "completion-review", "not-applicable"]', '["slice", "completion-review", "not-applicable", "partial"]'),
+    gateSource.replace('["slice", "completion-review", "not-applicable"]', '["slice", "completion-review", "not-applicable", "shadow-review"]'),
   );
   const headSha = await commit(root, "silently admit a partial review kind");
+  const output = execFileSync("node", [
+    resolve("scripts/contract-doc-probes/required-gate-invariants.v1.mjs"),
+    "vector.contract-doc-probe.v1",
+    root,
+    baseSha,
+    headSha,
+    "DELIVERY_CONTRACT_GOVERNANCE",
+    "DELIVERY_REQUIRED_GATE_INVARIANTS_V1",
+    "NO_SEMANTIC_CHANGE",
+  ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+  const result = JSON.parse(output);
+  assert.equal(result.assertions[0].status, "FAIL");
+  assert.notEqual(result.assertions[0].beforeSha256, result.assertions[0].afterSha256);
+});
+
+test("the required-gate invariant probe rejects unselected success relaxation", async (t) => {
+  const gateSource = await readFile(resolve("scripts/verify-required-gates.mjs"), "utf8");
+  const root = await governanceProbeFixture({ "scripts/verify-required-gates.mjs": gateSource });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const baseSha = await commit(root, "required gate base");
+  await writeFile(
+    join(root, "scripts", "verify-required-gates.mjs"),
+    gateSource.replace(
+      "result !== REQUIRED_GATE_CONTRACT.unselectedTerminalResult",
+      "![REQUIRED_GATE_CONTRACT.unselectedTerminalResult, REQUIRED_GATE_CONTRACT.selectedTerminalResult].includes(result)",
+    ),
+  );
+  const headSha = await commit(root, "incorrectly admit success for an unselected gate");
   const output = execFileSync("node", [
     resolve("scripts/contract-doc-probes/required-gate-invariants.v1.mjs"),
     "vector.contract-doc-probe.v1",

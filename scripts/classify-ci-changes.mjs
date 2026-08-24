@@ -111,11 +111,18 @@ const CONTAINER_OR_RUNTIME = [
   /^(?:vite\.config\.ts|worker\/)/,
 ];
 
-const matches = (file, patterns) => patterns.some((pattern) => pattern.test(file));
+const patternInventory = (patterns) => patterns.map((pattern) => ({ source: pattern.source, flags: pattern.flags }));
+const deepFreeze = (value) => {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.values(value).forEach(deepFreeze);
+    Object.freeze(value);
+  }
+  return value;
+};
 
-export function classifyChanges(inputFiles) {
-  const files = [...new Set(inputFiles.filter((file) => file.length > 0))].sort();
-  const result = {
+export const CLASSIFIER_DECISION_CONTRACT = deepFreeze({
+  schemaVersion: "vector.ci-change-classifier-decision.v1",
+  resultDefaults: {
     policy: true,
     quality: false,
     security_js: false,
@@ -125,7 +132,29 @@ export function classifyChanges(inputFiles) {
     rust_audit: false,
     integration: false,
     container: false,
-  };
+  },
+  groups: [
+    { id: "POLICY_ONLY", effect: "POLICY_ONLY_SHORT_CIRCUIT", patterns: patternInventory(POLICY_ONLY) },
+    { id: "WORKFLOW_CONTROL", effect: "ALL_GATES_SHORT_CIRCUIT", patterns: patternInventory(WORKFLOW_CONTROL) },
+    { id: "WEB_SOURCE", effect: ["quality", "web_tests"], patterns: patternInventory(WEB_SOURCE) },
+    { id: "BROWSER_SURFACE", effect: ["browser_tests"], patterns: patternInventory(BROWSER_SURFACE) },
+    { id: "JAVASCRIPT_SECURITY", effect: ["security_js"], patterns: patternInventory(JAVASCRIPT_SECURITY) },
+    { id: "RUST_CONTRACT", effect: ["rust_tests", "web_tests"], patterns: patternInventory(RUST_CONTRACT) },
+    { id: "RUST_MANIFEST", effect: ["rust_audit"], patterns: patternInventory(RUST_MANIFEST) },
+    { id: "SHARED_SIMULATION_CONTRACT", effect: ["quality", "web_tests", "rust_tests"], patterns: patternInventory(SHARED_SIMULATION_CONTRACT) },
+    { id: "ENVIRONMENT_OR_MODEL_DATA", effect: ["quality", "web_tests", "rust_tests", "integration"], patterns: patternInventory(ENVIRONMENT_OR_MODEL_DATA) },
+    { id: "DATABASE_OR_API", effect: ["integration", "web_tests"], patterns: patternInventory(DATABASE_OR_API) },
+    { id: "CONTAINER_OR_RUNTIME", effect: ["container", "integration"], patterns: patternInventory(CONTAINER_OR_RUNTIME) },
+  ],
+  unmatchedEffect: "ALL_GATES",
+  inputModes: ["ARGV", "STDIN0", "NAME_STATUS0"],
+  nameStatusClasses: ["A", "B", "C", "D", "M", "R", "T", "U", "X"],
+});
+
+export function classifyChanges(inputFiles) {
+  const matches = (file, patterns) => patterns.some((pattern) => pattern.test(file));
+  const files = [...new Set(inputFiles.filter((file) => file.length > 0))].sort();
+  const result = { ...CLASSIFIER_DECISION_CONTRACT.resultDefaults };
 
   for (const file of files) {
     if (matches(file, POLICY_ONLY)) continue;
@@ -191,7 +220,7 @@ export function classifyChanges(inputFiles) {
   return { files, ...result };
 }
 
-function run() {
+export function runClassifierCli() {
   const useNullDelimitedStdin = process.argv.includes("--stdin0");
   const useNameStatusStdin = process.argv.includes("--name-status0");
   if (useNullDelimitedStdin && useNameStatusStdin) throw new Error("Choose one null-delimited input mode.");
@@ -214,4 +243,4 @@ function run() {
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) run();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) runClassifierCli();

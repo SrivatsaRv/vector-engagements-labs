@@ -115,6 +115,8 @@ async function matrix(classifierPath, paths, revision) {
   const decisions = paths.map((path) => ({ path, result: implementation.classifyChanges([path]) }));
   const parser = parserCases.map((testCase) => runParserCase(classifierPath, testCase));
   return {
+    decisionContract: implementation.CLASSIFIER_DECISION_CONTRACT,
+    decisionImplementationSha256: sha256(`${implementation.classifyChanges.toString()}\n${implementation.runClassifierCli.toString()}`),
     paths,
     decisions,
     parser,
