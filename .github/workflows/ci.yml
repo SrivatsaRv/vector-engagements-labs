@@ -206,7 +206,7 @@ jobs:
           npm run reference-aam:rust:test
           npm run reference-aam:rust:doc
           npm run reference-aam:verify
-          npm run reference-aam:performance
+          npm run reference-aam:performance:hosted-linux-x64
           npm run sixdof-foundation:rust:fmt
           npm run sixdof-foundation:rust:clippy
           npm run sixdof-foundation:rust:verify

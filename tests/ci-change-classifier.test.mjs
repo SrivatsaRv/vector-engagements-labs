@@ -95,10 +95,12 @@ test("every generic-AAM owning path selects its Rust and dependency owners", () 
     ["lib/validation/generated/generic-aam-verifier-wasm.ts", webAndRust],
     ["scripts/build-generic-aam-verifier.mjs", webAndRust],
     ["scripts/benchmark-generic-aam.ts", webAndRust],
+    ["scripts/lib/generic-aam-performance-policy.mjs", webAndRust],
     ["scripts/generate-nasa-generic-aam-workload.mjs", webAndRust],
     ["scripts/verify-nasa-generic-aam-reference.mjs", webAndRust],
     ["tests/generic-aam-oracles.test.mjs", webAndRust],
     ["tests/generic-aam-verification.test.mjs", webAndRust],
+    ["tests/generic-aam-performance-policy.test.mjs", webAndRust],
     ["tests/canonical-rust-wasm-builder.test.mjs", webAndRust],
     [
       "package.json",

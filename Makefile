@@ -50,10 +50,10 @@ observability-local: compose-up
 	npm run observability:verify
 
 performance-local:
+	npm run reference-aam:performance
 	npm run performance:verify
 	npm run performance:track-store:verify
 	npm run capacity:baseline:verify
-	npm run reference-aam:performance
 
 capacity-baseline-local:
 	npm run capacity:baseline:verify

@@ -50,6 +50,16 @@ test("every declared verification layer has a named Make target", async () => {
   }
 });
 
+test("the load-sensitive generic-AAM baseline runs before other local performance workloads", async () => {
+  const makefile = await readFile("Makefile", "utf8");
+  const performance = makefile.split(/^performance-local:/m)[1]?.split(/^capacity-baseline-local:/m)[0];
+  assert.ok(performance, "performance-local is not declared");
+  assert.ok(
+    performance.indexOf("npm run reference-aam:performance") < performance.indexOf("npm run performance:verify"),
+    "the M5 generic-AAM baseline must run before other performance workloads contaminate its host context",
+  );
+});
+
 test("the clean-clone gate executes the context slice and built Worker verifier", async () => {
   const makefile = await readFile("Makefile", "utf8");
   const cleanClone = makefile.split(/^clean-clone-local:/m)[1];
@@ -149,7 +159,7 @@ test("hosted Rust stages own the complete generic-AAM verifier gate", async () =
     "reference-aam:rust:test",
     "reference-aam:rust:doc",
     "reference-aam:verify",
-    "reference-aam:performance",
+    "reference-aam:performance:hosted-linux-x64",
   ]) {
     assert.match(rust, new RegExp(`npm run ${command.replaceAll(":", "\\:")}`), `${command} is not owned by Stage 2B`);
   }
@@ -228,7 +238,9 @@ test("generic-AAM npm aliases resolve to the intended crate and verification com
     ),
     {
       "reference-aam:verify": "node --import tsx scripts/verify-nasa-generic-aam-reference.mjs",
-      "reference-aam:performance": "tsx scripts/benchmark-generic-aam.ts",
+      "reference-aam:performance": "tsx scripts/benchmark-generic-aam.ts --profile=APPLE_M5_NODE24",
+      "reference-aam:performance:hosted-linux-x64":
+        "tsx scripts/benchmark-generic-aam.ts --profile=GITHUB_HOSTED_UBUNTU24_X64_NODE22",
       "reference-aam:rust:build": "node scripts/build-generic-aam-verifier.mjs",
       "reference-aam:rust:verify": "node scripts/build-generic-aam-verifier.mjs --check",
       "reference-aam:rust:fmt":

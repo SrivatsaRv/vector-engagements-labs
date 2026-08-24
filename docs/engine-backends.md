@@ -73,6 +73,9 @@ compiler at runtime.
 - `npm run performance:verify` measures cold initialization and warm-run p50/p95 for both backends.
 - `npm run reference-aam:verify` and `npm run reference-aam:performance`
   verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
+  The local command is closed to the calibrated Apple M5 / Node 24 30/200 ms
+  profile. Hosted Stage 2B calls the separate closed Ubuntu 24 x64 / Node 22
+  65/200 ms alias and emits both full sample distributions before failing.
   Generic-AAM `:build` and `:verify` use that container, while `:fmt`, `:clippy`,
   `:test`, and `:doc` run on the host with exact repository-pinned Rust 1.97.1.
   Hosted Stage 2B owns all of those commands, full verification, and the bounded
