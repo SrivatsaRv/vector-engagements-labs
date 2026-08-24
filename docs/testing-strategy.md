@@ -112,7 +112,10 @@ commit, canonical base-policy digest, old endpoint, and exact Git operation.
 They cover implementation, test, and generated-rule slots; endpoint-aware
 `TEST_ONLY`; same-family/inventory/facet rename replacement; retained tombstones
 across later revisions; and rejection of prefix, wrong-digest, wrong-revision,
-orphan, edited, removed, mismatched-target, and bootstrap retirements.
+orphan, edited, removed, mismatched-target, copied/still-live, cross-inventory,
+new-dormant-probe, new-inert-multi-family, empty-generated-group, and bootstrap
+retirements. A two-hop rename proves historical replacement paths may later
+move under a second independently bound tombstone.
 TEST_ONLY, GENERATED_ARTIFACT_ONLY, INTERNAL_REFACTOR,
 NO_SEMANTIC_CHANGE, and DOCS_ALREADY_CURRENT are mutually exclusive,
 evidence-bearing dispositions; none receives credit merely because an arbitrary

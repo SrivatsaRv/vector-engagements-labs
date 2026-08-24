@@ -74,9 +74,14 @@ under the same family, generated group where applicable, inventory, and facets.
 Prefix rules, families, sections, generated groups, toolchains, commands, and
 workstreams cannot use this mechanism. Tombstones never classify current paths,
 cannot be edited or removed, and are unavailable during the one-time bootstrap.
-Historical multi-family and probe entries may remain inert only when the same
-old endpoint has a validated tombstone, preserving audit history without making
-a legitimately deleted or renamed path impossible to govern.
+Every active implementation, test, input, output, and generator rule must still
+match a tracked head path; a tombstone never excuses an active rule in the same
+or another inventory. Historical multi-family and probe entries may remain
+inert only when they already existed in the base policy and the same old
+endpoint has a validated tombstone. Newly added inert ledger or probe entries
+reject. Historical rename destinations need not remain tracked forever: a later
+delete or rename is governed by its own new tombstone, preserving the full
+append-only chain without preventing lifecycle evolution.
 
 Pull requests obtain the declaration from the single structured template block.
 `npm run --silent policy:contract-docs:template` derives the exact affected

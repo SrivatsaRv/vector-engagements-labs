@@ -766,6 +766,56 @@ test("an exact governed rename preserves family, inventory, and facet ownership"
   );
 });
 
+test("historical rename tombstones do not block a later governed rename", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const initialPolicy = structuredClone({ ...policy, nonSemanticProbes: [], canonicalSha256: undefined });
+  const initialRule = initialPolicy.families[0].implementationRules[0];
+  const secondRule = { ...initialRule, value: "lib/renamed-example.ts" };
+  runGit(fixture.root, ["mv", initialRule.value, secondRule.value]);
+  await writeFile(join(fixture.root, "docs", "example.md"), "# Example\n\n## Contract\n\nThe implementation endpoint moved to its second governed identity.\n\n## Other\n\nStable.\n");
+  const secondSha = await commit(fixture.root, "rename governed endpoint to second identity");
+  const secondPolicy = structuredClone(initialPolicy);
+  secondPolicy.families[0].implementationRules = [secondRule, ...initialPolicy.families[0].implementationRules.slice(1)];
+  secondPolicy.ruleRetirements = [{
+    retirementId: "EXAMPLE_FIRST_RENAME_RETIREMENT_V1",
+    familyId: "EXAMPLE",
+    inventory: "IMPLEMENTATION",
+    generatedGroupId: null,
+    rule: initialRule,
+    retiredAtMergeBaseSha: fixture.baseSha,
+    retiredFromPolicySha256: policySha256(initialPolicy),
+    replacementPath: secondRule.value,
+    rationale: "The first exact endpoint moved to a same-family implementation rule with identical facets.",
+  }];
+  assert.equal(
+    verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha: secondSha, declaration: declaration(), basePolicy: initialPolicy, headPolicy: secondPolicy }).state,
+    "VERIFIED",
+  );
+
+  const thirdRule = { ...initialRule, value: "lib/final-example.ts" };
+  runGit(fixture.root, ["mv", secondRule.value, thirdRule.value]);
+  await writeFile(join(fixture.root, "docs", "example.md"), "# Example\n\n## Contract\n\nThe implementation endpoint moved again while preserving both historical tombstones.\n\n## Other\n\nStable.\n");
+  const thirdSha = await commit(fixture.root, "rename governed endpoint to third identity");
+  const thirdPolicy = structuredClone(secondPolicy);
+  thirdPolicy.families[0].implementationRules = [thirdRule, ...initialPolicy.families[0].implementationRules.slice(1)];
+  thirdPolicy.ruleRetirements.push({
+    retirementId: "EXAMPLE_SECOND_RENAME_RETIREMENT_V1",
+    familyId: "EXAMPLE",
+    inventory: "IMPLEMENTATION",
+    generatedGroupId: null,
+    rule: secondRule,
+    retiredAtMergeBaseSha: secondSha,
+    retiredFromPolicySha256: policySha256(secondPolicy),
+    replacementPath: thirdRule.value,
+    rationale: "The second exact endpoint moved again while the first immutable tombstone remained historical evidence.",
+  });
+  assert.equal(
+    verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: secondSha, headSha: thirdSha, declaration: declaration(), basePolicy: secondPolicy, headPolicy: thirdPolicy }).state,
+    "VERIFIED",
+  );
+});
+
 test("test and generated exact rules use the same audited retirement contract", async (t) => {
   for (const subject of [
     { inventory: "TEST", generatedGroupId: null, path: "tests/example/example.test.mjs", familyField: "testRules" },
@@ -977,6 +1027,129 @@ test("rule retirements reject live endpoints, orphan records, and empty generate
     assert.throws(
       () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy }),
       /outputRules must be non-empty/i,
+    );
+  });
+
+  await t.test("a tombstone in one inventory cannot excuse an identical stale active rule", async (t) => {
+    const fixture = await fixtureRepository();
+    t.after(() => rm(fixture.root, { recursive: true, force: true }));
+    const basePolicy = structuredClone({ ...policy, nonSemanticProbes: [], canonicalSha256: undefined });
+    const retiredRule = basePolicy.families[0].implementationRules[0];
+    basePolicy.families[0].testRules = [retiredRule, ...basePolicy.families[0].testRules];
+    await rm(join(fixture.root, retiredRule.value));
+    await writeFile(join(fixture.root, "docs", "example.md"), "# Example\n\n## Contract\n\nThe implementation endpoint was retired while a hostile identical test rule remained active.\n\n## Other\n\nStable.\n");
+    const headSha = await commit(fixture.root, "attempt cross-inventory stale-rule escape");
+    const headPolicy = structuredClone(basePolicy);
+    headPolicy.families[0].implementationRules = headPolicy.families[0].implementationRules.slice(1);
+    headPolicy.ruleRetirements = [{
+      retirementId: "EXAMPLE_CROSS_INVENTORY_RETIREMENT_V1",
+      familyId: "EXAMPLE",
+      inventory: "IMPLEMENTATION",
+      generatedGroupId: null,
+      rule: retiredRule,
+      retiredAtMergeBaseSha: fixture.baseSha,
+      retiredFromPolicySha256: policySha256(basePolicy),
+      replacementPath: null,
+      rationale: "This hostile record retires only the implementation inventory while leaving an identical stale test rule active.",
+    }];
+    assert.throws(
+      () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy }),
+      /testRules\[0\] matches no tracked path/i,
+    );
+  });
+
+  await t.test("a generated-output tombstone cannot excuse an identical active input rule", async (t) => {
+    const fixture = await fixtureRepository();
+    t.after(() => rm(fixture.root, { recursive: true, force: true }));
+    const basePolicy = structuredClone({ ...policy, nonSemanticProbes: [], canonicalSha256: undefined });
+    const retiredRule = { kind: "EXACT", value: "lib/generated/example/value.ts", facets: ["schema"] };
+    const retainedOutput = { kind: "EXACT", value: "scripts/generate-example.mjs", facets: ["schema"] };
+    const group = basePolicy.families[0].generatedGroups[0];
+    group.outputRules = [retiredRule, retainedOutput];
+    group.inputRules = [retiredRule, ...group.inputRules];
+    await rm(join(fixture.root, retiredRule.value));
+    await writeFile(join(fixture.root, "docs", "example.md"), "# Example\n\n## Contract\n\nOne generated output endpoint was retired without authorizing a stale input rule.\n\n## Other\n\nStable.\n");
+    const headSha = await commit(fixture.root, "attempt generated cross-inventory stale-rule escape");
+    const headPolicy = structuredClone(basePolicy);
+    headPolicy.families[0].generatedGroups[0].outputRules = [retainedOutput];
+    headPolicy.ruleRetirements = [{
+      retirementId: "EXAMPLE_GENERATED_CROSS_INVENTORY_RETIREMENT_V1",
+      familyId: "EXAMPLE",
+      inventory: "GENERATED_OUTPUT",
+      generatedGroupId: "EXAMPLE_GENERATED",
+      rule: retiredRule,
+      retiredAtMergeBaseSha: fixture.baseSha,
+      retiredFromPolicySha256: policySha256(basePolicy),
+      replacementPath: null,
+      rationale: "This hostile record retires an output while leaving the identical endpoint active in the input inventory.",
+    }];
+    assert.throws(
+      () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy }),
+      /inputRules\[0\] matches no tracked path/i,
+    );
+  });
+
+  await t.test("a newly-added probe cannot use a tombstone as dormant path authority", async (t) => {
+    const fixture = await fixtureRepository();
+    t.after(() => rm(fixture.root, { recursive: true, force: true }));
+    const basePolicy = structuredClone({ ...policy, nonSemanticProbes: [], canonicalSha256: undefined });
+    const retiredRule = basePolicy.families[0].implementationRules[0];
+    await rm(join(fixture.root, retiredRule.value));
+    await writeFile(join(fixture.root, "docs", "example.md"), "# Example\n\n## Contract\n\nThe implementation endpoint and its active ownership were retired.\n\n## Other\n\nStable.\n");
+    const headSha = await commit(fixture.root, "attempt dormant probe authorization");
+    const headPolicy = structuredClone(basePolicy);
+    headPolicy.families[0].implementationRules = headPolicy.families[0].implementationRules.slice(1);
+    headPolicy.ruleRetirements = [{
+      retirementId: "EXAMPLE_DORMANT_PROBE_RETIREMENT_V1",
+      familyId: "EXAMPLE",
+      inventory: "IMPLEMENTATION",
+      generatedGroupId: null,
+      rule: retiredRule,
+      retiredAtMergeBaseSha: fixture.baseSha,
+      retiredFromPolicySha256: policySha256(basePolicy),
+      replacementPath: null,
+      rationale: "The implementation endpoint was deleted, but this record must not authorize a new dormant probe.",
+    }];
+    headPolicy.nonSemanticProbes = [{
+      id: "EXAMPLE_DORMANT_PROBE_V1",
+      familyId: "EXAMPLE",
+      disposition: "INTERNAL_REFACTOR",
+      changedPathRules: [retiredRule],
+      adapterPath: "scripts/contract-doc-probes/example.v1.mjs",
+      adapterSha256: fixtureProbeSha256,
+      assertionIds: ["PUBLIC_API_IDENTITY"],
+    }];
+    assert.throws(
+      () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy }),
+      /new non-semantic probe.*retired endpoint|dormant probe/i,
+    );
+  });
+
+  await t.test("a newly-added multi-family ledger path cannot be inert at creation", async (t) => {
+    const fixture = await fixtureRepository();
+    t.after(() => rm(fixture.root, { recursive: true, force: true }));
+    const basePolicy = structuredClone({ ...policy, nonSemanticProbes: [], canonicalSha256: undefined });
+    const retiredRule = basePolicy.families[0].implementationRules[0];
+    await rm(join(fixture.root, retiredRule.value));
+    await writeFile(join(fixture.root, "docs", "example.md"), "# Example\n\n## Contract\n\nThe single-owner endpoint was retired without inventing multi-family history.\n\n## Other\n\nStable.\n");
+    const headSha = await commit(fixture.root, "attempt inert multi-family ledger creation");
+    const headPolicy = structuredClone(basePolicy);
+    headPolicy.families[0].implementationRules = headPolicy.families[0].implementationRules.slice(1);
+    headPolicy.allowedMultiFamilyPaths = [retiredRule.value];
+    headPolicy.ruleRetirements = [{
+      retirementId: "EXAMPLE_INERT_MULTI_FAMILY_RETIREMENT_V1",
+      familyId: "EXAMPLE",
+      inventory: "IMPLEMENTATION",
+      generatedGroupId: null,
+      rule: retiredRule,
+      retiredAtMergeBaseSha: fixture.baseSha,
+      retiredFromPolicySha256: policySha256(basePolicy),
+      replacementPath: null,
+      rationale: "The single-owner endpoint was deleted, but its tombstone must not fabricate a multi-family ledger entry.",
+    }];
+    assert.throws(
+      () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy }),
+      /cannot be added as an inert multi-family path/i,
     );
   });
 });

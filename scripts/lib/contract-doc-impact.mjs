@@ -210,6 +210,24 @@ function assertPolicyDoesNotWeaken(basePolicy, headPolicy, operations, mergeBase
   const basePolicyDigest = policySha256(basePolicy);
   const baseRetirements = canonicalInventory(basePolicy.ruleRetirements);
   const newRetirements = headPolicy.ruleRetirements.filter((retirement) => !baseRetirements.has(canonicalJson(retirement)));
+  const baseMultiFamilyPaths = new Set(basePolicy.allowedMultiFamilyPaths);
+  const newMultiFamilyPaths = headPolicy.allowedMultiFamilyPaths.filter((path) => !baseMultiFamilyPaths.has(path));
+  for (const path of newMultiFamilyPaths) {
+    invariant(
+      !headPolicy.ruleRetirements.some((retirement) => retirement.rule.value === path),
+      `${path} cannot be added as an inert multi-family path after its endpoint retired.`,
+    );
+  }
+  const baseProbes = canonicalInventory(basePolicy.nonSemanticProbes);
+  const newProbes = headPolicy.nonSemanticProbes.filter((probe) => !baseProbes.has(canonicalJson(probe)));
+  for (const probe of newProbes) {
+    for (const rule of probe.changedPathRules) {
+      invariant(
+        !headPolicy.ruleRetirements.some((retirement) => retirement.familyId === probe.familyId && canonicalJson(retirement.rule) === canonicalJson(rule)),
+        `${probe.id} new non-semantic probe cannot use a retired endpoint as dormant path authority.`,
+      );
+    }
+  }
   const usedRetirements = new Set();
   const headFamilies = new Map(headPolicy.families.map((family) => [family.id, family]));
   for (const baseFamily of basePolicy.families) {
@@ -468,7 +486,6 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
     retirementSubjects.add(subject);
     if (trackedPaths.length) {
       invariant(!trackedPaths.includes(retirement.rule.value), `${label} old path is still tracked.`);
-      if (retirement.replacementPath !== null) invariant(trackedPaths.includes(retirement.replacementPath), `${label} replacement path is not tracked.`);
     }
   }
   invariant(Array.isArray(policy.nonSemanticProbes), "nonSemanticProbes must be an array.");
@@ -535,25 +552,26 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
     invariant(classification.kind === "FAMILY" && classification.familyMatches.length > 1, `${path} is listed as multi-family without multiple owners.`);
   }
   if (trackedPaths.length) {
-    const assertRuleMatches = (rule, label, familyId) => invariant(
+    const assertRuleMatches = (rule, label) => invariant(trackedPaths.some((path) => ruleMatches(path, rule)), `${label} matches no tracked path.`);
+    const assertHistoricalProbeRuleMatches = (rule, label, familyId) => invariant(
       trackedPaths.some((path) => ruleMatches(path, rule))
         || (rule.kind === "EXACT" && policy.ruleRetirements.some((retirement) => retirement.familyId === familyId && canonicalJson(retirement.rule) === canonicalJson(rule))),
       `${label} matches no tracked path.`,
     );
     for (const family of policy.families) {
-      family.implementationRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.implementationRules[${index}]`, family.id));
-      family.testRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.testRules[${index}]`, family.id));
+      family.implementationRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.implementationRules[${index}]`));
+      family.testRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.testRules[${index}]`));
       for (const group of family.generatedGroups) {
-        group.outputRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.${group.id}.outputRules[${index}]`, family.id));
-        group.inputRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.${group.id}.inputRules[${index}]`, family.id));
-        group.generatorRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.${group.id}.generatorRules[${index}]`, family.id));
+        group.outputRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.${group.id}.outputRules[${index}]`));
+        group.inputRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.${group.id}.inputRules[${index}]`));
+        group.generatorRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.${group.id}.generatorRules[${index}]`));
       }
     }
     policy.nonContractRules.forEach((rule, index) => assertRuleMatches(rule, `nonContractRules[${index}]`, null));
     for (const probe of policy.nonSemanticProbes) {
       const family = policy.families.find((candidate) => candidate.id === probe.familyId);
       for (const [index, rule] of probe.changedPathRules.entries()) {
-        assertRuleMatches(rule, `${probe.id}.changedPathRules[${index}]`, family.id);
+        assertHistoricalProbeRuleMatches(rule, `${probe.id}.changedPathRules[${index}]`, family.id);
         for (const path of trackedPaths.filter((candidate) => ruleMatches(candidate, rule))) {
           const classification = classifyPath(path, policy);
           invariant(classification.familyMatches?.some((match) => match.familyId === family.id), `${probe.id} covers path outside family ${family.id}: ${path}.`);
