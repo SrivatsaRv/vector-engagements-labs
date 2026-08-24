@@ -27,10 +27,6 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function git(root, args) {
-  return execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
-}
-
 function trackedPaths(root, commit) {
   const output = execFileSync("git", ["ls-tree", "-r", "--name-only", "-z", commit], {
     cwd: root,
@@ -43,9 +39,20 @@ function materialize(root, commit, directory) {
   const classifierPath = join(directory, "scripts", "classify-ci-changes.mjs");
   const helperPath = join(directory, "scripts", "lib", "contract-doc-impact.mjs");
   mkdirSync(join(directory, "scripts", "lib"), { recursive: true });
-  writeFileSync(classifierPath, git(root, ["show", `${commit}:scripts/classify-ci-changes.mjs`]));
-  writeFileSync(helperPath, git(root, ["show", `${commit}:scripts/lib/contract-doc-impact.mjs`]));
-  return realpathSync(classifierPath);
+  const classifierBytes = execFileSync("git", ["show", `${commit}:scripts/classify-ci-changes.mjs`], {
+    cwd: root,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  const helperBytes = execFileSync("git", ["show", `${commit}:scripts/lib/contract-doc-impact.mjs`], {
+    cwd: root,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  const moduleSourceSha256 = sha256(classifierBytes);
+  writeFileSync(classifierPath, classifierBytes);
+  writeFileSync(helperPath, helperBytes);
+  const realClassifierPath = realpathSync(classifierPath);
+  invariant(sha256(readFileSync(realClassifierPath)) === moduleSourceSha256, "Materialized classifier differs from its Git blob before execution.");
+  return { classifierPath: realClassifierPath, moduleSourceSha256 };
 }
 
 const boundaryPaths = [
@@ -110,12 +117,14 @@ function runParserCase(classifierPath, testCase) {
   }
 }
 
-async function matrix(classifierPath, paths, revision) {
+async function matrix(materialized, paths, revision) {
+  const { classifierPath, moduleSourceSha256 } = materialized;
   const implementation = await import(`${pathToFileURL(classifierPath).href}?revision=${revision}`);
   const decisions = paths.map((path) => ({ path, result: implementation.classifyChanges([path]) }));
   const parser = parserCases.map((testCase) => runParserCase(classifierPath, testCase));
+  invariant(sha256(readFileSync(classifierPath)) === moduleSourceSha256, "Classifier module changed during execution.");
   return {
-    moduleSourceSha256: sha256(readFileSync(classifierPath)),
+    moduleSourceSha256,
     decisionContract: implementation.CLASSIFIER_DECISION_CONTRACT,
     decisionImplementationSha256: sha256(`${implementation.classifyChanges.toString()}\n${implementation.runClassifierCli.toString()}`),
     paths,

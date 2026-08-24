@@ -110,6 +110,11 @@ the identity and cannot use a non-semantic exemption. These probes protect
 their declared decision contracts; they do not replace architectural review of
 technical adequacy.
 
+Classifier module identity is computed from the exact Git blob before the
+temporary module is written or executed. The probe checks the materialized
+bytes before import and again after all decisions and parser cases, so
+import-time code cannot erase or replace its own authority before comparison.
+
 Documentation, project-skill, and governance-only changes run the classifier,
 policy suite, and final gate without rebuilding the application, Rust engine,
 container, or PostGIS. Blog content and thumbnails build and test the rendered
