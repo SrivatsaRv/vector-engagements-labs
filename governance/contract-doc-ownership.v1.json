@@ -2782,7 +2782,7 @@
         }
       ],
       "adapterPath": "scripts/contract-doc-probes/classifier-decision-identity.v1.mjs",
-      "adapterSha256": "ee16a10eaee006c94f99eedefd1e876708ce4b9e11e3a9f919467bb4fa96d251",
+      "adapterSha256": "c1fb208512d9e9225d4ea364a8bd92e17f7f14965dfd0597df21871777d06003",
       "assertionIds": [
         "CI_CLASSIFIER_DECISION_MATRIX"
       ]
@@ -2944,5 +2944,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "7ac2d805e0e6d299e8218e75df841a90c41e6806af582a8fee755d83fbaf4154"
+  "canonicalSha256": "6fb8a9cc89d1ae140b4c9e5406fbaee462e7cbf42749a1a22e72e09281b41e0e"
 }

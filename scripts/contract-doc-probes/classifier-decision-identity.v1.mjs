@@ -2,7 +2,7 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -115,6 +115,7 @@ async function matrix(classifierPath, paths, revision) {
   const decisions = paths.map((path) => ({ path, result: implementation.classifyChanges([path]) }));
   const parser = parserCases.map((testCase) => runParserCase(classifierPath, testCase));
   return {
+    moduleSourceSha256: sha256(readFileSync(classifierPath)),
     decisionContract: implementation.CLASSIFIER_DECISION_CONTRACT,
     decisionImplementationSha256: sha256(`${implementation.classifyChanges.toString()}\n${implementation.runClassifierCli.toString()}`),
     paths,

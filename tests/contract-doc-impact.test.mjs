@@ -880,6 +880,37 @@ test("the classifier rejects an unfrozen decision inventory", async (t) => {
   ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }));
 });
 
+test("the classifier probe binds complete module source outside exported decisions", async (t) => {
+  const classifierSource = await readFile(resolve("scripts/classify-ci-changes.mjs"), "utf8");
+  const helperSource = await readFile(resolve("scripts/lib/contract-doc-impact.mjs"), "utf8");
+  const root = await governanceProbeFixture({
+    "scripts/classify-ci-changes.mjs": classifierSource,
+    "scripts/lib/contract-doc-impact.mjs": helperSource,
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const baseSha = await commit(root, "classifier module source base");
+  const monkeyPatchedSource = classifierSource.replace(
+    "export function classifyChanges(inputFiles) {",
+    "RegExp.prototype.test = function () { return this.source === '^future-namespace/' || false; };\n\nexport function classifyChanges(inputFiles) {",
+  );
+  assert.notEqual(monkeyPatchedSource, classifierSource);
+  await writeFile(join(root, "scripts", "classify-ci-changes.mjs"), monkeyPatchedSource);
+  const headSha = await commit(root, "inject unsampled top-level classifier authority");
+  const output = execFileSync("node", [
+    resolve("scripts/contract-doc-probes/classifier-decision-identity.v1.mjs"),
+    "vector.contract-doc-probe.v1",
+    root,
+    baseSha,
+    headSha,
+    "DELIVERY_CONTRACT_GOVERNANCE",
+    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V1",
+    "INTERNAL_REFACTOR",
+  ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+  const result = JSON.parse(output);
+  assert.equal(result.assertions[0].status, "FAIL");
+  assert.notEqual(result.assertions[0].beforeSha256, result.assertions[0].afterSha256);
+});
+
 test("the required-gate invariant probe binds a newly admitted review kind", async (t) => {
   const gateSource = await readFile(resolve("scripts/verify-required-gates.mjs"), "utf8");
   const root = await governanceProbeFixture({ "scripts/verify-required-gates.mjs": gateSource });
