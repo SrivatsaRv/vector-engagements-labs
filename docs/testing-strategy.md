@@ -6,6 +6,17 @@
 
 The verifier is offline and cannot fetch replacement evidence. Numeric transcription, interpolation, and runtime tests belong to later #142 children and must not be credited to #143.
 
+## Generic sensor Stage-0 source freeze
+
+`npm run generic-sensor:sources:verify` first proves the generated manifest and
+all derived governance records are current, then verifies the offline bundle.
+The verifier pins the complete canonical manifest digest and rejects
+caller-resealed source identities, substituted PDFs, relabelled renders, erased
+claims, and relaxed numeric/equation extraction policy even when every local
+hash, byte total, and dependent artifact is updated consistently. This command
+is mandatory in `make ci-quality`; `make generic-sensor-sources-local` exposes
+the same focused gate.
+
 Testing is part of the implementation contract. An executable action is incomplete until its behavior is covered at the appropriate test layers and the result is recorded. The project uses focused tests for fast feedback and staged integration evidence for release confidence.
 
 ## Required layers

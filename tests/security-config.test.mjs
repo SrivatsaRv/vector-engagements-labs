@@ -58,6 +58,7 @@ test("pull-request validation is change-aware with one stable required gate", as
   assert.match(ci, /npm run test:component/);
   assert.match(ci, /npm run test:browser/);
   assert.match(ci, /npm run environment:sources:verify/);
+  assert.match(ci, /npm run generic-sensor:sources:verify/);
   assert.match(ci, /npm run policy:aircraft-evidence:verify/);
   assert.match(ci, /npm run reference-aircraft:verify/);
   assert.doesNotMatch(ci, /performance-local|benchmark-engine/);

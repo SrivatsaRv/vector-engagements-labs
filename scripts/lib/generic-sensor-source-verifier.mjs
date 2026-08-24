@@ -26,6 +26,7 @@ const AUTHORITY_POLICY_PATH = "governance/generic-sensor-legal-authority-policy.
 const AUTHORITY_POLICY_SHA256 = "da1870627682a7db5582622ee829f045f8e99cf6bcfc7b6d462af34028d98961";
 const AUTHORITY_POLICY_ID = "generic-sensor-legal-authority-policy-v1";
 const AUTHORITY_EVIDENCE_ROOT = "governance/generic-sensor-legal-decision-evidence";
+const CANONICAL_MANIFEST_DIGEST = "353a666538a3dca2cf5fc4c1af907784a3a11da0f2f5795cc3ddbc0aefb456c4";
 const PRODUCTION_ROOTS = [".next", ".output", "app", "build", "components", "db", "dist", "engine-rust", "fixtures/model-packs", "fixtures/vector-record", "lib", "out", "public", "worker"];
 const PRODUCTION_MARKERS = [MANIFEST_SCHEMA, LEGAL_SCHEMA, AUTHORITY_SCHEMA, AUTHORITY_POLICY_SCHEMA, AUTHORITY_POLICY_ID, AUTHORITY_EVIDENCE_ROOT, INTENDED_USE, "generic-sensor-verification-sources", "generic-sensor-source-freeze-v1"];
 const NASA_IDENTITIES = {
@@ -519,6 +520,7 @@ export function verifyGenericSensorSourceBundle(options = {}) {
     authorityRegistry,
     repositoryRoot,
   });
+  if (manifest.canonicalManifestDigest !== CANONICAL_MANIFEST_DIGEST) fail("pinned canonical manifest identity mismatch");
   const frozenArtifactDigests = new Set();
   const frozenArtifactBytes = [];
   const collectFrozenArtifact = (candidate) => {

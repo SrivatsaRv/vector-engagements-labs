@@ -165,6 +165,14 @@ bytes and locations for isolated future verification work. It is not a catalog
 source row, model-pack source, compiled model, or production asset, and catalog
 admission must not resolve or import it.
 
+The verifier pins the complete canonical manifest digest rather than trusting a
+caller-recomputed digest. This closes every manifest field—including source
+identity and URLs, artifact bytes and hashes, render identity, eligible and
+ineligible claims, extracted-text policy, and the source-only policy—as one
+reviewed authority table. Replacing a PDF or render and updating every local
+hash or total still fails. Generator freshness plus full bundle verification is
+mandatory in `make ci-quality` through `generic-sensor:sources:verify`.
+
 The corresponding legal artifact keeps redistribution, reference execution,
 and adaptation as independent decisions. They currently remain
 `PENDING_REVIEW`; missing, pending, forged, agent-authored, wrong-jurisdiction,

@@ -56,15 +56,17 @@ equations. The exact source PDF or archive member remains authoritative.
 From the repository root, with no network access:
 
 ```sh
-node scripts/generate-generic-sensor-source-manifest.mjs
-node scripts/verify-generic-sensor-source-bundle.mjs
+npm run generic-sensor:sources:verify
 node --test tests/generic-sensor-source-bundle.test.mjs
 ```
 
-The first command checks that generated records are current; it performs no
-network access. `--write` is reserved for an intentional, reviewed regeneration
-from already frozen local bytes. The verifier hashes every declared artifact,
-parses the ZIP with bounded expansion, compares all archive members and selected
+The first command is also a mandatory `make ci-quality` gate. It checks that
+generated records are current and then runs the full verifier; neither step
+performs network access. `--write` is reserved for an intentional, reviewed
+regeneration from already frozen local bytes. The verifier pins the complete
+canonical manifest digest, so caller resealing cannot alter any manifest,
+source, artifact, render, claim, or policy field. It hashes every declared
+artifact, parses the ZIP with bounded expansion, compares all archive members and selected
 extractions, validates official metadata and page mappings, validates pending
 decision structure, and scans production roots for exposure.
 
