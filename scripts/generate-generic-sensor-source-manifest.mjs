@@ -343,7 +343,13 @@ const manifest = {
   },
   renderRecipe: {
     sourceRender: { tool: "pdftoppm", version: "26.05.0", dpi: 150, colourMode: "GRAYSCALE", extent: "FULL_PAGE", arguments: ["-r", "150", "-gray", "-f", "${PDF_PAGE}", "-l", "${PDF_PAGE}", "-singlefile", "-png"] },
-    uprightDisplayRender: { tool: "sharp", version: "0.35.0", operation: "ROTATE_90_DEGREES_CLOCKWISE", sourcePreserved: true },
+    uprightDisplayRender: {
+      tool: "sharp",
+      version: "0.35.0",
+      operation: "ROTATE_90_DEGREES_CLOCKWISE",
+      pngEncoder: { compressionLevel: 9, adaptiveFiltering: false, palette: false },
+      sourcePreserved: true,
+    },
     state: "NON_AUTHORITATIVE_DISCOVERY_AID",
   },
   visualInspection: visualArtifact,

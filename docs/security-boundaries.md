@@ -145,7 +145,9 @@ The issue #148 source freeze is quarantined under
 Rust/WASM, backend, Worker, browser, model-pack, VSR, fixture, public, and built
 assets must contain no Stage-0 subject/schema/export marker or source-bundle
 import. The offline verifier scans those boundaries and treats any exposure as
-a release failure.
+a release failure. It scans every production file as bytes, including built
+binary artifacts, and rejects both Stage-0 markers and any exact frozen-artifact
+digest; a file extension cannot bypass the quarantine.
 
 ZIP handling is verification-only and never writes archive-selected paths. It
 parses declared bytes with fixed archive, member-count, and expanded-size
