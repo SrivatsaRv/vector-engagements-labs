@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { generateKeyPairSync, sign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
@@ -7,6 +8,7 @@ import sharp from "sharp";
 import {
   assertAuthorizedDecision,
   assertNoProductionExposure,
+  canonicalJson,
   canonicalManifestDigest,
   parseBoundedZip,
   sha256,
@@ -31,6 +33,74 @@ function mutateOneByte(bytes) {
   const changed = Buffer.from(bytes);
   changed[Math.floor(changed.length / 2)] ^= 0x01;
   return changed;
+}
+
+function approvedAuthorityFixture(pendingDecision) {
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const sourceId = pendingDecision.sourceId;
+  const decisionField = "referenceExecution";
+  const approval = {
+    state: "APPROVED",
+    reviewer: { kind: "AUTHORIZED_HUMAN", id: "reviewer-001" },
+    decisionRecordId: "decision-001",
+    decidedOn: "2026-08-24",
+    jurisdiction: "IN",
+    scope: ["OFFLINE_REFERENCE_EXECUTION"],
+    conditions: ["OFFLINE_ONLY"],
+    evidenceSha256: "1".repeat(64),
+  };
+  const payload = {
+    schemaVersion: "vector.generic-sensor-verification-legal-attestation-payload.v1",
+    registryId: "test-authority-registry",
+    decisionArtifactId: decisions.decisionArtifactId,
+    decisionRecordId: approval.decisionRecordId,
+    sourceId,
+    decisionField,
+    reviewerId: approval.reviewer.id,
+    decidedOn: approval.decidedOn,
+    jurisdiction: approval.jurisdiction,
+    scope: approval.scope,
+    conditions: approval.conditions,
+    evidenceSha256: approval.evidenceSha256,
+  };
+  const payloadBytes = Buffer.from(canonicalJson(payload));
+  const authorityRegistry = {
+    schemaVersion: "vector.generic-sensor-verification-legal-authority-registry.v1",
+    registryId: payload.registryId,
+    subjectDecisionArtifactId: decisions.decisionArtifactId,
+    externalTrustRootRequired: true,
+    status: "ACTIVE_EXTERNALLY_ATTESTED_AUTHORITIES",
+    authorizedReviewers: [{
+      reviewerId: approval.reviewer.id,
+      jurisdictions: [approval.jurisdiction],
+      scopes: approval.scope,
+      validFrom: "2026-01-01",
+      validThrough: "2026-12-31",
+    }],
+    decisionRecords: [{
+      ...payload,
+      attestation: {
+        algorithm: "Ed25519",
+        keyId: "test-external-root",
+        payloadSha256: sha256(payloadBytes),
+        signatureBase64: sign(null, payloadBytes, privateKey).toString("base64"),
+      },
+    }],
+  };
+  const decision = clone(pendingDecision);
+  decision[decisionField] = approval;
+  return {
+    decision,
+    decisionField,
+    authorityRegistry,
+    requirement: {
+      sourceId,
+      jurisdiction: approval.jurisdiction,
+      scope: approval.scope[0],
+      authorityRegistry,
+      trustedAuthorityRoots: new Map([["test-external-root", publicKey]]),
+    },
+  };
 }
 
 function crc32(bytes) {
@@ -228,6 +298,33 @@ test("missing licence, wrong commit, forged approval, pending decisions, and out
     () => assertAuthorizedDecision(outOfScope, "referenceExecution", { jurisdiction: "IN", scope: "ADAPTATION" }),
     /scope/,
   );
+
+  const trusted = approvedAuthorityFixture(pending);
+  assert.doesNotThrow(() => assertAuthorizedDecision(trusted.decision, trusted.decisionField, trusted.requirement));
+  const impostor = clone(trusted.decision);
+  impostor.referenceExecution.reviewer.id = "self-declared-impostor";
+  assert.throws(() => assertAuthorizedDecision(impostor, "referenceExecution", trusted.requirement), /allowlisted|authority/);
+  const inventedRecord = clone(trusted.decision);
+  inventedRecord.referenceExecution.decisionRecordId = "invented-record";
+  assert.throws(() => assertAuthorizedDecision(inventedRecord, "referenceExecution", trusted.requirement), /decision record|attestation/);
+  const inventedEvidence = clone(trusted.decision);
+  inventedEvidence.referenceExecution.evidenceSha256 = "2".repeat(64);
+  assert.throws(() => assertAuthorizedDecision(inventedEvidence, "referenceExecution", trusted.requirement), /evidence|attestation/);
+  for (const invalidDate of ["2026-8-24", "2026-02-30"]) {
+    const invalid = clone(trusted.decision);
+    invalid.referenceExecution.decidedOn = invalidDate;
+    assert.throws(() => assertAuthorizedDecision(invalid, "referenceExecution", trusted.requirement), /date/);
+  }
+  const forgedApprovals = clone(decisions.decisions);
+  for (const decision of forgedApprovals) {
+    for (const field of ["redistribution", "referenceExecution", "adaptation"]) decision[field] = clone(trusted.decision.referenceExecution);
+  }
+  assert.equal(summarizeLegalDecisionState(forgedApprovals), "BLOCKED_UNTRUSTED_APPROVAL");
+  const taintedNonApproval = clone(pending);
+  taintedNonApproval.referenceExecution.jurisdiction = "IN";
+  taintedNonApproval.referenceExecution.scope = ["OFFLINE_REFERENCE_EXECUTION"];
+  taintedNonApproval.referenceExecution.conditions = ["HIDDEN_AUTHORITY"];
+  assert.throws(() => assertAuthorizedDecision(taintedNonApproval, "referenceExecution", trusted.requirement), /non-approval must not carry/);
 });
 
 test("community/game artifacts, dynamic sources, model claims, and production exposure are rejected", () => {

@@ -253,14 +253,27 @@ const decisions = {
   decisionArtifactId: "generic-sensor-source-legal-decisions-v1",
   subjectManifestId: manifestId,
   intendedUse: "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE",
-  authorityBoundary: "ONLY_AN_AUTHORIZED_HUMAN_REVIEWER_MAY_CHANGE_A_DECISION_FROM_PENDING_REVIEW",
+  authorityBoundary: "APPROVAL_REQUIRES_AN_ALLOWLISTED_HUMAN_AND_AN_EXTERNALLY_ROOTED_DETACHED_ATTESTATION",
   decisions: sourceIds.map(legalDecision),
 };
 output("legal-decisions.v1.json", decisions);
 
+const authorityRegistry = {
+  schemaVersion: "vector.generic-sensor-verification-legal-authority-registry.v1",
+  registryId: "generic-sensor-source-legal-authority-registry-v1",
+  subjectDecisionArtifactId: decisions.decisionArtifactId,
+  externalTrustRootRequired: true,
+  status: "NO_AUTHORIZED_REVIEWERS_OR_DECISION_RECORDS_REGISTERED",
+  authorizedReviewers: [],
+  decisionRecords: [],
+  blockingReason: "AUTHORIZED_HUMAN_ALLOWLIST_AND_EXTERNALLY_ROOTED_DETACHED_ATTESTATION_REQUIRED",
+};
+output("legal-authority-registry.v1.json", authorityRegistry);
+
 const inventoryArtifact = artifact("archive-inventory.v1.json", "COMPLETE_ARCHIVE_INVENTORY");
 const visualArtifact = artifact("visual-inspection.v1.json", "PRIMARY_VISUAL_INSPECTION_RECORD", "NON_AUTHORITATIVE_DISCOVERY_AID");
 const legalArtifact = artifact("legal-decisions.v1.json", "LEGAL_AND_EXPORT_DECISIONS", "REFERENCE_ONLY");
+const authorityArtifact = artifact("legal-authority-registry.v1.json", "EXTERNAL_LEGAL_AUTHORITY_REGISTRY", "REFERENCE_ONLY");
 const prefix = "dstl-Stone-Soup-d9e6fb1/";
 const stoneSource = {
   id: "dstl-stone-soup-v1.9.1",
@@ -309,6 +322,7 @@ for (const source of [stoneSource, ...nasaSources]) {
 }
 collectArtifact(visualArtifact);
 collectArtifact(legalArtifact);
+collectArtifact(authorityArtifact);
 const isolationEvidence = {
   schemaVersion: "vector.generic-sensor-verification-production-isolation-evidence.v1",
   subjectManifestId: manifestId,
@@ -354,9 +368,11 @@ const manifest = {
   },
   visualInspection: visualArtifact,
   legalDecisions: legalArtifact,
+  legalAuthorityRegistry: authorityArtifact,
   decisionReferences: sourceIds.map((sourceId) => ({
     sourceId,
     decisionArtifactId: decisions.decisionArtifactId,
+    authorityRegistryId: authorityRegistry.registryId,
     fields: ["redistribution", "referenceExecution", "adaptation"],
   })),
   isolationEvidence: isolationArtifact,

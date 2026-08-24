@@ -178,5 +178,6 @@ The CR-160557 record is negative-scope evidence only; no threshold model or
 detection consequence is admitted from it. Rendered pages and extracted text
 are non-authoritative navigation aids. Future numerical work remains blocked by
 the exact frozen-source review, an approved human reference-execution decision,
+an externally rooted detached attestation for that exact decision/evidence,
 independent expected values, and its owning model/admission contracts. Source
 availability never creates a generic or named production radar.

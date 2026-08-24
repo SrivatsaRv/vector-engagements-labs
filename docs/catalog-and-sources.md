@@ -168,9 +168,12 @@ admission must not resolve or import it.
 The corresponding legal artifact keeps redistribution, reference execution,
 and adaptation as independent decisions. They currently remain
 `PENDING_REVIEW`; missing, pending, forged, agent-authored, wrong-jurisdiction,
-or wrong-scope authority fails closed. Public availability or an open licence
-does not imply local execution, adaptation, export, model, or installation
-authority. Named platform and radar claims, game/community artifacts, and
-dynamic unpinned sources are expressly ineligible. Downstream #26 work remains
-blocked until this freeze is independently reviewed and the specifically
-required human decision is approved.
+or wrong-scope authority fails closed. `AUTHORIZED_HUMAN` is not a self-proving
+string: approval also requires an allowlisted reviewer and decision record whose
+canonical payload and evidence digest have a detached Ed25519 signature verified
+against a trust root supplied outside the bundle. The committed registry is
+empty. Public availability or an open licence does not imply local execution,
+adaptation, export, model, or installation authority. Named platform and radar
+claims, game/community artifacts, and dynamic unpinned sources are expressly
+ineligible. Downstream #26 work remains blocked until this freeze is
+independently reviewed and the specifically required human decision is approved.

@@ -173,8 +173,13 @@ selected member is compared. Stone Soup is never imported or executed.
 
 The legal artifact is authority data, not an agent recommendation. Each source
 has separate redistribution, reference-execution, and adaptation states. Only
-an authorized human record with identity, date, jurisdiction, scope,
-conditions, and evidence digest can represent approval; pending, missing,
-forged, agent-authored, and out-of-scope decisions fail closed. Network access
-is unnecessary for verification, and dynamic unpinned or substituted
-community/game material is rejected.
+an allowlisted human record with identity, canonical calendar date, closed
+jurisdiction and scope, conditions, and evidence digest can represent approval.
+The complete decision payload must carry a detached Ed25519 signature verified
+against a trust root supplied outside the source bundle. Repository-local or
+self-declared keys, reviewer-kind strings, invented records/evidence, malformed
+dates, pending, missing, forged, agent-authored, and out-of-scope decisions fail
+closed. Non-approval states carry no reviewer, date, jurisdiction, scope,
+conditions, record, or evidence authority. Network access is unnecessary for
+verification, and dynamic unpinned or substituted community/game material is
+rejected.
