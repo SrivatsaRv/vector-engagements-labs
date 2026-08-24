@@ -1,5 +1,5 @@
 import { performance } from "node:perf_hooks";
-import { runRustWasmSixDofVerification } from "../lib/engine/backend.ts";
+import { runRustWasmSixDofVerification } from "../lib/validation/sixdof-foundation-wasm.ts";
 import { runSixDofVerification, type SixDofVerificationInput } from "../lib/validation/sixdof-foundation.ts";
 
 const input: SixDofVerificationInput = {

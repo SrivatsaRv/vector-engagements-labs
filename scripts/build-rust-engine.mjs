@@ -54,12 +54,19 @@ function verifyModule(bytes, label) {
     "vector_output_len",
     "vector_output_ptr",
     "vector_reference_run_json",
-    "vector_sixdof_verification_run_json",
     "vector_run_json",
   ]) {
     if (!exports.has(required)) {
       throw new Error(`${label} is missing required WASM export ${required}.`);
     }
+  }
+  for (const forbidden of ["vector_sixdof_verifier_run_json", "vector_sixdof_verification_run_json"]) {
+    if (exports.has(forbidden)) {
+      throw new Error(`${label} exposes verification-only WASM export ${forbidden}.`);
+    }
+  }
+  if (bytes.length >= 500_000) {
+    throw new Error(`${label} is ${bytes.length} bytes; production artifact limit is 500000.`);
   }
 }
 

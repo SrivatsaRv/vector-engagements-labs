@@ -1,4 +1,4 @@
-.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local capacity-baseline-local reference-aircraft-local sixdof-foundation-local air-reference-local worker-local frontend-local browser-local clean-clone-local
+.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local capacity-baseline-local reference-aircraft-local reference-aam-local sixdof-foundation-local air-reference-local worker-local frontend-local browser-local clean-clone-local
 
 db-up: compose-build
 	docker compose up -d database
@@ -51,7 +51,9 @@ observability-local: compose-up
 
 performance-local:
 	npm run performance:verify
+	npm run performance:track-store:verify
 	npm run capacity:baseline:verify
+	npm run reference-aam:performance
 
 capacity-baseline-local:
 	npm run capacity:baseline:verify
@@ -60,8 +62,12 @@ reference-aircraft-local:
 	npm run reference-aircraft:verify
 
 sixdof-foundation-local:
+	npm run sixdof-foundation:rust:verify
 	npm run sixdof-foundation:verify
 	npm run sixdof-foundation:performance
+
+reference-aam-local:
+	npm run reference-aam:verify
 
 worker-local:
 	npm run build
@@ -76,7 +82,7 @@ frontend-local:
 
 browser-local:
 	npm run test:component
-	npm run test:browser
+	npm run test:browser:ci
 
 air-reference-local: reference-aircraft-local
 
@@ -92,11 +98,16 @@ clean-clone-local:
 
 ci-quality:
 	npm run environment:sources:verify
+	npm run tp1538:sources:verify
 	npm run policy:runtime-stubs:verify
 	npm run policy:aircraft-evidence:verify
+	npm run policy:nasa-generic-f16:verify
 	npm run symbols:verify
 	npm run models:verify
 	npm run reference-aircraft:verify
+	npm run reference-aam:verify
+	npm run reference-aam:rust:fmt
+	npm run sixdof-foundation:rust:fmt
 	npm run engine:rust:fmt
 	npm run lint
 	npm run typecheck
@@ -104,6 +115,14 @@ ci-quality:
 ci-tests:
 	npm run engine:rust:clippy
 	npm run engine:rust:verify
+	npm run sixdof-foundation:rust:clippy
+	npm run sixdof-foundation:rust:verify
+	npm run sixdof-foundation:rust:test
+	npm run sixdof-foundation:rust:doc
+	npm run reference-aam:rust:clippy
+	npm run reference-aam:rust:verify
+	npm run reference-aam:rust:test
+	npm run reference-aam:rust:doc
 	npm run engine:rust:test
 	npm run engine:rust:doc
 	npm run sixdof-foundation:performance

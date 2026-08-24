@@ -10,6 +10,8 @@ The default backend is a Rust 2021 `cdylib` compiled for `wasm32-unknown-unknown
 - `vector_max_input_len()` publishes the bounded admission limit;
 - `vector_input_reserve(length)` allocates the JSON input buffer;
 - `vector_run_json()` executes the deterministic fixed-step model;
+- `vector_generic_aam_run_json()` executes the isolated NASA TM-109057
+  `ENGINE_VERIFICATION_ONLY` contract and is not a production scenario entry;
 - `vector_output_ptr()` and `vector_output_len()` expose the serialized run.
 
 The build embeds the compiled module in the application with its SHA-256 digest and byte length. Loading fails closed if the required ABI or provenance is missing. VECTOR does not silently fall back to TypeScript after a Rust/WASM run has been selected.
@@ -60,6 +62,11 @@ committed, integrity-checked artifact and does not install a compiler at runtime
 - `tests/simulation-events.test.ts` proves insertion-order-independent event ordering, arbitrary-entity coverage, exact off-cadence event frames, duplicate and causal-reference rejection, and the absence of authoritative English strings.
 - `tests/model-pack.test.mjs` plus Rust `model_pack` tests verify the shared compiled object-data contract and committed digest fixture.
 - `npm run performance:verify` measures cold initialization and warm-run p50/p95 for both backends.
+- `npm run reference-aam:verify` and `npm run reference-aam:performance`
+  verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
+- `npm run sixdof-foundation:rust:build` regenerates the standalone 6DOF
+  verification artifact; `sixdof-foundation:rust:verify`, `:fmt`, `:clippy`,
+  `:test`, and `:doc` independently gate that private crate.
 
 ## Swap boundary
 
@@ -87,11 +94,14 @@ parity corpus. Its manifest provenance includes the selected backend, ABI name,
 and committed WASM artifact SHA-256. Loading, execution, record creation, or
 replay fails closed when those identities disagree.
 
-## Isolated six-degree-of-freedom verification ABI
+## Isolated six-degree-of-freedom verification artifact
 
-`vector_sixdof_verification_run_json` exposes the exact-key
-`vector.sixdof-verification-input.v1` kernel through the same bounded linear-memory
-transport. This operation is an ABI and numerical conformance surface, not an
+The exact-key `vector.sixdof-verification-input.v1` kernel is compiled only
+from `verification-rust/sixdof-foundation`. Its private
+`vector_sixdof_verifier_run_json` ABI is loaded by
+`lib/validation/sixdof-foundation-wasm.ts`; production `engine-rust`,
+`lib/engine/backend.ts`, the production WASM module, and the simulation Worker
+cannot import or export it. This is a numerical-conformance artifact, not an
 `EngineScenario` backend selection. It does not emit production frames/events,
 enter a Worker or VSR, or silently substitute for the deployed 3DOF engine. See
 [`sixdof-numerical-foundation.md`](sixdof-numerical-foundation.md).
@@ -104,9 +114,15 @@ scale-normalized Cholesky factor with an exactly representable `2^-32` relative
 pivot threshold and governed minimum mass/inertia scale. Rust/WASM does not
 accept a broader finite-input domain than TypeScript, and neither adapter emits
 conservation drift for a nonzero applied wrench.
-The JSON ABI uses correctly rounded binary64 decoding and verifies authored
+The private JSON ABI uses correctly rounded binary64 decoding and verifies authored
 frame-zero values plus scalar, angular, and conditioned-inertia ULP boundaries
 against the TypeScript adapter before a release artifact is admitted.
-The release profile uses size-first `opt-level = "z"`; the committed artifact
-must remain below the existing 500,000-byte regression limit while still
-passing the numerical and throughput gates.
+Both crates use size-first `opt-level = "z"` and have independent immutable
+artifacts. The production module retains its unchanged 500,000-byte limit and
+is currently 493,585 bytes with SHA-256
+`e1105047cd06edd50f13d8b212e1292bda747468ee7421a977112fadeef65b8c`.
+The private verifier is 161,590 bytes with SHA-256
+`b06b28cdb364477dbc9413e644bca2f0b2fa894e1436a28355269ae2f4321f37`.
+Build verification rejects a stale digest, a missing required private symbol,
+any production symbol in the verifier, any verifier symbol in production, or
+either artifact crossing its 500,000-byte limit.

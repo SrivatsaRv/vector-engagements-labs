@@ -29,10 +29,12 @@ TypeScript reference engine and returns the same replayable run contract.
 - `public_aircraft_reference.rs` owns the isolated NASA NESC trim-propagation
   oracle and versioned output used for external-history and cross-backend
   verification. It does not modify the operational scenario engine.
-- `sixdof_foundation.rs` owns the isolated, generic rigid-body verification
-  kernel, deterministic angular/conditioning admission, scale-normalized
-  Cholesky solve, and strict v1 input/output contract. It is not a production
-  `EngineScenario` backend and contains no named-aircraft data.
+
+Verification-only evaluators are separate crates under `verification-rust` and
+are never compiled into this production engine or its browser ABI. The generic
+rigid-body numerical foundation lives in
+`verification-rust/sixdof-foundation`; its generated adapter remains under
+`lib/validation` and is inaccessible to the production backend and Worker.
 
 The physics loop remains intentionally colocated while its equations and state
 transitions are still evolving together. It should be split by behavior only

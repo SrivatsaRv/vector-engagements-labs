@@ -95,17 +95,30 @@ test("the script-based Required PR Gate checks out the tested revision", async (
   assert.match(gate, /PR_REVIEW_KIND/);
 });
 
-test("selected browser contracts verify the built Worker artifact", async () => {
+test("selected browser contracts isolate every viewport before verifying the built Worker", async () => {
   const workflow = await readFile(".github/workflows/ci.yml", "utf8");
   const browser = workflow.split(/^  browser_tests:/m)[1]?.split(/^  rust_audit:/m)[0];
   assert.ok(browser, "Browser Contract job is missing");
-  const browserContracts = browser.indexOf("npm run test:browser");
+  const browserContracts = browser.indexOf("npm run test:browser:ci");
   const workerVerification = browser.indexOf("npm run worker:verify");
   assert.ok(browserContracts >= 0, "Browser Contract does not execute browser tests");
   assert.ok(
     workerVerification > browserContracts,
     "Browser Contract does not verify the production-built Worker after browser tests",
   );
+});
+
+test("browser-local uses the governed isolated browser runner", async () => {
+  const makefile = await readFile("Makefile", "utf8");
+  const browserLocal = makefile.split(/^browser-local:/m)[1]?.split(/^air-reference-local:/m)[0];
+  assert.ok(browserLocal, "browser-local is not declared");
+  assert.match(browserLocal, /npm run test:browser:ci/);
+  assert.doesNotMatch(browserLocal, /npm run test:browser\s*$/m);
+
+  const runner = await readFile("scripts/run-browser-contracts.mjs", "utf8");
+  assert.match(runner, /RUN_ALL_PROJECTS_ONCE/);
+  assert.match(runner, /--retries=0/);
+  assert.match(runner, /--workers=1/);
 });
 
 test("the Worker verifier uses the pinned Playwright browser outside local overrides", async () => {
@@ -157,6 +170,82 @@ test("managed live-target failure retains its server log and releases the port",
 
   const probe = createServer();
   probe.listen(port, "127.0.0.1");
+  await once(probe, "listening");
+  await new Promise((resolve, reject) =>
+    probe.close((error) => (error ? reject(error) : resolve())),
+  );
+});
+
+test("managed early server exit fails the task, retains diagnostics, and releases the port", async (t) => {
+  const { runManagedServer } = await import("../scripts/run-managed-server.mjs");
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), "vector-managed-server-exit-"));
+  t.after(() => rm(temporaryDirectory, { recursive: true, force: true }));
+  const port = await unusedLocalPort();
+  const logPath = join(temporaryDirectory, "application.log");
+  const serverProgram = [
+    "const http = require('node:http');",
+    `const server = http.createServer((_request, response) => response.end('ready')).listen(${port}, '127.0.0.1', () => { console.error('deliberate-server-exit'); setTimeout(() => server.close(() => process.exit(23)), 150); });`,
+  ].join("");
+  const taskProgram = "setTimeout(() => process.exit(0), 10000);";
+
+  const result = await runManagedServer({
+    server: { command: process.execPath, args: ["-e", serverProgram] },
+    task: { command: process.execPath, args: ["-e", taskProgram] },
+    logPath,
+    readyUrl: `http://127.0.0.1:${port}`,
+    startupTimeoutMs: 2_000,
+    shutdownTimeoutMs: 1_000,
+  });
+  assert.deepEqual(result, {
+    taskExitCode: 1,
+    serverExitedEarly: true,
+    interruptedBy: null,
+  });
+  assert.match(await readFile(logPath, "utf8"), /deliberate-server-exit/);
+
+  const probe = createServer();
+  probe.listen(port, "127.0.0.1");
+  await once(probe, "listening");
+  await new Promise((resolve, reject) =>
+    probe.close((error) => (error ? reject(error) : resolve())),
+  );
+});
+
+test("managed cleanup terminates descendants after their task leader exits", async (t) => {
+  const { runManagedServer } = await import("../scripts/run-managed-server.mjs");
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), "vector-managed-descendant-"));
+  t.after(() => rm(temporaryDirectory, { recursive: true, force: true }));
+  const serverPort = await unusedLocalPort();
+  const descendantPort = await unusedLocalPort();
+  const logPath = join(temporaryDirectory, "application.log");
+  const serverProgram = [
+    "const http = require('node:http');",
+    `const server = http.createServer((_request, response) => response.end('ready')).listen(${serverPort}, '127.0.0.1');`,
+    "process.on('SIGTERM', () => server.close(() => process.exit(0)));",
+  ].join("");
+  const descendantProgram = [
+    "const http = require('node:http');",
+    `http.createServer((_request, response) => response.end('child')).listen(${descendantPort}, '127.0.0.1');`,
+    "setTimeout(() => process.exit(0), 5000);",
+  ].join("");
+  const taskProgram = [
+    "const { spawn } = require('node:child_process');",
+    `const child = spawn(process.execPath, ['-e', ${JSON.stringify(descendantProgram)}], { stdio: 'ignore' });`,
+    "setTimeout(() => process.exit(child.pid ? 0 : 9), 100);",
+  ].join("");
+
+  const result = await runManagedServer({
+    server: { command: process.execPath, args: ["-e", serverProgram] },
+    task: { command: process.execPath, args: ["-e", taskProgram] },
+    logPath,
+    readyUrl: `http://127.0.0.1:${serverPort}`,
+    startupTimeoutMs: 2_000,
+    shutdownTimeoutMs: 1_000,
+  });
+  assert.equal(result.taskExitCode, 0);
+
+  const probe = createServer();
+  probe.listen(descendantPort, "127.0.0.1");
   await once(probe, "listening");
   await new Promise((resolve, reject) =>
     probe.close((error) => (error ? reject(error) : resolve())),

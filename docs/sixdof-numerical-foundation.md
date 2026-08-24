@@ -3,10 +3,13 @@
 Status: isolated verification kernel, schema v1, 2026-08-24.
 
 This foundation proves the source-independent rigid-body equations and the
-TypeScript/Rust-WASM boundary required by #134. It is deliberately not connected
-to `EngineScenario`, a model-pack compiler, Workers, VSR, playback, or named
-aircraft. It cannot be selected in the product and supplies no Su-30MKI, Su-30,
-F-16, weapon, sensor, control-law, or handling-quality evidence.
+TypeScript/Rust-WASM boundary required by #134. Rust is compiled into a separate
+verification-only artifact from `verification-rust/sixdof-foundation`; the
+production Rust engine, backend adapter, WASM module, and Worker contain no
+6DOF verifier. The foundation is deliberately not connected to `EngineScenario`,
+a model-pack compiler, Workers, VSR, playback, or named aircraft. It cannot be
+selected in the product and supplies no Su-30MKI, Su-30, F-16, weapon, sensor,
+control-law, or handling-quality evidence.
 
 ## Versioned contract
 
@@ -40,12 +43,12 @@ quaternion norm, excessive angular increment, invalid RK4 stage quaternion, and
 out-of-bound state or wrench values. There is no clamp, extrapolation, default,
 or fallback.
 
-The Rust/WASM JSON ABI enables `serde_json`'s correctly rounded binary64
+The private Rust/WASM JSON ABI enables `serde_json`'s correctly rounded binary64
 decoder. A finite JavaScript number therefore reaches Rust as the same IEEE-754
 value encoded by `JSON.stringify`; admission is never evaluated against a
 one-ULP-rounded neighbour. Verification retains the authored value at frame
 zero and sweeps scalar, angular-increment, and full-cross Cholesky boundaries
-through the actual embedded WASM transport.
+through the actual isolated WASM transport.
 
 Positive definiteness and the solve use the same scale-normalized Cholesky
 decomposition in TypeScript and Rust. Every normalized diagonal pivot must be at
@@ -116,10 +119,20 @@ falsification cases:
   rejection of `Number.MIN_VALUE` mass and `diag(1e-108)` inertia, and one finite
   zero-wrench tick at every minimum/maximum mass and conditioned-inertia scale
   combination;
-- actual embedded-WASM preservation of authored binary64 values plus a
+- actual isolated-WASM preservation of authored binary64 values plus a
   deterministic 3,360-case angular and full-cross Cholesky admission sweep;
 - conservation diagnostic applicability for zero versus nonzero wrench;
 - TypeScript and independent Rust/WASM fail-closed admission cases.
+- production-isolation regression across the Rust crate, WASM export table,
+  backend adapter, and built simulation Worker.
+
+The production artifact remains independently generated at 493,585 bytes,
+below its unchanged 500,000-byte gate, with no verifier export. The standalone
+verification artifact is 161,590 bytes and has its own 500,000-byte gate. Its
+SHA-256 is
+`b06b28cdb364477dbc9413e644bca2f0b2fa894e1436a28355269ae2f4321f37`;
+its exact Rust source/lock identity is
+`824200fca11e562779c1f6b871e302baa421ba2d6b4653684b3974e53c2aa637`.
 
 `npm run sixdof-foundation:performance` runs a 10,000-tick TypeScript and
 Node-hosted Rust/WASM benchmark. Its deliberately broad regression thresholds
@@ -127,7 +140,10 @@ are 1,000 ms and 2,000 ms respectively; recorded handoff evidence must name the
 host, architecture, runtime, workload, and measured time.
 `ci-tests` invokes this command directly, so `make ci-local` and
 `make clean-clone-local` cannot omit the performance gate. The focused
-`make sixdof-foundation-local` target runs both the numerical suite and benchmark.
+`make sixdof-foundation-local` first rebuild-verifies the private artifact, then
+runs the numerical suite and benchmark. `make ci-local` additionally runs its
+Rustfmt, strict Clippy, native Rust, and rustdoc gates independently of the
+production engine crate.
 
 ## Explicitly unmet #134 scope
 

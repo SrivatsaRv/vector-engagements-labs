@@ -34,8 +34,8 @@ test("observer projection is a deterministic tick projection without fabricated 
   assert.ok(first.every((picture) =>
     picture.trackId === "UNAVAILABLE" &&
     picture.observationCount === 0 &&
-    picture.confidence === 0 &&
-    picture.uncertaintyMeters === 0 &&
+    picture.confidence === null &&
+    picture.uncertaintyMeters === null &&
     !("position" in picture) &&
     !("observedEntityId" in picture) &&
     !("truthPosition" in picture),

@@ -15,11 +15,6 @@ import type {
   PublicAircraftReferenceInput,
   PublicAircraftReferenceRun,
 } from "../validation/public-aircraft-reference.ts";
-import type {
-  SixDofVerificationInput,
-  SixDofVerificationRun,
-} from "../validation/sixdof-foundation.ts";
-
 type RustEngineExports = WebAssembly.Exports & {
   memory: WebAssembly.Memory;
   vector_abi_version: () => number;
@@ -27,7 +22,6 @@ type RustEngineExports = WebAssembly.Exports & {
   vector_max_input_len: () => number;
   vector_run_json: () => number;
   vector_reference_run_json: () => number;
-  vector_sixdof_verification_run_json: () => number;
   vector_output_ptr: () => number;
   vector_output_len: () => number;
 };
@@ -94,7 +88,6 @@ function getRustEngine() {
     typeof exports.vector_max_input_len !== "function" ||
     typeof exports.vector_run_json !== "function" ||
     typeof exports.vector_reference_run_json !== "function" ||
-    typeof exports.vector_sixdof_verification_run_json !== "function" ||
     typeof exports.vector_output_ptr !== "function" ||
     typeof exports.vector_output_len !== "function"
   ) {
@@ -105,39 +98,6 @@ function getRustEngine() {
   }
   rustEngine = exports;
   return exports;
-}
-
-function runRustJsonOperation(
-  input: unknown,
-  operation: (engine: RustEngineExports) => number,
-  label: string,
-) {
-  const engine = getRustEngine();
-  const encoded = new TextEncoder().encode(JSON.stringify(input));
-  if (encoded.byteLength > engine.vector_max_input_len()) {
-    throw new Error(`The ${label} input exceeds the Rust/WASM ABI limit.`);
-  }
-  const inputPointer = engine.vector_input_reserve(encoded.byteLength);
-  if (encoded.byteLength > 0 && inputPointer === 0) {
-    throw new Error(`The Rust/WASM engine could not reserve the ${label} input buffer.`);
-  }
-  new Uint8Array(engine.memory.buffer, inputPointer, encoded.byteLength).set(encoded);
-  const succeeded = operation(engine) === 1;
-  const output = new TextDecoder().decode(
-    new Uint8Array(engine.memory.buffer, engine.vector_output_ptr(), engine.vector_output_len()),
-  );
-  if (!succeeded) throw new Error(`VECTOR Rust/WASM ${label} rejected the case: ${output}`);
-  return JSON.parse(output) as unknown;
-}
-
-export function runRustWasmSixDofVerification(
-  input: SixDofVerificationInput,
-): SixDofVerificationRun {
-  return runRustJsonOperation(
-    input,
-    (engine) => engine.vector_sixdof_verification_run_json(),
-    "six-DOF verification runner",
-  ) as SixDofVerificationRun;
 }
 
 export function runRustWasmPublicAircraftReference(

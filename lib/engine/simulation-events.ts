@@ -1,4 +1,5 @@
 import { canonicalJson } from "../canonical-json.ts";
+import { assertEngineObserverState } from "../information-state.ts";
 import type {
   EngineFrame,
   EngineScenario,
@@ -46,6 +47,7 @@ const PAYLOAD_KINDS = [
   "ENTITY_ENTERED_WORLD",
   "ENTITY_LIFECYCLE_CHANGED",
   "RUN_COMPLETED",
+  "TRACK_STATE_CHANGED",
 ] as const;
 const payloadRank = Object.fromEntries(PAYLOAD_KINDS.map((kind, index) => [kind, index]));
 const ENTITY_KINDS = [
@@ -67,6 +69,15 @@ const TERMINATIONS = [
   "invalid_scenario",
 ] as const;
 const PARTICIPANT_ROLES = ["ACTOR", "SUBJECT", "LAUNCHER", "WEAPON", "SENSOR"] as const;
+const TRACK_STATES = ["TENTATIVE", "CONFIRMED", "COASTING", "LOST"] as const;
+const TRACK_FROM_STATES = ["NONE", ...TRACK_STATES] as const;
+const TRACK_CAUSES = [
+  "INITIAL_OBSERVATION",
+  "CONFIRMATION_THRESHOLD_MET",
+  "FRESHNESS_EXPIRED",
+  "OBSERVATION_REACQUIRED",
+  "TRACK_EXPIRED",
+] as const;
 const UTF8_ENCODER = new TextEncoder();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -100,7 +111,7 @@ function member<T extends string>(value: unknown, values: readonly T[], label: s
   }
 }
 
-function compareText(left: string, right: string) {
+export function compareCanonicalText(left: string, right: string) {
   if (left === right) return 0;
   const leftBytes = UTF8_ENCODER.encode(left);
   const rightBytes = UTF8_ENCODER.encode(right);
@@ -163,7 +174,7 @@ function normalizeParticipants(
     byKey.set(key, { entityId: participant.entityId, role: participant.role });
   }
   return [...byKey.values()].sort((left, right) =>
-    compareText(left.entityId, right.entityId) || compareText(left.role, right.role)
+    compareCanonicalText(left.entityId, right.entityId) || compareCanonicalText(left.role, right.role)
   );
 }
 
@@ -176,7 +187,7 @@ function participantKey(participants: readonly SimulationEventParticipant[]) {
 function causeDraftKey(causes: readonly SimulationEventCauseReference[]) {
   return [...causes]
     .map((cause) => `RECEIPT:${cause.receipt.tick}:${cause.receipt.localKey}`)
-    .sort(compareText)
+    .sort(compareCanonicalText)
     .join("|");
 }
 
@@ -190,7 +201,15 @@ function payloadSortKey(payload: SimulationEventPayload) {
   if (payload.kind === "ENTITY_LIFECYCLE_CHANGED") {
     return canonicalJson(["2", payload.schemaVersion, payload.entityKind, payload.from, payload.to]);
   }
-  return canonicalJson(["3", payload.schemaVersion, payload.termination]);
+  if (payload.kind === "RUN_COMPLETED") {
+    return canonicalJson(["3", payload.schemaVersion, payload.termination]);
+  }
+  return canonicalJson([
+    "4", payload.schemaVersion, payload.perspective, payload.trackId,
+    payload.from, payload.to, payload.cause, payload.sensorModelId,
+    payload.sensorModelVersion, payload.modelPackDigest, payload.sourceSequence,
+    payload.sourceTimeSeconds, payload.estimateValueState, payload.uncertaintyValueState,
+  ]);
 }
 
 function canonicalDraftSortKey(event: SimulationEventDraft) {
@@ -221,12 +240,12 @@ function canonicalCommittedSortKey(event: SimulationEventV2) {
     event.ownerAffiliation ?? "",
     event.correlationId ?? "",
     event.localKey,
-    [...event.causeEventIds].sort(compareText).join("|"),
+    [...event.causeEventIds].sort(compareCanonicalText).join("|"),
   ].join("\u0001");
 }
 
 function compareDrafts(left: SimulationEventDraft, right: SimulationEventDraft) {
-  return compareText(canonicalDraftSortKey(left), canonicalDraftSortKey(right));
+  return compareCanonicalText(canonicalDraftSortKey(left), canonicalDraftSortKey(right));
 }
 
 function assertPayload(value: unknown, index: number): asserts value is SimulationEventPayload {
@@ -249,10 +268,43 @@ function assertPayload(value: unknown, index: number): asserts value is Simulati
     member(value.from, LIFECYCLES, `Simulation event ${index} prior lifecycle`);
     member(value.to, LIFECYCLES, `Simulation event ${index} next lifecycle`);
     if (value.from === value.to) throw new Error(`Simulation event ${index} records an unchanged lifecycle.`);
-  } else {
+  } else if (value.kind === "RUN_COMPLETED") {
     exactKeys(value, ["kind", "schemaVersion", "termination"], [], `Simulation event ${index} payload`);
     if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_COMPLETED) throw new Error(`Simulation event ${index} payload schema is unsupported.`);
     member(value.termination, TERMINATIONS, `Simulation event ${index} termination`);
+  } else {
+    exactKeys(value, [
+      "kind", "schemaVersion", "perspective", "trackId", "from", "to", "cause",
+      "sensorModelId", "sensorModelVersion", "modelPackDigest", "sourceSequence",
+      "sourceAssociationId", "sourceTimeSeconds", "observationId", "estimateValueState", "uncertaintyValueState",
+    ], [], `Simulation event ${index} payload`);
+    if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.TRACK_STATE_CHANGED) {
+      throw new Error(`Simulation event ${index} payload schema is unsupported.`);
+    }
+    member(value.perspective, ["IAF", "PAF"], `Simulation event ${index} track perspective`);
+    nonEmptyString(value.trackId, `Simulation event ${index} track ID`);
+    member(value.from, TRACK_FROM_STATES, `Simulation event ${index} prior track state`);
+    member(value.to, TRACK_STATES, `Simulation event ${index} next track state`);
+    member(value.cause, TRACK_CAUSES, `Simulation event ${index} track cause`);
+    if (value.from === value.to) throw new Error(`Simulation event ${index} records an unchanged track state.`);
+    nonEmptyString(value.sensorModelId, `Simulation event ${index} sensor model ID`);
+    nonEmptyString(value.sensorModelVersion, `Simulation event ${index} sensor model version`);
+    nonEmptyString(value.sourceAssociationId, `Simulation event ${index} source association ID`);
+    if (typeof value.modelPackDigest !== "string" || !/^[a-f0-9]{64}$/.test(value.modelPackDigest)) {
+      throw new Error(`Simulation event ${index} model-pack digest is invalid.`);
+    }
+    if (!Number.isSafeInteger(value.sourceSequence) || (value.sourceSequence as number) < 1) {
+      throw new Error(`Simulation event ${index} source sequence is invalid.`);
+    }
+    if (!Number.isFinite(value.sourceTimeSeconds) || (value.sourceTimeSeconds as number) < 0) {
+      throw new Error(`Simulation event ${index} source time is invalid.`);
+    }
+    if (!(value.observationId === null || (typeof value.observationId === "string" && value.observationId.length > 0))) {
+      throw new Error(`Simulation event ${index} observation identity is invalid.`);
+    }
+    if (value.estimateValueState !== "ESTIMATED" || value.uncertaintyValueState !== "ESTIMATED") {
+      throw new Error(`Simulation event ${index} track value state is invalid.`);
+    }
   }
 }
 
@@ -387,7 +439,42 @@ export function assertSimulationEventStream(
     string,
     Array<{ frameIndex: number; from: EntityLifecycle; to: EntityLifecycle }>
   >();
+  const frameTransitionsByTrack = new Map<
+    string,
+    Array<{
+      frameIndex: number;
+      from: "NONE" | "TENTATIVE" | "CONFIRMED" | "COASTING" | "LOST";
+      to: "TENTATIVE" | "CONFIRMED" | "COASTING" | "LOST";
+    }>
+  >();
+  const priorTrackState = new Map<string, "TENTATIVE" | "CONFIRMED" | "COASTING" | "LOST">();
   for (const [frameIndex, frame] of frames.entries()) {
+    for (const state of frame.observerStates) {
+      assertEngineObserverState(state);
+      const owner = state.perspective === "IAF" ? "BLUE" : "RED";
+      const admitted = "sensorModelId" in state
+        ? scenario.modelPack.observerSensors.find((sensor) => sensor.modelId === state.sensorModelId)
+        : undefined;
+      if ("sensorModelId" in state && !admitted) {
+        throw new Error("Observer state source is not bound to the compiled scenario sensor projection.");
+      }
+      if (state.schemaVersion === "vector.observer-state.v3") {
+        const producer = scenario.entities.find((entity) =>
+          entity.kind === "AIRCRAFT" && entity.affiliation === owner &&
+          entity.observerSensor?.modelId === state.sensorModelId &&
+          entity.observerSensor.modelVersion === admitted?.modelVersion &&
+          entity.observerSensor.modelPackDigest === scenario.modelPack.digest,
+        );
+        if (!producer) throw new Error("Observer state source is not bound to an admitted scenario sensor.");
+        for (const value of [...state.observations, ...state.tracks]) {
+          if (
+            value.source.modelPackDigest !== scenario.modelPack.digest ||
+            value.source.sensorModelId !== admitted?.modelId ||
+            value.source.sensorModelVersion !== admitted?.modelVersion
+          ) throw new Error("Observer observation or track source is not bound to the compiled scenario.");
+        }
+      }
+    }
     for (const entity of frame.entities) {
       if (!firstFrameIndexByEntity.has(entity.id)) {
         firstFrameIndexByEntity.set(entity.id, frameIndex);
@@ -400,11 +487,26 @@ export function assertSimulationEventStream(
       }
       finalLifecycleByEntity.set(entity.id, entity.lifecycle);
     }
+    for (const observer of frame.observerStates) {
+      if (observer.schemaVersion !== "vector.observer-state.v3") continue;
+      for (const track of observer.tracks) {
+        const key = `${observer.perspective}\u0000${track.trackId}`;
+        const from = priorTrackState.get(key) ?? "NONE";
+        if (from !== track.state) {
+          const transitions = frameTransitionsByTrack.get(key) ?? [];
+          transitions.push({ frameIndex, from, to: track.state });
+          frameTransitionsByTrack.set(key, transitions);
+        }
+        priorTrackState.set(key, track.state);
+      }
+    }
   }
   const consumedFrameTransitionsByEntity = new Map<string, number>();
   const seenIds = new Set<string>();
   const seenTransitions = new Set<string>();
   const seenLocalKeysByTick = new Map<number, Set<string>>();
+  const consumedFrameTransitionsByTrack = new Map<string, number>();
+  const lastEventIdByTrack = new Map<string, string>();
   let prior: SimulationEventV2 | undefined;
   for (const [index, raw] of values.entries()) {
     if (!isRecord(raw)) throw new Error(`Simulation event ${index} must be an object.`);
@@ -420,7 +522,7 @@ export function assertSimulationEventStream(
     member(raw.phase, PHASES, `Simulation event ${index} phase`);
     if (!isRecord(raw.producer)) throw new Error(`Simulation event ${index} producer must be an object.`);
     exactKeys(raw.producer, ["subsystem"], ["entityId"], `Simulation event ${index} producer`);
-    member(raw.producer.subsystem, ["RUN_COORDINATOR", "ENTITY_LIFECYCLE"], `Simulation event ${index} producer subsystem`);
+    member(raw.producer.subsystem, ["RUN_COORDINATOR", "ENTITY_LIFECYCLE", "SENSOR_TRACK"], `Simulation event ${index} producer subsystem`);
     if (raw.producer.entityId !== undefined) nonEmptyString(raw.producer.entityId, `Simulation event ${index} producer entity`);
     member(raw.knowledgeScope, ["WORLD", "SIDE_OWNED"], `Simulation event ${index} knowledge scope`);
     if (raw.ownerAffiliation !== undefined) member(raw.ownerAffiliation, ["BLUE", "RED", "NEUTRAL"], `Simulation event ${index} owner affiliation`);
@@ -443,7 +545,9 @@ export function assertSimulationEventStream(
     });
     if (causeSequences.some((value, causeIndex) => causeIndex > 0 && value <= causeSequences[causeIndex - 1]!)) throw new Error(`Simulation event ${raw.id} causal references are not canonical.`);
     assertPayload(raw.payload, index);
-    if (causeEventIds.length !== 0) throw new Error(`Simulation event ${raw.id} payload family does not admit causal references.`);
+    if (raw.payload.kind !== "TRACK_STATE_CHANGED" && causeEventIds.length !== 0) {
+      throw new Error(`Simulation event ${raw.id} payload family does not admit causal references.`);
+    }
     const event = raw as unknown as SimulationEventV2;
     const tickLocalKeys = seenLocalKeysByTick.get(event.tick) ?? new Set<string>();
     if (tickLocalKeys.has(event.localKey)) {
@@ -453,17 +557,96 @@ export function assertSimulationEventStream(
     seenLocalKeysByTick.set(event.tick, tickLocalKeys);
     if (seenIds.has(event.id)) throw new Error(`Duplicate simulation event ID ${event.id}.`);
     seenIds.add(event.id);
-    if (event.knowledgeScope !== "WORLD" || event.ownerAffiliation !== undefined) throw new Error(`Simulation event ${event.id} violates the delivered world-event boundary.`);
+    if (event.payload.kind === "TRACK_STATE_CHANGED") {
+      if (event.knowledgeScope !== "SIDE_OWNED" || !event.ownerAffiliation) {
+        throw new Error(`Simulation event ${event.id} violates the side-owned track boundary.`);
+      }
+    } else if (event.knowledgeScope !== "WORLD" || event.ownerAffiliation !== undefined) {
+      throw new Error(`Simulation event ${event.id} violates the delivered world-event boundary.`);
+    }
     const transitionKey = canonicalJson({ tick: event.tick, producer: event.producer, participants: event.participants, payload: event.payload });
     if (seenTransitions.has(transitionKey)) throw new Error("Simulation event stream contains a duplicate transition.");
     seenTransitions.add(transitionKey);
-    if (prior && (event.tick < prior.tick || event.frameIndex < prior.frameIndex || (event.tick === prior.tick && compareText(canonicalCommittedSortKey(event), canonicalCommittedSortKey(prior)) < 0))) throw new Error(`Simulation event ${event.id} violates canonical order.`);
+    if (prior && (event.tick < prior.tick || event.frameIndex < prior.frameIndex || (event.tick === prior.tick && compareCanonicalText(canonicalCommittedSortKey(event), canonicalCommittedSortKey(prior)) < 0))) throw new Error(`Simulation event ${event.id} violates canonical order.`);
 
     const frame = frames[event.frameIndex]!;
     if (event.payload.kind === "RUN_STARTED") {
       if (index !== 0 || event.tick !== 0 || event.frameIndex !== 0 || event.phase !== "LIFECYCLE" || event.producer.subsystem !== "RUN_COORDINATOR" || event.producer.entityId !== undefined || event.participants.length !== 0 || event.payload.scenarioId !== scenario.id || event.payload.scenarioVersion !== scenario.version) throw new Error("RUN_STARTED event is inconsistent with its scenario boundary.");
     } else if (event.payload.kind === "RUN_COMPLETED") {
       if (index !== values.length - 1 || event.frameIndex !== frames.length - 1 || event.phase !== "TERMINATION" || event.producer.subsystem !== "RUN_COORDINATOR" || event.producer.entityId !== undefined || event.participants.length !== 0 || event.payload.termination !== termination) throw new Error("RUN_COMPLETED event does not reference the final retained frame or run termination.");
+    } else if (event.payload.kind === "TRACK_STATE_CHANGED") {
+      const payload = event.payload;
+      const owner = payload.perspective === "IAF" ? "BLUE" : "RED";
+      const producerId = event.producer.entityId;
+      const producer = producerId ? entityById.get(producerId) : undefined;
+      const observer = frame.observerStates.find((item) => item.perspective === payload.perspective);
+      const track = observer?.schemaVersion === "vector.observer-state.v3"
+        ? observer.tracks.find((item) => item.trackId === payload.trackId)
+        : undefined;
+      const observation = observer?.schemaVersion === "vector.observer-state.v3" && payload.observationId !== null
+        ? observer.observations.find((item) => item.id === payload.observationId)
+        : undefined;
+      if (
+        event.phase !== "TRACKING" ||
+        event.producer.subsystem !== "SENSOR_TRACK" ||
+        !producer || producer.kind !== "AIRCRAFT" || producer.affiliation !== owner ||
+        event.ownerAffiliation !== owner ||
+        event.participants.length !== 1 ||
+        event.participants[0]?.entityId !== producerId ||
+        event.participants[0]?.role !== "SENSOR" ||
+        !track || track.state !== payload.to ||
+        track.owner !== payload.perspective ||
+        track.source.modelPackDigest !== payload.modelPackDigest ||
+        track.source.sensorModelId !== payload.sensorModelId ||
+        track.source.sensorModelVersion !== payload.sensorModelVersion ||
+        track.sourceAssociationId !== payload.sourceAssociationId ||
+        payload.modelPackDigest !== scenario.modelPack.digest ||
+        !scenario.modelPack.observerSensors.some((sensor) =>
+          sensor.modelId === payload.sensorModelId && sensor.modelVersion === payload.sensorModelVersion
+        ) ||
+        track.sourceSequence !== payload.sourceSequence ||
+        track.sourceTimeSeconds !== payload.sourceTimeSeconds
+      ) throw new Error(`Simulation track event ${event.id} has invalid ownership, source, or frame state.`);
+      const key = `${payload.perspective}\u0000${payload.trackId}`;
+      const transitionIndex = consumedFrameTransitionsByTrack.get(key) ?? 0;
+      const transition = frameTransitionsByTrack.get(key)?.[transitionIndex];
+      if (
+        transition?.frameIndex !== event.frameIndex ||
+        transition.from !== payload.from ||
+        transition.to !== payload.to
+      ) throw new Error(`Simulation event ${event.id} does not reference the first retained frame for its track transition.`);
+      const priorTrackEventId = lastEventIdByTrack.get(key);
+      if (priorTrackEventId === undefined) {
+        if (payload.from !== "NONE" || event.causeEventIds.length !== 0) {
+          throw new Error(`Simulation event ${event.id} has an invalid initial track cause.`);
+        }
+      } else if (event.causeEventIds.length !== 1 || event.causeEventIds[0] !== priorTrackEventId) {
+        throw new Error(`Simulation event ${event.id} does not cite its prior track transition.`);
+      }
+      const validCause =
+        (payload.from === "NONE" && payload.to === "TENTATIVE" && payload.cause === "INITIAL_OBSERVATION") ||
+        (payload.from === "TENTATIVE" && payload.to === "CONFIRMED" && payload.cause === "CONFIRMATION_THRESHOLD_MET") ||
+        (payload.from === "CONFIRMED" && payload.to === "COASTING" && payload.cause === "FRESHNESS_EXPIRED") ||
+        ((payload.from === "COASTING" || payload.from === "LOST") &&
+          (payload.to === "CONFIRMED" || payload.to === "TENTATIVE") &&
+          payload.cause === "OBSERVATION_REACQUIRED") ||
+        ((payload.from === "TENTATIVE" || payload.from === "CONFIRMED" || payload.from === "COASTING") &&
+          payload.to === "LOST" && payload.cause === "TRACK_EXPIRED");
+      if (!validCause) throw new Error(`Simulation event ${event.id} has an invalid track transition cause.`);
+      const observationDriven = ["INITIAL_OBSERVATION", "CONFIRMATION_THRESHOLD_MET", "OBSERVATION_REACQUIRED"].includes(payload.cause);
+      if (
+        observationDriven !== (payload.observationId !== null) ||
+        (observationDriven && (
+          !observation ||
+          observation.owner !== payload.perspective ||
+          observation.sourceAssociationId !== payload.sourceAssociationId ||
+          observation.sourceSequence !== payload.sourceSequence ||
+          observation.sourceTimeSeconds !== payload.sourceTimeSeconds ||
+          canonicalJson(observation.source) !== canonicalJson(track.source)
+        ))
+      ) throw new Error(`Simulation event ${event.id} has an invalid observation cause.`);
+      consumedFrameTransitionsByTrack.set(key, transitionIndex + 1);
+      lastEventIdByTrack.set(key, event.id);
     } else {
       const entityId = event.producer.entityId;
       const entity = entityId ? entityById.get(entityId) : undefined;
@@ -546,6 +729,11 @@ export function assertSimulationEventStream(
       const retainedTransitions = frameTransitionsByEntity.get(entity.id)?.length ?? 0;
       if (consumedTransitions !== retainedTransitions) {
         throw new Error(`Simulation event stream is missing a retained lifecycle transition for ${entity.id}.`);
+      }
+    }
+    for (const [key, transitions] of frameTransitionsByTrack) {
+      if ((consumedFrameTransitionsByTrack.get(key) ?? 0) !== transitions.length) {
+        throw new Error(`Simulation event stream is missing a retained track transition for ${key}.`);
       }
     }
   }

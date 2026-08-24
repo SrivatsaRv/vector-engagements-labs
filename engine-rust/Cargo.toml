@@ -15,12 +15,14 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = { version = "1.0.149", features = ["float_roundtrip"] }
+serde_json = "1.0.149"
 sha2 = "0.10.9"
 
 [profile.release]
 codegen-units = 1
 lto = true
+# The production browser engine remains below its unchanged 500 kB gate.
+# Verification-only evaluators are owned by separate crates and artifacts.
 opt-level = "z"
 overflow-checks = true
 panic = "abort"

@@ -1,12 +1,49 @@
 import assert from "node:assert/strict";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import test from "node:test";
-import { runRustWasmSixDofVerification } from "../lib/engine/backend.ts";
+import {
+  runRustWasmSixDofVerification,
+  SIX_DOF_FOUNDATION_VERIFIER_ARTIFACT,
+} from "../lib/validation/sixdof-foundation-wasm.ts";
 import {
   runSixDofVerification,
   SIX_DOF_VERIFICATION_LIMITS,
 } from "../lib/validation/sixdof-foundation.ts";
 
 const ZERO = { x: 0, y: 0, z: 0 };
+
+test("the isolated 6DOF verification artifact has a stable bounded identity", () => {
+  assert.match(SIX_DOF_FOUNDATION_VERIFIER_ARTIFACT.sha256, /^[a-f0-9]{64}$/);
+  assert.ok(SIX_DOF_FOUNDATION_VERIFIER_ARTIFACT.bytes > 100_000);
+  assert.ok(SIX_DOF_FOUNDATION_VERIFIER_ARTIFACT.bytes < 500_000);
+});
+
+test("production Rust, WASM, backend, and Worker surfaces contain no 6DOF verifier", () => {
+  const productionPaths = [
+    new URL("../engine-rust/src/lib.rs", import.meta.url),
+    new URL("../engine-rust/src/wasm_abi.rs", import.meta.url),
+    new URL("../lib/engine/backend.ts", import.meta.url),
+  ];
+  for (const path of productionPaths) {
+    assert.doesNotMatch(readFileSync(path, "utf8"), /six.?dof|sixdof/i, path.pathname);
+  }
+  const generated = readFileSync(new URL("../lib/engine/generated/vector-engine-wasm.ts", import.meta.url), "utf8");
+  const base64 = generated.match(/VECTOR_ENGINE_WASM_BASE64 = "([A-Za-z0-9+/=]+)"/)?.[1];
+  assert.ok(base64);
+  const bytes = Buffer.from(base64, "base64");
+  const exports = WebAssembly.Module.exports(new WebAssembly.Module(bytes)).map(({ name }) => name);
+  assert.ok(!exports.some((name) => /six.?dof|sixdof/i.test(name)));
+  assert.doesNotMatch(new TextDecoder().decode(bytes), /six.?dof|sixdof/i);
+  const collect = (directory) => existsSync(directory)
+    ? readdirSync(directory).flatMap((entry) => {
+      const path = new URL(entry, directory.href.endsWith("/") ? directory : new URL(`${directory.href}/`));
+      return statSync(path).isDirectory() ? collect(path) : [path];
+    })
+    : [];
+  for (const path of collect(new URL("../dist/", import.meta.url)).filter((entry) => /simulation\.worker-.*\.js$/.test(entry.pathname))) {
+    assert.doesNotMatch(readFileSync(path, "utf8"), /vector_sixdof_verification_run_json|sixdof-foundation/i, path.pathname);
+  }
+});
 
 function caseInput(overrides = {}) {
   return {

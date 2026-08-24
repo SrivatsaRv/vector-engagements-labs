@@ -1,8 +1,10 @@
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
 use crate::simulation_events::MAX_SIMULATION_EVENTS;
 use crate::{
-    first_fixed_step_tick_at_or_after, EngineError, EngineScenario, EntityDefinition, Table1d, Vec3,
+    first_fixed_step_tick_at_or_after, valid_verification_track_model, EngineError, EngineScenario,
+    EntityDefinition, Table1d, Vec3,
 };
 
 /// Maximum JSON payload accepted by the browser WASM ABI.
@@ -26,6 +28,133 @@ const MAX_FIXED_STEP_SECONDS: f64 = 1.0;
 
 fn invalid(message: impl Into<String>) -> EngineError {
     EngineError::InvalidScenario(message.into())
+}
+
+fn hash_string(hash: &mut Sha256, value: &str) {
+    hash.update(b"s");
+    hash.update((value.len() as u64).to_be_bytes());
+    hash.update(value.as_bytes());
+}
+
+fn hash_integer(hash: &mut Sha256, value: usize) {
+    hash.update(b"i");
+    hash.update((value as u64).to_be_bytes());
+}
+
+fn hash_number(hash: &mut Sha256, value: f64) {
+    hash.update(b"f");
+    hash.update(value.to_bits().to_be_bytes());
+}
+
+fn hash_vector(hash: &mut Sha256, value: Vec3) {
+    hash_number(hash, value.x);
+    hash_number(hash, value.y);
+    hash_number(hash, value.z);
+}
+
+fn hash_strings(hash: &mut Sha256, values: &[String]) {
+    hash_integer(hash, values.len());
+    for value in values {
+        hash_string(hash, value);
+    }
+}
+
+fn verify_runtime_model_pack_digest(scenario: &EngineScenario) -> Result<(), EngineError> {
+    let has_verification = scenario
+        .model_pack
+        .observer_sensors
+        .iter()
+        .any(|sensor| sensor.verification_track_model.is_some());
+    if scenario.model_pack.runtime_digest.is_none() && !has_verification {
+        return Ok(());
+    }
+    let expected = scenario
+        .model_pack
+        .runtime_digest
+        .as_deref()
+        .ok_or_else(|| {
+            invalid("modelPack.runtimeDigest is required for a verification track model")
+        })?;
+    sha256_digest("modelPack.runtimeDigest", expected)?;
+    let pack = &scenario.model_pack;
+    let mut hash = Sha256::new();
+    hash_string(&mut hash, "vector.runtime-model-pack-digest.v2");
+    hash_string(&mut hash, &pack.schema_version);
+    hash_string(&mut hash, &pack.id);
+    hash_string(&mut hash, &pack.version);
+    hash_string(&mut hash, &pack.digest);
+    hash_string(&mut hash, &pack.intended_use.id);
+    hash_string(&mut hash, &pack.intended_use.version);
+    hash_integer(&mut hash, pack.observer_sensors.len());
+    for sensor in &pack.observer_sensors {
+        hash_string(&mut hash, &sensor.model_id);
+        hash_string(&mut hash, &sensor.model_version);
+        hash_strings(&mut hash, &sensor.evidence_ref_ids);
+        hash_string(&mut hash, &sensor.sensor_kind);
+        hash_number(&mut hash, sensor.detection_range_m);
+        hash_number(&mut hash, sensor.minimum_range_m);
+        hash_number(&mut hash, sensor.scan_period_s);
+        hash_number(&mut hash, sensor.azimuth_field_of_view_rad);
+        hash_number(&mut hash, sensor.elevation_field_of_view_rad);
+        hash_integer(
+            &mut hash,
+            usize::from(sensor.verification_track_model.is_some()),
+        );
+        if let Some(model) = &sensor.verification_track_model {
+            hash_string(&mut hash, &model.schema_version);
+            hash_string(&mut hash, &model.value_state);
+            hash_string(&mut hash, &model.intended_use);
+            hash_vector(&mut hash, model.position_bias_m);
+            hash_vector(&mut hash, model.velocity_bias_mps);
+            hash_vector(&mut hash, model.position_standard_deviation_m);
+            hash_vector(&mut hash, model.velocity_standard_deviation_mps);
+            hash_integer(&mut hash, model.confirmation_observations as usize);
+            hash_number(&mut hash, model.maximum_observation_age_seconds);
+            hash_number(&mut hash, model.coast_after_seconds);
+            hash_number(&mut hash, model.lost_after_seconds);
+            hash_integer(&mut hash, model.observation_windows_seconds.len());
+            for window in &model.observation_windows_seconds {
+                hash_number(&mut hash, window.start);
+                hash_number(&mut hash, window.end);
+            }
+        }
+    }
+    hash_integer(&mut hash, pack.scenario_patches.len());
+    for patch in &pack.scenario_patches {
+        hash_string(&mut hash, &patch.schema_version);
+        hash_string(&mut hash, &patch.id);
+        hash_string(&mut hash, &patch.model_pack_digest);
+        hash_string(&mut hash, &patch.model_id);
+        hash_string(&mut hash, &patch.field_path);
+        hash_number(&mut hash, patch.old_value);
+        hash_number(&mut hash, patch.new_value);
+        hash_string(&mut hash, &patch.unit);
+        hash_string(&mut hash, &patch.reason);
+        hash_string(&mut hash, &patch.provenance.author_id);
+        hash_string(&mut hash, &patch.provenance.authored_at);
+        hash_strings(&mut hash, &patch.provenance.evidence_ref_ids);
+    }
+    let actual = format!("{:x}", hash.finalize());
+    if actual != expected {
+        return Err(invalid(format!(
+            "modelPack.runtimeDigest does not match its content: expected {expected}, computed {actual}"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_verification_track_model(
+    model: &crate::ObserverTrackModel,
+    intended_use_id: &str,
+) -> Result<(), EngineError> {
+    if intended_use_id != "vector.intended-use.engine-verification"
+        || !valid_verification_track_model(model)
+    {
+        return Err(invalid(
+            "generic track model is admitted only for engine verification",
+        ));
+    }
+    Ok(())
 }
 
 fn finite(path: &str, value: f64) -> Result<(), EngineError> {
@@ -274,7 +403,10 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
         )?;
     }
     if let Some(sensor) = &entity.observer_sensor {
-        if sensor.schema_version != "vector.observer-sensor-admission.v1" {
+        if !matches!(
+            sensor.schema_version.as_str(),
+            "vector.observer-sensor-admission.v1" | "vector.observer-sensor-admission.v2"
+        ) {
             return Err(invalid(format!(
                 "{root}.observerSensor.schemaVersion is unsupported"
             )));
@@ -458,6 +590,7 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
     identifier("modelPack.id", &scenario.model_pack.id)?;
     identifier("modelPack.version", &scenario.model_pack.version)?;
     sha256_digest("modelPack.digest", &scenario.model_pack.digest)?;
+    verify_runtime_model_pack_digest(scenario)?;
     identifier(
         "modelPack.intendedUse.id",
         &scenario.model_pack.intended_use.id,
@@ -613,10 +746,25 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
                     && sensor.scan_period_s == admission.scan_period_s
                     && sensor.azimuth_field_of_view_rad == admission.azimuth_field_of_view_rad
                     && sensor.elevation_field_of_view_rad == admission.elevation_field_of_view_rad
+                    && sensor.verification_track_model == admission.verification_track_model
             });
             if !exact_match {
                 return Err(invalid(format!(
                     "observer sensor {} is not bound to an admitted compiled sensor model",
+                    entity.id
+                )));
+            }
+            if let Some(model) = &admission.verification_track_model {
+                if admission.schema_version != "vector.observer-sensor-admission.v2" {
+                    return Err(invalid(format!(
+                        "observer sensor {} verification track model requires admission v2",
+                        entity.id
+                    )));
+                }
+                validate_verification_track_model(model, &scenario.model_pack.intended_use.id)?;
+            } else if admission.schema_version != "vector.observer-sensor-admission.v1" {
+                return Err(invalid(format!(
+                    "observer sensor {} has an unsupported admission schema",
                     entity.id
                 )));
             }

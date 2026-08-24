@@ -91,6 +91,27 @@ minimum range. This contract does not add a positive sensor to the deployed
 pack or make a track. It prevents incomplete public research evidence from
 becoming a generic radar by accident.
 
+### Generic track verification pack
+
+`vector.intended-use.engine-verification` is a separate non-production intended
+use for bounded engine tests. A source-authored sensor may attach
+`vector.generic-track-model.v1` only under that intended use and only with
+`TEST_FIXTURE / ENGINE_VERIFICATION_ONLY` state. The model freezes position and
+velocity bias, diagonal standard deviation, confirmation count, maximum source
+age, coast/loss thresholds, and deterministic observation windows. It is
+compiled and content-addressed through the same model-pack path as every other
+model; it is not an entity-level test mutation or a weapon/sensor-name heuristic.
+
+The engine scenario also binds a SHA-256 digest over the compact runtime
+model-pack projection. `vector.runtime-model-pack-digest.v2` hashes a closed,
+ordered binary projection: length-prefixed UTF-8 strings, fixed-width unsigned
+integers, and exact big-endian IEEE-754 bits. TypeScript and Rust recompute the
+same bytes before constructing runtime state. A changed projection, missing
+digest, wrong intended use, or unknown field fails admission. The production
+deployment manifest does not admit this pack, so the browser Worker rejects it.
+This contract proves generic
+TrackStore mechanics only; no named aircraft sensor is thereby available.
+
 ## Compilation and digest
 
 `compileModelPack(source)` performs all work before the engine starts:
@@ -186,6 +207,18 @@ as provenance for a future capability-specific surface; the current Lab and
 report instead retain the pack's blocking limitation verbatim. Neither surface
 may upgrade a geometry-teaching fixture into an `ADMITTED` named-performance
 claim.
+
+The separately versioned `NASA_NESC_GENERIC_F16_REFERENCE` verification corpus
+is an `ENGINE_VERIFICATION_ONLY` boundary; it does not mutate or extend the
+published aircraft evidence registry v2. Its first #135 slice registers
+immutable source and comparison identities but deliberately withholds an
+executable derivative because the public reports do not contain every Case
+13.2 propulsion/control table and a new descendant of the NESC package requires
+explicit licence and ancestry review. The previously reviewed Case 11 fixture
+remains preserved in registry v2, with its narrow ancestry and digest unchanged.
+A verification corpus with `runtimeAuthority: NONE` cannot satisfy a compiled
+aircraft component, expand a model validity domain, or be promoted through a
+catalog identity.
 
 ## Scenario binding and patches
 

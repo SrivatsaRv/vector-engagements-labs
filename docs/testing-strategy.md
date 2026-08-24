@@ -1,5 +1,11 @@
 # Testing strategy
 
+## Frozen TP-1538 evidence
+
+`npm run tp1538:sources:verify` checks the immutable source and metadata hashes, exact 59-page mapping, exhaustive manifest descriptors, source-render and upright lossless-display hashes/dimensions/orientation lineage, rights/export fields, visual-QA inventory, path confinement, and verification-only production isolation. `npm run tp1538:sources:generate` is deliberately pinned to Poppler `pdftoppm` 26.05.0 and Sharp 0.35.0; repeated generation must be byte-identical before any regenerated artifact is admitted.
+
+The verifier is offline and cannot fetch replacement evidence. Numeric transcription, interpolation, and runtime tests belong to later #142 children and must not be credited to #143.
+
 Testing is part of the implementation contract. An executable action is incomplete until its behavior is covered at the appropriate test layers and the result is recorded. The project uses focused tests for fast feedback and staged integration evidence for release confidence.
 
 ## Required layers
@@ -58,6 +64,18 @@ unbounded input rejection, energy invariance, step-size convergence at common
 checkpoints, and 1×10⁻⁹ TypeScript/Rust-WASM parity. A deliberately perturbed
 trajectory must fail the gate.
 
+Generic-missile arithmetic verification additionally runs
+`reference-aam:verify`. It checks the frozen NASA TM-109057 bytes, exact corpus
+and successor workload ownership, private-corpus mutation resistance, input/output falsifiers,
+independent arithmetic and convergence oracles, forward/reversed workload
+digests, a cross-platform quantized semantic identity with sampled and aggregate
+trajectory values, full-to-terminal comparison of all 30 numeric frame leaves under the governed default/CPA-specific absolute-plus-relative parity policy,
+half-bin/overflow/policy-tamper falsifiers, printed-radian boundary flips, D09 exceptional semantics, exhaustive
+finite content-addressed run decoding, isolated production-bundle scans, exact numeric-boundary sweeps, and complete TypeScript/actual-WASM frame parity. The separate
+`reference-aam:performance` target reports a 15-case Node-hosted workload under
+explicit p95 limits and makes no Worker or product-capacity claim. See
+[`generic-aam-verification.md`](generic-aam-verification.md).
+
 GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
 automated gate from changed paths. Repository-policy tests always run, and an
 unknown path fails closed through every CI job. Documentation and agent-harness
@@ -86,9 +104,36 @@ awaits the complete server process group after success, verifier failure, early
 server exit, or cancellation, and returns the verifier status. CI retains that
 directory on failure. The policy regression deliberately fails a verifier,
 checks that the log remains readable, and binds the same port again to prove
-cleanup. This process evidence is separate from Playwright, which already owns
-its built-server lifecycle and retains traces, screenshots, and video under
-`outputs/` on failure.
+cleanup. This process evidence is separate from the Browser Contract runner. CI
+builds the application once, then `scripts/run-browser-contracts.mjs` executes
+the five Playwright projects serially with a fresh managed Wrangler/Workerd
+process group for each viewport. The policy is `RUN_ALL_PROJECTS_ONCE`: all 15
+cases execute without retries even after one project fails, so later-viewport
+evidence is not suppressed. An external `SIGINT` or `SIGTERM` is different: it
+terminates the active server and test process groups, records the interruption,
+does not start later projects, and exits nonzero. Any project, server,
+interruption, cleanup, or evidence-retention failure makes the aggregate command
+fail. A pass requires a nonempty managed-server log and parseable Playwright JSON
+bound to the expected project, exactly three executed cases, and their successful
+statuses. The three governed case identities are exact and distinct; global or
+per-result errors cannot coexist with a passing status. Every governed project
+entry must bind to the selected project's isolated output directory.
+Browser-test failures require retained trace, screenshot, and video
+attachments. Early-server/interruption and Playwright harness-startup failures
+are separate closed evidence variants because browser artifacts cannot exist
+before a browser test begins. Per-project evidence is retained below
+`outputs/playwright/`; the deterministic aggregate is
+`browser-contract-summary.json`.
+
+This isolation boundary responds to two hosted, cross-branch late-suite
+failures in which Wrangler 4.123/Miniflare reported `ProxyController: Network
+connection lost` and the listener then refused requests. Exact-head reruns and
+three matched local runs per branch passed, so no deterministic application-
+bundle defect was claimed. Matched local server groups peaked at approximately
+1.23–1.34 GiB RSS. Issue #63 owns the remaining soak, hosted-runtime diagnosis,
+and broader harness acceptance; this slice limits one server group to one
+viewport project and preserves evidence when the nondeterministic failure
+recurs.
 
 ## Framework decision
 
@@ -102,7 +147,10 @@ inspection scripts and is not a test runner.
 - `npm run test:component` runs component contracts.
 - `npm run test:browser` builds and starts the application when `VECTOR_URL` is
   absent, or tests the supplied built application when it is present.
-- `make browser-local` runs both frontend runners.
+- `npm run test:browser:ci` builds once and gives each governed Playwright
+  project its own Wrangler/Workerd lifecycle. It is the Browser Contract CI
+  command and deliberately forces one worker and zero retries.
+- `make browser-local` runs component tests and the isolated CI browser runner.
 - The change classifier selects the Browser Contract job for app, component,
   scenario-admission, capability and runner changes. The Required PR Gate fails
   when that selected job does not pass.

@@ -261,12 +261,23 @@ export const DEPLOYMENT_CAPABILITIES =
 export function createVerificationDeploymentCapabilities(
   engine: EngineBackendId,
   enabledDomains: readonly EngagementDomain[] = ["A2A"],
+  additionalModelPackDigests: readonly string[] = [],
 ) {
   const admitted = new Set(enabledDomains);
   return createDeploymentCapabilityManifest({
     ...DEPLOYMENT_INPUT,
     buildIdentity: `verification-${engine}`,
     engine: { ...DEPLOYMENT_INPUT.engine, id: engine },
+    admittedModelPackDigests: [
+      ...DEPLOYMENT_INPUT.admittedModelPackDigests,
+      ...additionalModelPackDigests,
+    ],
+    optionalCapabilities: {
+      ...DEPLOYMENT_INPUT.optionalCapabilities,
+      ...(additionalModelPackDigests.length > 0
+        ? { sensors: enabled("The generic engine-verification sensor fixture is admitted.") }
+        : {}),
+    },
     domains: Object.fromEntries(
       Object.entries(DEPLOYMENT_INPUT.domains).map(([domain, decision]) => [
         domain,

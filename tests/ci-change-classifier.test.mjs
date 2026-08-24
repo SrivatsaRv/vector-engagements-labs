@@ -46,6 +46,10 @@ test("frontend code receives quality, security, and web tests", () => {
   ]);
 });
 
+test("the isolated browser runner selects its built-browser consumer", () => {
+  assert.equal(selected(["scripts/run-browser-contracts.mjs"]).includes("browser_tests"), true);
+});
+
 test("Rust implementation changes receive parity tests without dependency audit", () => {
   assert.deepEqual(selected(["engine-rust/src/lib.rs"]), [
     "policy",
