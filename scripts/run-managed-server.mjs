@@ -18,16 +18,49 @@ function exitOf(processHandle) {
 }
 
 function signalProcessGroup(processHandle, signal) {
-  if (processHandle.exitCode !== null || processHandle.signalCode !== null) return;
   try {
     if (isPosix && processHandle.pid) process.kill(-processHandle.pid, signal);
-    else processHandle.kill(signal);
+    else if (processHandle.exitCode === null && processHandle.signalCode === null) {
+      processHandle.kill(signal);
+    }
   } catch (error) {
     if (error?.code !== "ESRCH") throw error;
   }
 }
 
+function processGroupExists(processHandle) {
+  if (!isPosix || !processHandle.pid) {
+    return processHandle.exitCode === null && processHandle.signalCode === null;
+  }
+  try {
+    process.kill(-processHandle.pid, 0);
+    return true;
+  } catch (error) {
+    if (error?.code === "ESRCH") return false;
+    if (error?.code === "EPERM") return true;
+    throw error;
+  }
+}
+
+async function waitForProcessGroupExit(processHandle, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (processGroupExists(processHandle) && Date.now() < deadline) {
+    await delay(25);
+  }
+  return !processGroupExists(processHandle);
+}
+
 async function terminateProcessGroup(processHandle, exitPromise, timeoutMs) {
+  if (isPosix && processHandle.pid) {
+    signalProcessGroup(processHandle, "SIGTERM");
+    if (!(await waitForProcessGroupExit(processHandle, timeoutMs))) {
+      signalProcessGroup(processHandle, "SIGKILL");
+      if (!(await waitForProcessGroupExit(processHandle, timeoutMs))) {
+        throw new Error(`Managed process group ${processHandle.pid} did not terminate.`);
+      }
+    }
+    return exitPromise;
+  }
   if (processHandle.exitCode !== null || processHandle.signalCode !== null) {
     return exitPromise;
   }
@@ -103,44 +136,79 @@ export async function runManagedServer({
   process.once("SIGTERM", handleSigterm);
 
   try {
-    if (readyUrl) {
-      await waitForReady(readyUrl, serverProcess, startupTimeoutMs, interrupted);
-    }
-    taskProcess = spawn(task.command, task.args ?? [], {
-      cwd,
-      env,
-      detached: isPosix,
-      stdio: "inherit",
-    });
-    taskExit = exitOf(taskProcess);
-    const outcome = await Promise.race([
-      taskExit.then((exit) => ({ kind: "task", exit })),
-      serverExit.then((exit) => ({ kind: "server", exit })),
-    ]);
-    if (outcome.kind === "server") {
-      await terminateProcessGroup(taskProcess, taskExit, shutdownTimeoutMs);
+    try {
+      if (readyUrl) {
+        try {
+          await waitForReady(readyUrl, serverProcess, startupTimeoutMs, interrupted);
+        } catch (error) {
+          if (interrupted.signal) {
+            return {
+              taskExitCode: 1,
+              serverExitedEarly: false,
+              interruptedBy: interrupted.signal,
+            };
+          }
+          throw error;
+        }
+      }
+      taskProcess = spawn(task.command, task.args ?? [], {
+        cwd,
+        env,
+        detached: isPosix,
+        stdio: "inherit",
+      });
+      taskExit = exitOf(taskProcess);
+      const outcome = await Promise.race([
+        taskExit.then((exit) => ({ kind: "task", exit })),
+        serverExit.then((exit) => ({ kind: "server", exit })),
+      ]);
+      if (outcome.kind === "server") {
+        await terminateProcessGroup(taskProcess, taskExit, shutdownTimeoutMs);
+        return {
+          taskExitCode: 1,
+          serverExitedEarly: true,
+          interruptedBy: interrupted.signal,
+        };
+      }
       return {
-        taskExitCode: 1,
-        serverExitedEarly: true,
+        taskExitCode: outcome.exit.code ?? 1,
+        serverExitedEarly: false,
         interruptedBy: interrupted.signal,
       };
+    } finally {
+      let cleanupError;
+      if (taskProcess && taskExit) {
+        try {
+          await terminateProcessGroup(taskProcess, taskExit, shutdownTimeoutMs);
+        } catch (error) {
+          cleanupError = error;
+        }
+      }
+      try {
+        await terminateProcessGroup(serverProcess, serverExit, shutdownTimeoutMs);
+      } catch (error) {
+        cleanupError ??= error;
+      }
+      process.removeListener("SIGINT", handleSigint);
+      process.removeListener("SIGTERM", handleSigterm);
+      try {
+        await new Promise((resolve, reject) => {
+          log.once("error", reject);
+          log.end(resolve);
+        });
+      } catch (error) {
+        cleanupError ??= error;
+      }
+      if (cleanupError) throw cleanupError;
     }
-    return {
-      taskExitCode: outcome.exit.code ?? 1,
-      serverExitedEarly: false,
-      interruptedBy: interrupted.signal,
-    };
-  } finally {
-    if (taskProcess && taskExit && interrupted.signal) {
-      await terminateProcessGroup(taskProcess, taskExit, shutdownTimeoutMs);
-    }
-    await terminateProcessGroup(serverProcess, serverExit, shutdownTimeoutMs);
-    process.removeListener("SIGINT", handleSigint);
-    process.removeListener("SIGTERM", handleSigterm);
-    await new Promise((resolve, reject) => {
-      log.once("error", reject);
-      log.end(resolve);
-    });
+  } catch (error) {
+    if (!interrupted.signal) throw error;
+    const interruption = new Error(
+      `Managed server interrupted by ${interrupted.signal}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+    interruption.interruptedBy = interrupted.signal;
+    throw interruption;
   }
 }
 

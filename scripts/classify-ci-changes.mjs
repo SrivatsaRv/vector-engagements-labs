@@ -43,6 +43,7 @@ const BROWSER_SURFACE = [
   /^lib\/(?:information-state|map-layer-contracts|mission-admission|scenario-draft|scenario-package|scenario-spatial|scenario-validation|scenarios|simulation|tactical-symbol-contract|tactical-symbol-library|tactical-symbol-markup)\.ts$/,
   /^lib\/security\/browser-response\.ts$/,
   /^scripts\/(?:browser-worker-assets|build-runtime-bundles|verify-browser-worker)\.(?:c|m)?tsx?$/,
+  /^scripts\/run-browser-contracts\.mjs$/,
   /^tests\/(?:browser-runtime|browser-worker-assets)\.test\.(?:c|m)?tsx?$/,
   /^tests\/(?:browser|component)\//,
   /^(?:playwright|vitest)\.config\.ts$/,

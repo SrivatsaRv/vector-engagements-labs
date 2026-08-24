@@ -23,6 +23,7 @@
     "test": "npm run build && node --test tests/*.test.mjs && tsx --test tests/*.test.ts",
     "test:component": "vitest run",
     "test:browser": "playwright test",
+    "test:browser:ci": "npm run build && node scripts/run-browser-contracts.mjs",
     "test:admission:integration": "tsx --test tests/runtime-admission-db.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0 --ignore-pattern dist --ignore-pattern .next --ignore-pattern engine-rust/target --ignore-pattern public/vendor --ignore-pattern blog",

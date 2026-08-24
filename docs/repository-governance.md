@@ -68,8 +68,31 @@ The live application inside `make integration-ci` is owned by
 `scripts/run-managed-server.mjs`. It retains server output under
 `outputs/integration/`, terminates and awaits the server process group on every
 exit path, and propagates verifier failure. The integration workflow uploads
-that directory on failure. Playwright retains its separate trace, screenshot,
-video, and HTML evidence under `outputs/`.
+that directory on failure. The Browser Contract job reuses the same process-
+group boundary through `scripts/run-browser-contracts.mjs`, but starts a new
+Wrangler/Workerd group for each fixed Playwright project. The exported runner
+accepts only the exact ordered five-project inventory—subsets, reordering,
+duplicates, unknown names, and path-like names fail before filesystem work. It
+runs those five projects exactly once, aggregates their statuses deterministically, and retains
+server logs plus Playwright JSON, trace, screenshot, and video evidence below
+`outputs/playwright/`. Empty or malformed evidence cannot produce a passing
+summary. Server logs, JSON reports, summaries, and artifact paths must resolve
+to single-link regular files inside their exact governed output directory. The
+output, server, reports, artifact-root, and project directories are
+identity-checked real directories before and after evidence inspection and
+summary persistence. Replacing any governed directory or evidence file with a
+symbolic or hard link fails evidence admission and does not modify or delete the
+external target. Summary updates use a no-follow temporary file, atomic rename,
+and canonical readback. Browser-test failure,
+harness-startup failure, early-server exit, and
+external interruption have explicit evidence states. The managed boundary
+always terminates the detached task process group, including descendants that
+outlive a successfully exited task leader, before returning. Interruption state
+is preserved whether the signal arrives before readiness, during a browser
+case, or while cleanup reports another error; later projects are not started.
+Direct
+`npm run test:browser` remains available for a caller-owned `VECTOR_URL`; only
+CI and `make browser-local` select the isolated runner.
 
 The gate implementation is a tracked, unit-tested script rather than inline
 workflow shell. It accepts only explicit `true` or `false` selections, requires
