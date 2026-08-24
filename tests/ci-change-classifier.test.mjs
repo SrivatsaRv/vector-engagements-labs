@@ -69,6 +69,7 @@ test("every private 6DOF owning path selects its Rust and dependency owners", ()
     ["lib/validation/sixdof-foundation-wasm.ts", webAndRust],
     ["lib/validation/generated/sixdof-foundation-verifier-wasm.ts", webAndRust],
     ["scripts/build-sixdof-foundation-verifier.mjs", webAndRust],
+    ["scripts/lib/canonical-rust-wasm-builder.mjs", webAndRust],
     ["scripts/sixdof-production-isolation.mjs", webAndRust],
     ["scripts/benchmark-sixdof-foundation.ts", webAndRust],
     ["tests/sixdof-foundation.test.mjs", webAndRust],
@@ -98,6 +99,7 @@ test("every generic-AAM owning path selects its Rust and dependency owners", () 
     ["scripts/verify-nasa-generic-aam-reference.mjs", webAndRust],
     ["tests/generic-aam-oracles.test.mjs", webAndRust],
     ["tests/generic-aam-verification.test.mjs", webAndRust],
+    ["tests/canonical-rust-wasm-builder.test.mjs", webAndRust],
     [
       "package.json",
       ["policy", "quality", "security_js", "web_tests", "rust_tests", "integration", "container"],

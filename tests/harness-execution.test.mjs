@@ -177,17 +177,21 @@ test("Rust and private WASM builds use one exact cross-host toolchain", async ()
     assert.match(workflow, /toolchain:\s*1\.97\.1/);
   }
 
-  const builder = await readFile("scripts/build-sixdof-foundation-verifier.mjs", "utf8");
-  assert.match(builder, /rust:1\.97\.1-bookworm@sha256:408fe88047cef61a2087653b0c5255fa51c0f2d6d94ddedd7a2562a9b91a46f6/);
-  assert.match(builder, /linux\/amd64/);
-  assert.match(builder, /freshSha256/);
-  assert.match(builder, /committedSha256/);
+  const sharedBuilder = await readFile("scripts/lib/canonical-rust-wasm-builder.mjs", "utf8");
+  assert.match(sharedBuilder, /rust:1\.97\.1-bookworm@sha256:408fe88047cef61a2087653b0c5255fa51c0f2d6d94ddedd7a2562a9b91a46f6/);
+  assert.match(sharedBuilder, /linux\/amd64/);
+  assert.match(sharedBuilder, /trap restore_target_ownership EXIT/);
+  assert.match(sharedBuilder, /chown -R --.*\/target/);
 
-  const aamBuilder = await readFile("scripts/build-generic-aam-verifier.mjs", "utf8");
-  assert.match(aamBuilder, /rust:1\.97\.1-bookworm@sha256:408fe88047cef61a2087653b0c5255fa51c0f2d6d94ddedd7a2562a9b91a46f6/);
-  assert.match(aamBuilder, /linux\/amd64/);
-  assert.match(aamBuilder, /freshSha256/);
-  assert.match(aamBuilder, /committedSha256/);
+  for (const builderPath of [
+    "scripts/build-sixdof-foundation-verifier.mjs",
+    "scripts/build-generic-aam-verifier.mjs",
+  ]) {
+    const builder = await readFile(builderPath, "utf8");
+    assert.match(builder, /buildCanonicalRustWasm/);
+    assert.match(builder, /freshSha256/);
+    assert.match(builder, /committedSha256/);
+  }
 });
 
 test("private 6DOF npm aliases resolve to the intended crate and verification commands", async () => {

@@ -71,9 +71,11 @@ const RUST_CONTRACT = [
   /^package\.json$/,
   /^scripts\/(?:benchmark-sixdof-foundation\.ts|build-sixdof-foundation-verifier\.mjs|sixdof-production-isolation\.mjs)$/,
   /^scripts\/(?:benchmark-generic-aam\.ts|build-generic-aam-verifier\.mjs|generate-nasa-generic-aam-workload\.mjs|verify-nasa-generic-aam-reference\.mjs)$/,
+  /^scripts\/lib\/canonical-rust-wasm-builder\.mjs$/,
   /^scripts\/(?:build-rust-engine|generate-model-pack-fixture|verify-public-aircraft-reference)\.mjs$/,
   /^tests\/sixdof-foundation\.test\.mjs$/,
   /^tests\/generic-aam-(?:oracles|verification)\.test\.mjs$/,
+  /^tests\/canonical-rust-wasm-builder\.test\.mjs$/,
 ];
 
 const RUST_MANIFEST = [
