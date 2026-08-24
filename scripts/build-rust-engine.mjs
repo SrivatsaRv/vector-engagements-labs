@@ -10,6 +10,10 @@ import {
 } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import process from "node:process";
+import {
+  assertNoPrivateSixDofVerifierBytes,
+  assertNoPrivateSixDofVerifierExports,
+} from "./sixdof-production-isolation.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const manifest = resolve(root, "engine-rust/Cargo.toml");
@@ -43,9 +47,8 @@ const sourceSha256 = collectSourceFiles(resolve(root, "engine-rust"))
   .digest("hex");
 
 function verifyModule(bytes, label) {
-  const exports = new Set(
-    WebAssembly.Module.exports(new WebAssembly.Module(bytes)).map(({ name }) => name),
-  );
+  const exportNames = WebAssembly.Module.exports(new WebAssembly.Module(bytes)).map(({ name }) => name);
+  const exports = new Set(exportNames);
   for (const required of [
     "memory",
     "vector_abi_version",
@@ -60,11 +63,8 @@ function verifyModule(bytes, label) {
       throw new Error(`${label} is missing required WASM export ${required}.`);
     }
   }
-  for (const forbidden of ["vector_sixdof_verifier_run_json", "vector_sixdof_verification_run_json"]) {
-    if (exports.has(forbidden)) {
-      throw new Error(`${label} exposes verification-only WASM export ${forbidden}.`);
-    }
-  }
+  assertNoPrivateSixDofVerifierExports(exportNames, label);
+  assertNoPrivateSixDofVerifierBytes(bytes, label);
   if (bytes.length >= 500_000) {
     throw new Error(`${label} is ${bytes.length} bytes; production artifact limit is 500000.`);
   }

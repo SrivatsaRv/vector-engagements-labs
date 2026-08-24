@@ -124,7 +124,11 @@ falsification cases:
 - conservation diagnostic applicability for zero versus nonzero wrench;
 - TypeScript and independent Rust/WASM fail-closed admission cases.
 - production-isolation regression across the Rust crate, WASM export table,
-  backend adapter, and built simulation Worker.
+  backend adapter, generated production module, and built simulation Worker. One
+  centralized exact marker inventory rejects the private ABI prefix, both
+  verification schemas, adapter/generated-module identities, and crate identity;
+  an in-memory production-style bundle injection proves the real ABI cannot evade
+  the Worker check through the former misspelled marker.
 
 The production artifact remains independently generated at 493,585 bytes,
 below its unchanged 500,000-byte gate, with no verifier export. The standalone

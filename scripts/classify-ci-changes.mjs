@@ -66,7 +66,7 @@ const RUST_CONTRACT = [
   /^lib\/validation\/public-aircraft-reference\.ts$/,
   /^lib\/(?:model-pack|reference-model-pack|simulation-models)\.ts$/,
   /^package\.json$/,
-  /^scripts\/(?:benchmark-sixdof-foundation\.ts|build-sixdof-foundation-verifier\.mjs)$/,
+  /^scripts\/(?:benchmark-sixdof-foundation\.ts|build-sixdof-foundation-verifier\.mjs|sixdof-production-isolation\.mjs)$/,
   /^scripts\/(?:build-rust-engine|generate-model-pack-fixture|verify-public-aircraft-reference)\.mjs$/,
   /^tests\/sixdof-foundation\.test\.mjs$/,
 ];

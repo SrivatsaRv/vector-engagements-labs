@@ -187,10 +187,22 @@ The commit gate rejects high-severity production dependency advisories. Cargo
 manifest changes and releases also audit `engine-rust/Cargo.lock` with the
 pinned `cargo-audit` version and current RustSec advisory database. The
 Cloudflare Vite adapter, Wrangler, and Workers type package are upgraded as one
-tested compatibility set and are no longer excluded from Dependabot. Remaining
+tested compatibility set. They are temporarily frozen at adapter `1.46.0`,
+Wrangler `4.113.0`, and Workers types `5.20260721.1` by
+`governance/browser-toolchain-compatibility.v1.json`. Wrangler `4.114.0` and
+newer reproduce an upstream ProxyWorker/Miniflare network-loss regression; the
+upstream correction is not released as of 2026-08-24. Dependabot ignores only
+this three-package set until the governed removal trigger is satisfied. Removal
+requires a released version containing the upstream fix, three hosted exact-head
+browser-contract repeats, process/port cleanup evidence, full local gates, and
+independent review. Retries, viewport omission, ignored server exits, or weaker
+evidence admission are prohibited substitutes. Remaining
 npm audit findings are development-only advisories inherited through local
 migration and Cloudflare tooling; they are not shipped in the Worker runtime
-dependency surface and remain tracked for upstream removal. Production
+dependency surface and remain tracked for upstream removal. The last-known-good
+Miniflare release requests Undici `7.28.0`; VECTOR overrides that transitive
+development-server dependency to patched `7.29.0` and binds the override in the
+same compatibility record. Production
 dependencies currently audit cleanly.
 
 ## Continuous delivery

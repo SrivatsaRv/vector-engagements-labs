@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "vector.browser-toolchain-compatibility.v1",
+  "decisionId": "WRANGLER_PROXY_NETWORK_LOSS_2026_08_24",
+  "issue": "#63",
+  "status": "TEMPORARY_UPSTREAM_REGRESSION_PIN",
+  "reviewedOn": "2026-08-24",
+  "affectedRegression": {
+    "upstreamIssue": "https://github.com/cloudflare/workers-sdk/issues/14926",
+    "upstreamFixPullRequest": "https://github.com/cloudflare/workers-sdk/pull/15252",
+    "upstreamFixState": "OPEN_UNRELEASED",
+    "affectedFrom": "4.114.0",
+    "lastKnownGood": "4.113.0"
+  },
+  "pins": {
+    "@cloudflare/vite-plugin": "1.46.0",
+    "@cloudflare/workers-types": "5.20260721.1",
+    "wrangler": "4.113.0"
+  },
+  "dependabotIgnore": [
+    "@cloudflare/vite-plugin",
+    "@cloudflare/workers-types",
+    "wrangler"
+  ],
+  "reviewTrigger": "UPSTREAM_FIX_RELEASED_AND_EXACT_VERSION_PROVEN_IN_HOSTED_BROWSER_CONTRACT",
+  "revalidationRequirements": [
+    "EXACT_FIVE_PROJECT_BROWSER_CONTRACT_ZERO_RETRIES",
+    "THREE_HOSTED_EXACT_HEAD_REPEATS",
+    "PROCESS_GROUP_AND_PORT_RELEASE",
+    "MAKE_CI_LOCAL",
+    "MAKE_CLEAN_CLONE_LOCAL",
+    "INDEPENDENT_REVIEW"
+  ],
+  "prohibitedWorkarounds": [
+    "INCREASE_BROWSER_RETRIES",
+    "SKIP_FULL_HD_PROJECT",
+    "WEAKEN_EVIDENCE_ADMISSION",
+    "IGNORE_SERVER_EXIT"
+  ],
+  "securityOverrides": {
+    "undici": {
+      "version": "7.29.0",
+      "replaces": "7.28.0",
+      "reason": "PATCH_KNOWN_HIGH_SEVERITY_DEV_SERVER_ADVISORIES",
+      "scope": "LOCAL_AND_CI_TOOLCHAIN_ONLY"
+    }
+  }
+}

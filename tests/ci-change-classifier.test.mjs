@@ -68,6 +68,7 @@ test("every private 6DOF owning path selects its Rust and dependency owners", ()
     ["lib/validation/sixdof-foundation-wasm.ts", webAndRust],
     ["lib/validation/generated/sixdof-foundation-verifier-wasm.ts", webAndRust],
     ["scripts/build-sixdof-foundation-verifier.mjs", webAndRust],
+    ["scripts/sixdof-production-isolation.mjs", webAndRust],
     ["scripts/benchmark-sixdof-foundation.ts", webAndRust],
     ["tests/sixdof-foundation.test.mjs", webAndRust],
     [

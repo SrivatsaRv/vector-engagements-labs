@@ -9,6 +9,11 @@ import {
   runSixDofVerification,
   SIX_DOF_VERIFICATION_LIMITS,
 } from "../lib/validation/sixdof-foundation.ts";
+import {
+  assertNoPrivateSixDofVerifierBytes,
+  assertNoPrivateSixDofVerifierExports,
+  PRIVATE_SIX_DOF_PRODUCTION_MARKERS,
+} from "../scripts/sixdof-production-isolation.mjs";
 
 const ZERO = { x: 0, y: 0, z: 0 };
 
@@ -25,15 +30,15 @@ test("production Rust, WASM, backend, and Worker surfaces contain no 6DOF verifi
     new URL("../lib/engine/backend.ts", import.meta.url),
   ];
   for (const path of productionPaths) {
-    assert.doesNotMatch(readFileSync(path, "utf8"), /six.?dof|sixdof/i, path.pathname);
+    assertNoPrivateSixDofVerifierBytes(readFileSync(path), path.pathname);
   }
   const generated = readFileSync(new URL("../lib/engine/generated/vector-engine-wasm.ts", import.meta.url), "utf8");
   const base64 = generated.match(/VECTOR_ENGINE_WASM_BASE64 = "([A-Za-z0-9+/=]+)"/)?.[1];
   assert.ok(base64);
   const bytes = Buffer.from(base64, "base64");
   const exports = WebAssembly.Module.exports(new WebAssembly.Module(bytes)).map(({ name }) => name);
-  assert.ok(!exports.some((name) => /six.?dof|sixdof/i.test(name)));
-  assert.doesNotMatch(new TextDecoder().decode(bytes), /six.?dof|sixdof/i);
+  assertNoPrivateSixDofVerifierExports(exports, "production engine WASM");
+  assertNoPrivateSixDofVerifierBytes(bytes, "production engine WASM");
   const collect = (directory) => existsSync(directory)
     ? readdirSync(directory).flatMap((entry) => {
       const path = new URL(entry, directory.href.endsWith("/") ? directory : new URL(`${directory.href}/`));
@@ -41,7 +46,36 @@ test("production Rust, WASM, backend, and Worker surfaces contain no 6DOF verifi
     })
     : [];
   for (const path of collect(new URL("../dist/", import.meta.url)).filter((entry) => /simulation\.worker-.*\.js$/.test(entry.pathname))) {
-    assert.doesNotMatch(readFileSync(path, "utf8"), /vector_sixdof_verification_run_json|sixdof-foundation/i, path.pathname);
+    assertNoPrivateSixDofVerifierBytes(readFileSync(path), path.pathname);
+  }
+});
+
+test("a production-style bundle rejects the real private 6DOF adapter and ABI", () => {
+  const productionBundle = Buffer.from("self.onmessage = () => undefined;\n");
+  const privateAdapter = readFileSync(
+    new URL("../lib/validation/sixdof-foundation-wasm.ts", import.meta.url),
+  );
+  const contaminatedBundle = Buffer.concat([productionBundle, privateAdapter]);
+  assert.throws(
+    () => assertNoPrivateSixDofVerifierBytes(contaminatedBundle, "in-memory simulation Worker"),
+    /private 6DOF verifier marker/,
+  );
+  const abiOnlyContaminatedBundle = Buffer.concat([
+    productionBundle,
+    Buffer.from("exports.vector_sixdof_verifier_run_json();\n"),
+  ]);
+  assert.throws(
+    () => assertNoPrivateSixDofVerifierBytes(abiOnlyContaminatedBundle, "minified simulation Worker"),
+    /private 6DOF verifier marker/,
+  );
+  for (const marker of PRIVATE_SIX_DOF_PRODUCTION_MARKERS) {
+    assert.throws(
+      () => assertNoPrivateSixDofVerifierBytes(
+        Buffer.concat([productionBundle, Buffer.from(marker)]),
+        `production bundle injected with ${marker}`,
+      ),
+      /private 6DOF verifier marker/,
+    );
   }
 });
 
