@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import test from "node:test";
 import sharp from "sharp";
 
@@ -35,7 +36,7 @@ function mutateOneByte(bytes) {
   return changed;
 }
 
-function approvedAuthorityFixture(pendingDecision) {
+function callerControlledAuthorityFixture(pendingDecision) {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   const sourceId = pendingDecision.sourceId;
   const decisionField = "referenceExecution";
@@ -48,6 +49,7 @@ function approvedAuthorityFixture(pendingDecision) {
     scope: ["OFFLINE_REFERENCE_EXECUTION"],
     conditions: ["OFFLINE_ONLY"],
     evidenceSha256: "1".repeat(64),
+    blockingReason: null,
   };
   const payload = {
     schemaVersion: "vector.generic-sensor-verification-legal-attestation-payload.v1",
@@ -68,15 +70,10 @@ function approvedAuthorityFixture(pendingDecision) {
     schemaVersion: "vector.generic-sensor-verification-legal-authority-registry.v1",
     registryId: payload.registryId,
     subjectDecisionArtifactId: decisions.decisionArtifactId,
+    authorityPolicyId: "generic-sensor-legal-authority-policy-v1",
     externalTrustRootRequired: true,
-    status: "ACTIVE_EXTERNALLY_ATTESTED_AUTHORITIES",
-    authorizedReviewers: [{
-      reviewerId: approval.reviewer.id,
-      jurisdictions: [approval.jurisdiction],
-      scopes: approval.scope,
-      validFrom: "2026-01-01",
-      validThrough: "2026-12-31",
-    }],
+    status: "SIGNED_DECISION_RECORDS_PRESENT_UNVERIFIED",
+    blockingReason: "CALLER_ROOT_IS_NOT_GOVERNED",
     decisionRecords: [{
       ...payload,
       attestation: {
@@ -100,6 +97,92 @@ function approvedAuthorityFixture(pendingDecision) {
       authorityRegistry,
       trustedAuthorityRoots: new Map([["test-external-root", publicKey]]),
     },
+  };
+}
+
+function forgedBundleWithCallerRoot({ useFieldSpecificScopes = false } = {}) {
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const evidencePath = "governance/generic-sensor-legal-decision-evidence/README.md";
+  const evidenceBytes = readFileSync(resolve(evidencePath));
+  const evidenceArtifact = { path: evidencePath, sizeBytes: evidenceBytes.length, sha256: sha256(evidenceBytes) };
+  const forgedLegal = clone(decisions);
+  const forgedRegistry = {
+    schemaVersion: "vector.generic-sensor-verification-legal-authority-registry.v1",
+    registryId: "generic-sensor-source-legal-authority-registry-v1",
+    subjectDecisionArtifactId: decisions.decisionArtifactId,
+    authorityPolicyId: "generic-sensor-legal-authority-policy-v1",
+    externalTrustRootRequired: true,
+    status: "SIGNED_DECISION_RECORDS_PRESENT_UNVERIFIED",
+    blockingReason: "CALLER_ROOT_IS_NOT_GOVERNED",
+    decisionRecords: [],
+  };
+  for (const decision of forgedLegal.decisions) {
+    for (const field of ["redistribution", "referenceExecution", "adaptation"]) {
+      const fieldScope = {
+        redistribution: "REDISTRIBUTE_FROZEN_SOURCE_BYTES",
+        referenceExecution: "OFFLINE_REFERENCE_EXECUTION",
+        adaptation: "ADAPT_SOURCE_FOR_VERIFICATION",
+      }[field];
+      decision[field] = {
+        state: "APPROVED",
+        reviewer: { kind: "AUTHORIZED_HUMAN", id: "caller-controlled-reviewer" },
+        decisionRecordId: `${decision.sourceId}-${field.toLowerCase()}`,
+        decidedOn: "2026-08-24",
+        jurisdiction: "IN",
+        scope: [useFieldSpecificScopes ? fieldScope : "OFFLINE_REFERENCE_EXECUTION"],
+        conditions: ["CALLER_CONTROLLED"],
+        evidenceSha256: evidenceArtifact.sha256,
+        blockingReason: null,
+      };
+      const payload = {
+        schemaVersion: "vector.generic-sensor-verification-legal-attestation-payload.v1",
+        registryId: forgedRegistry.registryId,
+        decisionArtifactId: decisions.decisionArtifactId,
+        decisionRecordId: decision[field].decisionRecordId,
+        sourceId: decision.sourceId,
+        decisionField: field,
+        reviewerId: decision[field].reviewer.id,
+        decidedOn: decision[field].decidedOn,
+        jurisdiction: decision[field].jurisdiction,
+        scope: decision[field].scope,
+        conditions: decision[field].conditions,
+        evidenceSha256: decision[field].evidenceSha256,
+        evidenceArtifact,
+      };
+      const payloadBytes = Buffer.from(canonicalJson(payload));
+      forgedRegistry.decisionRecords.push({
+        ...payload,
+        attestation: {
+          algorithm: "Ed25519",
+          keyId: "caller-controlled-root",
+          payloadSha256: sha256(payloadBytes),
+          signatureBase64: sign(null, payloadBytes, privateKey).toString("base64"),
+        },
+      });
+    }
+  }
+  const legalBytes = Buffer.from(`${JSON.stringify(forgedLegal, null, 2)}\n`);
+  const registryBytes = Buffer.from(`${JSON.stringify(forgedRegistry, null, 2)}\n`);
+  const forgedManifest = clone(manifest);
+  const oldLegalBytes = forgedManifest.legalDecisions.sizeBytes;
+  const oldRegistryBytes = forgedManifest.legalAuthorityRegistry.sizeBytes;
+  forgedManifest.legalDecisions.sizeBytes = legalBytes.length;
+  forgedManifest.legalDecisions.sha256 = sha256(legalBytes);
+  forgedManifest.legalAuthorityRegistry.sizeBytes = registryBytes.length;
+  forgedManifest.legalAuthorityRegistry.sha256 = sha256(registryBytes);
+  const isolation = JSON.parse(readFileSync(resolve(root, forgedManifest.isolationEvidence.path), "utf8"));
+  isolation.frozenArtifactBytes += legalBytes.length - oldLegalBytes + registryBytes.length - oldRegistryBytes;
+  const isolationBytes = Buffer.from(`${JSON.stringify(isolation, null, 2)}\n`);
+  forgedManifest.isolationEvidence.sizeBytes = isolationBytes.length;
+  forgedManifest.isolationEvidence.sha256 = sha256(isolationBytes);
+  return {
+    manifest: seal(forgedManifest),
+    artifactOverrides: new Map([
+      [forgedManifest.legalDecisions.path, legalBytes],
+      [forgedManifest.legalAuthorityRegistry.path, registryBytes],
+      [forgedManifest.isolationEvidence.path, isolationBytes],
+    ]),
+    trustedAuthorityRoots: new Map([["caller-controlled-root", publicKey]]),
   };
 }
 
@@ -265,7 +348,7 @@ test("missing licence, wrong commit, forged approval, pending decisions, and out
 
   const pending = decisions.decisions.find((decision) => decision.sourceId === "dstl-stone-soup-v1.9.1");
   assert.throws(() => assertAuthorizedDecision(pending, "referenceExecution", { jurisdiction: "IN" }), /PENDING_REVIEW/);
-  assert.throws(() => assertAuthorizedDecision({}, "referenceExecution", { jurisdiction: "IN" }), /invalid/);
+  assert.throws(() => assertAuthorizedDecision({}, "referenceExecution", { jurisdiction: "IN" }), /invalid|exact keys/);
   const rejectedDecisions = clone(decisions.decisions);
   const notApplicableDecisions = clone(decisions.decisions);
   for (const decision of rejectedDecisions) for (const field of ["redistribution", "referenceExecution", "adaptation"]) decision[field].state = "REJECTED";
@@ -284,6 +367,7 @@ test("missing licence, wrong commit, forged approval, pending decisions, and out
     scope: ["OFFLINE_REFERENCE_EXECUTION"],
     conditions: [],
     evidenceSha256: "0".repeat(64),
+    blockingReason: null,
   };
   assert.throws(() => assertAuthorizedDecision(forged, "referenceExecution", { jurisdiction: "IN" }), /authorized human/);
 
@@ -299,17 +383,17 @@ test("missing licence, wrong commit, forged approval, pending decisions, and out
     /scope/,
   );
 
-  const trusted = approvedAuthorityFixture(pending);
-  assert.doesNotThrow(() => assertAuthorizedDecision(trusted.decision, trusted.decisionField, trusted.requirement));
+  const trusted = callerControlledAuthorityFixture(pending);
+  assert.throws(() => assertAuthorizedDecision(trusted.decision, trusted.decisionField, trusted.requirement), /evidence artifact/);
   const impostor = clone(trusted.decision);
   impostor.referenceExecution.reviewer.id = "self-declared-impostor";
-  assert.throws(() => assertAuthorizedDecision(impostor, "referenceExecution", trusted.requirement), /allowlisted|authority/);
+  assert.throws(() => assertAuthorizedDecision(impostor, "referenceExecution", trusted.requirement), /allowlisted|authority|policy|evidence/);
   const inventedRecord = clone(trusted.decision);
   inventedRecord.referenceExecution.decisionRecordId = "invented-record";
-  assert.throws(() => assertAuthorizedDecision(inventedRecord, "referenceExecution", trusted.requirement), /decision record|attestation/);
+  assert.throws(() => assertAuthorizedDecision(inventedRecord, "referenceExecution", trusted.requirement), /decision record|attestation|policy/);
   const inventedEvidence = clone(trusted.decision);
   inventedEvidence.referenceExecution.evidenceSha256 = "2".repeat(64);
-  assert.throws(() => assertAuthorizedDecision(inventedEvidence, "referenceExecution", trusted.requirement), /evidence|attestation/);
+  assert.throws(() => assertAuthorizedDecision(inventedEvidence, "referenceExecution", trusted.requirement), /evidence|attestation|policy/);
   for (const invalidDate of ["2026-8-24", "2026-02-30"]) {
     const invalid = clone(trusted.decision);
     invalid.referenceExecution.decidedOn = invalidDate;
@@ -325,6 +409,29 @@ test("missing licence, wrong commit, forged approval, pending decisions, and out
   taintedNonApproval.referenceExecution.scope = ["OFFLINE_REFERENCE_EXECUTION"];
   taintedNonApproval.referenceExecution.conditions = ["HIDDEN_AUTHORITY"];
   assert.throws(() => assertAuthorizedDecision(taintedNonApproval, "referenceExecution", trusted.requirement), /non-approval must not carry/);
+  const alternateAuthorityField = clone(pending);
+  alternateAuthorityField.referenceExecution.authorizedReviewer = { kind: "AUTHORIZED_HUMAN", id: "hidden-reviewer" };
+  assert.throws(() => assertAuthorizedDecision(alternateAuthorityField, "referenceExecution"), /exact keys/);
+  const wrongFieldScope = clone(trusted.decision);
+  wrongFieldScope.redistribution = clone(trusted.decision.referenceExecution);
+  assert.throws(() => assertAuthorizedDecision(wrongFieldScope, "redistribution", trusted.requirement), /field-specific scope/);
+  const bundleLocalAllowlist = clone(trusted.authorityRegistry);
+  bundleLocalAllowlist.authorizedReviewers = [];
+  assert.throws(
+    () => assertAuthorizedDecision(trusted.decision, trusted.decisionField, { ...trusted.requirement, authorityRegistry: bundleLocalAllowlist }),
+    /registry identity|exact keys/,
+  );
+
+  const callerForgedBundle = forgedBundleWithCallerRoot();
+  assert.throws(
+    () => verifyGenericSensorSourceBundle({ root, ...callerForgedBundle }),
+    /external authority policy|field-specific scope|evidence artifact/,
+  );
+  const fieldCorrectCallerForgedBundle = forgedBundleWithCallerRoot({ useFieldSpecificScopes: true });
+  assert.throws(
+    () => verifyGenericSensorSourceBundle({ root, ...fieldCorrectCallerForgedBundle }),
+    /pinned external authority policy/,
+  );
 });
 
 test("community/game artifacts, dynamic sources, model claims, and production exposure are rejected", () => {
@@ -361,4 +468,32 @@ test("community/game artifacts, dynamic sources, model claims, and production ex
     }),
     /production exposure frozen artifact/,
   );
+  assert.throws(
+    () => assertNoProductionExposure({
+      repositoryRoot: resolve("."),
+      virtualFiles: new Map([[".next/server/wrapped-reference.bin", Buffer.concat([Buffer.from("prefix"), frozenPdf, Buffer.from("suffix")])]]),
+      forbiddenArtifactBytes: [frozenPdf],
+    }),
+    /embedded frozen artifact/,
+  );
+
+  const temporaryRepository = mkdtempSync(join(tmpdir(), "vector-source-quarantine-"));
+  try {
+    mkdirSync(resolve(temporaryRepository, ".next/server"), { recursive: true });
+    writeFileSync(resolve(temporaryRepository, ".next/server/copied-reference.pdf"), frozenPdf);
+    mkdirSync(resolve(temporaryRepository, "public"), { recursive: true });
+    writeFileSync(resolve(temporaryRepository, "linked-reference.pdf"), frozenPdf);
+    symlinkSync(resolve(temporaryRepository, "linked-reference.pdf"), resolve(temporaryRepository, "public/reference-link.pdf"));
+    assert.throws(
+      () => assertNoProductionExposure({ repositoryRoot: temporaryRepository, forbiddenArtifactBytes: [frozenPdf] }),
+      /production exposure/,
+    );
+    rmSync(resolve(temporaryRepository, ".next"), { recursive: true, force: true });
+    assert.throws(
+      () => assertNoProductionExposure({ repositoryRoot: temporaryRepository, forbiddenArtifactBytes: [frozenPdf] }),
+      /production exposure/,
+    );
+  } finally {
+    rmSync(temporaryRepository, { recursive: true, force: true });
+  }
 });

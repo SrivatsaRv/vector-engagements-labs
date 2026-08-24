@@ -171,8 +171,13 @@ and adaptation as independent decisions. They currently remain
 or wrong-scope authority fails closed. `AUTHORIZED_HUMAN` is not a self-proving
 string: approval also requires an allowlisted reviewer and decision record whose
 canonical payload and evidence digest have a detached Ed25519 signature verified
-against a trust root supplied outside the bundle. The committed registry is
-empty. Public availability or an open licence does not imply local execution,
+against `governance/generic-sensor-legal-authority-policy.v1.json`. That policy
+is outside the source bundle, pinned by digest in the verifier, and cannot be
+replaced by a request-supplied key or allowlist. It currently registers no
+approval authority. Each decision field has one exact scope; evidence must
+resolve to exact bytes below the separately governed evidence root. The bundle
+registry is empty and can carry only signed records, never authority. Public
+availability or an open licence does not imply local execution,
 adaptation, export, model, or installation authority. Named platform and radar
 claims, game/community artifacts, and dynamic unpinned sources are expressly
 ineligible. Downstream #26 work remains blocked until this freeze is

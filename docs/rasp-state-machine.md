@@ -191,7 +191,8 @@ manifest, or decision artifacts.
 Later generic verification implementation remains blocked until the exact
 source-freeze commit passes independent review and an authorized human approves
 reference execution for the required jurisdiction and scope through an
-allowlisted record with an externally rooted detached attestation. Stone Soup
+allowlisted record in the digest-pinned external authority policy, an externally
+rooted detached attestation, and resolvable exact evidence bytes. Stone Soup
 adaptation additionally requires its distinct adaptation approval. Those gates
 still do not admit runtime behavior: #26 must separately implement and validate
 the owned information-state contracts. Pending, rejected, self-declared, or

@@ -1,5 +1,5 @@
-import { createHash, verify as verifySignature } from "node:crypto";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { createHash, createPublicKey, verify as verifySignature } from "node:crypto";
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { inflateRawSync } from "node:zlib";
 
@@ -7,6 +7,7 @@ const MANIFEST_SCHEMA = "vector.generic-sensor-verification-source-manifest.v1";
 const REPORT_SCHEMA = "vector.generic-sensor-verification-source-report.v1";
 const LEGAL_SCHEMA = "vector.generic-sensor-verification-legal-decisions.v1";
 const AUTHORITY_SCHEMA = "vector.generic-sensor-verification-legal-authority-registry.v1";
+const AUTHORITY_POLICY_SCHEMA = "vector.generic-sensor-legal-authority-policy.v1";
 const ATTESTATION_SCHEMA = "vector.generic-sensor-verification-legal-attestation-payload.v1";
 const INTENDED_USE = "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE";
 const WITHDRAWN_CR_160557_PREFIX = ["99cc", "854a"].join("");
@@ -15,9 +16,18 @@ const STONE_ARCHIVE_SHA256 = "728449aeac17bf2a233cd052b42f8306a7742fad26715be3f7
 const STONE_COMMIT = "a4336b920a799cfe0a77ecb05867c5deeb371c7a";
 const FORBIDDEN_CLAIM = /\b(?:DCS|War\s*Thunder|community\s+dump|APG-68|Su-30(?:MKI)?|F-16)\b/i;
 const SHA256 = /^[0-9a-f]{64}$/;
-const APPROVAL_SCOPES = new Set(["REDISTRIBUTE_FROZEN_SOURCE_BYTES", "OFFLINE_REFERENCE_EXECUTION", "ADAPT_SOURCE_FOR_VERIFICATION"]);
-const PRODUCTION_ROOTS = ["app", "components", "db", "dist", "engine-rust", "fixtures/model-packs", "fixtures/vector-record", "lib", "public", "worker"];
-const PRODUCTION_MARKERS = [MANIFEST_SCHEMA, LEGAL_SCHEMA, INTENDED_USE, "generic-sensor-verification-sources", "generic-sensor-source-freeze-v1"];
+const FIELD_SCOPE = Object.freeze({
+  redistribution: "REDISTRIBUTE_FROZEN_SOURCE_BYTES",
+  referenceExecution: "OFFLINE_REFERENCE_EXECUTION",
+  adaptation: "ADAPT_SOURCE_FOR_VERIFICATION",
+});
+const APPROVAL_SCOPES = new Set(Object.values(FIELD_SCOPE));
+const AUTHORITY_POLICY_PATH = "governance/generic-sensor-legal-authority-policy.v1.json";
+const AUTHORITY_POLICY_SHA256 = "da1870627682a7db5582622ee829f045f8e99cf6bcfc7b6d462af34028d98961";
+const AUTHORITY_POLICY_ID = "generic-sensor-legal-authority-policy-v1";
+const AUTHORITY_EVIDENCE_ROOT = "governance/generic-sensor-legal-decision-evidence";
+const PRODUCTION_ROOTS = [".next", ".output", "app", "build", "components", "db", "dist", "engine-rust", "fixtures/model-packs", "fixtures/vector-record", "lib", "out", "public", "worker"];
+const PRODUCTION_MARKERS = [MANIFEST_SCHEMA, LEGAL_SCHEMA, AUTHORITY_SCHEMA, AUTHORITY_POLICY_SCHEMA, AUTHORITY_POLICY_ID, AUTHORITY_EVIDENCE_ROOT, INTENDED_USE, "generic-sensor-verification-sources", "generic-sensor-source-freeze-v1"];
 const NASA_IDENTITIES = {
   "nasa-cr-66097": { ntrsId: "19660021027", reportNumber: "NASA-CR-66097", pages: [143, 144], reportPages: ["134", "135"], renderPages: [1, 143, 144] },
   "nasa-cr-151497": { ntrsId: "19770023372", reportNumber: "NASA-CR-151497", pages: [53, 54, 55, 56], reportPages: ["2", "3", "4", "5"], renderPages: [1, 2, 3, 4, 53, 54, 55, 56] },
@@ -188,12 +198,16 @@ function verifyNasaMetadata(source, bytes) {
 }
 
 function verifyDecisionField(decision, field) {
+  requireExactKeys(decision, ["sourceId", "redistribution", "referenceExecution", "adaptation"], `legal decision ${decision?.sourceId ?? "unknown"}`);
   const value = decision[field];
+  requireExactKeys(value, ["state", "reviewer", "decisionRecordId", "decidedOn", "jurisdiction", "scope", "conditions", "evidenceSha256", "blockingReason"], `${field} decision for ${decision.sourceId}`);
   if (!value || !["PENDING_REVIEW", "APPROVED", "REJECTED", "NOT_APPLICABLE"].includes(value.state)) fail(`invalid ${field} decision for ${decision.sourceId}`);
   if (value.state === "APPROVED") {
-    if (value.reviewer?.kind !== "AUTHORIZED_HUMAN" || !stableId(value.reviewer.id)) fail(`${field} approval requires an authorized human reviewer`);
-    if (!stableId(value.decisionRecordId) || !canonicalDate(value.decidedOn) || !/^[A-Z]{2}$/.test(value.jurisdiction ?? "") || !closedStringArray(value.scope, APPROVAL_SCOPES) || !closedStringArray(value.conditions) || !SHA256.test(value.evidenceSha256 ?? "") || /^0{64}$/.test(value.evidenceSha256)) fail(`${field} approval is incomplete or has an invalid date/scope`);
-  } else if (value.reviewer !== null || value.decisionRecordId !== null || value.decidedOn !== null || value.jurisdiction !== null || !Array.isArray(value.scope) || value.scope.length !== 0 || !Array.isArray(value.conditions) || value.conditions.length !== 0 || value.evidenceSha256 !== null) {
+    requireExactKeys(value.reviewer, ["kind", "id"], `${field} reviewer`);
+    if (value.reviewer.kind !== "AUTHORIZED_HUMAN" || !stableId(value.reviewer.id)) fail(`${field} approval requires an authorized human reviewer`);
+    if (value.blockingReason !== null) fail(`${field} approval must not carry a blocking reason`);
+    if (!stableId(value.decisionRecordId) || !canonicalDate(value.decidedOn) || !/^[A-Z]{2}$/.test(value.jurisdiction ?? "") || canonicalJson(value.scope) !== canonicalJson([FIELD_SCOPE[field]]) || !closedStringArray(value.scope, APPROVAL_SCOPES) || !closedStringArray(value.conditions) || !SHA256.test(value.evidenceSha256 ?? "") || /^0{64}$/.test(value.evidenceSha256)) fail(`${field} approval is incomplete, has an invalid date, or violates the field-specific scope contract`);
+  } else if (value.reviewer !== null || value.decisionRecordId !== null || value.decidedOn !== null || value.jurisdiction !== null || !Array.isArray(value.scope) || value.scope.length !== 0 || !Array.isArray(value.conditions) || value.conditions.length !== 0 || value.evidenceSha256 !== null || typeof value.blockingReason !== "string" || value.blockingReason.length === 0) {
     fail(`${field} non-approval must not carry approval authority`);
   }
 }
@@ -209,12 +223,16 @@ function stableId(value) {
   return typeof value === "string" && /^[a-z0-9][a-z0-9._:-]{0,127}$/.test(value);
 }
 
+function requireExactKeys(value, expected, location) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || canonicalJson(Object.keys(value).sort()) !== canonicalJson([...expected].sort())) fail(`${location} must use exact keys`);
+}
+
 function closedStringArray(value, allowed) {
   if (!Array.isArray(value) || value.length === 0 || new Set(value).size !== value.length) return false;
   return value.every((item) => typeof item === "string" && item.length > 0 && item.length <= 128 && (!allowed || allowed.has(item)));
 }
 
-function approvalPayload(registry, decision, field) {
+function approvalPayload(registry, decision, field, evidenceArtifact) {
   const value = decision[field];
   return {
     schemaVersion: ATTESTATION_SCHEMA,
@@ -229,41 +247,81 @@ function approvalPayload(registry, decision, field) {
     scope: value.scope,
     conditions: value.conditions,
     evidenceSha256: value.evidenceSha256,
+    evidenceArtifact,
   };
 }
 
 function validateAuthorityRegistryShape(registry) {
-  if (registry?.schemaVersion !== AUTHORITY_SCHEMA || registry.externalTrustRootRequired !== true || !stableId(registry.registryId) || !stableId(registry.subjectDecisionArtifactId) || !Array.isArray(registry.authorizedReviewers) || !Array.isArray(registry.decisionRecords)) fail("wrong legal-authority registry identity");
-  const expectedStatus = registry.authorizedReviewers.length === 0 && registry.decisionRecords.length === 0
-    ? "NO_AUTHORIZED_REVIEWERS_OR_DECISION_RECORDS_REGISTERED"
-    : "ACTIVE_EXTERNALLY_ATTESTED_AUTHORITIES";
+  requireExactKeys(registry, ["schemaVersion", "registryId", "subjectDecisionArtifactId", "authorityPolicyId", "externalTrustRootRequired", "status", "decisionRecords", "blockingReason"], "legal-authority registry");
+  if (registry?.schemaVersion !== AUTHORITY_SCHEMA || registry.externalTrustRootRequired !== true || !stableId(registry.registryId) || !stableId(registry.subjectDecisionArtifactId) || registry.authorityPolicyId !== AUTHORITY_POLICY_ID || "authorizedReviewers" in registry || !Array.isArray(registry.decisionRecords)) fail("wrong legal-authority registry identity");
+  const expectedStatus = registry.decisionRecords.length === 0
+    ? "NO_SIGNED_DECISION_RECORDS_REGISTERED"
+    : "SIGNED_DECISION_RECORDS_PRESENT_UNVERIFIED";
   if (registry.status !== expectedStatus) fail("legal-authority registry status is inconsistent");
-  if (new Set(registry.authorizedReviewers.map((reviewer) => reviewer.reviewerId)).size !== registry.authorizedReviewers.length || new Set(registry.decisionRecords.map((record) => record.decisionRecordId)).size !== registry.decisionRecords.length) fail("duplicate legal authority or decision-record identity");
-  for (const reviewer of registry.authorizedReviewers) {
-    if (!stableId(reviewer.reviewerId) || !canonicalDate(reviewer.validFrom) || !canonicalDate(reviewer.validThrough) || reviewer.validFrom > reviewer.validThrough || !closedStringArray(reviewer.jurisdictions) || !reviewer.jurisdictions.every((jurisdiction) => /^[A-Z]{2}$/.test(jurisdiction)) || !closedStringArray(reviewer.scopes, APPROVAL_SCOPES)) fail("malformed legal reviewer allowlist entry");
-  }
+  if (new Set(registry.decisionRecords.map((record) => record.decisionRecordId)).size !== registry.decisionRecords.length) fail("duplicate decision-record identity");
   return registry;
+}
+
+function safeEvidencePath(path) {
+  return typeof path === "string" && path.startsWith(`${AUTHORITY_EVIDENCE_ROOT}/`) && !path.includes("\\") && !path.split("/").some((part) => part === "." || part === "..") && !path.includes("\0");
+}
+
+function loadPinnedAuthorityPolicy(repositoryRoot) {
+  const bytes = readFileSync(resolve(repositoryRoot, AUTHORITY_POLICY_PATH));
+  if (sha256(bytes) !== AUTHORITY_POLICY_SHA256) fail("external authority policy digest mismatch");
+  const policy = JSON.parse(bytes.toString("utf8"));
+  requireExactKeys(policy, ["schemaVersion", "policyId", "subjectDecisionArtifactId", "status", "evidenceRoot", "trustRoots", "reviewerGrants", "changeAuthority"], "external authority policy");
+  if (policy.schemaVersion !== AUTHORITY_POLICY_SCHEMA || policy.policyId !== AUTHORITY_POLICY_ID || policy.subjectDecisionArtifactId !== "generic-sensor-source-legal-decisions-v1" || policy.evidenceRoot !== AUTHORITY_EVIDENCE_ROOT || !Array.isArray(policy.trustRoots) || !Array.isArray(policy.reviewerGrants)) fail("external authority policy identity is invalid");
+  const expectedStatus = policy.trustRoots.length === 0 && policy.reviewerGrants.length === 0 ? "NO_APPROVAL_AUTHORITIES_REGISTERED" : "APPROVAL_AUTHORITIES_REGISTERED";
+  if (policy.status !== expectedStatus) fail("external authority policy status is inconsistent");
+  if (new Set(policy.trustRoots.map((root) => root.keyId)).size !== policy.trustRoots.length) fail("duplicate external authority trust root");
+  for (const root of policy.trustRoots) {
+    requireExactKeys(root, ["keyId", "algorithm", "publicKeyPem", "state"], "external authority trust root");
+    if (!stableId(root.keyId) || root.algorithm !== "Ed25519" || typeof root.publicKeyPem !== "string" || root.state !== "ACTIVE") fail("malformed external authority trust root");
+    const key = createPublicKey(root.publicKeyPem);
+    if (key.type !== "public" || key.asymmetricKeyType !== "ed25519") fail("external authority trust root is not an Ed25519 public key");
+  }
+  const grantIdentities = policy.reviewerGrants.map((grant) => canonicalJson([grant.reviewerId, grant.keyId, grant.sourceId, grant.decisionField, grant.jurisdiction, grant.scope]));
+  if (new Set(grantIdentities).size !== grantIdentities.length) fail("duplicate external reviewer grant");
+  for (const grant of policy.reviewerGrants) {
+    requireExactKeys(grant, ["reviewerId", "keyId", "sourceId", "decisionField", "jurisdiction", "scope", "validFrom", "validThrough"], "external reviewer grant");
+    if (!stableId(grant.reviewerId) || !stableId(grant.keyId) || !stableId(grant.sourceId) || !Object.hasOwn(FIELD_SCOPE, grant.decisionField) || grant.scope !== FIELD_SCOPE[grant.decisionField] || !/^[A-Z]{2}$/.test(grant.jurisdiction ?? "") || !canonicalDate(grant.validFrom) || !canonicalDate(grant.validThrough) || grant.validFrom > grant.validThrough) fail("malformed field-specific external reviewer grant");
+    if (!policy.trustRoots.some((root) => root.keyId === grant.keyId)) fail("external reviewer grant has no pinned trust root");
+  }
+  return policy;
 }
 
 function verifyTrustedApproval(decision, field, requirement) {
   const registry = validateAuthorityRegistryShape(requirement.authorityRegistry);
-  const trustedRoots = requirement.trustedAuthorityRoots;
-  if (!(trustedRoots instanceof Map)) fail(`${field} approval requires a separately governed external authority registry`);
+  const repositoryRoot = resolve(requirement.repositoryRoot ?? ".");
+  const policy = loadPinnedAuthorityPolicy(repositoryRoot);
   if (requirement.sourceId && decision.sourceId !== requirement.sourceId) fail(`${field} approval source is out of scope`);
   const value = decision[field];
-  const reviewer = registry.authorizedReviewers?.find((candidate) => candidate.reviewerId === value.reviewer.id);
-  if (!reviewer) fail(`${field} reviewer is not allowlisted by external authority`);
-  if (!canonicalDate(reviewer.validFrom) || !canonicalDate(reviewer.validThrough) || reviewer.validFrom > value.decidedOn || reviewer.validThrough < value.decidedOn) fail(`${field} reviewer authority date is invalid or out of range`);
-  if (!closedStringArray(reviewer.jurisdictions) || !reviewer.jurisdictions.includes(value.jurisdiction) || !closedStringArray(reviewer.scopes, APPROVAL_SCOPES) || value.scope.some((scope) => !reviewer.scopes.includes(scope))) fail(`${field} reviewer authority jurisdiction or scope is insufficient`);
   const record = registry.decisionRecords?.find((candidate) => candidate.decisionRecordId === value.decisionRecordId);
   if (!record) fail(`${field} decision record is not registered`);
-  const payload = approvalPayload(registry, decision, field);
+  const evidenceArtifact = record.evidenceArtifact;
+  requireExactKeys(evidenceArtifact, ["path", "sizeBytes", "sha256"], `${field} evidence artifact`);
+  if (!safeEvidencePath(evidenceArtifact?.path) || !Number.isInteger(evidenceArtifact.sizeBytes) || evidenceArtifact.sizeBytes < 1 || evidenceArtifact.sizeBytes > 8 * 1024 * 1024 || evidenceArtifact.sha256 !== value.evidenceSha256) fail(`${field} evidence artifact identity is invalid`);
+  const evidencePath = resolve(repositoryRoot, evidenceArtifact.path);
+  if (!existsSync(resolve(repositoryRoot, AUTHORITY_EVIDENCE_ROOT)) || !existsSync(evidencePath)) fail(`${field} evidence artifact cannot be resolved`);
+  const evidenceRoot = realpathSync(resolve(repositoryRoot, AUTHORITY_EVIDENCE_ROOT));
+  const resolvedEvidencePath = realpathSync(evidencePath);
+  if (!resolvedEvidencePath.startsWith(`${evidenceRoot}${sep}`) || lstatSync(evidencePath).isSymbolicLink() || !statSync(resolvedEvidencePath).isFile()) fail(`${field} evidence artifact must be a regular file under the governed evidence root`);
+  const evidenceBytes = readFileSync(resolvedEvidencePath);
+  if (evidenceBytes.length !== evidenceArtifact.sizeBytes || sha256(evidenceBytes) !== evidenceArtifact.sha256) fail(`${field} evidence artifact bytes do not match the approval`);
+  const payload = approvalPayload(registry, decision, field, evidenceArtifact);
   const { attestation, ...registeredPayload } = record;
   if (canonicalJson(registeredPayload) !== canonicalJson(payload)) fail(`${field} decision record/evidence does not match the approval`);
   const payloadBytes = Buffer.from(canonicalJson(payload));
-  if (attestation?.algorithm !== "Ed25519" || !attestation.keyId || attestation.payloadSha256 !== sha256(payloadBytes)) fail(`${field} detached attestation identity is invalid`);
-  const trustedKey = trustedRoots.get(attestation.keyId);
-  if (!trustedKey) fail(`${field} detached attestation has no external trust root`);
+  requireExactKeys(attestation, ["algorithm", "keyId", "payloadSha256", "signatureBase64"], `${field} detached attestation`);
+  if (attestation.algorithm !== "Ed25519" || attestation.payloadSha256 !== sha256(payloadBytes)) fail(`${field} detached attestation identity is invalid`);
+  const grant = policy.reviewerGrants.find((candidate) => candidate.reviewerId === value.reviewer.id && candidate.sourceId === decision.sourceId && candidate.decisionField === field && candidate.jurisdiction === value.jurisdiction && candidate.scope === FIELD_SCOPE[field]);
+  if (!grant) fail(`${field} reviewer/source/jurisdiction/scope is not allowlisted by the pinned external authority policy`);
+  if (grant.validFrom > value.decidedOn || grant.validThrough < value.decidedOn) fail(`${field} reviewer authority date is out of range`);
+  if (attestation.keyId !== grant.keyId) fail(`${field} detached attestation key is outside the reviewer grant`);
+  const root = policy.trustRoots.find((candidate) => candidate.keyId === grant.keyId);
+  if (!root) fail(`${field} detached attestation has no pinned external trust root`);
+  const trustedKey = createPublicKey(root.publicKeyPem);
   const signature = Buffer.from(attestation.signatureBase64 ?? "", "base64");
   if (!attestation.signatureBase64 || signature.toString("base64") !== attestation.signatureBase64 || !verifySignature(null, payloadBytes, trustedKey, signature)) fail(`${field} detached attestation signature is invalid`);
   return value;
@@ -274,20 +332,32 @@ export function assertAuthorizedDecision(decision, field, requirement = {}) {
   const value = decision[field];
   if (value.state !== "APPROVED") fail(`${field} decision is ${value.state}`);
   if (requirement.jurisdiction && value.jurisdiction !== requirement.jurisdiction) fail(`${field} approval jurisdiction is out of scope`);
-  if (requirement.scope && !value.scope.includes(requirement.scope)) fail(`${field} approval scope is insufficient`);
+  if (requirement.scope && value.scope[0] !== requirement.scope) fail(`${field} approval scope is insufficient`);
   return verifyTrustedApproval(decision, field, requirement);
 }
 
-function walkFiles(path, rootPath, files) {
+function walkFiles(path, rootPath, files, visited = new Set(), displayPath = relative(rootPath, path).split(sep).join("/")) {
   if (!existsSync(path)) return;
-  for (const entry of readdirSync(path, { withFileTypes: true })) {
-    const entryPath = join(path, entry.name);
-    if (entry.isDirectory()) walkFiles(entryPath, rootPath, files);
-    else if (entry.isFile()) files.set(relative(rootPath, entryPath).split(sep).join("/"), readFileSync(entryPath));
+  const metadata = lstatSync(path);
+  if (metadata.isSymbolicLink()) {
+    const target = realpathSync(path);
+    const targetMetadata = statSync(target);
+    if (targetMetadata.isDirectory()) walkFiles(target, rootPath, files, visited, displayPath);
+    else if (targetMetadata.isFile()) files.set(displayPath, readFileSync(target));
+    return;
   }
+  if (metadata.isFile()) {
+    files.set(displayPath, readFileSync(path));
+    return;
+  }
+  if (!metadata.isDirectory()) return;
+  const identity = realpathSync(path);
+  if (visited.has(identity)) return;
+  visited.add(identity);
+  for (const entry of readdirSync(path, { withFileTypes: true })) walkFiles(join(path, entry.name), rootPath, files, visited, displayPath ? `${displayPath}/${entry.name}` : entry.name);
 }
 
-export function assertNoProductionExposure({ repositoryRoot, virtualFiles, forbiddenArtifactDigests = new Set() } = {}) {
+export function assertNoProductionExposure({ repositoryRoot, virtualFiles, forbiddenArtifactDigests = new Set(), forbiddenArtifactBytes = [] } = {}) {
   const root = resolve(repositoryRoot ?? ".");
   const files = new Map();
   for (const productionRoot of PRODUCTION_ROOTS) walkFiles(resolve(root, productionRoot), root, files);
@@ -295,6 +365,9 @@ export function assertNoProductionExposure({ repositoryRoot, virtualFiles, forbi
   for (const [path, bytes] of files) {
     if (PRODUCTION_MARKERS.some((marker) => bytes.includes(Buffer.from(marker)))) fail(`production exposure marker in ${path}`);
     if (forbiddenArtifactDigests.has(sha256(bytes))) fail(`production exposure frozen artifact in ${path}`);
+    for (const artifact of forbiddenArtifactBytes) {
+      if (artifact.length > 0 && artifact.length <= bytes.length && bytes.includes(artifact)) fail(`production exposure embedded frozen artifact in ${path}`);
+    }
   }
   return { filesScanned: files.size, exposures: 0 };
 }
@@ -325,7 +398,7 @@ function verifyIsolationEvidence(root, manifest, overrides) {
   const record = manifest.isolationEvidence;
   const content = artifactBytes(root, record, overrides);
   const evidence = JSON.parse(content.toString("utf8"));
-  if (evidence.schemaVersion !== "vector.generic-sensor-verification-production-isolation-evidence.v1" || evidence.subjectManifestId !== manifest.manifestId || evidence.expectedProductionExposures !== 0 || evidence.productionBuildImportPolicy !== "FORBIDDEN" || evidence.omissionReason !== "STAGE_0_ADDS_NO_RUNTIME_BEHAVIOR") fail("invalid production-isolation evidence");
+  if (evidence.schemaVersion !== "vector.generic-sensor-verification-production-isolation-evidence.v1" || evidence.subjectManifestId !== manifest.manifestId || canonicalJson(evidence.productionRootsScannedByVerifier) !== canonicalJson(PRODUCTION_ROOTS) || evidence.expectedProductionExposures !== 0 || evidence.productionBuildImportPolicy !== "FORBIDDEN" || evidence.omissionReason !== "STAGE_0_ADDS_NO_RUNTIME_BEHAVIOR") fail("invalid production-isolation evidence");
   const artifacts = new Map();
   const collect = (candidate) => {
     if (candidate?.path && Number.isInteger(candidate.sizeBytes) && SHA256.test(candidate.sha256 ?? "")) artifacts.set(candidate.path, candidate);
@@ -380,6 +453,8 @@ function verifyStoneSource(root, source, archiveBytes, overrides) {
 
 export function verifyGenericSensorSourceBundle(options = {}) {
   const root = resolve(options.root ?? "governance/generic-sensor-verification-sources");
+  const repositoryRoot = resolve(root, "../..");
+  const authorityPolicy = loadPinnedAuthorityPolicy(repositoryRoot);
   const manifest = options.manifest ?? JSON.parse(readFileSync(resolve(root, "manifest.v1.json"), "utf8"));
   const serialized = JSON.stringify(manifest);
   if (serialized.toLowerCase().includes(WITHDRAWN_CR_160557_PREFIX)) fail("withdrawn CR-160557 digest is invalid");
@@ -420,7 +495,7 @@ export function verifyGenericSensorSourceBundle(options = {}) {
   const authorityArtifact = manifest.legalAuthorityRegistry;
   const authorityBytes = artifactBytes(root, authorityArtifact, options.artifactOverrides);
   const authorityRegistry = validateAuthorityRegistryShape(JSON.parse(authorityBytes.toString("utf8")));
-  if (authorityRegistry.subjectDecisionArtifactId !== legal.decisionArtifactId) fail("legal-authority registry is bound to the wrong decision artifact");
+  if (authorityRegistry.subjectDecisionArtifactId !== legal.decisionArtifactId || authorityRegistry.authorityPolicyId !== authorityPolicy.policyId) fail("legal-authority registry is bound to the wrong decision artifact or external policy");
   if (legal.decisions?.length !== manifest.sources.length || new Set(legal.decisions.map((decision) => decision.sourceId)).size !== manifest.sources.length) fail("legal decisions do not cover the frozen source set");
   const approvedCount = legal.decisions.reduce((sum, decision) => sum + ["redistribution", "referenceExecution", "adaptation"].filter((field) => decision[field]?.state === "APPROVED").length, 0);
   if (authorityRegistry.decisionRecords.length !== approvedCount) fail("legal authority registry does not exactly cover approved decisions");
@@ -431,8 +506,10 @@ export function verifyGenericSensorSourceBundle(options = {}) {
       verifyDecisionField(decision, field);
       if (decision[field].state === "APPROVED") assertAuthorizedDecision(decision, field, {
         sourceId: source.id,
+        jurisdiction: decision[field].jurisdiction,
+        scope: FIELD_SCOPE[field],
         authorityRegistry,
-        trustedAuthorityRoots: options.trustedAuthorityRoots ?? new Map(),
+        repositoryRoot,
       });
     }
     const reference = manifest.decisionReferences?.find((candidate) => candidate.sourceId === source.id);
@@ -440,26 +517,30 @@ export function verifyGenericSensorSourceBundle(options = {}) {
   }
   const decisionState = summarizeLegalDecisionState(legal.decisions, {
     authorityRegistry,
-    trustedAuthorityRoots: options.trustedAuthorityRoots ?? new Map(),
+    repositoryRoot,
   });
   const frozenArtifactDigests = new Set();
-  const collectDigest = (candidate) => {
-    if (candidate?.path && SHA256.test(candidate.sha256 ?? "")) frozenArtifactDigests.add(candidate.sha256);
+  const frozenArtifactBytes = [];
+  const collectFrozenArtifact = (candidate) => {
+    if (candidate?.path && SHA256.test(candidate.sha256 ?? "")) {
+      frozenArtifactDigests.add(candidate.sha256);
+      frozenArtifactBytes.push(artifactBytes(root, candidate, options.artifactOverrides));
+    }
   };
   for (const source of manifest.sources) {
-    for (const artifact of source.artifacts) collectDigest(artifact);
-    collectDigest(source.archiveInventory);
-    for (const member of source.extractedMembers ?? []) collectDigest(member.extractedArtifact);
+    for (const artifact of source.artifacts) collectFrozenArtifact(artifact);
+    collectFrozenArtifact(source.archiveInventory);
+    for (const member of source.extractedMembers ?? []) collectFrozenArtifact(member.extractedArtifact);
     for (const page of source.renderPages ?? []) {
-      collectDigest(page.sourceRender);
-      collectDigest(page.displayRender);
+      collectFrozenArtifact(page.sourceRender);
+      collectFrozenArtifact(page.displayRender);
     }
   }
-  collectDigest(manifest.visualInspection);
-  collectDigest(manifest.legalDecisions);
-  collectDigest(manifest.legalAuthorityRegistry);
-  collectDigest(manifest.isolationEvidence);
-  const exposure = assertNoProductionExposure({ repositoryRoot: resolve(root, "../.."), forbiddenArtifactDigests: frozenArtifactDigests });
+  collectFrozenArtifact(manifest.visualInspection);
+  collectFrozenArtifact(manifest.legalDecisions);
+  collectFrozenArtifact(manifest.legalAuthorityRegistry);
+  collectFrozenArtifact(manifest.isolationEvidence);
+  const exposure = assertNoProductionExposure({ repositoryRoot, forbiddenArtifactDigests: frozenArtifactDigests, forbiddenArtifactBytes: frozenArtifactBytes });
   return {
     schemaVersion: REPORT_SCHEMA,
     manifestId: manifest.manifestId,
@@ -481,8 +562,10 @@ export function summarizeLegalDecisionState(decisions, authority = {}) {
       for (const decision of decisions) {
         for (const field of ["redistribution", "referenceExecution", "adaptation"]) assertAuthorizedDecision(decision, field, {
           sourceId: decision.sourceId,
+          jurisdiction: decision[field].jurisdiction,
+          scope: FIELD_SCOPE[field],
           authorityRegistry: authority.authorityRegistry,
-          trustedAuthorityRoots: authority.trustedAuthorityRoots ?? new Map(),
+          repositoryRoot: authority.repositoryRoot,
         });
       }
       return "AUTHORIZED_DECISIONS_PRESENT";

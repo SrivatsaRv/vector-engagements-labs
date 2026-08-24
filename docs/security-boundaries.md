@@ -160,9 +160,11 @@ The issue #148 source freeze is quarantined under
 Rust/WASM, backend, Worker, browser, model-pack, VSR, fixture, public, and built
 assets must contain no Stage-0 subject/schema/export marker or source-bundle
 import. The offline verifier scans those boundaries and treats any exposure as
-a release failure. It scans every production file as bytes, including built
-binary artifacts, and rejects both Stage-0 markers and any exact frozen-artifact
-digest; a file extension cannot bypass the quarantine.
+a release failure. It scans every production file as bytes, including symlink
+targets and `.next`, `.output`, `build`, `out`, `dist`, Rust/WASM, public, Worker,
+and browser artifacts. It rejects Stage-0 markers, exact frozen-artifact files,
+and frozen bytes embedded inside a larger file; a wrapper, suffix, file
+extension, symlink, or alternate build root cannot bypass the quarantine.
 
 ZIP handling is verification-only and never writes archive-selected paths. It
 parses declared bytes with fixed archive, member-count, and expanded-size
@@ -176,10 +178,17 @@ has separate redistribution, reference-execution, and adaptation states. Only
 an allowlisted human record with identity, canonical calendar date, closed
 jurisdiction and scope, conditions, and evidence digest can represent approval.
 The complete decision payload must carry a detached Ed25519 signature verified
-against a trust root supplied outside the source bundle. Repository-local or
-self-declared keys, reviewer-kind strings, invented records/evidence, malformed
-dates, pending, missing, forged, agent-authored, and out-of-scope decisions fail
-closed. Non-approval states carry no reviewer, date, jurisdiction, scope,
-conditions, record, or evidence authority. Network access is unnecessary for
-verification, and dynamic unpinned or substituted community/game material is
-rejected.
+against the digest-pinned policy at
+`governance/generic-sensor-legal-authority-policy.v1.json`, outside the source
+bundle. Caller-supplied roots or allowlists are ignored. The policy binds an
+exact reviewer, source, decision field, jurisdiction, scope, validity interval,
+and public key; each field has one fixed scope. Signed evidence identity must
+resolve to the exact bytes of a regular file below the governed external
+evidence root. Repository-local or self-declared keys, reviewer-kind strings,
+invented or unresolved records/evidence, malformed dates, pending, missing,
+forged, agent-authored, and out-of-scope decisions fail closed. Decision,
+reviewer, registry, policy, evidence, and attestation objects use exact keys.
+Non-approval states carry no reviewer, date, jurisdiction, scope, conditions,
+record, evidence, or alternate authority field. Network access is unnecessary
+for verification, and dynamic unpinned or substituted community/game material
+is rejected.

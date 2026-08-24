@@ -65,10 +65,10 @@
   },
   "legalAuthorityRegistry": {
     "path": "legal-authority-registry.v1.json",
-    "role": "EXTERNAL_LEGAL_AUTHORITY_REGISTRY",
+    "role": "SIGNED_LEGAL_DECISION_RECORD_REGISTRY",
     "state": "REFERENCE_ONLY",
-    "sizeBytes": 495,
-    "sha256": "d40a98911dd581aa500b77cc5a50012bad512ca2a17020b2711e1967de9394a9"
+    "sizeBytes": 517,
+    "sha256": "a13e3aadab956c431e862dfed1dce7f7036ee4edc917ae22344f36b23ac11e9a"
   },
   "decisionReferences": [
     {
@@ -126,8 +126,8 @@
     "path": "production-isolation-evidence.v1.json",
     "role": "PRODUCTION_ISOLATION_SIZE_EVIDENCE",
     "state": "REFERENCE_ONLY",
-    "sizeBytes": 799,
-    "sha256": "507434245080aed228c8486c1242e71d9f70c946f973c8678c0a6d37f019b347"
+    "sizeBytes": 851,
+    "sha256": "617b4d9fdfeb996a0afe33c5b5115d53b8369b2d1475979ba0ec78f8ab2c7887"
   },
   "sources": [
     {
@@ -1341,5 +1341,5 @@
       }
     }
   ],
-  "canonicalManifestDigest": "840fa2059c6218942a1880bdb898a71a1d2a7adfac04f6c83ae67efd58e56ab4"
+  "canonicalManifestDigest": "353a666538a3dca2cf5fc4c1af907784a3a11da0f2f5795cc3ddbc0aefb456c4"
 }
