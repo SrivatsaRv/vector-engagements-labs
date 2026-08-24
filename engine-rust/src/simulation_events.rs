@@ -11,6 +11,8 @@ pub const ENTITY_ENTERED_PAYLOAD_SCHEMA: &str =
 pub const LIFECYCLE_CHANGED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.entity-lifecycle-changed.v1";
 pub const RUN_COMPLETED_PAYLOAD_SCHEMA: &str = "vector.simulation-event-payload.run-completed.v1";
+pub const TRACK_CHANGED_PAYLOAD_SCHEMA: &str =
+    "vector.simulation-event-payload.track-state-changed.v3";
 pub const MAX_SIMULATION_EVENTS: usize = 100_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -35,6 +37,8 @@ pub enum SimulationEventSubsystem {
     RunCoordinator,
     #[serde(rename = "ENTITY_LIFECYCLE")]
     EntityLifecycle,
+    #[serde(rename = "SENSOR_TRACK")]
+    SensorTrack,
 }
 
 impl SimulationEventSubsystem {
@@ -42,6 +46,7 @@ impl SimulationEventSubsystem {
         match self {
             Self::RunCoordinator => "RUN_COORDINATOR",
             Self::EntityLifecycle => "ENTITY_LIFECYCLE",
+            Self::SensorTrack => "SENSOR_TRACK",
         }
     }
 }
@@ -91,11 +96,16 @@ pub struct SimulationEventParticipant {
 pub enum SimulationEventKnowledgeScope {
     #[serde(rename = "WORLD")]
     World,
+    #[serde(rename = "SIDE_OWNED")]
+    SideOwned,
 }
 
 impl SimulationEventKnowledgeScope {
     fn key(self) -> &'static str {
-        "WORLD"
+        match self {
+            Self::World => "WORLD",
+            Self::SideOwned => "SIDE_OWNED",
+        }
     }
 }
 
@@ -133,6 +143,35 @@ pub enum SimulationEventPayload {
         #[serde(rename = "schemaVersion")]
         schema_version: &'static str,
         termination: Termination,
+    },
+    #[serde(rename = "TRACK_STATE_CHANGED")]
+    TrackStateChanged {
+        #[serde(rename = "schemaVersion")]
+        schema_version: &'static str,
+        perspective: &'static str,
+        #[serde(rename = "trackId")]
+        track_id: String,
+        from: &'static str,
+        to: &'static str,
+        cause: &'static str,
+        #[serde(rename = "sensorModelId")]
+        sensor_model_id: String,
+        #[serde(rename = "sensorModelVersion")]
+        sensor_model_version: String,
+        #[serde(rename = "modelPackDigest")]
+        model_pack_digest: String,
+        #[serde(rename = "sourceAssociationId")]
+        source_association_id: String,
+        #[serde(rename = "sourceSequence")]
+        source_sequence: u64,
+        #[serde(rename = "sourceTimeSeconds")]
+        source_time_seconds: f64,
+        #[serde(rename = "observationId")]
+        observation_id: Option<Box<str>>,
+        #[serde(rename = "estimateValueState")]
+        estimate_value_state: &'static str,
+        #[serde(rename = "uncertaintyValueState")]
+        uncertainty_value_state: &'static str,
     },
 }
 
@@ -175,6 +214,7 @@ impl SimulationEventPayload {
             Self::EntityEnteredWorld { .. } => 1,
             Self::EntityLifecycleChanged { .. } => 2,
             Self::RunCompleted { .. } => 3,
+            Self::TrackStateChanged { .. } => 4,
         }
     }
 
@@ -211,6 +251,47 @@ impl SimulationEventPayload {
                 schema_version,
                 termination,
             } => vec!["3", schema_version, termination_key(*termination)],
+            Self::TrackStateChanged {
+                schema_version,
+                perspective,
+                track_id,
+                from,
+                to,
+                cause,
+                sensor_model_id,
+                sensor_model_version,
+                model_pack_digest,
+                source_association_id,
+                source_sequence,
+                source_time_seconds,
+                observation_id,
+                estimate_value_state,
+                uncertainty_value_state,
+            } => {
+                return serde_json::to_string(&serde_json::json!([
+                    "4",
+                    schema_version,
+                    perspective,
+                    track_id,
+                    from,
+                    to,
+                    cause,
+                    sensor_model_id,
+                    sensor_model_version,
+                    model_pack_digest,
+                    source_association_id,
+                    source_sequence,
+                    source_time_seconds,
+                    observation_id,
+                    estimate_value_state,
+                    uncertainty_value_state,
+                ]))
+                .map_err(|error| {
+                    EngineError::Serialization(format!(
+                        "could not encode simulation event payload key: {error}"
+                    ))
+                });
+            }
         };
         serde_json::to_string(&values).map_err(|error| {
             EngineError::Serialization(format!(
@@ -281,6 +362,7 @@ pub struct SimulationEventDraft {
     pub model_time_seconds: f64,
     pub phase: SimulationEventPhase,
     pub producer: SimulationEventProducer,
+    pub owner_affiliation: Option<Affiliation>,
     pub knowledge_scope: SimulationEventKnowledgeScope,
     pub participants: Vec<SimulationEventParticipant>,
     pub causes: Vec<SimulationEventCauseReference>,
@@ -299,6 +381,7 @@ impl SimulationEventDraft {
                 subsystem: SimulationEventSubsystem::RunCoordinator,
                 entity_id: None,
             },
+            owner_affiliation: None,
             knowledge_scope: SimulationEventKnowledgeScope::World,
             participants: Vec::new(),
             causes: Vec::new(),
@@ -327,6 +410,7 @@ impl SimulationEventDraft {
                 subsystem: SimulationEventSubsystem::EntityLifecycle,
                 entity_id: Some(entity_id.to_string()),
             },
+            owner_affiliation: None,
             knowledge_scope: SimulationEventKnowledgeScope::World,
             participants: vec![SimulationEventParticipant {
                 entity_id: entity_id.to_string(),
@@ -367,6 +451,7 @@ impl SimulationEventDraft {
                 subsystem: SimulationEventSubsystem::EntityLifecycle,
                 entity_id: Some(entity_id.to_string()),
             },
+            owner_affiliation: None,
             knowledge_scope: SimulationEventKnowledgeScope::World,
             participants: vec![SimulationEventParticipant {
                 entity_id: entity_id.to_string(),
@@ -393,6 +478,7 @@ impl SimulationEventDraft {
                 subsystem: SimulationEventSubsystem::RunCoordinator,
                 entity_id: None,
             },
+            owner_affiliation: None,
             knowledge_scope: SimulationEventKnowledgeScope::World,
             participants: Vec::new(),
             causes: Vec::new(),
@@ -400,6 +486,57 @@ impl SimulationEventDraft {
             payload: SimulationEventPayload::RunCompleted {
                 schema_version: RUN_COMPLETED_PAYLOAD_SCHEMA,
                 termination,
+            },
+        }
+    }
+
+    pub fn track_changed(
+        tick: u64,
+        time: f64,
+        sensor_entity_id: &str,
+        owner_affiliation: Affiliation,
+        transition: &crate::TrackTransitionCommit,
+        cause: Option<SimulationEventReceipt>,
+    ) -> Self {
+        Self {
+            local_key: transition.local_key.clone(),
+            tick,
+            model_time_seconds: time,
+            phase: SimulationEventPhase::Tracking,
+            producer: SimulationEventProducer {
+                subsystem: SimulationEventSubsystem::SensorTrack,
+                entity_id: Some(sensor_entity_id.to_string()),
+            },
+            owner_affiliation: Some(owner_affiliation),
+            knowledge_scope: SimulationEventKnowledgeScope::SideOwned,
+            participants: vec![SimulationEventParticipant {
+                entity_id: sensor_entity_id.to_string(),
+                role: SimulationEventParticipantRole::Sensor,
+            }],
+            causes: cause
+                .into_iter()
+                .map(SimulationEventCauseReference::EventReceipt)
+                .collect(),
+            correlation_id: Some(transition.track_id.clone()),
+            payload: SimulationEventPayload::TrackStateChanged {
+                schema_version: TRACK_CHANGED_PAYLOAD_SCHEMA,
+                perspective: transition.owner,
+                track_id: transition.track_id.clone(),
+                from: transition.from,
+                to: transition.to,
+                cause: transition.cause,
+                sensor_model_id: transition.source.sensor_model_id.clone(),
+                sensor_model_version: transition.source.sensor_model_version.clone(),
+                model_pack_digest: transition.source.model_pack_digest.clone(),
+                source_association_id: transition.source_association_id.clone(),
+                source_sequence: transition.source_sequence,
+                source_time_seconds: transition.source_time_seconds,
+                observation_id: transition
+                    .observation_id
+                    .clone()
+                    .map(String::into_boxed_str),
+                estimate_value_state: "ESTIMATED",
+                uncertainty_value_state: "ESTIMATED",
             },
         }
     }
@@ -445,7 +582,14 @@ fn draft_sort_key(draft: &SimulationEventDraft) -> Result<String, EngineError> {
         draft.producer.entity_id.clone().unwrap_or_default(),
         participants_key(&draft.participants),
         draft.knowledge_scope.key().to_string(),
-        String::new(),
+        draft
+            .owner_affiliation
+            .map_or("", |value| match value {
+                Affiliation::Blue => "BLUE",
+                Affiliation::Red => "RED",
+                Affiliation::Neutral => "NEUTRAL",
+            })
+            .to_string(),
         draft.correlation_id.clone().unwrap_or_default(),
         draft.local_key.clone(),
         causes_key(&draft.causes),
@@ -633,7 +777,7 @@ impl SimulationEventJournal {
                 frame_index,
                 phase: draft.phase,
                 producer: draft.producer,
-                owner_affiliation: None,
+                owner_affiliation: draft.owner_affiliation,
                 knowledge_scope: draft.knowledge_scope,
                 participants: draft.participants,
                 cause_event_ids,

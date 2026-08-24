@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use crate::EngineError;
+use crate::{valid_verification_track_model, EngineError, ObserverTrackModel};
 
 const COMPILED_SCHEMA: &str = "vector.compiled-model-pack.v1";
 const AIRCRAFT_EVIDENCE_REGISTRY: &str =
@@ -111,6 +111,8 @@ pub struct SensorModel {
     pub scan_period_s: f64,
     pub azimuth_field_of_view_rad: f64,
     pub elevation_field_of_view_rad: f64,
+    #[serde(default)]
+    pub verification_track_model: Option<ObserverTrackModel>,
     pub validity_domain: ValidityDomain,
 }
 
@@ -619,6 +621,12 @@ fn validate_sensor_evidence_admission(
     evidence: &[EvidenceReference],
 ) -> Result<(), EngineError> {
     if sensor.sensor_kind == "DECLARED_ENVELOPE" {
+        if sensor.verification_track_model.is_some() {
+            return Err(invalid(format!(
+                "sensor model {} cannot attach a verification track model to a declared envelope",
+                sensor.id
+            )));
+        }
         return Ok(());
     }
     if !matches!(sensor.sensor_kind.as_str(), "RADAR" | "INFRARED" | "VISUAL") {
@@ -702,6 +710,11 @@ fn validate_sensor_evidence_admission(
             "sensor model {} has unknown or unvalidated positive-sensor evidence coverage",
             sensor.id
         )));
+    }
+    if let Some(model) = &sensor.verification_track_model {
+        if !valid_verification_track_model(model) {
+            return Err(invalid("generic verification track model is invalid"));
+        }
     }
     Ok(())
 }
@@ -905,6 +918,17 @@ fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineEr
             model.elevation_field_of_view_rad,
         )?;
         validate_sensor_evidence_admission(model, &pack.evidence)?;
+        if model.verification_track_model.is_some()
+            && !pack
+                .intended_uses
+                .iter()
+                .any(|item| item.id == "vector.intended-use.engine-verification")
+        {
+            return Err(invalid(format!(
+                "sensor model {} verification track model requires engine-verification intended use",
+                model.id
+            )));
+        }
     }
     for model in &pack.aircraft {
         validate_validity_domain(

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
 import { chromium } from "playwright-core";
+import { buildSync } from "esbuild";
 import { adaptPreparedSimulation } from "../lib/runtime/model-pack-adapter.ts";
 import { prepareSimulation } from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
@@ -15,6 +16,8 @@ import { createPhaseAEnvironmentPack } from "../lib/geospatial/environment-pack.
 import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import { getStudyArea, getWeatherPreset } from "../lib/study-areas.ts";
 import { resolveBrowserWorkerAssets } from "./browser-worker-assets.ts";
+import { bindVerificationTrackModelPack } from "../lib/engine/verification-track-fixture.ts";
+import { TRACK_STORE_CAPACITY_WORKLOAD } from "../lib/validation/track-store-capacity.ts";
 
 type RuntimeMessage = {
   type: string;
@@ -39,6 +42,7 @@ type WorkerVerificationResult = {
   wallMs: number;
   frameCount: number;
   staleAdmissionError: string;
+  verificationAdmissionError: string;
   transferredByteLength: number;
   detachedAfterRecycle: boolean;
 };
@@ -50,10 +54,19 @@ const {
 } = resolveBrowserWorkerAssets();
 const workerBytes = readFileSync(resolve(assetDirectory, workerName));
 const environmentWorkerBytes = readFileSync(resolve(assetDirectory, environmentWorkerName));
+const trackStoreWorkerBytes = buildSync({
+  entryPoints: [resolve("scripts/track-store-capacity.worker.ts")],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "browser",
+  target: "es2022",
+}).outputFiles[0]!.contents;
 const server = createServer((request, response) => {
   const assets = new Map([
     [`/assets/${workerName}`, workerBytes],
     [`/assets/${environmentWorkerName}`, environmentWorkerBytes],
+    ["/assets/track-store-capacity.worker.js", trackStoreWorkerBytes],
   ]);
   const bytes = assets.get(request.url ?? "");
   if (bytes) {
@@ -85,6 +98,17 @@ const stalePack = await adaptPreparedSimulation(
     createVerificationDeploymentCapabilities(DEPLOYMENT_CAPABILITIES.engine.id),
   ),
 );
+const verificationBase = prepareSimulation(scenario, scenario.profile, DEPLOYMENT_CAPABILITIES);
+const verificationBinding = await bindVerificationTrackModelPack(verificationBase.engineScenario);
+const verificationPack = await adaptPreparedSimulation({
+  ...verificationBase,
+  engineScenario: verificationBinding.scenario,
+  capabilityManifest: createVerificationDeploymentCapabilities(
+    DEPLOYMENT_CAPABILITIES.engine.id,
+    ["A2A"],
+    [verificationBinding.pack.digest],
+  ),
+});
 const phaseAArea = getStudyArea("north-punjab");
 const phaseAPack = createPhaseAEnvironmentPack({
   studyArea: phaseAArea,
@@ -130,7 +154,7 @@ try {
   assert.equal(environmentSamples[0]?.terrain.elevation.datum, "MSL");
   assert.equal(environmentSamples[0]?.terrain.elevation.valueM, phaseAArea.surfaceElevationM);
   const result: WorkerVerificationResult = await page.evaluate(
-      async ({ pack: selectedPack, stalePack: rejectedPack, workerUrl }) => {
+      async ({ pack: selectedPack, stalePack: rejectedPack, verificationPack: rejectedVerificationPack, workerUrl }) => {
         const protocol = "vector.browser-runtime.v1";
         const worker = new Worker(workerUrl, { name: "vector-simulation-runtime" });
         const states: string[] = [];
@@ -179,6 +203,14 @@ try {
         send({ requestId: "stale-load", type: "load-model-pack", pack: rejectedPack });
         const staleAdmissionError = await staleAdmission.then(
           () => "unexpected model-pack admission",
+          (error: Error) => error.message,
+        );
+        const verificationAdmission = waitFor(
+          (message) => message.type === "model-pack-loaded",
+        );
+        send({ requestId: "verification-load", type: "load-model-pack", pack: rejectedVerificationPack });
+        const verificationAdmissionError = await verificationAdmission.then(
+          () => "unexpected verification-pack admission",
           (error: Error) => error.message,
         );
         const loaded = waitFor((message) => message.type === "model-pack-loaded");
@@ -267,11 +299,12 @@ try {
           wallMs: performance.now() - startedAt,
           frameCount: frameHeader.frames.length,
           staleAdmissionError,
+          verificationAdmissionError,
           transferredByteLength,
           detachedAfterRecycle,
         };
       },
-      { pack, stalePack, workerUrl: `${origin}/assets/${workerName}` },
+      { pack, stalePack, verificationPack, workerUrl: `${origin}/assets/${workerName}` },
     );
 
   assert.match(result.recordId, /^[a-f0-9]{64}$/);
@@ -287,6 +320,7 @@ try {
   assert.ok(result.boundaryCalls > 1);
   assert.ok(result.states.includes("failed"));
   assert.match(result.staleAdmissionError, /capability-manifest-stale/);
+  assert.match(result.verificationAdmissionError, /capability-manifest-stale/);
 
   const cancellation = await page.evaluate(
     async ({ pack, workerUrl }) => {
@@ -362,8 +396,43 @@ try {
   assert.ok(cancellation.messages.includes("state"));
   assert.ok(cancellation.messages.includes("cancelled"));
 
+  const trackStoreCapacity = await page.evaluate(async ({ workerUrl }) => {
+    const worker = new Worker(workerUrl, { type: "module" });
+    const receive = (type: string, runId: string) => new Promise<Record<string, unknown>>((resolveWait, rejectWait) => {
+      const timeout = setTimeout(() => rejectWait(new Error(`TrackStore Worker ${type} timed out.`)), 10_000);
+      const listener = (event: MessageEvent<Record<string, unknown>>) => {
+        if (event.data.type !== type || event.data.runId !== runId) return;
+        clearTimeout(timeout);
+        worker.removeEventListener("message", listener);
+        resolveWait(event.data);
+      };
+      worker.addEventListener("message", listener);
+    });
+    const firstProgress = receive("progress", "cancel-capacity");
+    worker.postMessage({ type: "run", runId: "cancel-capacity" });
+    await firstProgress;
+    const cancelled = receive("cancelled", "cancel-capacity");
+    worker.postMessage({ type: "cancel", runId: "cancel-capacity" });
+    await cancelled;
+    const completed = receive("completed", "recover-capacity");
+    worker.postMessage({ type: "run", runId: "recover-capacity" });
+    const result = await completed;
+    worker.terminate();
+    return result;
+  }, { workerUrl: `${origin}/assets/track-store-capacity.worker.js` });
+  assert.equal(trackStoreCapacity.workloadId, TRACK_STORE_CAPACITY_WORKLOAD.id);
+  assert.equal(trackStoreCapacity.workloadVersion, TRACK_STORE_CAPACITY_WORKLOAD.version);
+  assert.equal(trackStoreCapacity.retainedTracks, TRACK_STORE_CAPACITY_WORKLOAD.expected.retainedTracks);
+  assert.equal(trackStoreCapacity.transitionCount, TRACK_STORE_CAPACITY_WORKLOAD.expected.lifecycleTransitions);
+  assert.equal(trackStoreCapacity.canonicalPictures, 2);
+  assert.deepEqual(trackStoreCapacity.tracksPerPicture, TRACK_STORE_CAPACITY_WORKLOAD.sides.map(() => TRACK_STORE_CAPACITY_WORKLOAD.tracksPerSide));
+  const canonicalFrameBytes = trackStoreCapacity.canonicalFrameBytes;
+  if (typeof canonicalFrameBytes !== "number") throw new Error("TrackStore Worker omitted canonical frame bytes.");
+  assert.ok(canonicalFrameBytes > 0);
+  assert.equal(trackStoreCapacity.parityDigest, TRACK_STORE_CAPACITY_WORKLOAD.expected.parityDigest);
+
   process.stdout.write(
-    `${JSON.stringify({ workerAsset: workerName, environmentWorkerAsset: environmentWorkerName, backend: result, cancellation })}\n`,
+    `${JSON.stringify({ workerAsset: workerName, environmentWorkerAsset: environmentWorkerName, backend: result, cancellation, trackStoreCapacity })}\n`,
   );
 } finally {
   await browser.close();

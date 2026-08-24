@@ -33,6 +33,7 @@ import {
   resolveInstallationOriginReference,
   type InstallationOriginReference,
 } from "../mission-admission.ts";
+import { bindRuntimeModelPackDigest } from "./runtime-model-pack.ts";
 
 export type ScenarioCompilerInput = {
   id: string;
@@ -597,7 +598,7 @@ export function compileScenario(
     seed: input.seed,
     durationSeconds: input.domain === "G2G" ? 240 : 140,
     fixedStepSeconds: 0.05,
-    modelPack: {
+    modelPack: bindRuntimeModelPackDigest({
       schemaVersion: COMPILED_MODEL_PACK_SCHEMA_VERSION,
       id: CURRENT_MODEL_PACK_ID,
       version: CURRENT_MODEL_PACK_VERSION,
@@ -616,9 +617,12 @@ export function compileScenario(
         scanPeriodS: sensor.scanPeriodS,
         azimuthFieldOfViewRad: sensor.azimuthFieldOfViewRad,
         elevationFieldOfViewRad: sensor.elevationFieldOfViewRad,
+        ...(sensor.verificationTrackModel
+          ? { verificationTrackModel: structuredClone(sensor.verificationTrackModel) }
+          : {}),
       })),
       scenarioPatches: [],
-    },
+    }),
     entities,
     geospatial: {
       schemaVersion: "vector.engine-geospatial.v1",

@@ -99,7 +99,9 @@ jobs:
       - name: Verify generated assets, lint, and types
         run: |
           npm run environment:sources:verify
+          npm run tp1538:sources:verify
           npm run policy:aircraft-evidence:verify
+          npm run policy:nasa-generic-f16:verify
           npm run symbols:verify
           npm run models:verify
           npm run reference-aircraft:verify
@@ -217,7 +219,7 @@ jobs:
       - name: Run component and built-browser contracts
         run: |
           npm run test:component
-          npm run test:browser
+          npm run test:browser:ci
           npm run worker:verify
       - name: Upload browser evidence on failure
         if: failure()

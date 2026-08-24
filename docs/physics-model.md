@@ -1,5 +1,9 @@
 # Physics and information-model status
 
+## TP-1538 source boundary
+
+The frozen NASA-TP-1538 *Simulator study of stall/post-stall characteristics of a fighter airplane with relaxed longitudinal static stability* pages are evidence inputs only. They do not create coefficient tables or executable aerodynamics. Future #142 stages must independently double-enter and adjudicate the printed cells before a verification-only evaluator can use them. Production dynamics must not import the source assets or infer missing cells, propulsion, control laws, altitude dependence, Reynolds corrections, or named-aircraft fidelity.
+
 Vector currently uses a deterministic three-dimensional point-mass reference engine intended for inspectable sensitivity research, not verified prediction of named-system performance.
 
 ## Integrated model
@@ -103,15 +107,23 @@ The #26 observer boundary is tick-owned and fail closed. The deployed
 reference pack contains only a zero-range `DECLARED_ENVELOPE`, so each side
 records `UNSUPPORTED` with zero observations and no track or position. It does
 not derive measurements, covariance, radar range, or jamming effects from
-truth frames. The engine now has a bounded `vector.observer-sensor-admission.v1`
+truth frames. The engine retains a bounded `vector.observer-sensor-admission.v1`
 path for a future compiled positive-range `RADAR`, `INFRARED`, or `VISUAL`
 model: it binds every admission field exactly to the compiler-produced
 observer-sensor projection carried in the run binding, then uses only the
 declared scan/range/FOV inputs and produces a non-positional PLOT. An
 entity-level caller cannot add a sensor beside a valid pack digest. The binding
-transport itself remains governed by STUB-13. This is a mechanism test, not sensor fidelity. Datalink,
-AEW, EW, track estimation and weapon support remain unavailable until their
-typed interfaces and admitted model data exist.
+transport itself remains governed by STUB-13.
+
+A distinct source-authored `ENGINE_VERIFICATION_ONLY` pack now admits
+`vector.observer-sensor-admission.v2` with an explicit generic measurement and
+track model. It drives side-owned observations, uncertainty, confirmation,
+coasting, loss, and reacquisition in both engines and emits typed transition
+facts through the shared event journal. Production Worker admission rejects
+this pack. It is mechanism and parity evidence, not Su-30MKI/F-16 sensor
+fidelity. Datalink, AEW, EW, named-sensor behavior, association of multiple
+contacts, and weapon support remain unavailable until their typed interfaces
+and admitted model data exist.
 
 Positive sensor compilation now also requires a separate source/independent-
 validation artifact pair and explicit validation of every runtime bound,
@@ -125,8 +137,8 @@ Every movement trail is reconstructed only from recorded engine frames. The 3D s
 
 Model Truth remains separate from IAF and PAF RASP state. Today both RASP
 views are `UNSUPPORTED` because the deployed pack has no admitted measurement
-model. A later positive-range sensor admission can show only a non-positional
-PLOT; it does not yet estimate the selected opposing aircraft, classify it,
+model. The engine-verification fixture can show its generic side-owned estimate
+only in verification tests; it does not identify the opposing aircraft, classify it,
 apply jamming, link it, or support a weapon. An unavailable path yields
 `NO_TRACK` and removes the opposing marker instead of falling back to truth.
 

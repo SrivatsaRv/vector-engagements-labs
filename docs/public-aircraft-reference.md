@@ -4,7 +4,7 @@ VECTOR admits a public aircraft reference only as an isolated verification asset
 
 ## Admitted check case
 
-The first asset is NASA NESC 2015 Atmospheric Case 11, a 180-second subsonic, wings-level trimmed F-16 flyout. NASA publishes the case specification, an F-16 DAVE-ML package, and trajectory CSVs from independent implementations.
+The first asset is NASA NESC 2015 Atmospheric Case 11, a 180-second subsonic, wings-level trimmed F-16 flyout. NASA publishes the case specification, an F-16 DAVE-ML package, and trajectory CSVs from separately implemented simulation tools. Those trajectories share the same model definition: they are implementation-comparison evidence, not independent physical validation.
 
 | Evidence | Immutable identity |
 | --- | --- |
@@ -64,3 +64,47 @@ It also cannot admit named-aircraft performance. A future named aircraft pack
 must bind every required capability class to immutable source evidence and a
 separate independent validation artifact. Until then, its compiled admission
 state is `UNSUPPORTED`, and any named-performance consumer must fail closed.
+
+## Case 13.2 ingestion boundary
+
+Issue #135 registers NASA TP-1538, NASA/TM-2003-212145, the NESC F-16 package
+and Atmospheric Case 13.2 under the exact subject
+`NASA_NESC_GENERIC_F16_REFERENCE` and intended use
+`ENGINE_VERIFICATION_ONLY`. The two NTRS reports are public-use-permitted and
+their immutable PDF hashes and table-page ancestry are governed in the separate
+`nasa-generic-f16-verification-corpus.v1.json` artifact. Aircraft evidence
+registry v2 remains unchanged.
+
+No Case 13.2 evaluator or normalized table derivative is admitted by the first
+slice. TP-1538 publishes aerodynamic data, and TM-2003-212145 publishes mass
+properties and model equations/ranges, but the reports do not embed the full
+propulsion and control tables needed by the case. The NESC package includes
+those values through third-party/book-derived ancestry without an established
+new-derivative licence and ancestry decision. Copying them into the model pack
+without that explicit review would therefore violate the evidence boundary.
+
+This does not erase the narrow Case 11 derivative already reviewed and recorded
+in aircraft evidence registry v2. The corpus binds that legacy fixture to its
+published digest and ancestry while denying it runtime authority. It permits no
+new Case 13.2 or DAVE-ML descendant by implication.
+
+That reconciliation is exact rather than schema-shaped. The verifier pins the
+complete registry records for the Case 11 DAVE-ML source, Sim 04 comparison and
+committed descendant, including their identities, review/admission decisions,
+capability coverage, scope and ancestry. It cross-checks the standalone DAVE-ML
+record against the registry source. The shared capability boundary is
+aerodynamics, propulsion and flight controls; published mass properties remain
+owned by the separately hashed NASA reports in this corpus. The standalone
+`ENGINE_VERIFICATION_ONLY` and new-derivative restrictions coexist with registry
+`REFERENCE_ONLY`; neither is runtime or derivative authority.
+
+The offline gate `npm run policy:nasa-generic-f16:verify` verifies exact source
+identities, source-versus-comparison roles, licence decisions, page ancestry,
+the withheld derivative state, candidate-table hashes, closed units/axes, and
+fail-closed interpolation. It performs no network access and changes no
+production aircraft, TypeScript/Rust runtime, Worker, VSR, UI or report claim.
+The exported research-derivative validator requires the published aircraft
+registry and fully validates this exact standalone corpus before consuming any
+caller-supplied derivative; an unvalidated or mutated corpus or a broadly valid
+but mismatched Case 11 registry projection cannot confer ancestry, licence or
+runtime authority by reusing an expected artifact ID.

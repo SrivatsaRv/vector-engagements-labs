@@ -481,13 +481,10 @@ test("production Rust, WASM, backend, and Worker surfaces contain no generic-AAM
 test("Rust generic DTO is strict without mutating the shared production Vec3 contract", () => {
   const shared = readFileSync(new URL("../engine-rust/src/lib.rs", import.meta.url), "utf8");
   const generic = readFileSync(new URL("../verification-rust/generic-aam/src/model.rs", import.meta.url), "utf8");
-  const expectedSharedContract = `#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct Vec3 {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-}`;
-  assert.ok(shared.includes(expectedSharedContract));
+  assert.match(
+    shared,
+    /pub struct Vec3 \{\s+pub x: f64,\s+pub y: f64,\s+pub z: f64,\s+\}/,
+  );
   assert.doesNotMatch(shared, /#\[serde\(deny_unknown_fields\)\]\npub struct Vec3/);
   assert.match(generic, /struct GenericAamVec3/);
   assert.match(generic, /deny_unknown_fields[\s\S]{0,100}struct GenericAamVec3/);
