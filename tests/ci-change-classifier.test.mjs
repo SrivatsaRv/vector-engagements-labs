@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { classifyChanges } from "../scripts/classify-ci-changes.mjs";
+import { parseNameStatusZ } from "../scripts/lib/contract-doc-impact.mjs";
 
 const selected = (files) => {
   const jobs = classifyChanges(files);
@@ -10,6 +11,36 @@ const selected = (files) => {
     .filter(([, enabled]) => enabled)
     .map(([job]) => job);
 };
+
+test("rename and copy classification preserves both endpoints without trimming legal names", () => {
+  const operations = parseNameStatusZ("R100\u0000docs/old.md\u0000lib/new.ts\u0000C100\u0000 leading.ts\u0000components/copied.tsx\u0000");
+  const files = operations.flatMap(({ oldPath, path }) => [oldPath, path].filter(Boolean));
+  assert.deepEqual(files, ["docs/old.md", "lib/new.ts", " leading.ts", "components/copied.tsx"]);
+  assert.equal(classifyChanges(files).files.includes(" leading.ts"), true);
+  assert.equal(selected(files).includes("browser_tests"), true);
+});
+
+test("contract-documentation policy surfaces fail closed across every hosted gate", () => {
+  for (const path of [
+    "governance/contract-doc-ownership.v1.json",
+    "scripts/lib/contract-doc-impact.mjs",
+    "scripts/verify-contract-doc-impact.mjs",
+    "tests/contract-doc-impact.test.mjs",
+    "package.json",
+  ]) {
+    assert.deepEqual(selected([path]), [
+      "policy",
+      "quality",
+      "security_js",
+      "web_tests",
+      "browser_tests",
+      "rust_tests",
+      "rust_audit",
+      "integration",
+      "container",
+    ]);
+  }
+});
 
 test("documentation and project skills use only the stable policy gate", () => {
   assert.deepEqual(
@@ -286,6 +317,10 @@ test("workflow changes fail closed through every available gate", () => {
   ];
   assert.deepEqual(selected([".github/workflows/ci.yml"]), everyGate);
   assert.deepEqual(selected(["scripts/classify-ci-changes.mjs"]), everyGate);
+  assert.deepEqual(selected(["governance/contract-doc-ownership.v1.json"]), everyGate);
+  assert.deepEqual(selected(["scripts/lib/contract-doc-impact.mjs"]), everyGate);
+  assert.deepEqual(selected(["scripts/verify-contract-doc-impact.mjs"]), everyGate);
+  assert.deepEqual(selected(["tests/contract-doc-impact.test.mjs"]), everyGate);
 });
 
 test("unclassified paths fail closed through every available gate", () => {

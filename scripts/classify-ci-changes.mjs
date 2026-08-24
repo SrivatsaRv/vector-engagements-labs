@@ -1,6 +1,8 @@
 import { appendFileSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
+import { parseNameStatusZ } from "./lib/contract-doc-impact.mjs";
+
 const POLICY_ONLY = [
   /^\.codex\//,
   /^docs\//,
@@ -18,8 +20,13 @@ const WORKFLOW_CONTROL = [
   /^\.github\/workflows\//,
   /^\.github\/dependabot\.yml$/,
   /^Makefile$/,
+  /^(?:package|package-lock)\.json$/,
+  /^governance\/contract-doc-ownership\.v1\.json$/,
   /^scripts\/classify-ci-changes\.mjs$/,
+  /^scripts\/lib\/contract-doc-impact\.mjs$/,
   /^scripts\/run-managed-server\.mjs$/,
+  /^scripts\/verify-contract-doc-impact\.mjs$/,
+  /^tests\/contract-doc-impact\.test\.mjs$/,
 ];
 
 const WEB_SOURCE = [
@@ -106,7 +113,7 @@ const CONTAINER_OR_RUNTIME = [
 const matches = (file, patterns) => patterns.some((pattern) => pattern.test(file));
 
 export function classifyChanges(inputFiles) {
-  const files = [...new Set(inputFiles.map((file) => file.trim()).filter(Boolean))].sort();
+  const files = [...new Set(inputFiles.filter((file) => file.length > 0))].sort();
   const result = {
     policy: true,
     quality: false,
@@ -185,9 +192,14 @@ export function classifyChanges(inputFiles) {
 
 function run() {
   const useNullDelimitedStdin = process.argv.includes("--stdin0");
-  const files = useNullDelimitedStdin
-    ? readFileSync(0, "utf8").split("\0")
-    : process.argv.slice(2);
+  const useNameStatusStdin = process.argv.includes("--name-status0");
+  if (useNullDelimitedStdin && useNameStatusStdin) throw new Error("Choose one null-delimited input mode.");
+  const raw = useNullDelimitedStdin || useNameStatusStdin ? readFileSync(0) : null;
+  const files = useNameStatusStdin
+    ? parseNameStatusZ(raw).flatMap(({ oldPath, path }) => [oldPath, path].filter(Boolean))
+    : useNullDelimitedStdin
+      ? raw.toString("utf8").split("\0")
+      : process.argv.slice(2);
   const result = classifyChanges(files);
 
   if (process.env.GITHUB_OUTPUT) {

@@ -29,7 +29,7 @@ Repository administrators retain emergency recovery authority but should not use
 ## Continuous integration
 
 `ci.yml` is one change-aware pull-request and `main` pipeline. Stage 0 computes
-the changed files from immutable base and head revisions with the tracked
+the rename/copy-aware change set from the exact merge base and head revisions with the tracked
 classifier and always runs repository-policy regression tests. Independent
 quality, JavaScript supply-chain/CodeQL, web-contract, Rust/WASM/parity,
 RustSec, PostGIS/API, and container-rebuild jobs then run in parallel only when
@@ -37,6 +37,36 @@ their owned paths or an unclassified path changed. Workflow and Dependabot
 changes deliberately fail closed through every gate. Stage 4 retains the one
 stable branch-protection context and fails unless every selected job passed;
 jobs skipped by the classifier are not treated as missing evidence.
+
+Stage 0.6 separately enforces the versioned
+`vector.contract-doc-ownership.v1` policy. Every tracked path is either owned by
+a contract family or belongs to one closed non-contract class. Each governed
+change supplies exactly one bounded `vector.contract-doc-impact-declaration.v1`
+block naming every affected family and its exact stable Markdown section IDs.
+The validator reads Git blobs at the merge base and head, retains both endpoints
+of rename/copy records, rejects whitespace-only or unrelated-section churn, and
+mechanically verifies the closed exemption inventory. For policy changes it
+audits old endpoints under the base policy and new endpoints under the head
+policy; existing ownership cannot be erased by the policy being reviewed. The
+initial #162 landing is the only explicit bootstrap because its base has no
+ownership artifact. Later missing, malformed, weakened, or unmapped policy
+state fails closed.
+
+Pull requests obtain the declaration from the single structured template block.
+An edited body reruns CI. A `main` push resolves exactly one associated merged
+pull request through the read-only GitHub API and reuses the same declaration;
+zero or multiple associations fail. Local verification uses the same core and
+an explicit `VECTOR_CONTRACT_DOC_DECLARATION_FILE` or
+`VECTOR_CONTRACT_DOC_DECLARATION_JSON`. A dirty checkout is evaluated through a
+temporary Git index/tree/commit without changing the developer's branch or
+index. Missing local input is accepted only when the exact diff has no governed
+families. The Stage 4 gate requires the independent documentation-impact job to
+finish successfully with `VERIFIED` or `NO_RELEVANT_CHANGES`; cancelled,
+skipped, malformed, or unavailable evidence cannot be aggregated as success.
+
+This mechanism binds paths, identities, registered evidence, and owned section
+changes. It does not certify that prose is technically adequate and cannot
+replace CODEOWNER or human review of a policy that modifies its own verifier.
 
 Documentation, project-skill, and governance-only changes run the classifier,
 policy suite, and final gate without rebuilding the application, Rust engine,
@@ -59,7 +89,7 @@ classifier ownership. A path alias for a file that does not exist is not gate
 coverage. Policy regressions use the repository's real paths and verify that
 every classifier output is represented by the Required PR Gate.
 
-`make clean-clone-local` proves the documented release context slice resolves
+`make clean-clone-local` forwards the same explicit declaration input and proves the documented release context slice resolves
 from a new clone, installs the locked dependencies, then runs the deterministic
 baseline and `worker-local`. It therefore verifies the production-built Worker
 without relying on stale assets in the source checkout.

@@ -80,6 +80,8 @@ test("the pull request template requires layer-specific evidence", async () => {
   assert.match(template, /Closure classification/);
   assert.match(template, /Acceptance criteria addressed/);
   assert.match(template, /Closure verdict/);
+  assert.match(template, /vector-contract-doc-impact/);
+  assert.match(template, /vector\.contract-doc-impact-declaration\.v1/);
 });
 
 test("the script-based Required PR Gate checks out the tested revision", async () => {
@@ -93,6 +95,16 @@ test("the script-based Required PR Gate checks out the tested revision", async (
   assert.ok(nodeSetup > checkout, "Required PR Gate does not pin Node after checkout");
   assert.ok(verification > nodeSetup, "Required PR Gate runs before its source and runtime exist");
   assert.match(gate, /PR_REVIEW_KIND/);
+  assert.match(gate, /CONTRACT_DOC_IMPACT_STATE/);
+});
+
+test("local, hosted, and clean-clone gates execute the same documentation-impact validator", async () => {
+  const makefile = await readFile("Makefile", "utf8");
+  assert.match(makefile, /npm run policy:contract-docs:verify/);
+  assert.match(makefile, /VECTOR_CONTRACT_DOC_DECLARATION_FILE/);
+  const workflow = await readFile(".github/workflows/ci.yml", "utf8");
+  assert.match(workflow, /node scripts\/verify-contract-doc-impact\.mjs --github-event/);
+  assert.match(workflow, /contract_docs_state/);
 });
 
 test("selected browser contracts isolate every viewport before verifying the built Worker", async () => {

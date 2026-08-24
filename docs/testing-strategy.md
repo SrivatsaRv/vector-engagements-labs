@@ -12,6 +12,7 @@ Testing is part of the implementation contract. An executable action is incomple
 
 - **Unit:** pure math, coordinate transforms, parsers, reducers, validators, compilers, and state machines.
 - **Contract and regression:** schemas, canonical hashes, lifecycle transitions, backend boundaries, saved records, error cases, and every bug fix.
+- **Documentation impact:** base/head policy ownership, rename/copy endpoints, exact owning-section identities, structured dispositions, and hostile declaration inputs.
 - **Engine:** Rust unit/integration tests, TypeScript reference tests, strict lint/Clippy/rustdoc, and deterministic parity fixtures.
 - **Database and API integration:** empty-database migration, upgrade migration, deterministic seed/verifier, route admission, persistence, report replay, and failure paths.
 - **Frontend:** component and interaction tests for builder, maps, playback, reports, keyboard/touch behavior, loading, cancellation and errors.
@@ -24,7 +25,14 @@ Use the smallest complete set for a change. State why any applicable layer was o
 ## Existing baseline
 
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and
-production-audit checks. It first verifies the machine-readable runtime stub
+production-audit checks. It first runs the same contract-documentation impact
+validator used by hosted CI. Governed feature branches must supply an explicit
+declaration file or JSON value; an absent declaration fails as soon as the
+merge-base-to-worktree change set contains a registered family. The verifier
+constructs an isolated temporary Git snapshot for dirty and untracked files,
+so pre-commit validation neither ignores edits nor mutates the real index. The
+post-commit clean-clone run validates the exact immutable candidate and carries
+the declaration path forward. It then verifies the machine-readable runtime stub
 ledger. A new or removed production fallback, temporary adapter, model
 assumption, named-duel identifier, scripted guidance hold, or source-less public
 reference must update its owning ledger entry; an
@@ -77,14 +85,24 @@ explicit p95 limits and makes no Worker or product-capacity claim. See
 [`generic-aam-verification.md`](generic-aam-verification.md).
 
 GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
-automated gate from changed paths. Repository-policy tests always run, and an
+automated gate from merge-base-relative `--name-status -z` records. Rename and
+copy records retain both endpoints without trimming legal path bytes.
+`scripts/verify-contract-doc-impact.mjs` independently maps those endpoints to
+the base and head versions of `governance/contract-doc-ownership.v1.json`,
+validates the one structured declaration, and compares the exact registered
+Markdown sections. TEST_ONLY, GENERATED_ARTIFACT_ONLY, INTERNAL_REFACTOR,
+NO_SEMANTIC_CHANGE, and DOCS_ALREADY_CURRENT are mutually exclusive,
+evidence-bearing dispositions; none receives credit merely because an arbitrary
+document changed. Semantic database changes additionally require the registered
+Unreleased migration section. Repository-policy tests always run, and an
 unknown path fails closed through every CI job. Documentation and agent-harness
 changes do not consume application, Rust, container, or PostGIS runners. Web,
 simulation, database/API, dependency, workflow, and infrastructure paths each
 add their owning gates. Shared mission, scenario, environment, model, Worker and
 Vector Simulation Record contracts select the Rust/parity and integration gates
 that consume them. The single Required PR Gate is always emitted and verifies
-that every selected job passed and every unselected job was skipped. Failed,
+that the documentation-impact job succeeded, every selected job passed, and
+every unselected job was skipped. Failed,
 cancelled, timed-out, action-required or unexpectedly skipped selected jobs all
 fail the gate. Workflow-level path exclusions are not used because they can
 strand a required check.
@@ -183,3 +201,9 @@ still require migration before #62 can close.
 ## Release evidence
 
 The release steward requires passing unit, contract, parity, migration, API, frontend, browser, visual, security, performance, observability, cancellation, recovery, load and soak evidence for the applicable release scope. Targets in [`performance-capacity.md`](performance-capacity.md) remain targets until a reproducible benchmark record marks them measured.
+
+Release evidence must also include the exact contract-documentation declaration,
+base/head/merge-base identities, affected family inventory, and the Stage 0.6
+verdict. A passing policy job does not substitute for that independent result;
+failure, cancellation, skip, missing PR association, or stale section evidence
+must remain visible to the Required PR Gate.

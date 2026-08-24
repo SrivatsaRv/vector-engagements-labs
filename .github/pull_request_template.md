@@ -1,3 +1,14 @@
+## Contract documentation declaration
+
+Keep exactly one block. Follow `governance/contract-doc-ownership.v1.json`; replace the empty family inventory whenever governed contract paths change. The hosted gate binds this declaration to the exact Git change and owning Markdown sections.
+
+<!-- vector-contract-doc-impact
+{
+  "schemaVersion": "vector.contract-doc-impact-declaration.v1",
+  "families": []
+}
+-->
+
 ## What changed
 
 Describe the behavior and the owning contract.

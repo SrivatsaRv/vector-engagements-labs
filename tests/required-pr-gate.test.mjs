@@ -5,7 +5,13 @@ import { classifyChanges } from "../scripts/classify-ci-changes.mjs";
 import { REQUIRED_GATES, verifyRequiredGates } from "../scripts/verify-required-gates.mjs";
 
 const successfulEnvironment = () => {
-  const environment = { CLASSIFY_RESULT: "success", POLICY_RESULT: "success", PR_REVIEW_KIND: "slice" };
+  const environment = {
+    CLASSIFY_RESULT: "success",
+    POLICY_RESULT: "success",
+    CONTRACT_DOCS_RESULT: "success",
+    CONTRACT_DOC_IMPACT_STATE: "VERIFIED",
+    PR_REVIEW_KIND: "slice",
+  };
   for (const gate of REQUIRED_GATES) {
     environment[gate.selected] = "true";
     environment[gate.result] = "success";
@@ -52,6 +58,23 @@ test("the required gate rejects failed policy and classifier jobs", () => {
   const policyFailed = successfulEnvironment();
   policyFailed.POLICY_RESULT = "failure";
   assert.throws(() => verifyRequiredGates(policyFailed), /policy ended as failure/i);
+});
+
+for (const failedResult of ["failure", "cancelled", "skipped", "timed_out"]) {
+  test(`the required gate rejects a ${failedResult} documentation-impact gate`, () => {
+    const environment = successfulEnvironment();
+    environment.CONTRACT_DOCS_RESULT = failedResult;
+    assert.throws(() => verifyRequiredGates(environment), /documentation impact gate ended/i);
+  });
+}
+
+test("the required gate rejects missing or invalid documentation-impact state", () => {
+  const missing = successfulEnvironment();
+  delete missing.CONTRACT_DOC_IMPACT_STATE;
+  assert.throws(() => verifyRequiredGates(missing), /CONTRACT_DOC_IMPACT_STATE is missing/i);
+  const invalid = successfulEnvironment();
+  invalid.CONTRACT_DOC_IMPACT_STATE = "BYPASSED";
+  assert.throws(() => verifyRequiredGates(invalid), /impact state is invalid/i);
 });
 
 test("the required gate rejects an invalid PR review classification", () => {

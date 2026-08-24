@@ -86,12 +86,15 @@ clean-clone-local:
 		temporary_root="$$(mktemp -d)"; \
 		trap 'rm -rf "$$temporary_root"' EXIT INT TERM; \
 		git clone --quiet --no-local --branch "$$(git branch --show-current)" . "$$temporary_root/repository"; \
-		cd "$$temporary_root/repository"; \
-		scripts/context-slice.sh release >/dev/null; \
-		npm ci; \
-		make ci-local worker-local
+	cd "$$temporary_root/repository"; \
+	scripts/context-slice.sh release >/dev/null; \
+	npm ci; \
+	VECTOR_CONTRACT_DOC_DECLARATION_FILE="$${VECTOR_CONTRACT_DOC_DECLARATION_FILE:-}" \
+	VECTOR_CONTRACT_DOC_BASE_SHA="$${VECTOR_CONTRACT_DOC_BASE_SHA:-}" \
+	make ci-local worker-local
 
 ci-quality:
+	npm run policy:contract-docs:verify
 	npm run environment:sources:verify
 	npm run tp1538:sources:verify
 	npm run policy:runtime-stubs:verify

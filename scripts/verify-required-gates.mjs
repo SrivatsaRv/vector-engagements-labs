@@ -32,6 +32,13 @@ export function verifyRequiredGates(environment) {
   if (requireResult(environment, "POLICY_RESULT") !== "success") {
     throw new Error(`Repository policy ended as ${environment.POLICY_RESULT}.`);
   }
+  if (requireResult(environment, "CONTRACT_DOCS_RESULT") !== "success") {
+    throw new Error(`Contract documentation impact gate ended as ${environment.CONTRACT_DOCS_RESULT}.`);
+  }
+  const contractDocsState = requireResult(environment, "CONTRACT_DOC_IMPACT_STATE");
+  if (!["VERIFIED", "NO_RELEVANT_CHANGES"].includes(contractDocsState)) {
+    throw new Error(`Contract documentation impact state is invalid: ${contractDocsState}.`);
+  }
   const reviewKind = requireResult(environment, "PR_REVIEW_KIND");
   if (!["slice", "completion-review", "not-applicable"].includes(reviewKind)) {
     throw new Error(`PR review kind must be slice, completion-review, or not-applicable; received ${reviewKind}.`);
