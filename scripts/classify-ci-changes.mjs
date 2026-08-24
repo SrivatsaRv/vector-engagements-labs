@@ -59,6 +59,7 @@ const JAVASCRIPT_SECURITY = [
 
 const RUST_CONTRACT = [
   /^engine-rust\//,
+  /^verification-rust\/sixdof-foundation\//,
   /^fixtures\/public-reference\//,
   /^lib\/engine\//,
   /^lib\/validation\/public-aircraft-reference\.ts$/,
@@ -66,7 +67,10 @@ const RUST_CONTRACT = [
   /^scripts\/(?:build-rust-engine|generate-model-pack-fixture|verify-public-aircraft-reference)\.mjs$/,
 ];
 
-const RUST_MANIFEST = [/^engine-rust\/(?:Cargo\.toml|Cargo\.lock)$/];
+const RUST_MANIFEST = [
+  /^engine-rust\/(?:Cargo\.toml|Cargo\.lock)$/,
+  /^verification-rust\/sixdof-foundation\/(?:Cargo\.toml|Cargo\.lock)$/,
+];
 
 const SHARED_SIMULATION_CONTRACT = [
   /^fixtures\/(?:environment|model-packs|scenario|simulation|vector-record)\//,

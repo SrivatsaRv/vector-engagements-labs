@@ -186,7 +186,9 @@ jobs:
       - name: Cache Rust builds
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
         with:
-          workspaces: engine-rust
+          workspaces: |
+            engine-rust -> target
+            verification-rust/sixdof-foundation -> target
       - name: Install locked dependencies
         run: npm ci
       - name: Verify Rust, WASM, and parity contracts
@@ -196,6 +198,13 @@ jobs:
           npm run engine:rust:verify
           npm run engine:rust:test
           npm run engine:rust:doc
+          npm run sixdof-foundation:rust:fmt
+          npm run sixdof-foundation:rust:clippy
+          npm run sixdof-foundation:rust:verify
+          npm run sixdof-foundation:rust:test
+          npm run sixdof-foundation:rust:doc
+          npm run sixdof-foundation:verify
+          npm run sixdof-foundation:performance
           node --test tests/engine-backends.test.mjs tests/model-pack.test.mjs
 
   browser_tests:
@@ -246,7 +255,9 @@ jobs:
       - name: Install pinned cargo-audit
         run: cargo install cargo-audit --locked --version 0.22.2
       - name: Audit locked Rust dependencies
-        run: cargo audit --file engine-rust/Cargo.lock
+        run: |
+          cargo audit --file engine-rust/Cargo.lock
+          cargo audit --file verification-rust/sixdof-foundation/Cargo.lock
 
   integration:
     if: needs.classify.outputs.integration == 'true'

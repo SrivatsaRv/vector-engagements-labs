@@ -58,6 +58,17 @@ test("Rust implementation changes receive parity tests without dependency audit"
   ]);
 });
 
+test("private 6DOF Rust changes select their parity and dependency owners", () => {
+  assert.deepEqual(
+    selected(["verification-rust/sixdof-foundation/src/model.rs"]),
+    ["policy", "web_tests", "rust_tests"],
+  );
+  assert.deepEqual(
+    selected(["verification-rust/sixdof-foundation/Cargo.lock"]),
+    ["policy", "web_tests", "rust_tests", "rust_audit"],
+  );
+});
+
 test("runtime and engine changes execute the built Worker browser verifier", () => {
   for (const file of [
     "lib/runtime/simulation.worker.ts",

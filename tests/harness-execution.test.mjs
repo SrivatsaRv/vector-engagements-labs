@@ -108,6 +108,32 @@ test("selected browser contracts isolate every viewport before verifying the bui
   );
 });
 
+test("hosted Rust stages own the complete private 6DOF verifier gate", async () => {
+  const workflow = await readFile(".github/workflows/ci.yml", "utf8");
+  const rust = workflow.split(/^  rust_tests:/m)[1]?.split(/^  browser_tests:/m)[0];
+  const audit = workflow.split(/^  rust_audit:/m)[1]?.split(/^  integration:/m)[0];
+  assert.ok(rust, "Rust/WASM job is missing");
+  assert.ok(audit, "Rust dependency-audit job is missing");
+
+  assert.match(rust, /verification-rust\/sixdof-foundation\s*->\s*target/);
+  for (const command of [
+    "sixdof-foundation:rust:fmt",
+    "sixdof-foundation:rust:clippy",
+    "sixdof-foundation:rust:verify",
+    "sixdof-foundation:rust:test",
+    "sixdof-foundation:rust:doc",
+    "sixdof-foundation:verify",
+    "sixdof-foundation:performance",
+  ]) {
+    assert.match(rust, new RegExp(`npm run ${command.replaceAll(":", "\\:")}`), `${command} is not owned by Stage 2B`);
+  }
+  assert.match(
+    audit,
+    /cargo audit --file verification-rust\/sixdof-foundation\/Cargo\.lock/,
+    "Stage 2C does not audit the private verifier lockfile",
+  );
+});
+
 test("browser-local uses the governed isolated browser runner", async () => {
   const makefile = await readFile("Makefile", "utf8");
   const browserLocal = makefile.split(/^browser-local:/m)[1]?.split(/^air-reference-local:/m)[0];

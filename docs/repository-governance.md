@@ -163,7 +163,12 @@ Browser/responsive checks and performance benchmarks are deliberately not run
 on GitHub-hosted pull-request runners. They remain explicit maintainer checks
 through `make integration-local` and `make performance-local`, where the
 browser, GPU/software renderer, display dimensions, and machine class are
-controlled and the evidence is interpretable. The scheduled `codeql.yml`
+controlled and the evidence is interpretable. The sole exception is the
+private 6DOF verifier's bounded, Node-hosted 10,000-tick numerical regression;
+Stage 2B owns that non-product benchmark alongside the crate's formatting,
+Clippy, rebuild, native-test, rustdoc, parity, and isolation commands. Stage 2C
+audits its independent lockfile, and the classifier selects both owners for
+private-crate manifest changes. The scheduled `codeql.yml`
 workflow retains weekly security analysis without creating a second PR run.
 
 Rust sources carry a deterministic source digest; the embedded module carries
