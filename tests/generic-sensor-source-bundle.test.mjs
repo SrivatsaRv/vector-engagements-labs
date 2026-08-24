@@ -30,6 +30,49 @@ function seal(value) {
   return value;
 }
 
+function artifactDescriptor(manifestValue, path) {
+  const candidates = [manifestValue.visualInspection, manifestValue.legalDecisions, manifestValue.legalAuthorityRegistry, manifestValue.isolationEvidence];
+  for (const source of manifestValue.sources) {
+    candidates.push(...source.artifacts, source.archiveInventory);
+    for (const member of source.extractedMembers ?? []) candidates.push(member.extractedArtifact);
+    for (const page of source.renderPages ?? []) candidates.push(page.sourceRender, page.displayRender);
+  }
+  return candidates.find((candidate) => candidate?.path === path);
+}
+
+function replaceArtifact(manifestValue, overrides, path, bytes) {
+  const descriptor = artifactDescriptor(manifestValue, path);
+  assert.ok(descriptor, `missing test artifact descriptor for ${path}`);
+  descriptor.sizeBytes = bytes.length;
+  descriptor.sha256 = sha256(bytes);
+  overrides.set(path, bytes);
+}
+
+function finalizeIsolationOverride(manifestValue, overrides, mutate = () => {}) {
+  const isolation = JSON.parse(readFileSync(resolve(root, manifestValue.isolationEvidence.path), "utf8"));
+  mutate(isolation);
+  const artifacts = new Map();
+  const collect = (candidate) => {
+    if (candidate?.path && Number.isInteger(candidate.sizeBytes)) artifacts.set(candidate.path, candidate);
+  };
+  for (const source of manifestValue.sources) {
+    for (const artifact of source.artifacts) collect(artifact);
+    collect(source.archiveInventory);
+    for (const member of source.extractedMembers ?? []) collect(member.extractedArtifact);
+    for (const page of source.renderPages ?? []) {
+      collect(page.sourceRender);
+      collect(page.displayRender);
+    }
+  }
+  collect(manifestValue.visualInspection);
+  collect(manifestValue.legalDecisions);
+  collect(manifestValue.legalAuthorityRegistry);
+  isolation.frozenArtifactCount = artifacts.size;
+  isolation.frozenArtifactBytes = [...artifacts.values()].reduce((sum, artifact) => sum + artifact.sizeBytes, 0);
+  const bytes = Buffer.from(`${JSON.stringify(isolation, null, 2)}\n`);
+  replaceArtifact(manifestValue, overrides, manifestValue.isolationEvidence.path, bytes);
+}
+
 function mutateOneByte(bytes) {
   const changed = Buffer.from(bytes);
   changed[Math.floor(changed.length / 2)] ^= 0x01;
@@ -291,6 +334,63 @@ test("one-byte mutation, wrong size, wrong report, wrong page, and withdrawn CR-
   withdrawn.sources.find((source) => source.id === "nasa-cr-160557").artifacts[1].sha256 =
     "99cc854a00000000000000000000000000000000000000000000000000000000";
   assert.throws(() => verifyGenericSensorSourceBundle({ root, manifest: seal(withdrawn) }), /withdrawn CR-160557 digest/);
+});
+
+test("caller resealing cannot rewrite the canonical source, render, claim, or policy identity", () => {
+  for (const mutate of [
+    (candidate) => { candidate.subjectId = "caller-resealed-subject"; },
+    (candidate) => { candidate.sources[0].canonicalUrl = "https://example.test/caller-resealed-source"; },
+    (candidate) => { candidate.sources[0].publisher = "CALLER"; },
+    (candidate) => { candidate.sources[0].title = "Caller-resealed title"; },
+    (candidate) => { candidate.sources[1].extractedTextPolicy.maySupplyNumericValues = true; },
+    (candidate) => { candidate.sources[1].extractedTextPolicy.maySupplyEquations = true; },
+    (candidate) => { candidate.sources[1].eligibleClaims = []; },
+    (candidate) => { candidate.sources[1].ineligibleClaims = []; },
+  ]) {
+    const resealed = clone(manifest);
+    mutate(resealed);
+    assert.throws(() => verifyGenericSensorSourceBundle({ root, manifest: seal(resealed) }), /pinned canonical manifest/);
+  }
+
+  const rewrittenIdentity = clone(manifest);
+  const identityOverrides = new Map();
+  rewrittenIdentity.manifestId = "caller-resealed-source-freeze-v1";
+  const legal = JSON.parse(readFileSync(resolve(root, rewrittenIdentity.legalDecisions.path), "utf8"));
+  legal.subjectManifestId = rewrittenIdentity.manifestId;
+  replaceArtifact(rewrittenIdentity, identityOverrides, rewrittenIdentity.legalDecisions.path, Buffer.from(`${JSON.stringify(legal, null, 2)}\n`));
+  finalizeIsolationOverride(rewrittenIdentity, identityOverrides, (isolation) => { isolation.subjectManifestId = rewrittenIdentity.manifestId; });
+  assert.throws(
+    () => verifyGenericSensorSourceBundle({ root, manifest: seal(rewrittenIdentity), artifactOverrides: identityOverrides }),
+    /pinned canonical manifest/,
+  );
+
+  const substitutedPdf = clone(manifest);
+  const pdfOverrides = new Map();
+  replaceArtifact(
+    substitutedPdf,
+    pdfOverrides,
+    "raw/nasa/19660021027.pdf",
+    readFileSync(resolve(root, "raw/nasa/19770023372.pdf")),
+  );
+  finalizeIsolationOverride(substitutedPdf, pdfOverrides);
+  assert.throws(
+    () => verifyGenericSensorSourceBundle({ root, manifest: seal(substitutedPdf), artifactOverrides: pdfOverrides }),
+    /pinned canonical manifest/,
+  );
+
+  const relabelledRender = clone(manifest);
+  const renderOverrides = new Map();
+  replaceArtifact(
+    relabelledRender,
+    renderOverrides,
+    "renders/19660021027/pdf-143.png",
+    readFileSync(resolve(root, "renders/19660021027/pdf-144.png")),
+  );
+  finalizeIsolationOverride(relabelledRender, renderOverrides);
+  assert.throws(
+    () => verifyGenericSensorSourceBundle({ root, manifest: seal(relabelledRender), artifactOverrides: renderOverrides }),
+    /pinned canonical manifest/,
+  );
 });
 
 test("repacked or structurally unsafe archives and undeclared members fail before extraction", () => {

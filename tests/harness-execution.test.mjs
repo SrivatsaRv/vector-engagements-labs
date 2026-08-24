@@ -41,6 +41,7 @@ test("every declared verification layer has a named Make target", async () => {
     "observability-local",
     "container-verify",
     "air-reference-local",
+    "generic-sensor-sources-local",
     "clean-clone-local",
   ]) {
     assert.match(makefile, new RegExp(`^${target}:`, "m"), `${target} is not declared`);
@@ -48,6 +49,17 @@ test("every declared verification layer has a named Make target", async () => {
     assert.equal(dryRun.status, 0, `${target}: ${dryRun.stderr}`);
     assert.ok(dryRun.stdout.trim(), `${target} has no executable command contract`);
   }
+});
+
+test("the generic sensor generator and verifier are mandatory quality gates", async () => {
+  const makefile = await readFile("Makefile", "utf8");
+  const quality = makefile.split(/^ci-quality:/m)[1]?.split(/^ci-tests:/m)[0];
+  assert.ok(quality, "ci-quality is not declared");
+  assert.match(quality, /npm run generic-sensor:sources:verify/);
+
+  const packageJson = JSON.parse(await readFile("package.json", "utf8"));
+  assert.match(packageJson.scripts["generic-sensor:sources:verify"], /generate-generic-sensor-source-manifest\.mjs/);
+  assert.match(packageJson.scripts["generic-sensor:sources:verify"], /verify-generic-sensor-source-bundle\.mjs/);
 });
 
 test("the clean-clone gate executes the context slice and built Worker verifier", async () => {

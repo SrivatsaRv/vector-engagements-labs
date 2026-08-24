@@ -56,6 +56,7 @@
     "policy:contract-docs:verify": "node scripts/verify-contract-doc-impact.mjs",
     "policy:contract-docs:template": "node scripts/verify-contract-doc-impact.mjs --print-template",
     "environment:sources:verify": "node scripts/verify-environment-source-assets.mjs",
+    "generic-sensor:sources:verify": "node scripts/generate-generic-sensor-source-manifest.mjs && node scripts/verify-generic-sensor-source-bundle.mjs",
     "tp1538:sources:generate": "node scripts/generate-tp1538-source-manifest.mjs",
     "tp1538:sources:verify": "node scripts/verify-tp1538-source-manifest.mjs",
     "map:assets:prepare": "node scripts/prepare-maplibre-assets.mjs",

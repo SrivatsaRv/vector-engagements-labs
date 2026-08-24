@@ -165,6 +165,11 @@ targets and `.next`, `.output`, `build`, `out`, `dist`, Rust/WASM, public, Worke
 and browser artifacts. It rejects Stage-0 markers, exact frozen-artifact files,
 and frozen bytes embedded inside a larger file; a wrapper, suffix, file
 extension, symlink, or alternate build root cannot bypass the quarantine.
+The complete canonical source-manifest digest is verifier-pinned. A caller
+cannot replace a governed PDF or render, alter a source identity, erase scope
+claims, relax extracted-text policy, update local hashes and totals, and then
+promote the resealed manifest. Generator freshness and this full verification
+run as a required `make ci-quality` gate.
 
 ZIP handling is verification-only and never writes archive-selected paths. It
 parses declared bytes with fixed archive, member-count, and expanded-size
