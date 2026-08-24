@@ -135,6 +135,20 @@ and broader harness acceptance; this slice limits one server group to one
 viewport project and preserves evidence when the nondeterministic failure
 recurs.
 
+The later exact-head diagnosis matched Cloudflare workers-sdk issue `#14926`:
+Wrangler `4.114.0` and newer can treat a ProxyWorker-to-UserWorker keep-alive
+race as a fatal network loss. Upstream pull request `#15252` is still unreleased.
+VECTOR therefore uses the complete last-known-good compatible set declared in
+`governance/browser-toolchain-compatibility.v1.json`: Vite adapter `1.46.0`,
+Wrangler `4.113.0`, and Workers types `5.20260721.1`. This is a temporary release-
+infrastructure pin, not an application workaround. The five governed projects,
+one worker, zero retries, evidence checks, process-group cleanup, and failure
+classification remain unchanged. The pin cannot be removed until a released
+upstream fix passes the record's hosted and local revalidation requirements.
+Miniflare's transitive Undici `7.28.0` is overridden to patched `7.29.0`; the
+browser matrix and clean-clone gates validate that security override with the
+pinned runtime set.
+
 ## Framework decision
 
 Node's built-in test runner and Cargo remain the domain and engine runners.

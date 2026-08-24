@@ -64,11 +64,93 @@ test("pull-request validation is change-aware with one stable required gate", as
   assert.doesNotMatch(scheduledCodeql, /pull_request:|branches: \[main\]/);
 });
 
-test("Cloudflare toolchain is current and no longer dependency-ignored", async () => {
+test("Cloudflare toolchain is pinned to the governed proxy-regression compatibility set", async () => {
   const manifest = JSON.parse(await read("package.json"));
+  const lock = JSON.parse(await read("package-lock.json"));
   const dependabot = await read(".github/dependabot.yml");
-  assert.equal(manifest.devDependencies["@cloudflare/vite-plugin"], "1.52.1");
-  assert.equal(manifest.devDependencies.wrangler, "4.123.0");
-  assert.doesNotMatch(dependabot, /dependency-name: "wrangler"/);
-  assert.doesNotMatch(dependabot, /dependency-name: "@cloudflare\/vite-plugin"/);
+  const compatibility = JSON.parse(
+    await read("governance/browser-toolchain-compatibility.v1.json"),
+  );
+
+  assert.deepEqual(Object.keys(compatibility).sort(), [
+    "affectedRegression",
+    "decisionId",
+    "dependabotIgnore",
+    "issue",
+    "pins",
+    "prohibitedWorkarounds",
+    "revalidationRequirements",
+    "reviewTrigger",
+    "reviewedOn",
+    "schemaVersion",
+    "securityOverrides",
+    "status",
+  ]);
+  assert.equal(compatibility.schemaVersion, "vector.browser-toolchain-compatibility.v1");
+  assert.equal(compatibility.decisionId, "WRANGLER_PROXY_NETWORK_LOSS_2026_08_24");
+  assert.equal(compatibility.issue, "#63");
+  assert.equal(compatibility.status, "TEMPORARY_UPSTREAM_REGRESSION_PIN");
+  assert.equal(compatibility.reviewedOn, "2026-08-24");
+  assert.deepEqual(compatibility.affectedRegression, {
+    upstreamIssue: "https://github.com/cloudflare/workers-sdk/issues/14926",
+    upstreamFixPullRequest: "https://github.com/cloudflare/workers-sdk/pull/15252",
+    upstreamFixState: "OPEN_UNRELEASED",
+    affectedFrom: "4.114.0",
+    lastKnownGood: "4.113.0",
+  });
+  assert.deepEqual(compatibility.pins, {
+    "@cloudflare/vite-plugin": "1.46.0",
+    "@cloudflare/workers-types": "5.20260721.1",
+    wrangler: "4.113.0",
+  });
+  assert.deepEqual(compatibility.dependabotIgnore, [
+    "@cloudflare/vite-plugin",
+    "@cloudflare/workers-types",
+    "wrangler",
+  ]);
+  assert.equal(
+    compatibility.reviewTrigger,
+    "UPSTREAM_FIX_RELEASED_AND_EXACT_VERSION_PROVEN_IN_HOSTED_BROWSER_CONTRACT",
+  );
+  assert.deepEqual(compatibility.revalidationRequirements, [
+    "EXACT_FIVE_PROJECT_BROWSER_CONTRACT_ZERO_RETRIES",
+    "THREE_HOSTED_EXACT_HEAD_REPEATS",
+    "PROCESS_GROUP_AND_PORT_RELEASE",
+    "MAKE_CI_LOCAL",
+    "MAKE_CLEAN_CLONE_LOCAL",
+    "INDEPENDENT_REVIEW",
+  ]);
+  assert.deepEqual(compatibility.prohibitedWorkarounds, [
+    "INCREASE_BROWSER_RETRIES",
+    "SKIP_FULL_HD_PROJECT",
+    "WEAKEN_EVIDENCE_ADMISSION",
+    "IGNORE_SERVER_EXIT",
+  ]);
+  assert.deepEqual(compatibility.securityOverrides, {
+    undici: {
+      version: "7.29.0",
+      replaces: "7.28.0",
+      reason: "PATCH_KNOWN_HIGH_SEVERITY_DEV_SERVER_ADVISORIES",
+      scope: "LOCAL_AND_CI_TOOLCHAIN_ONLY",
+    },
+  });
+  assert.equal(manifest.overrides.undici, "7.29.0");
+
+  for (const [dependency, version] of Object.entries(compatibility.pins)) {
+    assert.equal(manifest.devDependencies[dependency], version);
+    assert.match(
+      dependabot,
+      new RegExp(`dependency-name: "${dependency.replaceAll("/", "\\/")}"`),
+    );
+  }
+  assert.equal(lock.packages["node_modules/@cloudflare/vite-plugin"].version, "1.46.0");
+  assert.equal(lock.packages["node_modules/@cloudflare/vite-plugin"].dependencies.wrangler, "4.113.0");
+  assert.equal(lock.packages["node_modules/@cloudflare/vite-plugin"].dependencies.miniflare, "4.20260721.0");
+  assert.equal(lock.packages["node_modules/@cloudflare/vite-plugin"].dependencies.workerd, "1.20260721.1");
+  assert.equal(lock.packages["node_modules/@cloudflare/workers-types"].version, "5.20260721.1");
+  assert.equal(lock.packages["node_modules/wrangler"].version, "4.113.0");
+  assert.equal(lock.packages["node_modules/wrangler"].dependencies.miniflare, "4.20260721.0");
+  assert.equal(lock.packages["node_modules/miniflare"].version, "4.20260721.0");
+  assert.equal(lock.packages["node_modules/miniflare/node_modules/undici"], undefined);
+  assert.equal(lock.packages["node_modules/undici"].version, "7.29.0");
 });

@@ -10,6 +10,12 @@ updates:
         patterns: ["*"]
         update-types: [minor, patch]
     ignore:
+      # #63 temporarily freezes the exact last-known-good Cloudflare browser
+      # toolchain while workers-sdk#15252 remains unreleased. The governed
+      # removal/revalidation contract is browser-toolchain-compatibility.v1.
+      - dependency-name: "@cloudflare/vite-plugin"
+      - dependency-name: "@cloudflare/workers-types"
+      - dependency-name: "wrangler"
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
     labels: ["dependencies", "javascript"]
