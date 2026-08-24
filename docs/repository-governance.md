@@ -82,6 +82,9 @@ endpoint has a validated tombstone. Newly added inert ledger or probe entries
 reject. Historical rename destinations need not remain tracked forever: a later
 delete or rename is governed by its own new tombstone, preserving the full
 append-only chain without preventing lifecycle evolution.
+Retiring a generated output is always semantic documentation work and cannot
+claim `GENERATED_ARTIFACT_ONLY`; freshness checks govern ordinary regeneration,
+not removal of the output contract itself.
 
 Pull requests obtain the declaration from the single structured template block.
 `npm run --silent policy:contract-docs:template` derives the exact affected

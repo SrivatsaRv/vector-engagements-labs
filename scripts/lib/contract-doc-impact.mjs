@@ -973,6 +973,10 @@ export function verifyContractDocImpact({
       invariant(JSON.stringify([...item.exemptionEvidence.paths].sort()) === JSON.stringify(familyChangedPaths), `${familyId} TEST_ONLY paths do not exactly cover the changed test paths.`);
     } else if (item.disposition === "GENERATED_ARTIFACT_ONLY") {
       invariant(!policyBootstrap, `${familyId} GENERATED_ARTIFACT_ONLY is unavailable during policy bootstrap.`);
+      invariant(
+        !validatedRuleRetirements.some((retirement) => retirement.familyId === familyId && retirement.inventory === "GENERATED_OUTPUT"),
+        `${familyId} GENERATED_ARTIFACT_ONLY cannot retire a governed generated output.`,
+      );
       const trustedFamily = basePolicy.families.find((candidate) => candidate.id === familyId);
       const group = trustedFamily?.generatedGroups.find((candidate) => candidate.id === item.exemptionEvidence.groupId);
       invariant(group, `${familyId} references an unknown or not-yet-trusted generated group ${item.exemptionEvidence.groupId}.`);

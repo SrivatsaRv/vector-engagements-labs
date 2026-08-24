@@ -1264,6 +1264,47 @@ test("generated-only requires unchanged inputs and generator plus the policy-own
   );
 });
 
+test("GENERATED_ARTIFACT_ONLY cannot conceal retirement of a governed output", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const basePolicy = structuredClone({ ...policy, nonSemanticProbes: [], canonicalSha256: undefined });
+  const retiredRule = { kind: "EXACT", value: "lib/generated/example/value.ts", facets: ["schema"] };
+  const retainedRule = { kind: "EXACT", value: "scripts/generate-example.mjs", facets: ["schema"] };
+  basePolicy.families[0].generatedGroups[0].outputRules = [retiredRule, retainedRule];
+  await rm(join(fixture.root, retiredRule.value));
+  const headSha = await commit(fixture.root, "retire generated output without contract documentation");
+  const headPolicy = structuredClone(basePolicy);
+  headPolicy.families[0].generatedGroups[0].outputRules = [retainedRule];
+  headPolicy.ruleRetirements = [{
+    retirementId: "EXAMPLE_GENERATED_ONLY_ESCAPE_RETIREMENT_V1",
+    familyId: "EXAMPLE",
+    inventory: "GENERATED_OUTPUT",
+    generatedGroupId: "EXAMPLE_GENERATED",
+    rule: retiredRule,
+    retiredAtMergeBaseSha: fixture.baseSha,
+    retiredFromPolicySha256: policySha256(basePolicy),
+    replacementPath: null,
+    rationale: "The governed output was deleted, which is a semantic contract change rather than routine regeneration.",
+  }];
+  const generatedOnly = declaration({
+    disposition: "GENERATED_ARTIFACT_ONLY",
+    evidence: [{ kind: "TEST", value: "node scripts/generate-example.mjs --check" }],
+    exemptionEvidence: { kind: "GENERATED_ARTIFACT_ONLY", groupId: "EXAMPLE_GENERATED" },
+  });
+  assert.throws(
+    () => verifyContractDocImpact({
+      rootDirectory: fixture.root,
+      baseSha: fixture.baseSha,
+      headSha,
+      declaration: generatedOnly,
+      basePolicy,
+      headPolicy,
+      freshnessRunner: () => true,
+    }),
+    /GENERATED_ARTIFACT_ONLY cannot retire a governed generated output/i,
+  );
+});
+
 test("registered freshness uses an exact secret-free head archive and rejects tracked mutation", async (t) => {
   const fixture = await fixtureRepository();
   t.after(() => rm(fixture.root, { recursive: true, force: true }));
