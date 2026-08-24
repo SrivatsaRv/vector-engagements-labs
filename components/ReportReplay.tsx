@@ -26,6 +26,29 @@ export function ReportReplay({
   const frame = selected.frame;
   const iafTrack = selectRecordedTrackState(result.pictures, selected, "IAF");
   const pafTrack = selectRecordedTrackState(result.pictures, selected, "PAF");
+  const pictureSummary = (picture: typeof iafTrack) => {
+    if (picture.state === "UNAVAILABLE") {
+      return { identity: "unavailable", status: "NO RECORDED PICTURE", source: "Unavailable", confidence: "Unavailable", uncertainty: "Unavailable" };
+    }
+    if (picture.track.schemaVersion === "vector.observer-state.v3") {
+      return {
+        identity: `${picture.track.trackCount} retained tracks`,
+        status: `${picture.track.visibleTrackCount} VISIBLE`,
+        source: picture.track.sensorModelId,
+        confidence: "Per-track state",
+        uncertainty: "Per-track uncertainty",
+      };
+    }
+    return {
+      identity: picture.track.trackId,
+      status: picture.track.status,
+      source: picture.track.source,
+      confidence: picture.track.confidence === null ? "Unavailable" : `${picture.track.confidence}%`,
+      uncertainty: picture.track.uncertaintyMeters === null ? "Unavailable" : `±${picture.track.uncertaintyMeters} m`,
+    };
+  };
+  const iafSummary = pictureSummary(iafTrack);
+  const pafSummary = pictureSummary(pafTrack);
   const model = findWeaponSimulationModel(scenario.blueSystemId);
   const primaryWeapon = result.entityManifest.find(
     (entity) => entity.id === result.engineRun.primaryWeaponId,
@@ -161,28 +184,28 @@ export function ReportReplay({
             <>
               <article>
                 <i className="profile-medium" />
-                <span>IAF RASP · {iafTrack.state === "AVAILABLE" ? iafTrack.track.trackId : "unavailable"}</span>
-                <strong>{iafTrack.state === "AVAILABLE" ? iafTrack.track.status : "NO RECORDED PICTURE"}</strong>
+                <span>IAF RASP · {iafSummary.identity}</span>
+                <strong>{iafSummary.status}</strong>
                 <dl>
                   <dt>Source</dt>
-                  <dd>{iafTrack.state === "AVAILABLE" ? iafTrack.track.source : "Unavailable"}</dd>
+                  <dd>{iafSummary.source}</dd>
                   <dt>Confidence</dt>
-                  <dd>{iafTrack.state === "AVAILABLE" ? `${iafTrack.track.confidence}%` : "Unavailable"}</dd>
+                  <dd>{iafSummary.confidence}</dd>
                   <dt>Uncertainty</dt>
-                  <dd>{iafTrack.state === "AVAILABLE" ? `±${iafTrack.track.uncertaintyMeters} m` : "Unavailable"}</dd>
+                  <dd>{iafSummary.uncertainty}</dd>
                 </dl>
               </article>
               <article>
                 <i className="profile-sustained" />
-                <span>PAF RASP · {pafTrack.state === "AVAILABLE" ? pafTrack.track.trackId : "unavailable"}</span>
-                <strong>{pafTrack.state === "AVAILABLE" ? pafTrack.track.status : "NO RECORDED PICTURE"}</strong>
+                <span>PAF RASP · {pafSummary.identity}</span>
+                <strong>{pafSummary.status}</strong>
                 <dl>
                   <dt>Source</dt>
-                  <dd>{pafTrack.state === "AVAILABLE" ? pafTrack.track.source : "Unavailable"}</dd>
+                  <dd>{pafSummary.source}</dd>
                   <dt>Confidence</dt>
-                  <dd>{pafTrack.state === "AVAILABLE" ? `${pafTrack.track.confidence}%` : "Unavailable"}</dd>
+                  <dd>{pafSummary.confidence}</dd>
                   <dt>Uncertainty</dt>
-                  <dd>{pafTrack.state === "AVAILABLE" ? `±${pafTrack.track.uncertaintyMeters} m` : "Unavailable"}</dd>
+                  <dd>{pafSummary.uncertainty}</dd>
                 </dl>
               </article>
             </>

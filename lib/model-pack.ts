@@ -1,6 +1,6 @@
 import { sha256Hex } from "./canonical-json.ts";
 import { assertGovernedAircraftEvidenceAdmission } from "./aircraft-evidence-registry.ts";
-import type { EntityLifecycle } from "./engine/contracts.ts";
+import type { EntityLifecycle, ObserverTrackModel } from "./engine/contracts.ts";
 import type { Vec3 } from "./engine/primitives.ts";
 
 export const MODEL_PACK_SOURCE_SCHEMA_VERSION = "vector.model-pack-source.v1";
@@ -15,7 +15,8 @@ export type IntendedUseId =
   | "vector.intended-use.wvr-maneuver-study"
   | "vector.intended-use.bvr-timeline-study"
   | "vector.intended-use.weapon-flyout-study"
-  | "vector.intended-use.debrief-comparison";
+  | "vector.intended-use.debrief-comparison"
+  | "vector.intended-use.engine-verification";
 
 export type IntendedUseContract = {
   schemaVersion: typeof INTENDED_USE_SCHEMA_VERSION;
@@ -212,6 +213,8 @@ export type SensorModelSource = ModelSourceBase & {
   scanPeriod: Quantity;
   azimuthFieldOfView: Quantity;
   elevationFieldOfView: Quantity;
+  /** Bounded generic fixture. Production intended uses cannot admit it. */
+  verificationTrackModel?: ObserverTrackModel;
 };
 
 export type SensorEvidenceCoverage = {
@@ -403,6 +406,7 @@ export type CompiledSensorModel = CompiledModelBase & {
   scanPeriodS: number;
   azimuthFieldOfViewRad: number;
   elevationFieldOfViewRad: number;
+  verificationTrackModel?: ObserverTrackModel;
 };
 
 export type CompiledAircraftModel = CompiledModelBase & {
@@ -727,6 +731,56 @@ function validateSensorEvidenceAdmission(
   }
 }
 
+function validateVerificationTrackModel(
+  issues: string[],
+  path: string,
+  model: ObserverTrackModel | undefined,
+  intendedUseIds: ReadonlySet<IntendedUseId>,
+) {
+  if (!model) return;
+  const expectedKeys = new Set([
+    "schemaVersion", "valueState", "intendedUse", "positionBiasM", "velocityBiasMps",
+    "positionStandardDeviationM", "velocityStandardDeviationMps", "confirmationObservations",
+    "maximumObservationAgeSeconds", "coastAfterSeconds", "lostAfterSeconds", "observationWindowsSeconds",
+  ]);
+  if (
+    Object.keys(model).length !== expectedKeys.size ||
+    Object.keys(model).some((key) => !expectedKeys.has(key))
+  ) issues.push(`${path}.verificationTrackModel has unsupported or missing fields`);
+  if (!intendedUseIds.has("vector.intended-use.engine-verification")) {
+    issues.push(`${path}.verificationTrackModel requires the engine-verification intended use`);
+  }
+  const finiteVector = (value: Vec3) =>
+    [value?.x, value?.y, value?.z].every((item) => typeof item === "number" && Number.isFinite(item));
+  const positiveVector = (value: Vec3) =>
+    finiteVector(value) && value.x > 0 && value.y > 0 && value.z > 0;
+  if (
+    model.schemaVersion !== "vector.generic-track-model.v1" ||
+    model.valueState !== "TEST_FIXTURE" ||
+    model.intendedUse !== "ENGINE_VERIFICATION_ONLY" ||
+    !finiteVector(model.positionBiasM) ||
+    !finiteVector(model.velocityBiasMps) ||
+    !positiveVector(model.positionStandardDeviationM) ||
+    !positiveVector(model.velocityStandardDeviationMps) ||
+    !Number.isSafeInteger(model.confirmationObservations) ||
+    model.confirmationObservations < 2 ||
+    !Number.isFinite(model.maximumObservationAgeSeconds) ||
+    model.maximumObservationAgeSeconds < 0 ||
+    !Number.isFinite(model.coastAfterSeconds) ||
+    model.coastAfterSeconds <= 0 ||
+    !Number.isFinite(model.lostAfterSeconds) ||
+    model.lostAfterSeconds <= model.coastAfterSeconds ||
+    !Array.isArray(model.observationWindowsSeconds) ||
+    model.observationWindowsSeconds.length === 0 ||
+    model.observationWindowsSeconds.some((window, windowIndex) =>
+      Object.keys(window).length !== 2 || !("start" in window) || !("end" in window) ||
+      !Number.isFinite(window.start) || !Number.isFinite(window.end) ||
+      window.start < 0 || window.end < window.start ||
+      (windowIndex > 0 && window.start <= model.observationWindowsSeconds[windowIndex - 1]!.end)
+    )
+  ) issues.push(`${path}.verificationTrackModel is invalid`);
+}
+
 function normalizeQuantity(
   issues: string[],
   path: string,
@@ -1036,6 +1090,7 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
     if (item.spoolTimeS < 0) issues.push(`propulsion[${index}].spoolTime must be non-negative`);
   });
 
+  const intendedUseIds = new Set(source.intendedUses.map((item) => item.id));
   const sensors = source.sensors.map((item, index): CompiledSensorModel => ({
     id: item.id,
     version: item.version,
@@ -1051,6 +1106,9 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
     scanPeriodS: normalizeQuantity(issues, `sensors[${index}].scanPeriod`, item.scanPeriod, "s", evidenceIds),
     azimuthFieldOfViewRad: normalizeQuantity(issues, `sensors[${index}].azimuthFieldOfView`, item.azimuthFieldOfView, "rad", evidenceIds),
     elevationFieldOfViewRad: normalizeQuantity(issues, `sensors[${index}].elevationFieldOfView`, item.elevationFieldOfView, "rad", evidenceIds),
+    ...(item.verificationTrackModel
+      ? { verificationTrackModel: structuredClone(item.verificationTrackModel) }
+      : {}),
   }));
   sensors.forEach((item, index) => {
     if (item.detectionRangeM < 0 || item.minimumRangeM < 0 || item.scanPeriodS <= 0) {
@@ -1062,6 +1120,12 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
   });
   source.sensors.forEach((item, index) => {
     validateSensorEvidenceAdmission(issues, `sensors[${index}]`, item, evidenceById);
+    validateVerificationTrackModel(
+      issues,
+      `sensors[${index}]`,
+      item.verificationTrackModel,
+      intendedUseIds,
+    );
   });
 
   const aircraft = source.aircraft.map((item, index): CompiledAircraftModel => {

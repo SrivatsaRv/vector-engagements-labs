@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "vector.track-store-capacity-workload.v1",
+  "id": "vector.track-store-capacity.100-track.v1",
+  "version": "1.0.0",
+  "intendedUse": "ENGINE_VERIFICATION_ONLY",
+  "sides": ["IAF", "PAF"],
+  "tracksPerSide": 50,
+  "updateRateHz": 20,
+  "durationSeconds": 5,
+  "ticks": 101,
+  "observationTickWindows": [[0, 1], [7, 100]],
+  "invalidProbeIntervalTicks": 10,
+  "source": {
+    "modelPackDigest": "7777777777777777777777777777777777777777777777777777777777777777",
+    "sensorModelId": "generic-verification-sensor",
+    "sensorModelVersion": "1.0.0"
+  },
+  "trackModel": {
+    "schemaVersion": "vector.generic-track-model.v1",
+    "valueState": "TEST_FIXTURE",
+    "intendedUse": "ENGINE_VERIFICATION_ONLY",
+    "positionBiasM": { "x": 5, "y": -2, "z": 1 },
+    "velocityBiasMps": { "x": 0.5, "y": -0.25, "z": 0 },
+    "positionStandardDeviationM": { "x": 40, "y": 40, "z": 60 },
+    "velocityStandardDeviationMps": { "x": 3, "y": 3, "z": 4 },
+    "confirmationObservations": 2,
+    "maximumObservationAgeSeconds": 0.1,
+    "coastAfterSeconds": 0.1,
+    "lostAfterSeconds": 0.2,
+    "observationWindowsSeconds": [{ "start": 0, "end": 5 }]
+  },
+  "expected": {
+    "activeSourceAssociations": 100,
+    "validUpdateAttempts": 9600,
+    "rejectedDuplicateAttempts": 20,
+    "rejectedOutOfOrderAttempts": 20,
+    "lifecycleTransitions": 600,
+    "retainedTracks": 100,
+    "canonicalFrameBytes": 71181,
+    "canonicalPictureBytes": 70357,
+    "transitionJsonBytes": 269801,
+    "repeatDigest": "eb5f2cf3306fb47ec0e347a7db176aed8ca38540484368d80bab0c07511ad8d2",
+    "parityDigest": "e70a8290091d554c28a7b192eaaab3cac531a227770fad27de346b2424a3ecd2"
+  }
+}

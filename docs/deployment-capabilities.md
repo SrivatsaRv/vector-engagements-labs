@@ -47,11 +47,13 @@ criteria remain open.
   deployment. Rust/WASM remains independently executable for parity verification
   and can replace TypeScript only through a reviewed manifest change after its
   server packaging is admitted.
-- The bounded TypeScript SensorState → Observation → TrackState model and its
-  compatible radar-jamming measurement effect are admitted. Saved records carry
-  observer pictures. Data link and AEW remain disabled because no admitted
-  sender-side observation/message path exists; they fail closed rather than
-  injecting a track. Terrain interaction remains disabled.
+- Production sensors are `UNSUPPORTED_BY_MODEL_PACK`; deployed runs emit
+  `SENSOR_MODEL_UNAVAILABLE` and cannot synthesize a track. A source-authored
+  generic Observation → TrackStore fixture exists only under
+  `ENGINE_VERIFICATION_ONLY`. The production Worker rejects its distinct
+  capability manifest and model-pack digest. No radar-jamming measurement
+  effect is admitted. Data link, AEW, EW, and terrain interaction remain
+  disabled and cannot inject a track or support state.
 - Tactical policy is not admitted. The product does not expose defensive-turn,
   g-demand, or team-decision controls; authored route following remains the
   admitted aircraft-motion authority.
