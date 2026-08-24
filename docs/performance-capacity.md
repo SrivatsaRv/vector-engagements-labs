@@ -62,16 +62,24 @@ The standalone NASA TM-109057 verification workload contains 15 cases and
 Worker, named-system, or entity-capacity workload. On Apple M5 arm64, macOS and
 Node v24.3.0, the post-policy ten-run 20-batch recheck measured TypeScript p95
 from 21.199 to 25.996 ms and Node-hosted Rust-WASM p95 from 159.438 to 164.396
-ms. The named `APPLE_M5_NODE24` regression profile retains 30/200 ms ceilings.
+ms. The named `APPLE_M5_NODE24` regression profile retains 30/200 ms ceilings
+and binds the exact runtime, platform, architecture, Apple M5 CPU, 10 logical
+cores, 17,179,869,184 memory bytes, non-GitHub context, and null runner/image
+fields.
 
 GitHub-hosted Ubuntu 24 x64 / Node v22.18.0 requires the separately selected
 `GITHUB_HOSTED_UBUNTU24_X64_NODE22` profile. Four sequential exact-commit
 diagnostic jobs measured TypeScript p95 at 46.208, 52.163, 45.081, and 34.857
-ms. The resulting hosted ceiling is 65 ms; Rust-WASM retains the existing 200
-ms ceiling. These failed calibration jobs are not release evidence. Every
-benchmark report names the selected profile and host, includes all 20 sorted
-samples for both backends, and is emitted before an aggregate threshold
-failure. A profile cannot be auto-selected or overridden by an environment
+ms. The resulting hosted TypeScript ceiling is 65 ms, leaving 24.6 percent
+headroom over the largest same-profile calibration sample; Rust-WASM retains
+the existing 200 ms ceiling. These failed calibration jobs are not release evidence.
+Every v3 benchmark report separates `boundProfileIdentity` from
+`observedContext`, includes all 20 sorted samples for both backends, and is
+emitted before an aggregate threshold failure. The hosted identity binds Node,
+Linux/x64, GitHub Actions, runner OS/architecture, and `ImageOS`; its CPU,
+logical cores, memory, and `ImageVersion` are observations and never profile
+authority; an absent observation is reported as `null`, not used to close or
+reject the profile. A profile cannot be auto-selected or overridden by an environment
 threshold. The local aggregate target runs this baseline first because running
 it after the other CPU-heavy performance workloads is a contaminated sample,
 not release evidence.

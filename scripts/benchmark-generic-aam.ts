@@ -58,6 +58,7 @@ const environment = {
   runnerOs: process.env.RUNNER_OS ?? null,
   runnerArch: process.env.RUNNER_ARCH ?? null,
   imageOs: process.env.ImageOS ?? null,
+  imageVersion: process.env.ImageVersion ?? null,
 };
 const arguments_ = process.argv.slice(2);
 if (arguments_.length !== 1 || !arguments_[0].startsWith("--profile=")) {
@@ -75,10 +76,10 @@ const results = measureGenericAamPerformanceBackends({
 
 process.exitCode = emitGenericAamPerformanceReport({
   report: {
-    schemaVersion: "vector.generic-aam-verification-performance.v2",
+    schemaVersion: "vector.generic-aam-verification-performance.v3",
     workloadId: workload.id,
-    profileId: profile.id,
-    environment,
+    boundProfileIdentity: { profileId: profile.id, ...profile.boundProfileIdentity },
+    observedContext: profile.observedContext,
     results,
     nonclaims: ["Node-hosted evaluator only", "No browser Worker capacity claim", "No production entity-capacity claim"],
   },

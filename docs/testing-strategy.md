@@ -78,7 +78,10 @@ closed Apple M5 / Node 24 30/200 ms profile. Hosted Stage 2B explicitly invokes
 profile uses the independently calibrated 65/200 ms ceilings. Both commands
 reject a mismatched environment and measure and emit both complete 20-sample
 backend distributions before aggregate threshold failure. No environment
-variable can override either policy, and neither target makes a Worker or
+variable can override either policy. The v3 report separates exact
+`boundProfileIdentity` from `observedContext`: every Apple M5 host field is
+bound, while hosted CPU, logical-core count, memory, and image release remain
+observations rather than profile authority. Neither target makes a Worker or
 product-capacity claim. `make performance-local` executes this load-sensitive
 M5 baseline before the engine, TrackStore, and capacity workloads so those
 benchmarks cannot pre-contaminate its named host context. See

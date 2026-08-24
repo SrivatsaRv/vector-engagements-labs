@@ -21,6 +21,7 @@ const appleM5Environment = {
   runnerOs: null,
   runnerArch: null,
   imageOs: null,
+  imageVersion: null,
 };
 
 const hostedEnvironment = {
@@ -34,6 +35,7 @@ const hostedEnvironment = {
   runnerOs: "Linux",
   runnerArch: "X64",
   imageOs: "ubuntu24",
+  imageVersion: "20260816.277.1",
 };
 
 test("generic-AAM performance profiles preserve independently calibrated ceilings", () => {
@@ -41,20 +43,47 @@ test("generic-AAM performance profiles preserve independently calibrated ceiling
     APPLE_M5_NODE24: {
       id: "APPLE_M5_NODE24",
       thresholdsP95Ms: { typescript: 30, "rust-wasm": 200 },
+      boundProfileIdentity: appleM5Environment,
     },
     GITHUB_HOSTED_UBUNTU24_X64_NODE22: {
       id: "GITHUB_HOSTED_UBUNTU24_X64_NODE22",
       thresholdsP95Ms: { typescript: 65, "rust-wasm": 200 },
+      boundProfileIdentity: {
+        runtime: "v22.18.0",
+        platform: "linux",
+        architecture: "x64",
+        githubActions: true,
+        runnerOs: "Linux",
+        runnerArch: "X64",
+        imageOs: "ubuntu24",
+      },
     },
   });
 });
 
 test("generic-AAM performance profile selection is explicit and environment-closed", () => {
-  assert.equal(resolveGenericAamPerformanceProfile("APPLE_M5_NODE24", appleM5Environment).id, "APPLE_M5_NODE24");
-  assert.equal(
-    resolveGenericAamPerformanceProfile("GITHUB_HOSTED_UBUNTU24_X64_NODE22", hostedEnvironment).id,
-    "GITHUB_HOSTED_UBUNTU24_X64_NODE22",
-  );
+  const appleProfile = resolveGenericAamPerformanceProfile("APPLE_M5_NODE24", appleM5Environment);
+  assert.equal(appleProfile.id, "APPLE_M5_NODE24");
+  assert.deepEqual(appleProfile.boundProfileIdentity, appleM5Environment);
+  assert.deepEqual(appleProfile.observedContext, {});
+
+  const hostedProfile = resolveGenericAamPerformanceProfile("GITHUB_HOSTED_UBUNTU24_X64_NODE22", hostedEnvironment);
+  assert.equal(hostedProfile.id, "GITHUB_HOSTED_UBUNTU24_X64_NODE22");
+  assert.deepEqual(hostedProfile.boundProfileIdentity, {
+    runtime: "v22.18.0",
+    platform: "linux",
+    architecture: "x64",
+    githubActions: true,
+    runnerOs: "Linux",
+    runnerArch: "X64",
+    imageOs: "ubuntu24",
+  });
+  assert.deepEqual(hostedProfile.observedContext, {
+    cpu: hostedEnvironment.cpu,
+    logicalCores: hostedEnvironment.logicalCores,
+    memoryBytes: hostedEnvironment.memoryBytes,
+    imageVersion: "20260816.277.1",
+  });
 
   assert.throws(() => resolveGenericAamPerformanceProfile("", appleM5Environment), /explicit performance profile/i);
   assert.throws(() => resolveGenericAamPerformanceProfile("UNREVIEWED", appleM5Environment), /unknown performance profile/i);
@@ -63,12 +92,25 @@ test("generic-AAM performance profile selection is explicit and environment-clos
     ["platform", "linux"],
     ["architecture", "x64"],
     ["cpu", "Apple M4"],
+    ["logicalCores", 8],
+    ["memoryBytes", 34_359_738_368],
     ["githubActions", true],
+    ["runnerOs", "macOS"],
+    ["runnerArch", "ARM64"],
+    ["imageOs", "macos15"],
+    ["imageVersion", "20260816.277.1"],
   ]) {
     assert.throws(
       () => resolveGenericAamPerformanceProfile("APPLE_M5_NODE24", { ...appleM5Environment, [field]: value }),
       /does not match/i,
       `Apple profile accepted mismatched ${field}`,
+    );
+    const missing = { ...appleM5Environment };
+    delete missing[field];
+    assert.throws(
+      () => resolveGenericAamPerformanceProfile("APPLE_M5_NODE24", missing),
+      /does not match/i,
+      `Apple profile accepted missing ${field}`,
     );
   }
   for (const [field, value] of [
@@ -85,6 +127,44 @@ test("generic-AAM performance profile selection is explicit and environment-clos
       /does not match/i,
       `hosted profile accepted mismatched ${field}`,
     );
+    const missing = { ...hostedEnvironment };
+    delete missing[field];
+    assert.throws(
+      () => resolveGenericAamPerformanceProfile("GITHUB_HOSTED_UBUNTU24_X64_NODE22", missing),
+      /does not match/i,
+      `hosted profile accepted missing ${field}`,
+    );
+  }
+});
+
+test("hosted hardware and image release remain observations, never profile authority", () => {
+  const baseline = resolveGenericAamPerformanceProfile("GITHUB_HOSTED_UBUNTU24_X64_NODE22", hostedEnvironment);
+  const changedEnvironment = {
+    ...hostedEnvironment,
+    cpu: "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+    logicalCores: 8,
+    memoryBytes: 34_359_738_368,
+    imageVersion: "20260823.300.1",
+  };
+  const changed = resolveGenericAamPerformanceProfile("GITHUB_HOSTED_UBUNTU24_X64_NODE22", changedEnvironment);
+
+  assert.deepEqual(changed.boundProfileIdentity, baseline.boundProfileIdentity);
+  assert.deepEqual(changed.observedContext, {
+    cpu: changedEnvironment.cpu,
+    logicalCores: changedEnvironment.logicalCores,
+    memoryBytes: changedEnvironment.memoryBytes,
+    imageVersion: changedEnvironment.imageVersion,
+  });
+  for (const field of ["cpu", "logicalCores", "memoryBytes", "imageVersion"]) {
+    assert.equal(Object.hasOwn(changed.boundProfileIdentity, field), false, `${field} became hosted profile authority`);
+
+    const withoutObservation = { ...hostedEnvironment };
+    delete withoutObservation[field];
+    const missing = resolveGenericAamPerformanceProfile(
+      "GITHUB_HOSTED_UBUNTU24_X64_NODE22",
+      withoutObservation,
+    );
+    assert.equal(missing.observedContext[field], null, `missing ${field} was not retained as an explicit observation`);
   }
 });
 
@@ -170,10 +250,10 @@ test("complete results are emitted before aggregate benchmark failure", () => {
   const errors = [];
   const exitCode = emitGenericAamPerformanceReport({
     report: {
-      schemaVersion: "vector.generic-aam-verification-performance.v2",
+      schemaVersion: "vector.generic-aam-verification-performance.v3",
       workloadId: "workload",
-      profileId: "APPLE_M5_NODE24",
-      environment: appleM5Environment,
+      boundProfileIdentity: { profileId: "APPLE_M5_NODE24", ...appleM5Environment },
+      observedContext: {},
       results,
       nonclaims: [],
     },
@@ -183,7 +263,12 @@ test("complete results are emitted before aggregate benchmark failure", () => {
 
   assert.equal(exitCode, 1);
   assert.equal(output.length, 1);
-  assert.deepEqual(JSON.parse(output[0]).results, results);
+  const emitted = JSON.parse(output[0]);
+  assert.deepEqual(emitted.results, results);
+  assert.deepEqual(emitted.boundProfileIdentity, { profileId: "APPLE_M5_NODE24", ...appleM5Environment });
+  assert.deepEqual(emitted.observedContext, {});
+  assert.equal(Object.hasOwn(emitted, "profileId"), false);
+  assert.equal(Object.hasOwn(emitted, "environment"), false);
   assert.equal(errors.length, 1);
   assert.match(errors[0], /typescript.*52\.163.*30/i);
   assert.match(errors[0], /rust-wasm.*220.*200/i);
