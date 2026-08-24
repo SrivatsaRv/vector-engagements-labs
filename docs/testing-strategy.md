@@ -97,6 +97,9 @@ file and heading from exact Git blobs, derives the changed semantic facets, and
 compares only their exact registered sections. Every test path belongs to its
 actual model, engine, evidence, Worker, VSR, UI, security, mission, geospatial,
 content, data, or delivery family rather than a generic test-only owner.
+Regression coverage changes a test and two independent owning sections in one
+fixture, proving the test-selected facet cannot hide the second changed contract
+section; migration headings remain a distinct requirement inventory.
 The template command runs the same analysis without accepting a declaration and
 emits the exact required family/section inventory for the current diff. Hosted
 verification writes the subsequently validated declaration to the visible job

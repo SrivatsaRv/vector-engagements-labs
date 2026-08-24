@@ -48,6 +48,10 @@ Rules carry a closed semantic-facet inventory (`schema`, `unit`, `datum`,
 `evidence`, `admission`, `validity`, `digest`, `runtime`, `vsr`, `ui`,
 `storage`, `delivery`, and `verification`), so only the sections and
 migration/changelog records owned by the affected facets are required. The
+required inventory is the union of sections selected by executable/test facets
+and every independently changed owning section. Migration/changelog sections
+are tracked separately, so they cannot broaden owning-document requirements and
+an executable or test change cannot mask a second changed contract section. The
 validator proves every registered document is a regular Git blob with exactly
 one registered heading, reads section bodies at the merge base and head,
 retains both endpoints of rename/copy records with `--find-copies-harder`, and

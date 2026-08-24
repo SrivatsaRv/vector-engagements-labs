@@ -2317,15 +2317,6 @@
         },
         {
           "kind": "EXACT",
-          "value": "lib/frontend/selectors.ts",
-          "facets": [
-            "admission",
-            "evidence",
-            "ui"
-          ]
-        },
-        {
-          "kind": "EXACT",
           "value": "lib/runtime/deployment-capabilities.ts",
           "facets": [
             "admission",
@@ -2547,14 +2538,6 @@
         {
           "kind": "EXACT",
           "value": "lib/frontend/selectors.ts",
-          "facets": [
-            "ui",
-            "vsr"
-          ]
-        },
-        {
-          "kind": "EXACT",
-          "value": "components/BrowserTelemetry.tsx",
           "facets": [
             "ui",
             "vsr"
@@ -4211,7 +4194,6 @@
     "app/api/runs/route.ts",
     "app/lab/page.tsx",
     "components/BlogShareAndComments.tsx",
-    "components/BrowserTelemetry.tsx",
     "components/EngagementMap.tsx",
     "components/ObjectPicker.tsx",
     "components/PlatformEvidence.tsx",
@@ -4253,7 +4235,6 @@
     "engine-rust/src/simulation_events.rs",
     "engine-rust/src/validation.rs",
     "lib/canonical-json.ts",
-    "lib/frontend/selectors.ts",
     "lib/catalog-admission.ts",
     "lib/engine/atmosphere.ts",
     "lib/engine/compiler.ts",
@@ -4413,5 +4394,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "675a73ad10b5c3dafe4f20bbca736d669ee05e56e00109df5006dabaa21fdbf8"
+  "canonicalSha256": "d63bc0e7d645867844f3a1b2ae463ad000addbc098efb75e9fe786432fef8219"
 }

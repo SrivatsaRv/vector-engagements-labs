@@ -512,6 +512,47 @@ test("a shared document selects only the family whose registered section changed
   assert.deepEqual(report.families, ["EXAMPLE"]);
 });
 
+test("an implementation change cannot mask an independently changed owning section", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const verificationSection = {
+    sectionId: "EXAMPLE_VERIFICATION",
+    path: "docs/example.md",
+    heading: "## Contract",
+    facets: ["schema", "verification"],
+  };
+  const persistenceSection = {
+    sectionId: "EXAMPLE_PERSISTENCE",
+    path: "docs/example.md",
+    heading: "## Other",
+    facets: ["storage"],
+  };
+  const facetPolicy = {
+    ...policy,
+    families: [{
+      ...policy.families[0],
+      owningSections: [verificationSection, persistenceSection],
+    }],
+    canonicalSha256: undefined,
+  };
+  await writeFile(join(fixture.root, "tests", "example", "example.test.mjs"), "// changed verification fixture\n");
+  await writeFile(
+    join(fixture.root, "docs", "example.md"),
+    "# Example\n\n## Contract\n\nVerification version two.\n\n## Other\n\nPersistence version two.\n",
+  );
+  const headSha = await commit(fixture.root, "verification and independent persistence contract");
+  const incomplete = declaration({ owningSections: [verificationSection] });
+  assert.throws(
+    () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: incomplete, policy: facetPolicy }),
+    /owning sections does not match/i,
+  );
+  const complete = declaration({ owningSections: [verificationSection, persistenceSection] });
+  assert.equal(
+    verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: complete, policy: facetPolicy }).state,
+    "VERIFIED",
+  );
+});
+
 test("the head policy cannot remove ownership that the base policy used", async (t) => {
   const fixture = await fixtureRepository();
   t.after(() => rm(fixture.root, { recursive: true, force: true }));
@@ -1449,8 +1490,8 @@ test("the repository policy maps real simulation identities to their exact owner
   assert.deepEqual(requiredSections(mission, "lib/scenario-spatial.ts"), ["MISSION_BUILDER_EXPANSION", "MISSION_SCENARIO_ARTIFACT"]);
 
   assert.deepEqual(ownersOf("app/lab/page.tsx").map((owner) => owner.id), ["UI_AUTHORING", "UI_OBSERVE", "UI_RESPONSIVE_INTERACTION"]);
-  assert.deepEqual(ownersOf("lib/frontend/selectors.ts").map((owner) => owner.id), ["CAPABILITY_DESCRIPTORS_SELECTORS", "UI_OBSERVE"]);
-  assert.deepEqual(ownersOf("components/BrowserTelemetry.tsx").map((owner) => owner.id), ["UI_OBSERVE", "OBSERVABILITY_OPERATIONS"]);
+  assert.deepEqual(ownersOf("lib/frontend/selectors.ts").map((owner) => owner.id), ["UI_OBSERVE"]);
+  assert.deepEqual(ownersOf("components/BrowserTelemetry.tsx").map((owner) => owner.id), ["OBSERVABILITY_OPERATIONS"]);
   for (const path of ["components/EngagementMap.tsx", "components/SimulationScene.tsx"]) {
     assert.deepEqual(ownersOf(path).map((owner) => owner.id), ["UI_OBSERVE", "UI_PRESENTATION_SEMANTICS", "UI_RESPONSIVE_INTERACTION"]);
     assert.deepEqual(requiredSections(uiPresentation, path), ["UI_PRODUCT_LANGUAGE", "UI_TACVIEW_SUBSET"]);

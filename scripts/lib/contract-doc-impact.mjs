@@ -636,22 +636,28 @@ function changedPathsForFamily(pathClassifications, familyId) {
     .map(({ path }) => path);
 }
 
-function changedFacetsForFamily(pathClassifications, familyId) {
-  const facets = new Set();
-  for (const { classification } of pathClassifications) {
-    const match = classification.familyMatches?.find((candidate) => candidate.familyId === familyId);
-    match?.facets.forEach((facet) => facets.add(facet));
-  }
-  return [...facets].sort();
-}
-
-function authoritativeChangedFacetsForFamily(pathClassifications, familyId) {
+function requiredSectionsForFamily(pathClassifications, family) {
   const implementationFacets = [...new Set(pathClassifications.flatMap(({ classification }) => (
     classification.familyMatches
-      ?.filter((match) => match.familyId === familyId && match.kinds.some((kind) => kind !== "OWNING_DOCUMENT"))
+      ?.filter((match) => match.familyId === family.id && match.kinds.some((kind) => kind !== "OWNING_DOCUMENT"))
       .flatMap((match) => match.facets) ?? []
   )))].sort();
-  return implementationFacets.length ? implementationFacets : changedFacetsForFamily(pathClassifications, familyId);
+  const changedOwningSectionKeys = new Set(pathClassifications.flatMap(({ classification }) => (
+    classification.familyMatches
+      ?.filter((match) => match.familyId === family.id)
+      .flatMap((match) => match.changedOwningSectionKeys ?? []) ?? []
+  )));
+  const changedMigrationSectionKeys = new Set(pathClassifications.flatMap(({ classification }) => (
+    classification.familyMatches
+      ?.filter((match) => match.familyId === family.id)
+      .flatMap((match) => match.changedMigrationSectionKeys ?? []) ?? []
+  )));
+  const implementationOwningSectionKeys = new Set(sectionsForFacets(family.owningSections, implementationFacets).map(sectionKey));
+  const implementationMigrationSectionKeys = new Set(sectionsForFacets(family.migrationSections, implementationFacets).map(sectionKey));
+  return {
+    owningSections: family.owningSections.filter((section) => implementationOwningSectionKeys.has(sectionKey(section)) || changedOwningSectionKeys.has(sectionKey(section))),
+    migrationSections: family.migrationSections.filter((section) => implementationMigrationSectionKeys.has(sectionKey(section)) || changedMigrationSectionKeys.has(sectionKey(section))),
+  };
 }
 
 function sectionsForFacets(sections, facets) {
@@ -730,7 +736,9 @@ export function verifyContractDocImpact({
       if (!match.kinds.includes("OWNING_DOCUMENT")) continue;
       owningDocumentPaths.add(classified.path);
       const family = headPolicy.families.find((candidate) => candidate.id === match.familyId);
-      const sections = [...family.owningSections, ...family.migrationSections].filter((section) => section.path === classified.path);
+      const owningSections = family.owningSections.filter((section) => section.path === classified.path);
+      const migrationSections = family.migrationSections.filter((section) => section.path === classified.path);
+      const sections = [...owningSections, ...migrationSections];
       const changedSections = sections.filter((section) => {
         const beforeContent = contentAt(root, mergeBase, section.path);
         const afterContent = contentAt(root, head, section.path);
@@ -746,9 +754,12 @@ export function verifyContractDocImpact({
       });
       if (changedSections.length > 0) {
         materiallyChangedDocumentPaths.add(classified.path);
-        if (match.kinds.length === 1) match.facets = [...new Set(changedSections.flatMap((section) => section.facets))].sort();
-        else match.facets = [...new Set([...match.facets, ...changedSections.flatMap((section) => section.facets)])].sort();
-        retainedMatches.push(match);
+        const changedSectionKeys = new Set(changedSections.map(sectionKey));
+        retainedMatches.push({
+          ...match,
+          changedOwningSectionKeys: owningSections.filter((section) => changedSectionKeys.has(sectionKey(section))).map(sectionKey),
+          changedMigrationSectionKeys: migrationSections.filter((section) => changedSectionKeys.has(sectionKey(section))).map(sectionKey),
+        });
       } else if (match.kinds.some((kind) => kind !== "OWNING_DOCUMENT")) {
         retainedMatches.push({ ...match, kinds: match.kinds.filter((kind) => kind !== "OWNING_DOCUMENT") });
       }
@@ -770,11 +781,11 @@ export function verifyContractDocImpact({
   const requiredFamilies = [...familyIds].sort();
   const requirements = requiredFamilies.map((familyId) => {
     const family = headPolicy.families.find((item) => item.id === familyId);
-    const changedFacets = authoritativeChangedFacetsForFamily(pathClassifications, familyId);
+    const requiredSections = requiredSectionsForFamily(pathClassifications, family);
     return {
       familyId,
-      owningSections: sectionsForFacets(family.owningSections, changedFacets),
-      migrationSections: sectionsForFacets(family.migrationSections, changedFacets),
+      owningSections: requiredSections.owningSections,
+      migrationSections: requiredSections.migrationSections,
     };
   });
   if (analysisOnly) {
@@ -798,9 +809,9 @@ export function verifyContractDocImpact({
     const family = headPolicy.families.find((item) => item.id === familyId);
     const item = declarations.get(familyId);
     const familyChangedPaths = [...new Set(changedPathsForFamily(pathClassifications, familyId))].sort();
-    const familyChangedFacets = authoritativeChangedFacetsForFamily(pathClassifications, familyId);
-    const requiredOwningSections = sectionsForFacets(family.owningSections, familyChangedFacets);
-    const requiredMigrationSections = sectionsForFacets(family.migrationSections, familyChangedFacets);
+    const requiredSections = requiredSectionsForFamily(pathClassifications, family);
+    const requiredOwningSections = requiredSections.owningSections;
+    const requiredMigrationSections = requiredSections.migrationSections;
     exactSectionInventory(item.owningSections, requiredOwningSections, `${familyId} owning sections`);
     if (item.disposition !== "SEMANTIC" && item.disposition !== "DOCS_ALREADY_CURRENT") {
       invariant(item.migration.state === "NOT_APPLICABLE" && item.migration.documents.length === 0, `${familyId} non-semantic disposition cannot claim migration documentation.`);
