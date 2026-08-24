@@ -2363,15 +2363,6 @@
         },
         {
           "kind": "EXACT",
-          "value": "tests/frontend-selectors.test.mjs",
-          "facets": [
-            "admission",
-            "evidence",
-            "ui"
-          ]
-        },
-        {
-          "kind": "EXACT",
           "value": "tests/named-aircraft-catalog.test.mjs",
           "facets": [
             "admission",
@@ -2617,6 +2608,14 @@
         }
       ],
       "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/frontend-selectors.test.mjs",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
         {
           "kind": "EXACT",
           "value": "tests/component/platform-evidence.test.tsx",
@@ -4394,5 +4393,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "d63bc0e7d645867844f3a1b2ae463ad000addbc098efb75e9fe786432fef8219"
+  "canonicalSha256": "6924e9da3a0ef79db71a8d3dcded6e45e8c751a236e31e6d773a41de867e5ff5"
 }

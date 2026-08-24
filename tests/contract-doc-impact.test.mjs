@@ -1491,6 +1491,7 @@ test("the repository policy maps real simulation identities to their exact owner
 
   assert.deepEqual(ownersOf("app/lab/page.tsx").map((owner) => owner.id), ["UI_AUTHORING", "UI_OBSERVE", "UI_RESPONSIVE_INTERACTION"]);
   assert.deepEqual(ownersOf("lib/frontend/selectors.ts").map((owner) => owner.id), ["UI_OBSERVE"]);
+  assert.deepEqual(ownersOf("tests/frontend-selectors.test.mjs").map((owner) => owner.id), ["UI_OBSERVE"]);
   assert.deepEqual(ownersOf("components/BrowserTelemetry.tsx").map((owner) => owner.id), ["OBSERVABILITY_OPERATIONS"]);
   for (const path of ["components/EngagementMap.tsx", "components/SimulationScene.tsx"]) {
     assert.deepEqual(ownersOf(path).map((owner) => owner.id), ["UI_OBSERVE", "UI_PRESENTATION_SEMANTICS", "UI_RESPONSIVE_INTERACTION"]);

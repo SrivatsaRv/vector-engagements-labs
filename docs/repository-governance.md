@@ -203,6 +203,10 @@ response-header, or delivery documentation.
 Anonymous blog-comment routes, persistence schema/migration, and live client
 instead own the blog publishing Notes section; they do not acquire saved-run
 semantics merely because both use bounded public-API helpers.
+Observe replay selectors and their direct regression test share one UI Observe
+owner. The renderless browser telemetry emitter is operations-observability
+only, so neither test-only nor instrumentation-only changes create unrelated
+capability or VSR documentation churn.
 `db/schema.ts` is a stable aggregate export only. Domain-owned table
 definitions live under `db/schema/`, so a comments-table change cannot select
 model-pack, VSR, catalog, or saved-run contracts. Every module still belongs to

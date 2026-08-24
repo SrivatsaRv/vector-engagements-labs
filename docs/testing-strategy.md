@@ -194,6 +194,10 @@ The same matrix rejects a broad security-directory owner: exact saved-run,
 basemap relay, browser-response, and delivery paths must resolve only to their
 corresponding security-boundary heading, with declared multiownership for the
 small shared public-admission helpers.
+Replay/current-geometry selector code and its regression test belong to the
+Observe family, while the renderless browser telemetry emitter belongs only to
+operations observability; neither path may force capability-admission or VSR UI
+documentation that it does not implement.
 The anonymous comment route, schema/migration, live client, and mixed boundary
 regression own the blog publishing Notes section and are explicitly excluded
 from the Saved runs family.
