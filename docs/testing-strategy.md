@@ -101,10 +101,19 @@ TEST_ONLY, GENERATED_ARTIFACT_ONLY, INTERNAL_REFACTOR,
 NO_SEMANTIC_CHANGE, and DOCS_ALREADY_CURRENT are mutually exclusive,
 evidence-bearing dispositions; none receives credit merely because an arbitrary
 document changed. INTERNAL_REFACTOR and NO_SEMANTIC_CHANGE remain unavailable
-unless the trusted adapter supplies the registered identity or invariant probe;
-declaration-authored hashes and prose alone never authorize them. A
-generated-only disposition executes the registered direct argv and cannot be
-redirected by editing `package.json`. Semantic schema/storage/VSR facets
+unless a versioned adapter already registered and digest-bound by the merge-base
+policy supplies the exact identity or invariant result. The declaration names
+probe IDs only; the family, disposition, changed-path coverage, adapter,
+assertions, revisions, and equal base/head identities are validated outside the
+declaration. Adapters execute twice with a scrubbed environment and bounded
+output; a newly added head-policy probe, malformed result, failed assertion,
+nondeterministic output, or caller-authored hash/command fails closed. A
+generated-only disposition executes the policy-registered direct argv after
+Stage 0.6 provisions its closed Node or Rust/WASM toolchain;
+it cannot be redirected by editing `package.json`. The command runs against a
+temporary exact-head archive and tracked-file mutation fails. The hosted checkout is the
+exact pull-request head rather than GitHub's synthetic merge tree. Semantic
+schema/storage/VSR facets
 additionally require their registered
 Unreleased migration section. Repository-policy tests always run, and an
 unknown or unclassified tracked path makes policy validation fail. Documentation and agent-harness

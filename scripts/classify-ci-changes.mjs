@@ -23,6 +23,7 @@ const WORKFLOW_CONTROL = [
   /^(?:package|package-lock)\.json$/,
   /^governance\/contract-doc-ownership\.v1\.json$/,
   /^scripts\/classify-ci-changes\.mjs$/,
+  /^scripts\/contract-doc-probes\//,
   /^scripts\/lib\/contract-doc-impact\.mjs$/,
   /^scripts\/run-managed-server\.mjs$/,
   /^scripts\/verify-contract-doc-impact\.mjs$/,

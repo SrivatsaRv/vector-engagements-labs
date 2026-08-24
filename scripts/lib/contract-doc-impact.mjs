@@ -17,6 +17,9 @@ const DISPOSITIONS = new Set([
   "DOCS_ALREADY_CURRENT",
 ]);
 const RULE_KINDS = new Set(["EXACT", "PREFIX"]);
+const GENERATED_TOOLCHAINS = new Set(["NODE", "NODE_RUST_WASM32"]);
+const NON_SEMANTIC_PROBE_DISPOSITIONS = new Set(["INTERNAL_REFACTOR", "NO_SEMANTIC_CHANGE"]);
+const PROBE_RESULT_SCHEMA = "vector.contract-doc-probe-result.v1";
 const FACETS = new Set(["admission", "datum", "delivery", "digest", "evidence", "runtime", "schema", "storage", "ui", "unit", "validity", "verification", "vsr"]);
 
 function invariant(condition, message) {
@@ -40,6 +43,7 @@ function substantiveString(value, label, minimum = 16) {
   requiredString(value, label);
   invariant(value.trim().length >= minimum, `${label} must contain specific evidence, not a generic placeholder.`);
   invariant(!/^(?:n\/?a|none|updated|no change|test(?:ed)?)\.?$/iu.test(value.trim()), `${label} is a generic placeholder.`);
+  invariant(!/(?:\breplace this\b|\bplaceholder\b|\btodo\b|\btbd\b|\blorem ipsum\b)/iu.test(value), `${label} is a generic placeholder.`);
   return value;
 }
 
@@ -160,6 +164,7 @@ function assertPolicyDoesNotWeaken(basePolicy, headPolicy) {
   invariant(headPolicy.maxDeclarationBytes <= basePolicy.maxDeclarationBytes, "Head policy increases the declaration byte limit.");
   requireInventorySubset(basePolicy.contractRoots, headPolicy.contractRoots, "contract roots");
   requireInventorySubset(basePolicy.allowedMultiFamilyPaths, headPolicy.allowedMultiFamilyPaths, "declared multi-family ownership");
+  requireInventorySubset(basePolicy.nonSemanticProbes, headPolicy.nonSemanticProbes, "non-semantic probes");
   const headFamilies = new Map(headPolicy.families.map((family) => [family.id, family]));
   for (const baseFamily of basePolicy.families) {
     const headFamily = headFamilies.get(baseFamily.id);
@@ -172,6 +177,7 @@ function assertPolicyDoesNotWeaken(basePolicy, headPolicy) {
     for (const baseGroup of baseFamily.generatedGroups) {
       const headGroup = headGroups.get(baseGroup.id);
       invariant(headGroup, `Head policy removes generated group ${baseFamily.id}.${baseGroup.id}.`);
+      invariant(headGroup.toolchainId === baseGroup.toolchainId, `Head policy changes ${baseFamily.id}.${baseGroup.id} freshness toolchain.`);
       invariant(JSON.stringify(headGroup.freshnessArgv) === JSON.stringify(baseGroup.freshnessArgv), `Head policy changes ${baseFamily.id}.${baseGroup.id} freshness command.`);
       for (const field of ["outputRules", "inputRules", "generatorRules"]) {
         requireInventorySubset(baseGroup[field], headGroup[field], `${baseFamily.id}.${baseGroup.id}.${field}`);
@@ -292,6 +298,7 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
     "declarationBlockName",
     "allowedDispositions",
     "families",
+    "nonSemanticProbes",
     "allowedMultiFamilyPaths",
     "nonContractRules",
     "contractRoots",
@@ -316,10 +323,14 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
     family.implementationRules.forEach((rule, index) => validateRule(rule, `${label}.implementationRules[${index}]`));
     family.testRules.forEach((rule, index) => validateRule(rule, `${label}.testRules[${index}]`));
     invariant(Array.isArray(family.generatedGroups), `${label}.generatedGroups must be an array.`);
+    const generatedGroupIds = new Set();
     for (const [groupIndex, group] of family.generatedGroups.entries()) {
       const groupLabel = `${label}.generatedGroups[${groupIndex}]`;
-      exactKeys(group, ["id", "outputRules", "inputRules", "generatorRules", "freshnessArgv"], groupLabel);
+      exactKeys(group, ["id", "toolchainId", "outputRules", "inputRules", "generatorRules", "freshnessArgv"], groupLabel);
       requiredString(group.id, `${groupLabel} id`);
+      invariant(!generatedGroupIds.has(group.id), `${label} repeats generated group ${group.id}.`);
+      generatedGroupIds.add(group.id);
+      invariant(GENERATED_TOOLCHAINS.has(group.toolchainId), `${groupLabel} has unsupported toolchain ${group.toolchainId}.`);
       for (const ruleSet of ["outputRules", "inputRules", "generatorRules"]) {
         invariant(Array.isArray(group[ruleSet]) && group[ruleSet].length > 0, `${groupLabel}.${ruleSet} must be non-empty.`);
         group[ruleSet].forEach((rule, index) => validateRule(rule, `${groupLabel}.${ruleSet}[${index}]`));
@@ -332,12 +343,56 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
     invariant(new Set(family.owningSections.map(sectionKey)).size === family.owningSections.length, `${label} repeats an owning section.`);
     invariant(Array.isArray(family.migrationSections), `${label}.migrationSections must be an array.`);
     family.migrationSections.forEach((item, index) => validateSection(item, `${label}.migrationSections[${index}]`));
+    const owningFacets = new Set(family.owningSections.flatMap((item) => item.facets));
+    const governedRules = [
+      ...family.implementationRules,
+      ...family.testRules,
+      ...family.generatedGroups.flatMap((group) => [...group.outputRules, ...group.inputRules, ...group.generatorRules]),
+    ];
+    for (const rule of governedRules) {
+      for (const facet of rule.facets) {
+        invariant(owningFacets.has(facet), `${family.id} rule facet ${facet} has no registered owning section.`);
+      }
+    }
+    for (const item of family.migrationSections) {
+      for (const facet of item.facets) {
+        invariant(owningFacets.has(facet), `${family.id} migration facet ${facet} has no registered owning section.`);
+      }
+    }
     if (rootDirectory) {
       for (const section of [...family.owningSections, ...family.migrationSections]) {
         const absolute = resolve(rootDirectory, section.path);
         invariant(existsSync(absolute) && lstatSync(absolute).isFile() && !lstatSync(absolute).isSymbolicLink(), `${label} registered document ${section.path} must be a regular file.`);
         markdownSection(readFileSync(absolute, "utf8"), section.heading, `${label} registered section ${section.sectionId}`);
       }
+    }
+  }
+  invariant(Array.isArray(policy.nonSemanticProbes), "nonSemanticProbes must be an array.");
+  const probeIds = new Set();
+  for (const [probeIndex, probe] of policy.nonSemanticProbes.entries()) {
+    const label = `nonSemanticProbes[${probeIndex}]`;
+    exactKeys(probe, ["id", "familyId", "disposition", "changedPathRules", "adapterPath", "adapterSha256", "assertionIds"], label);
+    invariant(/^[A-Z][A-Z0-9_]*_V\d+$/u.test(requiredString(probe.id, `${label} id`)), `${label} id must be a versioned identifier.`);
+    invariant(!probeIds.has(probe.id), `Duplicate non-semantic probe ${probe.id}.`);
+    probeIds.add(probe.id);
+    const family = policy.families.find((candidate) => candidate.id === probe.familyId);
+    invariant(family, `${label} references unknown family ${probe.familyId}.`);
+    invariant(NON_SEMANTIC_PROBE_DISPOSITIONS.has(probe.disposition), `${label} has unsupported disposition ${probe.disposition}.`);
+    invariant(Array.isArray(probe.changedPathRules) && probe.changedPathRules.length > 0, `${label}.changedPathRules must be non-empty.`);
+    probe.changedPathRules.forEach((rule, index) => validateRule(rule, `${label}.changedPathRules[${index}]`));
+    normalizeRepositoryPath(probe.adapterPath, `${label}.adapterPath`);
+    invariant(probe.adapterPath.startsWith("scripts/contract-doc-probes/") && probe.adapterPath.endsWith(".mjs"), `${label}.adapterPath is outside the trusted probe adapter root.`);
+    invariant(SHA256.test(probe.adapterSha256), `${label}.adapterSha256 is invalid.`);
+    const assertionIds = sortedUniqueStrings(probe.assertionIds, `${label}.assertionIds`);
+    invariant(assertionIds.length > 0 && assertionIds.every((id) => /^[A-Z][A-Z0-9_]*$/u.test(id)), `${label}.assertionIds are invalid.`);
+    const owningFacets = new Set(family.owningSections.flatMap((section) => section.facets));
+    for (const rule of probe.changedPathRules) {
+      for (const facet of rule.facets) invariant(owningFacets.has(facet), `${probe.id} rule facet ${facet} has no registered owning section.`);
+    }
+    if (rootDirectory) {
+      const adapter = resolve(rootDirectory, probe.adapterPath);
+      invariant(existsSync(adapter) && lstatSync(adapter).isFile() && !lstatSync(adapter).isSymbolicLink(), `${label} adapter must be a regular file.`);
+      invariant(sha256(readFileSync(adapter)) === probe.adapterSha256, `${label} adapter digest mismatch.`);
     }
   }
   sortedUniqueStrings(policy.allowedMultiFamilyPaths, "allowedMultiFamilyPaths").forEach((path) => normalizeRepositoryPath(path, "allowed multi-family path"));
@@ -386,6 +441,16 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
       }
     }
     policy.nonContractRules.forEach((rule, index) => assertRuleMatches(rule, `nonContractRules[${index}]`));
+    for (const probe of policy.nonSemanticProbes) {
+      const family = policy.families.find((candidate) => candidate.id === probe.familyId);
+      for (const [index, rule] of probe.changedPathRules.entries()) {
+        assertRuleMatches(rule, `${probe.id}.changedPathRules[${index}]`);
+        for (const path of trackedPaths.filter((candidate) => ruleMatches(candidate, rule))) {
+          const classification = classifyPath(path, policy);
+          invariant(classification.familyMatches?.some((match) => match.familyId === family.id), `${probe.id} covers path outside family ${family.id}: ${path}.`);
+        }
+      }
+    }
   }
   invariant(unclassifiedPaths.length === 0, `Policy leaves tracked paths unclassified: ${unclassifiedPaths.join(", ")}.`);
   invariant(blockedUnmappedPaths.length === 0, `Policy leaves contract-looking paths unmapped: ${blockedUnmappedPaths.join(", ")}.`);
@@ -397,8 +462,15 @@ function validateEvidence(evidence, label) {
   for (const [index, item] of evidence.entries()) {
     exactKeys(item, ["kind", "value"], `${label}[${index}]`);
     invariant(["TEST", "IDENTITY", "REVIEW"].includes(item.kind), `${label}[${index}] has unknown kind ${item.kind}.`);
-    requiredString(item.value, `${label}[${index}] value`);
+    substantiveString(item.value, `${label}[${index}] value`, 12);
   }
+}
+
+function validateHistoricalSectionEvidence(item, label) {
+  exactKeys(item, ["sectionId", "path", "heading", "facets", "contentSha256", "documentedAtCommit"], label);
+  validateSection({ sectionId: item.sectionId, path: item.path, heading: item.heading, facets: item.facets }, label);
+  invariant(SHA256.test(item.contentSha256), `${label} content hash is invalid.`);
+  invariant(COMMIT_SHA.test(item.documentedAtCommit), `${label} commit is invalid.`);
 }
 
 function validateExemptionEvidence(disposition, evidence, label) {
@@ -412,36 +484,20 @@ function validateExemptionEvidence(disposition, evidence, label) {
     exactKeys(evidence, ["kind", "paths"], label);
     sortedUniqueStrings(evidence.paths, `${label}.paths`).forEach((path) => normalizeRepositoryPath(path));
   } else if (disposition === "GENERATED_ARTIFACT_ONLY") {
-    exactKeys(evidence, ["kind", "groupId", "freshnessArgv"], label);
+    exactKeys(evidence, ["kind", "groupId"], label);
     requiredString(evidence.groupId, `${label}.groupId`);
-    invariant(Array.isArray(evidence.freshnessArgv) && evidence.freshnessArgv.length > 1, `${label}.freshnessArgv must be non-empty.`);
-    evidence.freshnessArgv.forEach((argument, index) => requiredString(argument, `${label}.freshnessArgv[${index}]`));
   } else if (disposition === "INTERNAL_REFACTOR") {
-    exactKeys(evidence, ["kind", "identities"], label);
-    invariant(Array.isArray(evidence.identities) && evidence.identities.length > 0, `${label}.identities must be non-empty.`);
-    for (const [index, identity] of evidence.identities.entries()) {
-      exactKeys(identity, ["name", "beforeSha256", "afterSha256"], `${label}.identities[${index}]`);
-      requiredString(identity.name, `${label}.identities[${index}].name`);
-      invariant(SHA256.test(identity.beforeSha256) && SHA256.test(identity.afterSha256), `${label}.identities[${index}] hashes are invalid.`);
-      invariant(identity.beforeSha256 === identity.afterSha256, `${label}.identities[${index}] changed; INTERNAL_REFACTOR is invalid.`);
-    }
+    exactKeys(evidence, ["kind", "probeIds"], label);
+    invariant(sortedUniqueStrings(evidence.probeIds, `${label}.probeIds`).length > 0, `${label}.probeIds must be non-empty.`);
   } else if (disposition === "NO_SEMANTIC_CHANGE") {
-    exactKeys(evidence, ["kind", "invariants"], label);
-    invariant(Array.isArray(evidence.invariants) && evidence.invariants.length > 0, `${label}.invariants must be non-empty.`);
-    for (const [index, identity] of evidence.invariants.entries()) {
-      exactKeys(identity, ["name", "evidence"], `${label}.invariants[${index}]`);
-      requiredString(identity.name, `${label}.invariants[${index}].name`);
-      requiredString(identity.evidence, `${label}.invariants[${index}].evidence`);
-    }
+    exactKeys(evidence, ["kind", "probeIds"], label);
+    invariant(sortedUniqueStrings(evidence.probeIds, `${label}.probeIds`).length > 0, `${label}.probeIds must be non-empty.`);
   } else if (disposition === "DOCS_ALREADY_CURRENT") {
-    exactKeys(evidence, ["kind", "sections"], label);
+    exactKeys(evidence, ["kind", "sections", "migrationSections"], label);
     invariant(Array.isArray(evidence.sections) && evidence.sections.length > 0, `${label}.sections must be non-empty.`);
-    for (const [index, item] of evidence.sections.entries()) {
-      exactKeys(item, ["sectionId", "path", "heading", "facets", "contentSha256", "documentedAtCommit"], `${label}.sections[${index}]`);
-      validateSection({ sectionId: item.sectionId, path: item.path, heading: item.heading, facets: item.facets }, `${label}.sections[${index}]`);
-      invariant(SHA256.test(item.contentSha256), `${label}.sections[${index}] content hash is invalid.`);
-      invariant(COMMIT_SHA.test(item.documentedAtCommit), `${label}.sections[${index}] commit is invalid.`);
-    }
+    evidence.sections.forEach((item, index) => validateHistoricalSectionEvidence(item, `${label}.sections[${index}]`));
+    invariant(Array.isArray(evidence.migrationSections), `${label}.migrationSections must be an array.`);
+    evidence.migrationSections.forEach((item, index) => validateHistoricalSectionEvidence(item, `${label}.migrationSections[${index}]`));
   }
 }
 
@@ -468,6 +524,8 @@ export function validateDeclaration(declaration, policy, { requiredFamilies } = 
     invariant(["NOT_APPLICABLE", "UPDATED", "DOCS_ALREADY_CURRENT"].includes(item.migration.state), `${label}.migration state is invalid.`);
     invariant(Array.isArray(item.migration.documents), `${label}.migration.documents must be an array.`);
     item.migration.documents.forEach((document, documentIndex) => validateSection(document, `${label}.migration.documents[${documentIndex}]`));
+    const registeredMigrationSections = new Set(policyFamilies.get(item.familyId).migrationSections.map(sectionKey));
+    invariant(item.migration.documents.every((document) => registeredMigrationSections.has(sectionKey(document))), `${label} names an unregistered migration section for ${item.familyId}.`);
     substantiveString(item.migration.rationale, `${label}.migration.rationale`);
     validateExemptionEvidence(item.disposition, item.exemptionEvidence, `${label}.exemptionEvidence`);
   }
@@ -599,8 +657,7 @@ export function verifyContractDocImpact({
   headPolicy = policy,
   policyBootstrap = false,
   freshnessRunner,
-  identityRunner,
-  invariantRunner,
+  probeRunner,
 }) {
   const root = realpathSync(rootDirectory);
   const base = resolveCommit(root, baseSha, "base SHA");
@@ -681,7 +738,7 @@ export function verifyContractDocImpact({
     const requiredOwningSections = sectionsForFacets(family.owningSections, familyChangedFacets);
     const requiredMigrationSections = sectionsForFacets(family.migrationSections, familyChangedFacets);
     exactSectionInventory(item.owningSections, requiredOwningSections, `${familyId} owning sections`);
-    if (item.disposition !== "SEMANTIC") {
+    if (item.disposition !== "SEMANTIC" && item.disposition !== "DOCS_ALREADY_CURRENT") {
       invariant(item.migration.state === "NOT_APPLICABLE" && item.migration.documents.length === 0, `${familyId} non-semantic disposition cannot claim migration documentation.`);
     }
     if (item.disposition === "SEMANTIC") {
@@ -705,22 +762,57 @@ export function verifyContractDocImpact({
       invariant(familyChangedPaths.every((path) => family.testRules.some((rule) => ruleMatches(path, rule))), `${familyId} TEST_ONLY includes a non-test path.`);
       invariant(JSON.stringify([...item.exemptionEvidence.paths].sort()) === JSON.stringify(familyChangedPaths), `${familyId} TEST_ONLY paths do not exactly cover the changed test paths.`);
     } else if (item.disposition === "GENERATED_ARTIFACT_ONLY") {
-      const group = family.generatedGroups.find((candidate) => candidate.id === item.exemptionEvidence.groupId);
-      invariant(group, `${familyId} references unknown generated group ${item.exemptionEvidence.groupId}.`);
-      invariant(JSON.stringify(item.exemptionEvidence.freshnessArgv) === JSON.stringify(group.freshnessArgv), `${familyId} freshness command does not match policy.`);
+      invariant(!policyBootstrap, `${familyId} GENERATED_ARTIFACT_ONLY is unavailable during policy bootstrap.`);
+      const trustedFamily = basePolicy.families.find((candidate) => candidate.id === familyId);
+      const group = trustedFamily?.generatedGroups.find((candidate) => candidate.id === item.exemptionEvidence.groupId);
+      invariant(group, `${familyId} references an unknown or not-yet-trusted generated group ${item.exemptionEvidence.groupId}.`);
       invariant(familyChangedPaths.every((path) => group.outputRules.some((rule) => ruleMatches(path, rule))), `${familyId} generated-only change includes an input, generator, or non-output path.`);
-      invariant(item.evidence.some((entry) => entry.value === group.freshnessArgv.join(" ")), `${familyId} generated-only declaration lacks freshness evidence.`);
       invariant(typeof freshnessRunner === "function", `${familyId} generated-only verification requires the registered freshness runner.`);
-      freshnessRunner(group.freshnessArgv);
-    } else if (item.disposition === "INTERNAL_REFACTOR") {
-      invariant(typeof identityRunner === "function", `${familyId} INTERNAL_REFACTOR is unavailable without a registered identity probe.`);
-      invariant(identityRunner({ familyId, evidence: item.exemptionEvidence, mergeBaseSha: mergeBase, headSha: head }) === true, `${familyId} registered identity probe failed.`);
-    } else if (item.disposition === "NO_SEMANTIC_CHANGE") {
-      invariant(typeof invariantRunner === "function", `${familyId} NO_SEMANTIC_CHANGE is unavailable without a registered invariant probe.`);
-      invariant(invariantRunner({ familyId, evidence: item.exemptionEvidence, mergeBaseSha: mergeBase, headSha: head }) === true, `${familyId} registered invariant probe failed.`);
+      freshnessRunner(group);
+    } else if (NON_SEMANTIC_PROBE_DISPOSITIONS.has(item.disposition)) {
+      invariant(!policyBootstrap, `${familyId} ${item.disposition} is unavailable during policy bootstrap.`);
+      invariant(typeof probeRunner === "function", `${familyId} ${item.disposition} is unavailable without the trusted probe runner.`);
+      const trustedProbes = new Map(basePolicy.nonSemanticProbes.map((probe) => [probe.id, probe]));
+      const selectedProbes = item.exemptionEvidence.probeIds.map((probeId) => {
+        const probe = trustedProbes.get(probeId);
+        invariant(probe, `${familyId} references an unknown or not-yet-trusted non-semantic probe ${probeId}.`);
+        invariant(probe.familyId === familyId, `${probeId} is not authorized for family ${familyId}.`);
+        invariant(probe.disposition === item.disposition, `${probeId} is not authorized for disposition ${item.disposition}.`);
+        return probe;
+      });
+      for (const path of familyChangedPaths) {
+        const coveringProbes = selectedProbes.filter((probe) => probe.changedPathRules.some((rule) => ruleMatches(path, rule)));
+        invariant(coveringProbes.length === 1, `${familyId} changed path ${path} must be covered by exactly one selected non-semantic probe.`);
+      }
+      for (const probe of selectedProbes) {
+        invariant(familyChangedPaths.some((path) => probe.changedPathRules.some((rule) => ruleMatches(path, rule))), `${probe.id} does not cover an affected path for ${familyId}.`);
+        const result = probeRunner({ probe, familyId, disposition: item.disposition, mergeBaseSha: mergeBase, headSha: head });
+        exactKeys(result, ["schemaVersion", "probeId", "familyId", "disposition", "baseSha", "headSha", "assertions"], `${probe.id} result`);
+        invariant(result.schemaVersion === PROBE_RESULT_SCHEMA, `${probe.id} returned an unsupported result schema.`);
+        invariant(result.probeId === probe.id && result.familyId === familyId && result.disposition === item.disposition, `${probe.id} returned mismatched authority identity.`);
+        invariant(result.baseSha === mergeBase && result.headSha === head, `${probe.id} returned mismatched revision identity.`);
+        invariant(Array.isArray(result.assertions), `${probe.id} assertions must be an array.`);
+        const expectedAssertionIds = [...probe.assertionIds].sort();
+        const actualAssertionIds = result.assertions.map((assertion, index) => {
+          exactKeys(assertion, ["id", "status", "beforeSha256", "afterSha256", "evidenceSha256"], `${probe.id}.assertions[${index}]`);
+          invariant(assertion.status === "PASS", `${probe.id} assertion ${assertion.id} did not pass.`);
+          invariant(SHA256.test(assertion.beforeSha256) && SHA256.test(assertion.afterSha256) && SHA256.test(assertion.evidenceSha256), `${probe.id} assertion ${assertion.id} has invalid evidence identity.`);
+          invariant(assertion.beforeSha256 === assertion.afterSha256, `${probe.id} assertion ${assertion.id} changed across revisions.`);
+          return requiredString(assertion.id, `${probe.id}.assertions[${index}].id`);
+        }).sort();
+        invariant(JSON.stringify(actualAssertionIds) === JSON.stringify(expectedAssertionIds), `${probe.id} assertion inventory mismatch.`);
+      }
     } else if (item.disposition === "DOCS_ALREADY_CURRENT") {
       exactSectionInventory(item.exemptionEvidence.sections, requiredOwningSections, `${familyId} docs-current evidence`);
-      for (const section of item.exemptionEvidence.sections) {
+      if (requiredMigrationSections.length) {
+        invariant(item.migration.state === "DOCS_ALREADY_CURRENT", `${familyId} applicable migration must be DOCS_ALREADY_CURRENT.`);
+        exactSectionInventory(item.migration.documents, requiredMigrationSections, `${familyId} migration documents`);
+        exactSectionInventory(item.exemptionEvidence.migrationSections, requiredMigrationSections, `${familyId} docs-current migration evidence`);
+      } else {
+        invariant(item.migration.state === "NOT_APPLICABLE" && item.migration.documents.length === 0, `${familyId} has no applicable migration section; migration must be NOT_APPLICABLE.`);
+        invariant(item.exemptionEvidence.migrationSections.length === 0, `${familyId} has no applicable docs-current migration evidence.`);
+      }
+      for (const section of [...item.exemptionEvidence.sections, ...item.exemptionEvidence.migrationSections]) {
         const documentedCommit = resolveCommit(root, section.documentedAtCommit, `${familyId} documentedAtCommit`);
         let isAncestor = true;
         try {

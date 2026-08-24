@@ -109,7 +109,15 @@ test("local, hosted, and clean-clone gates execute the same documentation-impact
   assert.match(makefile, /npm run policy:contract-docs:verify/);
   assert.match(makefile, /VECTOR_CONTRACT_DOC_DECLARATION_FILE/);
   const workflow = await readFile(".github/workflows/ci.yml", "utf8");
-  assert.match(workflow, /node scripts\/verify-contract-doc-impact\.mjs --github-event/);
+  const contractDocs = workflow.split(/^  contract_docs:/m)[1]?.split(/^  quality:/m)[0];
+  assert.ok(contractDocs, "contract documentation job is missing");
+  assert.match(contractDocs, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
+  assert.match(contractDocs, /actions-rust-lang\/setup-rust-toolchain@/);
+  assert.match(contractDocs, /target: wasm32-unknown-unknown/);
+  assert.match(contractDocs, /Swatinem\/rust-cache@/);
+  assert.match(contractDocs, /workspaces: engine-rust/);
+  assert.ok(contractDocs.indexOf("target: wasm32-unknown-unknown") < contractDocs.indexOf("node scripts/verify-contract-doc-impact.mjs --github-event"));
+  assert.match(contractDocs, /node scripts\/verify-contract-doc-impact\.mjs --github-event/);
   assert.match(workflow, /contract_docs_state/);
 });
 

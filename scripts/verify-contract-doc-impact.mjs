@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -19,6 +20,10 @@ const POLICY_PATH = "governance/contract-doc-ownership.v1.json";
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function git(root, args, options = {}) {
@@ -158,10 +163,89 @@ function writeOutput(report) {
   }
 }
 
-function runRegisteredFreshness(root, argv) {
+function trackedFileIdentity(root, commit, materializedRoot) {
+  const paths = git(root, ["ls-tree", "-r", "--name-only", "-z", commit]).split("\0").filter(Boolean);
+  return paths.map((path) => {
+    const absolute = resolve(materializedRoot, path);
+    invariant(absolute.startsWith(`${resolve(materializedRoot)}/`), `Tracked freshness path escapes materialized head: ${path}.`);
+    return [path, sha256(readFileSync(absolute))];
+  });
+}
+
+export function runRegisteredFreshness(root, { group, headSha }) {
+  invariant(group && typeof group === "object", "Registered freshness group is invalid.");
+  const { toolchainId, freshnessArgv: argv } = group;
+  invariant(["NODE", "NODE_RUST_WASM32"].includes(toolchainId), `Unsupported freshness toolchain ${toolchainId}.`);
   invariant(Array.isArray(argv) && argv.length > 1, "Registered freshness argv is invalid.");
-  invariant(["node", "node_modules/.bin/tsx"].includes(argv[0]), `Unsupported freshness executable ${argv[0]}.`);
-  execFileSync(argv[0], argv.slice(1), { cwd: root, stdio: "inherit", env: process.env });
+  invariant(argv[0] === "node", `Unsupported freshness executable ${argv[0]}.`);
+  execFileSync("node", ["--version"], { cwd: root, stdio: "ignore", timeout: 10_000 });
+  if (toolchainId === "NODE_RUST_WASM32") {
+    execFileSync("cargo", ["--version"], { cwd: root, stdio: "ignore", timeout: 10_000 });
+    const targets = execFileSync("rustup", ["target", "list", "--installed"], { cwd: root, encoding: "utf8", timeout: 10_000 });
+    invariant(targets.split(/\r?\n/u).includes("wasm32-unknown-unknown"), "Registered Rust freshness toolchain lacks wasm32-unknown-unknown.");
+  }
+  const freshnessRoot = mkdtempSync(join(tmpdir(), "vector-contract-doc-freshness-"));
+  try {
+    const archive = execFileSync("git", ["archive", "--format=tar", headSha], { cwd: root, encoding: "buffer", maxBuffer: 256 * 1024 * 1024 });
+    execFileSync("tar", ["-xf", "-", "-C", freshnessRoot], { input: archive, maxBuffer: 256 * 1024 * 1024 });
+    const before = trackedFileIdentity(root, headSha, freshnessRoot);
+    const environment = {
+      PATH: process.env.PATH ?? "",
+      HOME: process.env.HOME ?? "",
+      TMPDIR: process.env.TMPDIR ?? tmpdir(),
+      LANG: "C",
+      LC_ALL: "C",
+    };
+    execFileSync(argv[0], argv.slice(1), { cwd: freshnessRoot, stdio: "inherit", env: environment, timeout: 120_000, maxBuffer: 64 * 1024 * 1024 });
+    invariant(JSON.stringify(trackedFileIdentity(root, headSha, freshnessRoot)) === JSON.stringify(before), `Registered freshness group ${group.id} modified tracked head content.`);
+  } finally {
+    rmSync(freshnessRoot, { recursive: true, force: true });
+  }
+}
+
+export function runRegisteredProbe(root, { probe, familyId, disposition, mergeBaseSha, headSha }) {
+  invariant(probe && typeof probe === "object", "Registered non-semantic probe is invalid.");
+  invariant(probe.familyId === familyId && probe.disposition === disposition, `Registered probe ${probe.id} authority mismatch.`);
+  const baseAdapter = fileAt(root, mergeBaseSha, probe.adapterPath);
+  const headAdapter = fileAt(root, headSha, probe.adapterPath);
+  invariant(baseAdapter !== null && headAdapter !== null, `Registered probe ${probe.id} adapter is unavailable at both revisions.`);
+  invariant(sha256(baseAdapter) === probe.adapterSha256 && sha256(headAdapter) === probe.adapterSha256, `Registered probe ${probe.id} adapter digest mismatch.`);
+  const adapterRoot = mkdtempSync(join(tmpdir(), "vector-contract-doc-probe-"));
+  try {
+    const adapterPath = join(adapterRoot, "adapter.mjs");
+    writeFileSync(adapterPath, baseAdapter, { mode: 0o600 });
+    const arguments_ = [
+      adapterPath,
+      "vector.contract-doc-probe.v1",
+      root,
+      mergeBaseSha,
+      headSha,
+      familyId,
+      probe.id,
+      disposition,
+    ];
+    const environment = {
+      PATH: process.env.PATH ?? "",
+      HOME: process.env.HOME ?? "",
+      TMPDIR: process.env.TMPDIR ?? tmpdir(),
+      LANG: "C",
+      LC_ALL: "C",
+    };
+    const execute = () => execFileSync("node", arguments_, {
+      cwd: adapterRoot,
+      encoding: "utf8",
+      env: environment,
+      timeout: 60_000,
+      maxBuffer: 8 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const first = execute();
+    const second = execute();
+    invariant(first === second, `Registered probe ${probe.id} produced nondeterministic evidence.`);
+    return parseStrictJson(first, `registered probe ${probe.id} result`);
+  } finally {
+    rmSync(adapterRoot, { recursive: true, force: true });
+  }
 }
 
 async function main() {
@@ -222,7 +306,8 @@ async function main() {
     basePolicy: basePolicy ?? headPolicy,
     headPolicy,
     policyBootstrap,
-    freshnessRunner: (argv) => runRegisteredFreshness(root, argv),
+    freshnessRunner: (group) => runRegisteredFreshness(root, { group, headSha: head }),
+    probeRunner: (request) => runRegisteredProbe(root, request),
   });
   writeOutput(report);
 }

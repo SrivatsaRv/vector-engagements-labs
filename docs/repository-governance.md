@@ -78,9 +78,23 @@ This mechanism binds paths, identities, registered evidence, and owned section
 changes. It does not certify that prose is technically adequate and cannot
 replace CODEOWNER or human review of a policy that modifies its own verifier.
 Generated-only exemptions invoke the policy's closed direct argv (`node` or the
-locked local `tsx` executable), never a declaration-provided or mutable package
-script alias. Refactor and no-semantic-change exemptions remain unavailable
-until a trusted adapter supplies the registered probe.
+job-provisioned Rust/WASM toolchain), never a declaration-provided or mutable
+package script alias. Stage 0.6 checks out the exact pull-request head and
+provisions each registered generated group's closed toolchain before executing
+the same validator used locally and on push. Freshness runs in a temporary
+archive of the exact head commit, with secrets and tool overrides absent, and
+rejects any mutation of tracked head content. Refactor and no-semantic-change
+declarations contain only versioned probe IDs. The merge-base policy—not the
+pull request—owns each adapter path, exact adapter digest, family, disposition,
+path coverage, and assertion inventory. The validator executes the immutable
+base adapter twice in a scrubbed, bounded child process and accepts only an
+exact, deterministic result whose base/head identity digests are equal. A probe
+introduced by a pull request cannot authorize that pull request, probes are
+unavailable during bootstrap, a head-added generated group cannot self-exempt,
+and declaration-authored commands, hashes, or
+prose never become exemption authority. `DOCS_ALREADY_CURRENT` separately
+binds every applicable owning and migration/changelog section to the same exact
+earlier ancestor and content digest.
 
 Documentation, project-skill, and governance-only changes run the classifier,
 policy suite, and final gate without rebuilding the application, Rust engine,

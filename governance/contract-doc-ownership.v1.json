@@ -68,6 +68,14 @@
           ]
         },
         {
+          "kind": "PREFIX",
+          "value": "scripts/contract-doc-probes/",
+          "facets": [
+            "delivery",
+            "verification"
+          ]
+        },
+        {
           "kind": "EXACT",
           "value": "scripts/context-slice.sh",
           "facets": [
@@ -363,6 +371,7 @@
       "generatedGroups": [
         {
           "id": "COMPILED_MODEL_PACK_FIXTURES",
+          "toolchainId": "NODE",
           "outputRules": [
             {
               "kind": "PREFIX",
@@ -391,7 +400,7 @@
             }
           ],
           "freshnessArgv": [
-            "node_modules/.bin/tsx",
+            "node",
             "scripts/generate-model-pack-fixture.ts",
             "--check"
           ]
@@ -429,6 +438,14 @@
           "heading": "## Persistence",
           "facets": [
             "storage"
+          ]
+        },
+        {
+          "sectionId": "MODEL_PACK_VERIFICATION",
+          "path": "docs/model-pack-contract.md",
+          "heading": "## Verification",
+          "facets": [
+            "verification"
           ]
         }
       ],
@@ -1027,6 +1044,7 @@
       "generatedGroups": [
         {
           "id": "PRODUCTION_ENGINE_WASM",
+          "toolchainId": "NODE_RUST_WASM32",
           "outputRules": [
             {
               "kind": "PREFIX",
@@ -2749,6 +2767,46 @@
       "migrationSections": []
     }
   ],
+  "nonSemanticProbes": [
+    {
+      "id": "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V1",
+      "familyId": "DELIVERY_CONTRACT_GOVERNANCE",
+      "disposition": "INTERNAL_REFACTOR",
+      "changedPathRules": [
+        {
+          "kind": "EXACT",
+          "value": "scripts/classify-ci-changes.mjs",
+          "facets": [
+            "delivery"
+          ]
+        }
+      ],
+      "adapterPath": "scripts/contract-doc-probes/classifier-decision-identity.v1.mjs",
+      "adapterSha256": "12d0c6047efe0f0365f713705f0a7a819bb919ba110042bbce3a85b4d34d1f62",
+      "assertionIds": [
+        "CI_CLASSIFIER_DECISION_MATRIX"
+      ]
+    },
+    {
+      "id": "DELIVERY_REQUIRED_GATE_INVARIANTS_V1",
+      "familyId": "DELIVERY_CONTRACT_GOVERNANCE",
+      "disposition": "NO_SEMANTIC_CHANGE",
+      "changedPathRules": [
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-required-gates.mjs",
+          "facets": [
+            "delivery"
+          ]
+        }
+      ],
+      "adapterPath": "scripts/contract-doc-probes/required-gate-invariants.v1.mjs",
+      "adapterSha256": "75b42611810c3b08038747d19c457fe6db451e47856f9a169c49213aa59501db",
+      "assertionIds": [
+        "REQUIRED_GATE_FAIL_CLOSED_MATRIX"
+      ]
+    }
+  ],
   "allowedMultiFamilyPaths": [
     "CHANGELOG.md",
     "components/ObjectPicker.tsx",
@@ -2886,5 +2944,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "e823c45f820d0114b6db24b87dc0d44445740cb51b2a1906892837739d0bdcf7"
+  "canonicalSha256": "1ad5e0fb36181c28e1ae64925376814dca370d4048415a0bff5462949e923207"
 }

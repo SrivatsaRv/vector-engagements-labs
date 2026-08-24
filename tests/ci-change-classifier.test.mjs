@@ -23,6 +23,8 @@ test("rename and copy classification preserves both endpoints without trimming l
 test("contract-documentation policy surfaces fail closed across every hosted gate", () => {
   for (const path of [
     "governance/contract-doc-ownership.v1.json",
+    "scripts/contract-doc-probes/classifier-decision-identity.v1.mjs",
+    "scripts/contract-doc-probes/required-gate-invariants.v1.mjs",
     "scripts/lib/contract-doc-impact.mjs",
     "scripts/verify-contract-doc-impact.mjs",
     "tests/contract-doc-impact.test.mjs",

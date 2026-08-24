@@ -15,10 +15,18 @@ import {
   validatePolicy,
   verifyContractDocImpact,
 } from "../scripts/lib/contract-doc-impact.mjs";
-import { declarationTemplate, resolvePolicyBootstrap, resolvePushDeclaration } from "../scripts/verify-contract-doc-impact.mjs";
+import { declarationTemplate, resolvePolicyBootstrap, resolvePushDeclaration, runRegisteredFreshness, runRegisteredProbe } from "../scripts/verify-contract-doc-impact.mjs";
 
 const sha = (character) => character.repeat(64);
 const commitSha = (character) => character.repeat(40);
+const fixtureProbeSource = `#!/usr/bin/env node
+const [protocol, root, baseSha, headSha, familyId, probeId, disposition] = process.argv.slice(2);
+if (protocol !== "vector.contract-doc-probe.v1" || !root) process.exit(2);
+const assertionId = probeId === "EXAMPLE_IDENTITY_V1" ? "PUBLIC_API_IDENTITY" : "BEHAVIOR_INVARIANT";
+const digest = "a".repeat(64);
+process.stdout.write(JSON.stringify({schemaVersion:"vector.contract-doc-probe-result.v1",probeId,familyId,disposition,baseSha,headSha,assertions:[{id:assertionId,status:"PASS",beforeSha256:digest,afterSha256:digest,evidenceSha256:digest}]}) + "\\n");
+`;
+const fixtureProbeSha256 = createHash("sha256").update(fixtureProbeSource).digest("hex");
 
 const policy = {
   schemaVersion: "vector.contract-doc-ownership.v1",
@@ -39,11 +47,15 @@ const policy = {
     {
       id: "EXAMPLE",
       workstream: "staff-architecture",
-      implementationRules: [{ kind: "EXACT", value: "lib/example.ts", facets: ["schema"] }],
+      implementationRules: [
+        { kind: "EXACT", value: "lib/example.ts", facets: ["schema"] },
+        { kind: "PREFIX", value: "scripts/contract-doc-probes/", facets: ["verification"] },
+      ],
       testRules: [{ kind: "PREFIX", value: "tests/example/", facets: ["verification"] }],
       generatedGroups: [
         {
           id: "EXAMPLE_GENERATED",
+          toolchainId: "NODE",
           outputRules: [{ kind: "PREFIX", value: "lib/generated/example/", facets: ["schema"] }],
           inputRules: [{ kind: "PREFIX", value: "fixtures/example/", facets: ["schema"] }],
           generatorRules: [{ kind: "EXACT", value: "scripts/generate-example.mjs", facets: ["schema"] }],
@@ -52,6 +64,26 @@ const policy = {
       ],
       owningSections: [{ sectionId: "EXAMPLE_CONTRACT", path: "docs/example.md", heading: "## Contract", facets: ["schema", "verification"] }],
       migrationSections: [],
+    },
+  ],
+  nonSemanticProbes: [
+    {
+      id: "EXAMPLE_IDENTITY_V1",
+      familyId: "EXAMPLE",
+      disposition: "INTERNAL_REFACTOR",
+      changedPathRules: [{ kind: "EXACT", value: "lib/example.ts", facets: ["schema"] }],
+      adapterPath: "scripts/contract-doc-probes/example.v1.mjs",
+      adapterSha256: fixtureProbeSha256,
+      assertionIds: ["PUBLIC_API_IDENTITY"],
+    },
+    {
+      id: "EXAMPLE_INVARIANT_V1",
+      familyId: "EXAMPLE",
+      disposition: "NO_SEMANTIC_CHANGE",
+      changedPathRules: [{ kind: "EXACT", value: "lib/example.ts", facets: ["schema"] }],
+      adapterPath: "scripts/contract-doc-probes/example.v1.mjs",
+      adapterSha256: fixtureProbeSha256,
+      assertionIds: ["BEHAVIOR_INVARIANT"],
     },
   ],
   allowedMultiFamilyPaths: [],
@@ -86,6 +118,20 @@ function declaration(overrides = {}) {
   };
 }
 
+function passingProbeResult({ probe, familyId, disposition, mergeBaseSha, headSha }, overrides = {}) {
+  const digest = sha("a");
+  return {
+    schemaVersion: "vector.contract-doc-probe-result.v1",
+    probeId: probe.id,
+    familyId,
+    disposition,
+    baseSha: mergeBaseSha,
+    headSha,
+    assertions: probe.assertionIds.map((id) => ({ id, status: "PASS", beforeSha256: digest, afterSha256: digest, evidenceSha256: digest })),
+    ...overrides,
+  };
+}
+
 function runGit(root, arguments_) {
   return execFileSync("git", arguments_, { cwd: root, encoding: "utf8" }).trim();
 }
@@ -101,12 +147,14 @@ async function fixtureRepository() {
   await mkdir(join(root, "lib", "generated", "example"), { recursive: true });
   await mkdir(join(root, "fixtures", "example"), { recursive: true });
   await mkdir(join(root, "scripts"), { recursive: true });
+  await mkdir(join(root, "scripts", "contract-doc-probes"), { recursive: true });
   await writeFile(join(root, "docs", "example.md"), "# Example\n\n## Contract\n\nVersion one.\n\n## Other\n\nStable.\n");
   await writeFile(join(root, "lib", "example.ts"), "export const value = 1;\n");
   await writeFile(join(root, "tests", "example", "example.test.mjs"), "// fixture\n");
   await writeFile(join(root, "lib", "generated", "example", "value.ts"), "export const generated = 1;\n");
   await writeFile(join(root, "fixtures", "example", "input.json"), "{}\n");
   await writeFile(join(root, "scripts", "generate-example.mjs"), "// fixture\n");
+  await writeFile(join(root, "scripts", "contract-doc-probes", "example.v1.mjs"), fixtureProbeSource);
   await writeFile(join(root, ".gitignore"), "node_modules\n");
   runGit(root, ["add", "."]);
   runGit(root, ["commit", "--quiet", "-m", "base"]);
@@ -141,8 +189,15 @@ test("the PR adapter requires exactly one bounded declaration block", () => {
   );
 });
 
-test("the generated declaration template is strict and structurally complete", () => {
-  assert.doesNotThrow(() => validateDeclaration(declarationTemplate(policy), policy));
+test("the generated declaration template is structurally complete but cannot be submitted unchanged", () => {
+  const generated = declarationTemplate(policy);
+  assert.equal(generated.schemaVersion, DECLARATION_SCHEMA);
+  assert.equal(generated.families.length, 1);
+  assert.throws(() => validateDeclaration(generated, policy), /placeholder|specific evidence/i);
+  assert.throws(
+    () => validateDeclaration(declaration({ evidence: [{ kind: "TEST", value: "x" }] }), policy),
+    /specific evidence|at least/i,
+  );
 });
 
 test("push verification requires exactly one revision-bound associated merged main pull request", async () => {
@@ -228,6 +283,7 @@ test("policy validation rejects unsupported glob rules and accidental overlaps",
     "lib/generated/example/value.ts",
     "fixtures/example/input.json",
     "scripts/generate-example.mjs",
+    "scripts/contract-doc-probes/example.v1.mjs",
     ".gitignore",
     "unowned-root-file.xyz",
   ] }), /unclassified/i);
@@ -240,6 +296,23 @@ test("policy validation resolves every registered document and exact heading", a
   assert.throws(() => validatePolicy(missing, { rootDirectory: fixture.root, trackedPaths: runGit(fixture.root, ["ls-files"]).split("\n") }), /regular file/i);
   const wrongHeading = { ...policy, families: [{ ...policy.families[0], owningSections: [{ ...section, heading: "## Missing" }] }] };
   assert.throws(() => validatePolicy(wrongHeading, { rootDirectory: fixture.root, trackedPaths: runGit(fixture.root, ["ls-files"]).split("\n") }), /exactly once/i);
+});
+
+test("every governed rule facet resolves to a registered owning section", () => {
+  const orphanFacetPolicy = {
+    ...policy,
+    families: [{
+      ...policy.families[0],
+      implementationRules: [
+        ...policy.families[0].implementationRules,
+        { kind: "EXACT", value: "lib/unmapped-semantic.ts", facets: ["validity"] },
+      ],
+    }],
+  };
+  assert.throws(
+    () => validatePolicy(orphanFacetPolicy, { trackedPaths: [] }),
+    /facet validity.*owning section/i,
+  );
 });
 
 test("semantic changes require the exact owning section to change materially", async (t) => {
@@ -390,7 +463,7 @@ test("the head policy cannot remove ownership that the base policy used", async 
       basePolicy: { ...policy, canonicalSha256: undefined },
       headPolicy: weakened,
     }),
-    /removes (?:contract ownership|family ownership|EXAMPLE\.implementationRules)/i,
+    /removes (?:contract ownership|family ownership|EXAMPLE\.implementationRules)|covers path outside family/i,
   );
 
   const sectionWeakened = {
@@ -407,7 +480,7 @@ test("the head policy cannot remove ownership that the base policy used", async 
       basePolicy: { ...policy, canonicalSha256: undefined },
       headPolicy: sectionWeakened,
     }),
-    /removes EXAMPLE\.owningSections/i,
+    /removes EXAMPLE\.owningSections|rule facet verification.*owning section/i,
   );
 });
 
@@ -445,7 +518,7 @@ test("TEST_ONLY is restricted to the registered test surface", async (t) => {
   assert.equal(verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: testOnly, policy: { ...policy, canonicalSha256: undefined } }).state, "VERIFIED");
 });
 
-test("generated-only requires unchanged inputs and generator plus the registered direct freshness argv", async (t) => {
+test("generated-only requires unchanged inputs and generator plus the policy-owned toolchain and freshness argv", async (t) => {
   const fixture = await fixtureRepository();
   t.after(() => rm(fixture.root, { recursive: true, force: true }));
   await writeFile(join(fixture.root, "lib", "generated", "example", "value.ts"), "export const generated = 2;\n");
@@ -453,18 +526,56 @@ test("generated-only requires unchanged inputs and generator plus the registered
   const generated = declaration({
     disposition: "GENERATED_ARTIFACT_ONLY",
     evidence: [{ kind: "TEST", value: "node scripts/generate-example.mjs --check" }],
-    exemptionEvidence: { kind: "GENERATED_ARTIFACT_ONLY", groupId: "EXAMPLE_GENERATED", freshnessArgv: ["node", "scripts/generate-example.mjs", "--check"] },
+    exemptionEvidence: { kind: "GENERATED_ARTIFACT_ONLY", groupId: "EXAMPLE_GENERATED" },
   });
-  const commands = [];
+  const groups = [];
   assert.equal(verifyContractDocImpact({
     rootDirectory: fixture.root,
     baseSha: fixture.baseSha,
     headSha,
     declaration: generated,
     policy: { ...policy, canonicalSha256: undefined },
-    freshnessRunner: (command) => commands.push(command),
+    freshnessRunner: (group) => groups.push(group),
   }).state, "VERIFIED");
-  assert.deepEqual(commands, [["node", "scripts/generate-example.mjs", "--check"]]);
+  assert.deepEqual(groups, [policy.families[0].generatedGroups[0]]);
+  assert.throws(() => verifyContractDocImpact({
+    rootDirectory: fixture.root,
+    baseSha: fixture.baseSha,
+    headSha,
+    declaration: generated,
+    policy: { ...policy, canonicalSha256: undefined },
+    policyBootstrap: true,
+    freshnessRunner: () => true,
+  }), /unavailable during policy bootstrap/i);
+  const headOnlyGroup = { ...policy.families[0].generatedGroups[0], id: "HEAD_ONLY_GENERATED" };
+  const headOnlyPolicy = {
+    ...policy,
+    canonicalSha256: undefined,
+    families: [{ ...policy.families[0], generatedGroups: [...policy.families[0].generatedGroups, headOnlyGroup] }],
+  };
+  const headOnlyDeclaration = structuredClone(generated);
+  headOnlyDeclaration.families[0].exemptionEvidence.groupId = headOnlyGroup.id;
+  assert.throws(() => verifyContractDocImpact({
+    rootDirectory: fixture.root,
+    baseSha: fixture.baseSha,
+    headSha,
+    declaration: headOnlyDeclaration,
+    basePolicy: { ...policy, canonicalSha256: undefined },
+    headPolicy: headOnlyPolicy,
+    freshnessRunner: () => true,
+  }), /not-yet-trusted generated group/i);
+  assert.throws(
+    () => validateDeclaration(declaration({
+      disposition: "GENERATED_ARTIFACT_ONLY",
+      evidence: [{ kind: "TEST", value: "node scripts/generate-example.mjs --check" }],
+      exemptionEvidence: {
+        kind: "GENERATED_ARTIFACT_ONLY",
+        groupId: "EXAMPLE_GENERATED",
+        freshnessArgv: ["node", "scripts/generate-example.mjs", "--check"],
+      },
+    }), policy),
+    /unknown key freshnessArgv/i,
+  );
 
   runGit(fixture.root, ["reset", "--hard", fixture.baseSha]);
   await writeFile(join(fixture.root, "lib", "generated", "example", "value.ts"), "export const generated = 3;\n");
@@ -483,18 +594,40 @@ test("generated-only requires unchanged inputs and generator plus the registered
   );
 });
 
+test("registered freshness uses an exact secret-free head archive and rejects tracked mutation", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  await writeFile(join(fixture.root, "scripts", "check-freshness-env.mjs"), "if (process.env.GITHUB_TOKEN) throw new Error('secret exposed');\n");
+  await writeFile(join(fixture.root, "scripts", "mutate-tracked.mjs"), "import { writeFileSync } from 'node:fs'; writeFileSync('lib/example.ts', 'mutated\\n');\n");
+  const headSha = await commit(fixture.root, "freshness execution fixtures");
+  const previousToken = process.env.GITHUB_TOKEN;
+  process.env.GITHUB_TOKEN = "must-not-reach-freshness";
+  t.after(() => {
+    if (previousToken === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = previousToken;
+  });
+  assert.doesNotThrow(() => runRegisteredFreshness(fixture.root, {
+    headSha,
+    group: { id: "ENVIRONMENT", toolchainId: "NODE", freshnessArgv: ["node", "scripts/check-freshness-env.mjs"] },
+  }));
+  assert.throws(() => runRegisteredFreshness(fixture.root, {
+    headSha,
+    group: { id: "MUTATOR", toolchainId: "NODE", freshnessArgv: ["node", "scripts/mutate-tracked.mjs"] },
+  }), /modified tracked head content/i);
+});
+
 test("refactor, no-semantic-change, and docs-current evidence are discriminated", () => {
   assert.doesNotThrow(() => validateDeclaration(declaration({
     disposition: "INTERNAL_REFACTOR",
-    exemptionEvidence: { kind: "INTERNAL_REFACTOR", identities: [{ name: "public-api", beforeSha256: sha("b"), afterSha256: sha("b") }] },
+    exemptionEvidence: { kind: "INTERNAL_REFACTOR", probeIds: ["EXAMPLE_IDENTITY_V1"] },
   }), policy));
   assert.throws(() => validateDeclaration(declaration({
     disposition: "INTERNAL_REFACTOR",
-    exemptionEvidence: { kind: "NO_SEMANTIC_CHANGE", invariants: [{ name: "behavior", evidence: "focused regression" }] },
+    exemptionEvidence: { kind: "NO_SEMANTIC_CHANGE", probeIds: ["EXAMPLE_INVARIANT_V1"] },
   }), policy), /must match disposition/i);
   assert.doesNotThrow(() => validateDeclaration(declaration({
     disposition: "DOCS_ALREADY_CURRENT",
-    exemptionEvidence: { kind: "DOCS_ALREADY_CURRENT", sections: [{ ...section, contentSha256: sha("c"), documentedAtCommit: commitSha("d") }] },
+    exemptionEvidence: { kind: "DOCS_ALREADY_CURRENT", sections: [{ ...section, contentSha256: sha("c"), documentedAtCommit: commitSha("d") }], migrationSections: [] },
   }), policy));
 });
 
@@ -506,11 +639,11 @@ test("refactor and no-semantic exemptions cannot trust declaration-only assertio
   const basePolicy = { ...policy, canonicalSha256: undefined };
   const refactor = declaration({
     disposition: "INTERNAL_REFACTOR",
-    exemptionEvidence: { kind: "INTERNAL_REFACTOR", identities: [{ name: "public-api", beforeSha256: sha("b"), afterSha256: sha("b") }] },
+    exemptionEvidence: { kind: "INTERNAL_REFACTOR", probeIds: ["EXAMPLE_IDENTITY_V1"] },
   });
   assert.throws(
     () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: refactor, policy: basePolicy }),
-    /unavailable without a registered identity probe/i,
+    /unavailable without the trusted probe runner/i,
   );
   assert.equal(verifyContractDocImpact({
     rootDirectory: fixture.root,
@@ -518,17 +651,120 @@ test("refactor and no-semantic exemptions cannot trust declaration-only assertio
     headSha,
     declaration: refactor,
     policy: basePolicy,
-    identityRunner: () => true,
+    probeRunner: passingProbeResult,
   }).state, "VERIFIED");
 
   const noSemantic = declaration({
     disposition: "NO_SEMANTIC_CHANGE",
-    exemptionEvidence: { kind: "NO_SEMANTIC_CHANGE", invariants: [{ name: "behavior", evidence: "registered invariant output is byte-identical" }] },
+    exemptionEvidence: { kind: "NO_SEMANTIC_CHANGE", probeIds: ["EXAMPLE_INVARIANT_V1"] },
   });
   assert.throws(
     () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: noSemantic, policy: basePolicy }),
-    /unavailable without a registered invariant probe/i,
+    /unavailable without the trusted probe runner/i,
   );
+  assert.equal(verifyContractDocImpact({
+    rootDirectory: fixture.root,
+    baseSha: fixture.baseSha,
+    headSha,
+    declaration: noSemantic,
+    policy: basePolicy,
+    probeRunner: passingProbeResult,
+  }).state, "VERIFIED");
+});
+
+test("non-semantic probes are base-policy authority with exact coverage and fail-closed results", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  await writeFile(join(fixture.root, "lib", "example.ts"), "export const value = 2;\n");
+  const headSha = await commit(fixture.root, "trusted probe contract");
+  const trustedPolicy = { ...policy, canonicalSha256: undefined };
+  const refactor = declaration({
+    disposition: "INTERNAL_REFACTOR",
+    exemptionEvidence: { kind: "INTERNAL_REFACTOR", probeIds: ["EXAMPLE_IDENTITY_V1"] },
+  });
+  const verify = (probeRunner, overrides = {}) => verifyContractDocImpact({
+    rootDirectory: fixture.root,
+    baseSha: fixture.baseSha,
+    headSha,
+    declaration: refactor,
+    basePolicy: trustedPolicy,
+    headPolicy: trustedPolicy,
+    probeRunner,
+    ...overrides,
+  });
+  assert.equal(verify(passingProbeResult).state, "VERIFIED");
+
+  for (const [name, mutate, pattern] of [
+    ["boolean", () => true, /result must be an object/i],
+    ["wrong revision", (request) => passingProbeResult(request, { headSha: fixture.baseSha }), /revision identity/i],
+    ["failed assertion", (request) => {
+      const result = passingProbeResult(request);
+      result.assertions[0].status = "FAIL";
+      return result;
+    }, /did not pass/i],
+    ["changed identity", (request) => {
+      const result = passingProbeResult(request);
+      result.assertions[0].afterSha256 = sha("b");
+      return result;
+    }, /changed across revisions/i],
+    ["extra assertion", (request) => {
+      const result = passingProbeResult(request);
+      result.assertions.push({ ...result.assertions[0], id: "UNREGISTERED" });
+      return result;
+    }, /assertion inventory/i],
+  ]) {
+    assert.throws(() => verify(mutate), pattern, name);
+  }
+
+  const wrongProbe = structuredClone(refactor);
+  wrongProbe.families[0].exemptionEvidence.probeIds = ["EXAMPLE_INVARIANT_V1"];
+  assert.throws(() => verifyContractDocImpact({
+    rootDirectory: fixture.root,
+    baseSha: fixture.baseSha,
+    headSha,
+    declaration: wrongProbe,
+    policy: trustedPolicy,
+    probeRunner: passingProbeResult,
+  }), /not authorized for disposition/i);
+
+  const addedProbe = {
+    ...policy.nonSemanticProbes[0],
+    id: "HEAD_ONLY_IDENTITY_V2",
+    assertionIds: ["HEAD_ONLY_ASSERTION"],
+  };
+  const headPolicy = { ...trustedPolicy, nonSemanticProbes: [...trustedPolicy.nonSemanticProbes, addedProbe] };
+  const headOnly = structuredClone(refactor);
+  headOnly.families[0].exemptionEvidence.probeIds = [addedProbe.id];
+  assert.throws(() => verifyContractDocImpact({
+    rootDirectory: fixture.root,
+    baseSha: fixture.baseSha,
+    headSha,
+    declaration: headOnly,
+    basePolicy: trustedPolicy,
+    headPolicy,
+    probeRunner: passingProbeResult,
+  }), /not-yet-trusted/i);
+
+  assert.throws(() => verify(passingProbeResult, { policyBootstrap: true }), /unavailable during policy bootstrap/i);
+});
+
+test("the production probe adapter is digest-bound, deterministic, and revision-bound", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  await writeFile(join(fixture.root, "lib", "example.ts"), "export const value = 2;\n");
+  const headSha = await commit(fixture.root, "execute trusted probe");
+  const probe = policy.nonSemanticProbes[0];
+  const request = {
+    probe,
+    familyId: probe.familyId,
+    disposition: probe.disposition,
+    mergeBaseSha: fixture.baseSha,
+    headSha,
+  };
+  assert.deepEqual(runRegisteredProbe(fixture.root, request), passingProbeResult(request));
+
+  const forged = { ...probe, adapterSha256: sha("f") };
+  assert.throws(() => runRegisteredProbe(fixture.root, { ...request, probe: forged }), /adapter digest mismatch/i);
 });
 
 test("DOCS_ALREADY_CURRENT requires an exact earlier ancestor and section identity", async (t) => {
@@ -545,6 +781,7 @@ test("DOCS_ALREADY_CURRENT requires an exact earlier ancestor and section identi
     exemptionEvidence: {
       kind: "DOCS_ALREADY_CURRENT",
       sections: [{ ...section, contentSha256, documentedAtCommit }],
+      migrationSections: [],
     },
   });
   assert.equal(verifyContractDocImpact({ rootDirectory: fixture.root, baseSha, headSha, declaration: docsCurrent, policy }).state, "VERIFIED");
@@ -555,12 +792,62 @@ test("DOCS_ALREADY_CURRENT requires an exact earlier ancestor and section identi
       headSha,
       declaration: declaration({
         disposition: "DOCS_ALREADY_CURRENT",
-        exemptionEvidence: { kind: "DOCS_ALREADY_CURRENT", sections: [{ ...section, contentSha256, documentedAtCommit: baseSha }] },
+        exemptionEvidence: { kind: "DOCS_ALREADY_CURRENT", sections: [{ ...section, contentSha256, documentedAtCommit: baseSha }], migrationSections: [] },
       }),
       policy,
     }),
     /not an earlier ancestor/i,
   );
+});
+
+test("DOCS_ALREADY_CURRENT cannot bypass an applicable migration or changelog identity", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  await writeFile(join(fixture.root, "CHANGELOG.md"), "# Changelog\n\n## Unreleased\n\nSchema contract already documented.\n");
+  const documentedAtCommit = await commit(fixture.root, "document schema and migration");
+  await writeFile(join(fixture.root, ".gitignore"), "node_modules\noutputs\n");
+  const baseSha = await commit(fixture.root, "later integration base");
+  await writeFile(join(fixture.root, "lib", "example.ts"), "export const value = 2;\n");
+  const headSha = await commit(fixture.root, "implementation catches up with documentation");
+  const migrationSection = { sectionId: "EXAMPLE_CHANGELOG", path: "CHANGELOG.md", heading: "## Unreleased", facets: ["schema"] };
+  const migrationPolicy = {
+    ...policy,
+    families: [{ ...policy.families[0], migrationSections: [migrationSection] }],
+  };
+  const owningContentSha256 = createHash("sha256").update("## Contract\n\nVersion one.").digest("hex");
+  const migrationContentSha256 = createHash("sha256").update("## Unreleased\n\nSchema contract already documented.").digest("hex");
+  const bypass = declaration({
+    disposition: "DOCS_ALREADY_CURRENT",
+    migration: {
+      state: "NOT_APPLICABLE",
+      documents: [],
+      rationale: "The declaration incorrectly attempts to omit an applicable migration record.",
+    },
+    exemptionEvidence: {
+      kind: "DOCS_ALREADY_CURRENT",
+      sections: [{ ...section, contentSha256: owningContentSha256, documentedAtCommit }],
+      migrationSections: [],
+    },
+  });
+  assert.throws(
+    () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha, headSha, declaration: bypass, policy: migrationPolicy }),
+    /migration.*DOCS_ALREADY_CURRENT|migration.*inventory/i,
+  );
+
+  const complete = declaration({
+    disposition: "DOCS_ALREADY_CURRENT",
+    migration: {
+      state: "DOCS_ALREADY_CURRENT",
+      documents: [migrationSection],
+      rationale: "The earlier Unreleased section already records the exact schema migration obligation.",
+    },
+    exemptionEvidence: {
+      kind: "DOCS_ALREADY_CURRENT",
+      sections: [{ ...section, contentSha256: owningContentSha256, documentedAtCommit }],
+      migrationSections: [{ ...migrationSection, contentSha256: migrationContentSha256, documentedAtCommit }],
+    },
+  });
+  assert.equal(verifyContractDocImpact({ rootDirectory: fixture.root, baseSha, headSha, declaration: complete, policy: migrationPolicy }).state, "VERIFIED");
 });
 
 test("path normalization and symlink escape fail closed", async (t) => {
