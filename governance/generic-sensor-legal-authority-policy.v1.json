@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "vector.generic-sensor-legal-authority-policy.v1",
+  "policyId": "generic-sensor-legal-authority-policy-v1",
+  "subjectDecisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+  "status": "NO_APPROVAL_AUTHORITIES_REGISTERED",
+  "evidenceRoot": "governance/generic-sensor-legal-decision-evidence",
+  "trustRoots": [],
+  "reviewerGrants": [],
+  "changeAuthority": "SEPARATE_HUMAN_REVIEWED_COMMIT_AND_PINNED_DIGEST_UPDATE_REQUIRED"
+}

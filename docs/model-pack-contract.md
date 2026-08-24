@@ -414,8 +414,10 @@ not satisfy a `vector.sensor-evidence-admission.v1` field.
 Reference execution remains blocked while its human decision is
 `PENDING_REVIEW`; code copying or adaptation requires a separate approved
 adaptation decision. Approval additionally requires the separately governed
-reviewer allowlist and an externally rooted detached attestation over the exact
-decision/evidence record. Even later approval would authorize only its recorded
+digest-pinned reviewer/key policy, an externally rooted detached attestation,
+and exact resolution of the signed evidence bytes. The required scope is fixed
+per decision field and cannot be substituted. Even later approval would
+authorize only its recorded
 jurisdiction, scope, and conditions. It would not promote a source into a model
 pack or establish target, platform, radar, or installation applicability.
 Production pack generation and admission reject any import of the Stage-0

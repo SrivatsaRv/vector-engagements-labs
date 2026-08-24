@@ -262,18 +262,18 @@ const authorityRegistry = {
   schemaVersion: "vector.generic-sensor-verification-legal-authority-registry.v1",
   registryId: "generic-sensor-source-legal-authority-registry-v1",
   subjectDecisionArtifactId: decisions.decisionArtifactId,
+  authorityPolicyId: "generic-sensor-legal-authority-policy-v1",
   externalTrustRootRequired: true,
-  status: "NO_AUTHORIZED_REVIEWERS_OR_DECISION_RECORDS_REGISTERED",
-  authorizedReviewers: [],
+  status: "NO_SIGNED_DECISION_RECORDS_REGISTERED",
   decisionRecords: [],
-  blockingReason: "AUTHORIZED_HUMAN_ALLOWLIST_AND_EXTERNALLY_ROOTED_DETACHED_ATTESTATION_REQUIRED",
+  blockingReason: "PINNED_EXTERNAL_AUTHORITY_POLICY_SIGNED_RECORD_AND_RESOLVABLE_EVIDENCE_REQUIRED",
 };
 output("legal-authority-registry.v1.json", authorityRegistry);
 
 const inventoryArtifact = artifact("archive-inventory.v1.json", "COMPLETE_ARCHIVE_INVENTORY");
 const visualArtifact = artifact("visual-inspection.v1.json", "PRIMARY_VISUAL_INSPECTION_RECORD", "NON_AUTHORITATIVE_DISCOVERY_AID");
 const legalArtifact = artifact("legal-decisions.v1.json", "LEGAL_AND_EXPORT_DECISIONS", "REFERENCE_ONLY");
-const authorityArtifact = artifact("legal-authority-registry.v1.json", "EXTERNAL_LEGAL_AUTHORITY_REGISTRY", "REFERENCE_ONLY");
+const authorityArtifact = artifact("legal-authority-registry.v1.json", "SIGNED_LEGAL_DECISION_RECORD_REGISTRY", "REFERENCE_ONLY");
 const prefix = "dstl-Stone-Soup-d9e6fb1/";
 const stoneSource = {
   id: "dstl-stone-soup-v1.9.1",
@@ -329,7 +329,7 @@ const isolationEvidence = {
   measuredOn: "2026-08-24",
   frozenArtifactCount: frozenArtifacts.size,
   frozenArtifactBytes: [...frozenArtifacts.values()].reduce((sum, candidate) => sum + candidate.sizeBytes, 0),
-  productionRootsScannedByVerifier: ["app", "components", "db", "dist", "engine-rust", "fixtures/model-packs", "fixtures/vector-record", "lib", "public", "worker"],
+  productionRootsScannedByVerifier: [".next", ".output", "app", "build", "components", "db", "dist", "engine-rust", "fixtures/model-packs", "fixtures/vector-record", "lib", "out", "public", "worker"],
   expectedProductionExposures: 0,
   productionBuildImportPolicy: "FORBIDDEN",
   regressionCommand: "node --test tests/generic-sensor-source-bundle.test.mjs",

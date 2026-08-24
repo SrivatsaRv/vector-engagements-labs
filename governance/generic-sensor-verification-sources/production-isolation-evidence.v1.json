@@ -3,9 +3,12 @@
   "subjectManifestId": "generic-sensor-source-freeze-v1",
   "measuredOn": "2026-08-24",
   "frozenArtifactCount": 77,
-  "frozenArtifactBytes": 62376262,
+  "frozenArtifactBytes": 62376284,
   "productionRootsScannedByVerifier": [
+    ".next",
+    ".output",
     "app",
+    "build",
     "components",
     "db",
     "dist",
@@ -13,6 +16,7 @@
     "fixtures/model-packs",
     "fixtures/vector-record",
     "lib",
+    "out",
     "public",
     "worker"
   ],

@@ -14,9 +14,13 @@ All redistribution, reference-execution, and adaptation decisions are
 no authorized reviewer or decision record. An approval requires an allowlisted
 human reviewer, canonical calendar date, closed jurisdiction and scope,
 conditions, evidence digest, and a detached Ed25519 decision attestation
-verified by a trust root supplied outside this bundle. Self-declared reviewer
-kinds, invented records or evidence, agent assertions, and repository-local
-keys cannot create authority.
+verified through the digest-pinned policy at
+`../generic-sensor-legal-authority-policy.v1.json`. The policy is outside this
+bundle and currently registers no approval authority. Request-supplied roots or
+allowlists are ignored. The signed evidence must resolve to exact regular-file
+bytes under the external governed evidence root. Self-declared reviewer kinds,
+invented or unresolved records/evidence, agent assertions, and bundle-local keys
+cannot create authority.
 
 In particular, this bundle does not authorize executing or importing Stone
 Soup, adapting its code, generating reference vectors, transcribing equations
@@ -31,8 +35,8 @@ identity; it exists only in a rejection regression.
 - `legal-decisions.v1.json` preserves the three independent legal decision
   dimensions for every source.
 - `legal-authority-registry.v1.json` is the fail-closed, currently empty
-  reviewer/decision-record registry; trusted public keys are external inputs and
-  are never self-declared by this bundle.
+  signed-decision-record registry. It is bound to the external pinned authority
+  policy and cannot declare reviewers, grants, trusted keys, or evidence bytes.
 - `archive-inventory.v1.json` declares every member of the frozen Stone Soup
   archive before bounded extraction.
 - `visual-inspection.v1.json` records the primary full-page visual inspection
