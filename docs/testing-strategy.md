@@ -90,6 +90,13 @@ commands preserve
 the production engine's separate unchanged 500,000-byte gate; they do not make
 the verifier available to the engine, backend, or Worker.
 
+`rust-toolchain.toml` and every hosted Rust setup pin Rust 1.97.1. Private 6DOF
+raw bytes are rebuilt through one immutable Linux/amd64 Rust image rather than
+the caller's host compiler; the embedded builder identity, source digest, byte
+digest, size, and ABI exports must all match. This closes floating-stable and
+cross-host codegen drift without normalizing code/data sections or admitting a
+second platform-specific artifact.
+
 GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
 automated gate from changed paths. Repository-policy tests always run, and an
 unknown path fails closed through every CI job. Documentation and agent-harness

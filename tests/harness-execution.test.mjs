@@ -134,6 +134,30 @@ test("hosted Rust stages own the complete private 6DOF verifier gate", async () 
   );
 });
 
+test("Rust and private 6DOF WASM builds use one exact cross-host toolchain", async () => {
+  const toolchain = await readFile("rust-toolchain.toml", "utf8");
+  assert.match(toolchain, /^channel = "1\.97\.1"$/m);
+  assert.match(toolchain, /^profile = "minimal"$/m);
+  assert.match(toolchain, /^components = \["clippy", "rustfmt"\]$/m);
+  assert.match(toolchain, /^targets = \["wasm32-unknown-unknown"\]$/m);
+
+  for (const workflowPath of [
+    ".github/workflows/ci.yml",
+    ".github/workflows/deploy-cloudflare.yml",
+    ".github/workflows/release.yml",
+  ]) {
+    const workflow = await readFile(workflowPath, "utf8");
+    assert.doesNotMatch(workflow, /toolchain:\s*stable/);
+    assert.match(workflow, /toolchain:\s*1\.97\.1/);
+  }
+
+  const builder = await readFile("scripts/build-sixdof-foundation-verifier.mjs", "utf8");
+  assert.match(builder, /rust:1\.97\.1-bookworm@sha256:408fe88047cef61a2087653b0c5255fa51c0f2d6d94ddedd7a2562a9b91a46f6/);
+  assert.match(builder, /linux\/amd64/);
+  assert.match(builder, /freshSha256/);
+  assert.match(builder, /committedSha256/);
+});
+
 test("private 6DOF npm aliases resolve to the intended crate and verification commands", async () => {
   const manifest = JSON.parse(await readFile("package.json", "utf8"));
   assert.deepEqual(

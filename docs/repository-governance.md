@@ -171,11 +171,13 @@ audits its independent lockfile, and the classifier selects both owners for
 private-crate manifest changes. The scheduled `codeql.yml`
 workflow retains weekly security analysis without creating a second PR run.
 
-Rust sources carry a deterministic source digest; the embedded module carries
-its own byte digest and required-export check; CI also compiles the module
-afresh on its runner. This avoids incorrectly requiring different compiler
-platforms to emit byte-identical WASM. Actions are pinned to immutable commit
-SHAs.
+Rust sources carry a deterministic source digest; embedded modules carry their
+own byte digest and required-export checks. Native Rust commands and hosted
+setup pin Rust 1.97.1 through `rust-toolchain.toml`. The private 6DOF artifact is
+compiled afresh through an immutable Linux/amd64 Rust 1.97.1 image, so every
+host verifies one canonical raw module instead of accepting host-specific
+code/data output. Compiler, image, source, size, and byte drift fail closed.
+Actions are pinned to immutable commit SHAs.
 
 Pull requests receive CodeQL and dependency review inside the causal `ci.yml`
 pipeline. `codeql.yml` is reserved for the weekly scheduled scan and explicit

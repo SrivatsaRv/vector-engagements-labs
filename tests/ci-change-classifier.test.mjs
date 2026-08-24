@@ -61,6 +61,7 @@ test("Rust implementation changes receive parity tests without dependency audit"
 test("every private 6DOF owning path selects its Rust and dependency owners", () => {
   const webAndRust = ["policy", "quality", "security_js", "web_tests", "rust_tests"];
   const cases = [
+    ["rust-toolchain.toml", ["policy", "web_tests", "rust_tests", "rust_audit"]],
     ["verification-rust/sixdof-foundation/src/model.rs", ["policy", "web_tests", "rust_tests"]],
     ["verification-rust/sixdof-foundation/Cargo.toml", ["policy", "web_tests", "rust_tests", "rust_audit"]],
     ["verification-rust/sixdof-foundation/Cargo.lock", ["policy", "web_tests", "rust_tests", "rust_audit"]],

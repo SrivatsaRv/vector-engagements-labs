@@ -58,6 +58,7 @@ const JAVASCRIPT_SECURITY = [
 ];
 
 const RUST_CONTRACT = [
+  /^rust-toolchain\.toml$/,
   /^engine-rust\//,
   /^verification-rust\/sixdof-foundation\//,
   /^fixtures\/public-reference\//,
@@ -72,6 +73,7 @@ const RUST_CONTRACT = [
 ];
 
 const RUST_MANIFEST = [
+  /^rust-toolchain\.toml$/,
   /^engine-rust\/(?:Cargo\.toml|Cargo\.lock)$/,
   /^verification-rust\/sixdof-foundation\/(?:Cargo\.toml|Cargo\.lock)$/,
 ];

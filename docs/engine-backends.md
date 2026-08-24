@@ -48,9 +48,14 @@ parity checks. See [`deployment-capabilities.md`](deployment-capabilities.md).
 
 ## Build and verification
 
-Rebuilding the artifact requires Rust stable, Cargo on `PATH`, and the
-`wasm32-unknown-unknown` target. The production application consumes the
-committed, integrity-checked artifact and does not install a compiler at runtime.
+Native Rust checks use the exact repository toolchain in `rust-toolchain.toml`:
+Rust 1.97.1 with rustfmt, Clippy, and `wasm32-unknown-unknown`. The private 6DOF
+module has the stronger raw-byte requirement: its build command runs the pinned
+Linux/amd64 Rust 1.97.1 container image by immutable platform-manifest digest.
+That canonical host is necessary because Rust/LLVM code and data layout changed
+both across 1.97.1/1.98.0 and across macOS/Linux for this crate. The production
+application consumes committed, integrity-checked artifacts and installs no
+compiler at runtime.
 
 - `npm run engine:rust:build` compiles release WASM and regenerates the embedded artifact.
 - `npm run engine:rust:verify` recompiles and rejects a stale committed artifact.
@@ -121,8 +126,9 @@ Both crates use size-first `opt-level = "z"` and have independent immutable
 artifacts. The production module retains its unchanged 500,000-byte limit and
 is currently 493,585 bytes with SHA-256
 `e1105047cd06edd50f13d8b212e1292bda747468ee7421a977112fadeef65b8c`.
-The private verifier is 161,590 bytes with SHA-256
-`b06b28cdb364477dbc9413e644bca2f0b2fa894e1436a28355269ae2f4321f37`.
+The private verifier is 161,542 bytes with SHA-256
+`d15440083d393fd692254113c06432c62ec81fcaed1003d44d22362b35ccad8d`.
 Build verification rejects a stale digest, a missing required private symbol,
 any production symbol in the verifier, any verifier symbol in production, or
-either artifact crossing its 500,000-byte limit.
+either artifact crossing its 500,000-byte limit. A mismatch reports both fresh
+and committed byte identities without accepting a host-specific alternative.

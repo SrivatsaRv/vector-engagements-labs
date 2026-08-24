@@ -132,11 +132,15 @@ falsification cases:
 
 The production artifact remains independently generated at 493,585 bytes,
 below its unchanged 500,000-byte gate, with no verifier export. The standalone
-verification artifact is 161,590 bytes and has its own 500,000-byte gate. Its
+verification artifact is 161,542 bytes and has its own 500,000-byte gate. Its
 SHA-256 is
-`b06b28cdb364477dbc9413e644bca2f0b2fa894e1436a28355269ae2f4321f37`;
+`d15440083d393fd692254113c06432c62ec81fcaed1003d44d22362b35ccad8d`;
 its exact Rust source/lock identity is
 `824200fca11e562779c1f6b871e302baa421ba2d6b4653684b3974e53c2aa637`.
+The raw module is generated only by the immutable Linux/amd64 Rust 1.97.1
+builder declared in `scripts/build-sixdof-foundation-verifier.mjs`; native Rust
+commands use the matching exact repository toolchain. Rust 1.98.0 and native
+macOS outputs are diagnostic non-candidates, not alternate accepted hashes.
 
 `npm run sixdof-foundation:performance` runs a 10,000-tick TypeScript and
 Node-hosted Rust/WASM benchmark. Its deliberately broad regression thresholds
@@ -147,7 +151,8 @@ host, architecture, runtime, workload, and measured time.
 `make sixdof-foundation-local` first rebuild-verifies the private artifact, then
 runs the numerical suite and benchmark. `make ci-local` additionally runs its
 Rustfmt, strict Clippy, native Rust, and rustdoc gates independently of the
-production engine crate.
+production engine crate. Rebuild mismatches print the source, canonical-builder,
+fresh-byte, and committed-byte identities while remaining fail-closed.
 
 ## Explicitly unmet #134 scope
 

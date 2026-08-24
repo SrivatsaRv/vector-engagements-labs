@@ -18,6 +18,15 @@ import {
 const ZERO = { x: 0, y: 0, z: 0 };
 
 test("the isolated 6DOF verification artifact has a stable bounded identity", () => {
+  assert.equal(
+    SIX_DOF_FOUNDATION_VERIFIER_ARTIFACT.builder,
+    "linux/amd64:docker.io/library/rust:1.97.1-bookworm@sha256:408fe88047cef61a2087653b0c5255fa51c0f2d6d94ddedd7a2562a9b91a46f6",
+  );
+  assert.equal(
+    SIX_DOF_FOUNDATION_VERIFIER_ARTIFACT.sha256,
+    "d15440083d393fd692254113c06432c62ec81fcaed1003d44d22362b35ccad8d",
+  );
+  assert.equal(SIX_DOF_FOUNDATION_VERIFIER_ARTIFACT.bytes, 161_542);
   assert.match(SIX_DOF_FOUNDATION_VERIFIER_ARTIFACT.sha256, /^[a-f0-9]{64}$/);
   assert.ok(SIX_DOF_FOUNDATION_VERIFIER_ARTIFACT.bytes > 100_000);
   assert.ok(SIX_DOF_FOUNDATION_VERIFIER_ARTIFACT.bytes < 500_000);
