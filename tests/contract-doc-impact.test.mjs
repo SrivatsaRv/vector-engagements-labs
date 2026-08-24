@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 
 import {
@@ -165,6 +165,18 @@ async function commit(root, message) {
   runGit(root, ["add", "."]);
   runGit(root, ["commit", "--quiet", "-m", message]);
   return runGit(root, ["rev-parse", "HEAD"]);
+}
+
+async function governanceProbeFixture(files) {
+  const root = await mkdtemp(join(tmpdir(), "vector-doc-probe-adversary-"));
+  runGit(root, ["init", "--quiet"]);
+  runGit(root, ["config", "user.email", "tests@example.invalid"]);
+  runGit(root, ["config", "user.name", "VECTOR tests"]);
+  for (const [path, content] of Object.entries(files)) {
+    await mkdir(dirname(join(root, path)), { recursive: true });
+    await writeFile(join(root, path), content);
+  }
+  return root;
 }
 
 test("strict JSON rejects duplicate and unknown keys", () => {
@@ -767,6 +779,61 @@ test("the production probe adapter is digest-bound, deterministic, and revision-
   assert.throws(() => runRegisteredProbe(fixture.root, { ...request, probe: forged }), /adapter digest mismatch/i);
 });
 
+test("the classifier identity probe detects a decision outside the former canned matrix", async (t) => {
+  const classifierSource = await readFile(resolve("scripts/classify-ci-changes.mjs"), "utf8");
+  const helperSource = await readFile(resolve("scripts/lib/contract-doc-impact.mjs"), "utf8");
+  const root = await governanceProbeFixture({
+    "scripts/classify-ci-changes.mjs": classifierSource,
+    "scripts/lib/contract-doc-impact.mjs": helperSource,
+    "custom/unregistered-boundary.ts": "export const boundary = true;\n",
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const baseSha = await commit(root, "classifier base");
+  await writeFile(
+    join(root, "scripts", "classify-ci-changes.mjs"),
+    classifierSource.replace("const POLICY_ONLY = [", "const POLICY_ONLY = [\n  /^custom\\//,"),
+  );
+  const headSha = await commit(root, "silently change an unenumerated classifier boundary");
+  const output = execFileSync("node", [
+    resolve("scripts/contract-doc-probes/classifier-decision-identity.v1.mjs"),
+    "vector.contract-doc-probe.v1",
+    root,
+    baseSha,
+    headSha,
+    "DELIVERY_CONTRACT_GOVERNANCE",
+    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V1",
+    "INTERNAL_REFACTOR",
+  ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+  const result = JSON.parse(output);
+  assert.equal(result.assertions[0].status, "FAIL");
+  assert.notEqual(result.assertions[0].beforeSha256, result.assertions[0].afterSha256);
+});
+
+test("the required-gate invariant probe detects relaxed review-kind admission", async (t) => {
+  const gateSource = await readFile(resolve("scripts/verify-required-gates.mjs"), "utf8");
+  const root = await governanceProbeFixture({ "scripts/verify-required-gates.mjs": gateSource });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const baseSha = await commit(root, "required gate base");
+  await writeFile(
+    join(root, "scripts", "verify-required-gates.mjs"),
+    gateSource.replace('["slice", "completion-review", "not-applicable"]', '["slice", "completion-review", "not-applicable", "partial"]'),
+  );
+  const headSha = await commit(root, "silently admit a partial review kind");
+  const output = execFileSync("node", [
+    resolve("scripts/contract-doc-probes/required-gate-invariants.v1.mjs"),
+    "vector.contract-doc-probe.v1",
+    root,
+    baseSha,
+    headSha,
+    "DELIVERY_CONTRACT_GOVERNANCE",
+    "DELIVERY_REQUIRED_GATE_INVARIANTS_V1",
+    "NO_SEMANTIC_CHANGE",
+  ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+  const result = JSON.parse(output);
+  assert.equal(result.assertions[0].status, "FAIL");
+  assert.notEqual(result.assertions[0].beforeSha256, result.assertions[0].afterSha256);
+});
+
 test("DOCS_ALREADY_CURRENT requires an exact earlier ancestor and section identity", async (t) => {
   const fixture = await fixtureRepository();
   t.after(() => rm(fixture.root, { recursive: true, force: true }));
@@ -848,6 +915,27 @@ test("DOCS_ALREADY_CURRENT cannot bypass an applicable migration or changelog id
     },
   });
   assert.equal(verifyContractDocImpact({ rootDirectory: fixture.root, baseSha, headSha, declaration: complete, policy: migrationPolicy }).state, "VERIFIED");
+
+  await writeFile(join(fixture.root, ".gitignore"), "node_modules\noutputs\nprobe-cache\n");
+  const differentEarlierCommit = await commit(fixture.root, "second historical snapshot with unchanged contract sections");
+  await writeFile(join(fixture.root, ".gitignore"), "node_modules\noutputs\nprobe-cache\ntemporary\n");
+  const laterBaseSha = await commit(fixture.root, "later base after second historical snapshot");
+  await writeFile(join(fixture.root, "lib", "example.ts"), "export const value = 3;\n");
+  const laterHeadSha = await commit(fixture.root, "implementation after mixed historical snapshots");
+  const mixedHistoricalCommits = {
+    ...complete,
+    families: [{
+      ...complete.families[0],
+      exemptionEvidence: {
+        ...complete.families[0].exemptionEvidence,
+        migrationSections: [{ ...migrationSection, contentSha256: migrationContentSha256, documentedAtCommit: differentEarlierCommit }],
+      },
+    }],
+  };
+  assert.throws(
+    () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: laterBaseSha, headSha: laterHeadSha, declaration: mixedHistoricalCommits, policy: migrationPolicy }),
+    /same earlier ancestor/i,
+  );
 });
 
 test("path normalization and symlink escape fail closed", async (t) => {

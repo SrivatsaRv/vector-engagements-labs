@@ -2782,7 +2782,7 @@
         }
       ],
       "adapterPath": "scripts/contract-doc-probes/classifier-decision-identity.v1.mjs",
-      "adapterSha256": "12d0c6047efe0f0365f713705f0a7a819bb919ba110042bbce3a85b4d34d1f62",
+      "adapterSha256": "9af948d3f18ac09d6a5e32811121c398b57dbe83b73da368ffa89b56da81cb2b",
       "assertionIds": [
         "CI_CLASSIFIER_DECISION_MATRIX"
       ]
@@ -2801,7 +2801,7 @@
         }
       ],
       "adapterPath": "scripts/contract-doc-probes/required-gate-invariants.v1.mjs",
-      "adapterSha256": "75b42611810c3b08038747d19c457fe6db451e47856f9a169c49213aa59501db",
+      "adapterSha256": "f43b41b31ababcd18323650e357ebba3a51ac50c4368fe790664de02b758c814",
       "assertionIds": [
         "REQUIRED_GATE_FAIL_CLOSED_MATRIX"
       ]
@@ -2944,5 +2944,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "1ad5e0fb36181c28e1ae64925376814dca370d4048415a0bff5462949e923207"
+  "canonicalSha256": "03c4df072feb4ba27d41584b1bb6eef7009ebb71c67dcee9220a308563ec6e7a"
 }

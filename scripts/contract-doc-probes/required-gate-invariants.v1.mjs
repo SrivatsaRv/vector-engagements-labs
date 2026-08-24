@@ -48,16 +48,56 @@ function successfulEnvironment(requiredGates) {
 
 async function matrix(modulePath, revision) {
   const implementation = await import(`${pathToFileURL(modulePath).href}?revision=${revision}`);
-  const cases = [
-    { id: "SUCCESS", mutate: () => {}, expected: true },
-    { id: "UNSELECTED_SKIPPED", mutate: (env) => { env.CONTAINER_SELECTED = "false"; env.CONTAINER_RESULT = "skipped"; }, expected: true },
-    { id: "CLASSIFIER_CANCELLED", mutate: (env) => { env.CLASSIFY_RESULT = "cancelled"; }, expected: false },
-    { id: "DOCS_CANCELLED", mutate: (env) => { env.CONTRACT_DOCS_RESULT = "cancelled"; }, expected: false },
-    { id: "DOCS_BYPASSED", mutate: (env) => { env.CONTRACT_DOC_IMPACT_STATE = "BYPASSED"; }, expected: false },
-    { id: "SELECTED_FAILURE", mutate: (env) => { env.WEB_TESTS_RESULT = "failure"; }, expected: false },
-    { id: "MISSING_SELECTION", mutate: (env) => { delete env.RUST_TESTS_SELECTED; }, expected: false },
-    { id: "UNSELECTED_RAN", mutate: (env) => { env.QUALITY_SELECTED = "false"; }, expected: false },
-  ];
+  const cases = [];
+  const add = (id, mutate, expected) => cases.push({ id, mutate, expected });
+  const invalidValues = [undefined, "", "failure", "cancelled", "skipped", "timed_out", "action_required", "arbitrary"];
+  for (const state of ["VERIFIED", "NO_RELEVANT_CHANGES"]) {
+    add(`VALID_DOC_STATE_${state}`, (env) => { env.CONTRACT_DOC_IMPACT_STATE = state; }, true);
+  }
+  for (const kind of ["slice", "completion-review", "not-applicable"]) {
+    add(`VALID_REVIEW_KIND_${kind}`, (env) => { env.PR_REVIEW_KIND = kind; }, true);
+  }
+  for (const field of ["CLASSIFY_RESULT", "POLICY_RESULT", "CONTRACT_DOCS_RESULT"]) {
+    for (const value of invalidValues) {
+      add(`${field}_${value ?? "MISSING"}`, (env) => {
+        if (value === undefined) delete env[field];
+        else env[field] = value;
+      }, false);
+    }
+  }
+  for (const value of [undefined, "", "BYPASSED", "FAILED", "partial", "arbitrary"]) {
+    add(`CONTRACT_DOC_IMPACT_STATE_${value ?? "MISSING"}`, (env) => {
+      if (value === undefined) delete env.CONTRACT_DOC_IMPACT_STATE;
+      else env.CONTRACT_DOC_IMPACT_STATE = value;
+    }, false);
+  }
+  for (const value of [undefined, "", "unknown", "partial", "completion", "arbitrary"]) {
+    add(`PR_REVIEW_KIND_${value ?? "MISSING"}`, (env) => {
+      if (value === undefined) delete env.PR_REVIEW_KIND;
+      else env.PR_REVIEW_KIND = value;
+    }, false);
+  }
+  for (const gate of implementation.REQUIRED_GATES) {
+    add(`${gate.key}_SELECTED_SUCCESS`, () => {}, true);
+    add(`${gate.key}_UNSELECTED_SKIPPED`, (env) => { env[gate.selected] = "false"; env[gate.result] = "skipped"; }, true);
+    for (const value of [undefined, "", "yes", "1", "arbitrary"]) {
+      add(`${gate.key}_SELECTION_${value ?? "MISSING"}`, (env) => {
+        if (value === undefined) delete env[gate.selected];
+        else env[gate.selected] = value;
+      }, false);
+    }
+    for (const value of invalidValues) {
+      add(`${gate.key}_SELECTED_RESULT_${value ?? "MISSING"}`, (env) => {
+        if (value === undefined) delete env[gate.result];
+        else env[gate.result] = value;
+      }, false);
+      add(`${gate.key}_UNSELECTED_RESULT_${value ?? "MISSING"}`, (env) => {
+        env[gate.selected] = "false";
+        if (value === undefined) delete env[gate.result];
+        else env[gate.result] = value;
+      }, value === "skipped");
+    }
+  }
   const results = cases.map(({ id, mutate, expected }) => {
     const environment = successfulEnvironment(implementation.REQUIRED_GATES);
     mutate(environment);

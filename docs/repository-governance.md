@@ -96,6 +96,16 @@ prose never become exemption authority. `DOCS_ALREADY_CURRENT` separately
 binds every applicable owning and migration/changelog section to the same exact
 earlier ancestor and content digest.
 
+The initial classifier identity probe evaluates the union of base/head tracked
+paths plus registered boundary sentinels and the add, modify, delete, rename,
+and copy parser classes, including malformed-record rejection. The Required PR
+Gate probe evaluates every mandatory field, every admitted documentation and
+review state, every selected/unselected gate, and the closed terminal-result
+classes. A decision outside those registered corpora is not silently inferred
+to be unchanged: the base-owned adapter must be versioned before it can
+authorize that surface. These finite probes protect their declared decision
+contracts; they do not replace architectural review of arbitrary behavior.
+
 Documentation, project-skill, and governance-only changes run the classifier,
 policy suite, and final gate without rebuilding the application, Rust engine,
 container, or PostGIS. Blog content and thumbnails build and test the rendered

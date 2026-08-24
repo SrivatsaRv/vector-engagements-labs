@@ -812,7 +812,10 @@ export function verifyContractDocImpact({
         invariant(item.migration.state === "NOT_APPLICABLE" && item.migration.documents.length === 0, `${familyId} has no applicable migration section; migration must be NOT_APPLICABLE.`);
         invariant(item.exemptionEvidence.migrationSections.length === 0, `${familyId} has no applicable docs-current migration evidence.`);
       }
-      for (const section of [...item.exemptionEvidence.sections, ...item.exemptionEvidence.migrationSections]) {
+      const historicalSections = [...item.exemptionEvidence.sections, ...item.exemptionEvidence.migrationSections];
+      const documentedCommits = new Set(historicalSections.map((section) => section.documentedAtCommit));
+      invariant(documentedCommits.size === 1, `${familyId} DOCS_ALREADY_CURRENT evidence must bind every owning and migration section to the same earlier ancestor.`);
+      for (const section of historicalSections) {
         const documentedCommit = resolveCommit(root, section.documentedAtCommit, `${familyId} documentedAtCommit`);
         let isAncestor = true;
         try {
