@@ -2,14 +2,14 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 
 const RESULT_SCHEMA = "vector.contract-doc-probe-result.v1";
 const PROTOCOL = "vector.contract-doc-probe.v1";
 const ASSERTION_ID = "REQUIRED_GATE_FAIL_CLOSED_MATRIX";
+const OBSERVATION_SCHEMA = "vector.required-gate-observation.v1";
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -27,8 +27,13 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function git(root, args) {
-  return execFileSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
+function exactKeys(value, keys, label) {
+  invariant(value && typeof value === "object" && !Array.isArray(value), `${label} must be an object.`);
+  invariant(JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort()), `${label} has unsupported fields.`);
+}
+
+function git(root, args, encoding = "utf8") {
+  return execFileSync("git", args, { cwd: root, encoding, maxBuffer: 8 * 1024 * 1024 });
 }
 
 function successfulEnvironment(requiredGates) {
@@ -46,8 +51,7 @@ function successfulEnvironment(requiredGates) {
   return environment;
 }
 
-async function matrix(modulePath, revision) {
-  const implementation = await import(`${pathToFileURL(modulePath).href}?revision=${revision}`);
+function requiredGateObservation(implementation) {
   const cases = [];
   const add = (id, mutate, expected) => cases.push({ id, mutate, expected });
   const terminalValues = [undefined, "", "success", "failure", "cancelled", "skipped", "timed_out", "action_required", "arbitrary"];
@@ -114,9 +118,54 @@ async function matrix(modulePath, revision) {
   });
   return {
     decisionContract: implementation.REQUIRED_GATE_CONTRACT,
-    decisionImplementationSha256: sha256(implementation.verifyRequiredGates.toString()),
+    decisionImplementationSource: implementation.verifyRequiredGates.toString(),
     requiredGates: implementation.REQUIRED_GATES,
     results,
+  };
+}
+
+const REQUIRED_GATE_OBSERVER_SOURCE = [
+  "#!/usr/bin/env node",
+  'import { pathToFileURL } from "node:url";',
+  successfulEnvironment.toString(),
+  requiredGateObservation.toString(),
+  "const [modulePath, revision] = process.argv.slice(2);",
+  'if (process.argv.slice(2).length !== 2 || !/^[0-9a-f]{40}$/u.test(revision)) throw new Error("Invalid required-gate observation request.");',
+  'const implementation = await import(`${pathToFileURL(modulePath).href}?revision=${revision}`);',
+  `const observation = { schemaVersion: ${JSON.stringify(OBSERVATION_SCHEMA)}, ...requiredGateObservation(implementation) };`,
+  'process.stdout.write(`${JSON.stringify(observation)}\\n`);',
+  "",
+].join("\n");
+
+function materialize(root, revision, modulePath) {
+  const source = git(root, ["show", `${revision}:scripts/verify-required-gates.mjs`], "buffer");
+  const moduleSourceSha256 = sha256(source);
+  writeFileSync(modulePath, source, { mode: 0o400 });
+  const realModulePath = realpathSync(modulePath);
+  invariant(sha256(readFileSync(realModulePath)) === moduleSourceSha256, "Materialized required-gate module differs from its Git blob before execution.");
+  return { modulePath: realModulePath, moduleSourceSha256 };
+}
+
+function matrix(materialized, revision, observerPath) {
+  const output = execFileSync("node", [observerPath, materialized.modulePath, revision], {
+    encoding: "utf8",
+    env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", TMPDIR: process.env.TMPDIR ?? tmpdir() },
+    timeout: 10_000,
+    maxBuffer: 16 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const observation = JSON.parse(output);
+  exactKeys(observation, ["schemaVersion", "decisionContract", "decisionImplementationSource", "requiredGates", "results"], "Required-gate observation");
+  invariant(observation.schemaVersion === OBSERVATION_SCHEMA, "Required-gate observation schema mismatch.");
+  invariant(typeof observation.decisionImplementationSource === "string", "Required-gate implementation observation is invalid.");
+  invariant(Array.isArray(observation.requiredGates) && Array.isArray(observation.results), "Required-gate observation is incomplete.");
+  invariant(sha256(readFileSync(materialized.modulePath)) === materialized.moduleSourceSha256, "Required-gate module changed during execution.");
+  return {
+    moduleSourceSha256: materialized.moduleSourceSha256,
+    decisionContract: observation.decisionContract,
+    decisionImplementationSha256: sha256(observation.decisionImplementationSource),
+    requiredGates: observation.requiredGates,
+    results: observation.results,
   };
 }
 
@@ -132,10 +181,10 @@ async function main() {
   try {
     const basePath = join(probeRoot, "required-gate-base.mjs");
     const headPath = join(probeRoot, "required-gate-head.mjs");
-    writeFileSync(basePath, git(root, ["show", `${baseSha}:scripts/verify-required-gates.mjs`]));
-    writeFileSync(headPath, git(root, ["show", `${headSha}:scripts/verify-required-gates.mjs`]));
-    const before = await matrix(basePath, baseSha);
-    const after = await matrix(headPath, headSha);
+    const observerPath = join(probeRoot, "required-gate-observer.mjs");
+    writeFileSync(observerPath, REQUIRED_GATE_OBSERVER_SOURCE, { mode: 0o500 });
+    const before = matrix(materialize(root, baseSha, basePath), baseSha, observerPath);
+    const after = matrix(materialize(root, headSha, headPath), headSha, observerPath);
     const expectedPass = before.results.every(({ pass }) => pass) && after.results.every(({ pass }) => pass);
     const beforeSha256 = sha256(canonicalJson(before));
     const afterSha256 = sha256(canonicalJson(after));

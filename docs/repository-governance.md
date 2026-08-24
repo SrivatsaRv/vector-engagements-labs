@@ -87,8 +87,11 @@ rejects any mutation of tracked head content. Refactor and no-semantic-change
 declarations contain only versioned probe IDs. The merge-base policy—not the
 pull request—owns each adapter path, exact adapter digest, family, disposition,
 path coverage, and assertion inventory. The validator executes the immutable
-base adapter twice in a scrubbed, bounded child process and accepts only an
-exact, deterministic result whose base/head identity digests are equal. A probe
+base adapter twice in a scrubbed, bounded child process. That trusted adapter
+materializes each exact Git blob and executes candidate decision code only in a
+second child process; the adapter parent computes all source, comparison, and
+evidence digests without importing candidate code. It accepts only an exact,
+deterministic result whose base/head identity digests are equal. A probe
 introduced by a pull request cannot authorize that pull request, probes are
 unavailable during bootstrap, a head-added generated group cannot self-exempt,
 and declaration-authored commands, hashes, or
@@ -110,10 +113,12 @@ the identity and cannot use a non-semantic exemption. These probes protect
 their declared decision contracts; they do not replace architectural review of
 technical adequacy.
 
-Classifier module identity is computed from the exact Git blob before the
-temporary module is written or executed. The probe checks the materialized
-bytes before import and again after all decisions and parser cases, so
-import-time code cannot erase or replace its own authority before comparison.
+Classifier and Required PR Gate module identities are computed from exact Git
+blobs before their temporary modules are written or executed. Candidate modules
+run in observation children and return unhashed observations; only the trusted
+adapter parent computes decision and evidence hashes. The parent checks each
+materialized module before execution and again after all decision/parser cases,
+so candidate code cannot replace its source or the adapter's hashing authority.
 
 Documentation, project-skill, and governance-only changes run the classifier,
 policy suite, and final gate without rebuilding the application, Rust engine,

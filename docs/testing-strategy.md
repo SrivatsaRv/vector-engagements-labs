@@ -106,7 +106,9 @@ policy supplies the exact identity or invariant result. The declaration names
 probe IDs only; the family, disposition, changed-path coverage, adapter,
 assertions, revisions, and equal base/head identities are validated outside the
 declaration. Adapters execute twice with a scrubbed environment and bounded
-output; a newly added head-policy probe, malformed result, failed assertion,
+output. Candidate decision modules execute in a nested observation process and
+return unhashed data; the immutable adapter parent alone hashes Git source,
+decision identities, and evidence. A newly added head-policy probe, malformed result, failed assertion,
 nondeterministic output, or caller-authored hash/command fails closed. The
 classifier refactor probe binds the complete exported rule/effect inventory and
 exact decision-function identity, then compares every base/head tracked path,

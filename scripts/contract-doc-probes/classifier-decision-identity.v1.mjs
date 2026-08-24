@@ -5,11 +5,30 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 
 const RESULT_SCHEMA = "vector.contract-doc-probe-result.v1";
 const PROTOCOL = "vector.contract-doc-probe.v1";
 const ASSERTION_ID = "CI_CLASSIFIER_DECISION_MATRIX";
+const OBSERVATION_SCHEMA = "vector.classifier-decision-observation.v1";
+
+const CLASSIFIER_OBSERVER_SOURCE = [
+  "#!/usr/bin/env node",
+  'import { readFileSync } from "node:fs";',
+  'import { pathToFileURL } from "node:url";',
+  "const [classifierPath, revision] = process.argv.slice(2);",
+  'if (process.argv.slice(2).length !== 2 || !/^[0-9a-f]{40}$/u.test(revision)) throw new Error("Invalid classifier observation request.");',
+  'const request = JSON.parse(readFileSync(0, "utf8"));',
+  'if (!request || Object.keys(request).length !== 1 || !Array.isArray(request.paths)) throw new Error("Invalid classifier observation input.");',
+  'const implementation = await import(`${pathToFileURL(classifierPath).href}?revision=${revision}`);',
+  "const observation = {",
+  `  schemaVersion: ${JSON.stringify(OBSERVATION_SCHEMA)},`,
+  "  decisionContract: implementation.CLASSIFIER_DECISION_CONTRACT,",
+  '  decisionImplementationSource: `${implementation.classifyChanges.toString()}\\n${implementation.runClassifierCli.toString()}` ,',
+  "  decisions: request.paths.map((path) => ({ path, result: implementation.classifyChanges([path]) })),",
+  "};",
+  'process.stdout.write(`${JSON.stringify(observation)}\\n`);',
+  "",
+].join("\n");
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -25,6 +44,11 @@ function canonicalJson(value) {
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function exactKeys(value, keys, label) {
+  invariant(value && typeof value === "object" && !Array.isArray(value), `${label} must be an object.`);
+  invariant(JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort()), `${label} has unsupported fields.`);
 }
 
 function trackedPaths(root, commit) {
@@ -117,18 +141,34 @@ function runParserCase(classifierPath, testCase) {
   }
 }
 
-async function matrix(materialized, paths, revision) {
+function observeClassifier(observerPath, classifierPath, paths, revision) {
+  const output = execFileSync("node", [observerPath, classifierPath, revision], {
+    input: canonicalJson({ paths }),
+    encoding: "utf8",
+    env: { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? "", TMPDIR: process.env.TMPDIR ?? tmpdir() },
+    timeout: 10_000,
+    maxBuffer: 16 * 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const observation = JSON.parse(output);
+  exactKeys(observation, ["schemaVersion", "decisionContract", "decisionImplementationSource", "decisions"], "Classifier observation");
+  invariant(observation.schemaVersion === OBSERVATION_SCHEMA, "Classifier observation schema mismatch.");
+  invariant(typeof observation.decisionImplementationSource === "string", "Classifier implementation observation is invalid.");
+  invariant(Array.isArray(observation.decisions) && observation.decisions.length === paths.length, "Classifier decision observation is incomplete.");
+  return observation;
+}
+
+function matrix(materialized, paths, revision, observerPath) {
   const { classifierPath, moduleSourceSha256 } = materialized;
-  const implementation = await import(`${pathToFileURL(classifierPath).href}?revision=${revision}`);
-  const decisions = paths.map((path) => ({ path, result: implementation.classifyChanges([path]) }));
+  const observation = observeClassifier(observerPath, classifierPath, paths, revision);
   const parser = parserCases.map((testCase) => runParserCase(classifierPath, testCase));
   invariant(sha256(readFileSync(classifierPath)) === moduleSourceSha256, "Classifier module changed during execution.");
   return {
     moduleSourceSha256,
-    decisionContract: implementation.CLASSIFIER_DECISION_CONTRACT,
-    decisionImplementationSha256: sha256(`${implementation.classifyChanges.toString()}\n${implementation.runClassifierCli.toString()}`),
+    decisionContract: observation.decisionContract,
+    decisionImplementationSha256: sha256(observation.decisionImplementationSource),
     paths,
-    decisions,
+    decisions: observation.decisions,
     parser,
     parserExpectationsSatisfied: parser.every(({ expected, outcome }) => expected === outcome),
   };
@@ -144,9 +184,11 @@ async function main() {
   invariant(disposition === "INTERNAL_REFACTOR", "Classifier probe disposition mismatch.");
   const probeRoot = mkdtempSync(join(tmpdir(), "vector-contract-classifier-probe-"));
   try {
+    const observerPath = join(probeRoot, "classifier-observer.mjs");
+    writeFileSync(observerPath, CLASSIFIER_OBSERVER_SOURCE, { mode: 0o500 });
     const paths = [...new Set([...trackedPaths(root, baseSha), ...trackedPaths(root, headSha), ...boundaryPaths])].sort();
-    const before = await matrix(materialize(root, baseSha, join(probeRoot, "base")), paths, baseSha);
-    const after = await matrix(materialize(root, headSha, join(probeRoot, "head")), paths, headSha);
+    const before = matrix(materialize(root, baseSha, join(probeRoot, "base")), paths, baseSha, observerPath);
+    const after = matrix(materialize(root, headSha, join(probeRoot, "head")), paths, headSha, observerPath);
     const beforeSha256 = sha256(canonicalJson(before));
     const afterSha256 = sha256(canonicalJson(after));
     const expectedPass = before.parserExpectationsSatisfied && after.parserExpectationsSatisfied;

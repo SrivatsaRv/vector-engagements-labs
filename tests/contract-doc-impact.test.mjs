@@ -944,6 +944,48 @@ test("the classifier probe rejects self-erasing import-time authority", async (t
   ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }), /Classifier module changed during execution/i);
 });
 
+test("the classifier probe keeps evidence hashing outside candidate module authority", async (t) => {
+  const classifierSource = await readFile(resolve("scripts/classify-ci-changes.mjs"), "utf8");
+  const helperSource = await readFile(resolve("scripts/lib/contract-doc-impact.mjs"), "utf8");
+  const root = await governanceProbeFixture({
+    "scripts/classify-ci-changes.mjs": classifierSource,
+    "scripts/lib/contract-doc-impact.mjs": helperSource,
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const baseSha = await commit(root, "classifier trusted hash base");
+  const reboundHashSource = classifierSource
+    .replace(
+      'import { appendFileSync, readFileSync } from "node:fs";',
+      'import crypto from "node:crypto";\nimport { appendFileSync, readFileSync } from "node:fs";\nimport { syncBuiltinESMExports } from "node:module";',
+    )
+    .replace(
+      "export function classifyChanges(inputFiles) {",
+      `const originalCreateHash = crypto.createHash.bind(crypto);\ncrypto.createHash = (...arguments_) => {\n  const hash = originalCreateHash(...arguments_);\n  const update = hash.update.bind(hash);\n  hash.update = (value, ...rest) => {\n    if (typeof value === "string") return { digest: () => "0".repeat(64) };\n    update(value, ...rest);\n    return hash;\n  };\n  return hash;\n};\nsyncBuiltinESMExports();\n\nexport function classifyChanges(inputFiles) {`,
+    )
+    .replace(
+      "patterns: patternInventory(\n        /^\\.codex\\//,",
+      "patterns: patternInventory(\n        /^future-namespace\\//,\n        /^\\.codex\\//,",
+    );
+  assert.notEqual(reboundHashSource, classifierSource);
+  await writeFile(join(root, "scripts", "classify-ci-changes.mjs"), reboundHashSource);
+  const headSha = await commit(root, "rebind candidate hash authority");
+  const output = execFileSync("node", [
+    resolve("scripts/contract-doc-probes/classifier-decision-identity.v1.mjs"),
+    "vector.contract-doc-probe.v1",
+    root,
+    baseSha,
+    headSha,
+    "DELIVERY_CONTRACT_GOVERNANCE",
+    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V1",
+    "INTERNAL_REFACTOR",
+  ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+  const result = JSON.parse(output);
+  assert.equal(result.assertions[0].status, "FAIL");
+  assert.notEqual(result.assertions[0].beforeSha256, result.assertions[0].afterSha256);
+  assert.notEqual(result.assertions[0].beforeSha256, "0".repeat(64));
+  assert.notEqual(result.assertions[0].afterSha256, "0".repeat(64));
+});
+
 test("the required-gate invariant probe binds a newly admitted review kind", async (t) => {
   const gateSource = await readFile(resolve("scripts/verify-required-gates.mjs"), "utf8");
   const root = await governanceProbeFixture({ "scripts/verify-required-gates.mjs": gateSource });
@@ -995,6 +1037,40 @@ test("the required-gate invariant probe rejects unselected success relaxation", 
   const result = JSON.parse(output);
   assert.equal(result.assertions[0].status, "FAIL");
   assert.notEqual(result.assertions[0].beforeSha256, result.assertions[0].afterSha256);
+});
+
+test("the required-gate probe keeps evidence hashing outside candidate module authority", async (t) => {
+  const gateSource = await readFile(resolve("scripts/verify-required-gates.mjs"), "utf8");
+  const root = await governanceProbeFixture({ "scripts/verify-required-gates.mjs": gateSource });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const baseSha = await commit(root, "required gate trusted hash base");
+  const reboundHashSource = gateSource
+    .replace(
+      'import { pathToFileURL } from "node:url";',
+      'import crypto from "node:crypto";\nimport { syncBuiltinESMExports } from "node:module";\nimport { pathToFileURL } from "node:url";',
+    )
+    .replace(
+      'reviewKinds: ["slice", "completion-review", "not-applicable"],',
+      `reviewKinds: ["slice", "completion-review", "not-applicable", "shadow-review"],\n  trustedHashMutation: (() => {\n    const originalCreateHash = crypto.createHash.bind(crypto);\n    crypto.createHash = (...arguments_) => {\n      const hash = originalCreateHash(...arguments_);\n      hash.update = () => ({ digest: () => "0".repeat(64) });\n      return hash;\n    };\n    syncBuiltinESMExports();\n    return true;\n  })(),`,
+    );
+  assert.notEqual(reboundHashSource, gateSource);
+  await writeFile(join(root, "scripts", "verify-required-gates.mjs"), reboundHashSource);
+  const headSha = await commit(root, "rebind required gate hash authority");
+  const output = execFileSync("node", [
+    resolve("scripts/contract-doc-probes/required-gate-invariants.v1.mjs"),
+    "vector.contract-doc-probe.v1",
+    root,
+    baseSha,
+    headSha,
+    "DELIVERY_CONTRACT_GOVERNANCE",
+    "DELIVERY_REQUIRED_GATE_INVARIANTS_V1",
+    "NO_SEMANTIC_CHANGE",
+  ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+  const result = JSON.parse(output);
+  assert.equal(result.assertions[0].status, "FAIL");
+  assert.notEqual(result.assertions[0].beforeSha256, result.assertions[0].afterSha256);
+  assert.notEqual(result.assertions[0].beforeSha256, "0".repeat(64));
+  assert.notEqual(result.assertions[0].afterSha256, "0".repeat(64));
 });
 
 test("DOCS_ALREADY_CURRENT requires an exact earlier ancestor and section identity", async (t) => {
