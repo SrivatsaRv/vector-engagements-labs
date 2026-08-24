@@ -15,7 +15,6 @@ import type {
   PublicAircraftReferenceInput,
   PublicAircraftReferenceRun,
 } from "../validation/public-aircraft-reference.ts";
-
 type RustEngineExports = WebAssembly.Exports & {
   memory: WebAssembly.Memory;
   vector_abi_version: () => number;

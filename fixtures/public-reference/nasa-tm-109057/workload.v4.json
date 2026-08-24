@@ -1,0 +1,265 @@
+{
+  "schemaVersion": "vector.generic-aam-verification-workload.v4",
+  "id": "nasa-tm-109057-appendix-b-bounded-sweep.v4",
+  "sourceSha256": "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa",
+  "caseCount": 15,
+  "cases": [
+    {
+      "id": "RATE32_SEEKER15",
+      "tickRateHz": 32,
+      "seekerHalfAngleDeg": 15,
+      "seekerHalfAngleRad": 0.261798,
+      "maxTicks": 960,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 0,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 491,
+      "expectedCause": "POST_BURN_OPEN",
+      "expectedFrameCount": 491,
+      "semanticOutcomeSha256": "a9b636d29120b47772e62b001357ffdbc795c69c9644593df21ab1fdcefe31ee"
+    },
+    {
+      "id": "RATE32_SEEKER20",
+      "tickRateHz": 32,
+      "seekerHalfAngleDeg": 20,
+      "seekerHalfAngleRad": 0.349064,
+      "maxTicks": 960,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 1000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 492,
+      "expectedCause": "POST_BURN_OPEN",
+      "expectedFrameCount": 492,
+      "semanticOutcomeSha256": "cf8097e042ddd884a70e508dfb6c863a16c583f32c103375fcc116b4859b5963"
+    },
+    {
+      "id": "RATE32_SEEKER30",
+      "tickRateHz": 32,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 960,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 2000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 496,
+      "expectedCause": "POST_BURN_OPEN",
+      "expectedFrameCount": 496,
+      "semanticOutcomeSha256": "f388b161cac218166997fd5d3bfe5943d9a90b3d79d2181d76248c3ab15ecc00"
+    },
+    {
+      "id": "RATE64_SEEKER15",
+      "tickRateHz": 64,
+      "seekerHalfAngleDeg": 15,
+      "seekerHalfAngleRad": 0.261798,
+      "maxTicks": 1920,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 0,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 982,
+      "expectedCause": "POST_BURN_OPEN",
+      "expectedFrameCount": 982,
+      "semanticOutcomeSha256": "4241c998fe97fe74383ca04e9455d3ef528c45b9c6563adcebd74c267bb47a0c"
+    },
+    {
+      "id": "RATE64_SEEKER20",
+      "tickRateHz": 64,
+      "seekerHalfAngleDeg": 20,
+      "seekerHalfAngleRad": 0.349064,
+      "maxTicks": 1920,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 1000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 984,
+      "expectedCause": "POST_BURN_OPEN",
+      "expectedFrameCount": 984,
+      "semanticOutcomeSha256": "bc27c19bcce6c33195c710c33c2f50f71b8a0ba21556e7ca6084fc40900e0f55"
+    },
+    {
+      "id": "RATE64_SEEKER30",
+      "tickRateHz": 64,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 1920,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 2000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 992,
+      "expectedCause": "POST_BURN_OPEN",
+      "expectedFrameCount": 992,
+      "semanticOutcomeSha256": "8fe8d9c9b6f90210cd0320d4060a94850b7a2a7e9392bd1e66860f8c3d9bad17"
+    },
+    {
+      "id": "RATE128_SEEKER15",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 15,
+      "seekerHalfAngleRad": 0.261798,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 0,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 1964,
+      "expectedCause": "POST_BURN_OPEN",
+      "expectedFrameCount": 1964,
+      "semanticOutcomeSha256": "ddbae21f6cbdc18d929774ce08c8ea8b133a27ea28d83232bd52ab73ada1c1f6"
+    },
+    {
+      "id": "RATE128_SEEKER20",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 20,
+      "seekerHalfAngleRad": 0.349064,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 1000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 1968,
+      "expectedCause": "POST_BURN_OPEN",
+      "expectedFrameCount": 1968,
+      "semanticOutcomeSha256": "41f820112c159ba916b72857279081aba3ad3a84b14858c60d572897dcf012b1"
+    },
+    {
+      "id": "RATE128_SEEKER30",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 2000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 1983,
+      "expectedCause": "POST_BURN_OPEN",
+      "expectedFrameCount": 1983,
+      "semanticOutcomeSha256": "bdbee766b8d99e56ba0f057cebd259583f116c029ad7e6aac07dcaf163d0e8e8"
+    },
+    {
+      "id": "BOUND_X_MIN",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 0,
+        "y": 100,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_SEEKER_LIMIT",
+      "expectedTick": 1,
+      "expectedCause": "SEEKER_LIMIT",
+      "expectedFrameCount": 1,
+      "semanticOutcomeSha256": "cf0e698bd05c5ad5eb14e5334fb7a525d0fd5a0c7d4237577a2471c6004718cf"
+    },
+    {
+      "id": "BOUND_Y_MIN",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": -4000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_SEEKER_LIMIT",
+      "expectedTick": 1,
+      "expectedCause": "SEEKER_LIMIT",
+      "expectedFrameCount": 1,
+      "semanticOutcomeSha256": "134b8de2556bca094b55ff8ff99db884e5a2ef3ecfacde971459d8a345369782"
+    },
+    {
+      "id": "BOUND_Y_MAX",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 4000,
+        "z": -6000
+      },
+      "expectedTerminal": "MISS_SEEKER_LIMIT",
+      "expectedTick": 1,
+      "expectedCause": "SEEKER_LIMIT",
+      "expectedFrameCount": 1,
+      "semanticOutcomeSha256": "def2243cd171ced50dbc812327ebe1ec5826b5f03af54c83afbaff86f02a3589"
+    },
+    {
+      "id": "BOUND_ALT_MIN",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 0,
+        "z": -2000
+      },
+      "expectedTerminal": "MISS_SEEKER_LIMIT",
+      "expectedTick": 1,
+      "expectedCause": "SEEKER_LIMIT",
+      "expectedFrameCount": 1,
+      "semanticOutcomeSha256": "d741899ce7e750226bb8911dbead9cc31742ffafe1ecee796611162627e0f617"
+    },
+    {
+      "id": "BOUND_ALT_MAX",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 0,
+        "z": -12000
+      },
+      "expectedTerminal": "MISS_SEEKER_LIMIT",
+      "expectedTick": 1,
+      "expectedCause": "SEEKER_LIMIT",
+      "expectedFrameCount": 1,
+      "semanticOutcomeSha256": "fb2711ac39700263c1ceb7c2f53e11e1096071a972fa37d6fcad2a7fe35688ef"
+    },
+    {
+      "id": "CONFLICT_THRUST",
+      "tickRateHz": 128,
+      "seekerHalfAngleDeg": 30,
+      "seekerHalfAngleRad": 0.523596,
+      "maxTicks": 3840,
+      "targetPositionM": {
+        "x": 4500,
+        "y": 2000,
+        "z": -6000
+      },
+      "caseRole": "TABLE_THRUST_CONFLICT_SENSITIVITY",
+      "expectedTerminal": "MISS_OPENING_AFTER_BURN",
+      "expectedTick": 1788,
+      "expectedCause": "POST_BURN_OPEN",
+      "expectedFrameCount": 1788,
+      "semanticOutcomeSha256": "075ad5eece320726d046f62b8131027810aa34e616d8831efe9c31d2bc17a67a"
+    }
+  ],
+  "expectedBatchSha256": "4cfabe5da23f210ec6e1c1851bb98e7415edd2b67d7ad719b076296a6c2470e4"
+}

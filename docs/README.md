@@ -18,6 +18,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-
 - [`deployment-capabilities.md`](deployment-capabilities.md): deployment-owned domain, engine, model-pack and optional-capability admission.
 - [`physics-model.md`](physics-model.md): equations, atmosphere, guidance, termination, numerical limits, and declared assumptions.
 - [`public-aircraft-reference.md`](public-aircraft-reference.md): NASA NESC aircraft check-case evidence, SI-normalized trim propagation, tolerances, parity, measurements, and limits.
+- [`generic-aam-verification.md`](generic-aam-verification.md): governed NASA TM-109057 generic missile arithmetic, discrepancy decisions, standalone TS/Rust-WASM verification, and nonclaims.
 - [`aircraft-evidence-registry.md`](aircraft-evidence-registry.md): governed public-artifact inventory, per-capability named-aircraft admission, and explicit evidence gaps.
 - [`scenario-builder.md`](scenario-builder.md): authoring journey, state ownership, map controls, and validation.
 - [`vector-simulation-record.md`](vector-simulation-record.md): portable replay and debriefing record.

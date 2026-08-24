@@ -64,6 +64,18 @@ unbounded input rejection, energy invariance, step-size convergence at common
 checkpoints, and 1×10⁻⁹ TypeScript/Rust-WASM parity. A deliberately perturbed
 trajectory must fail the gate.
 
+Generic-missile arithmetic verification additionally runs
+`reference-aam:verify`. It checks the frozen NASA TM-109057 bytes, exact corpus
+and successor workload ownership, private-corpus mutation resistance, input/output falsifiers,
+independent arithmetic and convergence oracles, forward/reversed workload
+digests, a cross-platform quantized semantic identity with sampled and aggregate
+trajectory values, full-to-terminal comparison of all 30 numeric frame leaves under the governed default/CPA-specific absolute-plus-relative parity policy,
+half-bin/overflow/policy-tamper falsifiers, printed-radian boundary flips, D09 exceptional semantics, exhaustive
+finite content-addressed run decoding, isolated production-bundle scans, exact numeric-boundary sweeps, and complete TypeScript/actual-WASM frame parity. The separate
+`reference-aam:performance` target reports a 15-case Node-hosted workload under
+explicit p95 limits and makes no Worker or product-capacity claim. See
+[`generic-aam-verification.md`](generic-aam-verification.md).
+
 GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
 automated gate from changed paths. Repository-policy tests always run, and an
 unknown path fails closed through every CI job. Documentation and agent-harness
