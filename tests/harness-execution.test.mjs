@@ -134,7 +134,33 @@ test("hosted Rust stages own the complete private 6DOF verifier gate", async () 
   );
 });
 
-test("Rust and private 6DOF WASM builds use one exact cross-host toolchain", async () => {
+test("hosted Rust stages own the complete generic-AAM verifier gate", async () => {
+  const workflow = await readFile(".github/workflows/ci.yml", "utf8");
+  const rust = workflow.split(/^  rust_tests:/m)[1]?.split(/^  browser_tests:/m)[0];
+  const audit = workflow.split(/^  rust_audit:/m)[1]?.split(/^  integration:/m)[0];
+  assert.ok(rust, "Rust/WASM job is missing");
+  assert.ok(audit, "Rust dependency-audit job is missing");
+
+  assert.match(rust, /verification-rust\/generic-aam\s*->\s*target/);
+  for (const command of [
+    "reference-aam:rust:fmt",
+    "reference-aam:rust:clippy",
+    "reference-aam:rust:verify",
+    "reference-aam:rust:test",
+    "reference-aam:rust:doc",
+    "reference-aam:verify",
+    "reference-aam:performance",
+  ]) {
+    assert.match(rust, new RegExp(`npm run ${command.replaceAll(":", "\\:")}`), `${command} is not owned by Stage 2B`);
+  }
+  assert.match(
+    audit,
+    /cargo audit --file verification-rust\/generic-aam\/Cargo\.lock/,
+    "Stage 2C does not audit the generic-AAM verifier lockfile",
+  );
+});
+
+test("Rust and private WASM builds use one exact cross-host toolchain", async () => {
   const toolchain = await readFile("rust-toolchain.toml", "utf8");
   assert.match(toolchain, /^channel = "1\.97\.1"$/m);
   assert.match(toolchain, /^profile = "minimal"$/m);
@@ -156,6 +182,12 @@ test("Rust and private 6DOF WASM builds use one exact cross-host toolchain", asy
   assert.match(builder, /linux\/amd64/);
   assert.match(builder, /freshSha256/);
   assert.match(builder, /committedSha256/);
+
+  const aamBuilder = await readFile("scripts/build-generic-aam-verifier.mjs", "utf8");
+  assert.match(aamBuilder, /rust:1\.97\.1-bookworm@sha256:408fe88047cef61a2087653b0c5255fa51c0f2d6d94ddedd7a2562a9b91a46f6/);
+  assert.match(aamBuilder, /linux\/amd64/);
+  assert.match(aamBuilder, /freshSha256/);
+  assert.match(aamBuilder, /committedSha256/);
 });
 
 test("private 6DOF npm aliases resolve to the intended crate and verification commands", async () => {
@@ -180,6 +212,29 @@ test("private 6DOF npm aliases resolve to the intended crate and verification co
         "cargo test --manifest-path verification-rust/sixdof-foundation/Cargo.toml --locked --all-targets",
       "sixdof-foundation:rust:doc":
         "RUSTDOCFLAGS='-D warnings' cargo doc --manifest-path verification-rust/sixdof-foundation/Cargo.toml --locked --no-deps",
+    },
+  );
+});
+
+test("generic-AAM npm aliases resolve to the intended crate and verification commands", async () => {
+  const manifest = JSON.parse(await readFile("package.json", "utf8"));
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(manifest.scripts).filter(([name]) => name.startsWith("reference-aam:")),
+    ),
+    {
+      "reference-aam:verify": "node --import tsx scripts/verify-nasa-generic-aam-reference.mjs",
+      "reference-aam:performance": "tsx scripts/benchmark-generic-aam.ts",
+      "reference-aam:rust:build": "node scripts/build-generic-aam-verifier.mjs",
+      "reference-aam:rust:verify": "node scripts/build-generic-aam-verifier.mjs --check",
+      "reference-aam:rust:fmt":
+        "cargo fmt --manifest-path verification-rust/generic-aam/Cargo.toml -- --check",
+      "reference-aam:rust:clippy":
+        "cargo clippy --manifest-path verification-rust/generic-aam/Cargo.toml --locked --all-targets -- -D warnings",
+      "reference-aam:rust:test":
+        "cargo test --manifest-path verification-rust/generic-aam/Cargo.toml --locked --all-targets",
+      "reference-aam:rust:doc":
+        "RUSTDOCFLAGS='-D warnings' cargo doc --manifest-path verification-rust/generic-aam/Cargo.toml --locked --no-deps",
     },
   );
 });

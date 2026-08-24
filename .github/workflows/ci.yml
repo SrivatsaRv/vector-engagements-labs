@@ -189,6 +189,7 @@ jobs:
         with:
           workspaces: |
             engine-rust -> target
+            verification-rust/generic-aam -> target
             verification-rust/sixdof-foundation -> target
       - name: Install locked dependencies
         run: npm ci
@@ -199,6 +200,13 @@ jobs:
           npm run engine:rust:verify
           npm run engine:rust:test
           npm run engine:rust:doc
+          npm run reference-aam:rust:fmt
+          npm run reference-aam:rust:clippy
+          npm run reference-aam:rust:verify
+          npm run reference-aam:rust:test
+          npm run reference-aam:rust:doc
+          npm run reference-aam:verify
+          npm run reference-aam:performance
           npm run sixdof-foundation:rust:fmt
           npm run sixdof-foundation:rust:clippy
           npm run sixdof-foundation:rust:verify
@@ -258,6 +266,7 @@ jobs:
       - name: Audit locked Rust dependencies
         run: |
           cargo audit --file engine-rust/Cargo.lock
+          cargo audit --file verification-rust/generic-aam/Cargo.lock
           cargo audit --file verification-rust/sixdof-foundation/Cargo.lock
 
   integration:

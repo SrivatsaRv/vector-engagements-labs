@@ -159,24 +159,26 @@ and must state their rationale and the owning issue; #66 owns those policy
 exceptions. A new fallback or model-assumption indicator without that evidence
 fails the local and PR gate.
 
-Browser/responsive checks and performance benchmarks are deliberately not run
+Browser/responsive checks and product performance benchmarks are deliberately not run
 on GitHub-hosted pull-request runners. They remain explicit maintainer checks
 through `make integration-local` and `make performance-local`, where the
 browser, GPU/software renderer, display dimensions, and machine class are
-controlled and the evidence is interpretable. The sole exception is the
-private 6DOF verifier's bounded, Node-hosted 10,000-tick numerical regression;
-Stage 2B owns that non-product benchmark alongside the crate's formatting,
-Clippy, rebuild, native-test, rustdoc, parity, and isolation commands. Stage 2C
-audits its independent lockfile, and the classifier selects both owners for
-private-crate manifest changes. The scheduled `codeql.yml`
+controlled and the evidence is interpretable. The exceptions are the private
+6DOF verifier's bounded, Node-hosted 10,000-tick numerical regression and the
+generic-AAM verifier's bounded 15-case reference workload. Stage 2B owns those
+non-product benchmarks alongside each crate's formatting, Clippy, canonical
+rebuild, native-test, rustdoc, parity, and isolation commands. Stage 2C audits
+all three Rust lockfiles, and the classifier selects the Rust and audit owners
+for each private-crate manifest change. The scheduled `codeql.yml`
 workflow retains weekly security analysis without creating a second PR run.
 
 Rust sources carry a deterministic source digest; embedded modules carry their
 own byte digest and required-export checks. Native Rust commands and hosted
-setup pin Rust 1.97.1 through `rust-toolchain.toml`. The private 6DOF artifact is
-compiled afresh through an immutable Linux/amd64 Rust 1.97.1 image, so every
-host verifies one canonical raw module instead of accepting host-specific
-code/data output. Compiler, image, source, size, and byte drift fail closed.
+setup pin Rust 1.97.1 through `rust-toolchain.toml`. The private 6DOF and
+generic-AAM artifacts are compiled afresh through an immutable Linux/amd64 Rust
+1.97.1 image, so every host verifies one canonical raw module per crate instead
+of accepting host-specific code/data output. Compiler, image, source, size, and
+byte drift fail closed.
 Actions are pinned to immutable commit SHAs.
 
 Pull requests receive CodeQL and dependency review inside the causal `ci.yml`

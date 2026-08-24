@@ -60,21 +60,26 @@ const JAVASCRIPT_SECURITY = [
 const RUST_CONTRACT = [
   /^rust-toolchain\.toml$/,
   /^engine-rust\//,
+  /^verification-rust\/generic-aam\//,
   /^verification-rust\/sixdof-foundation\//,
   /^fixtures\/public-reference\//,
   /^lib\/engine\//,
   /^lib\/validation\/(?:sixdof-foundation(?:-wasm)?|generated\/sixdof-foundation-verifier-wasm)\.ts$/,
+  /^lib\/validation\/(?:generic-aam-verification(?:-wasm)?|generated\/generic-aam-verifier-wasm)\.ts$/,
   /^lib\/validation\/public-aircraft-reference\.ts$/,
   /^lib\/(?:model-pack|reference-model-pack|simulation-models)\.ts$/,
   /^package\.json$/,
   /^scripts\/(?:benchmark-sixdof-foundation\.ts|build-sixdof-foundation-verifier\.mjs|sixdof-production-isolation\.mjs)$/,
+  /^scripts\/(?:benchmark-generic-aam\.ts|build-generic-aam-verifier\.mjs|generate-nasa-generic-aam-workload\.mjs|verify-nasa-generic-aam-reference\.mjs)$/,
   /^scripts\/(?:build-rust-engine|generate-model-pack-fixture|verify-public-aircraft-reference)\.mjs$/,
   /^tests\/sixdof-foundation\.test\.mjs$/,
+  /^tests\/generic-aam-(?:oracles|verification)\.test\.mjs$/,
 ];
 
 const RUST_MANIFEST = [
   /^rust-toolchain\.toml$/,
   /^engine-rust\/(?:Cargo\.toml|Cargo\.lock)$/,
+  /^verification-rust\/generic-aam\/(?:Cargo\.toml|Cargo\.lock)$/,
   /^verification-rust\/sixdof-foundation\/(?:Cargo\.toml|Cargo\.lock)$/,
 ];
 

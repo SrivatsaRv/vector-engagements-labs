@@ -53,6 +53,14 @@ At integer tick `n`, time is `n/tickRateHz`. The evaluator advances the constant
 
 Rust verification is compiled from the separate `verification-rust/generic-aam` crate with serde_json `float_roundtrip`. Its generated adapter lives under `lib/validation`, is imported only by verification scripts, tests, and the benchmark, and deep-validates the decoded output. The production `engine-rust` crate, production WASM ABI, `lib/engine/backend.ts`, and built simulation Worker contain no generic-AAM module, export, subject string, or adapter. Rust uses a local strict generic DTO; the shared production `Vec3` remains byte-for-byte unchanged. `TABLE_THRUST_CONFLICT_SENSITIVITY` and `COMMAND_LIMIT_SENSITIVITY` are explicitly non-authoritative causal contrasts.
 
+The repository-wide Rust contract pins 1.97.1. The generic-AAM module is
+compiled through the immutable Linux/amd64
+`rust:1.97.1-bookworm@sha256:408fe88047cef61a2087653b0c5255fa51c0f2d6d94ddedd7a2562a9b91a46f6`
+builder used for private verification artifacts. The repository is mounted
+read-only and the Cargo target is isolated. Source, builder, exact byte digest,
+byte length, and ABI exports must all match; host-native output is diagnostic
+only and is never an admitted alternate artifact.
+
 ## Verification and performance
 
 Independent tests cover range/LOS/LOS-rate, between-tick and receding closest approach, strict hit epsilon, thrust/drag/speed, exact burnout transition, axial command, PN sign/limit boundaries, first-order lag, printed-radian seeker equality/epsilon, ground, D09 exceptions, and simultaneous-cause precedence. A one-second control-lag fixture converges monotonically at 32/64/128/256 Hz against its closed form, and full evaluator trajectories show decreasing endpoint differences across the same four rates.
@@ -65,7 +73,7 @@ The v4 successor was prompted by a real cross-host falsifier at immutable `b77f6
 
 Independent review of immutable v4 SHA `6a97c3b230c6751080cb88485859b4743dba3593` then exposed the short-horizon parity gap: the prior test stopped after two seconds. The full governed workload had 36 values above `1e-9`, only in CPA distance (34) and time (2): `CONFLICT_THRUST` 20, `RATE128_SEEKER30` 10, `RATE64_SEEKER20` 4, and `RATE32_SEEKER30` 2. Maximum distance delta was `2.0713287085527554e-8` at `CONFLICT_THRUST` tick 101 (relative `1.3612619218727864e-11`); maximum time delta was `3.499962986097671e-9` at tick 100 (relative `2.033981575206581e-12`). Results were identical on macOS arm64 / Node 24.3.0 and Linux x64 / Node 22.18.0. Direct point, cross-product, and direct-square-root recomputations retained the same maximum distance delta, showing cancellation amplification from already-admitted sub-`1e-9` trajectory drift rather than an implementation-order defect. V5 therefore leaves printed evaluator arithmetic unchanged and binds the proportionate CPA-only combined tolerances above. The corpus records the exact per-rate/seeker maxima, host identities, values, counts, formula, and rationale. The v5 verifier produces the same semantic batch `430a2a8a…`, 12,145-frame/364,350-comparison parity report, and 36/36 focused pass on both declared hosts.
 
-Two independently generated artifacts have separate integrity and size gates. The production Rust/WASM artifact retains its existing 500,000-byte ceiling and contains no generic-AAM code. The historical #144 pre-merge freeze was 410,994 bytes, SHA-256 `22e250cb506d1464544b6b25f05d5db3c0914fc6fe7bfdc9290141fe01dac1bd`, from production-source identity `e78eb3302d48d916e0bbcd934a13627be85c37d9f17d328027d71ab2830cc678`. After current-main integration and the separate 6DOF-verifier boundary, the production artifact is 493,585 bytes, SHA-256 `e1105047cd06edd50f13d8b212e1292bda747468ee7421a977112fadeef65b8c`, from production-source identity `331b0bae4336f88a1ef81e26c5f068a01c89ece1a732d30eae21b0e74b42f2bc`; it still contains no generic-AAM or 6DOF-verifier ABI. The generic-AAM verification-only artifact remains 205,536 bytes, SHA-256 `cac19c36ae8c03a8d10d9caa0d1b82f9f31e2c602fc91748598b44f2c6dcb94e`, from verification-source identity `4156fb4e400ebc9aa4a735896472264e61b17ef382311ef048c8eff9963892b8`. These current identities are rebuilt and verified in a clean clone before freeze.
+Two independently generated artifacts have separate integrity and size gates. The production Rust/WASM artifact retains its existing 500,000-byte ceiling and contains no generic-AAM code. The historical #144 pre-merge freeze was 410,994 bytes, SHA-256 `22e250cb506d1464544b6b25f05d5db3c0914fc6fe7bfdc9290141fe01dac1bd`, from production-source identity `e78eb3302d48d916e0bbcd934a13627be85c37d9f17d328027d71ab2830cc678`. After current-main integration and the separate 6DOF-verifier boundary, the production artifact is 493,585 bytes, SHA-256 `e1105047cd06edd50f13d8b212e1292bda747468ee7421a977112fadeef65b8c`, from production-source identity `331b0bae4336f88a1ef81e26c5f068a01c89ece1a732d30eae21b0e74b42f2bc`; it still contains no generic-AAM or 6DOF-verifier ABI. The canonical generic-AAM verification-only artifact is 205,464 bytes, SHA-256 `44cd233b65ff82832bdf5853f78b763edfb3f12ae00d1ddc7c63df4ff693c435`, from unchanged verification-source identity `4156fb4e400ebc9aa4a735896472264e61b17ef382311ef048c8eff9963892b8`. These current identities are rebuilt and verified in a clean clone before freeze.
 
 On Apple M5 / macOS arm64 / Node v24.3.0, three isolated final 20-batch runs (15 cases, 12,145 frames, approximately 11.0 MB JSON per batch) observed TypeScript p95 23.220–25.989 ms and Node-hosted Rust-WASM p95 158.133–177.073 ms. Default gates remain 30 and 200 ms. Two prior TypeScript p95 results of 35.614 and 119.161 ms are excluded as contaminated: concurrent clean-clone Vitest workers occupied 70–90% CPU across eight processes; the unchanged benchmark passed before and after that load ended. The benchmark emits p50/p95/p99/max, RSS growth, frames, and bytes. It makes no Worker, UI, 100-entity, or product-capacity claim. A regression-first canonical-text digest implementation produced a 1,366.461 ms TypeScript p95 and was rejected; the admitted fixed-order binary64 output encoding preserves all governed fields while keeping both unchanged performance gates.
 
@@ -78,7 +86,10 @@ node --import tsx --test tests/generic-aam-verification.test.mjs tests/generic-a
 npm run reference-aam:performance
 npm run engine:rust:verify
 npm run reference-aam:rust:verify
+npm run reference-aam:rust:fmt
+npm run reference-aam:rust:clippy
 npm run reference-aam:rust:test
+npm run reference-aam:rust:doc
 make ci-local
 make clean-clone-local
 ```

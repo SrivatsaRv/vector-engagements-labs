@@ -83,6 +83,32 @@ test("every private 6DOF owning path selects its Rust and dependency owners", ()
   }
 });
 
+test("every generic-AAM owning path selects its Rust and dependency owners", () => {
+  const webAndRust = ["policy", "quality", "security_js", "web_tests", "rust_tests"];
+  const cases = [
+    ["verification-rust/generic-aam/src/model.rs", ["policy", "web_tests", "rust_tests"]],
+    ["verification-rust/generic-aam/Cargo.toml", ["policy", "web_tests", "rust_tests", "rust_audit"]],
+    ["verification-rust/generic-aam/Cargo.lock", ["policy", "web_tests", "rust_tests", "rust_audit"]],
+    ["lib/validation/generic-aam-verification.ts", webAndRust],
+    ["lib/validation/generic-aam-verification-wasm.ts", webAndRust],
+    ["lib/validation/generated/generic-aam-verifier-wasm.ts", webAndRust],
+    ["scripts/build-generic-aam-verifier.mjs", webAndRust],
+    ["scripts/benchmark-generic-aam.ts", webAndRust],
+    ["scripts/generate-nasa-generic-aam-workload.mjs", webAndRust],
+    ["scripts/verify-nasa-generic-aam-reference.mjs", webAndRust],
+    ["tests/generic-aam-oracles.test.mjs", webAndRust],
+    ["tests/generic-aam-verification.test.mjs", webAndRust],
+    [
+      "package.json",
+      ["policy", "quality", "security_js", "web_tests", "rust_tests", "integration", "container"],
+    ],
+  ];
+
+  for (const [path, expected] of cases) {
+    assert.deepEqual(selected([path]), expected, path);
+  }
+});
+
 test("runtime and engine changes execute the built Worker browser verifier", () => {
   for (const file of [
     "lib/runtime/simulation.worker.ts",

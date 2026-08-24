@@ -69,6 +69,10 @@ compiler at runtime.
 - `npm run performance:verify` measures cold initialization and warm-run p50/p95 for both backends.
 - `npm run reference-aam:verify` and `npm run reference-aam:performance`
   verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
+  Its `reference-aam:rust:*` commands use the repository-pinned Linux/amd64
+  Rust 1.97.1 builder; hosted Stage 2B owns formatting, Clippy, exact rebuild,
+  native tests, rustdoc, full verification, and the bounded benchmark. Stage 2C
+  audits its independent lockfile.
 - `npm run sixdof-foundation:rust:build` regenerates the standalone 6DOF
   verification artifact; `sixdof-foundation:rust:verify`, `:fmt`, `:clippy`,
   `:test`, and `:doc` independently gate that private crate.

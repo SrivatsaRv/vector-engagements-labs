@@ -3,7 +3,10 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import test from "node:test";
 
-import { runRustWasmGenericAamVerification } from "../lib/validation/generic-aam-verification-wasm.ts";
+import {
+  GENERIC_AAM_VERIFIER_ARTIFACT,
+  runRustWasmGenericAamVerification,
+} from "../lib/validation/generic-aam-verification-wasm.ts";
 import {
   assertGenericAamFullFrameParity,
   genericAamCorpusView,
@@ -29,6 +32,14 @@ const workload = JSON.parse(readFileSync(new URL(
 const clone = (value) => structuredClone(value);
 const corpus = () => clone(genericAamCorpusView());
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+
+test("the generic-AAM private artifact has one canonical cross-host identity", () => {
+  assert.deepEqual(GENERIC_AAM_VERIFIER_ARTIFACT, {
+    builder: "linux/amd64:docker.io/library/rust:1.97.1-bookworm@sha256:408fe88047cef61a2087653b0c5255fa51c0f2d6d94ddedd7a2562a9b91a46f6",
+    sha256: "44cd233b65ff82832bdf5853f78b763edfb3f12ae00d1ddc7c63df4ff693c435",
+    bytes: 205464,
+  });
+});
 
 function assertCloseStructure(actual, expected, label = "value") {
   if (typeof expected === "number") {
