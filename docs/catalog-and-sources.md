@@ -121,6 +121,22 @@ WGS84/vertical-datum declaration, coverage limitation, raw-byte checksum, and
 fail-closed parser. They are deliberately point-only and cannot be selected,
 compiled, or replayed as an area environment pack.
 
+The NASA historical F-16 external-store record in
+`governance/nasa-historical-f16-store-source` is an even narrower source freeze.
+It commits only a content-addressed manifest and instructions. Exact PDF,
+metadata, page-render, and display-rotation identities are recorded, but the
+source bytes are not redistributed while human use/export/redistribution
+decisions remain pending. The verifier performs no download and rejects an
+extra, missing, linked, changed, truncated, swapped, or wrongly rendered local
+artifact.
+
+This record cannot seed `platform_weapon_compatibility`, stations, loadouts,
+model-pack quantities, or catalog assertions. The cited layouts and one
+historical test configuration are not an exhaustive compatibility matrix. The
+single reported GBU-8 ejection is not a release envelope. Current F-16 station
+compatibility and teaching loadouts remain `UNVERIFIED` or
+`MODEL_ASSUMPTION`.
+
 ## Environment-pack installation coverage
 
 Phase A publishes `vector.environment-pack.v1` with the exact
