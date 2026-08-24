@@ -155,3 +155,22 @@ gaps and an explicit `TEXT_ONLY_OR_ABSENT` runway-evidence state. It must never
 be rendered or validated as a complete IAF/PAF base catalogue. PostGIS remains
 the canonical geometry source for published points; the Phase A pack binds the
 same immutable coverage identity required by future ground-start admission.
+
+## Generic sensor verification source freeze
+
+`governance/generic-sensor-verification-sources/manifest.v1.json` is a separate
+Stage-0, content-addressed research-source record with intended use
+`ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE`. It preserves exact public reference
+bytes and locations for isolated future verification work. It is not a catalog
+source row, model-pack source, compiled model, or production asset, and catalog
+admission must not resolve or import it.
+
+The corresponding legal artifact keeps redistribution, reference execution,
+and adaptation as independent decisions. They currently remain
+`PENDING_REVIEW`; missing, pending, forged, agent-authored, wrong-jurisdiction,
+or wrong-scope authority fails closed. Public availability or an open licence
+does not imply local execution, adaptation, export, model, or installation
+authority. Named platform and radar claims, game/community artifacts, and
+dynamic unpinned sources are expressly ineligible. Downstream #26 work remains
+blocked until this freeze is independently reviewed and the specifically
+required human decision is approved.

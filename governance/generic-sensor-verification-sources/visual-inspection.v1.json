@@ -1,0 +1,454 @@
+{
+  "schemaVersion": "vector.generic-sensor-verification-visual-inspection.v1",
+  "status": "PRIMARY_INSPECTION_COMPLETE_INDEPENDENT_REVIEW_REQUIRED",
+  "inspectionDate": "2026-08-24",
+  "inspectionMethod": "FULL_PAGE_RENDER_VISUAL_REVIEW",
+  "reviewerRole": "PRIMARY_SOURCE_FREEZE_IMPLEMENTER",
+  "limitations": [
+    "This record is not an authorized human legal or export decision.",
+    "An independent exact-commit review remains required before publication.",
+    "Rendered images and any OCR are navigation aids; source PDF bytes remain authoritative."
+  ],
+  "pages": [
+    {
+      "sourceId": "nasa-cr-66097",
+      "sourcePdfPage": 1,
+      "reportPage": null,
+      "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-66097",
+      "sourcePdfPage": 143,
+      "reportPage": "134",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-66097",
+      "sourcePdfPage": 144,
+      "reportPage": "135",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-151497",
+      "sourcePdfPage": 1,
+      "reportPage": null,
+      "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-151497",
+      "sourcePdfPage": 2,
+      "reportPage": null,
+      "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-151497",
+      "sourcePdfPage": 3,
+      "reportPage": null,
+      "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-151497",
+      "sourcePdfPage": 4,
+      "reportPage": null,
+      "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-151497",
+      "sourcePdfPage": 53,
+      "reportPage": "2",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-151497",
+      "sourcePdfPage": 54,
+      "reportPage": "3",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-151497",
+      "sourcePdfPage": 55,
+      "reportPage": "4",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-151497",
+      "sourcePdfPage": 56,
+      "reportPage": "5",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 1,
+      "reportPage": null,
+      "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 82,
+      "reportPage": "5-25",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 83,
+      "reportPage": "5-26",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 84,
+      "reportPage": "5-27",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 85,
+      "reportPage": "5-28",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 86,
+      "reportPage": "5-29",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 87,
+      "reportPage": "5-30",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 88,
+      "reportPage": "5-31",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 89,
+      "reportPage": "5-32",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 90,
+      "reportPage": "5-33",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 91,
+      "reportPage": "5-34",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 92,
+      "reportPage": "5-35",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 93,
+      "reportPage": "5-36",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 94,
+      "reportPage": "5-37",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 95,
+      "reportPage": "5-38",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 96,
+      "reportPage": "5-39",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 97,
+      "reportPage": "5-40",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "sourcePdfPage": 98,
+      "reportPage": "5-41",
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 1,
+      "reportPage": null,
+      "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 2,
+      "reportPage": null,
+      "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 3,
+      "reportPage": null,
+      "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 4,
+      "reportPage": null,
+      "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 5,
+      "reportPage": null,
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 6,
+      "reportPage": null,
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 7,
+      "reportPage": null,
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 8,
+      "reportPage": null,
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 9,
+      "reportPage": null,
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 10,
+      "reportPage": null,
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 11,
+      "reportPage": null,
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 12,
+      "reportPage": null,
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 13,
+      "reportPage": null,
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 14,
+      "reportPage": null,
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "sourcePdfPage": 15,
+      "reportPage": null,
+      "purpose": "RELEVANT_SOURCE_CONTEXT",
+      "titleAndReportIdentityChecked": true,
+      "equationContextChecked": true,
+      "limitationsChecked": true,
+      "result": "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE"
+    }
+  ]
+}

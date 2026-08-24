@@ -157,3 +157,20 @@ Complete nonlinear aircraft coefficient-table and engine-map execution; store dr
 ## Rust/WASM gate
 
 The Rust integrator may replace the TypeScript numerical loop only after deterministic parity, numerical-tolerance, malformed-package, extreme-condition, lifecycle, and benchmark tests pass. JavaScript remains responsible for product state and rendering; batches will use a browser Worker.
+
+## Generic sensor source-only boundary
+
+The frozen generic radar, measurement, filtering, and association references
+under `governance/generic-sensor-verification-sources/` are verification-source
+locations only. This Stage-0 record executes no reference implementation,
+transcribes no equation or coefficient, generates no vector, and changes no
+tick. It does not supply detection or minimum range, RCS, antenna, power, loss,
+noise, covariance, probability, false-alarm, clutter, scan, gate, assignment,
+filter, CFAR, EW, or track behavior.
+
+The CR-160557 record is negative-scope evidence only; no threshold model or
+detection consequence is admitted from it. Rendered pages and extracted text
+are non-authoritative navigation aids. Future numerical work remains blocked by
+the exact frozen-source review, an approved human reference-execution decision,
+independent expected values, and its owning model/admission contracts. Source
+availability never creates a generic or named production radar.

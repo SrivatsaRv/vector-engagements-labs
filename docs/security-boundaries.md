@@ -137,3 +137,27 @@ same structural renderer or a separately versioned, tested sanitization policy.
 This slice does not provide a nonce/hash CSP, comment moderation, operator
 identity, retention, or a production CSP report endpoint; those remain open
 items in #70.
+
+## Offline reference-source quarantine
+
+The issue #148 source freeze is quarantined under
+`governance/generic-sensor-verification-sources/`. Production TypeScript,
+Rust/WASM, backend, Worker, browser, model-pack, VSR, fixture, public, and built
+assets must contain no Stage-0 subject/schema/export marker or source-bundle
+import. The offline verifier scans those boundaries and treats any exposure as
+a release failure.
+
+ZIP handling is verification-only and never writes archive-selected paths. It
+parses declared bytes with fixed archive, member-count, and expanded-size
+limits, validates local and central records, CRC and sizes, and rejects
+traversal, absolute or non-UTF-8 paths, backslashes, symlinks, duplicates,
+encryption, unsupported compression, and undeclared inventory changes before a
+selected member is compared. Stone Soup is never imported or executed.
+
+The legal artifact is authority data, not an agent recommendation. Each source
+has separate redistribution, reference-execution, and adaptation states. Only
+an authorized human record with identity, date, jurisdiction, scope,
+conditions, and evidence digest can represent approval; pending, missing,
+forged, agent-authored, and out-of-scope decisions fail closed. Network access
+is unnecessary for verification, and dynamic unpinned or substituted
+community/game material is rejected.

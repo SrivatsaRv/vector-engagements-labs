@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "vector.generic-sensor-verification-production-isolation-evidence.v1",
+  "subjectManifestId": "generic-sensor-source-freeze-v1",
+  "measuredOn": "2026-08-24",
+  "frozenArtifactCount": 76,
+  "frozenArtifactBytes": 62375758,
+  "productionRootsScannedByVerifier": [
+    "app",
+    "components",
+    "db",
+    "dist",
+    "engine-rust",
+    "fixtures/model-packs",
+    "fixtures/vector-record",
+    "lib",
+    "public",
+    "worker"
+  ],
+  "expectedProductionExposures": 0,
+  "productionBuildImportPolicy": "FORBIDDEN",
+  "regressionCommand": "node --test tests/generic-sensor-source-bundle.test.mjs",
+  "omittedRuntimeLayers": [
+    "BROWSER",
+    "DATABASE",
+    "MIGRATION",
+    "NUMERICAL_PARITY",
+    "PERFORMANCE"
+  ],
+  "omissionReason": "STAGE_0_ADDS_NO_RUNTIME_BEHAVIOR"
+}
