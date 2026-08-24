@@ -54,6 +54,7 @@
     "policy:runtime-stubs:verify": "node scripts/verify-runtime-stub-ledger.mjs",
     "policy:aircraft-evidence:verify": "node scripts/verify-aircraft-evidence-registry.mjs",
     "policy:nasa-generic-f16:verify": "node scripts/verify-nasa-generic-f16-reference.mjs",
+    "policy:nasa-f16-store-source:verify": "node scripts/verify-nasa-f16-store-source.mjs",
     "environment:sources:verify": "node scripts/verify-environment-source-assets.mjs",
     "tp1538:sources:generate": "node scripts/generate-tp1538-source-manifest.mjs",
     "tp1538:sources:verify": "node scripts/verify-tp1538-source-manifest.mjs",
