@@ -218,7 +218,7 @@ jobs:
       - name: Run component and built-browser contracts
         run: |
           npm run test:component
-          npm run test:browser
+          npm run test:browser:ci
           npm run worker:verify
       - name: Upload browser evidence on failure
         if: failure()
