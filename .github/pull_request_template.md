@@ -1,6 +1,6 @@
 ## Contract documentation declaration
 
-Keep exactly one block. Follow `governance/contract-doc-ownership.v1.json`; replace the empty family inventory whenever governed contract paths change. The hosted gate binds this declaration to the exact Git change and owning Markdown sections.
+Keep exactly one block. Follow the [contract-document ownership policy](/SrivatsaRv/vector-engagements-labs/blob/main/governance/contract-doc-ownership.v1.json); replace the empty family inventory whenever governed contract paths change. Generate a structurally complete example with `npm run --silent policy:contract-docs:template`. The hosted gate binds this declaration to the exact Git change and owning Markdown sections.
 
 <!-- vector-contract-doc-impact
 {
@@ -8,6 +8,36 @@ Keep exactly one block. Follow `governance/contract-doc-ownership.v1.json`; repl
   "families": []
 }
 -->
+
+Example shape (do not add a second HTML declaration block):
+
+```json
+{
+  "schemaVersion": "vector.contract-doc-impact-declaration.v1",
+  "families": [
+    {
+      "familyId": "DELIVERY_CONTRACT_GOVERNANCE",
+      "disposition": "SEMANTIC",
+      "owningSections": [
+        {
+          "sectionId": "DELIVERY_CONTINUOUS_INTEGRATION",
+          "path": "docs/repository-governance.md",
+          "heading": "## Continuous integration",
+          "facets": ["delivery"]
+        }
+      ],
+      "rationale": "State the exact contract behavior changed by this pull request.",
+      "evidence": [{ "kind": "TEST", "value": "State the exact verification command and result." }],
+      "migration": {
+        "state": "NOT_APPLICABLE",
+        "documents": [],
+        "rationale": "State the exact persistence, migration, and changelog impact."
+      },
+      "exemptionEvidence": null
+    }
+  ]
+}
+```
 
 ## What changed
 

@@ -82,6 +82,9 @@ test("the pull request template requires layer-specific evidence", async () => {
   assert.match(template, /Closure verdict/);
   assert.match(template, /vector-contract-doc-impact/);
   assert.match(template, /vector\.contract-doc-impact-declaration\.v1/);
+  assert.match(template, /contract-document ownership policy.*governance\/contract-doc-ownership\.v1\.json/i);
+  assert.match(template, /npm run --silent policy:contract-docs:template/);
+  assert.match(template, /DELIVERY_CONTINUOUS_INTEGRATION/);
 });
 
 test("the script-based Required PR Gate checks out the tested revision", async () => {
@@ -99,6 +102,9 @@ test("the script-based Required PR Gate checks out the tested revision", async (
 });
 
 test("local, hosted, and clean-clone gates execute the same documentation-impact validator", async () => {
+  const packageJson = JSON.parse(await readFile("package.json", "utf8"));
+  assert.equal(packageJson.scripts["policy:contract-docs:verify"], "node scripts/verify-contract-doc-impact.mjs");
+  assert.equal(packageJson.scripts["policy:contract-docs:template"], "node scripts/verify-contract-doc-impact.mjs --print-template");
   const makefile = await readFile("Makefile", "utf8");
   assert.match(makefile, /npm run policy:contract-docs:verify/);
   assert.match(makefile, /VECTOR_CONTRACT_DOC_DECLARATION_FILE/);

@@ -2,6 +2,7 @@
   "schemaVersion": "vector.contract-doc-ownership.v1",
   "policyId": "VECTOR_CONTRACT_DOC_OWNERSHIP",
   "issue": "#162",
+  "bootstrapBaseSha": "661d280699f260e32c53d6a1b0a6f5cf3415dde7",
   "maxDeclarationBytes": 32768,
   "declarationBlockName": "vector-contract-doc-impact",
   "allowedDispositions": [
@@ -17,33 +18,240 @@
       "id": "DELIVERY_CONTRACT_GOVERNANCE",
       "workstream": "staff-architecture",
       "implementationRules": [
-        { "kind": "PREFIX", "value": ".codex/" },
-        { "kind": "PREFIX", "value": ".github/" },
-        { "kind": "EXACT", "value": "governance/contract-doc-ownership.v1.json" },
-        { "kind": "EXACT", "value": "scripts/lib/contract-doc-impact.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-contract-doc-impact.mjs" },
-        { "kind": "EXACT", "value": "scripts/classify-ci-changes.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-required-gates.mjs" },
-        { "kind": "EXACT", "value": "scripts/context-slice.sh" },
-        { "kind": "EXACT", "value": "scripts/verify-pr-closure-governance.mjs" },
-        { "kind": "EXACT", "value": "Makefile" },
-        { "kind": "EXACT", "value": "package.json" },
-        { "kind": "EXACT", "value": "package-lock.json" },
-        { "kind": "EXACT", "value": "Dockerfile" },
-        { "kind": "EXACT", "value": "compose.yaml" },
-        { "kind": "EXACT", "value": "next.config.ts" },
-        { "kind": "EXACT", "value": "playwright.config.ts" },
-        { "kind": "EXACT", "value": "vite.config.ts" },
-        { "kind": "EXACT", "value": "vitest.config.ts" },
-        { "kind": "EXACT", "value": "eslint.config.mjs" },
-        { "kind": "EXACT", "value": "postcss.config.mjs" },
-        { "kind": "EXACT", "value": "tsconfig.json" }
+        {
+          "kind": "PREFIX",
+          "value": ".codex/",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": ".github/",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/contract-doc-ownership.v1.json",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/lib/contract-doc-impact.mjs",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-contract-doc-impact.mjs",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/classify-ci-changes.mjs",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-required-gates.mjs",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/context-slice.sh",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-pr-closure-governance.mjs",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "Makefile",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "package.json",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "package-lock.json",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "Dockerfile",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "compose.yaml",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "next.config.ts",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "playwright.config.ts",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "vite.config.ts",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "vitest.config.ts",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "eslint.config.mjs",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "postcss.config.mjs",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tsconfig.json",
+          "facets": [
+            "delivery"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/ci-change-classifier.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/contract-doc-impact.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/harness-execution.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/persona-skills.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/pr-closure-governance.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/required-pr-gate.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
-        { "sectionId": "DELIVERY_CONTINUOUS_INTEGRATION", "path": "docs/repository-governance.md", "heading": "## Continuous integration" },
-        { "sectionId": "DELIVERY_TEST_BASELINE", "path": "docs/testing-strategy.md", "heading": "## Existing baseline" }
+        {
+          "sectionId": "DELIVERY_CONTINUOUS_INTEGRATION",
+          "path": "docs/repository-governance.md",
+          "heading": "## Continuous integration",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "sectionId": "DELIVERY_TEST_BASELINE",
+          "path": "docs/testing-strategy.md",
+          "heading": "## Existing baseline",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "sectionId": "DELIVERY_CONTAINER_PROMOTION",
+          "path": "docs/container-release.md",
+          "heading": "## Candidate verification and promotion",
+          "facets": [
+            "runtime"
+          ]
+        },
+        {
+          "sectionId": "DELIVERY_ENGINEERING_RELEASE",
+          "path": "docs/engineering-principles.md",
+          "heading": "## Required release evidence",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "sectionId": "DELIVERY_REGRESSION_GATES",
+          "path": "docs/regression-matrix.md",
+          "heading": "## Commit gates",
+          "facets": [
+            "validity"
+          ]
+        }
       ],
       "migrationSections": []
     },
@@ -51,73 +259,411 @@
       "id": "MODEL_PACK_COMPILER_RESOLVER",
       "workstream": "simulation-systems",
       "implementationRules": [
-        { "kind": "EXACT", "value": "app/blog/page.tsx" },
-        { "kind": "PREFIX", "value": "app/blogs/" },
-        { "kind": "EXACT", "value": "app/math/page.tsx" },
-        { "kind": "EXACT", "value": "app/page.tsx" },
-        { "kind": "EXACT", "value": "app/symbols/page.tsx" },
-        { "kind": "EXACT", "value": "components/BlogArticle.tsx" },
-        { "kind": "EXACT", "value": "components/BlogComments.tsx" },
-        { "kind": "EXACT", "value": "components/BlogEditorialDiagram.tsx" },
-        { "kind": "EXACT", "value": "components/BlogShareAndComments.tsx" },
-        { "kind": "EXACT", "value": "components/BlogsIndexClient.tsx" },
-        { "kind": "EXACT", "value": "components/LandingMiniSim.tsx" },
-        { "kind": "EXACT", "value": "components/MermaidDiagram.tsx" },
-        { "kind": "EXACT", "value": "lib/model-pack.ts" },
-        { "kind": "EXACT", "value": "lib/reference-model-pack.ts" },
-        { "kind": "EXACT", "value": "lib/simulation-models.ts" },
-        { "kind": "EXACT", "value": "lib/runtime/model-pack-adapter.ts" },
-        { "kind": "PREFIX", "value": "fixtures/model-packs/" },
-        { "kind": "EXACT", "value": "scripts/generate-model-pack-fixture.ts" },
-        { "kind": "EXACT", "value": "scripts/verify-governed-catalog-data.ts" }
+        {
+          "kind": "EXACT",
+          "value": "lib/model-pack.ts",
+          "facets": [
+            "schema"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/canonical-json.ts",
+          "facets": [
+            "schema"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/reference-model-pack.ts",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/simulation-models.ts",
+          "facets": [
+            "schema"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/engine/compiler.ts",
+          "facets": [
+            "runtime"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/engine/runtime-model-pack.ts",
+          "facets": [
+            "runtime"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/runtime/model-pack-adapter.ts",
+          "facets": [
+            "runtime"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "engine-rust/src/model_pack.rs",
+          "facets": [
+            "schema"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "fixtures/model-packs/",
+          "facets": [
+            "digest"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/generate-model-pack-fixture.ts",
+          "facets": [
+            "digest"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-governed-catalog-data.ts",
+          "facets": [
+            "admission"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/model-pack.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/deployment-config.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/aircraft-configuration-contrast.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        }
+      ],
       "generatedGroups": [
         {
           "id": "COMPILED_MODEL_PACK_FIXTURES",
-          "outputRules": [{ "kind": "PREFIX", "value": "fixtures/model-packs/" }],
-          "inputRules": [{ "kind": "EXACT", "value": "lib/reference-model-pack.ts" }],
-          "generatorRules": [{ "kind": "EXACT", "value": "scripts/generate-model-pack-fixture.ts" }],
-          "freshnessCommand": "npm run models:verify"
+          "outputRules": [
+            {
+              "kind": "PREFIX",
+              "value": "fixtures/model-packs/",
+              "facets": [
+                "digest"
+              ]
+            }
+          ],
+          "inputRules": [
+            {
+              "kind": "EXACT",
+              "value": "lib/reference-model-pack.ts",
+              "facets": [
+                "digest"
+              ]
+            }
+          ],
+          "generatorRules": [
+            {
+              "kind": "EXACT",
+              "value": "scripts/generate-model-pack-fixture.ts",
+              "facets": [
+                "digest"
+              ]
+            }
+          ],
+          "freshnessArgv": [
+            "node_modules/.bin/tsx",
+            "scripts/generate-model-pack-fixture.ts",
+            "--check"
+          ]
         }
       ],
       "owningSections": [
-        { "sectionId": "MODEL_PACK_SCHEMAS", "path": "docs/model-pack-contract.md", "heading": "## Versioned schemas" },
-        { "sectionId": "MODEL_PACK_COMPILATION", "path": "docs/model-pack-contract.md", "heading": "## Compilation and digest" },
-        { "sectionId": "MODEL_PACK_BINDING", "path": "docs/model-pack-contract.md", "heading": "## Scenario binding and patches" },
-        { "sectionId": "MODEL_PACK_PERSISTENCE", "path": "docs/model-pack-contract.md", "heading": "## Persistence" }
+        {
+          "sectionId": "MODEL_PACK_SCHEMAS",
+          "path": "docs/model-pack-contract.md",
+          "heading": "## Versioned schemas",
+          "facets": [
+            "schema"
+          ]
+        },
+        {
+          "sectionId": "MODEL_PACK_COMPILATION",
+          "path": "docs/model-pack-contract.md",
+          "heading": "## Compilation and digest",
+          "facets": [
+            "digest"
+          ]
+        },
+        {
+          "sectionId": "MODEL_PACK_BINDING",
+          "path": "docs/model-pack-contract.md",
+          "heading": "## Scenario binding and patches",
+          "facets": [
+            "admission",
+            "runtime"
+          ]
+        },
+        {
+          "sectionId": "MODEL_PACK_PERSISTENCE",
+          "path": "docs/model-pack-contract.md",
+          "heading": "## Persistence",
+          "facets": [
+            "storage"
+          ]
+        }
       ],
-      "migrationSections": []
+      "migrationSections": [
+        {
+          "sectionId": "MODEL_PACK_COMPILER_RESOLVER_CHANGELOG",
+          "path": "CHANGELOG.md",
+          "heading": "## Unreleased",
+          "facets": [
+            "admission",
+            "digest",
+            "runtime",
+            "schema",
+            "storage"
+          ]
+        }
+      ]
     },
     {
       "id": "EVIDENCE_RAW_DERIVATIVE_STORAGE",
       "workstream": "verification-release",
       "implementationRules": [
-        { "kind": "EXACT", "value": "governance/aircraft-evidence-registry.v1.json" },
-        { "kind": "EXACT", "value": "governance/aircraft-evidence-registry.v2.json" },
-        { "kind": "PREFIX", "value": "governance/environment-sources/" },
-        { "kind": "PREFIX", "value": "governance/nasa-historical-f16-store-source/" },
-        { "kind": "EXACT", "value": "governance/nasa-generic-f16-verification-corpus.v1.json" },
-        { "kind": "PREFIX", "value": "governance/sources/" },
-        { "kind": "PREFIX", "value": "fixtures/public-reference/" },
-        { "kind": "EXACT", "value": "lib/aircraft-evidence-registry.ts" },
-        { "kind": "EXACT", "value": "lib/catalog-admission.ts" },
-        { "kind": "EXACT", "value": "lib/validation/public-aircraft-reference.ts" },
-        { "kind": "EXACT", "value": "scripts/generate-tp1538-source-manifest.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-aircraft-evidence-registry.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-environment-source-assets.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-nasa-f16-store-source.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-nasa-generic-f16-reference.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-public-aircraft-reference.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-tp1538-source-manifest.mjs" }
+        {
+          "kind": "EXACT",
+          "value": "governance/aircraft-evidence-registry.v1.json",
+          "facets": [
+            "evidence"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/aircraft-evidence-registry.v2.json",
+          "facets": [
+            "evidence"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "governance/environment-sources/",
+          "facets": [
+            "evidence"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "governance/nasa-historical-f16-store-source/",
+          "facets": [
+            "evidence"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/nasa-generic-f16-verification-corpus.v1.json",
+          "facets": [
+            "evidence"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "governance/sources/",
+          "facets": [
+            "evidence"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "fixtures/public-reference/",
+          "facets": [
+            "evidence"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/aircraft-evidence-registry.ts",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/catalog-admission.ts",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/validation/public-aircraft-reference.ts",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/generate-tp1538-source-manifest.mjs",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-aircraft-evidence-registry.mjs",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-environment-source-assets.mjs",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-nasa-f16-store-source.mjs",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-nasa-generic-f16-reference.mjs",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-public-aircraft-reference.mjs",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-tp1538-source-manifest.mjs",
+          "facets": [
+            "admission"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/aircraft-evidence-registry.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/environment-source-admission.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/nasa-f16-store-source.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/nasa-generic-f16-reference.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/public-aircraft-reference.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/tp1538-source-manifest.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/provenance.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
-        { "sectionId": "EVIDENCE_ADMISSION_RULE", "path": "docs/aircraft-evidence-registry.md", "heading": "## Admission rule" },
-        { "sectionId": "EVIDENCE_CURRENT_SUBJECTS", "path": "docs/aircraft-evidence-registry.md", "heading": "## Exact current subjects" },
-        { "sectionId": "EVIDENCE_CHANGE_PROCEDURE", "path": "docs/aircraft-evidence-registry.md", "heading": "## Change procedure" },
-        { "sectionId": "EVIDENCE_SOURCE_CHAIN", "path": "docs/catalog-and-sources.md", "heading": "## Template-to-report version chain" }
+        {
+          "sectionId": "EVIDENCE_ADMISSION_RULE",
+          "path": "docs/aircraft-evidence-registry.md",
+          "heading": "## Admission rule",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "sectionId": "EVIDENCE_CURRENT_SUBJECTS",
+          "path": "docs/aircraft-evidence-registry.md",
+          "heading": "## Exact current subjects",
+          "facets": [
+            "validity"
+          ]
+        },
+        {
+          "sectionId": "EVIDENCE_CHANGE_PROCEDURE",
+          "path": "docs/aircraft-evidence-registry.md",
+          "heading": "## Change procedure",
+          "facets": [
+            "admission"
+          ]
+        },
+        {
+          "sectionId": "EVIDENCE_SOURCE_CHAIN",
+          "path": "docs/catalog-and-sources.md",
+          "heading": "## Template-to-report version chain",
+          "facets": [
+            "evidence"
+          ]
+        },
+        {
+          "sectionId": "EVIDENCE_PUBLIC_REFERENCE",
+          "path": "docs/public-aircraft-reference.md",
+          "heading": "## Current evidence",
+          "facets": [
+            "verification"
+          ]
+        }
       ],
       "migrationSections": []
     },
@@ -125,140 +671,934 @@
       "id": "PERSISTENCE_DATABASE_SCHEMA",
       "workstream": "platform-data",
       "implementationRules": [
-        { "kind": "PREFIX", "value": "db/" },
-        { "kind": "PREFIX", "value": "drizzle/" },
-        { "kind": "PREFIX", "value": "drizzle-legacy-sqlite/" },
-        { "kind": "EXACT", "value": "drizzle.config.ts" },
-        { "kind": "EXACT", "value": "scripts/migrate-db.mjs" },
-        { "kind": "EXACT", "value": "scripts/node-postgres-adapter.mjs" },
-        { "kind": "EXACT", "value": "scripts/seed-db.ts" },
-        { "kind": "EXACT", "value": "scripts/verify-aircraft-evidence-db-upgrade.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-credibility-catalog.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-db.mjs" }
+        {
+          "kind": "PREFIX",
+          "value": "db/",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "drizzle/",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "drizzle-legacy-sqlite/",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "drizzle.config.ts",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/migrate-db.mjs",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/node-postgres-adapter.mjs",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/seed-db.ts",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-aircraft-evidence-db-upgrade.mjs",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-credibility-catalog.mjs",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-db.mjs",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/runtime-admission-db.test.ts",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
-        { "sectionId": "DATABASE_MODEL_PACK_PERSISTENCE", "path": "docs/model-pack-contract.md", "heading": "## Persistence" },
-        { "sectionId": "DATABASE_SAVED_RUNS", "path": "docs/security-boundaries.md", "heading": "## Saved runs" }
+        {
+          "sectionId": "DATABASE_MODEL_PACK_PERSISTENCE",
+          "path": "docs/model-pack-contract.md",
+          "heading": "## Persistence",
+          "facets": [
+            "schema",
+            "storage"
+          ]
+        },
+        {
+          "sectionId": "DATABASE_SAVED_RUNS",
+          "path": "docs/security-boundaries.md",
+          "heading": "## Saved runs",
+          "facets": [
+            "storage",
+            "vsr"
+          ]
+        }
       ],
       "migrationSections": [
-        { "sectionId": "DATABASE_CHANGELOG", "path": "CHANGELOG.md", "heading": "## Unreleased" }
+        {
+          "sectionId": "DATABASE_CHANGELOG",
+          "path": "CHANGELOG.md",
+          "heading": "## Unreleased",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        }
       ]
     },
     {
       "id": "ENGINE_ABI_RUNTIME",
       "workstream": "simulation-systems",
       "implementationRules": [
-        { "kind": "PREFIX", "value": "engine-rust/" },
-        { "kind": "PREFIX", "value": "verification-rust/" },
-        { "kind": "PREFIX", "value": "lib/engine/" },
-        { "kind": "PREFIX", "value": "lib/validation/" },
-        { "kind": "EXACT", "value": "scripts/benchmark-capacity-baseline.ts" },
-        { "kind": "EXACT", "value": "scripts/benchmark-engine.ts" },
-        { "kind": "EXACT", "value": "scripts/benchmark-generic-aam.ts" },
-        { "kind": "EXACT", "value": "scripts/benchmark-track-store.ts" },
-        { "kind": "EXACT", "value": "scripts/build-generic-aam-verifier.mjs" },
-        { "kind": "EXACT", "value": "scripts/build-rust-engine.mjs" },
-        { "kind": "EXACT", "value": "scripts/generate-nasa-generic-aam-workload.mjs" },
-        { "kind": "EXACT", "value": "scripts/track-store-capacity.worker.ts" },
-        { "kind": "EXACT", "value": "scripts/verify-nasa-generic-aam-reference.mjs" },
-        { "kind": "PREFIX", "value": "fixtures/performance/" },
-        { "kind": "EXACT", "value": "governance/nasa-tm-109057-generic-aam-verification-corpus.v1.json" },
-        { "kind": "EXACT", "value": "governance/nasa-tm-109057-generic-aam-verification-corpus.v2.json" },
-        { "kind": "EXACT", "value": "governance/nasa-tm-109057-generic-aam-verification-corpus.v3.json" },
-        { "kind": "EXACT", "value": "governance/nasa-tm-109057-generic-aam-verification-corpus.v4.json" },
-        { "kind": "EXACT", "value": "governance/nasa-tm-109057-generic-aam-verification-corpus.v5.json" }
+        {
+          "kind": "PREFIX",
+          "value": "engine-rust/",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "verification-rust/",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "lib/engine/",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "lib/validation/",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-capacity-baseline.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-engine.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-generic-aam.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-track-store.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/build-generic-aam-verifier.mjs",
+          "facets": [
+            "datum",
+            "unit",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/build-rust-engine.mjs",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/generate-nasa-generic-aam-workload.mjs",
+          "facets": [
+            "datum",
+            "unit",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/track-store-capacity.worker.ts",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-nasa-generic-aam-reference.mjs",
+          "facets": [
+            "datum",
+            "unit",
+            "verification"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "fixtures/performance/",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/nasa-tm-109057-generic-aam-verification-corpus.v1.json",
+          "facets": [
+            "datum",
+            "unit",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/nasa-tm-109057-generic-aam-verification-corpus.v2.json",
+          "facets": [
+            "datum",
+            "unit",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/nasa-tm-109057-generic-aam-verification-corpus.v3.json",
+          "facets": [
+            "datum",
+            "unit",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/nasa-tm-109057-generic-aam-verification-corpus.v4.json",
+          "facets": [
+            "datum",
+            "unit",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/nasa-tm-109057-generic-aam-verification-corpus.v5.json",
+          "facets": [
+            "datum",
+            "unit",
+            "verification"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/engine-backends.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/engine.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/capacity-baseline.test.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/generic-aam-oracles.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/generic-aam-verification.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/track-store.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/sensor-model-admission.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        }
+      ],
       "generatedGroups": [
         {
           "id": "PRODUCTION_ENGINE_WASM",
-          "outputRules": [{ "kind": "PREFIX", "value": "lib/engine/generated/" }],
-          "inputRules": [{ "kind": "PREFIX", "value": "engine-rust/" }],
-          "generatorRules": [{ "kind": "EXACT", "value": "scripts/build-rust-engine.mjs" }],
-          "freshnessCommand": "npm run engine:rust:verify"
+          "outputRules": [
+            {
+              "kind": "PREFIX",
+              "value": "lib/engine/generated/",
+              "facets": [
+                "digest",
+                "runtime"
+              ]
+            }
+          ],
+          "inputRules": [
+            {
+              "kind": "PREFIX",
+              "value": "engine-rust/",
+              "facets": [
+                "digest",
+                "runtime"
+              ]
+            }
+          ],
+          "generatorRules": [
+            {
+              "kind": "EXACT",
+              "value": "scripts/build-rust-engine.mjs",
+              "facets": [
+                "digest",
+                "runtime"
+              ]
+            }
+          ],
+          "freshnessArgv": [
+            "node",
+            "scripts/build-rust-engine.mjs",
+            "--check"
+          ]
         }
       ],
       "owningSections": [
-        { "sectionId": "ENGINE_RUST_WASM", "path": "docs/engine-backends.md", "heading": "## Rust / WebAssembly" },
-        { "sectionId": "ENGINE_SELECTION_PROVENANCE", "path": "docs/engine-backends.md", "heading": "## Selection and provenance" },
-        { "sectionId": "ENGINE_SWAP_BOUNDARY", "path": "docs/engine-backends.md", "heading": "## Swap boundary" }
+        {
+          "sectionId": "ENGINE_RUST_WASM",
+          "path": "docs/engine-backends.md",
+          "heading": "## Rust / WebAssembly",
+          "facets": [
+            "schema"
+          ]
+        },
+        {
+          "sectionId": "ENGINE_SELECTION_PROVENANCE",
+          "path": "docs/engine-backends.md",
+          "heading": "## Selection and provenance",
+          "facets": [
+            "digest"
+          ]
+        },
+        {
+          "sectionId": "ENGINE_SWAP_BOUNDARY",
+          "path": "docs/engine-backends.md",
+          "heading": "## Swap boundary",
+          "facets": [
+            "runtime"
+          ]
+        },
+        {
+          "sectionId": "ENGINE_GENERIC_AAM_CONTRACT",
+          "path": "docs/generic-aam-verification.md",
+          "heading": "## Executable contract",
+          "facets": [
+            "datum",
+            "unit"
+          ]
+        },
+        {
+          "sectionId": "ENGINE_PERFORMANCE_MATRIX",
+          "path": "docs/performance-capacity.md",
+          "heading": "## Required performance test matrix",
+          "facets": [
+            "verification"
+          ]
+        }
       ],
-      "migrationSections": []
+      "migrationSections": [
+        {
+          "sectionId": "ENGINE_ABI_RUNTIME_CHANGELOG",
+          "path": "CHANGELOG.md",
+          "heading": "## Unreleased",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema"
+          ]
+        }
+      ]
     },
     {
       "id": "BROWSER_WORKER_PROTOCOL",
       "workstream": "browser-runtime",
       "implementationRules": [
-        { "kind": "PREFIX", "value": "worker/" },
-        { "kind": "PREFIX", "value": "lib/runtime/" },
-        { "kind": "EXACT", "value": "scripts/browser-worker-assets.ts" },
-        { "kind": "EXACT", "value": "scripts/build-runtime-bundles.mjs" },
-        { "kind": "EXACT", "value": "scripts/run-managed-server.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-browser-worker.ts" }
+        {
+          "kind": "PREFIX",
+          "value": "worker/",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "lib/runtime/",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/browser-worker-assets.ts",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/build-runtime-bundles.mjs",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/run-managed-server.mjs",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-browser-worker.ts",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema",
+            "verification"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/browser-runtime.test.mjs",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/browser-worker-assets.test.ts",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema",
+            "verification"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
-        { "sectionId": "WORKER_DEDICATED_RUNTIME", "path": "docs/browser-engine-architecture.md", "heading": "## Dedicated simulation Worker" },
-        { "sectionId": "WORKER_BUILT_VERIFICATION", "path": "docs/browser-engine-architecture.md", "heading": "## Built Worker verification" }
+        {
+          "sectionId": "WORKER_DEDICATED_RUNTIME",
+          "path": "docs/browser-engine-architecture.md",
+          "heading": "## Dedicated simulation Worker",
+          "facets": [
+            "runtime",
+            "schema"
+          ]
+        },
+        {
+          "sectionId": "WORKER_BUILT_VERIFICATION",
+          "path": "docs/browser-engine-architecture.md",
+          "heading": "## Built Worker verification",
+          "facets": [
+            "digest",
+            "verification"
+          ]
+        }
       ],
-      "migrationSections": []
+      "migrationSections": [
+        {
+          "sectionId": "BROWSER_WORKER_PROTOCOL_CHANGELOG",
+          "path": "CHANGELOG.md",
+          "heading": "## Unreleased",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema"
+          ]
+        }
+      ]
     },
     {
       "id": "RECORD_VSR_PERSISTENCE",
       "workstream": "verification-release",
       "implementationRules": [
-        { "kind": "PREFIX", "value": "lib/record/" },
-        { "kind": "EXACT", "value": "lib/report-export.ts" },
-        { "kind": "EXACT", "value": "app/report/page.tsx" },
-        { "kind": "EXACT", "value": "components/ReportReplay.tsx" }
+        {
+          "kind": "PREFIX",
+          "value": "lib/record/",
+          "facets": [
+            "digest",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/canonical-json.ts",
+          "facets": [
+            "digest",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/report-export.ts",
+          "facets": [
+            "digest",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/report/page.tsx",
+          "facets": [
+            "digest",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/ReportReplay.tsx",
+          "facets": [
+            "digest",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "app/api/runs/",
+          "facets": [
+            "digest",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/security/saved-run.ts",
+          "facets": [
+            "digest",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/security/saved-run-admission.ts",
+          "facets": [
+            "digest",
+            "storage",
+            "vsr"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/vector-record.test.mjs",
+          "facets": [
+            "digest",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/simulation-events.test.ts",
+          "facets": [
+            "digest",
+            "storage",
+            "vsr"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
-        { "sectionId": "VSR_INTEGRITY_REPLAY", "path": "docs/vector-simulation-record.md", "heading": "## Integrity and replay" },
-        { "sectionId": "VSR_BROWSER_BOUNDARY", "path": "docs/vector-simulation-record.md", "heading": "## Browser and interoperability boundary" }
+        {
+          "sectionId": "VSR_INTEGRITY_REPLAY",
+          "path": "docs/vector-simulation-record.md",
+          "heading": "## Integrity and replay",
+          "facets": [
+            "digest",
+            "vsr"
+          ]
+        },
+        {
+          "sectionId": "VSR_BROWSER_BOUNDARY",
+          "path": "docs/vector-simulation-record.md",
+          "heading": "## Browser and interoperability boundary",
+          "facets": [
+            "storage",
+            "vsr"
+          ]
+        }
       ],
-      "migrationSections": []
+      "migrationSections": [
+        {
+          "sectionId": "RECORD_VSR_PERSISTENCE_CHANGELOG",
+          "path": "CHANGELOG.md",
+          "heading": "## Unreleased",
+          "facets": [
+            "digest",
+            "storage",
+            "vsr"
+          ]
+        }
+      ]
     },
     {
       "id": "CAPABILITY_DESCRIPTORS_SELECTORS",
       "workstream": "staff-architecture",
       "implementationRules": [
-        { "kind": "EXACT", "value": "config/deployment-capabilities.json" },
-        { "kind": "EXACT", "value": "lib/capability-data.ts" },
-        { "kind": "EXACT", "value": "lib/frontend/selectors.ts" },
-        { "kind": "EXACT", "value": "components/PlatformEvidence.tsx" },
-        { "kind": "EXACT", "value": "components/ObjectPicker.tsx" }
+        {
+          "kind": "EXACT",
+          "value": "config/deployment-capabilities.json",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/capability-data.ts",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/frontend/selectors.ts",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/PlatformEvidence.tsx",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/ObjectPicker.tsx",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/catalog-admission.test.mjs",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/deployment-capabilities.test.mjs",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/frontend-selectors.test.mjs",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/named-aircraft-catalog.test.mjs",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
-        { "sectionId": "CAPABILITY_ADMITTED_SURFACE", "path": "docs/deployment-capabilities.md", "heading": "## Current admitted surface" },
-        { "sectionId": "CAPABILITY_AUTHORITY_BOUNDARY", "path": "docs/scenario-builder.md", "heading": "## Operator input versus governed behavior" }
+        {
+          "sectionId": "CAPABILITY_ADMITTED_SURFACE",
+          "path": "docs/deployment-capabilities.md",
+          "heading": "## Current admitted surface",
+          "facets": [
+            "admission",
+            "evidence"
+          ]
+        },
+        {
+          "sectionId": "CAPABILITY_AUTHORITY_BOUNDARY",
+          "path": "docs/scenario-builder.md",
+          "heading": "## Operator input versus governed behavior",
+          "facets": [
+            "ui"
+          ]
+        }
       ],
-      "migrationSections": []
+      "migrationSections": [
+        {
+          "sectionId": "CAPABILITY_DESCRIPTORS_SELECTORS_CHANGELOG",
+          "path": "CHANGELOG.md",
+          "heading": "## Unreleased",
+          "facets": [
+            "admission"
+          ]
+        }
+      ]
     },
     {
       "id": "UI_AUTHORING",
       "workstream": "frontend-3d",
       "implementationRules": [
-        { "kind": "EXACT", "value": "app/lab/page.tsx" },
-        { "kind": "EXACT", "value": "app/scenarios/page.tsx" },
-        { "kind": "EXACT", "value": "app/workbench/page.tsx" },
-        { "kind": "EXACT", "value": "components/CurrentGeometry.tsx" },
-        { "kind": "EXACT", "value": "components/ObjectPicker.tsx" },
-        { "kind": "EXACT", "value": "components/ScenarioAuthoringMap.tsx" },
-        { "kind": "EXACT", "value": "components/ScenarioLibrary.tsx" },
-        { "kind": "EXACT", "value": "components/SpatialEntityEditor.tsx" }
+        {
+          "kind": "EXACT",
+          "value": "app/lab/page.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/scenarios/page.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/workbench/page.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/CurrentGeometry.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/ObjectPicker.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/ScenarioAuthoringMap.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/ScenarioLibrary.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/SpatialEntityEditor.tsx",
+          "facets": [
+            "ui"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/browser/route-authoring.spec.ts",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/current-geometry.test.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/scenario-library.test.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/spatial-entity-editor.test.tsx",
+          "facets": [
+            "ui"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
-        { "sectionId": "UI_BUILDER_CONTRACT", "path": "docs/scenario-builder.md", "heading": "## Full builder UX specification" },
-        { "sectionId": "UI_ARTIFACT_STATE_BOUNDARY", "path": "docs/scenario-builder.md", "heading": "### Artifact and state boundaries" }
+        {
+          "sectionId": "UI_BUILDER_CONTRACT",
+          "path": "docs/scenario-builder.md",
+          "heading": "## Full builder UX specification",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "sectionId": "UI_ARTIFACT_STATE_BOUNDARY",
+          "path": "docs/scenario-builder.md",
+          "heading": "### Artifact and state boundaries",
+          "facets": [
+            "ui"
+          ]
+        }
       ],
       "migrationSections": []
     },
@@ -266,22 +1606,149 @@
       "id": "UI_OBSERVE",
       "workstream": "frontend-3d",
       "implementationRules": [
-        { "kind": "EXACT", "value": "components/BrowserTelemetry.tsx" },
-        { "kind": "EXACT", "value": "components/EngagementMap.tsx" },
-        { "kind": "EXACT", "value": "components/PlatformEvidence.tsx" },
-        { "kind": "EXACT", "value": "components/PrintTrajectory.tsx" },
-        { "kind": "EXACT", "value": "components/RouteTransitionInspector.tsx" },
-        { "kind": "EXACT", "value": "components/SimulationScene.tsx" },
-        { "kind": "EXACT", "value": "components/TelemetryChart.tsx" },
-        { "kind": "EXACT", "value": "components/TrackStateInspector.tsx" },
-        { "kind": "EXACT", "value": "components/ViewportTelemetry.tsx" },
-        { "kind": "EXACT", "value": "components/VectorMapControls.tsx" }
+        {
+          "kind": "EXACT",
+          "value": "components/BrowserTelemetry.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/EngagementMap.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/PlatformEvidence.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/PrintTrajectory.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/RouteTransitionInspector.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/SimulationScene.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/TelemetryChart.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/TrackStateInspector.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/ViewportTelemetry.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/VectorMapControls.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/component/platform-evidence.test.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/route-transition-inspector.test.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/track-state-inspector.test.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/viewport-telemetry.test.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/map-symbol-report.test.mjs",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
-        { "sectionId": "UI_OBSERVE_SHELL", "path": "docs/responsive-ui.md", "heading": "## Observe viewport shell" },
-        { "sectionId": "UI_OBSERVE_PROOF", "path": "docs/responsive-ui.md", "heading": "## Automated proof" }
+        {
+          "sectionId": "UI_OBSERVE_SHELL",
+          "path": "docs/responsive-ui.md",
+          "heading": "## Observe viewport shell",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "sectionId": "UI_OBSERVE_PROOF",
+          "path": "docs/responsive-ui.md",
+          "heading": "## Automated proof",
+          "facets": [
+            "ui",
+            "verification",
+            "vsr"
+          ]
+        }
       ],
       "migrationSections": []
     },
@@ -289,21 +1756,104 @@
       "id": "UI_PRESENTATION_SEMANTICS",
       "workstream": "frontend-3d",
       "implementationRules": [
-        { "kind": "EXACT", "value": "components/SymbolReference.tsx" },
-        { "kind": "EXACT", "value": "components/TacticalSymbol.tsx" },
-        { "kind": "EXACT", "value": "components/TacticalSymbolLegend.tsx" },
-        { "kind": "EXACT", "value": "lib/generated/game-icons.ts" },
-        { "kind": "EXACT", "value": "lib/tactical-symbol-contract.ts" },
-        { "kind": "EXACT", "value": "lib/tactical-symbol-library.ts" },
-        { "kind": "EXACT", "value": "lib/tactical-symbol-markup.ts" },
-        { "kind": "EXACT", "value": "scripts/generate-tactical-icons.mjs" }
-        ,{ "kind": "EXACT", "value": "scripts/verify-blog-editorial.mjs" }
+        {
+          "kind": "EXACT",
+          "value": "components/SymbolReference.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/TacticalSymbol.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/TacticalSymbolLegend.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/generated/game-icons.ts",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/tactical-symbol-contract.ts",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/tactical-symbol-library.ts",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/tactical-symbol-markup.ts",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/generate-tactical-icons.mjs",
+          "facets": [
+            "ui"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/component/tactical-symbol-legend.test.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/tactical-symbol-contract.test.ts",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/rendered-html.test.mjs",
+          "facets": [
+            "ui"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
-        { "sectionId": "UI_PRODUCT_LANGUAGE", "path": "docs/product-language.md", "heading": "## Mission-set taxonomy" },
-        { "sectionId": "UI_TACVIEW_SUBSET", "path": "docs/tacview-visual-subset.md", "heading": "## Typed presentation grammar" }
+        {
+          "sectionId": "UI_PRODUCT_LANGUAGE",
+          "path": "docs/product-language.md",
+          "heading": "## Mission-set taxonomy",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "sectionId": "UI_TACVIEW_SUBSET",
+          "path": "docs/tacview-visual-subset.md",
+          "heading": "## Typed presentation grammar",
+          "facets": [
+            "ui"
+          ]
+        }
       ],
       "migrationSections": []
     },
@@ -311,104 +1861,1012 @@
       "id": "UI_RESPONSIVE_INTERACTION",
       "workstream": "frontend-3d",
       "implementationRules": [
-        { "kind": "EXACT", "value": "app/globals.css" },
-        { "kind": "EXACT", "value": "app/layout.tsx" },
-        { "kind": "EXACT", "value": "components/ProductHeader.tsx" }
-        ,{ "kind": "EXACT", "value": "scripts/run-browser-contracts.mjs" }
-        ,{ "kind": "EXACT", "value": "scripts/verify-responsive-ui.mjs" }
+        {
+          "kind": "EXACT",
+          "value": "app/globals.css",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/layout.tsx",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/ProductHeader.tsx",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/run-browser-contracts.mjs",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-responsive-ui.mjs",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/browser-contract-runner.test.mjs",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/browser/capability-admission.spec.ts",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/setup.ts",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
-        { "sectionId": "UI_RESPONSIVE_BEHAVIOR", "path": "docs/responsive-ui.md", "heading": "## Behavioral rules" },
-        { "sectionId": "UI_RESPONSIVE_PROOF", "path": "docs/responsive-ui.md", "heading": "## Automated proof" }
+        {
+          "sectionId": "UI_RESPONSIVE_BEHAVIOR",
+          "path": "docs/responsive-ui.md",
+          "heading": "## Behavioral rules",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "sectionId": "UI_RESPONSIVE_PROOF",
+          "path": "docs/responsive-ui.md",
+          "heading": "## Automated proof",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        }
       ],
       "migrationSections": []
     },
     {
-      "id": "PRODUCT_RUNTIME_MISC",
-      "workstream": "staff-architecture",
+      "id": "GEOSPATIAL_ENVIRONMENT",
+      "workstream": "geospatial-environment",
       "implementationRules": [
-        { "kind": "PREFIX", "value": "lib/geospatial/" },
-        { "kind": "PREFIX", "value": "lib/observability/" },
-        { "kind": "PREFIX", "value": "lib/security/" },
-        { "kind": "EXACT", "value": "lib/blog-markdown.tsx" },
-        { "kind": "EXACT", "value": "lib/blog.server.ts" },
-        { "kind": "EXACT", "value": "lib/blog.ts" },
-        { "kind": "EXACT", "value": "lib/canonical-json.ts" },
-        { "kind": "EXACT", "value": "lib/information-state.ts" },
-        { "kind": "EXACT", "value": "lib/installations.ts" },
-        { "kind": "EXACT", "value": "lib/map-layer-contracts.ts" },
-        { "kind": "EXACT", "value": "lib/mission-admission.ts" },
-        { "kind": "EXACT", "value": "lib/object-catalog.ts" },
-        { "kind": "EXACT", "value": "lib/scenario-draft.ts" },
-        { "kind": "EXACT", "value": "lib/scenario-package.ts" },
-        { "kind": "EXACT", "value": "lib/scenario-spatial.ts" },
-        { "kind": "EXACT", "value": "lib/scenario-validation.ts" },
-        { "kind": "EXACT", "value": "lib/scenarios.ts" },
-        { "kind": "EXACT", "value": "lib/simulation.ts" },
-        { "kind": "EXACT", "value": "lib/study-areas.ts" },
-        { "kind": "EXACT", "value": "lib/vector-map.ts" },
-        { "kind": "PREFIX", "value": "app/api/" },
-        { "kind": "EXACT", "value": "app/chatgpt-auth.ts" },
-        { "kind": "EXACT", "value": "scripts/prepare-maplibre-assets.mjs" },
-        { "kind": "EXACT", "value": "scripts/start-production.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-app.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-container-image.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-observability.mjs" },
-        { "kind": "EXACT", "value": "scripts/verify-runtime-stub-ledger.mjs" },
-        { "kind": "EXACT", "value": "governance/browser-toolchain-compatibility.v1.json" },
-        { "kind": "EXACT", "value": "governance/installation-catalogue.v1.json" },
-        { "kind": "EXACT", "value": "governance/issue-closure-governance.v1.json" },
-        { "kind": "EXACT", "value": "governance/runtime-stub-ledger.v1.json" }
+        {
+          "kind": "PREFIX",
+          "value": "lib/geospatial/",
+          "facets": [
+            "admission",
+            "datum",
+            "evidence",
+            "runtime",
+            "unit"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/installations.ts",
+          "facets": [
+            "admission",
+            "datum",
+            "evidence",
+            "runtime",
+            "unit"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/map-layer-contracts.ts",
+          "facets": [
+            "admission",
+            "datum",
+            "evidence",
+            "runtime",
+            "unit"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/study-areas.ts",
+          "facets": [
+            "admission",
+            "datum",
+            "evidence",
+            "runtime",
+            "unit"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/vector-map.ts",
+          "facets": [
+            "admission",
+            "datum",
+            "evidence",
+            "runtime",
+            "unit"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/api/map-tile/route.ts",
+          "facets": [
+            "admission",
+            "datum",
+            "evidence",
+            "runtime",
+            "unit"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/prepare-maplibre-assets.mjs",
+          "facets": [
+            "admission",
+            "datum",
+            "evidence",
+            "runtime",
+            "unit"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/installation-catalogue.v1.json",
+          "facets": [
+            "admission",
+            "datum",
+            "evidence",
+            "runtime",
+            "unit"
+          ]
+        }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/basemap-tiles.test.ts",
+          "facets": [
+            "admission",
+            "datum",
+            "evidence",
+            "runtime",
+            "unit"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/geospatial-environment.test.mjs",
+          "facets": [
+            "admission",
+            "datum",
+            "evidence",
+            "runtime",
+            "unit"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/installation-catalogue.test.mjs",
+          "facets": [
+            "admission",
+            "datum",
+            "evidence",
+            "runtime",
+            "unit"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
-        { "sectionId": "PRODUCT_PHYSICS_CONTRACT", "path": "docs/physics-model.md", "heading": "## Integrated model" },
-        { "sectionId": "PRODUCT_SECURITY_BOUNDARY", "path": "docs/security-boundaries.md", "heading": "## Delivery trust" }
+        {
+          "sectionId": "GEOSPATIAL_FRAME_DATUM",
+          "path": "docs/geospatial-environment.md",
+          "heading": "## Coordinate authority",
+          "facets": [
+            "datum",
+            "unit"
+          ]
+        },
+        {
+          "sectionId": "GEOSPATIAL_SOURCE_ADMISSION",
+          "path": "docs/geospatial-environment.md",
+          "heading": "## Phase B source-ingestion admission boundary",
+          "facets": [
+            "admission",
+            "evidence",
+            "runtime"
+          ]
+        }
       ],
       "migrationSections": []
     },
     {
-      "id": "VERIFICATION_TEST_SURFACE",
-      "workstream": "verification-release",
-      "implementationRules": [],
-      "testRules": [{ "kind": "PREFIX", "value": "tests/" }],
+      "id": "MISSION_SCENARIO_RUNTIME",
+      "workstream": "simulation-systems",
+      "implementationRules": [
+        {
+          "kind": "EXACT",
+          "value": "lib/information-state.ts",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/mission-admission.ts",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/object-catalog.ts",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-draft.ts",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-package.ts",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-spatial.ts",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-validation.ts",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenarios.ts",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/simulation.ts",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/api/catalog/route.ts",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        }
+      ],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/mission-admission.test.mjs",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/rasp-state-machine.test.mjs",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/scenario-draft.test.mjs",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/simulation.test.mjs",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema",
+            "ui"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
-        { "sectionId": "VERIFICATION_REQUIRED_LAYERS", "path": "docs/testing-strategy.md", "heading": "## Required layers" },
-        { "sectionId": "VERIFICATION_RELEASE_EVIDENCE", "path": "docs/testing-strategy.md", "heading": "## Release evidence" }
+        {
+          "sectionId": "MISSION_SCENARIO_ARTIFACT",
+          "path": "docs/scenario-builder.md",
+          "heading": "## Scenario artifact",
+          "facets": [
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "sectionId": "MISSION_STATE_MACHINE",
+          "path": "docs/rasp-state-machine.md",
+          "heading": "## Canonical boundary",
+          "facets": [
+            "admission",
+            "runtime"
+          ]
+        },
+        {
+          "sectionId": "MISSION_INTEGRATED_MODEL",
+          "path": "docs/physics-model.md",
+          "heading": "## Integrated model",
+          "facets": [
+            "runtime"
+          ]
+        }
+      ],
+      "migrationSections": [
+        {
+          "sectionId": "MISSION_SCENARIO_RUNTIME_CHANGELOG",
+          "path": "CHANGELOG.md",
+          "heading": "## Unreleased",
+          "facets": [
+            "admission",
+            "runtime",
+            "schema"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SECURITY_DELIVERY_RUNTIME",
+      "workstream": "security-release",
+      "implementationRules": [
+        {
+          "kind": "PREFIX",
+          "value": "lib/security/",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/chatgpt-auth.ts",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/api/blog-comments/route.ts",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/start-production.mjs",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-app.mjs",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-container-image.mjs",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-runtime-stub-ledger.mjs",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/browser-toolchain-compatibility.v1.json",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/issue-closure-governance.v1.json",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/runtime-stub-ledger.v1.json",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        }
+      ],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/cloudflare-loader.mjs",
+          "facets": [
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/browser-response-headers.test.mjs",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/browser-response-policy.test.ts",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/runtime-admission.test.ts",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/runtime-stub-ledger.test.mjs",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/security-boundaries.test.ts",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/security-config.test.mjs",
+          "facets": [
+            "admission",
+            "delivery",
+            "validity"
+          ]
+        }
+      ],
+      "generatedGroups": [],
+      "owningSections": [
+        {
+          "sectionId": "SECURITY_DELIVERY_TRUST",
+          "path": "docs/security-boundaries.md",
+          "heading": "## Delivery trust",
+          "facets": [
+            "delivery",
+            "validity"
+          ]
+        },
+        {
+          "sectionId": "SECURITY_RESPONSE_BASELINE",
+          "path": "docs/security-boundaries.md",
+          "heading": "## Browser response baseline",
+          "facets": [
+            "admission",
+            "validity"
+          ]
+        }
+      ],
+      "migrationSections": []
+    },
+    {
+      "id": "OBSERVABILITY_OPERATIONS",
+      "workstream": "operations",
+      "implementationRules": [
+        {
+          "kind": "PREFIX",
+          "value": "lib/observability/",
+          "facets": [
+            "delivery",
+            "runtime"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "observability/",
+          "facets": [
+            "delivery",
+            "runtime"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/api/health/route.ts",
+          "facets": [
+            "delivery",
+            "runtime"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/api/metrics/route.ts",
+          "facets": [
+            "delivery",
+            "runtime"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/api/telemetry/route.ts",
+          "facets": [
+            "delivery",
+            "runtime"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-observability.mjs",
+          "facets": [
+            "delivery",
+            "runtime"
+          ]
+        }
+      ],
+      "testRules": [],
+      "generatedGroups": [],
+      "owningSections": [
+        {
+          "sectionId": "OBSERVABILITY_CONTRACT",
+          "path": "docs/observability.md",
+          "heading": "## Metric contract",
+          "facets": [
+            "runtime"
+          ]
+        },
+        {
+          "sectionId": "OBSERVABILITY_DEPLOYMENT",
+          "path": "docs/cloudflare-architecture.md",
+          "heading": "## Deployment gates",
+          "facets": [
+            "delivery"
+          ]
+        }
+      ],
+      "migrationSections": []
+    },
+    {
+      "id": "CONTENT_PUBLISHING",
+      "workstream": "frontend-content",
+      "implementationRules": [
+        {
+          "kind": "EXACT",
+          "value": "app/blog/page.tsx",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "app/blogs/",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/math/page.tsx",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/page.tsx",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/symbols/page.tsx",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/BlogArticle.tsx",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/BlogComments.tsx",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/BlogEditorialDiagram.tsx",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/BlogShareAndComments.tsx",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/BlogsIndexClient.tsx",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/LandingMiniSim.tsx",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/MermaidDiagram.tsx",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/blog-markdown.tsx",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/blog.server.ts",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/blog.ts",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "content/blog/",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "public/blog/",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-blog-editorial.mjs",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        }
+      ],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/blog-trusted-content.test.ts",
+          "facets": [
+            "delivery",
+            "ui",
+            "validity"
+          ]
+        }
+      ],
+      "generatedGroups": [],
+      "owningSections": [
+        {
+          "sectionId": "CONTENT_TRUST_BOUNDARY",
+          "path": "docs/blog-publishing.md",
+          "heading": "## Content safety",
+          "facets": [
+            "validity"
+          ]
+        },
+        {
+          "sectionId": "CONTENT_RENDERING",
+          "path": "docs/blog-publishing.md",
+          "heading": "## Source of truth",
+          "facets": [
+            "delivery",
+            "ui"
+          ]
+        }
       ],
       "migrationSections": []
     }
   ],
   "allowedMultiFamilyPaths": [
+    "CHANGELOG.md",
     "components/ObjectPicker.tsx",
     "components/PlatformEvidence.tsx",
+    "docs/model-pack-contract.md",
+    "docs/responsive-ui.md",
+    "docs/scenario-builder.md",
+    "docs/security-boundaries.md",
+    "engine-rust/src/model_pack.rs",
+    "lib/canonical-json.ts",
+    "lib/engine/compiler.ts",
+    "lib/engine/runtime-model-pack.ts",
     "lib/runtime/model-pack-adapter.ts",
+    "lib/security/saved-run-admission.ts",
+    "lib/security/saved-run.ts",
     "lib/validation/public-aircraft-reference.ts"
   ],
   "nonContractRules": [
-    { "id": "DOCUMENTATION", "kind": "PREFIX", "value": "docs/" },
-    { "id": "ROOT_CHANGELOG", "kind": "EXACT", "value": "CHANGELOG.md" },
-    { "id": "PUBLIC_ASSETS", "kind": "PREFIX", "value": "public/" },
-    { "id": "BLOG_CONTENT", "kind": "PREFIX", "value": "content/" },
-    { "id": "OBSERVABILITY_CONFIG", "kind": "PREFIX", "value": "observability/" },
-    { "id": "ROOT_DOCKERIGNORE", "kind": "EXACT", "value": ".dockerignore" },
-    { "id": "ROOT_ENV_EXAMPLE", "kind": "EXACT", "value": ".env.example" },
-    { "id": "ROOT_GITIGNORE", "kind": "EXACT", "value": ".gitignore" },
-    { "id": "ROOT_AGENTS", "kind": "EXACT", "value": "AGENTS.md" },
-    { "id": "ROOT_BLOG_TYPES", "kind": "EXACT", "value": "blog-content.d.ts" },
-    { "id": "ROOT_CLOUDFLARE_TYPES", "kind": "EXACT", "value": "cloudflare-env.d.ts" },
-    { "id": "ROOT_CODE_OF_CONDUCT", "kind": "EXACT", "value": "CODE_OF_CONDUCT.md" },
-    { "id": "ROOT_CONTRIBUTING", "kind": "EXACT", "value": "CONTRIBUTING.md" },
-    { "id": "ROOT_GOVERNANCE", "kind": "EXACT", "value": "GOVERNANCE.md" },
-    { "id": "ROOT_LICENSE", "kind": "EXACT", "value": "LICENSE" },
-    { "id": "ROOT_NOTICE", "kind": "EXACT", "value": "NOTICE" },
-    { "id": "ROOT_README", "kind": "EXACT", "value": "README.md" },
-    { "id": "ROOT_SECURITY", "kind": "EXACT", "value": "SECURITY.md" },
-    { "id": "ROOT_VITE_ENV", "kind": "EXACT", "value": "vite-env.d.ts" }
+    {
+      "id": "DOCS_INDEX",
+      "kind": "EXACT",
+      "value": "docs/README.md"
+    },
+    {
+      "id": "PUBLIC_FAVICON",
+      "kind": "EXACT",
+      "value": "public/favicon.svg"
+    },
+    {
+      "id": "PUBLIC_FILE_ICON",
+      "kind": "EXACT",
+      "value": "public/file.svg"
+    },
+    {
+      "id": "PUBLIC_GLOBE_ICON",
+      "kind": "EXACT",
+      "value": "public/globe.svg"
+    },
+    {
+      "id": "PUBLIC_OPEN_GRAPH",
+      "kind": "EXACT",
+      "value": "public/og.png"
+    },
+    {
+      "id": "PUBLIC_WINDOW_ICON",
+      "kind": "EXACT",
+      "value": "public/window.svg"
+    },
+    {
+      "id": "ROOT_DOCKERIGNORE",
+      "kind": "EXACT",
+      "value": ".dockerignore"
+    },
+    {
+      "id": "ROOT_ENV_EXAMPLE",
+      "kind": "EXACT",
+      "value": ".env.example"
+    },
+    {
+      "id": "ROOT_GITIGNORE",
+      "kind": "EXACT",
+      "value": ".gitignore"
+    },
+    {
+      "id": "ROOT_AGENTS",
+      "kind": "EXACT",
+      "value": "AGENTS.md"
+    },
+    {
+      "id": "ROOT_BLOG_TYPES",
+      "kind": "EXACT",
+      "value": "blog-content.d.ts"
+    },
+    {
+      "id": "ROOT_CLOUDFLARE_TYPES",
+      "kind": "EXACT",
+      "value": "cloudflare-env.d.ts"
+    },
+    {
+      "id": "ROOT_CODE_OF_CONDUCT",
+      "kind": "EXACT",
+      "value": "CODE_OF_CONDUCT.md"
+    },
+    {
+      "id": "ROOT_CONTRIBUTING",
+      "kind": "EXACT",
+      "value": "CONTRIBUTING.md"
+    },
+    {
+      "id": "ROOT_GOVERNANCE",
+      "kind": "EXACT",
+      "value": "GOVERNANCE.md"
+    },
+    {
+      "id": "ROOT_LICENSE",
+      "kind": "EXACT",
+      "value": "LICENSE"
+    },
+    {
+      "id": "ROOT_NOTICE",
+      "kind": "EXACT",
+      "value": "NOTICE"
+    },
+    {
+      "id": "ROOT_README",
+      "kind": "EXACT",
+      "value": "README.md"
+    },
+    {
+      "id": "ROOT_SECURITY",
+      "kind": "EXACT",
+      "value": "SECURITY.md"
+    },
+    {
+      "id": "ROOT_VITE_ENV",
+      "kind": "EXACT",
+      "value": "vite-env.d.ts"
+    }
   ],
   "contractRoots": [
     ".codex/",
@@ -428,5 +2886,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "51922a2eab881f4489eed866c1e613fb6cd30414a9f4f684db704d3c45ca5a41"
+  "canonicalSha256": "e823c45f820d0114b6db24b87dc0d44445740cb51b2a1906892837739d0bdcf7"
 }

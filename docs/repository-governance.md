@@ -40,22 +40,32 @@ jobs skipped by the classifier are not treated as missing evidence.
 
 Stage 0.6 separately enforces the versioned
 `vector.contract-doc-ownership.v1` policy. Every tracked path is either owned by
-a contract family or belongs to one closed non-contract class. Each governed
+a contract family or belongs to one closed, exact non-contract class; there is
+no blanket documentation or product-runtime escape hatch. Each governed
 change supplies exactly one bounded `vector.contract-doc-impact-declaration.v1`
 block naming every affected family and its exact stable Markdown section IDs.
-The validator reads Git blobs at the merge base and head, retains both endpoints
-of rename/copy records, rejects whitespace-only or unrelated-section churn, and
-mechanically verifies the closed exemption inventory. For policy changes it
+Rules carry a closed semantic-facet inventory (`schema`, `unit`, `datum`,
+`evidence`, `admission`, `validity`, `digest`, `runtime`, `vsr`, `ui`,
+`storage`, `delivery`, and `verification`), so only the sections and
+migration/changelog records owned by the affected facets are required. The
+validator proves every registered document is a regular Git blob with exactly
+one registered heading, reads section bodies at the merge base and head,
+retains both endpoints of rename/copy records with `--find-copies-harder`, and
+rejects invalid UTF-8, control-bearing paths, whitespace-only changes, and
+unrelated-section churn. For policy changes it
 audits old endpoints under the base policy and new endpoints under the head
 policy; existing ownership cannot be erased by the policy being reviewed. The
-initial #162 landing is the only explicit bootstrap because its base has no
-ownership artifact. Later missing, malformed, weakened, or unmapped policy
-state fails closed.
+initial #162 landing is the only explicit bootstrap and is bound to exact base
+`661d280699f260e32c53d6a1b0a6f5cf3415dde7`; both the integration tip and the
+merge base must lack the policy. A stale branch whose integration tip already
+has the policy must rebase. Later missing, malformed, weakened, unclassified,
+or unmapped policy state fails closed.
 
 Pull requests obtain the declaration from the single structured template block.
 An edited body reruns CI. A `main` push resolves exactly one associated merged
-pull request through the read-only GitHub API and reuses the same declaration;
-zero or multiple associations fail. Local verification uses the same core and
+pull request through the read-only GitHub API and binds its merge commit, base
+commit, source-head identity, target branch, and declaration to the push;
+zero, multiple, stale, or revision-mismatched associations fail. Local verification uses the same core and
 an explicit `VECTOR_CONTRACT_DOC_DECLARATION_FILE` or
 `VECTOR_CONTRACT_DOC_DECLARATION_JSON`. A dirty checkout is evaluated through a
 temporary Git index/tree/commit without changing the developer's branch or
@@ -67,6 +77,10 @@ skipped, malformed, or unavailable evidence cannot be aggregated as success.
 This mechanism binds paths, identities, registered evidence, and owned section
 changes. It does not certify that prose is technically adequate and cannot
 replace CODEOWNER or human review of a policy that modifies its own verifier.
+Generated-only exemptions invoke the policy's closed direct argv (`node` or the
+locked local `tsx` executable), never a declaration-provided or mutable package
+script alias. Refactor and no-semantic-change exemptions remain unavailable
+until a trusted adapter supplies the registered probe.
 
 Documentation, project-skill, and governance-only changes run the classifier,
 policy suite, and final gate without rebuilding the application, Rust engine,

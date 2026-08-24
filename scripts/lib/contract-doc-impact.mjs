@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
 export const DECLARATION_SCHEMA = "vector.contract-doc-impact-declaration.v1";
@@ -17,6 +17,7 @@ const DISPOSITIONS = new Set([
   "DOCS_ALREADY_CURRENT",
 ]);
 const RULE_KINDS = new Set(["EXACT", "PREFIX"]);
+const FACETS = new Set(["admission", "datum", "delivery", "digest", "evidence", "runtime", "schema", "storage", "ui", "unit", "validity", "verification", "vsr"]);
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -171,7 +172,7 @@ function assertPolicyDoesNotWeaken(basePolicy, headPolicy) {
     for (const baseGroup of baseFamily.generatedGroups) {
       const headGroup = headGroups.get(baseGroup.id);
       invariant(headGroup, `Head policy removes generated group ${baseFamily.id}.${baseGroup.id}.`);
-      invariant(headGroup.freshnessCommand === baseGroup.freshnessCommand, `Head policy changes ${baseFamily.id}.${baseGroup.id} freshness command.`);
+      invariant(JSON.stringify(headGroup.freshnessArgv) === JSON.stringify(baseGroup.freshnessArgv), `Head policy changes ${baseFamily.id}.${baseGroup.id} freshness command.`);
       for (const field of ["outputRules", "inputRules", "generatorRules"]) {
         requireInventorySubset(baseGroup[field], headGroup[field], `${baseFamily.id}.${baseGroup.id}.${field}`);
       }
@@ -186,7 +187,7 @@ function sha256(value) {
 function normalizeRepositoryPath(value, label = "repository path") {
   requiredString(value, label);
   invariant(!isAbsolute(value), `${label} must be relative.`);
-  invariant(!value.includes("\\") && !value.includes("\u0000"), `${label} must use normalized POSIX separators.`);
+  invariant(!value.includes("\\") && !/[\u0000-\u001f\u007f]/u.test(value), `${label} must not contain controls and must use normalized POSIX separators.`);
   const parts = value.split("/");
   invariant(parts.every((part) => part && part !== "." && part !== ".."), `${label} must be a normalized repository path.`);
   return value;
@@ -207,7 +208,7 @@ function assertNoSymlink(rootDirectory, repositoryPath) {
 }
 
 function validateRule(rule, label) {
-  exactKeys(rule, ["kind", "value"], label);
+  exactKeys(rule, ["kind", "value", "facets"], label);
   invariant(RULE_KINDS.has(rule.kind), `${label} has unsupported match kind ${rule.kind}; glob rules are not admitted.`);
   if (rule.kind === "PREFIX") {
     invariant(rule.value.endsWith("/"), `${label} prefix must end with '/'.`);
@@ -215,6 +216,9 @@ function validateRule(rule, label) {
   } else {
     normalizeRepositoryPath(rule.value, `${label} value`);
   }
+  invariant(Array.isArray(rule.facets) && rule.facets.length > 0, `${label} facets must be non-empty.`);
+  const facets = sortedUniqueStrings(rule.facets, `${label} facets`);
+  facets.forEach((facet) => invariant(FACETS.has(facet), `${label} has unknown facet ${facet}.`));
 }
 
 function ruleMatches(path, rule) {
@@ -222,14 +226,16 @@ function ruleMatches(path, rule) {
 }
 
 function validateSection(section, label) {
-  exactKeys(section, ["sectionId", "path", "heading"], label);
+  exactKeys(section, ["sectionId", "path", "heading", "facets"], label);
   invariant(/^[A-Z][A-Z0-9_]*$/u.test(requiredString(section.sectionId, `${label} sectionId`)), `${label} sectionId is invalid.`);
   normalizeRepositoryPath(section.path, `${label} path`);
   invariant(/^#{1,6}\s+\S/u.test(requiredString(section.heading, `${label} heading`)), `${label} heading must be an exact Markdown heading.`);
+  invariant(Array.isArray(section.facets) && section.facets.length > 0, `${label} facets must be non-empty.`);
+  sortedUniqueStrings(section.facets, `${label} facets`).forEach((facet) => invariant(FACETS.has(facet), `${label} has unknown facet ${facet}.`));
 }
 
 function sectionKey(section) {
-  return `${section.sectionId}\u0000${section.path}\u0000${section.heading}`;
+  return `${section.sectionId}\u0000${section.path}\u0000${section.heading}\u0000${[...section.facets].sort().join(",")}`;
 }
 
 function sortedUniqueStrings(values, label) {
@@ -244,14 +250,23 @@ function classifyPath(path, policy) {
   const familyMatches = [];
   for (const family of policy.families) {
     const kinds = [];
-    if (family.implementationRules.some((rule) => ruleMatches(path, rule))) kinds.push("IMPLEMENTATION");
-    if (family.testRules.some((rule) => ruleMatches(path, rule))) kinds.push("TEST");
-    for (const group of family.generatedGroups) {
-      if (group.outputRules.some((rule) => ruleMatches(path, rule))) kinds.push(`GENERATED_OUTPUT:${group.id}`);
-      if (group.inputRules.some((rule) => ruleMatches(path, rule))) kinds.push(`GENERATED_INPUT:${group.id}`);
-      if (group.generatorRules.some((rule) => ruleMatches(path, rule))) kinds.push(`GENERATOR:${group.id}`);
+    const facets = new Set();
+    for (const rule of family.implementationRules.filter((rule) => ruleMatches(path, rule))) {
+      kinds.push("IMPLEMENTATION");
+      rule.facets.forEach((facet) => facets.add(facet));
     }
-    if (kinds.length) familyMatches.push({ familyId: family.id, kinds });
+    for (const rule of family.testRules.filter((rule) => ruleMatches(path, rule))) {
+      kinds.push("TEST");
+      rule.facets.forEach((facet) => facets.add(facet));
+    }
+    for (const group of family.generatedGroups) {
+      for (const rule of group.outputRules.filter((rule) => ruleMatches(path, rule))) { kinds.push(`GENERATED_OUTPUT:${group.id}`); rule.facets.forEach((facet) => facets.add(facet)); }
+      for (const rule of group.inputRules.filter((rule) => ruleMatches(path, rule))) { kinds.push(`GENERATED_INPUT:${group.id}`); rule.facets.forEach((facet) => facets.add(facet)); }
+      for (const rule of group.generatorRules.filter((rule) => ruleMatches(path, rule))) { kinds.push(`GENERATOR:${group.id}`); rule.facets.forEach((facet) => facets.add(facet)); }
+    }
+    const documentSections = [...family.owningSections, ...family.migrationSections].filter((section) => section.path === path);
+    if (documentSections.length) kinds.push("OWNING_DOCUMENT");
+    if (kinds.length) familyMatches.push({ familyId: family.id, kinds: [...new Set(kinds)], facets: [...facets].sort() });
   }
   const nonContractMatches = policy.nonContractRules.filter((rule) => ruleMatches(path, rule));
   invariant(!(familyMatches.length && nonContractMatches.length), `${path} is both contract and non-contract policy surface.`);
@@ -272,6 +287,7 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
     "schemaVersion",
     "policyId",
     "issue",
+    "bootstrapBaseSha",
     "maxDeclarationBytes",
     "declarationBlockName",
     "allowedDispositions",
@@ -283,6 +299,7 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
   ], "contract documentation ownership policy");
   invariant(policy.schemaVersion === POLICY_SCHEMA, `Unsupported policy schema ${policy.schemaVersion}.`);
   invariant(policy.policyId === "VECTOR_CONTRACT_DOC_OWNERSHIP" && policy.issue === "#162", "Policy identity must remain bound to #162.");
+  invariant(COMMIT_SHA.test(policy.bootstrapBaseSha), "Policy bootstrapBaseSha must be an exact commit.");
   invariant(Number.isInteger(policy.maxDeclarationBytes) && policy.maxDeclarationBytes >= 1024 && policy.maxDeclarationBytes <= 65536, "Policy declaration byte bound is invalid.");
   requiredString(policy.declarationBlockName, "declaration block name");
   invariant(JSON.stringify(policy.allowedDispositions) === JSON.stringify([...DISPOSITIONS]), "Policy dispositions must equal the closed canonical inventory.");
@@ -301,19 +318,27 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
     invariant(Array.isArray(family.generatedGroups), `${label}.generatedGroups must be an array.`);
     for (const [groupIndex, group] of family.generatedGroups.entries()) {
       const groupLabel = `${label}.generatedGroups[${groupIndex}]`;
-      exactKeys(group, ["id", "outputRules", "inputRules", "generatorRules", "freshnessCommand"], groupLabel);
+      exactKeys(group, ["id", "outputRules", "inputRules", "generatorRules", "freshnessArgv"], groupLabel);
       requiredString(group.id, `${groupLabel} id`);
       for (const ruleSet of ["outputRules", "inputRules", "generatorRules"]) {
         invariant(Array.isArray(group[ruleSet]) && group[ruleSet].length > 0, `${groupLabel}.${ruleSet} must be non-empty.`);
         group[ruleSet].forEach((rule, index) => validateRule(rule, `${groupLabel}.${ruleSet}[${index}]`));
       }
-      requiredString(group.freshnessCommand, `${groupLabel} freshnessCommand`);
+      invariant(Array.isArray(group.freshnessArgv) && group.freshnessArgv.length > 1, `${groupLabel}.freshnessArgv must contain an executable and arguments.`);
+      group.freshnessArgv.forEach((argument, index) => requiredString(argument, `${groupLabel}.freshnessArgv[${index}]`));
     }
     invariant(Array.isArray(family.owningSections) && family.owningSections.length > 0, `${label} requires owning sections.`);
     family.owningSections.forEach((item, index) => validateSection(item, `${label}.owningSections[${index}]`));
     invariant(new Set(family.owningSections.map(sectionKey)).size === family.owningSections.length, `${label} repeats an owning section.`);
     invariant(Array.isArray(family.migrationSections), `${label}.migrationSections must be an array.`);
     family.migrationSections.forEach((item, index) => validateSection(item, `${label}.migrationSections[${index}]`));
+    if (rootDirectory) {
+      for (const section of [...family.owningSections, ...family.migrationSections]) {
+        const absolute = resolve(rootDirectory, section.path);
+        invariant(existsSync(absolute) && lstatSync(absolute).isFile() && !lstatSync(absolute).isSymbolicLink(), `${label} registered document ${section.path} must be a regular file.`);
+        markdownSection(readFileSync(absolute, "utf8"), section.heading, `${label} registered section ${section.sectionId}`);
+      }
+    }
   }
   sortedUniqueStrings(policy.allowedMultiFamilyPaths, "allowedMultiFamilyPaths").forEach((path) => normalizeRepositoryPath(path, "allowed multi-family path"));
   invariant(Array.isArray(policy.nonContractRules), "nonContractRules must be an array.");
@@ -323,7 +348,7 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
     requiredString(rule.id, `nonContractRules[${index}] id`);
     invariant(!nonContractIds.has(rule.id), `Duplicate non-contract rule id ${rule.id}.`);
     nonContractIds.add(rule.id);
-    validateRule({ kind: rule.kind, value: rule.value }, `nonContractRules[${index}]`);
+    validateRule({ kind: rule.kind, value: rule.value, facets: ["delivery"] }, `nonContractRules[${index}]`);
   });
   sortedUniqueStrings(policy.contractRoots, "contractRoots").forEach((root) => {
     invariant(root.endsWith("/"), "Contract roots must end with '/'.");
@@ -362,6 +387,8 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
     }
     policy.nonContractRules.forEach((rule, index) => assertRuleMatches(rule, `nonContractRules[${index}]`));
   }
+  invariant(unclassifiedPaths.length === 0, `Policy leaves tracked paths unclassified: ${unclassifiedPaths.join(", ")}.`);
+  invariant(blockedUnmappedPaths.length === 0, `Policy leaves contract-looking paths unmapped: ${blockedUnmappedPaths.join(", ")}.`);
   return { trackedPaths: trackedPaths.length, unclassifiedPaths, blockedUnmappedPaths };
 }
 
@@ -385,9 +412,10 @@ function validateExemptionEvidence(disposition, evidence, label) {
     exactKeys(evidence, ["kind", "paths"], label);
     sortedUniqueStrings(evidence.paths, `${label}.paths`).forEach((path) => normalizeRepositoryPath(path));
   } else if (disposition === "GENERATED_ARTIFACT_ONLY") {
-    exactKeys(evidence, ["kind", "groupId", "freshnessCommand"], label);
+    exactKeys(evidence, ["kind", "groupId", "freshnessArgv"], label);
     requiredString(evidence.groupId, `${label}.groupId`);
-    requiredString(evidence.freshnessCommand, `${label}.freshnessCommand`);
+    invariant(Array.isArray(evidence.freshnessArgv) && evidence.freshnessArgv.length > 1, `${label}.freshnessArgv must be non-empty.`);
+    evidence.freshnessArgv.forEach((argument, index) => requiredString(argument, `${label}.freshnessArgv[${index}]`));
   } else if (disposition === "INTERNAL_REFACTOR") {
     exactKeys(evidence, ["kind", "identities"], label);
     invariant(Array.isArray(evidence.identities) && evidence.identities.length > 0, `${label}.identities must be non-empty.`);
@@ -409,8 +437,8 @@ function validateExemptionEvidence(disposition, evidence, label) {
     exactKeys(evidence, ["kind", "sections"], label);
     invariant(Array.isArray(evidence.sections) && evidence.sections.length > 0, `${label}.sections must be non-empty.`);
     for (const [index, item] of evidence.sections.entries()) {
-      exactKeys(item, ["sectionId", "path", "heading", "contentSha256", "documentedAtCommit"], `${label}.sections[${index}]`);
-      validateSection({ sectionId: item.sectionId, path: item.path, heading: item.heading }, `${label}.sections[${index}]`);
+      exactKeys(item, ["sectionId", "path", "heading", "facets", "contentSha256", "documentedAtCommit"], `${label}.sections[${index}]`);
+      validateSection({ sectionId: item.sectionId, path: item.path, heading: item.heading, facets: item.facets }, `${label}.sections[${index}]`);
       invariant(SHA256.test(item.contentSha256), `${label}.sections[${index}] content hash is invalid.`);
       invariant(COMMIT_SHA.test(item.documentedAtCommit), `${label}.sections[${index}] commit is invalid.`);
     }
@@ -434,8 +462,8 @@ export function validateDeclaration(declaration, policy, { requiredFamilies } = 
     validateEvidence(item.evidence, `${label}.evidence`);
     invariant(Array.isArray(item.owningSections), `${label}.owningSections must be an array.`);
     item.owningSections.forEach((section, sectionIndex) => validateSection(section, `${label}.owningSections[${sectionIndex}]`));
-    const expectedSections = policyFamilies.get(item.familyId).owningSections.map(sectionKey).sort();
-    invariant(JSON.stringify(item.owningSections.map(sectionKey).sort()) === JSON.stringify(expectedSections), `${label} must name every exact owning section for ${item.familyId}.`);
+    const registeredSections = new Set(policyFamilies.get(item.familyId).owningSections.map(sectionKey));
+    invariant(item.owningSections.every((section) => registeredSections.has(sectionKey(section))), `${label} names an unregistered owning section for ${item.familyId}.`);
     exactKeys(item.migration, ["state", "documents", "rationale"], `${label}.migration`);
     invariant(["NOT_APPLICABLE", "UPDATED", "DOCS_ALREADY_CURRENT"].includes(item.migration.state), `${label}.migration state is invalid.`);
     invariant(Array.isArray(item.migration.documents), `${label}.migration.documents must be an array.`);
@@ -462,7 +490,8 @@ export function extractDeclarationFromPullRequestBody(body, policy) {
 }
 
 export function parseNameStatusZ(raw) {
-  const fields = Buffer.isBuffer(raw) ? raw.toString("utf8").split("\u0000") : String(raw).split("\u0000");
+  const decoded = Buffer.isBuffer(raw) ? new TextDecoder("utf-8", { fatal: true }).decode(raw) : String(raw);
+  const fields = decoded.split("\u0000");
   if (fields.at(-1) === "") fields.pop();
   const operations = [];
   for (let index = 0; index < fields.length;) {
@@ -502,6 +531,18 @@ function contentAt(rootDirectory, commit, path) {
   }
 }
 
+function assertRegisteredSectionsAt(rootDirectory, commit, policy, label) {
+  const seen = new Set();
+  for (const family of policy.families) {
+    for (const section of [...family.owningSections, ...family.migrationSections]) {
+      const key = sectionKey(section);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      markdownSection(contentAt(rootDirectory, commit, section.path), section.heading, `${label} ${section.path}`);
+    }
+  }
+}
+
 function markdownSection(content, heading, label) {
   invariant(typeof content === "string", `${label} is unavailable.`);
   const lines = content.replaceAll("\r\n", "\n").split("\n");
@@ -529,6 +570,20 @@ function changedPathsForFamily(pathClassifications, familyId) {
     .map(({ path }) => path);
 }
 
+function changedFacetsForFamily(pathClassifications, familyId) {
+  const facets = new Set();
+  for (const { classification } of pathClassifications) {
+    const match = classification.familyMatches?.find((candidate) => candidate.familyId === familyId);
+    match?.facets.forEach((facet) => facets.add(facet));
+  }
+  return [...facets].sort();
+}
+
+function sectionsForFacets(sections, facets) {
+  const required = new Set(facets);
+  return sections.filter((section) => section.facets.some((facet) => required.has(facet)));
+}
+
 function exactSectionInventory(actual, expected, label) {
   invariant(JSON.stringify(actual.map(sectionKey).sort()) === JSON.stringify(expected.map(sectionKey).sort()), `${label} does not match the registered section inventory.`);
 }
@@ -544,6 +599,8 @@ export function verifyContractDocImpact({
   headPolicy = policy,
   policyBootstrap = false,
   freshnessRunner,
+  identityRunner,
+  invariantRunner,
 }) {
   const root = realpathSync(rootDirectory);
   const base = resolveCommit(root, baseSha, "base SHA");
@@ -555,8 +612,12 @@ export function verifyContractDocImpact({
   }
   const baseTrackedPaths = git(root, ["ls-tree", "-r", "--name-only", "-z", mergeBase]).split("\u0000").filter(Boolean);
   const trackedPaths = git(root, ["ls-tree", "-r", "--name-only", "-z", head]).split("\u0000").filter(Boolean);
-  if (!policyBootstrap) validatePolicy(basePolicy, { trackedPaths: baseTrackedPaths });
+  if (!policyBootstrap) {
+    validatePolicy(basePolicy, { trackedPaths: baseTrackedPaths });
+    assertRegisteredSectionsAt(root, mergeBase, basePolicy, "base policy section");
+  }
   validatePolicy(headPolicy, { rootDirectory: root, trackedPaths });
+  assertRegisteredSectionsAt(root, head, headPolicy, "head policy section");
   if (!policyBootstrap) assertPolicyDoesNotWeaken(basePolicy, headPolicy);
   for (const path of policyBootstrap ? [] : baseTrackedPaths) {
     const before = classifyPath(path, basePolicy);
@@ -567,7 +628,7 @@ export function verifyContractDocImpact({
     const afterFamilies = after.familyMatches.map(({ familyId }) => familyId).sort();
     invariant(beforeFamilies.every((familyId) => afterFamilies.includes(familyId)), `Head policy removes family ownership from ${path}.`);
   }
-  const diffRaw = execFileSync("git", ["diff", "--name-status", "-z", "--find-renames", "--find-copies", mergeBase, head], { cwd: root, encoding: "buffer", maxBuffer: 64 * 1024 * 1024 });
+  const diffRaw = execFileSync("git", ["diff", "--name-status", "-z", "--find-renames", "--find-copies", "--find-copies-harder", mergeBase, head], { cwd: root, encoding: "buffer", maxBuffer: 64 * 1024 * 1024 });
   const operations = parseNameStatusZ(diffRaw);
   const changedPaths = [...new Set(operations.flatMap((operation) => [operation.oldPath, operation.path]).filter(Boolean))].sort();
   const pathClassifications = [];
@@ -586,6 +647,23 @@ export function verifyContractDocImpact({
       for (const match of classification.familyMatches ?? []) familyIds.add(match.familyId);
     }
   }
+  for (const classified of pathClassifications) {
+    for (const match of classified.classification.familyMatches ?? []) {
+      if (!match.kinds.includes("OWNING_DOCUMENT")) continue;
+      const family = headPolicy.families.find((candidate) => candidate.id === match.familyId);
+      const sections = [...family.owningSections, ...family.migrationSections].filter((section) => section.path === classified.path);
+      const changedSections = sections.filter((section) => {
+        const beforeContent = contentAt(root, mergeBase, section.path);
+        const afterContent = contentAt(root, head, section.path);
+        if (beforeContent === null || afterContent === null) return true;
+        const before = markdownSection(beforeContent, section.heading, `${section.path} at base`);
+        const after = markdownSection(afterContent, section.heading, `${section.path} at head`);
+        return materiallyNormalized(before) !== materiallyNormalized(after);
+      });
+      invariant(changedSections.length > 0, `${classified.path} changed outside every registered owning section for ${match.familyId}.`);
+      match.facets = [...new Set([...match.facets, ...changedSections.flatMap((section) => section.facets)])].sort();
+    }
+  }
   for (const path of changedPaths) {
     assertNoSymlink(root, path);
   }
@@ -599,19 +677,23 @@ export function verifyContractDocImpact({
     const family = headPolicy.families.find((item) => item.id === familyId);
     const item = declarations.get(familyId);
     const familyChangedPaths = [...new Set(changedPathsForFamily(pathClassifications, familyId))].sort();
+    const familyChangedFacets = changedFacetsForFamily(pathClassifications, familyId);
+    const requiredOwningSections = sectionsForFacets(family.owningSections, familyChangedFacets);
+    const requiredMigrationSections = sectionsForFacets(family.migrationSections, familyChangedFacets);
+    exactSectionInventory(item.owningSections, requiredOwningSections, `${familyId} owning sections`);
     if (item.disposition !== "SEMANTIC") {
       invariant(item.migration.state === "NOT_APPLICABLE" && item.migration.documents.length === 0, `${familyId} non-semantic disposition cannot claim migration documentation.`);
     }
     if (item.disposition === "SEMANTIC") {
-      for (const section of family.owningSections) {
+      for (const section of requiredOwningSections) {
         const before = markdownSection(contentAt(root, mergeBase, section.path), section.heading, `${section.path} at base`);
         const after = markdownSection(contentAt(root, head, section.path), section.heading, `${section.path} at head`);
         invariant(materiallyNormalized(before) !== materiallyNormalized(after), `${familyId} owning section ${section.path} ${section.heading} did not change materially.`);
       }
-      if (family.migrationSections.length) {
+      if (requiredMigrationSections.length) {
         invariant(item.migration.state === "UPDATED", `${familyId} requires updated migration/changelog sections.`);
-        exactSectionInventory(item.migration.documents, family.migrationSections, `${familyId} migration documents`);
-        for (const section of family.migrationSections) {
+        exactSectionInventory(item.migration.documents, requiredMigrationSections, `${familyId} migration documents`);
+        for (const section of requiredMigrationSections) {
           const before = markdownSection(contentAt(root, mergeBase, section.path), section.heading, `${section.path} at base`);
           const after = markdownSection(contentAt(root, head, section.path), section.heading, `${section.path} at head`);
           invariant(materiallyNormalized(before) !== materiallyNormalized(after), `${familyId} migration section ${section.path} ${section.heading} did not change materially.`);
@@ -625,13 +707,19 @@ export function verifyContractDocImpact({
     } else if (item.disposition === "GENERATED_ARTIFACT_ONLY") {
       const group = family.generatedGroups.find((candidate) => candidate.id === item.exemptionEvidence.groupId);
       invariant(group, `${familyId} references unknown generated group ${item.exemptionEvidence.groupId}.`);
-      invariant(item.exemptionEvidence.freshnessCommand === group.freshnessCommand, `${familyId} freshness command does not match policy.`);
+      invariant(JSON.stringify(item.exemptionEvidence.freshnessArgv) === JSON.stringify(group.freshnessArgv), `${familyId} freshness command does not match policy.`);
       invariant(familyChangedPaths.every((path) => group.outputRules.some((rule) => ruleMatches(path, rule))), `${familyId} generated-only change includes an input, generator, or non-output path.`);
-      invariant(item.evidence.some((entry) => entry.value === group.freshnessCommand), `${familyId} generated-only declaration lacks freshness evidence.`);
+      invariant(item.evidence.some((entry) => entry.value === group.freshnessArgv.join(" ")), `${familyId} generated-only declaration lacks freshness evidence.`);
       invariant(typeof freshnessRunner === "function", `${familyId} generated-only verification requires the registered freshness runner.`);
-      freshnessRunner(group.freshnessCommand);
+      freshnessRunner(group.freshnessArgv);
+    } else if (item.disposition === "INTERNAL_REFACTOR") {
+      invariant(typeof identityRunner === "function", `${familyId} INTERNAL_REFACTOR is unavailable without a registered identity probe.`);
+      invariant(identityRunner({ familyId, evidence: item.exemptionEvidence, mergeBaseSha: mergeBase, headSha: head }) === true, `${familyId} registered identity probe failed.`);
+    } else if (item.disposition === "NO_SEMANTIC_CHANGE") {
+      invariant(typeof invariantRunner === "function", `${familyId} NO_SEMANTIC_CHANGE is unavailable without a registered invariant probe.`);
+      invariant(invariantRunner({ familyId, evidence: item.exemptionEvidence, mergeBaseSha: mergeBase, headSha: head }) === true, `${familyId} registered invariant probe failed.`);
     } else if (item.disposition === "DOCS_ALREADY_CURRENT") {
-      exactSectionInventory(item.exemptionEvidence.sections, family.owningSections, `${familyId} docs-current evidence`);
+      exactSectionInventory(item.exemptionEvidence.sections, requiredOwningSections, `${familyId} docs-current evidence`);
       for (const section of item.exemptionEvidence.sections) {
         const documentedCommit = resolveCommit(root, section.documentedAtCommit, `${familyId} documentedAtCommit`);
         let isAncestor = true;

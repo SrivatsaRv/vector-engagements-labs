@@ -53,8 +53,40 @@ function readPolicyAt(root, commit) {
   return raw === null ? null : parseStrictJson(raw, `${POLICY_PATH} at ${commit}`);
 }
 
+export function resolvePolicyBootstrap({ baseSha, mergeBaseSha, baseTipPolicy, mergeBasePolicy, headPolicy }) {
+  const bootstrap = baseTipPolicy === null && mergeBasePolicy === null;
+  if (bootstrap) {
+    invariant(baseSha === mergeBaseSha, "Policy bootstrap requires the exact integration base, not a stale branch merge base.");
+    invariant(headPolicy.bootstrapBaseSha === baseSha, "Policy bootstrap is not bound to the registered base commit.");
+    return true;
+  }
+  invariant(baseTipPolicy && mergeBasePolicy, "A branch whose integration tip has policy but merge base does not must rebase before verification.");
+  invariant(baseTipPolicy.canonicalSha256 === mergeBasePolicy.canonicalSha256, "Integration-tip policy differs from merge-base policy; rebase before verification.");
+  return false;
+}
+
 function emptyDeclaration() {
   return { schemaVersion: DECLARATION_SCHEMA, families: [] };
+}
+
+export function declarationTemplate(policy) {
+  const family = policy.families[0];
+  return {
+    schemaVersion: DECLARATION_SCHEMA,
+    families: [{
+      familyId: family.id,
+      disposition: "SEMANTIC",
+      owningSections: [family.owningSections[0]],
+      rationale: "Replace this text with the exact contract behavior changed by this pull request.",
+      evidence: [{ kind: "TEST", value: "Replace with the exact verification command and result." }],
+      migration: {
+        state: "NOT_APPLICABLE",
+        documents: [],
+        rationale: "Replace with the exact persistence, migration, and changelog impact.",
+      },
+      exemptionEvidence: null,
+    }],
+  };
 }
 
 function localDeclaration(policy) {
@@ -106,7 +138,13 @@ export async function resolvePushDeclaration(event, policy, {
   });
   invariant(response.ok, `Associated pull-request lookup failed with HTTP ${response.status}.`);
   const pullRequests = await response.json();
-  const merged = pullRequests.filter((pullRequest) => pullRequest.merged_at && pullRequest.base?.ref === "main");
+  const merged = pullRequests.filter((pullRequest) => (
+    pullRequest.merged_at
+    && pullRequest.base?.ref === "main"
+    && pullRequest.merge_commit_sha === event.after
+    && pullRequest.base?.sha === event.before
+    && /^[0-9a-f]{40}$/u.test(pullRequest.head?.sha ?? "")
+  ));
   invariant(merged.length === 1, `Push commit must resolve to exactly one merged main pull request; found ${merged.length}.`);
   return extractDeclarationFromPullRequestBody(merged[0].body ?? "", policy);
 }
@@ -120,14 +158,19 @@ function writeOutput(report) {
   }
 }
 
-function runRegisteredFreshness(root, command) {
-  const match = /^npm run ([a-z0-9:-]+)$/u.exec(command);
-  invariant(match, `Unsupported freshness command ${command}.`);
-  execFileSync("npm", ["run", match[1]], { cwd: root, stdio: "inherit", env: process.env });
+function runRegisteredFreshness(root, argv) {
+  invariant(Array.isArray(argv) && argv.length > 1, "Registered freshness argv is invalid.");
+  invariant(["node", "node_modules/.bin/tsx"].includes(argv[0]), `Unsupported freshness executable ${argv[0]}.`);
+  execFileSync(argv[0], argv.slice(1), { cwd: root, stdio: "inherit", env: process.env });
 }
 
 async function main() {
   const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]).trim();
+  if (process.argv.includes("--print-template")) {
+    const policy = parseStrictJson(readFileSync(resolve(root, POLICY_PATH), "utf8"), "contract documentation ownership policy");
+    process.stdout.write(`${JSON.stringify(declarationTemplate(policy), null, 2)}\n`);
+    return;
+  }
   const githubMode = process.argv.includes("--github-event");
   let base;
   let head;
@@ -155,7 +198,7 @@ async function main() {
     const dirty = git(root, ["status", "--porcelain=v1", "-z"]).length > 0;
     head = dirty ? createWorktreeSnapshot(root) : exactCommit(root, "HEAD", "local head SHA");
     const requestedBase = process.env.VECTOR_CONTRACT_DOC_BASE_SHA || undefined;
-    base = exactCommit(root, requestedBase ?? git(root, ["merge-base", "origin/main", head]).trim(), "local base SHA");
+    base = exactCommit(root, requestedBase ?? "origin/main", "local integration-tip SHA");
     const headPolicy = readPolicyAt(root, head);
     invariant(headPolicy, `Local head is missing ${POLICY_PATH}.`);
     declaration = localDeclaration(headPolicy);
@@ -163,8 +206,9 @@ async function main() {
 
   const mergeBase = git(root, ["merge-base", base, head]).trim();
   const headPolicy = readPolicyAt(root, head);
+  const baseTipPolicy = readPolicyAt(root, base);
   const basePolicy = readPolicyAt(root, mergeBase);
-  const policyBootstrap = basePolicy === null;
+  const policyBootstrap = resolvePolicyBootstrap({ baseSha: base, mergeBaseSha: mergeBase, baseTipPolicy, mergeBasePolicy: basePolicy, headPolicy });
   if (policyBootstrap) {
     invariant(fileAt(root, mergeBase, POLICY_PATH) === null, "Policy bootstrap requires an absent base policy.");
     invariant(fileAt(root, head, POLICY_PATH) !== null, "Policy bootstrap requires the head policy artifact.");
@@ -178,7 +222,7 @@ async function main() {
     basePolicy: basePolicy ?? headPolicy,
     headPolicy,
     policyBootstrap,
-    freshnessRunner: (command) => runRegisteredFreshness(root, command),
+    freshnessRunner: (argv) => runRegisteredFreshness(root, argv),
   });
   writeOutput(report);
 }

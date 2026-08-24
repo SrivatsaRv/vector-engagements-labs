@@ -86,16 +86,28 @@ explicit p95 limits and makes no Worker or product-capacity claim. See
 
 GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
 automated gate from merge-base-relative `--name-status -z` records. Rename and
-copy records retain both endpoints without trimming legal path bytes.
+copy records use `--find-copies-harder` and retain both endpoints without
+trimming legal path bytes. Invalid UTF-8, control characters, absolute paths,
+dot segments, backslashes, symlink traversal, and unregistered additions fail
+closed.
 `scripts/verify-contract-doc-impact.mjs` independently maps those endpoints to
 the base and head versions of `governance/contract-doc-ownership.v1.json`,
-validates the one structured declaration, and compares the exact registered
-Markdown sections. TEST_ONLY, GENERATED_ARTIFACT_ONLY, INTERNAL_REFACTOR,
+validates the one structured declaration, resolves every registered Markdown
+file and heading from exact Git blobs, derives the changed semantic facets, and
+compares only their exact registered sections. Every test path belongs to its
+actual model, engine, evidence, Worker, VSR, UI, security, mission, geospatial,
+content, data, or delivery family rather than a generic test-only owner.
+TEST_ONLY, GENERATED_ARTIFACT_ONLY, INTERNAL_REFACTOR,
 NO_SEMANTIC_CHANGE, and DOCS_ALREADY_CURRENT are mutually exclusive,
 evidence-bearing dispositions; none receives credit merely because an arbitrary
-document changed. Semantic database changes additionally require the registered
+document changed. INTERNAL_REFACTOR and NO_SEMANTIC_CHANGE remain unavailable
+unless the trusted adapter supplies the registered identity or invariant probe;
+declaration-authored hashes and prose alone never authorize them. A
+generated-only disposition executes the registered direct argv and cannot be
+redirected by editing `package.json`. Semantic schema/storage/VSR facets
+additionally require their registered
 Unreleased migration section. Repository-policy tests always run, and an
-unknown path fails closed through every CI job. Documentation and agent-harness
+unknown or unclassified tracked path makes policy validation fail. Documentation and agent-harness
 changes do not consume application, Rust, container, or PostGIS runners. Web,
 simulation, database/API, dependency, workflow, and infrastructure paths each
 add their owning gates. Shared mission, scenario, environment, model, Worker and
