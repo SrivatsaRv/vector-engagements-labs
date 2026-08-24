@@ -147,6 +147,48 @@ public-aircraft-reference validators as well as generated model and symbol
 checks. An unclassified evidence artifact still fails closed through the full
 matrix; it is not silently treated as documentation.
 
+Regression fixtures distinguish the browser simulation Worker from the
+Cloudflare delivery Worker. They also prove that a change to canonical JSON
+identity selects browser, Rust/parity, and persistence consumers; that every
+generic-AAM verifier source, adapter, generated artifact, generator, and Rust
+crate selects its Rust owner; and that each registered seed, database-upgrade,
+or credibility-catalog executable selects integration. The generic-AAM
+generated-only disposition is available only through its registered Rust
+source, exact generated output, direct generator command, and successful
+freshness reconstruction. Ownership tests additionally keep generic delivery
+harnesses out of the simulation-Worker family, bind the runtime capability
+validator to both descriptor and Worker contracts, and require the public
+aircraft fixture/evaluator/verifier chain to update its numerical-evidence
+contract when that chain changes. They also bind the model-pack compiler to its
+digest/admission/runtime sections, evidence registries to admission and subject
+validity, VSR digest/event sources to every replay consumer, and real
+TypeScript/Rust physics producers to the integrated-model and Rust/WASM proof
+sections. This prevents backend documentation from becoming a substitute for
+the actual physics or recording contract.
+
+Precision regressions also prohibit broad semantic ownership where distinct
+authorities merely share a directory. They bind geospatial datum, environment,
+terrain, source-admission, verification, installation, and scenario-spatial
+paths to different headings; require the built-browser gate for every
+browser-consumed geospatial/catalog producer; and keep offline source admission
+out of that product claim. Generic database migrations prove platform
+migration/provisioning mechanics only. Exact model-pack and saved-run schema,
+migration, seed, verifier, and integration-test paths additionally select their
+respective persistence contracts. Mission tests distinguish authored scenario,
+information-state/replay, spatial, and orchestration facets. Generic-AAM
+source/evaluator/workload changes select their isolated verification family,
+while production engine and capacity changes select only engine/backend and
+performance contracts. Negative assertions prove object-catalog facts cannot
+acquire RASP ownership, catalog admission selects its model/database consumers,
+and saved-run lifecycle admission cannot acquire VSR archive or replay sections.
+The same matrix rejects a broad security-directory owner: exact saved-run,
+basemap relay, browser-response, and delivery paths must resolve only to their
+corresponding security-boundary heading, with declared multiownership for the
+small shared public-admission helpers.
+The anonymous comment route, schema/migration, live client, and mixed boundary
+regression own the blog publishing Notes section and are explicitly excluded
+from the Saved runs family.
+
 `make integration-ci` uses the tracked managed-server runner. The runner writes
 the built application output to `outputs/integration/application.log`, stops and
 awaits the complete server process group after success, verifier failure, early

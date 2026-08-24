@@ -1200,3 +1200,202 @@ test("the repository policy is closed and covers every tracked path", async () =
   assert.equal(report.unclassifiedPaths.length, 0);
   assert.equal(report.blockedUnmappedPaths.length, 0);
 });
+
+test("the repository policy maps real simulation identities to their exact owners and facets", async () => {
+  const repositoryPolicy = parseStrictJson(
+    await readFile("governance/contract-doc-ownership.v1.json", "utf8"),
+    "contract documentation ownership policy",
+  );
+  const family = (id) => repositoryPolicy.families.find((candidate) => candidate.id === id);
+  const exactRule = (owner, path) => owner.implementationRules.find((rule) => rule.kind === "EXACT" && rule.value === path);
+  const prefixRule = (owner, path) => owner.implementationRules.find((rule) => rule.kind === "PREFIX" && rule.value === path);
+  const ruleMatches = (rule, path) => rule.kind === "EXACT" ? rule.value === path : path.startsWith(rule.value);
+  const ownersOf = (path) => repositoryPolicy.families.filter((owner) => [
+    ...owner.implementationRules,
+    ...owner.testRules,
+    ...owner.generatedGroups.flatMap((group) => [...group.outputRules, ...group.inputRules, ...group.generatorRules]),
+  ].some((rule) => ruleMatches(rule, path)));
+  const requiredSections = (owner, path) => {
+    const facets = new Set([...owner.implementationRules, ...owner.testRules]
+      .filter((rule) => ruleMatches(rule, path)).flatMap((rule) => rule.facets));
+    return owner.owningSections.filter((section) => section.facets.some((facet) => facets.has(facet)))
+      .map((section) => section.sectionId).sort();
+  };
+  const browserWorker = family("BROWSER_WORKER_PROTOCOL");
+  const securitySavedRuns = family("SECURITY_SAVED_RUNS");
+  const securityCatalog = family("SECURITY_CATALOG_BASEMAP");
+  const securityResponse = family("SECURITY_BROWSER_RESPONSE");
+  const securityDelivery = family("SECURITY_DELIVERY_RUNTIME");
+  const delivery = family("DELIVERY_CONTRACT_GOVERNANCE");
+  const modelPack = family("MODEL_PACK_COMPILER_RESOLVER");
+  const engine = family("ENGINE_ABI_RUNTIME");
+  const genericAam = family("GENERIC_AAM_VERIFICATION");
+  const physics = family("SIMULATION_PHYSICS_RUNTIME");
+  const vsr = family("RECORD_VSR_PERSISTENCE");
+  const geospatial = family("GEOSPATIAL_ENVIRONMENT");
+  const mission = family("MISSION_SCENARIO_RUNTIME");
+  const persistence = family("PERSISTENCE_DATABASE_SCHEMA");
+  const capabilities = family("CAPABILITY_DESCRIPTORS_SELECTORS");
+  const evidence = family("EVIDENCE_RAW_DERIVATIVE_STORAGE");
+  const contentComments = family("CONTENT_COMMENTS");
+
+  assert.equal(browserWorker.implementationRules.some((rule) => rule.kind === "PREFIX" && rule.value === "worker/"), false);
+  assert.equal(securityDelivery.implementationRules.some((rule) => rule.kind === "PREFIX" && rule.value === "lib/security/"), false);
+  assert.deepEqual(exactRule(securitySavedRuns, "lib/security/saved-run.ts").facets, ["admission", "digest", "storage", "validity"]);
+  assert.deepEqual(exactRule(securitySavedRuns, "lib/security/saved-run-admission.ts").facets, ["admission", "storage", "validity"]);
+  assert.deepEqual(requiredSections(securitySavedRuns, "lib/security/saved-run.ts"), ["SECURITY_SAVED_RUNS"]);
+  assert.deepEqual(ownersOf("lib/security/saved-run.ts").map((owner) => owner.id), ["RECORD_VSR_PERSISTENCE", "SECURITY_SAVED_RUNS"]);
+  assert.deepEqual(exactRule(securityCatalog, "lib/security/basemap-tiles.ts").facets, ["admission", "validity"]);
+  assert.deepEqual(requiredSections(securityCatalog, "lib/security/basemap-tiles.ts"), ["SECURITY_CATALOG_BASEMAP_RELAY"]);
+  assert.deepEqual(ownersOf("lib/security/admission-policy.ts").map((owner) => owner.id), ["SECURITY_SAVED_RUNS", "SECURITY_CATALOG_BASEMAP"]);
+  assert.deepEqual(exactRule(securityResponse, "lib/security/browser-response.ts").facets, ["admission", "validity"]);
+  assert.deepEqual(exactRule(securityResponse, "worker/index.ts").facets, ["admission", "validity"]);
+  assert.deepEqual(requiredSections(securityResponse, "worker/index.ts"), ["SECURITY_RESPONSE_BASELINE"]);
+  assert.deepEqual(requiredSections(securityDelivery, "scripts/start-production.mjs"), ["SECURITY_DELIVERY_TRUST"]);
+  for (const path of ["app/api/runs/route.ts", "app/api/health/route.ts", "db/migrations/012_saved_run_lifecycle_admission.sql"]) {
+    assert.notEqual(exactRule(securitySavedRuns, path), undefined, `${path} must own the saved-run security boundary`);
+    assert.deepEqual(requiredSections(securitySavedRuns, path), ["SECURITY_SAVED_RUNS"]);
+  }
+  for (const path of ["app/api/catalog/route.ts", "db/migrations/011_public_api_admission.sql"]) {
+    assert.notEqual(exactRule(securityCatalog, path), undefined, `${path} must own the catalog/basemap security boundary`);
+    assert.deepEqual(requiredSections(securityCatalog, path), ["SECURITY_CATALOG_BASEMAP_RELAY"]);
+  }
+  assert.deepEqual(ownersOf("db/schema.ts").map((owner) => owner.id), ["MODEL_PACK_COMPILER_RESOLVER", "PERSISTENCE_DATABASE_SCHEMA", "RECORD_VSR_PERSISTENCE", "SECURITY_SAVED_RUNS", "SECURITY_CATALOG_BASEMAP", "CONTENT_COMMENTS"]);
+  assert.equal(exactRule(securitySavedRuns, "app/api/blog-comments/route.ts"), undefined);
+  assert.deepEqual(exactRule(contentComments, "app/api/blog-comments/route.ts").facets, ["admission", "storage", "validity"]);
+  assert.deepEqual(requiredSections(contentComments, "app/api/blog-comments/route.ts"), ["CONTENT_COMMENTS"]);
+  assert.deepEqual(requiredSections(contentComments, "db/migrations/008_blog_post_comments.sql"), ["CONTENT_COMMENTS"]);
+  assert.deepEqual(exactRule(contentComments, "db/schema.ts").facets, ["schema", "storage"]);
+  assert.deepEqual(exactRule(contentComments, "components/BlogShareAndComments.tsx").facets, ["admission", "storage", "ui", "validity"]);
+  assert.deepEqual(requiredSections(contentComments, "components/BlogShareAndComments.tsx"), ["CONTENT_COMMENTS"]);
+  for (const path of ["scripts/build-runtime-bundles.mjs", "scripts/run-managed-server.mjs"]) {
+    assert.equal(exactRule(browserWorker, path), undefined, `${path} is not simulation-Worker authority`);
+  }
+  assert.deepEqual(exactRule(delivery, "scripts/build-runtime-bundles.mjs").facets, ["delivery", "runtime"]);
+  assert.deepEqual(exactRule(delivery, "scripts/run-managed-server.mjs").facets, ["delivery", "verification"]);
+  assert.deepEqual(exactRule(modelPack, "lib/canonical-json.ts").facets, ["digest", "schema"]);
+  for (const path of ["lib/model-pack.ts", "engine-rust/src/model_pack.rs"]) {
+    assert.deepEqual(exactRule(modelPack, path).facets, ["admission", "datum", "digest", "evidence", "runtime", "schema", "unit", "validity"]);
+  }
+  for (const sectionId of [
+    "MODEL_PACK_SOURCE_DEFINITION",
+    "MODEL_PACK_SCHEMAS",
+    "MODEL_PACK_COMPILATION",
+    "MODEL_PACK_INTENDED_USE",
+    "MODEL_PACK_BINDING",
+    "MODEL_PACK_ARTIFACT_BOUNDARIES",
+    "MODEL_PACK_LOADOUT_COMPATIBILITY",
+    "MODEL_PACK_CURRENT_REFERENCE",
+    "MODEL_PACK_CONSUMPTION_RULES",
+  ]) {
+    assert.equal(modelPack.owningSections.some((section) => section.sectionId === sectionId), true, `${sectionId} must remain owned`);
+  }
+  for (const registryPath of [
+    "governance/aircraft-evidence-registry.v1.json",
+    "governance/aircraft-evidence-registry.v2.json",
+  ]) {
+    assert.deepEqual(exactRule(evidence, registryPath).facets, ["admission", "evidence", "validity"]);
+  }
+  assert.deepEqual(exactRule(capabilities, "lib/runtime/deployment-capabilities.ts").facets, ["admission", "evidence"]);
+  assert.deepEqual(exactRule(evidence, "lib/validation/public-aircraft-reference.ts").facets, ["admission", "verification"]);
+  assert.deepEqual(exactRule(evidence, "scripts/verify-public-aircraft-reference.mjs").facets, ["admission", "verification"]);
+  assert.deepEqual(exactRule(evidence, "fixtures/public-reference/nasa-nesc-2015-f16-case11.json").facets, ["evidence", "verification"]);
+  assert.equal(prefixRule(evidence, "fixtures/public-reference/"), undefined);
+  assert.deepEqual(exactRule(evidence, "lib/object-catalog.ts").facets, ["schema"]);
+  assert.deepEqual(ownersOf("lib/object-catalog.ts").map((owner) => owner.id), ["EVIDENCE_RAW_DERIVATIVE_STORAGE", "MISSION_SCENARIO_RUNTIME"]);
+  assert.deepEqual(requiredSections(evidence, "lib/object-catalog.ts"), ["EVIDENCE_FIXED_DEVELOPMENT_FIXTURE"]);
+  assert.deepEqual(exactRule(evidence, "engine-rust/src/public_aircraft_reference.rs").facets, ["verification"]);
+
+  assert.deepEqual(exactRule(vsr, "lib/runtime/digest.ts").facets, ["digest", "vsr"]);
+  for (const path of ["lib/engine/simulation-events.ts", "engine-rust/src/simulation_events.rs"]) {
+    assert.deepEqual(exactRule(vsr, path).facets, ["digest", "schema", "vsr"]);
+  }
+  for (const path of ["lib/engine/core.ts", "lib/engine/track-store.ts", "engine-rust/src/lib.rs"]) {
+    assert.notEqual(exactRule(physics, path), undefined, `${path} must have a physics contract owner`);
+  }
+  assert.equal(
+    physics.owningSections.some((section) => section.path === "docs/physics-model.md" && section.heading === "## Integrated model"),
+    true,
+  );
+
+  assert.equal(engine.implementationRules.some((rule) => rule.kind === "PREFIX" && rule.value === "lib/validation/"), false);
+  assert.equal(engine.implementationRules.some((rule) => rule.value.includes("generic-aam")), false);
+  for (const path of [
+    "lib/validation/generic-aam-verification.ts",
+    "lib/validation/generic-aam-verification-wasm.ts",
+  ]) {
+    assert.deepEqual(exactRule(genericAam, path).facets, ["datum", "unit", "verification"]);
+  }
+  for (const path of ["lib/validation/capacity-baseline.ts", "lib/validation/track-store-capacity.ts"]) {
+    assert.deepEqual(exactRule(engine, path).facets, ["verification"]);
+  }
+  assert.deepEqual(exactRule(genericAam, "lib/validation/generated/generic-aam-verifier-wasm.ts").facets, ["digest", "verification"]);
+  assert.deepEqual(prefixRule(genericAam, "verification-rust/generic-aam/").facets, ["datum", "digest", "schema", "unit", "verification"]);
+
+  const generated = genericAam.generatedGroups.find((group) => group.id === "GENERIC_AAM_VERIFIER_WASM");
+  assert.deepEqual(generated.outputRules, [{
+    kind: "EXACT",
+    value: "lib/validation/generated/generic-aam-verifier-wasm.ts",
+    facets: ["digest", "verification"],
+  }]);
+  assert.deepEqual(generated.inputRules, [{
+    kind: "PREFIX",
+    value: "verification-rust/generic-aam/",
+    facets: ["datum", "digest", "schema", "unit", "verification"],
+  }]);
+  assert.deepEqual(generated.generatorRules, [{
+    kind: "EXACT",
+    value: "scripts/build-generic-aam-verifier.mjs",
+    facets: ["datum", "digest", "schema", "unit", "verification"],
+  }]);
+  assert.deepEqual(generated.freshnessArgv, ["node", "scripts/build-generic-aam-verifier.mjs", "--check"]);
+
+  assert.equal(geospatial.implementationRules.some((rule) => rule.kind === "PREFIX" && rule.value === "lib/geospatial/"), false);
+  assert.deepEqual(exactRule(geospatial, "lib/geospatial/vertical-datums.ts").facets, ["datum"]);
+  assert.deepEqual(exactRule(geospatial, "lib/geospatial/terrain.ts").facets, ["validity"]);
+  assert.deepEqual(exactRule(geospatial, "lib/scenario-spatial.ts").facets, ["datum", "unit", "ui"]);
+  assert.deepEqual(exactRule(geospatial, "lib/study-areas.ts").facets, ["runtime", "schema", "ui"]);
+  assert.deepEqual(exactRule(geospatial, "lib/mission-admission.ts").facets, ["runtime", "storage"]);
+  assert.deepEqual(exactRule(geospatial, "app/api/catalog/route.ts").facets, ["storage"]);
+  for (const sectionId of [
+    "GEOSPATIAL_VERTICAL_DATUMS",
+    "GEOSPATIAL_SYNTHETIC_MANIFEST",
+    "GEOSPATIAL_EXECUTABLE_PACK",
+    "GEOSPATIAL_SOURCE_ADMISSION",
+    "GEOSPATIAL_TERRAIN_LOS",
+    "GEOSPATIAL_VERIFICATION",
+    "GEOSPATIAL_SPATIAL_CONTRACT",
+    "GEOSPATIAL_CATALOG_SYNTHETIC_IDENTITY",
+  ]) assert.equal(geospatial.owningSections.some((section) => section.sectionId === sectionId), true, `${sectionId} must remain owned`);
+
+  assert.deepEqual(exactRule(mission, "lib/information-state.ts").facets, ["runtime", "vsr"]);
+  assert.deepEqual(exactRule(mission, "lib/object-catalog.ts").facets, ["schema", "ui"]);
+  assert.deepEqual(exactRule(mission, "lib/scenario-spatial.ts").facets, ["schema", "ui"]);
+  assert.deepEqual(exactRule(mission, "lib/simulation.ts").facets, ["runtime", "schema", "vsr"]);
+  assert.equal(mission.owningSections.some((section) => section.sectionId === "MISSION_INTEGRATED_MODEL"), false);
+  assert.equal(mission.owningSections.some((section) => section.sectionId === "MISSION_SPATIAL_CONTRACT"), false);
+  assert.deepEqual(requiredSections(mission, "lib/information-state.ts"), ["MISSION_RECORD_REPLAY", "MISSION_STATE_MACHINE"]);
+  assert.deepEqual(requiredSections(mission, "lib/scenario-draft.ts"), ["MISSION_BUILDER_EXPANSION", "MISSION_SCENARIO_ARTIFACT"]);
+  assert.deepEqual(requiredSections(mission, "lib/scenario-spatial.ts"), ["MISSION_BUILDER_EXPANSION", "MISSION_SCENARIO_ARTIFACT"]);
+
+  assert.deepEqual(exactRule(persistence, "db/schema.ts").facets, ["schema"]);
+  assert.deepEqual(prefixRule(persistence, "db/migrations/").facets, ["schema"]);
+  assert.equal(persistence.owningSections.some((section) => section.path === "docs/model-pack-contract.md"), false);
+  assert.equal(persistence.owningSections.some((section) => section.path === "docs/security-boundaries.md"), false);
+  assert.deepEqual(exactRule(modelPack, "db/migrations/007_model_pack_foundation.sql").facets, ["admission", "schema", "storage"]);
+  assert.deepEqual(exactRule(modelPack, "lib/catalog-admission.ts").facets, ["admission", "digest", "schema", "storage"]);
+  assert.deepEqual(exactRule(modelPack, "app/api/catalog/route.ts").facets, ["admission", "digest", "schema", "storage"]);
+  assert.deepEqual(exactRule(evidence, "lib/catalog-admission.ts").facets, ["evidence"]);
+  assert.deepEqual(exactRule(evidence, "app/api/catalog/route.ts").facets, ["evidence"]);
+  assert.deepEqual(exactRule(mission, "app/api/catalog/route.ts").facets, ["schema"]);
+  assert.equal(requiredSections(modelPack, "lib/catalog-admission.ts").includes("MODEL_PACK_PERSISTENCE"), true);
+  assert.equal(exactRule(vsr, "db/migrations/011_public_api_admission.sql"), undefined);
+  assert.deepEqual(exactRule(vsr, "db/migrations/012_saved_run_lifecycle_admission.sql").facets, ["admission"]);
+  assert.deepEqual(exactRule(vsr, "lib/security/saved-run-admission.ts").facets, ["admission"]);
+  assert.deepEqual(requiredSections(vsr, "lib/security/saved-run-admission.ts"), ["VSR_SAVED_RUNS"]);
+  assert.deepEqual(vsr.testRules.find((rule) => rule.kind === "EXACT" && rule.value === "tests/runtime-admission-db.test.ts").facets, ["admission"]);
+  assert.equal(prefixRule(modelPack, "drizzle/"), undefined);
+  assert.equal(prefixRule(vsr, "drizzle/"), undefined);
+  assert.deepEqual(ownersOf("fixtures/public-reference/nasa-tm-109057/workload.v5.json").map((owner) => owner.id), ["GENERIC_AAM_VERIFICATION"]);
+  assert.deepEqual(ownersOf("governance/environment-sources/nasa-power-hourly-20200115/manifest.v1.json").map((owner) => owner.id), ["GEOSPATIAL_ENVIRONMENT"]);
+});

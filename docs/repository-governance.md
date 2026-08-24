@@ -141,6 +141,59 @@ classifier ownership. A path alias for a file that does not exist is not gate
 coverage. Policy regressions use the repository's real paths and verify that
 every classifier output is represented by the Required PR Gate.
 
+Worker ownership is deliberately split by runtime. `lib/runtime/simulation.worker.ts`
+and its protocol/build/verifier paths belong to the browser simulation-Worker
+contract; `worker/index.ts` is the Cloudflare application Worker and belongs to
+security/delivery integration. The generic managed-server harness and Node
+runtime/admin bundler belong to delivery governance, not the simulation-Worker
+protocol. Shared canonical JSON changes select the
+model-pack, Rust/parity, built-browser Worker, and persistence consumers because
+they can change compiled-pack and VSR identities. Generic-AAM verifier sources,
+unit/datum adapters, the generated verifier module, and its direct generator are
+one governed Rust/WASM verification group. The runtime deployment-capability
+validator is jointly owned by the capability descriptor and Worker contracts.
+Public-aircraft fixtures, evaluators, and verifier commands require their
+numerical-verification section as well as evidence/admission documentation.
+Database seeds and evidence/catalog upgrade verifiers always select the
+database/API integration gate. Model-pack compilation, digest, admission, and
+runtime binding are all explicit facets of the model-pack implementation—not
+schema-only. Evidence-registry revisions select evidence, admission, subject
+validity, and change-procedure documentation. VSR digest and event authorities
+are jointly owned with their engine/Worker producers and select replay,
+integration, parity, and built-browser consumers. Finally, executable
+TypeScript/Rust atmosphere, primitives, dynamics, tracking, and weapon-admission
+producers belong to a dedicated physics-runtime family whose owning contract is
+the integrated physics model rather than the backend-selection document.
+
+Phase-one ownership is intentionally precise rather than prefix-shaped.
+Geospatial transforms, vertical datums, environment-pack schemas, terrain/LOS,
+source admission, installation coverage, and scenario-spatial authoring each
+select only their exact contract sections; browser-consumed geospatial and
+object-catalog authorities additionally select the built-browser gate. Mission
+ownership separately maps information-state/replay, scenario admission,
+authoring, spatial transforms, and simulation orchestration instead of treating
+all mission files as one semantic surface. Generic database mechanics own
+migration/backup, provisioning, and database-test documentation, while only
+the exact model-pack and saved-run tables, migrations, seed/verifier paths, and
+Drizzle representations jointly own their model-pack or VSR persistence
+contracts. The verification-only generic-AAM corpus, private Rust evaluator,
+generated module, workload, oracles, and performance evidence form a dedicated
+family; unrelated production-engine or capacity changes cannot force changes
+to its source-evidence contract. Source-backed object-catalog facts own the
+fixed-fixture documentation, while catalog credibility admission and its API
+projection jointly own model-pack identity, digest, persistence, and geospatial
+installation coverage. Saved-run quota and lifecycle admission select only the
+Saved runs boundary; they do not claim VSR archive, replay, or digest authority.
+Security ownership is exact-path rather than `lib/security/**`: saved-run and
+public-admission code owns Saved runs, basemap relay code owns Catalog and
+basemap relay, response-header code owns Browser response baseline, and release
+scripts/governance own Delivery trust. A shared admission helper may be
+explicitly multi-owned, but a saved-run edit cannot force unrelated basemap,
+response-header, or delivery documentation.
+Anonymous blog-comment routes, persistence schema/migration, and live client
+instead own the blog publishing Notes section; they do not acquire saved-run
+semantics merely because both use bounded public-API helpers.
+
 `make clean-clone-local` forwards the same explicit declaration input and proves the documented release context slice resolves
 from a new clone, installs the locked dependencies, then runs the deterministic
 baseline and `worker-local`. It therefore verifies the production-built Worker
