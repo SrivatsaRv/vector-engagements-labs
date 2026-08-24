@@ -99,6 +99,7 @@ jobs:
       - name: Verify generated assets, lint, and types
         run: |
           npm run environment:sources:verify
+          npm run tp1538:sources:verify
           npm run policy:aircraft-evidence:verify
           npm run policy:nasa-generic-f16:verify
           npm run symbols:verify
