@@ -13,6 +13,7 @@
     "NO_SEMANTIC_CHANGE",
     "DOCS_ALREADY_CURRENT"
   ],
+  "ruleRetirements": [],
   "families": [
     {
       "id": "DELIVERY_CONTRACT_GOVERNANCE",
@@ -4393,5 +4394,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "6924e9da3a0ef79db71a8d3dcded6e45e8c751a236e31e6d773a41de867e5ff5"
+  "canonicalSha256": "93af2afcd4c1222b441f5851dcbcf7039f91470d324d7e6231d6932442c37782"
 }

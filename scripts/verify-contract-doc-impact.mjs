@@ -174,8 +174,18 @@ export function writeOutput(report) {
       JSON.stringify(report.declaration, null, 2),
       "```",
       "",
-    ].join("\n");
-    writeFileSync(summaryPath, summary, { flag: "a" });
+    ];
+    if (report.ruleRetirements?.length) summary.push(
+      "## Governed rule retirements",
+      "",
+      "These append-only tombstones were validated against the exact merge base, base-policy digest, and Git delete/rename operations.",
+      "",
+      "```json",
+      JSON.stringify(report.ruleRetirements, null, 2),
+      "```",
+      "",
+    );
+    writeFileSync(summaryPath, summary.join("\n"), { flag: "a" });
   }
 }
 

@@ -19,6 +19,18 @@ import { declarationTemplate, resolvePolicyBootstrap, resolvePushDeclaration, ru
 
 const sha = (character) => character.repeat(64);
 const commitSha = (character) => character.repeat(40);
+const canonicalJson = (value) => {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+};
+const policySha256 = (value) => {
+  const unsigned = structuredClone(value);
+  delete unsigned.canonicalSha256;
+  return createHash("sha256").update(canonicalJson(unsigned)).digest("hex");
+};
 const fixtureProbeSource = `#!/usr/bin/env node
 const [protocol, root, baseSha, headSha, familyId, probeId, disposition] = process.argv.slice(2);
 if (protocol !== "vector.contract-doc-probe.v1" || !root) process.exit(2);
@@ -43,6 +55,7 @@ const policy = {
     "NO_SEMANTIC_CHANGE",
     "DOCS_ALREADY_CURRENT",
   ],
+  ruleRetirements: [],
   families: [
     {
       id: "EXAMPLE",
@@ -233,10 +246,17 @@ test("hosted output renders the exact validated declaration for reviewers", asyn
     else process.env.GITHUB_STEP_SUMMARY = previous;
   });
   const exactDeclaration = declaration();
-  writeOutput({ state: "VERIFIED", policyBootstrap: false, declaration: exactDeclaration });
+  writeOutput({
+    state: "VERIFIED",
+    policyBootstrap: false,
+    declaration: exactDeclaration,
+    ruleRetirements: [{ retirementId: "EXAMPLE_IMPLEMENTATION_LIB_EXAMPLE_TS_V1" }],
+  });
   const summary = await readFile(summaryPath, "utf8");
   assert.match(summary, /exact declaration validated/i);
   assert.match(summary, new RegExp(exactDeclaration.families[0].rationale.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+  assert.match(summary, /Governed rule retirements/u);
+  assert.match(summary, /EXAMPLE_IMPLEMENTATION_LIB_EXAMPLE_TS_V1/u);
 });
 
 test("push verification requires exactly one revision-bound associated merged main pull request", async () => {
@@ -592,6 +612,373 @@ test("the head policy cannot remove ownership that the base policy used", async 
     }),
     /removes EXAMPLE\.owningSections|rule facet verification.*owning section/i,
   );
+});
+
+test("an exact governed rule can retire only with a revision-bound deleted endpoint tombstone", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const basePolicy = {
+    ...policy,
+    canonicalSha256: undefined,
+  };
+  await rm(join(fixture.root, "lib", "example.ts"));
+  await writeFile(join(fixture.root, "docs", "example.md"), "# Example\n\n## Contract\n\nThe exact implementation path was intentionally retired.\n\n## Other\n\nStable.\n");
+  const headSha = await commit(fixture.root, "retire exact governed path");
+  const retiredRule = basePolicy.families[0].implementationRules[0];
+  assert.throws(
+    () => verifyContractDocImpact({
+      rootDirectory: fixture.root,
+      baseSha: fixture.baseSha,
+      headSha,
+      declaration: declaration(),
+      basePolicy,
+      headPolicy: basePolicy,
+    }),
+    /matches no tracked path/i,
+  );
+  const removedWithoutRetirement = {
+    ...basePolicy,
+    families: [{
+      ...basePolicy.families[0],
+      implementationRules: basePolicy.families[0].implementationRules.slice(1),
+    }],
+  };
+  assert.throws(
+    () => verifyContractDocImpact({
+      rootDirectory: fixture.root,
+      baseSha: fixture.baseSha,
+      headSha,
+      declaration: declaration(),
+      basePolicy,
+      headPolicy: removedWithoutRetirement,
+    }),
+    /removes EXAMPLE\.implementationRules|changedPathRules\[0\] matches no tracked path/i,
+  );
+  const headPolicy = {
+    ...basePolicy,
+    families: [{
+      ...basePolicy.families[0],
+      implementationRules: basePolicy.families[0].implementationRules.slice(1),
+    }],
+    ruleRetirements: [{
+      retirementId: "EXAMPLE_IMPLEMENTATION_LIB_EXAMPLE_TS_V1",
+      familyId: "EXAMPLE",
+      inventory: "IMPLEMENTATION",
+      generatedGroupId: null,
+      rule: retiredRule,
+      retiredAtMergeBaseSha: fixture.baseSha,
+      retiredFromPolicySha256: policySha256(basePolicy),
+      replacementPath: null,
+      rationale: "lib/example.ts was deleted and its old endpoint remains governed by the base policy.",
+    }],
+  };
+  assert.equal(
+    verifyContractDocImpact({
+      rootDirectory: fixture.root,
+      baseSha: fixture.baseSha,
+      headSha,
+      declaration: declaration(),
+      basePolicy,
+      headPolicy,
+    }).state,
+    "VERIFIED",
+  );
+  assert.throws(
+    () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), headPolicy, policyBootstrap: true }),
+    /retirements are unavailable during policy bootstrap/i,
+  );
+  const wrongBase = structuredClone(headPolicy);
+  wrongBase.ruleRetirements[0].retiredFromPolicySha256 = sha("f");
+  assert.throws(
+    () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy: wrongBase }),
+    /not bound to the exact base policy/i,
+  );
+  const wrongMergeBase = structuredClone(headPolicy);
+  wrongMergeBase.ruleRetirements[0].retiredAtMergeBaseSha = commitSha("f");
+  assert.throws(
+    () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy: wrongMergeBase }),
+    /not bound to the exact merge-base commit/i,
+  );
+  const prefixRetirement = structuredClone(headPolicy);
+  prefixRetirement.ruleRetirements[0].rule.kind = "PREFIX";
+  prefixRetirement.ruleRetirements[0].rule.value = "lib/";
+  assert.throws(
+    () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy: prefixRetirement }),
+    /may retire only an EXACT rule/i,
+  );
+  await writeFile(join(fixture.root, ".gitignore"), "node_modules\ncoverage\n");
+  const laterHeadSha = await commit(fixture.root, "unrelated follow-up after retirement");
+  const emptyDeclaration = { schemaVersion: DECLARATION_SCHEMA, families: [] };
+  assert.equal(
+    verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: headSha, headSha: laterHeadSha, declaration: emptyDeclaration, basePolicy: headPolicy, headPolicy }).state,
+    "NO_RELEVANT_CHANGES",
+  );
+  const erasedTombstone = { ...headPolicy, ruleRetirements: [] };
+  assert.throws(
+    () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: headSha, headSha: laterHeadSha, declaration: emptyDeclaration, basePolicy: headPolicy, headPolicy: erasedTombstone }),
+    /removes rule retirements|changedPathRules\[0\] matches no tracked path/i,
+  );
+});
+
+test("an exact governed rename preserves family, inventory, and facet ownership", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const basePolicy = { ...policy, nonSemanticProbes: [], canonicalSha256: undefined };
+  runGit(fixture.root, ["mv", "lib/example.ts", "lib/renamed-example.ts"]);
+  await writeFile(join(fixture.root, "docs", "example.md"), "# Example\n\n## Contract\n\nThe implementation path was renamed without losing its contract owner.\n\n## Other\n\nStable.\n");
+  const headSha = await commit(fixture.root, "rename exact governed path");
+  const retiredRule = basePolicy.families[0].implementationRules[0];
+  const replacementRule = { ...retiredRule, value: "lib/renamed-example.ts" };
+  const headPolicy = {
+    ...basePolicy,
+    families: [{
+      ...basePolicy.families[0],
+      implementationRules: [replacementRule, ...basePolicy.families[0].implementationRules.slice(1)],
+    }],
+    ruleRetirements: [{
+      retirementId: "EXAMPLE_IMPLEMENTATION_LIB_EXAMPLE_TS_RENAME_V1",
+      familyId: "EXAMPLE",
+      inventory: "IMPLEMENTATION",
+      generatedGroupId: null,
+      rule: retiredRule,
+      retiredAtMergeBaseSha: fixture.baseSha,
+      retiredFromPolicySha256: policySha256(basePolicy),
+      replacementPath: "lib/renamed-example.ts",
+      rationale: "The exact implementation endpoint moved while retaining the same family, inventory, and facets.",
+    }],
+    allowedMultiFamilyPaths: [],
+  };
+  assert.equal(
+    verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy }).state,
+    "VERIFIED",
+  );
+  const wrongInventory = structuredClone(headPolicy);
+  wrongInventory.ruleRetirements[0].inventory = "TEST";
+  assert.throws(
+    () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy: wrongInventory }),
+    /removes EXAMPLE\.implementationRules|rule remains active/i,
+  );
+  const wrongReplacement = structuredClone(headPolicy);
+  wrongReplacement.ruleRetirements[0].replacementPath = "tests/example/example.test.mjs";
+  assert.throws(
+    () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy: wrongReplacement }),
+    /not bound to exactly one declared rename endpoint/i,
+  );
+});
+
+test("test and generated exact rules use the same audited retirement contract", async (t) => {
+  for (const subject of [
+    { inventory: "TEST", generatedGroupId: null, path: "tests/example/example.test.mjs", familyField: "testRules" },
+    { inventory: "GENERATED_OUTPUT", generatedGroupId: "EXAMPLE_GENERATED", path: "lib/generated/example/value.ts", familyField: "generated" },
+  ]) {
+    await t.test(subject.inventory, async (t) => {
+      const fixture = await fixtureRepository();
+      t.after(() => rm(fixture.root, { recursive: true, force: true }));
+      const basePolicy = structuredClone({ ...policy, nonSemanticProbes: [], canonicalSha256: undefined });
+      let retiredRule;
+      if (subject.familyField === "testRules") {
+        retiredRule = { kind: "EXACT", value: subject.path, facets: ["verification"] };
+        basePolicy.families[0].testRules = [retiredRule];
+      } else {
+        retiredRule = { kind: "EXACT", value: subject.path, facets: ["schema"] };
+        basePolicy.families[0].generatedGroups[0].outputRules = [
+          retiredRule,
+          { kind: "EXACT", value: "scripts/generate-example.mjs", facets: ["schema"] },
+        ];
+      }
+      await rm(join(fixture.root, subject.path));
+      if (subject.inventory !== "TEST") {
+        await writeFile(join(fixture.root, "docs", "example.md"), `# Example\n\n## Contract\n\nThe ${subject.inventory} endpoint was retired under the same closed contract.\n\n## Other\n\nStable.\n`);
+      }
+      const headSha = await commit(fixture.root, `retire ${subject.inventory}`);
+      const headPolicy = structuredClone(basePolicy);
+      if (subject.familyField === "testRules") headPolicy.families[0].testRules = [];
+      else headPolicy.families[0].generatedGroups[0].outputRules = headPolicy.families[0].generatedGroups[0].outputRules.slice(1);
+      headPolicy.ruleRetirements = [{
+        retirementId: `EXAMPLE_${subject.inventory}_RETIREMENT_V1`,
+        familyId: "EXAMPLE",
+        inventory: subject.inventory,
+        generatedGroupId: subject.generatedGroupId,
+        rule: retiredRule,
+        retiredAtMergeBaseSha: fixture.baseSha,
+        retiredFromPolicySha256: policySha256(basePolicy),
+        replacementPath: null,
+        rationale: `The exact ${subject.inventory} endpoint was deleted while its base-policy ownership remains auditable.`,
+      }];
+      const retirementDeclaration = subject.inventory === "TEST"
+        ? declaration({
+          disposition: "TEST_ONLY",
+          owningSections: [section],
+          exemptionEvidence: { kind: "TEST_ONLY", paths: [subject.path] },
+        })
+        : declaration();
+      assert.equal(
+        verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: retirementDeclaration, basePolicy, headPolicy }).state,
+        "VERIFIED",
+      );
+    });
+  }
+});
+
+test("a deleted multi-family endpoint requires one retirement per exact owner", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  await writeFile(join(fixture.root, "docs", "second.md"), "# Second\n\n## Contract\n\nVersion one.\n");
+  const baseSha = await commit(fixture.root, "add second owner document");
+  const secondSection = { sectionId: "SECOND_CONTRACT", path: "docs/second.md", heading: "## Contract", facets: ["schema"] };
+  const sharedRule = { kind: "EXACT", value: "lib/example.ts", facets: ["schema"] };
+  const secondFamily = {
+    id: "SECOND",
+    workstream: "staff-architecture",
+    implementationRules: [sharedRule],
+    testRules: [],
+    generatedGroups: [],
+    owningSections: [secondSection],
+    migrationSections: [],
+  };
+  const basePolicy = structuredClone({
+    ...policy,
+    families: [policy.families[0], secondFamily],
+    nonSemanticProbes: [],
+    allowedMultiFamilyPaths: ["lib/example.ts"],
+    canonicalSha256: undefined,
+  });
+  await rm(join(fixture.root, "lib", "example.ts"));
+  await writeFile(join(fixture.root, "docs", "example.md"), "# Example\n\n## Contract\n\nThe shared endpoint was retired.\n\n## Other\n\nStable.\n");
+  await writeFile(join(fixture.root, "docs", "second.md"), "# Second\n\n## Contract\n\nThe shared endpoint was retired.\n");
+  const headSha = await commit(fixture.root, "retire shared endpoint");
+  const headPolicy = structuredClone(basePolicy);
+  headPolicy.families[0].implementationRules = headPolicy.families[0].implementationRules.slice(1);
+  headPolicy.families[1].implementationRules = [];
+  headPolicy.ruleRetirements = [
+    {
+      retirementId: "EXAMPLE_SHARED_ENDPOINT_RETIREMENT_V1",
+      familyId: "EXAMPLE",
+      inventory: "IMPLEMENTATION",
+      generatedGroupId: null,
+      rule: sharedRule,
+      retiredAtMergeBaseSha: baseSha,
+      retiredFromPolicySha256: policySha256(basePolicy),
+      replacementPath: null,
+      rationale: "The shared exact endpoint was deleted from the EXAMPLE family under the audited retirement contract.",
+    },
+    {
+      retirementId: "SECOND_SHARED_ENDPOINT_RETIREMENT_V1",
+      familyId: "SECOND",
+      inventory: "IMPLEMENTATION",
+      generatedGroupId: null,
+      rule: sharedRule,
+      retiredAtMergeBaseSha: baseSha,
+      retiredFromPolicySha256: policySha256(basePolicy),
+      replacementPath: null,
+      rationale: "The shared exact endpoint was deleted from the SECOND family under the audited retirement contract.",
+    },
+  ];
+  const multiDeclaration = {
+    schemaVersion: DECLARATION_SCHEMA,
+    families: [
+      declaration().families[0],
+      {
+        familyId: "SECOND",
+        disposition: "SEMANTIC",
+        owningSections: [secondSection],
+        rationale: "The second owner document records retirement of the shared exact implementation endpoint.",
+        evidence: [{ kind: "TEST", value: "node --test tests/contract-doc-impact.test.mjs" }],
+        migration: { state: "NOT_APPLICABLE", documents: [], rationale: "No persisted schema or migration is affected by path retirement." },
+        exemptionEvidence: null,
+      },
+    ],
+  };
+  assert.equal(
+    verifyContractDocImpact({ rootDirectory: fixture.root, baseSha, headSha, declaration: multiDeclaration, basePolicy, headPolicy }).state,
+    "VERIFIED",
+  );
+  const partialRetirement = structuredClone(headPolicy);
+  partialRetirement.ruleRetirements.pop();
+  assert.throws(
+    () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha, headSha, declaration: multiDeclaration, basePolicy, headPolicy: partialRetirement }),
+    /removes SECOND\.implementationRules/i,
+  );
+});
+
+test("rule retirements reject live endpoints, orphan records, and empty generated contracts", async (t) => {
+  await t.test("a copied or still-tracked endpoint cannot be retired", async (t) => {
+    const fixture = await fixtureRepository();
+    t.after(() => rm(fixture.root, { recursive: true, force: true }));
+    const basePolicy = structuredClone({ ...policy, nonSemanticProbes: [], canonicalSha256: undefined });
+    await writeFile(join(fixture.root, "lib", "copied-example.ts"), "export const value = 1;\n");
+    const headSha = await commit(fixture.root, "copy governed endpoint without deleting its source");
+    const retiredRule = basePolicy.families[0].implementationRules[0];
+    const headPolicy = structuredClone(basePolicy);
+    headPolicy.families[0].implementationRules = headPolicy.families[0].implementationRules.slice(1);
+    headPolicy.ruleRetirements = [{
+      retirementId: "EXAMPLE_LIVE_ENDPOINT_RETIREMENT_V1",
+      familyId: "EXAMPLE",
+      inventory: "IMPLEMENTATION",
+      generatedGroupId: null,
+      rule: retiredRule,
+      retiredAtMergeBaseSha: fixture.baseSha,
+      retiredFromPolicySha256: policySha256(basePolicy),
+      replacementPath: null,
+      rationale: "This hostile record attempts to retire an endpoint that remains tracked after a copy operation.",
+    }];
+    assert.throws(
+      () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy }),
+      /old path is still tracked|not bound to exactly one deleted endpoint/i,
+    );
+  });
+
+  await t.test("a tombstone cannot be added without retiring a base rule", async (t) => {
+    const fixture = await fixtureRepository();
+    t.after(() => rm(fixture.root, { recursive: true, force: true }));
+    const basePolicy = structuredClone({ ...policy, nonSemanticProbes: [], canonicalSha256: undefined });
+    await rm(join(fixture.root, ".gitignore"));
+    const headSha = await commit(fixture.root, "delete a non-contract path");
+    const headPolicy = structuredClone(basePolicy);
+    headPolicy.nonContractRules = [];
+    headPolicy.ruleRetirements = [{
+      retirementId: "EXAMPLE_ORPHAN_RETIREMENT_V1",
+      familyId: "EXAMPLE",
+      inventory: "IMPLEMENTATION",
+      generatedGroupId: null,
+      rule: { kind: "EXACT", value: ".gitignore", facets: ["schema"] },
+      retiredAtMergeBaseSha: fixture.baseSha,
+      retiredFromPolicySha256: policySha256(basePolicy),
+      replacementPath: null,
+      rationale: "This hostile record names no implementation rule from the immutable base policy inventory.",
+    }];
+    assert.throws(
+      () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: { schemaVersion: DECLARATION_SCHEMA, families: [] }, basePolicy, headPolicy }),
+      /adds a rule retirement without retiring an exact base rule/i,
+    );
+  });
+
+  await t.test("a generated group cannot retire its last output contract", async (t) => {
+    const fixture = await fixtureRepository();
+    t.after(() => rm(fixture.root, { recursive: true, force: true }));
+    const basePolicy = structuredClone({ ...policy, nonSemanticProbes: [], canonicalSha256: undefined });
+    const retiredRule = { kind: "EXACT", value: "lib/generated/example/value.ts", facets: ["schema"] };
+    basePolicy.families[0].generatedGroups[0].outputRules = [retiredRule];
+    await rm(join(fixture.root, retiredRule.value));
+    const headSha = await commit(fixture.root, "delete the last generated output");
+    const headPolicy = structuredClone(basePolicy);
+    headPolicy.families[0].generatedGroups[0].outputRules = [];
+    headPolicy.ruleRetirements = [{
+      retirementId: "EXAMPLE_LAST_GENERATED_OUTPUT_RETIREMENT_V1",
+      familyId: "EXAMPLE",
+      inventory: "GENERATED_OUTPUT",
+      generatedGroupId: "EXAMPLE_GENERATED",
+      rule: retiredRule,
+      retiredAtMergeBaseSha: fixture.baseSha,
+      retiredFromPolicySha256: policySha256(basePolicy),
+      replacementPath: null,
+      rationale: "This hostile record attempts to leave a registered freshness group without any generated outputs.",
+    }];
+    assert.throws(
+      () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha, declaration: declaration(), basePolicy, headPolicy }),
+      /outputRules must be non-empty/i,
+    );
+  });
 });
 
 test("a supplied merge base is exact and replay-bound", async (t) => {

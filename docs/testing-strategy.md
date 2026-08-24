@@ -106,6 +106,13 @@ verification writes the subsequently validated declaration to the visible job
 summary. Regression coverage also proves changelog headings are family-unique,
 the aggregate Drizzle facade has only generic database ownership, and each
 domain schema module selects only its generic plus truthful domain owners.
+Exact-rule retirement regressions reproduce the former delete/rename deadlock
+and then require a bijective, append-only tombstone bound to the merge-base
+commit, canonical base-policy digest, old endpoint, and exact Git operation.
+They cover implementation, test, and generated-rule slots; endpoint-aware
+`TEST_ONLY`; same-family/inventory/facet rename replacement; retained tombstones
+across later revisions; and rejection of prefix, wrong-digest, wrong-revision,
+orphan, edited, removed, mismatched-target, and bootstrap retirements.
 TEST_ONLY, GENERATED_ARTIFACT_ONLY, INTERNAL_REFACTOR,
 NO_SEMANTIC_CHANGE, and DOCS_ALREADY_CURRENT are mutually exclusive,
 evidence-bearing dispositions; none receives credit merely because an arbitrary

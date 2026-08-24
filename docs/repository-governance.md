@@ -65,6 +65,19 @@ merge base must lack the policy. A stale branch whose integration tip already
 has the policy must rebase. Later missing, malformed, weakened, unclassified,
 or unmapped policy state fails closed.
 
+Governed `EXACT` implementation, test, or generated rules may leave the active
+inventory only through an append-only `ruleRetirements` tombstone. The
+tombstone binds the exact merge-base commit, canonical base-policy digest,
+family, rule inventory, facets, and Git delete or rename operation. A deletion
+has no replacement; a rename must add an active exact rule for the new endpoint
+under the same family, generated group where applicable, inventory, and facets.
+Prefix rules, families, sections, generated groups, toolchains, commands, and
+workstreams cannot use this mechanism. Tombstones never classify current paths,
+cannot be edited or removed, and are unavailable during the one-time bootstrap.
+Historical multi-family and probe entries may remain inert only when the same
+old endpoint has a validated tombstone, preserving audit history without making
+a legitimately deleted or renamed path impossible to govern.
+
 Pull requests obtain the declaration from the single structured template block.
 `npm run --silent policy:contract-docs:template` derives the exact affected
 family, owning-section, and migration-section inventory from the current

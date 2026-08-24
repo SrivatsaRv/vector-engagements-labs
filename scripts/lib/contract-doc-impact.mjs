@@ -17,6 +17,7 @@ const DISPOSITIONS = new Set([
   "DOCS_ALREADY_CURRENT",
 ]);
 const RULE_KINDS = new Set(["EXACT", "PREFIX"]);
+const RULE_RETIREMENT_INVENTORIES = new Set(["IMPLEMENTATION", "TEST", "GENERATED_OUTPUT", "GENERATED_INPUT", "GENERATED_GENERATOR"]);
 const GENERATED_TOOLCHAINS = new Set(["NODE", "NODE_RUST_WASM32"]);
 const NON_SEMANTIC_PROBE_DISPOSITIONS = new Set(["INTERNAL_REFACTOR", "NO_SEMANTIC_CHANGE"]);
 const PROBE_RESULT_SCHEMA = "vector.contract-doc-probe-result.v1";
@@ -158,32 +159,98 @@ function requireInventorySubset(beforeValues, afterValues, label) {
   for (const item of canonicalInventory(beforeValues)) invariant(after.has(item), `Head policy removes ${label}.`);
 }
 
-function assertPolicyDoesNotWeaken(basePolicy, headPolicy) {
+function policySha256(policy) {
+  const unsigned = { ...policy };
+  delete unsigned.canonicalSha256;
+  return sha256(canonicalJson(unsigned));
+}
+
+function rulesForInventory(family, inventory, generatedGroupId) {
+  if (inventory === "IMPLEMENTATION") return family.implementationRules;
+  if (inventory === "TEST") return family.testRules;
+  const group = family.generatedGroups.find((candidate) => candidate.id === generatedGroupId);
+  invariant(group, `Unknown generated group ${family.id}.${generatedGroupId}.`);
+  if (inventory === "GENERATED_OUTPUT") return group.outputRules;
+  if (inventory === "GENERATED_INPUT") return group.inputRules;
+  if (inventory === "GENERATED_GENERATOR") return group.generatorRules;
+  throw new Error(`Unsupported rule inventory ${inventory}.`);
+}
+
+function retirementKey(retirement) {
+  return canonicalJson({
+    familyId: retirement.familyId,
+    inventory: retirement.inventory,
+    generatedGroupId: retirement.generatedGroupId,
+    rule: retirement.rule,
+  });
+}
+
+function assertRuleRetirementOperation(retirement, operations, headPolicy) {
+  const oldPath = retirement.rule.value;
+  if (retirement.replacementPath === null) {
+    const deletions = operations.filter((operation) => operation.status.startsWith("D") && (operation.oldPath ?? operation.path) === oldPath);
+    invariant(deletions.length === 1, `${retirement.retirementId} is not bound to exactly one deleted endpoint.`);
+    return;
+  }
+  const renames = operations.filter((operation) => operation.status.startsWith("R") && operation.oldPath === oldPath && operation.path === retirement.replacementPath);
+  invariant(renames.length === 1, `${retirement.retirementId} is not bound to exactly one declared rename endpoint.`);
+  const family = headPolicy.families.find((candidate) => candidate.id === retirement.familyId);
+  const replacementRule = { ...retirement.rule, value: retirement.replacementPath };
+  invariant(canonicalInventory(rulesForInventory(family, retirement.inventory, retirement.generatedGroupId)).has(canonicalJson(replacementRule)), `${retirement.retirementId} rename replacement is not governed by the same family, inventory, and facets.`);
+}
+
+function assertPolicyDoesNotWeaken(basePolicy, headPolicy, operations, mergeBaseSha) {
   invariant(headPolicy.policyId === basePolicy.policyId && headPolicy.issue === basePolicy.issue, "Head policy changes immutable policy identity.");
   invariant(headPolicy.declarationBlockName === basePolicy.declarationBlockName, "Head policy changes the declaration block identity.");
   invariant(headPolicy.maxDeclarationBytes <= basePolicy.maxDeclarationBytes, "Head policy increases the declaration byte limit.");
   requireInventorySubset(basePolicy.contractRoots, headPolicy.contractRoots, "contract roots");
   requireInventorySubset(basePolicy.allowedMultiFamilyPaths, headPolicy.allowedMultiFamilyPaths, "declared multi-family ownership");
   requireInventorySubset(basePolicy.nonSemanticProbes, headPolicy.nonSemanticProbes, "non-semantic probes");
+  requireInventorySubset(basePolicy.ruleRetirements, headPolicy.ruleRetirements, "rule retirements");
+  const basePolicyDigest = policySha256(basePolicy);
+  const baseRetirements = canonicalInventory(basePolicy.ruleRetirements);
+  const newRetirements = headPolicy.ruleRetirements.filter((retirement) => !baseRetirements.has(canonicalJson(retirement)));
+  const usedRetirements = new Set();
   const headFamilies = new Map(headPolicy.families.map((family) => [family.id, family]));
   for (const baseFamily of basePolicy.families) {
     const headFamily = headFamilies.get(baseFamily.id);
     invariant(headFamily, `Head policy removes family ${baseFamily.id}.`);
     invariant(headFamily.workstream === baseFamily.workstream, `Head policy changes ${baseFamily.id} workstream ownership.`);
-    for (const field of ["implementationRules", "testRules", "owningSections", "migrationSections"]) {
-      requireInventorySubset(baseFamily[field], headFamily[field], `${baseFamily.id}.${field}`);
+    for (const [field, inventory] of [["implementationRules", "IMPLEMENTATION"], ["testRules", "TEST"]]) {
+      const after = canonicalInventory(headFamily[field]);
+      for (const rule of baseFamily[field]) {
+        if (after.has(canonicalJson(rule))) continue;
+        const retirement = newRetirements.find((candidate) => candidate.familyId === baseFamily.id && candidate.inventory === inventory && candidate.generatedGroupId === null && canonicalJson(candidate.rule) === canonicalJson(rule));
+        invariant(retirement, `Head policy removes ${baseFamily.id}.${field}.`);
+        invariant(retirement.retiredAtMergeBaseSha === mergeBaseSha, `${retirement.retirementId} is not bound to the exact merge-base commit.`);
+        invariant(retirement.retiredFromPolicySha256 === basePolicyDigest, `${retirement.retirementId} is not bound to the exact base policy.`);
+        assertRuleRetirementOperation(retirement, operations, headPolicy);
+        usedRetirements.add(retirement.retirementId);
+      }
     }
+    for (const field of ["owningSections", "migrationSections"]) requireInventorySubset(baseFamily[field], headFamily[field], `${baseFamily.id}.${field}`);
     const headGroups = new Map(headFamily.generatedGroups.map((group) => [group.id, group]));
     for (const baseGroup of baseFamily.generatedGroups) {
       const headGroup = headGroups.get(baseGroup.id);
       invariant(headGroup, `Head policy removes generated group ${baseFamily.id}.${baseGroup.id}.`);
       invariant(headGroup.toolchainId === baseGroup.toolchainId, `Head policy changes ${baseFamily.id}.${baseGroup.id} freshness toolchain.`);
       invariant(JSON.stringify(headGroup.freshnessArgv) === JSON.stringify(baseGroup.freshnessArgv), `Head policy changes ${baseFamily.id}.${baseGroup.id} freshness command.`);
-      for (const field of ["outputRules", "inputRules", "generatorRules"]) {
-        requireInventorySubset(baseGroup[field], headGroup[field], `${baseFamily.id}.${baseGroup.id}.${field}`);
+      for (const [field, inventory] of [["outputRules", "GENERATED_OUTPUT"], ["inputRules", "GENERATED_INPUT"], ["generatorRules", "GENERATED_GENERATOR"]]) {
+        const after = canonicalInventory(headGroup[field]);
+        for (const rule of baseGroup[field]) {
+          if (after.has(canonicalJson(rule))) continue;
+          const retirement = newRetirements.find((candidate) => candidate.familyId === baseFamily.id && candidate.inventory === inventory && candidate.generatedGroupId === baseGroup.id && canonicalJson(candidate.rule) === canonicalJson(rule));
+          invariant(retirement, `Head policy removes ${baseFamily.id}.${baseGroup.id}.${field}.`);
+          invariant(retirement.retiredAtMergeBaseSha === mergeBaseSha, `${retirement.retirementId} is not bound to the exact merge-base commit.`);
+          invariant(retirement.retiredFromPolicySha256 === basePolicyDigest, `${retirement.retirementId} is not bound to the exact base policy.`);
+          assertRuleRetirementOperation(retirement, operations, headPolicy);
+          usedRetirements.add(retirement.retirementId);
+        }
       }
     }
   }
+  invariant(newRetirements.every((retirement) => usedRetirements.has(retirement.retirementId)), "Head policy adds a rule retirement without retiring an exact base rule.");
+  return newRetirements;
 }
 
 function sha256(value) {
@@ -298,6 +365,7 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
     "declarationBlockName",
     "allowedDispositions",
     "families",
+    "ruleRetirements",
     "nonSemanticProbes",
     "allowedMultiFamilyPaths",
     "nonContractRules",
@@ -322,6 +390,8 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
     invariant(Array.isArray(family.implementationRules) && Array.isArray(family.testRules), `${label} rules must be arrays.`);
     family.implementationRules.forEach((rule, index) => validateRule(rule, `${label}.implementationRules[${index}]`));
     family.testRules.forEach((rule, index) => validateRule(rule, `${label}.testRules[${index}]`));
+    invariant(canonicalInventory(family.implementationRules).size === family.implementationRules.length, `${label}.implementationRules contains duplicates.`);
+    invariant(canonicalInventory(family.testRules).size === family.testRules.length, `${label}.testRules contains duplicates.`);
     invariant(Array.isArray(family.generatedGroups), `${label}.generatedGroups must be an array.`);
     const generatedGroupIds = new Set();
     for (const [groupIndex, group] of family.generatedGroups.entries()) {
@@ -334,6 +404,7 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
       for (const ruleSet of ["outputRules", "inputRules", "generatorRules"]) {
         invariant(Array.isArray(group[ruleSet]) && group[ruleSet].length > 0, `${groupLabel}.${ruleSet} must be non-empty.`);
         group[ruleSet].forEach((rule, index) => validateRule(rule, `${groupLabel}.${ruleSet}[${index}]`));
+        invariant(canonicalInventory(group[ruleSet]).size === group[ruleSet].length, `${groupLabel}.${ruleSet} contains duplicates.`);
       }
       invariant(Array.isArray(group.freshnessArgv) && group.freshnessArgv.length > 1, `${groupLabel}.freshnessArgv must contain an executable and arguments.`);
       group.freshnessArgv.forEach((argument, index) => requiredString(argument, `${groupLabel}.freshnessArgv[${index}]`));
@@ -365,6 +436,39 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
         invariant(existsSync(absolute) && lstatSync(absolute).isFile() && !lstatSync(absolute).isSymbolicLink(), `${label} registered document ${section.path} must be a regular file.`);
         markdownSection(readFileSync(absolute, "utf8"), section.heading, `${label} registered section ${section.sectionId}`);
       }
+    }
+  }
+  invariant(Array.isArray(policy.ruleRetirements), "ruleRetirements must be an array.");
+  const retirementIds = new Set();
+  const retirementSubjects = new Set();
+  for (const [retirementIndex, retirement] of policy.ruleRetirements.entries()) {
+    const label = `ruleRetirements[${retirementIndex}]`;
+    exactKeys(retirement, ["retirementId", "familyId", "inventory", "generatedGroupId", "rule", "retiredAtMergeBaseSha", "retiredFromPolicySha256", "replacementPath", "rationale"], label);
+    invariant(/^[A-Z][A-Z0-9_]*_V\d+$/u.test(requiredString(retirement.retirementId, `${label} retirementId`)), `${label} retirementId must be a versioned identifier.`);
+    invariant(!retirementIds.has(retirement.retirementId), `Duplicate rule retirement ${retirement.retirementId}.`);
+    retirementIds.add(retirement.retirementId);
+    const family = policy.families.find((candidate) => candidate.id === retirement.familyId);
+    invariant(family, `${label} references unknown family ${retirement.familyId}.`);
+    invariant(RULE_RETIREMENT_INVENTORIES.has(retirement.inventory), `${label} has unsupported inventory ${retirement.inventory}.`);
+    if (retirement.inventory.startsWith("GENERATED_")) {
+      requiredString(retirement.generatedGroupId, `${label} generatedGroupId`);
+      invariant(family.generatedGroups.some((group) => group.id === retirement.generatedGroupId), `${label} references unknown generated group ${retirement.generatedGroupId}.`);
+    } else {
+      invariant(retirement.generatedGroupId === null, `${label} generatedGroupId must be null outside generated inventories.`);
+    }
+    validateRule(retirement.rule, `${label}.rule`);
+    invariant(retirement.rule.kind === "EXACT", `${label} may retire only an EXACT rule.`);
+    invariant(COMMIT_SHA.test(retirement.retiredAtMergeBaseSha), `${label} retiredAtMergeBaseSha is invalid.`);
+    invariant(SHA256.test(retirement.retiredFromPolicySha256), `${label} retiredFromPolicySha256 is invalid.`);
+    if (retirement.replacementPath !== null) normalizeRepositoryPath(retirement.replacementPath, `${label} replacementPath`);
+    substantiveString(retirement.rationale, `${label} rationale`);
+    invariant(!canonicalInventory(rulesForInventory(family, retirement.inventory, retirement.generatedGroupId)).has(canonicalJson(retirement.rule)), `${label} rule remains active.`);
+    const subject = retirementKey(retirement);
+    invariant(!retirementSubjects.has(subject), `${label} repeats a retired rule subject.`);
+    retirementSubjects.add(subject);
+    if (trackedPaths.length) {
+      invariant(!trackedPaths.includes(retirement.rule.value), `${label} old path is still tracked.`);
+      if (retirement.replacementPath !== null) invariant(trackedPaths.includes(retirement.replacementPath), `${label} replacement path is not tracked.`);
     }
   }
   invariant(Array.isArray(policy.nonSemanticProbes), "nonSemanticProbes must be an array.");
@@ -426,25 +530,30 @@ export function validatePolicy(policy, { rootDirectory, trackedPaths = [] } = {}
     if (classification?.kind === "BLOCKED_UNMAPPED_CONTRACT") blockedUnmappedPaths.push(path);
   }
   for (const path of policy.allowedMultiFamilyPaths) {
+    if (trackedPaths.length && !trackedPaths.includes(path) && policy.ruleRetirements.some((retirement) => retirement.rule.value === path)) continue;
     const classification = classifyPath(path, policy);
     invariant(classification.kind === "FAMILY" && classification.familyMatches.length > 1, `${path} is listed as multi-family without multiple owners.`);
   }
   if (trackedPaths.length) {
-    const assertRuleMatches = (rule, label) => invariant(trackedPaths.some((path) => ruleMatches(path, rule)), `${label} matches no tracked path.`);
+    const assertRuleMatches = (rule, label, familyId) => invariant(
+      trackedPaths.some((path) => ruleMatches(path, rule))
+        || (rule.kind === "EXACT" && policy.ruleRetirements.some((retirement) => retirement.familyId === familyId && canonicalJson(retirement.rule) === canonicalJson(rule))),
+      `${label} matches no tracked path.`,
+    );
     for (const family of policy.families) {
-      family.implementationRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.implementationRules[${index}]`));
-      family.testRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.testRules[${index}]`));
+      family.implementationRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.implementationRules[${index}]`, family.id));
+      family.testRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.testRules[${index}]`, family.id));
       for (const group of family.generatedGroups) {
-        group.outputRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.${group.id}.outputRules[${index}]`));
-        group.inputRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.${group.id}.inputRules[${index}]`));
-        group.generatorRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.${group.id}.generatorRules[${index}]`));
+        group.outputRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.${group.id}.outputRules[${index}]`, family.id));
+        group.inputRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.${group.id}.inputRules[${index}]`, family.id));
+        group.generatorRules.forEach((rule, index) => assertRuleMatches(rule, `${family.id}.${group.id}.generatorRules[${index}]`, family.id));
       }
     }
-    policy.nonContractRules.forEach((rule, index) => assertRuleMatches(rule, `nonContractRules[${index}]`));
+    policy.nonContractRules.forEach((rule, index) => assertRuleMatches(rule, `nonContractRules[${index}]`, null));
     for (const probe of policy.nonSemanticProbes) {
       const family = policy.families.find((candidate) => candidate.id === probe.familyId);
       for (const [index, rule] of probe.changedPathRules.entries()) {
-        assertRuleMatches(rule, `${probe.id}.changedPathRules[${index}]`);
+        assertRuleMatches(rule, `${probe.id}.changedPathRules[${index}]`, family.id);
         for (const path of trackedPaths.filter((candidate) => ruleMatches(candidate, rule))) {
           const classification = classifyPath(path, policy);
           invariant(classification.familyMatches?.some((match) => match.familyId === family.id), `${probe.id} covers path outside family ${family.id}: ${path}.`);
@@ -699,8 +808,12 @@ export function verifyContractDocImpact({
   }
   validatePolicy(headPolicy, { rootDirectory: root, trackedPaths });
   assertRegisteredSectionsAt(root, head, headPolicy, "head policy section");
-  if (!policyBootstrap) assertPolicyDoesNotWeaken(basePolicy, headPolicy);
+  if (policyBootstrap) invariant(headPolicy.ruleRetirements.length === 0, "Rule retirements are unavailable during policy bootstrap.");
+  const diffRaw = execFileSync("git", ["diff", "--name-status", "-z", "--find-renames", "--find-copies", "--find-copies-harder", mergeBase, head], { cwd: root, encoding: "buffer", maxBuffer: 64 * 1024 * 1024 });
+  const operations = parseNameStatusZ(diffRaw);
+  const validatedRuleRetirements = policyBootstrap ? [] : assertPolicyDoesNotWeaken(basePolicy, headPolicy, operations, mergeBase);
   for (const path of policyBootstrap ? [] : baseTrackedPaths) {
+    if (!trackedPaths.includes(path)) continue;
     const before = classifyPath(path, basePolicy);
     if (before.kind !== "FAMILY") continue;
     const after = classifyPath(path, headPolicy);
@@ -709,8 +822,6 @@ export function verifyContractDocImpact({
     const afterFamilies = after.familyMatches.map(({ familyId }) => familyId).sort();
     invariant(beforeFamilies.every((familyId) => afterFamilies.includes(familyId)), `Head policy removes family ownership from ${path}.`);
   }
-  const diffRaw = execFileSync("git", ["diff", "--name-status", "-z", "--find-renames", "--find-copies", "--find-copies-harder", mergeBase, head], { cwd: root, encoding: "buffer", maxBuffer: 64 * 1024 * 1024 });
-  const operations = parseNameStatusZ(diffRaw);
   const changedPaths = [...new Set(operations.flatMap((operation) => [operation.oldPath, operation.path]).filter(Boolean))].sort();
   const pathClassifications = [];
   const familyIds = new Set();
@@ -798,11 +909,12 @@ export function verifyContractDocImpact({
       families: requiredFamilies,
       requirements,
       operations,
+      ruleRetirements: validatedRuleRetirements,
     };
   }
   validateDeclaration(declaration, headPolicy, { requiredFamilies });
   if (!requiredFamilies.length) {
-    return { state: "NO_RELEVANT_CHANGES", baseSha: base, headSha: head, mergeBaseSha: mergeBase, policyBootstrap, families: [], operations };
+    return { state: "NO_RELEVANT_CHANGES", baseSha: base, headSha: head, mergeBaseSha: mergeBase, policyBootstrap, families: [], operations, ruleRetirements: validatedRuleRetirements };
   }
   const declarations = new Map(declaration.families.map((item) => [item.familyId, item]));
   for (const familyId of requiredFamilies) {
@@ -834,7 +946,12 @@ export function verifyContractDocImpact({
         invariant(item.migration.state === "NOT_APPLICABLE" && item.migration.documents.length === 0, `${familyId} has no registered migration section; migration must be NOT_APPLICABLE.`);
       }
     } else if (item.disposition === "TEST_ONLY") {
-      invariant(familyChangedPaths.every((path) => family.testRules.some((rule) => ruleMatches(path, rule))), `${familyId} TEST_ONLY includes a non-test path.`);
+      const endpointMatches = pathClassifications.flatMap(({ path, classification }) => (
+        classification.familyMatches
+          ?.filter((match) => match.familyId === familyId && match.kinds.some((kind) => kind !== "OWNING_DOCUMENT"))
+          .map((match) => ({ path, match })) ?? []
+      ));
+      invariant(endpointMatches.length > 0 && endpointMatches.every(({ match }) => match.kinds.every((kind) => kind === "TEST")), `${familyId} TEST_ONLY includes a non-test path.`);
       invariant(JSON.stringify([...item.exemptionEvidence.paths].sort()) === JSON.stringify(familyChangedPaths), `${familyId} TEST_ONLY paths do not exactly cover the changed test paths.`);
     } else if (item.disposition === "GENERATED_ARTIFACT_ONLY") {
       invariant(!policyBootstrap, `${familyId} GENERATED_ARTIFACT_ONLY is unavailable during policy bootstrap.`);
@@ -914,5 +1031,6 @@ export function verifyContractDocImpact({
     families: requiredFamilies,
     declaration,
     operations,
+    ruleRetirements: validatedRuleRetirements,
   };
 }
