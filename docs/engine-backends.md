@@ -49,13 +49,13 @@ parity checks. See [`deployment-capabilities.md`](deployment-capabilities.md).
 ## Build and verification
 
 Native Rust checks use the exact repository toolchain in `rust-toolchain.toml`:
-Rust 1.97.1 with rustfmt, Clippy, and `wasm32-unknown-unknown`. The private 6DOF
-module has the stronger raw-byte requirement: its build command runs the pinned
-Linux/amd64 Rust 1.97.1 container image by immutable platform-manifest digest.
-That canonical host is necessary because Rust/LLVM code and data layout changed
-both across 1.97.1/1.98.0 and across macOS/Linux for this crate. The production
-application consumes committed, integrity-checked artifacts and installs no
-compiler at runtime.
+Rust 1.97.1 with rustfmt, Clippy, and `wasm32-unknown-unknown`. Both private
+verifier modules require canonical Linux/amd64 raw-byte artifact generation.
+Their build and verify commands run the pinned Rust 1.97.1 container image by
+immutable platform-manifest digest. That canonical host is necessary because
+Rust/LLVM code and data layout changed both across 1.97.1/1.98.0 and across
+macOS/Linux. The production application consumes committed, integrity-checked
+artifacts and installs no compiler at runtime.
 
 - `npm run engine:rust:build` compiles release WASM and regenerates the embedded artifact.
 - `npm run engine:rust:verify` recompiles and rejects a stale committed artifact.
@@ -69,10 +69,10 @@ compiler at runtime.
 - `npm run performance:verify` measures cold initialization and warm-run p50/p95 for both backends.
 - `npm run reference-aam:verify` and `npm run reference-aam:performance`
   verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
-  Its `reference-aam:rust:*` commands use the repository-pinned Linux/amd64
-  Rust 1.97.1 builder; hosted Stage 2B owns formatting, Clippy, exact rebuild,
-  native tests, rustdoc, full verification, and the bounded benchmark. Stage 2C
-  audits its independent lockfile.
+  Generic-AAM `:build` and `:verify` use that container, while `:fmt`, `:clippy`,
+  `:test`, and `:doc` run on the host with exact repository-pinned Rust 1.97.1.
+  Hosted Stage 2B owns all of those commands, full verification, and the bounded
+  benchmark. Stage 2C audits its independent lockfile.
 - `npm run sixdof-foundation:rust:build` regenerates the standalone 6DOF
   verification artifact; `sixdof-foundation:rust:verify`, `:fmt`, `:clippy`,
   `:test`, and `:doc` independently gate that private crate.

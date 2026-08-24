@@ -239,6 +239,18 @@ test("generic-AAM npm aliases resolve to the intended crate and verification com
   );
 });
 
+test("backend docs distinguish canonical private bytes from host-native Rust checks", async () => {
+  const docs = await readFile("docs/engine-backends.md", "utf8");
+  assert.match(
+    docs,
+    /Both private\s+verifier modules require canonical Linux\/amd64 raw-byte artifact generation\./,
+  );
+  assert.match(
+    docs,
+    /Generic-AAM `:build` and `:verify` use that container, while `:fmt`, `:clippy`,\s+`:test`, and `:doc` run on the host with exact repository-pinned Rust 1\.97\.1\./,
+  );
+});
+
 test("browser-local uses the governed isolated browser runner", async () => {
   const makefile = await readFile("Makefile", "utf8");
   const browserLocal = makefile.split(/^browser-local:/m)[1]?.split(/^air-reference-local:/m)[0];
