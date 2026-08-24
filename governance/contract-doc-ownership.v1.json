@@ -389,7 +389,7 @@
         },
         {
           "kind": "EXACT",
-          "value": "db/schema.ts",
+          "value": "db/schema/model-pack.ts",
           "facets": [
             "schema",
             "storage"
@@ -655,7 +655,7 @@
         {
           "sectionId": "MODEL_PACK_COMPILER_RESOLVER_CHANGELOG",
           "path": "CHANGELOG.md",
-          "heading": "## Unreleased",
+          "heading": "#### Model packs",
           "facets": [
             "admission",
             "datum",
@@ -674,6 +674,13 @@
       "id": "EVIDENCE_RAW_DERIVATIVE_STORAGE",
       "workstream": "verification-release",
       "implementationRules": [
+        {
+          "kind": "EXACT",
+          "value": "db/schema/catalog.ts",
+          "facets": [
+            "schema"
+          ]
+        },
         {
           "kind": "EXACT",
           "value": "governance/aircraft-evidence-registry.v1.json",
@@ -1033,6 +1040,13 @@
         },
         {
           "kind": "PREFIX",
+          "value": "db/schema/",
+          "facets": [
+            "schema"
+          ]
+        },
+        {
+          "kind": "PREFIX",
           "value": "db/migrations/",
           "facets": [
             "schema"
@@ -1142,7 +1156,7 @@
         {
           "sectionId": "DATABASE_CHANGELOG",
           "path": "CHANGELOG.md",
-          "heading": "## Unreleased",
+          "heading": "#### Database schema",
           "facets": [
             "schema",
             "storage"
@@ -1349,7 +1363,7 @@
         {
           "sectionId": "ENGINE_ABI_RUNTIME_CHANGELOG",
           "path": "CHANGELOG.md",
-          "heading": "## Unreleased",
+          "heading": "#### Engine ABI",
           "facets": [
             "digest",
             "runtime",
@@ -1639,7 +1653,7 @@
         {
           "sectionId": "GENERIC_AAM_VERIFICATION_CHANGELOG",
           "path": "CHANGELOG.md",
-          "heading": "## Unreleased",
+          "heading": "#### Generic AAM verification",
           "facets": [
             "datum",
             "digest",
@@ -1786,7 +1800,7 @@
         {
           "sectionId": "SIMULATION_PHYSICS_RUNTIME_CHANGELOG",
           "path": "CHANGELOG.md",
-          "heading": "## Unreleased",
+          "heading": "#### Simulation physics",
           "facets": [
             "admission",
             "datum",
@@ -1879,7 +1893,7 @@
         {
           "sectionId": "BROWSER_WORKER_PROTOCOL_CHANGELOG",
           "path": "CHANGELOG.md",
-          "heading": "## Unreleased",
+          "heading": "#### Browser Worker protocol",
           "facets": [
             "digest",
             "runtime",
@@ -1995,11 +2009,18 @@
         },
         {
           "kind": "EXACT",
-          "value": "db/schema.ts",
+          "value": "db/schema/vector-record.ts",
           "facets": [
             "schema",
             "storage",
             "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "db/schema/saved-run-admission.ts",
+          "facets": [
+            "admission"
           ]
         },
         {
@@ -2260,7 +2281,7 @@
         {
           "sectionId": "RECORD_VSR_PERSISTENCE_CHANGELOG",
           "path": "CHANGELOG.md",
-          "heading": "## Unreleased",
+          "heading": "#### Vector simulation records",
           "facets": [
             "admission",
             "digest",
@@ -2392,7 +2413,7 @@
         {
           "sectionId": "CAPABILITY_DESCRIPTORS_SELECTORS_CHANGELOG",
           "path": "CHANGELOG.md",
-          "heading": "## Unreleased",
+          "heading": "#### Capability descriptors",
           "facets": [
             "admission"
           ]
@@ -2515,6 +2536,22 @@
       "id": "UI_OBSERVE",
       "workstream": "frontend-3d",
       "implementationRules": [
+        {
+          "kind": "EXACT",
+          "value": "app/lab/page.tsx",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/frontend/selectors.ts",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
         {
           "kind": "EXACT",
           "value": "components/BrowserTelemetry.tsx",
@@ -2667,6 +2704,20 @@
       "implementationRules": [
         {
           "kind": "EXACT",
+          "value": "components/EngagementMap.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/SimulationScene.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "components/SymbolReference.tsx",
           "facets": [
             "ui"
@@ -2772,6 +2823,30 @@
       "implementationRules": [
         {
           "kind": "EXACT",
+          "value": "app/lab/page.tsx",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/EngagementMap.tsx",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/SimulationScene.tsx",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "app/globals.css",
           "facets": [
             "ui",
@@ -2863,6 +2938,14 @@
       "id": "GEOSPATIAL_ENVIRONMENT",
       "workstream": "geospatial-environment",
       "implementationRules": [
+        {
+          "kind": "EXACT",
+          "value": "db/schema/geospatial.ts",
+          "facets": [
+            "schema",
+            "storage"
+          ]
+        },
         {
           "kind": "EXACT",
           "value": "lib/geospatial/contracts.ts",
@@ -3132,6 +3215,20 @@
       "implementationRules": [
         {
           "kind": "EXACT",
+          "value": "db/schema/catalog.ts",
+          "facets": [
+            "schema"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "db/schema/scenarios.ts",
+          "facets": [
+            "schema"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "lib/information-state.ts",
           "facets": [
             "runtime",
@@ -3301,7 +3398,7 @@
         {
           "sectionId": "MISSION_SCENARIO_RUNTIME_CHANGELOG",
           "path": "CHANGELOG.md",
-          "heading": "## Unreleased",
+          "heading": "#### Mission scenarios",
           "facets": [
             "admission",
             "runtime",
@@ -3395,7 +3492,7 @@
         },
         {
           "kind": "EXACT",
-          "value": "db/schema.ts",
+          "value": "db/schema/saved-run-admission.ts",
           "facets": [
             "admission",
             "storage",
@@ -3515,7 +3612,7 @@
         },
         {
           "kind": "EXACT",
-          "value": "db/schema.ts",
+          "value": "db/schema/public-api-admission.ts",
           "facets": [
             "admission",
             "storage",
@@ -3721,6 +3818,13 @@
       "workstream": "operations",
       "implementationRules": [
         {
+          "kind": "EXACT",
+          "value": "components/BrowserTelemetry.tsx",
+          "facets": [
+            "runtime"
+          ]
+        },
+        {
           "kind": "PREFIX",
           "value": "lib/observability/",
           "facets": [
@@ -3813,7 +3917,7 @@
         },
         {
           "kind": "EXACT",
-          "value": "db/schema.ts",
+          "value": "db/schema/blog-comments.ts",
           "facets": [
             "schema",
             "storage"
@@ -4105,9 +4209,13 @@
     "app/api/catalog/route.ts",
     "app/api/health/route.ts",
     "app/api/runs/route.ts",
+    "app/lab/page.tsx",
     "components/BlogShareAndComments.tsx",
+    "components/BrowserTelemetry.tsx",
+    "components/EngagementMap.tsx",
     "components/ObjectPicker.tsx",
     "components/PlatformEvidence.tsx",
+    "components/SimulationScene.tsx",
     "db/migrations/001_catalog.sql",
     "db/migrations/002_saved_run_integrity.sql",
     "db/migrations/003_scenario_package_provenance.sql",
@@ -4118,7 +4226,14 @@
     "db/migrations/010_immutable_credibility_catalog.sql",
     "db/migrations/011_public_api_admission.sql",
     "db/migrations/012_saved_run_lifecycle_admission.sql",
-    "db/schema.ts",
+    "db/schema/blog-comments.ts",
+    "db/schema/catalog.ts",
+    "db/schema/geospatial.ts",
+    "db/schema/model-pack.ts",
+    "db/schema/public-api-admission.ts",
+    "db/schema/saved-run-admission.ts",
+    "db/schema/scenarios.ts",
+    "db/schema/vector-record.ts",
     "docs/aircraft-evidence-registry.md",
     "docs/blog-publishing.md",
     "docs/catalog-and-sources.md",
@@ -4138,6 +4253,7 @@
     "engine-rust/src/simulation_events.rs",
     "engine-rust/src/validation.rs",
     "lib/canonical-json.ts",
+    "lib/frontend/selectors.ts",
     "lib/catalog-admission.ts",
     "lib/engine/atmosphere.ts",
     "lib/engine/compiler.ts",
@@ -4297,5 +4413,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "613f7ac13291e66149983d58b79206036e2c3cea1ab93b24451eb69b13ff12e7"
+  "canonicalSha256": "675a73ad10b5c3dafe4f20bbca736d669ee05e56e00109df5006dabaa21fdbf8"
 }

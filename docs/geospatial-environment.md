@@ -99,6 +99,9 @@ entity contracts.
 
 ## Phase A executable EnvironmentPack
 
+The installation and study-area persistence declarations live in
+`db/schema/geospatial.ts` behind the unchanged aggregate Drizzle facade.
+
 `vector.environment-pack.v1` is the executable, Worker-loadable Phase A
 boundary for future ground and route work. It is constructed from explicitly
 selected governed draft inputs and has an immutable ID, version, and SHA-256

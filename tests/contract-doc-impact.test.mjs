@@ -15,7 +15,7 @@ import {
   validatePolicy,
   verifyContractDocImpact,
 } from "../scripts/lib/contract-doc-impact.mjs";
-import { declarationTemplate, resolvePolicyBootstrap, resolvePushDeclaration, runRegisteredFreshness, runRegisteredProbe } from "../scripts/verify-contract-doc-impact.mjs";
+import { declarationTemplate, resolvePolicyBootstrap, resolvePushDeclaration, runRegisteredFreshness, runRegisteredProbe, writeOutput } from "../scripts/verify-contract-doc-impact.mjs";
 
 const sha = (character) => character.repeat(64);
 const commitSha = (character) => character.repeat(40);
@@ -210,6 +210,33 @@ test("the generated declaration template is structurally complete but cannot be 
     () => validateDeclaration(declaration({ evidence: [{ kind: "TEST", value: "x" }] }), policy),
     /specific evidence|at least/i,
   );
+});
+
+test("the declaration template uses the exact diff-derived family and section inventory", () => {
+  const requirements = [
+    { familyId: "EXAMPLE", owningSections: [section], migrationSections: [] },
+  ];
+  const generated = declarationTemplate(policy, requirements);
+  assert.deepEqual(generated.families.map((item) => item.familyId), ["EXAMPLE"]);
+  assert.deepEqual(generated.families[0].owningSections, [section]);
+  assert.equal(generated.families[0].migration.state, "NOT_APPLICABLE");
+});
+
+test("hosted output renders the exact validated declaration for reviewers", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "vector-doc-summary-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const summaryPath = join(directory, "summary.md");
+  const previous = process.env.GITHUB_STEP_SUMMARY;
+  process.env.GITHUB_STEP_SUMMARY = summaryPath;
+  t.after(() => {
+    if (previous === undefined) delete process.env.GITHUB_STEP_SUMMARY;
+    else process.env.GITHUB_STEP_SUMMARY = previous;
+  });
+  const exactDeclaration = declaration();
+  writeOutput({ state: "VERIFIED", policyBootstrap: false, declaration: exactDeclaration });
+  const summary = await readFile(summaryPath, "utf8");
+  assert.match(summary, /exact declaration validated/i);
+  assert.match(summary, new RegExp(exactDeclaration.families[0].rationale.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
 });
 
 test("push verification requires exactly one revision-bound associated merged main pull request", async () => {
@@ -453,6 +480,36 @@ test("multi-family changes require one complete declaration per family", () => {
     () => validateDeclaration(declaration(), twoFamilyPolicy, { requiredFamilies: ["EXAMPLE", "SECOND"] }),
     /missing family SECOND/i,
   );
+});
+
+test("a shared document selects only the family whose registered section changed", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const second = {
+    ...policy.families[0],
+    id: "SECOND",
+    implementationRules: [],
+    testRules: [],
+    generatedGroups: [],
+    owningSections: [{ sectionId: "SECOND_CONTRACT", path: "docs/example.md", heading: "## Other", facets: ["schema"] }],
+  };
+  const twoFamilyPolicy = {
+    ...policy,
+    families: [...policy.families, second],
+    allowedMultiFamilyPaths: ["docs/example.md"],
+    canonicalSha256: undefined,
+  };
+  await writeFile(join(fixture.root, "docs", "example.md"), "# Example\n\n## Contract\n\nVersion two.\n\n## Other\n\nStable.\n");
+  const headSha = await commit(fixture.root, "change one owned section");
+  const report = verifyContractDocImpact({
+    rootDirectory: fixture.root,
+    baseSha: fixture.baseSha,
+    headSha,
+    declaration: declaration(),
+    basePolicy: twoFamilyPolicy,
+    headPolicy: twoFamilyPolicy,
+  });
+  assert.deepEqual(report.families, ["EXAMPLE"]);
 });
 
 test("the head policy cannot remove ownership that the base policy used", async (t) => {
@@ -1238,6 +1295,11 @@ test("the repository policy maps real simulation identities to their exact owner
   const capabilities = family("CAPABILITY_DESCRIPTORS_SELECTORS");
   const evidence = family("EVIDENCE_RAW_DERIVATIVE_STORAGE");
   const contentComments = family("CONTENT_COMMENTS");
+  const uiAuthoring = family("UI_AUTHORING");
+  const uiObserve = family("UI_OBSERVE");
+  const uiPresentation = family("UI_PRESENTATION_SEMANTICS");
+  const uiResponsive = family("UI_RESPONSIVE_INTERACTION");
+  const observability = family("OBSERVABILITY_OPERATIONS");
 
   assert.equal(browserWorker.implementationRules.some((rule) => rule.kind === "PREFIX" && rule.value === "worker/"), false);
   assert.equal(securityDelivery.implementationRules.some((rule) => rule.kind === "PREFIX" && rule.value === "lib/security/"), false);
@@ -1260,12 +1322,20 @@ test("the repository policy maps real simulation identities to their exact owner
     assert.notEqual(exactRule(securityCatalog, path), undefined, `${path} must own the catalog/basemap security boundary`);
     assert.deepEqual(requiredSections(securityCatalog, path), ["SECURITY_CATALOG_BASEMAP_RELAY"]);
   }
-  assert.deepEqual(ownersOf("db/schema.ts").map((owner) => owner.id), ["MODEL_PACK_COMPILER_RESOLVER", "PERSISTENCE_DATABASE_SCHEMA", "RECORD_VSR_PERSISTENCE", "SECURITY_SAVED_RUNS", "SECURITY_CATALOG_BASEMAP", "CONTENT_COMMENTS"]);
+  assert.deepEqual(ownersOf("db/schema.ts").map((owner) => owner.id), ["PERSISTENCE_DATABASE_SCHEMA"]);
+  assert.deepEqual(ownersOf("db/schema/model-pack.ts").map((owner) => owner.id), ["MODEL_PACK_COMPILER_RESOLVER", "PERSISTENCE_DATABASE_SCHEMA"]);
+  assert.deepEqual(ownersOf("db/schema/vector-record.ts").map((owner) => owner.id), ["PERSISTENCE_DATABASE_SCHEMA", "RECORD_VSR_PERSISTENCE"]);
+  assert.deepEqual(ownersOf("db/schema/saved-run-admission.ts").map((owner) => owner.id), ["PERSISTENCE_DATABASE_SCHEMA", "RECORD_VSR_PERSISTENCE", "SECURITY_SAVED_RUNS"]);
+  assert.deepEqual(ownersOf("db/schema/public-api-admission.ts").map((owner) => owner.id), ["PERSISTENCE_DATABASE_SCHEMA", "SECURITY_CATALOG_BASEMAP"]);
+  assert.deepEqual(ownersOf("db/schema/blog-comments.ts").map((owner) => owner.id), ["PERSISTENCE_DATABASE_SCHEMA", "CONTENT_COMMENTS"]);
+  assert.equal(new Set(repositoryPolicy.families.flatMap((owner) => owner.migrationSections)
+    .filter((section) => section.path === "CHANGELOG.md")
+    .map((section) => section.heading)).size, 9, "each changelog-owning family must have a distinct section");
   assert.equal(exactRule(securitySavedRuns, "app/api/blog-comments/route.ts"), undefined);
   assert.deepEqual(exactRule(contentComments, "app/api/blog-comments/route.ts").facets, ["admission", "storage", "validity"]);
   assert.deepEqual(requiredSections(contentComments, "app/api/blog-comments/route.ts"), ["CONTENT_COMMENTS"]);
   assert.deepEqual(requiredSections(contentComments, "db/migrations/008_blog_post_comments.sql"), ["CONTENT_COMMENTS"]);
-  assert.deepEqual(exactRule(contentComments, "db/schema.ts").facets, ["schema", "storage"]);
+  assert.deepEqual(exactRule(contentComments, "db/schema/blog-comments.ts").facets, ["schema", "storage"]);
   assert.deepEqual(exactRule(contentComments, "components/BlogShareAndComments.tsx").facets, ["admission", "storage", "ui", "validity"]);
   assert.deepEqual(requiredSections(contentComments, "components/BlogShareAndComments.tsx"), ["CONTENT_COMMENTS"]);
   for (const path of ["scripts/build-runtime-bundles.mjs", "scripts/run-managed-server.mjs"]) {
@@ -1378,7 +1448,20 @@ test("the repository policy maps real simulation identities to their exact owner
   assert.deepEqual(requiredSections(mission, "lib/scenario-draft.ts"), ["MISSION_BUILDER_EXPANSION", "MISSION_SCENARIO_ARTIFACT"]);
   assert.deepEqual(requiredSections(mission, "lib/scenario-spatial.ts"), ["MISSION_BUILDER_EXPANSION", "MISSION_SCENARIO_ARTIFACT"]);
 
+  assert.deepEqual(ownersOf("app/lab/page.tsx").map((owner) => owner.id), ["UI_AUTHORING", "UI_OBSERVE", "UI_RESPONSIVE_INTERACTION"]);
+  assert.deepEqual(ownersOf("lib/frontend/selectors.ts").map((owner) => owner.id), ["CAPABILITY_DESCRIPTORS_SELECTORS", "UI_OBSERVE"]);
+  assert.deepEqual(ownersOf("components/BrowserTelemetry.tsx").map((owner) => owner.id), ["UI_OBSERVE", "OBSERVABILITY_OPERATIONS"]);
+  for (const path of ["components/EngagementMap.tsx", "components/SimulationScene.tsx"]) {
+    assert.deepEqual(ownersOf(path).map((owner) => owner.id), ["UI_OBSERVE", "UI_PRESENTATION_SEMANTICS", "UI_RESPONSIVE_INTERACTION"]);
+    assert.deepEqual(requiredSections(uiPresentation, path), ["UI_PRODUCT_LANGUAGE", "UI_TACVIEW_SUBSET"]);
+    assert.deepEqual(requiredSections(uiResponsive, path), ["UI_RESPONSIVE_BEHAVIOR", "UI_RESPONSIVE_PROOF"]);
+  }
+  assert.deepEqual(requiredSections(uiObserve, "app/lab/page.tsx"), ["UI_OBSERVE_PROOF", "UI_OBSERVE_SHELL"]);
+  assert.deepEqual(requiredSections(observability, "components/BrowserTelemetry.tsx"), ["OBSERVABILITY_CONTRACT"]);
+  assert.notEqual(exactRule(uiAuthoring, "app/lab/page.tsx"), undefined);
+
   assert.deepEqual(exactRule(persistence, "db/schema.ts").facets, ["schema"]);
+  assert.deepEqual(prefixRule(persistence, "db/schema/").facets, ["schema"]);
   assert.deepEqual(prefixRule(persistence, "db/migrations/").facets, ["schema"]);
   assert.equal(persistence.owningSections.some((section) => section.path === "docs/model-pack-contract.md"), false);
   assert.equal(persistence.owningSections.some((section) => section.path === "docs/security-boundaries.md"), false);

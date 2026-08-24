@@ -62,6 +62,12 @@ has the policy must rebase. Later missing, malformed, weakened, unclassified,
 or unmapped policy state fails closed.
 
 Pull requests obtain the declaration from the single structured template block.
+`npm run --silent policy:contract-docs:template` derives the exact affected
+family, owning-section, and migration-section inventory from the current
+base/head diff; it does not emit an arbitrary first-family example. The hosted
+job copies the exact validated declaration, including rationale and evidence,
+into its visible GitHub step summary so the HTML-comment transport does not
+hide the review record from reviewers or assistive-reading flows.
 An edited body reruns CI. A `main` push resolves exactly one associated merged
 pull request through the read-only GitHub API and binds its merge commit, base
 commit, source-head identity, target branch, and declaration to the push;
@@ -193,6 +199,13 @@ response-header, or delivery documentation.
 Anonymous blog-comment routes, persistence schema/migration, and live client
 instead own the blog publishing Notes section; they do not acquire saved-run
 semantics merely because both use bounded public-API helpers.
+`db/schema.ts` is a stable aggregate export only. Domain-owned table
+definitions live under `db/schema/`, so a comments-table change cannot select
+model-pack, VSR, catalog, or saved-run contracts. Every module still belongs to
+the generic database family and is loaded through the one aggregate Drizzle
+schema; these are ownership boundaries, not parallel schemas. Likewise, each
+changelog-owning family has one distinct heading below `CHANGELOG.md` /
+`Unreleased`, so one contract's release note cannot select unrelated families.
 
 `make clean-clone-local` forwards the same explicit declaration input and proves the documented release context slice resolves
 from a new clone, installs the locked dependencies, then runs the deterministic

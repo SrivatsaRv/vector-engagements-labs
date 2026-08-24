@@ -42,6 +42,10 @@ frozen environment-pack binding and never query either source.
 
 ## Fixed development fixture
 
+Source, subsystem, platform, weapon, compatibility, and assertion table
+definitions are grouped in `db/schema/catalog.ts` and remain available through
+the aggregate schema facade.
+
 This slice deliberately remains **4 catalog platforms, 3 scenario-selectable
 platforms, 8 weapons, 8 model sets, 21
 public-reference installations, and 8 scenario templates**. The installation
@@ -138,6 +142,10 @@ compatibility and teaching loadouts remain `UNVERIFIED` or
 `MODEL_ASSUMPTION`.
 
 ## Environment-pack installation coverage
+
+Installation and study-area table definitions are owned by
+`db/schema/geospatial.ts`; this module split does not change their PostGIS
+columns, constraints, or catalog identities.
 
 Phase A publishes `vector.environment-pack.v1` with the exact
 `vector.installation-catalogue.v1` ID/version/digest, the per-record source and

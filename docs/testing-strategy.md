@@ -97,6 +97,12 @@ file and heading from exact Git blobs, derives the changed semantic facets, and
 compares only their exact registered sections. Every test path belongs to its
 actual model, engine, evidence, Worker, VSR, UI, security, mission, geospatial,
 content, data, or delivery family rather than a generic test-only owner.
+The template command runs the same analysis without accepting a declaration and
+emits the exact required family/section inventory for the current diff. Hosted
+verification writes the subsequently validated declaration to the visible job
+summary. Regression coverage also proves changelog headings are family-unique,
+the aggregate Drizzle facade has only generic database ownership, and each
+domain schema module selects only its generic plus truthful domain owners.
 TEST_ONLY, GENERATED_ARTIFACT_ONLY, INTERNAL_REFACTOR,
 NO_SEMANTIC_CHANGE, and DOCS_ALREADY_CURRENT are mutually exclusive,
 evidence-bearing dispositions; none receives credit merely because an arbitrary

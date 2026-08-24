@@ -43,6 +43,9 @@ The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-eas
 
 ## Scenario artifact
 
+The persisted scenario-template table is declared by
+`db/schema/scenarios.ts` and re-exported from the one aggregate Drizzle schema.
+
 Construct produces a `vector.scenario.v3` package with an intended-use identity
 and immutable compiled model-pack identity/digest. Compilation produces an
 immutable engine scenario containing all spawned entities, initial states,

@@ -67,6 +67,10 @@ that prior digest and repeats the same no-build Compose operation.
 
 ## Migration, backup, and restore order
 
+Domain-owned files under `db/schema/` are re-exported by `db/schema.ts` and
+therefore remain one Drizzle schema and one forward-migration sequence. The
+module split introduces no migration, table, or backup-format change.
+
 Forward-only migrations execute as a health-gated one-shot job before the
 application starts. Production never runs the `seed` profile/service. Before a
 release containing migrations, take a database-provider snapshot or an

@@ -74,23 +74,25 @@ function emptyDeclaration() {
   return { schemaVersion: DECLARATION_SCHEMA, families: [] };
 }
 
-export function declarationTemplate(policy) {
-  const family = policy.families[0];
+export function declarationTemplate(policy, requirements) {
+  const requested = Array.isArray(requirements)
+    ? requirements
+    : [{ familyId: policy.families[0].id, owningSections: [policy.families[0].owningSections[0]], migrationSections: [] }];
   return {
     schemaVersion: DECLARATION_SCHEMA,
-    families: [{
-      familyId: family.id,
+    families: requested.map((requirement) => ({
+      familyId: requirement.familyId,
       disposition: "SEMANTIC",
-      owningSections: [family.owningSections[0]],
+      owningSections: requirement.owningSections,
       rationale: "Replace this text with the exact contract behavior changed by this pull request.",
       evidence: [{ kind: "TEST", value: "Replace with the exact verification command and result." }],
       migration: {
-        state: "NOT_APPLICABLE",
-        documents: [],
+        state: requirement.migrationSections.length ? "UPDATED" : "NOT_APPLICABLE",
+        documents: requirement.migrationSections,
         rationale: "Replace with the exact persistence, migration, and changelog impact.",
       },
       exemptionEvidence: null,
-    }],
+    })),
   };
 }
 
@@ -154,12 +156,26 @@ export async function resolvePushDeclaration(event, policy, {
   return extractDeclarationFromPullRequestBody(merged[0].body ?? "", policy);
 }
 
-function writeOutput(report) {
+export function writeOutput(report) {
   const rendered = `${JSON.stringify(report, null, 2)}\n`;
   process.stdout.write(rendered);
   const outputPath = process.env.GITHUB_OUTPUT;
   if (outputPath) {
     writeFileSync(outputPath, `contract_docs_state=${report.state}\npolicy_bootstrap=${report.policyBootstrap ? "true" : "false"}\n`, { flag: "a" });
+  }
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (summaryPath && report.declaration) {
+    const summary = [
+      "## Contract documentation declaration",
+      "",
+      "This is the exact declaration validated against the pull-request diff.",
+      "",
+      "```json",
+      JSON.stringify(report.declaration, null, 2),
+      "```",
+      "",
+    ].join("\n");
+    writeFileSync(summaryPath, summary, { flag: "a" });
   }
 }
 
@@ -251,8 +267,27 @@ export function runRegisteredProbe(root, { probe, familyId, disposition, mergeBa
 async function main() {
   const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]).trim();
   if (process.argv.includes("--print-template")) {
-    const policy = parseStrictJson(readFileSync(resolve(root, POLICY_PATH), "utf8"), "contract documentation ownership policy");
-    process.stdout.write(`${JSON.stringify(declarationTemplate(policy), null, 2)}\n`);
+    const dirty = git(root, ["status", "--porcelain=v1", "-z"]).length > 0;
+    const head = dirty ? createWorktreeSnapshot(root) : exactCommit(root, "HEAD", "template head SHA");
+    const base = exactCommit(root, process.env.VECTOR_CONTRACT_DOC_BASE_SHA || "origin/main", "template integration-tip SHA");
+    const mergeBase = git(root, ["merge-base", base, head]).trim();
+    const headPolicy = readPolicyAt(root, head);
+    const baseTipPolicy = readPolicyAt(root, base);
+    const basePolicy = readPolicyAt(root, mergeBase);
+    invariant(headPolicy, `Template head is missing ${POLICY_PATH}.`);
+    const policyBootstrap = resolvePolicyBootstrap({ baseSha: base, mergeBaseSha: mergeBase, baseTipPolicy, mergeBasePolicy: basePolicy, headPolicy });
+    const analysis = verifyContractDocImpact({
+      rootDirectory: root,
+      baseSha: base,
+      headSha: head,
+      mergeBaseSha: mergeBase,
+      declaration: undefined,
+      basePolicy: basePolicy ?? headPolicy,
+      headPolicy,
+      policyBootstrap,
+      analysisOnly: true,
+    });
+    process.stdout.write(`${JSON.stringify(declarationTemplate(headPolicy, analysis.requirements), null, 2)}\n`);
     return;
   }
   const githubMode = process.argv.includes("--github-event");

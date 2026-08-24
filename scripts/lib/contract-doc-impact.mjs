@@ -618,6 +618,14 @@ function markdownSection(content, heading, label) {
   return lines.slice(matching[0], end).join("\n").normalize("NFC").trimEnd();
 }
 
+function optionalMarkdownSection(content, heading, label) {
+  if (typeof content !== "string") return null;
+  const lines = content.replaceAll("\r\n", "\n").split("\n");
+  const count = lines.filter((line) => line === heading).length;
+  if (count === 0) return null;
+  return markdownSection(content, heading, label);
+}
+
 function materiallyNormalized(content) {
   return content.replace(/\s+/gu, " ").trim();
 }
@@ -635,6 +643,15 @@ function changedFacetsForFamily(pathClassifications, familyId) {
     match?.facets.forEach((facet) => facets.add(facet));
   }
   return [...facets].sort();
+}
+
+function authoritativeChangedFacetsForFamily(pathClassifications, familyId) {
+  const implementationFacets = [...new Set(pathClassifications.flatMap(({ classification }) => (
+    classification.familyMatches
+      ?.filter((match) => match.familyId === familyId && match.kinds.some((kind) => kind !== "OWNING_DOCUMENT"))
+      .flatMap((match) => match.facets) ?? []
+  )))].sort();
+  return implementationFacets.length ? implementationFacets : changedFacetsForFamily(pathClassifications, familyId);
 }
 
 function sectionsForFacets(sections, facets) {
@@ -656,6 +673,7 @@ export function verifyContractDocImpact({
   basePolicy = policy,
   headPolicy = policy,
   policyBootstrap = false,
+  analysisOnly = false,
   freshnessRunner,
   probeRunner,
 }) {
@@ -701,30 +719,76 @@ export function verifyContractDocImpact({
       invariant(classification.kind !== "UNCLASSIFIED", `Changed ${endpoint.toLowerCase()} endpoint ${path} is not classified.`);
       invariant(classification.kind !== "BLOCKED_UNMAPPED_CONTRACT", `Changed contract-looking ${endpoint.toLowerCase()} endpoint ${path} is not registered.`);
       pathClassifications.push({ path, endpoint, classification });
-      for (const match of classification.familyMatches ?? []) familyIds.add(match.familyId);
     }
   }
+  const owningDocumentPaths = new Set();
+  const materiallyChangedDocumentPaths = new Set();
+  const bootstrapRegisteredSectionPaths = new Set();
   for (const classified of pathClassifications) {
+    const retainedMatches = [];
     for (const match of classified.classification.familyMatches ?? []) {
       if (!match.kinds.includes("OWNING_DOCUMENT")) continue;
+      owningDocumentPaths.add(classified.path);
       const family = headPolicy.families.find((candidate) => candidate.id === match.familyId);
       const sections = [...family.owningSections, ...family.migrationSections].filter((section) => section.path === classified.path);
       const changedSections = sections.filter((section) => {
         const beforeContent = contentAt(root, mergeBase, section.path);
         const afterContent = contentAt(root, head, section.path);
         if (beforeContent === null || afterContent === null) return true;
-        const before = markdownSection(beforeContent, section.heading, `${section.path} at base`);
+        const before = optionalMarkdownSection(beforeContent, section.heading, `${section.path} at base`);
+        if (before === null && policyBootstrap) {
+          bootstrapRegisteredSectionPaths.add(section.path);
+          return false;
+        }
+        invariant(before !== null, `${section.path} at base is missing registered heading ${section.heading}.`);
         const after = markdownSection(afterContent, section.heading, `${section.path} at head`);
         return materiallyNormalized(before) !== materiallyNormalized(after);
       });
-      invariant(changedSections.length > 0, `${classified.path} changed outside every registered owning section for ${match.familyId}.`);
-      match.facets = [...new Set([...match.facets, ...changedSections.flatMap((section) => section.facets)])].sort();
+      if (changedSections.length > 0) {
+        materiallyChangedDocumentPaths.add(classified.path);
+        if (match.kinds.length === 1) match.facets = [...new Set(changedSections.flatMap((section) => section.facets))].sort();
+        else match.facets = [...new Set([...match.facets, ...changedSections.flatMap((section) => section.facets)])].sort();
+        retainedMatches.push(match);
+      } else if (match.kinds.some((kind) => kind !== "OWNING_DOCUMENT")) {
+        retainedMatches.push({ ...match, kinds: match.kinds.filter((kind) => kind !== "OWNING_DOCUMENT") });
+      }
     }
+    classified.classification.familyMatches = [
+      ...(classified.classification.familyMatches ?? []).filter((match) => !match.kinds.includes("OWNING_DOCUMENT")),
+      ...retainedMatches,
+    ];
+  }
+  for (const path of owningDocumentPaths) {
+    invariant(materiallyChangedDocumentPaths.has(path) || bootstrapRegisteredSectionPaths.has(path), `${path} changed outside every registered owning section.`);
+  }
+  for (const classified of pathClassifications) {
+    for (const match of classified.classification.familyMatches ?? []) familyIds.add(match.familyId);
   }
   for (const path of changedPaths) {
     assertNoSymlink(root, path);
   }
   const requiredFamilies = [...familyIds].sort();
+  const requirements = requiredFamilies.map((familyId) => {
+    const family = headPolicy.families.find((item) => item.id === familyId);
+    const changedFacets = authoritativeChangedFacetsForFamily(pathClassifications, familyId);
+    return {
+      familyId,
+      owningSections: sectionsForFacets(family.owningSections, changedFacets),
+      migrationSections: sectionsForFacets(family.migrationSections, changedFacets),
+    };
+  });
+  if (analysisOnly) {
+    return {
+      state: requiredFamilies.length ? "DECLARATION_REQUIRED" : "NO_RELEVANT_CHANGES",
+      baseSha: base,
+      headSha: head,
+      mergeBaseSha: mergeBase,
+      policyBootstrap,
+      families: requiredFamilies,
+      requirements,
+      operations,
+    };
+  }
   validateDeclaration(declaration, headPolicy, { requiredFamilies });
   if (!requiredFamilies.length) {
     return { state: "NO_RELEVANT_CHANGES", baseSha: base, headSha: head, mergeBaseSha: mergeBase, policyBootstrap, families: [], operations };
@@ -734,7 +798,7 @@ export function verifyContractDocImpact({
     const family = headPolicy.families.find((item) => item.id === familyId);
     const item = declarations.get(familyId);
     const familyChangedPaths = [...new Set(changedPathsForFamily(pathClassifications, familyId))].sort();
-    const familyChangedFacets = changedFacetsForFamily(pathClassifications, familyId);
+    const familyChangedFacets = authoritativeChangedFacetsForFamily(pathClassifications, familyId);
     const requiredOwningSections = sectionsForFacets(family.owningSections, familyChangedFacets);
     const requiredMigrationSections = sectionsForFacets(family.migrationSections, familyChangedFacets);
     exactSectionInventory(item.owningSections, requiredOwningSections, `${familyId} owning sections`);
@@ -743,17 +807,17 @@ export function verifyContractDocImpact({
     }
     if (item.disposition === "SEMANTIC") {
       for (const section of requiredOwningSections) {
-        const before = markdownSection(contentAt(root, mergeBase, section.path), section.heading, `${section.path} at base`);
+        const before = optionalMarkdownSection(contentAt(root, mergeBase, section.path), section.heading, `${section.path} at base`);
         const after = markdownSection(contentAt(root, head, section.path), section.heading, `${section.path} at head`);
-        invariant(materiallyNormalized(before) !== materiallyNormalized(after), `${familyId} owning section ${section.path} ${section.heading} did not change materially.`);
+        invariant((before === null && policyBootstrap) || materiallyNormalized(before) !== materiallyNormalized(after), `${familyId} owning section ${section.path} ${section.heading} did not change materially.`);
       }
       if (requiredMigrationSections.length) {
         invariant(item.migration.state === "UPDATED", `${familyId} requires updated migration/changelog sections.`);
         exactSectionInventory(item.migration.documents, requiredMigrationSections, `${familyId} migration documents`);
         for (const section of requiredMigrationSections) {
-          const before = markdownSection(contentAt(root, mergeBase, section.path), section.heading, `${section.path} at base`);
+          const before = optionalMarkdownSection(contentAt(root, mergeBase, section.path), section.heading, `${section.path} at base`);
           const after = markdownSection(contentAt(root, head, section.path), section.heading, `${section.path} at head`);
-          invariant(materiallyNormalized(before) !== materiallyNormalized(after), `${familyId} migration section ${section.path} ${section.heading} did not change materially.`);
+          invariant((before === null && policyBootstrap) || materiallyNormalized(before) !== materiallyNormalized(after), `${familyId} migration section ${section.path} ${section.heading} did not change materially.`);
         }
       } else {
         invariant(item.migration.state === "NOT_APPLICABLE" && item.migration.documents.length === 0, `${familyId} has no registered migration section; migration must be NOT_APPLICABLE.`);
@@ -830,5 +894,14 @@ export function verifyContractDocImpact({
       }
     }
   }
-  return { state: "VERIFIED", baseSha: base, headSha: head, mergeBaseSha: mergeBase, policyBootstrap, families: requiredFamilies, operations };
+  return {
+    state: "VERIFIED",
+    baseSha: base,
+    headSha: head,
+    mergeBaseSha: mergeBase,
+    policyBootstrap,
+    families: requiredFamilies,
+    declaration,
+    operations,
+  };
 }

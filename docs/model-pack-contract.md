@@ -9,6 +9,10 @@ recording, reports, and both engine backends.
 
 ## Artifact boundaries
 
+Persistence declarations for intended use, source packs, credibility, and
+compiled packs are isolated in `db/schema/model-pack.ts`; `db/schema.ts`
+remains the single aggregate Drizzle export.
+
 The following artifacts have different owners and must not be collapsed:
 
 | Artifact | Identity | Mutable | Responsibility |
@@ -23,6 +27,9 @@ Presentation labels, icons, meshes, map state, and camera state do not belong in
 physical model definitions. A runtime state never becomes catalog authority.
 
 ## Versioned schemas
+
+The schema-module split changes ownership granularity only. Existing table,
+column, constraint, and JSON payload contracts are unchanged.
 
 | Constant | Value | TypeScript owner |
 | --- | --- | --- |
@@ -41,6 +48,9 @@ cross-language fixture is
 [`fixtures/model-packs/vector-scalar-study-v0.8.compiled.json`](../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json).
 
 ## Source definition
+
+The immutable source-definition row remains represented by
+`modelPackSources`; only its TypeScript declaration moved to the domain module.
 
 One `ModelPackSource` contains:
 
@@ -291,6 +301,9 @@ incompatible data rejects the scenario; it never falls back to the legacy model
 authoring list or a weapon-name heuristic.
 
 ## Persistence
+
+Model-pack storage consumers import the unchanged aggregate schema facade,
+while contract-document ownership follows `db/schema/model-pack.ts` directly.
 
 Forward migration
 [`db/migrations/007_model_pack_foundation.sql`](../db/migrations/007_model_pack_foundation.sql)

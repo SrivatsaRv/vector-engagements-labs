@@ -1,6 +1,6 @@
 ## Contract documentation declaration
 
-Keep exactly one block. Follow the [contract-document ownership policy](/SrivatsaRv/vector-engagements-labs/blob/main/governance/contract-doc-ownership.v1.json); replace the empty family inventory whenever governed contract paths change. Generate a structurally complete example with `npm run --silent policy:contract-docs:template`. The hosted gate binds this declaration to the exact Git change and owning Markdown sections.
+Keep exactly one block. Follow the [contract-document ownership policy](/SrivatsaRv/vector-engagements-labs/blob/main/governance/contract-doc-ownership.v1.json); replace the empty family inventory whenever governed contract paths change. Generate the exact diff-derived family and section inventory with `npm run --silent policy:contract-docs:template`, then replace its deliberately invalid rationale/evidence placeholders. The hosted gate binds this declaration to the exact Git change and owning Markdown sections and renders the validated declaration in the job summary for reviewers and assistive-reading flows.
 
 <!-- vector-contract-doc-impact
 {
