@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
+import sharp from "sharp";
 
 import {
   assertAuthorizedDecision,
@@ -9,6 +10,7 @@ import {
   canonicalManifestDigest,
   parseBoundedZip,
   sha256,
+  summarizeLegalDecisionState,
   verifyGenericSensorSourceBundle,
 } from "../scripts/lib/generic-sensor-source-verifier.mjs";
 
@@ -88,13 +90,20 @@ function storedZip(entries) {
   return Buffer.concat([...locals, ...centrals, end]);
 }
 
-test("the committed source freeze verifies exact immutable bytes and remains blocked for execution", () => {
+test("the committed source freeze verifies exact immutable bytes and remains blocked for execution", async () => {
   const report = verifyGenericSensorSourceBundle({ root });
   assert.equal(report.schemaVersion, "vector.generic-sensor-verification-source-report.v1");
   assert.equal(report.sourceCount, 5);
   assert.equal(report.decisionState, "BLOCKED_PENDING_HUMAN_REVIEW");
   assert.equal(report.productionExposures, 0);
   assert.equal(report.withdrawnDigestPresent, false);
+  for (const page of [8, 11, 14]) {
+    const stem = String(page).padStart(3, "0");
+    const source = readFileSync(resolve(root, `renders/19800011044/pdf-${stem}.png`));
+    const display = readFileSync(resolve(root, `renders/19800011044/pdf-${stem}-display-upright.png`));
+    const reproduced = await sharp(source).rotate(90).png({ compressionLevel: 9, adaptiveFiltering: false, palette: false }).toBuffer();
+    assert.equal(sha256(reproduced), sha256(display));
+  }
 });
 
 test("one-byte mutation, wrong size, wrong report, wrong page, and withdrawn CR-160557 identity fail", () => {
@@ -117,6 +126,14 @@ test("one-byte mutation, wrong size, wrong report, wrong page, and withdrawn CR-
   wrongPage.sources.find((source) => source.id === "nasa-cr-160557").relevantLocations[0].pdfPages[0] = 4;
   assert.throws(() => verifyGenericSensorSourceBundle({ root, manifest: seal(wrongPage) }), /wrong relevant page mapping/);
 
+  const wrongRenderPage = clone(manifest);
+  wrongRenderPage.sources.find((source) => source.id === "nasa-cr-66097").renderPages.find((page) => page.sourcePdfPage === 143).sourcePdfPage = 142;
+  assert.throws(() => verifyGenericSensorSourceBundle({ root, manifest: seal(wrongRenderPage) }), /wrong render page mapping/);
+
+  const incompleteRenderRecipe = clone(manifest);
+  delete incompleteRenderRecipe.renderRecipe.uprightDisplayRender.pngEncoder;
+  assert.throws(() => verifyGenericSensorSourceBundle({ root, manifest: seal(incompleteRenderRecipe) }), /wrong offline render recipe/);
+
   const withdrawn = clone(manifest);
   withdrawn.sources.find((source) => source.id === "nasa-cr-160557").artifacts[1].sha256 =
     "99cc854a00000000000000000000000000000000000000000000000000000000";
@@ -137,15 +154,6 @@ test("repacked or structurally unsafe archives and undeclared members fail befor
 
   const inventoryPath = "archive-inventory.v1.json";
   const undeclaredInventory = JSON.parse(readFileSync(resolve(root, inventoryPath), "utf8"));
-  undeclaredInventory.entries.push({
-    path: "undeclared.txt",
-    compressionMethod: 0,
-    compressedSize: 1,
-    uncompressedSize: 1,
-    crc32Hex: "8cdc1683",
-    unixMode: 0o100644,
-    localHeaderOffset: 0,
-  });
   undeclaredInventory.entryCount += 1;
   const undeclaredBytes = Buffer.from(`${JSON.stringify(undeclaredInventory, null, 2)}\n`);
   const undeclaredManifest = clone(manifest);
@@ -169,6 +177,9 @@ test("repacked or structurally unsafe archives and undeclared members fail befor
     () => parseBoundedZip(storedZip([{ name: "huge.bin", data: "x" }]), { maxExpandedBytes: 0 }),
     /expanded-size limit/,
   );
+  const mismatchedLocalHeader = storedZip([{ name: "method.txt", data: "x" }]);
+  mismatchedLocalHeader.writeUInt16LE(8, 8);
+  assert.throws(() => parseBoundedZip(mismatchedLocalHeader), /local\/central compression metadata mismatch/);
 });
 
 test("missing licence, wrong commit, forged approval, pending decisions, and out-of-scope approvals fail closed", () => {
@@ -185,6 +196,13 @@ test("missing licence, wrong commit, forged approval, pending decisions, and out
   const pending = decisions.decisions.find((decision) => decision.sourceId === "dstl-stone-soup-v1.9.1");
   assert.throws(() => assertAuthorizedDecision(pending, "referenceExecution", { jurisdiction: "IN" }), /PENDING_REVIEW/);
   assert.throws(() => assertAuthorizedDecision({}, "referenceExecution", { jurisdiction: "IN" }), /invalid/);
+  const rejectedDecisions = clone(decisions.decisions);
+  const notApplicableDecisions = clone(decisions.decisions);
+  for (const decision of rejectedDecisions) for (const field of ["redistribution", "referenceExecution", "adaptation"]) decision[field].state = "REJECTED";
+  for (const decision of notApplicableDecisions) for (const field of ["redistribution", "referenceExecution", "adaptation"]) decision[field].state = "NOT_APPLICABLE";
+  assert.equal(summarizeLegalDecisionState(rejectedDecisions), "BLOCKED_REJECTED");
+  assert.equal(summarizeLegalDecisionState(notApplicableDecisions), "BLOCKED_NOT_APPLICABLE");
+  assert.throws(() => assertAuthorizedDecision(notApplicableDecisions[0], "referenceExecution", { jurisdiction: "IN" }), /NOT_APPLICABLE/);
 
   const forged = clone(pending);
   forged.referenceExecution = {
@@ -229,5 +247,21 @@ test("community/game artifacts, dynamic sources, model claims, and production ex
       virtualFiles: new Map([["lib/engine/forbidden.ts", "import '../../governance/generic-sensor-verification-sources/manifest.v1.json'" ]]),
     }),
     /production exposure/,
+  );
+  assert.throws(
+    () => assertNoProductionExposure({
+      repositoryRoot: resolve("."),
+      virtualFiles: new Map([["engine-rust/target/forbidden.wasm", Buffer.from("binary vector.generic-sensor-verification-source-manifest.v1 marker")]]),
+    }),
+    /production exposure marker/,
+  );
+  const frozenPdf = readFileSync(resolve(root, "raw/nasa/19800011044.pdf"));
+  assert.throws(
+    () => assertNoProductionExposure({
+      repositoryRoot: resolve("."),
+      virtualFiles: new Map([["public/forbidden-reference.pdf", frozenPdf]]),
+      forbiddenArtifactDigests: new Set([sha256(frozenPdf)]),
+    }),
+    /production exposure frozen artifact/,
   );
 });

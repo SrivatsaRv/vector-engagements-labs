@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { extname, join, relative, resolve, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { inflateRawSync } from "node:zlib";
 
 const MANIFEST_SCHEMA = "vector.generic-sensor-verification-source-manifest.v1";
@@ -13,14 +13,13 @@ const STONE_ARCHIVE_SHA256 = "728449aeac17bf2a233cd052b42f8306a7742fad26715be3f7
 const STONE_COMMIT = "a4336b920a799cfe0a77ecb05867c5deeb371c7a";
 const FORBIDDEN_CLAIM = /\b(?:DCS|War\s*Thunder|community\s+dump|APG-68|Su-30(?:MKI)?|F-16)\b/i;
 const SHA256 = /^[0-9a-f]{64}$/;
-const TEXT_EXTENSIONS = new Set(["", ".cjs", ".css", ".html", ".js", ".json", ".jsx", ".md", ".mjs", ".rs", ".ts", ".tsx", ".txt", ".yaml", ".yml"]);
 const PRODUCTION_ROOTS = ["app", "components", "db", "dist", "engine-rust", "fixtures/model-packs", "fixtures/vector-record", "lib", "public", "worker"];
 const PRODUCTION_MARKERS = [MANIFEST_SCHEMA, LEGAL_SCHEMA, INTENDED_USE, "generic-sensor-verification-sources", "generic-sensor-source-freeze-v1"];
 const NASA_IDENTITIES = {
-  "nasa-cr-66097": { ntrsId: "19660021027", reportNumber: "NASA-CR-66097", pages: [143, 144], reportPages: ["134", "135"] },
-  "nasa-cr-151497": { ntrsId: "19770023372", reportNumber: "NASA-CR-151497", pages: [53, 54, 55, 56], reportPages: ["2", "3", "4", "5"] },
-  "nasa-cr-168347": { ntrsId: "19840019990", reportNumber: "NASA-CR-168347", pages: Array.from({ length: 17 }, (_, index) => 82 + index), reportPages: Array.from({ length: 17 }, (_, index) => `5-${25 + index}`) },
-  "nasa-cr-160557": { ntrsId: "19800011044", reportNumber: "NASA-CR-160557", pages: Array.from({ length: 11 }, (_, index) => 5 + index), reportPages: Array(11).fill(null) },
+  "nasa-cr-66097": { ntrsId: "19660021027", reportNumber: "NASA-CR-66097", pages: [143, 144], reportPages: ["134", "135"], renderPages: [1, 143, 144] },
+  "nasa-cr-151497": { ntrsId: "19770023372", reportNumber: "NASA-CR-151497", pages: [53, 54, 55, 56], reportPages: ["2", "3", "4", "5"], renderPages: [1, 2, 3, 4, 53, 54, 55, 56] },
+  "nasa-cr-168347": { ntrsId: "19840019990", reportNumber: "NASA-CR-168347", pages: Array.from({ length: 17 }, (_, index) => 82 + index), reportPages: Array.from({ length: 17 }, (_, index) => `5-${25 + index}`), renderPages: [1, ...Array.from({ length: 17 }, (_, index) => 82 + index)] },
+  "nasa-cr-160557": { ntrsId: "19800011044", reportNumber: "NASA-CR-160557", pages: Array.from({ length: 11 }, (_, index) => 5 + index), reportPages: Array(11).fill(null), renderPages: Array.from({ length: 15 }, (_, index) => index + 1) },
 };
 
 function fail(message) {
@@ -118,6 +117,9 @@ export function parseBoundedZip(input, limits = {}) {
     if (localHeaderOffset + 30 > bytes.length || bytes.readUInt32LE(localHeaderOffset) !== 0x04034b50) fail(`invalid local header for ${name}`);
     const localNameLength = bytes.readUInt16LE(localHeaderOffset + 26);
     const localExtraLength = bytes.readUInt16LE(localHeaderOffset + 28);
+    const localFlags = bytes.readUInt16LE(localHeaderOffset + 6);
+    const localMethod = bytes.readUInt16LE(localHeaderOffset + 8);
+    if (localFlags !== flags || localMethod !== method) fail(`local/central compression metadata mismatch for ${name}`);
     const localName = bytes.subarray(localHeaderOffset + 30, localHeaderOffset + 30 + localNameLength).toString("utf8");
     if (localName !== name) fail(`local/central name mismatch for ${name}`);
     const dataOffset = localHeaderOffset + 30 + localNameLength + localExtraLength;
@@ -160,6 +162,19 @@ function verifyNasaMetadata(source, bytes) {
   if (!identity || source.ntrsId !== identity.ntrsId || source.reportNumber !== identity.reportNumber) fail(`wrong frozen NASA identity for ${source.id}`);
   const location = source.relevantLocations?.[0];
   if (canonicalJson(location?.pdfPages) !== canonicalJson(identity.pages) || canonicalJson(location?.reportPages) !== canonicalJson(identity.reportPages)) fail(`wrong relevant page mapping for ${source.id}`);
+  if (canonicalJson(source.renderPages?.map((page) => page.sourcePdfPage)) !== canonicalJson(identity.renderPages)) fail(`wrong render page mapping for ${source.id}`);
+  for (const page of source.renderPages) {
+    const stem = String(page.sourcePdfPage).padStart(3, "0");
+    const expectedSourcePath = `renders/${source.ntrsId}/pdf-${stem}.png`;
+    if (page.sourceRender?.path !== expectedSourcePath) fail(`render artifact does not match source page for ${source.id}:${page.sourcePdfPage}`);
+    const relevantIndex = identity.pages.indexOf(page.sourcePdfPage);
+    const expectedReportPage = relevantIndex === -1 ? null : identity.reportPages[relevantIndex];
+    const expectedPurpose = relevantIndex === -1 ? "IDENTITY_OR_LIMITATION_CONTEXT" : "RELEVANT_SOURCE_CONTEXT";
+    if (page.reportPage !== expectedReportPage || page.purpose !== expectedPurpose) fail(`wrong source/display page context for ${source.id}:${page.sourcePdfPage}`);
+    const uprightExpected = source.id === "nasa-cr-160557" && [8, 11, 14].includes(page.sourcePdfPage);
+    const expectedDisplayPath = uprightExpected ? `renders/${source.ntrsId}/pdf-${stem}-display-upright.png` : null;
+    if ((page.displayRender?.path ?? null) !== expectedDisplayPath) fail(`wrong upright display artifact for ${source.id}:${page.sourcePdfPage}`);
+  }
   const metadata = JSON.parse(bytes.toString("utf8"));
   if (String(metadata.id) !== source.ntrsId) fail(`wrong NASA record for ${source.id}`);
   if (!metadata.otherReportNumbers?.includes(source.reportNumber)) fail(`wrong report number for ${source.id}`);
@@ -194,18 +209,18 @@ function walkFiles(path, rootPath, files) {
   for (const entry of readdirSync(path, { withFileTypes: true })) {
     const entryPath = join(path, entry.name);
     if (entry.isDirectory()) walkFiles(entryPath, rootPath, files);
-    else if (entry.isFile() && TEXT_EXTENSIONS.has(extname(entry.name))) files.set(relative(rootPath, entryPath).split(sep).join("/"), readFileSync(entryPath));
+    else if (entry.isFile()) files.set(relative(rootPath, entryPath).split(sep).join("/"), readFileSync(entryPath));
   }
 }
 
-export function assertNoProductionExposure({ repositoryRoot, virtualFiles } = {}) {
+export function assertNoProductionExposure({ repositoryRoot, virtualFiles, forbiddenArtifactDigests = new Set() } = {}) {
   const root = resolve(repositoryRoot ?? ".");
   const files = new Map();
   for (const productionRoot of PRODUCTION_ROOTS) walkFiles(resolve(root, productionRoot), root, files);
   for (const [path, bytes] of virtualFiles ?? []) files.set(path, Buffer.from(bytes));
   for (const [path, bytes] of files) {
-    const text = bytes.toString("utf8");
-    if (PRODUCTION_MARKERS.some((marker) => text.includes(marker))) fail(`production exposure in ${path}`);
+    if (PRODUCTION_MARKERS.some((marker) => bytes.includes(Buffer.from(marker)))) fail(`production exposure marker in ${path}`);
+    if (forbiddenArtifactDigests.has(sha256(bytes))) fail(`production exposure frozen artifact in ${path}`);
   }
   return { filesScanned: files.size, exposures: 0 };
 }
@@ -216,14 +231,16 @@ function verifyVisualInspection(root, manifest, overrides) {
   const inspection = JSON.parse((overrides?.get(record.path) ?? readFileSync(resolve(root, record.path))).toString("utf8"));
   if (inspection.schemaVersion !== "vector.generic-sensor-verification-visual-inspection.v1") fail("wrong visual-inspection schema");
   if (inspection.status !== "PRIMARY_INSPECTION_COMPLETE_INDEPENDENT_REVIEW_REQUIRED") fail("visual inspection must preserve independent-review requirement");
-  const inspected = new Set(inspection.pages.map((page) => `${page.sourceId}:${page.sourcePdfPage}`));
+  const inspected = new Map(inspection.pages.map((page) => [`${page.sourceId}:${page.sourcePdfPage}`, page]));
   const expectedPageCount = manifest.sources.reduce((sum, source) => sum + (source.renderPages?.length ?? 0), 0);
   if (inspection.pages.length !== expectedPageCount || inspected.size !== expectedPageCount) fail("visual-inspection page coverage is not exact");
   for (const source of manifest.sources.filter((candidate) => candidate.publisher === "NASA")) {
     for (const page of source.renderPages) {
       artifactBytes(root, page.sourceRender, overrides);
       if (page.displayRender) artifactBytes(root, page.displayRender, overrides);
-      if (!inspected.has(`${source.id}:${page.sourcePdfPage}`)) fail(`uninspected source page ${source.id}:${page.sourcePdfPage}`);
+      const inspectedPage = inspected.get(`${source.id}:${page.sourcePdfPage}`);
+      if (!inspectedPage) fail(`uninspected source page ${source.id}:${page.sourcePdfPage}`);
+      if (inspectedPage.reportPage !== page.reportPage || inspectedPage.purpose !== page.purpose || inspectedPage.titleAndReportIdentityChecked !== true || inspectedPage.equationContextChecked !== true || inspectedPage.limitationsChecked !== true || inspectedPage.result !== "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE") fail(`visual-inspection mapping mismatch for ${source.id}:${page.sourcePdfPage}`);
       const uprightExpected = source.id === "nasa-cr-160557" && [8, 11, 14].includes(page.sourcePdfPage);
       if (uprightExpected !== Boolean(page.displayRender) || (uprightExpected && page.displayTransform !== "ROTATE_90_DEGREES_CLOCKWISE") || (!uprightExpected && page.displayTransform !== "NONE")) fail(`wrong display mapping for ${source.id}:${page.sourcePdfPage}`);
     }
@@ -274,7 +291,7 @@ function verifyStoneSource(root, source, archiveBytes, overrides) {
     unixMode: entry.unixMode,
     localHeaderOffset: entry.localHeaderOffset,
   }));
-  if (canonicalJson(actualInventory) !== canonicalJson(inventory.entries) || inventory.totalExpandedBytes !== parsed.totalExpandedBytes || inventory.archiveSha256 !== STONE_ARCHIVE_SHA256) fail("archive inventory mismatch or undeclared files");
+  if (inventory.entryCount !== parsed.entries.length || canonicalJson(actualInventory) !== canonicalJson(inventory.entries) || inventory.totalExpandedBytes !== parsed.totalExpandedBytes || inventory.archiveSha256 !== STONE_ARCHIVE_SHA256) fail("archive inventory mismatch or undeclared files");
   const entries = new Map(parsed.entries.map((entry) => [entry.path, entry]));
   for (const member of source.extractedMembers) {
     const entry = entries.get(member.archivePath);
@@ -295,7 +312,8 @@ export function verifyGenericSensorSourceBundle(options = {}) {
   if (manifest.canonicalManifestDigest !== canonicalManifestDigest(manifest)) fail("manifest digest mismatch");
   if (manifest.sources?.length !== 5 || new Set(manifest.sources.map((source) => source.id)).size !== 5) fail("source set must contain exactly five unique records");
   if (manifest.status !== "BLOCKED_PENDING_HUMAN_REVIEW" || manifest.sourcePolicy?.productionRuntimeUsePermitted !== false || manifest.sourcePolicy?.stoneSoupExecutionPermitted !== false || manifest.sourcePolicy?.stoneSoupAdaptationPermitted !== false || manifest.sourcePolicy?.numericModelTranscriptionPermitted !== false || manifest.sourcePolicy?.namedSystemClaimsPermitted !== false || manifest.sourcePolicy?.redistributionPermitted !== false) fail("source-only policy must fail closed");
-  if (manifest.renderRecipe?.sourceRender?.tool !== "pdftoppm" || manifest.renderRecipe.sourceRender.version !== "26.05.0" || manifest.renderRecipe.sourceRender.dpi !== 150 || manifest.renderRecipe.sourceRender.extent !== "FULL_PAGE" || manifest.renderRecipe?.uprightDisplayRender?.tool !== "sharp" || manifest.renderRecipe.uprightDisplayRender.version !== "0.35.0" || manifest.renderRecipe.state !== "NON_AUTHORITATIVE_DISCOVERY_AID") fail("wrong offline render recipe");
+  const sharpRecipe = manifest.renderRecipe?.uprightDisplayRender;
+  if (manifest.renderRecipe?.sourceRender?.tool !== "pdftoppm" || manifest.renderRecipe.sourceRender.version !== "26.05.0" || manifest.renderRecipe.sourceRender.dpi !== 150 || manifest.renderRecipe.sourceRender.extent !== "FULL_PAGE" || sharpRecipe?.tool !== "sharp" || sharpRecipe.version !== "0.35.0" || sharpRecipe.pngEncoder?.compressionLevel !== 9 || sharpRecipe.pngEncoder?.adaptiveFiltering !== false || sharpRecipe.pngEncoder?.palette !== false || manifest.renderRecipe.state !== "NON_AUTHORITATIVE_DISCOVERY_AID") fail("wrong offline render recipe");
   if (FORBIDDEN_CLAIM.test(serialized)) fail("forbidden named, community, or game claim in manifest");
   for (const source of manifest.sources) {
     if (!source.canonicalUrl || /(?:\/latest\b|[?&](?:latest|version)=latest)/i.test(source.canonicalUrl)) fail(`dynamic source URL for ${source.id}`);
@@ -332,15 +350,40 @@ export function verifyGenericSensorSourceBundle(options = {}) {
     const reference = manifest.decisionReferences?.find((candidate) => candidate.sourceId === source.id);
     if (!reference || reference.decisionArtifactId !== legal.decisionArtifactId || canonicalJson(reference.fields) !== canonicalJson(["redistribution", "referenceExecution", "adaptation"])) fail(`missing per-source legal decision reference for ${source.id}`);
   }
-  const pending = legal.decisions.some((decision) => ["redistribution", "referenceExecution", "adaptation"].some((field) => decision[field].state === "PENDING_REVIEW"));
-  const exposure = assertNoProductionExposure({ repositoryRoot: resolve(root, "../..") });
+  const decisionState = summarizeLegalDecisionState(legal.decisions);
+  const frozenArtifactDigests = new Set();
+  const collectDigest = (candidate) => {
+    if (candidate?.path && SHA256.test(candidate.sha256 ?? "")) frozenArtifactDigests.add(candidate.sha256);
+  };
+  for (const source of manifest.sources) {
+    for (const artifact of source.artifacts) collectDigest(artifact);
+    collectDigest(source.archiveInventory);
+    for (const member of source.extractedMembers ?? []) collectDigest(member.extractedArtifact);
+    for (const page of source.renderPages ?? []) {
+      collectDigest(page.sourceRender);
+      collectDigest(page.displayRender);
+    }
+  }
+  collectDigest(manifest.visualInspection);
+  collectDigest(manifest.legalDecisions);
+  collectDigest(manifest.isolationEvidence);
+  const exposure = assertNoProductionExposure({ repositoryRoot: resolve(root, "../.."), forbiddenArtifactDigests: frozenArtifactDigests });
   return {
     schemaVersion: REPORT_SCHEMA,
     manifestId: manifest.manifestId,
     manifestDigest: manifest.canonicalManifestDigest,
     sourceCount: manifest.sources.length,
-    decisionState: pending ? "BLOCKED_PENDING_HUMAN_REVIEW" : "AUTHORIZED_DECISIONS_PRESENT",
+    decisionState,
     productionExposures: exposure.exposures,
     withdrawnDigestPresent: false,
   };
+}
+
+export function summarizeLegalDecisionState(decisions) {
+  const states = decisions.flatMap((decision) => ["redistribution", "referenceExecution", "adaptation"].map((field) => decision[field]?.state));
+  if (states.includes("REJECTED")) return "BLOCKED_REJECTED";
+  if (states.includes("PENDING_REVIEW")) return "BLOCKED_PENDING_HUMAN_REVIEW";
+  if (states.includes("NOT_APPLICABLE")) return "BLOCKED_NOT_APPLICABLE";
+  if (states.length > 0 && states.every((state) => state === "APPROVED")) return "AUTHORIZED_DECISIONS_PRESENT";
+  return "BLOCKED_MISSING_OR_INVALID_DECISION";
 }

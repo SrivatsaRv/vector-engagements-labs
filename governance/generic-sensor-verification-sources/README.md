@@ -60,8 +60,9 @@ decision structure, and scans production roots for exposure.
 The render recipe is Poppler `pdftoppm` 26.05.0 at 150 DPI, grayscale, full
 page. CR-160557 PDF pages 8, 11, and 14 are intrinsically rotated; their source
 renders are preserved and separate Sharp 0.35.0 90-degree-clockwise display
-derivatives are manifest-hashed. The display derivative never replaces the
-source-page identity.
+derivatives are manifest-hashed. Sharp uses deterministic PNG options
+`compressionLevel: 9`, `adaptiveFiltering: false`, and `palette: false`. The
+display derivative never replaces the source-page identity.
 
 ## Explicitly omitted layers
 
