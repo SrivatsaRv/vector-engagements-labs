@@ -1,0 +1,346 @@
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { extname, join, relative, resolve, sep } from "node:path";
+import { inflateRawSync } from "node:zlib";
+
+const MANIFEST_SCHEMA = "vector.generic-sensor-verification-source-manifest.v1";
+const REPORT_SCHEMA = "vector.generic-sensor-verification-source-report.v1";
+const LEGAL_SCHEMA = "vector.generic-sensor-verification-legal-decisions.v1";
+const INTENDED_USE = "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE";
+const WITHDRAWN_CR_160557_PREFIX = ["99cc", "854a"].join("");
+const CORRECT_CR_160557_SHA256 = "516547a9ea42ed46b20c348105ebbbbce1628f3e3eb96d6ec517a42647be4456";
+const STONE_ARCHIVE_SHA256 = "728449aeac17bf2a233cd052b42f8306a7742fad26715be3f780abfbaf50abab";
+const STONE_COMMIT = "a4336b920a799cfe0a77ecb05867c5deeb371c7a";
+const FORBIDDEN_CLAIM = /\b(?:DCS|War\s*Thunder|community\s+dump|APG-68|Su-30(?:MKI)?|F-16)\b/i;
+const SHA256 = /^[0-9a-f]{64}$/;
+const TEXT_EXTENSIONS = new Set(["", ".cjs", ".css", ".html", ".js", ".json", ".jsx", ".md", ".mjs", ".rs", ".ts", ".tsx", ".txt", ".yaml", ".yml"]);
+const PRODUCTION_ROOTS = ["app", "components", "db", "dist", "engine-rust", "fixtures/model-packs", "fixtures/vector-record", "lib", "public", "worker"];
+const PRODUCTION_MARKERS = [MANIFEST_SCHEMA, LEGAL_SCHEMA, INTENDED_USE, "generic-sensor-verification-sources", "generic-sensor-source-freeze-v1"];
+const NASA_IDENTITIES = {
+  "nasa-cr-66097": { ntrsId: "19660021027", reportNumber: "NASA-CR-66097", pages: [143, 144], reportPages: ["134", "135"] },
+  "nasa-cr-151497": { ntrsId: "19770023372", reportNumber: "NASA-CR-151497", pages: [53, 54, 55, 56], reportPages: ["2", "3", "4", "5"] },
+  "nasa-cr-168347": { ntrsId: "19840019990", reportNumber: "NASA-CR-168347", pages: Array.from({ length: 17 }, (_, index) => 82 + index), reportPages: Array.from({ length: 17 }, (_, index) => `5-${25 + index}`) },
+  "nasa-cr-160557": { ntrsId: "19800011044", reportNumber: "NASA-CR-160557", pages: Array.from({ length: 11 }, (_, index) => 5 + index), reportPages: Array(11).fill(null) },
+};
+
+function fail(message) {
+  throw new Error(`generic sensor source verification failed: ${message}`);
+}
+
+export function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+export function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+export function canonicalManifestDigest(manifest) {
+  const unsigned = structuredClone(manifest);
+  delete unsigned.canonicalManifestDigest;
+  return sha256(Buffer.from(canonicalJson(unsigned)));
+}
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function zipPathIsUnsafe(name) {
+  if (!name || name.includes("\0") || name.includes("\\") || name.startsWith("/") || /^[A-Za-z]:/.test(name)) return true;
+  return name.split("/").some((part) => part === "." || part === "..");
+}
+
+function findEndOfCentralDirectory(bytes) {
+  const minimum = Math.max(0, bytes.length - 65_557);
+  for (let offset = bytes.length - 22; offset >= minimum; offset -= 1) {
+    if (bytes.readUInt32LE(offset) === 0x06054b50) return offset;
+  }
+  fail("ZIP end-of-central-directory record missing");
+}
+
+export function parseBoundedZip(input, limits = {}) {
+  const bytes = Buffer.from(input);
+  const maxArchiveBytes = limits.maxArchiveBytes ?? 32 * 1024 * 1024;
+  const maxExpandedBytes = limits.maxExpandedBytes ?? 64 * 1024 * 1024;
+  const maxEntries = limits.maxEntries ?? 2_000;
+  if (bytes.length > maxArchiveBytes) fail("ZIP archive-size limit exceeded");
+  const endOffset = findEndOfCentralDirectory(bytes);
+  const disk = bytes.readUInt16LE(endOffset + 4);
+  const centralDisk = bytes.readUInt16LE(endOffset + 6);
+  const diskEntries = bytes.readUInt16LE(endOffset + 8);
+  const entryCount = bytes.readUInt16LE(endOffset + 10);
+  const centralSize = bytes.readUInt32LE(endOffset + 12);
+  const centralOffset = bytes.readUInt32LE(endOffset + 16);
+  if (disk !== 0 || centralDisk !== 0 || diskEntries !== entryCount) fail("multi-disk ZIP is unsafe");
+  if (entryCount === 0xffff || centralSize === 0xffffffff || centralOffset === 0xffffffff) fail("ZIP64 archive is unsupported");
+  if (entryCount > maxEntries) fail("ZIP entry-count limit exceeded");
+  if (centralOffset + centralSize > endOffset) fail("ZIP central directory is out of bounds");
+
+  const names = new Set();
+  const entries = [];
+  let totalExpandedBytes = 0;
+  let cursor = centralOffset;
+  for (let index = 0; index < entryCount; index += 1) {
+    if (cursor + 46 > bytes.length || bytes.readUInt32LE(cursor) !== 0x02014b50) fail("invalid ZIP central-directory entry");
+    const flags = bytes.readUInt16LE(cursor + 8);
+    const method = bytes.readUInt16LE(cursor + 10);
+    const expectedCrc = bytes.readUInt32LE(cursor + 16);
+    const compressedSize = bytes.readUInt32LE(cursor + 20);
+    const uncompressedSize = bytes.readUInt32LE(cursor + 24);
+    const nameLength = bytes.readUInt16LE(cursor + 28);
+    const extraLength = bytes.readUInt16LE(cursor + 30);
+    const commentLength = bytes.readUInt16LE(cursor + 32);
+    const externalAttributes = bytes.readUInt32LE(cursor + 38);
+    const localHeaderOffset = bytes.readUInt32LE(cursor + 42);
+    const next = cursor + 46 + nameLength + extraLength + commentLength;
+    if (next > bytes.length) fail("ZIP central-directory entry is out of bounds");
+    const nameBytes = bytes.subarray(cursor + 46, cursor + 46 + nameLength);
+    const name = nameBytes.toString("utf8");
+    if (Buffer.compare(Buffer.from(name, "utf8"), nameBytes) !== 0) fail("unsafe non-UTF-8 ZIP member name");
+    if (zipPathIsUnsafe(name)) fail(`unsafe ZIP member path: ${name}`);
+    if (names.has(name)) fail(`duplicate ZIP member: ${name}`);
+    names.add(name);
+    if ((flags & 0x1) !== 0) fail(`encrypted ZIP member is unsafe: ${name}`);
+    if (method !== 0 && method !== 8) fail(`unsupported ZIP compression method for ${name}`);
+    const unixMode = externalAttributes >>> 16;
+    if ((unixMode & 0o170000) === 0o120000) fail(`symlink ZIP member is unsafe: ${name}`);
+    totalExpandedBytes += uncompressedSize;
+    if (totalExpandedBytes > maxExpandedBytes) fail("ZIP expanded-size limit exceeded");
+    if (localHeaderOffset + 30 > bytes.length || bytes.readUInt32LE(localHeaderOffset) !== 0x04034b50) fail(`invalid local header for ${name}`);
+    const localNameLength = bytes.readUInt16LE(localHeaderOffset + 26);
+    const localExtraLength = bytes.readUInt16LE(localHeaderOffset + 28);
+    const localName = bytes.subarray(localHeaderOffset + 30, localHeaderOffset + 30 + localNameLength).toString("utf8");
+    if (localName !== name) fail(`local/central name mismatch for ${name}`);
+    const dataOffset = localHeaderOffset + 30 + localNameLength + localExtraLength;
+    if (dataOffset + compressedSize > bytes.length) fail(`compressed data is out of bounds for ${name}`);
+    const compressed = bytes.subarray(dataOffset, dataOffset + compressedSize);
+    const content = method === 0 ? Buffer.from(compressed) : inflateRawSync(compressed, { maxOutputLength: maxExpandedBytes });
+    if (content.length !== uncompressedSize) fail(`expanded size mismatch for ${name}`);
+    if (crc32(content) !== expectedCrc) fail(`CRC mismatch for ${name}`);
+    entries.push({
+      path: name,
+      compressionMethod: method,
+      compressedSize,
+      uncompressedSize,
+      crc32Hex: expectedCrc.toString(16).padStart(8, "0"),
+      unixMode,
+      localHeaderOffset,
+      isDirectory: name.endsWith("/"),
+      content,
+    });
+    cursor = next;
+  }
+  if (cursor !== centralOffset + centralSize) fail("ZIP central-directory size mismatch");
+  return { entries, totalExpandedBytes };
+}
+
+function artifactBytes(root, artifact, overrides) {
+  const bytes = overrides?.get(artifact.path) ?? readFileSync(resolve(root, artifact.path));
+  if (bytes.length !== artifact.sizeBytes) fail(`size mismatch for ${artifact.path}`);
+  if (sha256(bytes) !== artifact.sha256) fail(`digest mismatch for ${artifact.path}`);
+  return bytes;
+}
+
+function requireStates(value, location) {
+  const allowed = new Set(["REFERENCE_ONLY", "NON_AUTHORITATIVE_DISCOVERY_AID", "INELIGIBLE"]);
+  if (!allowed.has(value)) fail(`invalid evidence state at ${location}`);
+}
+
+function verifyNasaMetadata(source, bytes) {
+  const identity = NASA_IDENTITIES[source.id];
+  if (!identity || source.ntrsId !== identity.ntrsId || source.reportNumber !== identity.reportNumber) fail(`wrong frozen NASA identity for ${source.id}`);
+  const location = source.relevantLocations?.[0];
+  if (canonicalJson(location?.pdfPages) !== canonicalJson(identity.pages) || canonicalJson(location?.reportPages) !== canonicalJson(identity.reportPages)) fail(`wrong relevant page mapping for ${source.id}`);
+  const metadata = JSON.parse(bytes.toString("utf8"));
+  if (String(metadata.id) !== source.ntrsId) fail(`wrong NASA record for ${source.id}`);
+  if (!metadata.otherReportNumbers?.includes(source.reportNumber)) fail(`wrong report number for ${source.id}`);
+  if (metadata.title !== source.title) fail(`wrong title for ${source.id}`);
+  if (metadata.distribution !== "PUBLIC" || metadata.copyright?.determinationType !== "GOV_PUBLIC_USE_PERMITTED") fail(`wrong distribution metadata for ${source.id}`);
+  if (metadata.exportControl?.isExportControl !== "NO" || metadata.exportControl?.ear !== "NO" || metadata.exportControl?.itar !== "NO") fail(`wrong export metadata for ${source.id}`);
+  if (!metadata.downloads?.some((download) => download.name === `${source.ntrsId}.pdf`)) fail(`wrong NASA download identity for ${source.id}`);
+}
+
+function verifyDecisionField(decision, field) {
+  const value = decision[field];
+  if (!value || !["PENDING_REVIEW", "APPROVED", "REJECTED", "NOT_APPLICABLE"].includes(value.state)) fail(`invalid ${field} decision for ${decision.sourceId}`);
+  if (value.state === "APPROVED") {
+    if (value.reviewer?.kind !== "AUTHORIZED_HUMAN" || !value.reviewer.id) fail(`${field} approval requires an authorized human reviewer`);
+    if (!value.decisionRecordId || !value.decidedOn || !value.jurisdiction || !value.scope?.length || !Array.isArray(value.conditions) || !SHA256.test(value.evidenceSha256 ?? "") || /^0{64}$/.test(value.evidenceSha256)) fail(`${field} approval is incomplete`);
+  } else if (value.reviewer !== null || value.decisionRecordId !== null || value.decidedOn !== null || value.evidenceSha256 !== null) {
+    fail(`${field} non-approval must not carry approval authority`);
+  }
+}
+
+export function assertAuthorizedDecision(decision, field, requirement = {}) {
+  verifyDecisionField(decision, field);
+  const value = decision[field];
+  if (value.state !== "APPROVED") fail(`${field} decision is ${value.state}`);
+  if (requirement.jurisdiction && value.jurisdiction !== requirement.jurisdiction) fail(`${field} approval jurisdiction is out of scope`);
+  if (requirement.scope && !value.scope.includes(requirement.scope)) fail(`${field} approval scope is insufficient`);
+  return value;
+}
+
+function walkFiles(path, rootPath, files) {
+  if (!existsSync(path)) return;
+  for (const entry of readdirSync(path, { withFileTypes: true })) {
+    const entryPath = join(path, entry.name);
+    if (entry.isDirectory()) walkFiles(entryPath, rootPath, files);
+    else if (entry.isFile() && TEXT_EXTENSIONS.has(extname(entry.name))) files.set(relative(rootPath, entryPath).split(sep).join("/"), readFileSync(entryPath));
+  }
+}
+
+export function assertNoProductionExposure({ repositoryRoot, virtualFiles } = {}) {
+  const root = resolve(repositoryRoot ?? ".");
+  const files = new Map();
+  for (const productionRoot of PRODUCTION_ROOTS) walkFiles(resolve(root, productionRoot), root, files);
+  for (const [path, bytes] of virtualFiles ?? []) files.set(path, Buffer.from(bytes));
+  for (const [path, bytes] of files) {
+    const text = bytes.toString("utf8");
+    if (PRODUCTION_MARKERS.some((marker) => text.includes(marker))) fail(`production exposure in ${path}`);
+  }
+  return { filesScanned: files.size, exposures: 0 };
+}
+
+function verifyVisualInspection(root, manifest, overrides) {
+  const record = manifest.visualInspection;
+  artifactBytes(root, record, overrides);
+  const inspection = JSON.parse((overrides?.get(record.path) ?? readFileSync(resolve(root, record.path))).toString("utf8"));
+  if (inspection.schemaVersion !== "vector.generic-sensor-verification-visual-inspection.v1") fail("wrong visual-inspection schema");
+  if (inspection.status !== "PRIMARY_INSPECTION_COMPLETE_INDEPENDENT_REVIEW_REQUIRED") fail("visual inspection must preserve independent-review requirement");
+  const inspected = new Set(inspection.pages.map((page) => `${page.sourceId}:${page.sourcePdfPage}`));
+  const expectedPageCount = manifest.sources.reduce((sum, source) => sum + (source.renderPages?.length ?? 0), 0);
+  if (inspection.pages.length !== expectedPageCount || inspected.size !== expectedPageCount) fail("visual-inspection page coverage is not exact");
+  for (const source of manifest.sources.filter((candidate) => candidate.publisher === "NASA")) {
+    for (const page of source.renderPages) {
+      artifactBytes(root, page.sourceRender, overrides);
+      if (page.displayRender) artifactBytes(root, page.displayRender, overrides);
+      if (!inspected.has(`${source.id}:${page.sourcePdfPage}`)) fail(`uninspected source page ${source.id}:${page.sourcePdfPage}`);
+      const uprightExpected = source.id === "nasa-cr-160557" && [8, 11, 14].includes(page.sourcePdfPage);
+      if (uprightExpected !== Boolean(page.displayRender) || (uprightExpected && page.displayTransform !== "ROTATE_90_DEGREES_CLOCKWISE") || (!uprightExpected && page.displayTransform !== "NONE")) fail(`wrong display mapping for ${source.id}:${page.sourcePdfPage}`);
+    }
+  }
+}
+
+function verifyIsolationEvidence(root, manifest, overrides) {
+  const record = manifest.isolationEvidence;
+  const content = artifactBytes(root, record, overrides);
+  const evidence = JSON.parse(content.toString("utf8"));
+  if (evidence.schemaVersion !== "vector.generic-sensor-verification-production-isolation-evidence.v1" || evidence.subjectManifestId !== manifest.manifestId || evidence.expectedProductionExposures !== 0 || evidence.productionBuildImportPolicy !== "FORBIDDEN" || evidence.omissionReason !== "STAGE_0_ADDS_NO_RUNTIME_BEHAVIOR") fail("invalid production-isolation evidence");
+  const artifacts = new Map();
+  const collect = (candidate) => {
+    if (candidate?.path && Number.isInteger(candidate.sizeBytes) && SHA256.test(candidate.sha256 ?? "")) artifacts.set(candidate.path, candidate);
+  };
+  for (const source of manifest.sources) {
+    for (const artifact of source.artifacts) collect(artifact);
+    collect(source.archiveInventory);
+    for (const member of source.extractedMembers ?? []) collect(member.extractedArtifact);
+    for (const page of source.renderPages ?? []) {
+      collect(page.sourceRender);
+      collect(page.displayRender);
+    }
+  }
+  collect(manifest.visualInspection);
+  collect(manifest.legalDecisions);
+  const measuredBytes = [...artifacts.values()].reduce((sum, artifact) => sum + artifact.sizeBytes, 0);
+  if (evidence.frozenArtifactCount !== artifacts.size || evidence.frozenArtifactBytes !== measuredBytes) fail("production-isolation size evidence mismatch");
+}
+
+function verifyStoneSource(root, source, archiveBytes, overrides) {
+  if (source.archiveSha256 !== STONE_ARCHIVE_SHA256 || source.vcs.resolvedCommit !== STONE_COMMIT) fail("wrong Stone Soup archive or resolved commit");
+  if (source.vcs.annotatedTagObject !== "d9e6fb16f5ae176817aeb6a6fc3a39f544694408" || source.vcs.annotatedTagSigned !== false || source.vcs.resolvedCommitSignature !== "VERIFIED") fail("Stone Soup tag and commit identity are not independently represented");
+  const metadataArtifact = source.artifacts.find((artifact) => artifact.role === "OFFICIAL_METADATA");
+  const metadata = JSON.parse(artifactBytes(root, metadataArtifact, overrides).toString("utf8"));
+  if (metadata.id !== 20830467 || metadata.doi !== source.doi || metadata.metadata?.version !== "v1.9.1" || metadata.metadata?.license?.id !== "mit-license") fail("wrong Stone Soup Zenodo identity");
+  const zipFile = metadata.files?.find((file) => file.key === "dstl/Stone-Soup-v1.9.1.zip");
+  if (!zipFile || zipFile.size !== archiveBytes.length || zipFile.checksum !== "md5:5551faf19954c7400821e7616f1199ff") fail("wrong Stone Soup Zenodo archive record");
+  const parsed = parseBoundedZip(archiveBytes, source.archiveLimits);
+  const inventoryBytes = artifactBytes(root, source.archiveInventory, overrides);
+  const inventory = JSON.parse(inventoryBytes.toString("utf8"));
+  const actualInventory = parsed.entries.map((entry) => ({
+    path: entry.path,
+    compressionMethod: entry.compressionMethod,
+    compressedSize: entry.compressedSize,
+    uncompressedSize: entry.uncompressedSize,
+    crc32Hex: entry.crc32Hex,
+    unixMode: entry.unixMode,
+    localHeaderOffset: entry.localHeaderOffset,
+  }));
+  if (canonicalJson(actualInventory) !== canonicalJson(inventory.entries) || inventory.totalExpandedBytes !== parsed.totalExpandedBytes || inventory.archiveSha256 !== STONE_ARCHIVE_SHA256) fail("archive inventory mismatch or undeclared files");
+  const entries = new Map(parsed.entries.map((entry) => [entry.path, entry]));
+  for (const member of source.extractedMembers) {
+    const entry = entries.get(member.archivePath);
+    if (!entry || entry.isDirectory) fail(`missing declared Stone Soup member ${member.archivePath}`);
+    const extracted = artifactBytes(root, member.extractedArtifact, overrides);
+    if (sha256(entry.content) !== member.extractedArtifact.sha256 || !entry.content.equals(extracted)) fail(`extracted member mismatch for ${member.archivePath}`);
+  }
+  const licence = source.extractedMembers.find((member) => member.role === "LICENSE");
+  if (!licence || licence.extractedArtifact.sha256 !== "2462f3d8a857f601e266f048a4ff051366c1e05f098cf3a1524eaf922f879815") fail("MIT licence notice missing or changed");
+}
+
+export function verifyGenericSensorSourceBundle(options = {}) {
+  const root = resolve(options.root ?? "governance/generic-sensor-verification-sources");
+  const manifest = options.manifest ?? JSON.parse(readFileSync(resolve(root, "manifest.v1.json"), "utf8"));
+  const serialized = JSON.stringify(manifest);
+  if (serialized.toLowerCase().includes(WITHDRAWN_CR_160557_PREFIX)) fail("withdrawn CR-160557 digest is invalid");
+  if (manifest.schemaVersion !== MANIFEST_SCHEMA || manifest.intendedUse !== INTENDED_USE) fail("wrong manifest schema or intended use");
+  if (manifest.canonicalManifestDigest !== canonicalManifestDigest(manifest)) fail("manifest digest mismatch");
+  if (manifest.sources?.length !== 5 || new Set(manifest.sources.map((source) => source.id)).size !== 5) fail("source set must contain exactly five unique records");
+  if (manifest.status !== "BLOCKED_PENDING_HUMAN_REVIEW" || manifest.sourcePolicy?.productionRuntimeUsePermitted !== false || manifest.sourcePolicy?.stoneSoupExecutionPermitted !== false || manifest.sourcePolicy?.stoneSoupAdaptationPermitted !== false || manifest.sourcePolicy?.numericModelTranscriptionPermitted !== false || manifest.sourcePolicy?.namedSystemClaimsPermitted !== false || manifest.sourcePolicy?.redistributionPermitted !== false) fail("source-only policy must fail closed");
+  if (manifest.renderRecipe?.sourceRender?.tool !== "pdftoppm" || manifest.renderRecipe.sourceRender.version !== "26.05.0" || manifest.renderRecipe.sourceRender.dpi !== 150 || manifest.renderRecipe.sourceRender.extent !== "FULL_PAGE" || manifest.renderRecipe?.uprightDisplayRender?.tool !== "sharp" || manifest.renderRecipe.uprightDisplayRender.version !== "0.35.0" || manifest.renderRecipe.state !== "NON_AUTHORITATIVE_DISCOVERY_AID") fail("wrong offline render recipe");
+  if (FORBIDDEN_CLAIM.test(serialized)) fail("forbidden named, community, or game claim in manifest");
+  for (const source of manifest.sources) {
+    if (!source.canonicalUrl || /(?:\/latest\b|[?&](?:latest|version)=latest)/i.test(source.canonicalUrl)) fail(`dynamic source URL for ${source.id}`);
+    requireStates(source.state, source.id);
+    for (const claim of source.eligibleClaims ?? []) {
+      if (claim.state !== "REFERENCE_ONLY" || claim.kind !== "BIBLIOGRAPHIC_OR_SOURCE_LOCATION_ONLY") fail(`eligible claim exceeds source-location scope for ${source.id}`);
+    }
+    for (const claim of source.ineligibleClaims ?? []) if (claim.state !== "INELIGIBLE") fail(`ineligible claim state missing for ${source.id}`);
+    for (const artifact of source.artifacts) artifactBytes(root, artifact, options.artifactOverrides);
+    if (source.publisher === "NASA") {
+      if (canonicalJson(source.rights) !== canonicalJson({ distribution: "PUBLIC", publicUse: "GOV_PUBLIC_USE_PERMITTED", exportControl: "NO", ear: "NO", itar: "NO" })) fail(`wrong declared NASA rights for ${source.id}`);
+      const metadataArtifact = source.artifacts.find((artifact) => artifact.role === "OFFICIAL_METADATA");
+      verifyNasaMetadata(source, options.artifactOverrides?.get(metadataArtifact.path) ?? readFileSync(resolve(root, metadataArtifact.path)));
+      if (source.id === "nasa-cr-160557" && source.artifacts.find((artifact) => artifact.role === "SOURCE_PDF")?.sha256 !== CORRECT_CR_160557_SHA256) fail("wrong CR-160557 digest");
+    }
+  }
+  const stone = manifest.sources.find((source) => source.id === "dstl-stone-soup-v1.9.1");
+  const archiveArtifact = stone?.artifacts.find((artifact) => artifact.role === "SOURCE_ARCHIVE");
+  if (!stone || !archiveArtifact) fail("Stone Soup source is missing");
+  if (canonicalJson(stone.rights) !== canonicalJson({ licence: "MIT", access: "OPEN", exportControl: "NOT_STATED", ear: "NOT_STATED", itar: "NOT_STATED" })) fail("wrong declared Stone Soup rights");
+  verifyStoneSource(root, stone, artifactBytes(root, archiveArtifact, options.artifactOverrides), options.artifactOverrides);
+  verifyVisualInspection(root, manifest, options.artifactOverrides);
+  verifyIsolationEvidence(root, manifest, options.artifactOverrides);
+
+  const legalArtifact = manifest.legalDecisions;
+  const legalBytes = artifactBytes(root, legalArtifact, options.artifactOverrides);
+  const legal = JSON.parse(legalBytes.toString("utf8"));
+  if (legal.schemaVersion !== LEGAL_SCHEMA || legal.intendedUse !== INTENDED_USE || legal.subjectManifestId !== manifest.manifestId) fail("wrong legal-decision artifact identity");
+  if (legal.decisions?.length !== manifest.sources.length || new Set(legal.decisions.map((decision) => decision.sourceId)).size !== manifest.sources.length) fail("legal decisions do not cover the frozen source set");
+  for (const source of manifest.sources) {
+    const decision = legal.decisions.find((candidate) => candidate.sourceId === source.id);
+    if (!decision) fail(`missing legal decision for ${source.id}`);
+    for (const field of ["redistribution", "referenceExecution", "adaptation"]) verifyDecisionField(decision, field);
+    const reference = manifest.decisionReferences?.find((candidate) => candidate.sourceId === source.id);
+    if (!reference || reference.decisionArtifactId !== legal.decisionArtifactId || canonicalJson(reference.fields) !== canonicalJson(["redistribution", "referenceExecution", "adaptation"])) fail(`missing per-source legal decision reference for ${source.id}`);
+  }
+  const pending = legal.decisions.some((decision) => ["redistribution", "referenceExecution", "adaptation"].some((field) => decision[field].state === "PENDING_REVIEW"));
+  const exposure = assertNoProductionExposure({ repositoryRoot: resolve(root, "../..") });
+  return {
+    schemaVersion: REPORT_SCHEMA,
+    manifestId: manifest.manifestId,
+    manifestDigest: manifest.canonicalManifestDigest,
+    sourceCount: manifest.sources.length,
+    decisionState: pending ? "BLOCKED_PENDING_HUMAN_REVIEW" : "AUTHORIZED_DECISIONS_PRESENT",
+    productionExposures: exposure.exposures,
+    withdrawnDigestPresent: false,
+  };
+}
