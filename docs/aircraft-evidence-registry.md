@@ -105,3 +105,73 @@ The registry does not fetch remote data in a simulation tick, or at build time.
 Remote hashes identify source material; only a committed derivative has its
 content re-hashed locally. A corrected source or derivative requires a new
 registry version and review.
+
+## Generic NASA F-16 verification corpus
+
+The separately owned, versioned
+[`governance/nasa-generic-f16-verification-corpus.v1.json`](../governance/nasa-generic-f16-verification-corpus.v1.json)
+records one non-catalog verification corpus with the exact subject
+`NASA_NESC_GENERIC_F16_REFERENCE` and intended use
+`ENGINE_VERIFICATION_ONLY`. The published aircraft evidence registry v2 is not
+extended or reinterpreted by this corpus. The corpus is not a fourth
+named-aircraft subject and has `runtimeAuthority: NONE`; it cannot be selected
+as a PAF F-16, relabelled as a Su-30-family aircraft, or used to admit named
+performance.
+
+The immutable evidence identities for the first #135 slice are:
+
+| Role | Artifact | SHA-256 | Licence decision |
+| --- | --- | --- | --- |
+| source report | NASA TP-1538 / NTRS 19800005879 | `aae0ece64474291368c0b4c816d3ab327c6100329e6eb030c2f4545d0913feb3` | NASA NTRS `GOV_PUBLIC_USE_PERMITTED` |
+| source report | NASA/TM-2003-212145 / NTRS 20030013626 | `df7eb1a40f18c5d025de7759c4c227a36c283b8522f89dd9bed5c7d6b6aaedc9` | NASA NTRS `PUBLIC_USE_PERMITTED` |
+| common-model reference | NASA NESC F-16 package | `20c60f615ae8e87d81c9d98b54fff45a2832840201499cbcfe3f45a60ef3e5b2` | new derivative requires explicit licence and ancestry review |
+| common-model comparison | NESC Atmospheric Case 13.2 archive | `b26a2f9eb4c537ea96bf73493004ae77d37b38d496b32e6d50e00b4ec9482fb1` | new derivative requires explicit licence and ancestry review |
+
+TP-1538 publishes numeric aerodynamic tables in Table III (PDF pages 51–85,
+report pages 45–79) and mass/dimensional data in Table I (PDF/report pages
+49/43). TM-2003-212145 publishes the simulated mass properties in Table 1
+(PDF/report pages 48/33), but directs the actual aerodynamic and propulsion
+table values to external MATLAB package files. The NESC package fills those
+gaps only through a lineage that includes a Morelli copyright notice and
+Stevens and Lewis book-derived propulsion and inertia material. Its
+package-wide derivative redistribution authority for a new corpus is not
+established.
+
+Registry v2 already records the reviewed
+`vector-nesc-case11-derived-fixture`, a narrow SI-normalized descendant of the
+NESC model and Case 11 comparison output. The standalone corpus preserves that
+legacy fact and its exact digest. It does not claim that all derivatives are
+forbidden; it requires a new, explicit licence and ancestry review before any
+additional descendant is committed or promoted.
+
+The standalone verifier treats the three published Case 11 registry records as
+one immutable projection: the DAVE-ML source, Sim 04 comparison and committed
+descendant must retain their complete IDs, digests, locations, authorities,
+kinds, review states, admission uses, capability coverage, scopes and descendant
+ancestry. Broad registry-schema validity is not sufficient. The standalone
+DAVE-ML record is also cross-bound to the registry source by ID, authority, URI,
+SHA-256 and capability set. Its reviewed `ENGINE_VERIFICATION_ONLY` use and
+new-derivative restriction remain stricter standalone decisions; registry
+`REFERENCE_ONLY` never grants permission to create another derivative. The
+registry v2 file itself remains byte-identical.
+
+Consequently the normalized derivative is deliberately `WITHHELD`: there are
+no committed Case 13.2 coefficient, propulsion, inertia, control or trajectory
+tables and no production evaluator. The NESC trajectories remain a comparison
+between implementations of a common model, not independent physical
+validation. `npm run policy:nasa-generic-f16:verify` checks the exact identities,
+roles, licence decisions, subject, intended use, page ancestry and withheld
+state without accessing the network. Passing `-- --artifact-dir <directory>`
+also hashes locally retained source bytes offline; expected filenames are
+`19800005879.pdf`, `20030013626.pdf`, `F16_package.zip`, and
+`Atmos_13p2_SubsonicAirspeedChangeF16.zip`.
+
+Research-candidate table validation is not allowed to trust a caller-supplied
+corpus by shape or artifact ID alone. `validateResearchDerivative` requires the
+published aircraft registry and re-runs the full standalone-corpus validation,
+including the complete three-record Case 11 projection and local descendant
+digest, before it evaluates derivative ancestry or table content. A changed
+corpus subject, authority, admission state, artifact identity, licence, role,
+page capability or output—or a semantically valid but different registry
+record—therefore fails before a restricted DAVE-ML artifact can masquerade as a
+permitted NTRS report.
