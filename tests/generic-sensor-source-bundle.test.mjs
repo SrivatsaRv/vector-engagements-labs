@@ -46,10 +46,25 @@ function assertHostedRendererProvisioning(workflow, installer, dockerfile, wrapp
   assert.match(installer, /https:\/\/poppler\.freedesktop\.org\/poppler-\$\{poppler_version\}\.tar\.xz/u);
   assert.match(installer, /sha256sum --check --strict/u);
   assert.match(installer, /pdftoppm" -v/u);
+  assert.match(
+    installer,
+    /s\|@@GITHUB_WORKSPACE@@\|\$\{GITHUB_WORKSPACE\}\|g/u,
+    "every workspace placeholder in the generated wrapper must be replaced",
+  );
   assert.match(dockerfile, /^FROM @@UBUNTU_IMAGE@@/u);
   assert.match(dockerfile, /@@POPPLER_SHA256@@/u);
   assert.match(dockerfile, /cmake --build \/tmp\/poppler\/build --target pdftoppm --parallel 2/u);
+  assert.doesNotMatch(
+    dockerfile,
+    /ENTRYPOINT \["\/tmp\//u,
+    "the renderer executable cannot live below /tmp because the wrapper bind-mounts that path",
+  );
+  assert.match(dockerfile, /cp \/tmp\/poppler\/build\/utils\/pdftoppm \/opt\/poppler\/bin\/pdftoppm/u);
+  assert.match(dockerfile, /cp -a \/tmp\/poppler\/build\/libpoppler\.so\* \/opt\/poppler\/lib\//u);
+  assert.match(dockerfile, /ENV LD_LIBRARY_PATH=\/opt\/poppler\/lib/u);
+  assert.match(dockerfile, /ENTRYPOINT \["\/opt\/poppler\/bin\/pdftoppm"\]/u);
   assert.match(wrapper, /docker run --rm --network none/u);
+  assert.match(wrapper, /--volume "\/tmp:\/tmp"/u);
   assert.equal((workflow.match(/Restore the content-keyed renderer image/gu) ?? []).length, 3);
 }
 
@@ -723,6 +738,42 @@ test("hosted jobs provision the exact renderer before entering the offline gate"
   assert.throws(
     () => assertHostedRendererProvisioning(workflow.replace("actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830", "actions/cache@main"), installer, dockerfile, wrapper),
     /actions\/cache/,
+  );
+  assert.throws(
+    () => assertHostedRendererProvisioning(
+      workflow,
+      installer,
+      dockerfile.replace(
+        'ENTRYPOINT ["/opt/poppler/bin/pdftoppm"]',
+        'ENTRYPOINT ["/tmp/poppler/build/utils/pdftoppm"]',
+      ),
+      wrapper,
+    ),
+    /renderer executable cannot live below \/tmp/,
+  );
+  assert.throws(
+    () => assertHostedRendererProvisioning(
+      workflow,
+      installer,
+      dockerfile.replace(
+        "cp /tmp/poppler/build/utils/pdftoppm /opt/poppler/bin/pdftoppm",
+        "cp /tmp/poppler/build/utils/pdftoppm /opt/poppler/bin/unbound-renderer",
+      ),
+      wrapper,
+    ),
+    /cp \/tmp\/poppler\/build\/utils\/pdftoppm/,
+  );
+  assert.throws(
+    () => assertHostedRendererProvisioning(
+      workflow,
+      installer.replace(
+        's|@@GITHUB_WORKSPACE@@|${GITHUB_WORKSPACE}|g',
+        's|@@GITHUB_WORKSPACE@@|${GITHUB_WORKSPACE}|',
+      ),
+      dockerfile,
+      wrapper,
+    ),
+    /every workspace placeholder/,
   );
 });
 

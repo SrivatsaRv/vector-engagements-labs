@@ -45,7 +45,7 @@ fi
 
 sed \
   -e "s|@@IMAGE_TAG@@|${image_tag}|" \
-  -e "s|@@GITHUB_WORKSPACE@@|${GITHUB_WORKSPACE}|" \
+  -e "s|@@GITHUB_WORKSPACE@@|${GITHUB_WORKSPACE}|g" \
   "${GITHUB_WORKSPACE}/scripts/pinned-pdftoppm-wrapper.sh.in" > "${bin_dir}/pdftoppm"
 chmod 0755 "${bin_dir}/pdftoppm"
 "${bin_dir}/pdftoppm" -v 2>&1 | grep -F "pdftoppm version ${poppler_version}"

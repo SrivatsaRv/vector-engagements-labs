@@ -48,6 +48,11 @@ instead of compiling twice. The cold x86-emulated reproduction completed in
 6m31s; the setup job has a 15-minute budget while the existing 20-minute
 quality/integration budgets remain unchanged. The verifier container has no
 network and every Linux render must match its committed profile byte-for-byte.
+The built executable and its Poppler shared library live under `/opt/poppler`;
+they cannot be placed below `/tmp`, because the network-denied wrapper mounts
+the host temporary tree there for exact input and output paths. Bootstrap also
+expands every workspace placeholder before the wrapper's version probe, so no
+literal template token can survive into a hosted mount target.
 
 Testing is part of the implementation contract. An executable action is incomplete until its behavior is covered at the appropriate test layers and the result is recorded. The project uses focused tests for fast feedback and staged integration evidence for release confidence.
 
