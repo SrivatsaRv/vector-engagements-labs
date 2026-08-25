@@ -446,6 +446,12 @@ reference, or map anchor.
   cross-environment, incomplete or out-of-coverage runway evidence blocks
   compilation at a stable field path. Manual drag clears the base/runway
   identity and remains an explicitly airborne placement.
+- Ground-start wind admission samples the exact regional atmosphere grid at the
+  selected runway threshold and readiness/start model time. The sampler's
+  sourced east/north wind plus the authored weather modifiers is projected onto
+  the runway true heading and compared with the immutable aircraft ground
+  envelope. Modifier-only wind is never used as a substitute; missing coverage,
+  no-data or invalid time rejects the start at the same admission boundary.
 - The browser labels the bounded set as “bases available in this environment
   pack.” Only installations with complete public-educational runway
   geometry/elevation evidence enter origin pickers. Other catalog points remain

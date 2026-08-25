@@ -169,13 +169,21 @@ runway threshold is compared with the sampled DEM. The higher elevation plus
 0.01 m is used only when disagreement is at most 30 m; this reconciliation is
 declared as `MODEL_ASSUMPTION`, and a larger conflict fails admission.
 
-Forward migration `014_environment_pack_runways.sql` adds immutable PostGIS
-environment-pack rows and sourced runway geometry. Seed and catalog admission
-verify pack, terrain, atmosphere, installation-catalogue and per-runway content
-digests. It also replaces the v4 scenario cards and Air-mission validity limits
+Forward migration `014_environment_pack_runways.sql` creates the PostGIS
+environment-pack and sourced-runway schema and installs the canonical 21
+installation prerequisites, 24 governed runway rows, and 12 exact regional
+EnvironmentPacks itself. Production migration therefore does not depend on the
+development seed command. `db:environment-upgrade:verify` runs immediately
+after migration and before seed to compare every installed pack payload and
+identity plus every runway content digest with the runtime-admitted catalogs.
+Seed remains idempotent. Catalog admission verifies pack, terrain, atmosphere,
+installation-catalogue and per-runway content digests. The migration also
+replaces the v4 scenario cards and Air-mission validity limits
 with exact sourced EnvironmentPack wording and canonical content hashes;
 `environment:migration:verify` rejects generated SQL drift. A content change is
-a new version; a trigger prohibits mutating archived pack content. VSR embeds
+a new version; a trigger prohibits mutation of every archived pack column
+except the explicit `superseded_at` lifecycle marker, and the live database
+gate exercises a mutation matrix covering every protected column. VSR embeds
 the full admitted pack, so a deleted or superseded current catalogue cannot
 alter replay. API, map, 3D and report show the same pack digest, time and datum.
 

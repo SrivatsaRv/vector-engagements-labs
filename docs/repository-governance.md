@@ -420,6 +420,13 @@ Scenario-authored minima, surface/tailwind values, or self-labelled evidence
 states are rejected; no installation or production claim may treat the ground
 performance envelope as validated platform data.
 
+`STUB-25` separately owns #61's visible runway/DEM elevation reconciliation.
+The regional pack uses the higher surface plus 0.01 m only inside its declared
+30 m disagreement envelope and rejects larger conflicts. It remains
+release-blocking until datum-compatible, cell-specific runway elevation
+evidence replaces that bounded public-educational assumption; it does not
+broaden `STUB-24` or turn the ground-performance envelope into sourced data.
+
 Browser/responsive checks and performance benchmarks are deliberately not run
 on GitHub-hosted pull-request runners. They remain explicit maintainer checks
 through `make integration-local` and `make performance-local`, where the

@@ -7,7 +7,7 @@ import {
   WEAPONS,
   catalogReviewState,
 } from "../lib/capability-data.ts";
-import { INSTALLATION_CATALOGUE, PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
+import { INSTALLATION_CATALOGUE, INSTALLATION_DATABASE_SOURCES, PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import { admitEnvironmentPack, type RegionalEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
 import { sha256Identity } from "../lib/geospatial/digest.ts";
 import { OBJECT_CATALOG } from "../lib/object-catalog.ts";
@@ -90,8 +90,7 @@ try {
       ON CONFLICT (id,version) DO NOTHING`;
     for (const source of [
       ...SOURCES,
-      { id: "iaf-stations-wikipedia", title: "List of Indian Air Force stations", publisher: "Wikipedia contributors", url: "https://en.wikipedia.org/wiki/List_of_Indian_Air_Force_stations", sourceClass: "SECONDARY" as const, note: "Public-reference coordinates; individual entries require source review." },
-      { id: "shield-paf-orbat-2026-05-19", title: "SHIELD Pakistan Air Force ORBAT seed", publisher: "Reach Defence SHIELD", url: "urn:shield:data:paf_orbat.json", sourceClass: "USER" as const, note: "Operator-supplied, public-reference PAF installation coordinates and attributes compiled from the source-intelligence statement embedded in paf_orbat.json; validated 2026-05-19." },
+      ...INSTALLATION_DATABASE_SOURCES,
     ]) {
       await tx`INSERT INTO sources (id,title,publisher,url,published_at,source_class,notes)
         VALUES (${source.id},${source.title},${source.publisher},${source.url},${"publishedAt" in source ? source.publishedAt ?? null : null},${source.sourceClass},${source.note})

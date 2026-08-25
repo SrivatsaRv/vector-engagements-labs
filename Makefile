@@ -39,6 +39,7 @@ integration-local: compose-up
 integration-ci:
 	npm run db:migrate
 	npm run db:governed-data:verify
+	npm run db:environment-upgrade:verify
 	npm run db:seed
 	npm run db:verify
 	VECTOR_DB_FIXTURE_MODE=aircraft-evidence-v1-upgrade npm run db:aircraft-upgrade:verify

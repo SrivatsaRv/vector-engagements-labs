@@ -5,10 +5,10 @@ import {
   INSTALLATION_CATALOGUE_IDENTITY,
   PUBLIC_INSTALLATIONS,
 } from "./installations.ts";
-import { isPointInsideStudyArea } from "./scenario-spatial.ts";
+import { geographicToEnginePosition, isPointInsideStudyArea } from "./scenario-spatial.ts";
 import { getStudyArea } from "./study-areas.ts";
 import type { Scenario } from "./simulation.ts";
-import type { EnvironmentPack } from "./geospatial/environment-pack.ts";
+import { createEnvironmentSampler, type EnvironmentPack } from "./geospatial/environment-pack.ts";
 import {
   ModelPackValidationError,
   validateScenarioModelInstance,
@@ -1009,10 +1009,27 @@ export function compileAirMissionDefinition(
     const groundEnvelope = resolveAircraftConfiguration({ pack: context.modelPack, aircraftId: assignment.aircraftId, weaponId: store.weaponId, quantity: store.quantity, stationId: store.stationId, compatibilityRuleId: store.compatibilityRuleId }).groundEnvelope;
     if (runway.lengthM < groundEnvelope.minimumRunwayLengthM) fail("MISSION_RUNWAY_INVALID", "start.runway.lengthM", "Runway is shorter than the assigned aircraft ground envelope.", "Choose a longer runway or a different admitted aircraft configuration.");
     if (!groundEnvelope.compatibleSurfaces.includes(runway.surface)) fail("MISSION_RUNWAY_INVALID", "start.runway.surface", "Runway surface is incompatible with the assigned aircraft ground envelope.", "Choose a compatible surface.");
-    const headingRad = heading * Math.PI / 180;
-    const tailwindMps = context.scenario.wind * Math.sin(headingRad) + context.scenario.windNorth * Math.cos(headingRad);
-    if (tailwindMps > groundEnvelope.maximumTailwindMps) fail("MISSION_RUNWAY_INVALID", "start.runway.headingDeg", "Tailwind exceeds the assigned aircraft ground envelope.", "Reverse takeoff direction, select another runway, or change admitted weather.");
     if (!Number.isFinite(groundStart.readinessDelaySeconds) || groundStart.readinessDelaySeconds < 0) fail("MISSION_RUNWAY_INVALID", "start.readinessDelaySeconds", "Readiness delay must be finite and non-negative.", "Provide seconds from model start.");
+    const runwayEnginePosition = geographicToEnginePosition({
+      longitude: runway.threshold.longitude,
+      latitude: runway.threshold.latitude,
+      altitudeM: runway.threshold.elevation.valueM,
+      verticalDatum: "MSL",
+    }, area);
+    let effectiveWind: { x: number; y: number };
+    try {
+      effectiveWind = createEnvironmentSampler(context.environmentPack!).sample({
+        eastM: runwayEnginePosition.x,
+        northM: runwayEnginePosition.y,
+        upM: runway.threshold.elevation.valueM,
+        modelTimeSeconds: groundStart.readinessDelaySeconds,
+      }).windEnuMps;
+    } catch {
+      fail("MISSION_RUNWAY_INVALID", "start.runway.headingDeg", "The admitted environment has no valid wind sample at the runway threshold and mission start time.", "Select a runway and start time inside the exact EnvironmentPack coverage and validity interval.");
+    }
+    const headingRad = heading * Math.PI / 180;
+    const tailwindMps = effectiveWind!.x * Math.sin(headingRad) + effectiveWind!.y * Math.cos(headingRad);
+    if (tailwindMps > groundEnvelope.maximumTailwindMps) fail("MISSION_RUNWAY_INVALID", "start.runway.headingDeg", "Tailwind exceeds the assigned aircraft ground envelope.", "Reverse takeoff direction, select another runway, or change admitted weather.");
     if (!admittedRunways!.some((admittedRunway) =>
       sha256HexSync(runway) === sha256HexSync(admittedRunway)
     )) {

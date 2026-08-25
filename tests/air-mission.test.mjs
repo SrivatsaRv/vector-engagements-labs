@@ -502,6 +502,24 @@ test("runway identity, evidence, state, dimensions, surface, heading, and wind f
   );
 });
 
+test("ground-start tailwind combines sourced atmosphere wind with authored modifiers", () => {
+  const scenario = admittedGroundFixture();
+  scenario.wind = 2;
+  scenario.windNorth = 2;
+  const headingRad = scenario.airMission.start.runway.headingDeg * Math.PI / 180;
+  const authoredOnlyTailwind = scenario.wind * Math.sin(headingRad)
+    + scenario.windNorth * Math.cos(headingRad);
+  assert.ok(authoredOnlyTailwind < 5, "the authored modifier alone must remain inside the envelope");
+  assert.throws(
+    () => prepareSimulation(scenario),
+    (error) => error instanceof AirMissionAdmissionError
+      && error.code === "MISSION_RUNWAY_INVALID"
+      && error.fieldPath === "start.runway.headingDeg"
+      && /Tailwind exceeds/u.test(error.message),
+    "the sourced grid plus authored modifier must reject at the runway admission boundary",
+  );
+});
+
 test("compilation is pure and does not accept a decorative UI-only mission object", () => {
   const scenario = fixture();
   const mission = structuredClone(scenario.airMission);

@@ -48,6 +48,10 @@ promotion remain downstream under #154, later #161 stages and #155.
 - Add migration 014 for immutable PostGIS environment packs, sourced runway
   geometry/elevation/provenance, exact catalogue readback, and canonical v4
   scenario-package EnvironmentPack wording/hashes.
+- Make migration 014 self-sufficient for production by installing its governed
+  source/installation prerequisites, 24 runways and 12 regional packs before
+  seed; protect every pack column except `superseded_at` with a live mutation
+  matrix.
 
 The aggregate `db/schema.ts` facade now re-exports domain-owned schema modules;
 table names, columns, constraints, and prior migrations are unchanged.
@@ -148,6 +152,8 @@ Migration `013_air_mission_contract.sql` freezes exact upgraded template JSON
 and hashes; no production seed or fallback default performs the migration.
 - Add exact `vector.installation-origin.v2` runway starts and fail-closed
   runway/DEM reconciliation within a declared 30 m model envelope.
+- Validate ground-start tailwind from the sourced regional atmosphere plus
+  authored modifiers sampled at the runway threshold and readiness time.
 
 Scenario-template table declarations now live in `db/schema/scenarios.ts`
 behind the unchanged aggregate schema export.

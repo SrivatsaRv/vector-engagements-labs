@@ -34,6 +34,7 @@
     "db:credibility:verify": "node scripts/verify-credibility-catalog.mjs",
     "db:seed": "tsx scripts/seed-db.ts",
     "db:verify": "node scripts/verify-db.mjs",
+    "db:environment-upgrade:verify": "node scripts/verify-db.mjs --environment-upgrade-only",
     "db:aircraft-upgrade:verify": "node scripts/verify-aircraft-evidence-db-upgrade.mjs",
     "app:verify": "node scripts/verify-app.mjs",
     "observability:verify": "node scripts/verify-observability.mjs",

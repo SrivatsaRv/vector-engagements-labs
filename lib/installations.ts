@@ -157,6 +157,20 @@ export const INSTALLATION_CATALOGUE: InstallationCatalogue = Object.freeze({
 
 export const INSTALLATION_CATALOGUE_IDENTITY = INSTALLATION_CATALOGUE.identity;
 
+/** Database source prerequisites owned by the governed installation catalogue. */
+export const INSTALLATION_DATABASE_SOURCES = Object.freeze(
+  INSTALLATION_CATALOGUE.sources
+    .filter((source) => INSTALLATION_CATALOGUE.records.some((record) => record.sourceId === source.id))
+    .map((source) => Object.freeze({
+      ...source,
+      publishedAt: null,
+      sourceClass: source.id === "iaf-stations-wikipedia" ? "SECONDARY" as const : "USER" as const,
+      note: source.id === "iaf-stations-wikipedia"
+        ? "Public-reference coordinates; individual entries require source review."
+        : "Operator-supplied, public-reference PAF installation coordinates and attributes; validated 2026-05-19.",
+    })),
+);
+
 /** Compatibility projection for current seed, compiler, and test consumers. */
 export type PublicInstallation = Pick<InstallationCatalogueRecord,
   "id" | "service" | "name" | "icaoCode" | "longitude" | "latitude" |
