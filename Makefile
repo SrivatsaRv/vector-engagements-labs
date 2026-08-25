@@ -73,6 +73,7 @@ generic-sensor-sources-local:
 worker-local:
 	npm run build
 	npm run generic-sensor:sources:verify
+	npm run policy:nasa-f16-store-source:verify
 	npm run runtime:verify
 	npm run worker:verify
 

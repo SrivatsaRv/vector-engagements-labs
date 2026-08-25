@@ -130,6 +130,16 @@ That command now verifies both the legacy v1 fixture and the two v2 anonymous
 research archives through registered generator and input rules, so one clean
 archive check detects drift across the whole model-pack fixture family.
 
+The historical F-16 external-store source gate runs its evidence generator,
+committed quarantine inventory, source-terms/release-owner verification,
+production-isolation scan, and hostile regressions under the shared deny-all
+network preload. An explicitly requested source-directory run additionally
+reproduces all 16 pages with the pinned Poppler and Sharp versions. The normal
+quality gate does not fetch mutable NTRS or policy URLs. Local Worker and
+hosted integration builds rerun the same production-isolation check after the
+built output exists; an absent build directory is not accepted as that final
+evidence.
+
 Governed `EXACT` implementation, test, or generated rules may leave the active
 inventory only through an append-only `ruleRetirements` tombstone. The
 tombstone binds the exact merge-base commit, canonical base-policy digest,

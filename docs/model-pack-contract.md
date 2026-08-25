@@ -337,13 +337,21 @@ SHA-256, exact subject claim, admission eligibility, and declared capability
 coverage. A digest-valid pack cannot substitute C/D, NASA-reference, or
 cross-capability evidence under a familiar ID.
 
+### Historical F-16 external-store source-only boundary
+
 The source-only contract
 `vector.nasa-historical-f16-store-source-manifest.v1` is not a model-pack
-evidence kind. It freezes three historical NASA artifacts and their page/render
-lineage while every human admission decision remains pending. The compiler,
-Rust/WASM loader, Worker, browser, VSR, database, and model-pack fixtures must
-not import its schema, subjects, or values. A matching hash alone cannot promote
-it into `SOURCE` or `VALIDATION` evidence.
+evidence kind. It freezes three historical NASA artifacts and their exact
+page/render lineage in a quarantine. Pinned NASA source terms authorize only
+internal verification use and redistribution of the exact source bytes and
+declared renders. The separate `RELEASE_OWNER_REVIEW` is technical and
+non-legal; it binds all 16 page/report/anchor mappings and records that no
+numeric value or equation was transcribed. Adaptation, execution, model
+admission, numeric/equation transcription and runtime permissions remain
+false. The compiler, Rust/WASM loader, Worker, browser, VSR, database, and
+model-pack fixtures must not import its schema, subjects, values, authority or
+review artifacts. A matching hash alone cannot promote it into `SOURCE` or
+`VALIDATION` evidence.
 
 The manifest also prevents unit and datum laundering. NASA-CR-172354's printed
 `kN·m²`/`lb·in²` values remain legacy force-times-length-squared quantities; a
@@ -352,6 +360,8 @@ future conversion to `kg·m²` must explicitly divide the SI numerator by
 numbers, span stations, semi-span fractions, fuselage stations, and
 forward-hook-relative distances remain distinct. A complete 3D station datum
 and body-frame transform are unavailable.
+
+### Catalog admission enforcement
 
 Catalog admission checks that every aircraft carries this boundary before the
 catalog API returns a validated template. The API exposes the state and reason

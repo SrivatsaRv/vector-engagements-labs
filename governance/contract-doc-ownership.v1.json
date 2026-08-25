@@ -1019,6 +1019,14 @@
             "evidence",
             "verification"
           ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/generate-nasa-f16-store-source-evidence.mjs",
+          "facets": [
+            "evidence",
+            "verification"
+          ]
         }
       ],
       "testRules": [
@@ -1036,6 +1044,33 @@
           "sectionId": "EVIDENCE_F16_HISTORICAL_STORE_FREEZE",
           "path": "docs/aircraft-evidence-registry.md",
           "heading": "## Historical external-store source freeze",
+          "facets": [
+            "evidence",
+            "verification"
+          ]
+        },
+        {
+          "sectionId": "EVIDENCE_F16_HISTORICAL_STORE_CATALOG_BOUNDARY",
+          "path": "docs/catalog-and-sources.md",
+          "heading": "### Historical F-16 external-store source-only quarantine",
+          "facets": [
+            "evidence",
+            "verification"
+          ]
+        },
+        {
+          "sectionId": "EVIDENCE_F16_HISTORICAL_STORE_MODEL_PACK_BOUNDARY",
+          "path": "docs/model-pack-contract.md",
+          "heading": "### Historical F-16 external-store source-only boundary",
+          "facets": [
+            "evidence",
+            "verification"
+          ]
+        },
+        {
+          "sectionId": "EVIDENCE_F16_HISTORICAL_STORE_PHYSICS_BOUNDARY",
+          "path": "docs/physics-model.md",
+          "heading": "### Historical F-16 external-store source-only boundary",
           "facets": [
             "evidence",
             "verification"
@@ -4987,5 +5022,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "3fc4211684e3690880a74d3817cadfc49196f4037cc81ec7b49a0b90e424ee59"
+  "canonicalSha256": "3a0a59228f90f6e2673b27b59b55715e5500b8a7334a175a2edfca065e7a3de5"
 }

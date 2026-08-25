@@ -1,0 +1,597 @@
+{
+  "schemaVersion": "vector.nasa-historical-f16-store-release-owner-visual-review.v1",
+  "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+  "reviewerRole": "RELEASE_OWNER_REVIEW",
+  "reviewedOn": "2026-08-25",
+  "subject": {
+    "manifestId": "nasa-historical-f16-store-source-20260824",
+    "manifestCanonicalDigest": "db4a8cd7fbdff99cc3f4653fe2d380980350afddaeba426051294963052b943a",
+    "intendedUse": "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE",
+    "pageCount": 16
+  },
+  "reviewedPages": [
+    {
+      "artifactId": "nasa-tm-74078",
+      "citationId": "19780003061",
+      "reportNumbers": [
+        "NASA-TM-74078"
+      ],
+      "pageId": "tm74078-figure2-loadings",
+      "pdfPage": 4,
+      "printedPage": "3",
+      "anchor": "Figure 2",
+      "eligibleCategory": "HISTORICAL_LOADING_FIGURE_NONEXHAUSTIVE",
+      "sourceRender": {
+        "path": "renders/tm74078-p004-source.png",
+        "sha256": "797a273e0674be196173e685cb95e21f150e4047709fb77b4a322bf47a2374b1",
+        "byteLength": 86033,
+        "widthPx": 1048,
+        "heightPx": 1356
+      },
+      "displayRender": {
+        "path": "renders/tm74078-p004-display.png",
+        "sha256": "ad27de9fbb29686693d2636d2193ae2b403fac44aa33787ff09a7c64e9c9c451",
+        "byteLength": 69509,
+        "widthPx": 1356,
+        "heightPx": 1048
+      },
+      "eligibleClaimDigest": "3a5a505bd818d930c6200a6e925db215b5e981310163ff20b3afc56a0f14977b",
+      "ineligibleInferenceDigest": "4d7b2a431bd4761c49cdda641dc17717b3eb34f1b64fe89731b1f3e619fcb016",
+      "qualificationDigest": "ab78d115e5e8b2de96f53fef8ae5febf8fb02a034ab5f8013d10a43e24b8eabd",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-tm-74078",
+      "citationId": "19780003061",
+      "reportNumbers": [
+        "NASA-TM-74078"
+      ],
+      "pageId": "tm74078-nine-stations",
+      "pdfPage": 5,
+      "printedPage": "4",
+      "anchor": "External stores paragraph",
+      "eligibleCategory": "HISTORICAL_STATION_COUNT_CONTEXT",
+      "sourceRender": {
+        "path": "renders/tm74078-p005-display.png",
+        "sha256": "62527e076c7e1f2bdf9a8388f2de19893386364815cb9c1f0647dd3bd968e27b",
+        "byteLength": 114992,
+        "widthPx": 1040,
+        "heightPx": 1350
+      },
+      "displayRender": {
+        "path": "renders/tm74078-p005-display.png",
+        "sha256": "62527e076c7e1f2bdf9a8388f2de19893386364815cb9c1f0647dd3bd968e27b",
+        "byteLength": 114992,
+        "widthPx": 1040,
+        "heightPx": 1350
+      },
+      "eligibleClaimDigest": "7d5721331c54c5d54e57fabb9ea5030fd4b2126ae41b82d10cbd0bf71a27d103",
+      "ineligibleInferenceDigest": "91ede4921fc9bdc8fbc4514aa96e23b0873d46d2f29490f3f1eaf4bd92a7bfbc",
+      "qualificationDigest": "1e16e35ee2b129af1adcc2b935d37e2f95620c0e47e807880c13d2f50588f916",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-tm-74078",
+      "citationId": "19780003061",
+      "reportNumbers": [
+        "NASA-TM-74078"
+      ],
+      "pageId": "tm74078-figure4-span-fractions",
+      "pdfPage": 7,
+      "printedPage": "6",
+      "anchor": "Figure 4",
+      "eligibleCategory": "HISTORICAL_NONDIMENSIONAL_SPAN_CONTEXT",
+      "sourceRender": {
+        "path": "renders/tm74078-p007-source.png",
+        "sha256": "be664473efe34ae94903fdb116e9fe302e95066e739dd295c176b589f32cdb9c",
+        "byteLength": 45819,
+        "widthPx": 1040,
+        "heightPx": 1350
+      },
+      "displayRender": {
+        "path": "renders/tm74078-p007-display.png",
+        "sha256": "d8b2d9ba39ae9d589f7f0675db223ffa591454381f1bdaef126a8a8c1e4253c7",
+        "byteLength": 30631,
+        "widthPx": 1350,
+        "heightPx": 1040
+      },
+      "eligibleClaimDigest": "89cb348c469973dcccfac73de59ec6a3233c1938178a9ab1a27a5ad744c0ea6a",
+      "ineligibleInferenceDigest": "6eb83771dd271da130afed6b9a3d78ce0244504cba9105f695f6cd5d6657d24c",
+      "qualificationDigest": "636aea64490fb7bae9646a6305621c05e9c9523119ced4c9b3c2f2ab2979d09f",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-cr-172354",
+      "citationId": "19870000632",
+      "reportNumbers": [
+        "NASA-CR-172354",
+        "NAS 1.26:172354"
+      ],
+      "pageId": "cr172354-station-map",
+      "pdfPage": 6,
+      "printedPage": "2",
+      "anchor": "Configuration paragraph",
+      "eligibleCategory": "HISTORICAL_STATION_MAPPING_CONTEXT",
+      "sourceRender": {
+        "path": "renders/cr172354-p006-display.png",
+        "sha256": "509679436ea1b5323aacf0d2e65ca72cd166d8a7173a45dac305bbccc1b79e02",
+        "byteLength": 46130,
+        "widthPx": 1271,
+        "heightPx": 1619
+      },
+      "displayRender": {
+        "path": "renders/cr172354-p006-display.png",
+        "sha256": "509679436ea1b5323aacf0d2e65ca72cd166d8a7173a45dac305bbccc1b79e02",
+        "byteLength": 46130,
+        "widthPx": 1271,
+        "heightPx": 1619
+      },
+      "eligibleClaimDigest": "597b279f3ef1f8f7e88a72181cfb970bb6113e2fadb399666608f73cef224470",
+      "ineligibleInferenceDigest": "837a1a901e039052043135b3fff1a0d3910bb53658f8d58242d4e21b0c7479ab",
+      "qualificationDigest": "8a1b35172160542c4ab74ce5315962b39c62c5b5b56f9ac9710dae9b84f18b7c",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-cr-172354",
+      "citationId": "19870000632",
+      "reportNumbers": [
+        "NASA-CR-172354",
+        "NAS 1.26:172354"
+      ],
+      "pageId": "cr172354-store-configuration",
+      "pdfPage": 13,
+      "printedPage": "9",
+      "anchor": "Store configuration selection",
+      "eligibleCategory": "CONFIGURATION_BOUNDED_STORE_ARRANGEMENT",
+      "sourceRender": {
+        "path": "renders/cr172354-p013-display.png",
+        "sha256": "dc771bc7d367156c6c1c3ab52f377ed784cc9b3e1c9773301bca699269b97ded",
+        "byteLength": 118259,
+        "widthPx": 1271,
+        "heightPx": 1653
+      },
+      "displayRender": {
+        "path": "renders/cr172354-p013-display.png",
+        "sha256": "dc771bc7d367156c6c1c3ab52f377ed784cc9b3e1c9773301bca699269b97ded",
+        "byteLength": 118259,
+        "widthPx": 1271,
+        "heightPx": 1653
+      },
+      "eligibleClaimDigest": "bfaf1c55693602ab9c94be569fa8a1b21fa89b72a8184763e3c0d243f9636427",
+      "ineligibleInferenceDigest": "9d7d2f9b6069774810472c781d8313b207dd0be87cff4b725f70b116cf2adcf1",
+      "qualificationDigest": "d0604da5c91b6946afe474b31c371c6e9f110f34103f750a65b4a4295c7a4ed5",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-cr-172354",
+      "citationId": "19870000632",
+      "reportNumbers": [
+        "NASA-CR-172354",
+        "NAS 1.26:172354"
+      ],
+      "pageId": "cr172354-table2-qualifications",
+      "pdfPage": 27,
+      "printedPage": "23",
+      "anchor": "Table 2 qualification paragraph",
+      "eligibleCategory": "LEGACY_TABLE_QUALIFICATIONS",
+      "sourceRender": {
+        "path": "renders/cr172354-p027-display.png",
+        "sha256": "6152ac27165b66cdfa0258c01a8f5662a64c3dd5b4930364e7b95340d3fd13b6",
+        "byteLength": 109297,
+        "widthPx": 1271,
+        "heightPx": 1653
+      },
+      "displayRender": {
+        "path": "renders/cr172354-p027-display.png",
+        "sha256": "6152ac27165b66cdfa0258c01a8f5662a64c3dd5b4930364e7b95340d3fd13b6",
+        "byteLength": 109297,
+        "widthPx": 1271,
+        "heightPx": 1653
+      },
+      "eligibleClaimDigest": "cf1472ea3101cc8ecd6311c1f06b42d5ca532d66504b1ebb239cf3b1ba30d1ea",
+      "ineligibleInferenceDigest": "44797e254b2c81c3ff6e90c665aca464295de4a7a6d6ba7403b1ab0e2d012cff",
+      "qualificationDigest": "bc05c45b3994f39beb8d776e6c0d0898223fcde8e047ba05b256617bc33ab19b",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-cr-172354",
+      "citationId": "19870000632",
+      "reportNumbers": [
+        "NASA-CR-172354",
+        "NAS 1.26:172354"
+      ],
+      "pageId": "cr172354-final-pylon-force",
+      "pdfPage": 28,
+      "printedPage": "24",
+      "anchor": "Final assembled pylon weight and aerodynamic representation",
+      "eligibleCategory": "FINAL_PYLON_FORCE_AND_ANALYSIS_QUALIFICATION",
+      "sourceRender": {
+        "path": "renders/cr172354-p028-display.png",
+        "sha256": "42dceb040dcedd7951e26440e20e92617a995db8719baf329b47c03b59a95e2d",
+        "byteLength": 111751,
+        "widthPx": 1271,
+        "heightPx": 1630
+      },
+      "displayRender": {
+        "path": "renders/cr172354-p028-display.png",
+        "sha256": "42dceb040dcedd7951e26440e20e92617a995db8719baf329b47c03b59a95e2d",
+        "byteLength": 111751,
+        "widthPx": 1271,
+        "heightPx": 1630
+      },
+      "eligibleClaimDigest": "2e3824fe8469eafb4fcdf92bf60b53a6daa80676011aebdfba21c63cf27b0ec9",
+      "ineligibleInferenceDigest": "0aaa7f2e38a77cb5b724b6b36efffbd553f805f8aebef19a4d5d03e803fd6d59",
+      "qualificationDigest": "9066082bd1832b8d3fc241fe35abdf6936c11a9ec31771043e4ecfb254522518",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-cr-172354",
+      "citationId": "19870000632",
+      "reportNumbers": [
+        "NASA-CR-172354",
+        "NAS 1.26:172354"
+      ],
+      "pageId": "cr172354-table2-values",
+      "pdfPage": 78,
+      "printedPage": "74",
+      "anchor": "Table 2",
+      "eligibleCategory": "LEGACY_TABLE_LOCATION_AND_UNIT_CONTEXT",
+      "sourceRender": {
+        "path": "renders/cr172354-p078-display.png",
+        "sha256": "02bb41101ead3bb82f5fa67141077f5ee3ff685f402b62a01a103750b4cefdf1",
+        "byteLength": 63588,
+        "widthPx": 1271,
+        "heightPx": 1623
+      },
+      "displayRender": {
+        "path": "renders/cr172354-p078-display.png",
+        "sha256": "02bb41101ead3bb82f5fa67141077f5ee3ff685f402b62a01a103750b4cefdf1",
+        "byteLength": 63588,
+        "widthPx": 1271,
+        "heightPx": 1623
+      },
+      "eligibleClaimDigest": "67fbef5b693585f72910d917c69fb5f94ada6dabdfa32d1681d2ee66102fe766",
+      "ineligibleInferenceDigest": "d871f8ee3cc23dbe71cbd64ae621ea001879f6bb068de7713e40cd8bd38d8c26",
+      "qualificationDigest": "6ea7baef51a8159f05770f425ed4ade22c4bf69c6613fb0ce4f8c0473959fdba",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-cr-172354",
+      "citationId": "19870000632",
+      "reportNumbers": [
+        "NASA-CR-172354",
+        "NAS 1.26:172354"
+      ],
+      "pageId": "cr172354-figure19-side-view",
+      "pdfPage": 123,
+      "printedPage": "119",
+      "anchor": "Figure 19",
+      "eligibleCategory": "TWO_DIMENSIONAL_SOURCE_DIAGRAM_ONLY",
+      "sourceRender": {
+        "path": "renders/cr172354-p123-display.png",
+        "sha256": "56748df18ce1f6309b3d45f6856ab36a838239b0ba71bc5ae54c60c146acc7c1",
+        "byteLength": 62052,
+        "widthPx": 1271,
+        "heightPx": 1636
+      },
+      "displayRender": {
+        "path": "renders/cr172354-p123-display.png",
+        "sha256": "56748df18ce1f6309b3d45f6856ab36a838239b0ba71bc5ae54c60c146acc7c1",
+        "byteLength": 62052,
+        "widthPx": 1271,
+        "heightPx": 1636
+      },
+      "eligibleClaimDigest": "ad1479eb318d3265ea039bcf0b869752995946139856a8f5e5db954853d744bc",
+      "ineligibleInferenceDigest": "545711c2d85128c8c7a6f136569ae02a001bb9d9d062478cab8813b9c1ae03d2",
+      "qualificationDigest": "4e9672ec0aef940ab9c96750443640e281f589e02bfabe60752f708ec9d03cf2",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-tm-87766",
+      "citationId": "19860022096",
+      "reportNumbers": [
+        "NASA-TM-87766",
+        "NAS 1.15:87766"
+      ],
+      "pageId": "tm87766-fsd-configuration",
+      "pdfPage": 4,
+      "printedPage": "2",
+      "anchor": "Test configuration",
+      "eligibleCategory": "CONFIGURATION_IDENTITY",
+      "sourceRender": {
+        "path": "renders/tm87766-p004-display.png",
+        "sha256": "6f13acf801a84dbe1766d69d66c43cf62f182033d0f63faa47613e7b22337da0",
+        "byteLength": 178000,
+        "widthPx": 1269,
+        "heightPx": 1660
+      },
+      "displayRender": {
+        "path": "renders/tm87766-p004-display.png",
+        "sha256": "6f13acf801a84dbe1766d69d66c43cf62f182033d0f63faa47613e7b22337da0",
+        "byteLength": 178000,
+        "widthPx": 1269,
+        "heightPx": 1660
+      },
+      "eligibleClaimDigest": "e2253f79318fc98aa3fc3ac101595b678fde4696a87284418fd916ee16a2e738",
+      "ineligibleInferenceDigest": "7536f5b78fed0fd1a76dd5dd7228d687ba69fe197d95c2c557632ac1cb852ba3",
+      "qualificationDigest": "733b13d90f36cf4f36bc524c2f1e9a0cf18613e4342e720c5f5e03970aba7759",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-tm-87766",
+      "citationId": "19860022096",
+      "reportNumbers": [
+        "NASA-TM-87766",
+        "NAS 1.15:87766"
+      ],
+      "pageId": "tm87766-test-conditions-p5",
+      "pdfPage": 7,
+      "printedPage": "5",
+      "anchor": "Test conditions",
+      "eligibleCategory": "TEST_CONDITION_BOUNDARY",
+      "sourceRender": {
+        "path": "renders/tm87766-p007-display.png",
+        "sha256": "76f17879b975ed4a901e84a45e1ed3169f283418eb31dabbab1eede27b17c2dd",
+        "byteLength": 153756,
+        "widthPx": 1240,
+        "heightPx": 1638
+      },
+      "displayRender": {
+        "path": "renders/tm87766-p007-display.png",
+        "sha256": "76f17879b975ed4a901e84a45e1ed3169f283418eb31dabbab1eede27b17c2dd",
+        "byteLength": 153756,
+        "widthPx": 1240,
+        "heightPx": 1638
+      },
+      "eligibleClaimDigest": "c55e54c9a33dfe0298487cb007df2b523bca5898c8ce630634e8e92083e66611",
+      "ineligibleInferenceDigest": "39424cfb5c0e644ffa96d7223cf9698db6fb60dbbee7749591a19525373967a2",
+      "qualificationDigest": "e31b28581c6ecd63a557e6fb52e4e317943682c25d264929ff41783ffc715562",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-tm-87766",
+      "citationId": "19860022096",
+      "reportNumbers": [
+        "NASA-TM-87766",
+        "NAS 1.15:87766"
+      ],
+      "pageId": "tm87766-test-conditions-p6",
+      "pdfPage": 8,
+      "printedPage": "6",
+      "anchor": "GBU-8 separation flight",
+      "eligibleCategory": "SINGLE_EJECTION_SETUP_CONTEXT",
+      "sourceRender": {
+        "path": "renders/tm87766-p008-display.png",
+        "sha256": "bbe830c2e0ee85d4b765696889e0fd04f3481386141184539c87d40cafeb6950",
+        "byteLength": 151714,
+        "widthPx": 1278,
+        "heightPx": 1668
+      },
+      "displayRender": {
+        "path": "renders/tm87766-p008-display.png",
+        "sha256": "bbe830c2e0ee85d4b765696889e0fd04f3481386141184539c87d40cafeb6950",
+        "byteLength": 151714,
+        "widthPx": 1278,
+        "heightPx": 1668
+      },
+      "eligibleClaimDigest": "06d4060a5574377b28ef05f8f7edd04323d500128f9def6ba9c406b1e0502773",
+      "ineligibleInferenceDigest": "da22333cf8965fb369b81a7ac5c5ba99ea60b55f4988b4715b13f09811f25fee",
+      "qualificationDigest": "5b93bb654dfefaef6c69fe18d2344e78782463d321b462761eee02a7ae17b209",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-tm-87766",
+      "citationId": "19860022096",
+      "reportNumbers": [
+        "NASA-TM-87766",
+        "NAS 1.15:87766"
+      ],
+      "pageId": "tm87766-results-p7",
+      "pdfPage": 9,
+      "printedPage": "7",
+      "anchor": "Initial decoupler pylon",
+      "eligibleCategory": "INITIAL_PYLON_OBSERVATION",
+      "sourceRender": {
+        "path": "renders/tm87766-p009-display.png",
+        "sha256": "070df7beb19bfebdf72e957f7d327ce4b0b3bd52976a33da9eb2ebacd1e36a34",
+        "byteLength": 187186,
+        "widthPx": 1250,
+        "heightPx": 1645
+      },
+      "displayRender": {
+        "path": "renders/tm87766-p009-display.png",
+        "sha256": "070df7beb19bfebdf72e957f7d327ce4b0b3bd52976a33da9eb2ebacd1e36a34",
+        "byteLength": 187186,
+        "widthPx": 1250,
+        "heightPx": 1645
+      },
+      "eligibleClaimDigest": "b895f707bff2c6bf5141c6d2ca48908fc3a51b0e63f368acd9d41e09aeb712cf",
+      "ineligibleInferenceDigest": "af676042bb3b313c40e67ce92f33aac75df56f4db2dc452ed7b19a073cb4180c",
+      "qualificationDigest": "0f0ada757557074b74ff64a9174a7596a61f8e1f4b45432908df2d7233f19b26",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-tm-87766",
+      "citationId": "19860022096",
+      "reportNumbers": [
+        "NASA-TM-87766",
+        "NAS 1.15:87766"
+      ],
+      "pageId": "tm87766-results-p8",
+      "pdfPage": 10,
+      "printedPage": "8",
+      "anchor": "Modified decoupler pylon",
+      "eligibleCategory": "MODIFIED_PYLON_OBSERVATION",
+      "sourceRender": {
+        "path": "renders/tm87766-p010-display.png",
+        "sha256": "3c559a9690802ad13f35d1e2bb18b28b7735bc85ef9c644ace155a634f13d5fb",
+        "byteLength": 189642,
+        "widthPx": 1253,
+        "heightPx": 1647
+      },
+      "displayRender": {
+        "path": "renders/tm87766-p010-display.png",
+        "sha256": "3c559a9690802ad13f35d1e2bb18b28b7735bc85ef9c644ace155a634f13d5fb",
+        "byteLength": 189642,
+        "widthPx": 1253,
+        "heightPx": 1647
+      },
+      "eligibleClaimDigest": "b3ee2e052ee19e933567ff7c481351429beee01032e30e4708f708236c44dacf",
+      "ineligibleInferenceDigest": "eb0e6423e5191a965abd508e50912eece6be04443d895a2136cc756bdd8c5b21",
+      "qualificationDigest": "cd9903f581aa71ee8a0da57e0f50f95cbb58e14511377c3f3b0c785666d53145",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-tm-87766",
+      "citationId": "19860022096",
+      "reportNumbers": [
+        "NASA-TM-87766",
+        "NAS 1.15:87766"
+      ],
+      "pageId": "tm87766-results-p9",
+      "pdfPage": 11,
+      "printedPage": "9",
+      "anchor": "Flight-test envelope and maneuvering flight",
+      "eligibleCategory": "TEST_ENVELOPE_OBSERVATION",
+      "sourceRender": {
+        "path": "renders/tm87766-p011-display.png",
+        "sha256": "0b3bb921a25bb2e132b9631ccb1c553a30e8056d8bc8469859c1e3e293379707",
+        "byteLength": 195655,
+        "widthPx": 1253,
+        "heightPx": 1647
+      },
+      "displayRender": {
+        "path": "renders/tm87766-p011-display.png",
+        "sha256": "0b3bb921a25bb2e132b9631ccb1c553a30e8056d8bc8469859c1e3e293379707",
+        "byteLength": 195655,
+        "widthPx": 1253,
+        "heightPx": 1647
+      },
+      "eligibleClaimDigest": "ec3f5e7682b6049160737faa078e90c31a180a99bea8aa5bc2bbbc65b607792e",
+      "ineligibleInferenceDigest": "8cfe0f6f0eb21072e2b7e8732522044434bc9537ee1bacef257f01911753bbf5",
+      "qualificationDigest": "876dcbe2e84e301fec7888a9a5f404021af33864253785d348d0a23cb33e04b3",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    },
+    {
+      "artifactId": "nasa-tm-87766",
+      "citationId": "19860022096",
+      "reportNumbers": [
+        "NASA-TM-87766",
+        "NAS 1.15:87766"
+      ],
+      "pageId": "tm87766-single-ejection-p10",
+      "pdfPage": 12,
+      "printedPage": "10",
+      "anchor": "Store ejection",
+      "eligibleCategory": "SINGLE_EJECTION_OBSERVATION",
+      "sourceRender": {
+        "path": "renders/tm87766-p012-display.png",
+        "sha256": "d64e130fe486d49b0b3f7998aee25c9338c175588a0de1a096ff5181dc6ae217",
+        "byteLength": 173335,
+        "widthPx": 1246,
+        "heightPx": 1642
+      },
+      "displayRender": {
+        "path": "renders/tm87766-p012-display.png",
+        "sha256": "d64e130fe486d49b0b3f7998aee25c9338c175588a0de1a096ff5181dc6ae217",
+        "byteLength": 173335,
+        "widthPx": 1246,
+        "heightPx": 1642
+      },
+      "eligibleClaimDigest": "da34a1ca358d2f33d329902cbd011d342cc1982b1e6c3630f79f0f42283c2448",
+      "ineligibleInferenceDigest": "d8db3e64261e262a8aa68647fe6bcd4b8a4fd338f1d211d0bc801eb1de53cf68",
+      "qualificationDigest": "00b07bcae417a25828ef6411875a4854e628faf9ebd56e7967c9f3c636ecd5a9",
+      "orientationReadable": true,
+      "legible": true,
+      "unclipped": true,
+      "reportIdentityConsistent": true,
+      "pageMappingConsistent": true,
+      "limitationsAndNonclaimsConsistent": true
+    }
+  ],
+  "findings": {
+    "titleAndReportIdentity": "CONSISTENT",
+    "declaredPageAndAnchorMapping": "CONSISTENT",
+    "orientationLegibilityAndClipping": "CONSISTENT",
+    "eligibleContextCategory": "CONSISTENT_WITH_SOURCE_LOCATION_ONLY_SCOPE",
+    "limitationsAndNonclaims": "CONSISTENT"
+  },
+  "legalApproval": false,
+  "numericOrEquationTranscriptionPerformed": false,
+  "note": "Technical release-owner review of exact full-page render identities only. Source PDF bytes remain authoritative; no value, equation, model parameter, compatibility record, release envelope, or runtime capability was transcribed or admitted."
+}

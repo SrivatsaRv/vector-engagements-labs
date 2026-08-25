@@ -104,11 +104,21 @@ a future mass-inertia conversion must divide the SI numerator by declared
 `g0 = 9.80665 m/s²`. The final assembled-pylon weight is on PDF page 28,
 printed page 24, and remains force.
 
-Reference-use, redistribution, export, and human visual-review decisions are
-still pending. Therefore the PDFs and renders are not committed, no source row
-is admission-eligible, and no aircraft capability changes state. The offline
-verifier can check user-supplied exact bytes and reproduce the page renders; it
-cannot approve them or create model-pack evidence.
+The committed quarantine preserves the three exact PDFs, metadata snapshots,
+18 declared full-page render files, and the exact NASA Public Access Plan used
+as authority evidence. Official NASA source terms plus the digest-pinned NTRS
+facts authorize internal verification use and redistribution of those exact
+bytes and declared renders only. `RELEASE_OWNER_REVIEW` separately records a
+non-legal semantic inspection of all 16 page/report/anchor mappings. It does
+not create legal, adaptation, execution, model, or runtime authority and no
+numeric value or equation was transcribed.
+
+The manifest therefore keeps adaptation, execution, numeric/equation
+transcription, model admission, and runtime permissions false. No source row is
+admission-eligible and no aircraft capability changes state. The deny-all
+offline verifier checks the committed inventory, source terms, release record,
+exact bytes, page counts and render reproduction; it cannot promote the bundle
+into model-pack evidence.
 
 ## Change procedure
 

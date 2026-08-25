@@ -4,7 +4,6 @@
   "version": "1.0.0",
   "intendedUse": "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE",
   "accessDate": "2026-08-24",
-  "canonicalDigest": "ee777c79ec2b2d8a00a152b91a85cfafdedf8db07f94cb6cf2d7524bc574c602",
   "availabilityStates": [
     "REFERENCE_ONLY",
     "UNSUPPORTED",
@@ -12,35 +11,47 @@
     "UNAVAILABLE"
   ],
   "referenceUseDecision": {
-    "value": "PENDING",
-    "reviewer": null,
-    "authorityBasis": null,
-    "decisionDate": null,
-    "scope": null,
-    "evidenceDigest": null
+    "value": "SOURCE_TERMS_AUTHORIZED_INTERNAL_VERIFICATION_ONLY",
+    "authorityKind": "AUTHORITATIVE_SOURCE_TERMS",
+    "authorityRecordId": "nasa-historical-f16-store-source-terms-authority-20260825",
+    "decisionDate": "2026-08-25",
+    "scope": "EXACT_FROZEN_SOURCES_AND_DECLARED_REVIEW_RENDERS_FOR_INTERNAL_ENGINE_VERIFICATION_RESEARCH_ONLY",
+    "evidenceDigest": "03af846a698d6fcb461c5c82f3e2f352882edbffa2f08be2dae9523a672fa7ba",
+    "legalApproval": false
   },
   "redistributionDecision": {
-    "value": "PENDING",
-    "reviewer": null,
-    "authorityBasis": null,
-    "decisionDate": null,
-    "scope": null,
-    "evidenceDigest": null
+    "value": "SOURCE_TERMS_AUTHORIZED_EXACT_BYTES_AND_DECLARED_RENDERS",
+    "authorityKind": "AUTHORITATIVE_SOURCE_TERMS",
+    "authorityRecordId": "nasa-historical-f16-store-source-terms-authority-20260825",
+    "decisionDate": "2026-08-25",
+    "scope": "EXACT_FROZEN_NASA_BYTES_METADATA_POLICY_AND_DECLARED_FULL_PAGE_REVIEW_RENDERS_ONLY",
+    "evidenceDigest": "03af846a698d6fcb461c5c82f3e2f352882edbffa2f08be2dae9523a672fa7ba",
+    "legalApproval": false
   },
   "exportReviewDecision": {
-    "value": "PENDING",
-    "reviewer": null,
-    "authorityBasis": null,
-    "decisionDate": null,
-    "scope": null,
-    "evidenceDigest": null
+    "value": "SOURCE_METADATA_NO_RESTRICTION",
+    "authorityKind": "AUTHORITATIVE_SOURCE_TERMS",
+    "authorityRecordId": "nasa-historical-f16-store-source-terms-authority-20260825",
+    "decisionDate": "2026-08-25",
+    "scope": "EXACT_THREE_DIGEST_PINNED_NTRS_RECORDS_ONLY",
+    "evidenceDigest": "03af846a698d6fcb461c5c82f3e2f352882edbffa2f08be2dae9523a672fa7ba",
+    "legalApproval": false
   },
   "renderRecipe": {
     "renderer": "pdftoppm",
     "rendererVersion": "26.05.0",
     "dpi": 150,
     "format": "PNG",
-    "arguments": ["-f", "<pdfPage>", "-l", "<pdfPage>", "-r", "150", "-png", "-singlefile"],
+    "arguments": [
+      "-f",
+      "<pdfPage>",
+      "-l",
+      "<pdfPage>",
+      "-r",
+      "150",
+      "-png",
+      "-singlefile"
+    ],
     "displayRotation": {
       "tool": "sharp",
       "toolVersion": "0.35.0",
@@ -52,25 +63,60 @@
     }
   },
   "coordinateConcepts": {
-    "aircraftStationNumber": { "sameAs": null, "availability": "REFERENCE_ONLY" },
-    "spanStation": { "sameAs": null, "availability": "REFERENCE_ONLY" },
-    "semiSpanFraction": { "sameAs": null, "availability": "REFERENCE_ONLY" },
-    "fuselageStation": { "sameAs": null, "availability": "REFERENCE_ONLY" },
-    "forwardHookRelativeDistance": { "sameAs": null, "availability": "REFERENCE_ONLY" },
-    "lateralDatum": { "sameAs": null, "availability": "UNAVAILABLE" },
-    "verticalDatum": { "sameAs": null, "availability": "UNAVAILABLE" },
-    "handedness": { "sameAs": null, "availability": "UNAVAILABLE" },
-    "completeBodyFrameTransform": { "sameAs": null, "availability": "UNAVAILABLE" },
-    "completeStationGeometry": { "sameAs": null, "availability": "UNAVAILABLE" }
+    "aircraftStationNumber": {
+      "sameAs": null,
+      "availability": "REFERENCE_ONLY"
+    },
+    "spanStation": {
+      "sameAs": null,
+      "availability": "REFERENCE_ONLY"
+    },
+    "semiSpanFraction": {
+      "sameAs": null,
+      "availability": "REFERENCE_ONLY"
+    },
+    "fuselageStation": {
+      "sameAs": null,
+      "availability": "REFERENCE_ONLY"
+    },
+    "forwardHookRelativeDistance": {
+      "sameAs": null,
+      "availability": "REFERENCE_ONLY"
+    },
+    "lateralDatum": {
+      "sameAs": null,
+      "availability": "UNAVAILABLE"
+    },
+    "verticalDatum": {
+      "sameAs": null,
+      "availability": "UNAVAILABLE"
+    },
+    "handedness": {
+      "sameAs": null,
+      "availability": "UNAVAILABLE"
+    },
+    "completeBodyFrameTransform": {
+      "sameAs": null,
+      "availability": "UNAVAILABLE"
+    },
+    "completeStationGeometry": {
+      "sameAs": null,
+      "availability": "UNAVAILABLE"
+    }
   },
   "artifacts": [
     {
       "id": "nasa-tm-74078",
       "citationId": "19780003061",
-      "reportNumbers": ["NASA-TM-74078"],
+      "reportNumbers": [
+        "NASA-TM-74078"
+      ],
       "title": "F-16 flutter model studies with external wing stores",
       "publicationDate": "1977-10-01",
-      "authors": ["Foughner, J. T., Jr.", "Bensinger, C. T."],
+      "authors": [
+        "Foughner, J. T., Jr.",
+        "Bensinger, C. T."
+      ],
       "subject": "NASA_TM74078_F16_FSD_QUARTER_SCALE_FLUTTER_MODEL",
       "role": "HISTORICAL_LAYOUT_AND_AEROELASTIC_CONTEXT",
       "pdf": {
@@ -79,14 +125,16 @@
         "mediaType": "application/pdf",
         "byteLength": 3611496,
         "sha256": "9daf1a24166a359731b2eb28cf6b7f3eff877de73d964ad4551cc8003ff8da78",
-        "pageCount": 17
+        "pageCount": 17,
+        "repositoryPath": "sources/TM74078.pdf"
       },
       "metadata": {
         "fileName": "19780003061.json",
         "url": "https://ntrs.nasa.gov/api/citations/19780003061",
         "mediaType": "application/json",
         "byteLength": 3351,
-        "sha256": "14293d25ca78af273df30ed1f9891f7acd3f1999bc8af49b33e837662a6423cb"
+        "sha256": "14293d25ca78af273df30ed1f9891f7acd3f1999bc8af49b33e837662a6423cb",
+        "repositoryPath": "sources/19780003061.json"
       },
       "rightsFacts": {
         "distribution": "PUBLIC",
@@ -117,8 +165,28 @@
           "coordinateSemantics": "NONE",
           "sourceOrientationDeg": 270,
           "appliedDisplayRotationDeg": 90,
-          "render": { "sourceWidthPx": 1048, "sourceHeightPx": 1356, "sourceByteLength": 86033, "sourceSha256": "797a273e0674be196173e685cb95e21f150e4047709fb77b4a322bf47a2374b1", "displayWidthPx": 1356, "displayHeightPx": 1048, "displayByteLength": 69509, "displaySha256": "ad27de9fbb29686693d2636d2193ae2b403fac44aa33787ff09a7c64e9c9c451" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page legible after clockwise rotation; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1048,
+            "sourceHeightPx": 1356,
+            "sourceByteLength": 86033,
+            "sourceSha256": "797a273e0674be196173e685cb95e21f150e4047709fb77b4a322bf47a2374b1",
+            "displayWidthPx": 1356,
+            "displayHeightPx": 1048,
+            "displayByteLength": 69509,
+            "displaySha256": "ad27de9fbb29686693d2636d2193ae2b403fac44aa33787ff09a7c64e9c9c451",
+            "displayPath": "renders/tm74078-p004-display.png",
+            "sourcePath": "renders/tm74078-p004-source.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "tm74078-nine-stations",
@@ -133,8 +201,28 @@
           "coordinateSemantics": "AIRCRAFT_STATION_NUMBER_DISTINCT",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1040, "sourceHeightPx": 1350, "sourceByteLength": 114992, "sourceSha256": "62527e076c7e1f2bdf9a8388f2de19893386364815cb9c1f0647dd3bd968e27b", "displayWidthPx": 1040, "displayHeightPx": 1350, "displayByteLength": 114992, "displaySha256": "62527e076c7e1f2bdf9a8388f2de19893386364815cb9c1f0647dd3bd968e27b" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1040,
+            "sourceHeightPx": 1350,
+            "sourceByteLength": 114992,
+            "sourceSha256": "62527e076c7e1f2bdf9a8388f2de19893386364815cb9c1f0647dd3bd968e27b",
+            "displayWidthPx": 1040,
+            "displayHeightPx": 1350,
+            "displayByteLength": 114992,
+            "displaySha256": "62527e076c7e1f2bdf9a8388f2de19893386364815cb9c1f0647dd3bd968e27b",
+            "displayPath": "renders/tm74078-p005-display.png",
+            "sourcePath": "renders/tm74078-p005-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "tm74078-figure4-span-fractions",
@@ -144,23 +232,52 @@
           "eligibleClaim": "Nominal historical wing stations are shown at 0.37, 0.63, 0.83, and 1.00 of semi-span.",
           "ineligibleInference": "Nondimensional fractions are not 3D station vectors.",
           "uncertaintyQualification": "Nominal nondimensional layout only; dimensional datum, handedness, and uncertainty are unavailable.",
-          "literalUnits": ["SEMI_SPAN_FRACTION"],
+          "literalUnits": [
+            "SEMI_SPAN_FRACTION"
+          ],
           "quantitySemantics": "NONDIMENSIONAL_LAYOUT_CONTEXT",
           "coordinateSemantics": "SEMI_SPAN_FRACTION_DISTINCT",
           "sourceOrientationDeg": 270,
           "appliedDisplayRotationDeg": 90,
-          "render": { "sourceWidthPx": 1040, "sourceHeightPx": 1350, "sourceByteLength": 45819, "sourceSha256": "be664473efe34ae94903fdb116e9fe302e95066e739dd295c176b589f32cdb9c", "displayWidthPx": 1350, "displayHeightPx": 1040, "displayByteLength": 30631, "displaySha256": "d8b2d9ba39ae9d589f7f0675db223ffa591454381f1bdaef126a8a8c1e4253c7" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page legible after clockwise rotation; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1040,
+            "sourceHeightPx": 1350,
+            "sourceByteLength": 45819,
+            "sourceSha256": "be664473efe34ae94903fdb116e9fe302e95066e739dd295c176b589f32cdb9c",
+            "displayWidthPx": 1350,
+            "displayHeightPx": 1040,
+            "displayByteLength": 30631,
+            "displaySha256": "d8b2d9ba39ae9d589f7f0675db223ffa591454381f1bdaef126a8a8c1e4253c7",
+            "displayPath": "renders/tm74078-p007-display.png",
+            "sourcePath": "renders/tm74078-p007-source.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         }
       ]
     },
     {
       "id": "nasa-cr-172354",
       "citationId": "19870000632",
-      "reportNumbers": ["NASA-CR-172354", "NAS 1.26:172354"],
+      "reportNumbers": [
+        "NASA-CR-172354",
+        "NAS 1.26:172354"
+      ],
       "title": "Design and Fabrication of the NASA Decoupler Pylon for the F-16 Aircraft",
       "publicationDate": "1985-01-01",
-      "authors": ["Clayton, J. D.", "Haller, R. L.", "Hassler, J. M., Jr."],
+      "authors": [
+        "Clayton, J. D.",
+        "Haller, R. L.",
+        "Hassler, J. M., Jr."
+      ],
       "subject": "NASA_CR172354_F16_DECOUPLER_PYLON_DESIGN",
       "role": "DESIGN_ANALYSIS_AND_GROUND_TEST_SOURCE",
       "pdf": {
@@ -169,14 +286,16 @@
         "mediaType": "application/pdf",
         "byteLength": 8581738,
         "sha256": "0aa427839db20133fd342f77ed2fa9bbe9907c26360a629c8ce2699921834485",
-        "pageCount": 203
+        "pageCount": 203,
+        "repositoryPath": "sources/CR172354.pdf"
       },
       "metadata": {
         "fileName": "19870000632.json",
         "url": "https://ntrs.nasa.gov/api/citations/19870000632",
         "mediaType": "application/json",
         "byteLength": 4166,
-        "sha256": "c826c0626027eeb3e8ae252ac75b97f49602a903befd4bc4cb86a8578c8e03fe"
+        "sha256": "c826c0626027eeb3e8ae252ac75b97f49602a903befd4bc4cb86a8578c8e03fe",
+        "repositoryPath": "sources/19870000632.json"
       },
       "rightsFacts": {
         "distribution": "PUBLIC",
@@ -207,8 +326,28 @@
           "coordinateSemantics": "AIRCRAFT_STATION_AND_SPAN_STATION_DISTINCT",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1271, "sourceHeightPx": 1619, "sourceByteLength": 46130, "sourceSha256": "509679436ea1b5323aacf0d2e65ca72cd166d8a7173a45dac305bbccc1b79e02", "displayWidthPx": 1271, "displayHeightPx": 1619, "displayByteLength": 46130, "displaySha256": "509679436ea1b5323aacf0d2e65ca72cd166d8a7173a45dac305bbccc1b79e02" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1271,
+            "sourceHeightPx": 1619,
+            "sourceByteLength": 46130,
+            "sourceSha256": "509679436ea1b5323aacf0d2e65ca72cd166d8a7173a45dac305bbccc1b79e02",
+            "displayWidthPx": 1271,
+            "displayHeightPx": 1619,
+            "displayByteLength": 46130,
+            "displaySha256": "509679436ea1b5323aacf0d2e65ca72cd166d8a7173a45dac305bbccc1b79e02",
+            "displayPath": "renders/cr172354-p006-display.png",
+            "sourcePath": "renders/cr172354-p006-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "cr172354-store-configuration",
@@ -223,8 +362,28 @@
           "coordinateSemantics": "SPAN_STATION_DISTINCT",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1271, "sourceHeightPx": 1653, "sourceByteLength": 118259, "sourceSha256": "dc771bc7d367156c6c1c3ab52f377ed784cc9b3e1c9773301bca699269b97ded", "displayWidthPx": 1271, "displayHeightPx": 1653, "displayByteLength": 118259, "displaySha256": "dc771bc7d367156c6c1c3ab52f377ed784cc9b3e1c9773301bca699269b97ded" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1271,
+            "sourceHeightPx": 1653,
+            "sourceByteLength": 118259,
+            "sourceSha256": "dc771bc7d367156c6c1c3ab52f377ed784cc9b3e1c9773301bca699269b97ded",
+            "displayWidthPx": 1271,
+            "displayHeightPx": 1653,
+            "displayByteLength": 118259,
+            "displaySha256": "dc771bc7d367156c6c1c3ab52f377ed784cc9b3e1c9773301bca699269b97ded",
+            "displayPath": "renders/cr172354-p013-display.png",
+            "sourcePath": "renders/cr172354-p013-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "cr172354-table2-qualifications",
@@ -239,8 +398,28 @@
           "coordinateSemantics": "NONE",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1271, "sourceHeightPx": 1653, "sourceByteLength": 109297, "sourceSha256": "6152ac27165b66cdfa0258c01a8f5662a64c3dd5b4930364e7b95340d3fd13b6", "displayWidthPx": 1271, "displayHeightPx": 1653, "displayByteLength": 109297, "displaySha256": "6152ac27165b66cdfa0258c01a8f5662a64c3dd5b4930364e7b95340d3fd13b6" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1271,
+            "sourceHeightPx": 1653,
+            "sourceByteLength": 109297,
+            "sourceSha256": "6152ac27165b66cdfa0258c01a8f5662a64c3dd5b4930364e7b95340d3fd13b6",
+            "displayWidthPx": 1271,
+            "displayHeightPx": 1653,
+            "displayByteLength": 109297,
+            "displaySha256": "6152ac27165b66cdfa0258c01a8f5662a64c3dd5b4930364e7b95340d3fd13b6",
+            "displayPath": "renders/cr172354-p027-display.png",
+            "sourcePath": "renders/cr172354-p027-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "cr172354-final-pylon-force",
@@ -250,13 +429,36 @@
           "eligibleClaim": "The preliminary pylon estimate includes the MAU-12 rack and excludes the alignment device and damper. The separately reported final assembled-pylon force was used in final flutter analysis; no aerodynamic forces were applied to the GBU-8 or 370-gallon tank in that analysis.",
           "ineligibleInference": "The force is not mass, the final component-by-component inclusion scope is not enumerated, and the analysis supplies no store-drag increment.",
           "uncertaintyQualification": "Preliminary included/excluded components are explicit; final-assembly component scope beyond the reported force remains unavailable.",
-          "literalUnits": ["N", "lb"],
+          "literalUnits": [
+            "N",
+            "lb"
+          ],
           "quantitySemantics": "FORCE_WEIGHT_REQUIRES_G0_FOR_FUTURE_MASS_CONVERSION",
           "coordinateSemantics": "NONE",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1271, "sourceHeightPx": 1630, "sourceByteLength": 111751, "sourceSha256": "42dceb040dcedd7951e26440e20e92617a995db8719baf329b47c03b59a95e2d", "displayWidthPx": 1271, "displayHeightPx": 1630, "displayByteLength": 111751, "displaySha256": "42dceb040dcedd7951e26440e20e92617a995db8719baf329b47c03b59a95e2d" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1271,
+            "sourceHeightPx": 1630,
+            "sourceByteLength": 111751,
+            "sourceSha256": "42dceb040dcedd7951e26440e20e92617a995db8719baf329b47c03b59a95e2d",
+            "displayWidthPx": 1271,
+            "displayHeightPx": 1630,
+            "displayByteLength": 111751,
+            "displaySha256": "42dceb040dcedd7951e26440e20e92617a995db8719baf329b47c03b59a95e2d",
+            "displayPath": "renders/cr172354-p028-display.png",
+            "sourcePath": "renders/cr172354-p028-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "cr172354-table2-values",
@@ -266,13 +468,40 @@
           "eligibleClaim": "Table 2 literally prints force weight, CG aft of the forward hook, and inertia about store CG with SI and English labels.",
           "ineligibleInference": "Printed force-times-length-squared numbers cannot be relabeled as mass inertia.",
           "uncertaintyQualification": "Table exclusions and assumptions on PDF page 27/printed page 23 remain mandatory; no installed-aircraft uncertainty is supplied.",
-          "literalUnits": ["kN·m²", "lb·in²", "kN", "lb", "cm", "in."],
+          "literalUnits": [
+            "kN·m²",
+            "lb·in²",
+            "kN",
+            "lb",
+            "cm",
+            "in."
+          ],
           "quantitySemantics": "LEGACY_FORCE_TIMES_LENGTH_SQUARED_REQUIRES_DIVIDE_BY_G0_FOR_FUTURE_KG_M2",
           "coordinateSemantics": "FORWARD_HOOK_RELATIVE_DISTANCE_DISTINCT",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1271, "sourceHeightPx": 1623, "sourceByteLength": 63588, "sourceSha256": "02bb41101ead3bb82f5fa67141077f5ee3ff685f402b62a01a103750b4cefdf1", "displayWidthPx": 1271, "displayHeightPx": 1623, "displayByteLength": 63588, "displaySha256": "02bb41101ead3bb82f5fa67141077f5ee3ff685f402b62a01a103750b4cefdf1" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1271,
+            "sourceHeightPx": 1623,
+            "sourceByteLength": 63588,
+            "sourceSha256": "02bb41101ead3bb82f5fa67141077f5ee3ff685f402b62a01a103750b4cefdf1",
+            "displayWidthPx": 1271,
+            "displayHeightPx": 1623,
+            "displayByteLength": 63588,
+            "displaySha256": "02bb41101ead3bb82f5fa67141077f5ee3ff685f402b62a01a103750b4cefdf1",
+            "displayPath": "renders/cr172354-p078-display.png",
+            "sourcePath": "renders/cr172354-p078-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "cr172354-figure19-side-view",
@@ -282,23 +511,52 @@
           "eligibleClaim": "Figure 19 is a two-dimensional side-view structural representation at span station 120 with fuselage-station and local longitudinal/vertical dimensions.",
           "ineligibleInference": "The figure is not a complete 3D body-frame transform or datum definition.",
           "uncertaintyQualification": "Lateral datum, vertical datum, handedness, body-axis transform, complete station geometry, and positional uncertainty are unavailable.",
-          "literalUnits": ["m", "in"],
+          "literalUnits": [
+            "m",
+            "in"
+          ],
           "quantitySemantics": "TWO_DIMENSIONAL_SOURCE_DIAGRAM",
           "coordinateSemantics": "FUSELAGE_STATION_AND_SPAN_STATION_DISTINCT_BODY_TRANSFORM_UNAVAILABLE",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1271, "sourceHeightPx": 1636, "sourceByteLength": 62052, "sourceSha256": "56748df18ce1f6309b3d45f6856ab36a838239b0ba71bc5ae54c60c146acc7c1", "displayWidthPx": 1271, "displayHeightPx": 1636, "displayByteLength": 62052, "displaySha256": "56748df18ce1f6309b3d45f6856ab36a838239b0ba71bc5ae54c60c146acc7c1" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1271,
+            "sourceHeightPx": 1636,
+            "sourceByteLength": 62052,
+            "sourceSha256": "56748df18ce1f6309b3d45f6856ab36a838239b0ba71bc5ae54c60c146acc7c1",
+            "displayWidthPx": 1271,
+            "displayHeightPx": 1636,
+            "displayByteLength": 62052,
+            "displaySha256": "56748df18ce1f6309b3d45f6856ab36a838239b0ba71bc5ae54c60c146acc7c1",
+            "displayPath": "renders/cr172354-p123-display.png",
+            "sourcePath": "renders/cr172354-p123-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         }
       ]
     },
     {
       "id": "nasa-tm-87766",
       "citationId": "19860022096",
-      "reportNumbers": ["NASA-TM-87766", "NAS 1.15:87766"],
+      "reportNumbers": [
+        "NASA-TM-87766",
+        "NAS 1.15:87766"
+      ],
       "title": "Flight test of passive wing/store flutter suppression",
       "publicationDate": "1986-08-01",
-      "authors": ["Cazier, F. W., Jr.", "Kehoe, M. W."],
+      "authors": [
+        "Cazier, F. W., Jr.",
+        "Kehoe, M. W."
+      ],
       "subject": "NASA_TM87766_FSD_F16A_DECOUPLER_FLIGHT_TEST",
       "role": "CONFIGURATION_BOUNDED_AEROELASTIC_FLIGHT_EVIDENCE",
       "pdf": {
@@ -307,14 +565,16 @@
         "mediaType": "application/pdf",
         "byteLength": 1062241,
         "sha256": "ce85f3664c03f6f1e1d18b57d645d60d93f19df5fbb7bb5cdaf3c8d2fbaab961",
-        "pageCount": 29
+        "pageCount": 29,
+        "repositoryPath": "sources/TM87766.pdf"
       },
       "metadata": {
         "fileName": "19860022096.json",
         "url": "https://ntrs.nasa.gov/api/citations/19860022096",
         "mediaType": "application/json",
         "byteLength": 4002,
-        "sha256": "4274d309f1d150853a16b01a39476e48c846f02beeacd8a9a8f7b33ddd5b9f32"
+        "sha256": "4274d309f1d150853a16b01a39476e48c846f02beeacd8a9a8f7b33ddd5b9f32",
+        "repositoryPath": "sources/19860022096.json"
       },
       "rightsFacts": {
         "distribution": "PUBLIC",
@@ -345,8 +605,28 @@
           "coordinateSemantics": "NONE",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1269, "sourceHeightPx": 1660, "sourceByteLength": 178000, "sourceSha256": "6f13acf801a84dbe1766d69d66c43cf62f182033d0f63faa47613e7b22337da0", "displayWidthPx": 1269, "displayHeightPx": 1660, "displayByteLength": 178000, "displaySha256": "6f13acf801a84dbe1766d69d66c43cf62f182033d0f63faa47613e7b22337da0" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1269,
+            "sourceHeightPx": 1660,
+            "sourceByteLength": 178000,
+            "sourceSha256": "6f13acf801a84dbe1766d69d66c43cf62f182033d0f63faa47613e7b22337da0",
+            "displayWidthPx": 1269,
+            "displayHeightPx": 1660,
+            "displayByteLength": 178000,
+            "displaySha256": "6f13acf801a84dbe1766d69d66c43cf62f182033d0f63faa47613e7b22337da0",
+            "displayPath": "renders/tm87766-p004-display.png",
+            "sourcePath": "renders/tm87766-p004-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "tm87766-test-conditions-p5",
@@ -356,13 +636,37 @@
           "eligibleClaim": "The reported standard, initial, and modified-pylon observations are bounded to the stated flight-test conditions; 4g maneuvers are observations.",
           "ineligibleInference": "No aircraft/store operating envelope is established.",
           "uncertaintyQualification": "Reported test points are observations, not interpolatable or extrapolatable limits.",
-          "literalUnits": ["ft", "Mach", "g-observation"],
+          "literalUnits": [
+            "ft",
+            "Mach",
+            "g-observation"
+          ],
           "quantitySemantics": "TEST_CONDITION_OBSERVATION",
           "coordinateSemantics": "NONE",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1240, "sourceHeightPx": 1638, "sourceByteLength": 153756, "sourceSha256": "76f17879b975ed4a901e84a45e1ed3169f283418eb31dabbab1eede27b17c2dd", "displayWidthPx": 1240, "displayHeightPx": 1638, "displayByteLength": 153756, "displaySha256": "76f17879b975ed4a901e84a45e1ed3169f283418eb31dabbab1eede27b17c2dd" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1240,
+            "sourceHeightPx": 1638,
+            "sourceByteLength": 153756,
+            "sourceSha256": "76f17879b975ed4a901e84a45e1ed3169f283418eb31dabbab1eede27b17c2dd",
+            "displayWidthPx": 1240,
+            "displayHeightPx": 1638,
+            "displayByteLength": 153756,
+            "displaySha256": "76f17879b975ed4a901e84a45e1ed3169f283418eb31dabbab1eede27b17c2dd",
+            "displayPath": "renders/tm87766-p007-display.png",
+            "sourcePath": "renders/tm87766-p007-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "tm87766-test-conditions-p6",
@@ -377,8 +681,28 @@
           "coordinateSemantics": "NONE",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1278, "sourceHeightPx": 1668, "sourceByteLength": 151714, "sourceSha256": "bbe830c2e0ee85d4b765696889e0fd04f3481386141184539c87d40cafeb6950", "displayWidthPx": 1278, "displayHeightPx": 1668, "displayByteLength": 151714, "displaySha256": "bbe830c2e0ee85d4b765696889e0fd04f3481386141184539c87d40cafeb6950" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1278,
+            "sourceHeightPx": 1668,
+            "sourceByteLength": 151714,
+            "sourceSha256": "bbe830c2e0ee85d4b765696889e0fd04f3481386141184539c87d40cafeb6950",
+            "displayWidthPx": 1278,
+            "displayHeightPx": 1668,
+            "displayByteLength": 151714,
+            "displaySha256": "bbe830c2e0ee85d4b765696889e0fd04f3481386141184539c87d40cafeb6950",
+            "displayPath": "renders/tm87766-p008-display.png",
+            "sourcePath": "renders/tm87766-p008-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "tm87766-results-p7",
@@ -388,13 +712,37 @@
           "eligibleClaim": "Reported flutter suppression and 4g behavior remain observations within the tested configuration and conditions.",
           "ineligibleInference": "No universal flutter clearance or maneuver authority is supplied.",
           "uncertaintyQualification": "Reported behavior is bounded to the exact historical test article, stores, pylons, altitudes, and Mach conditions.",
-          "literalUnits": ["ft", "Mach", "g-observation"],
+          "literalUnits": [
+            "ft",
+            "Mach",
+            "g-observation"
+          ],
           "quantitySemantics": "CONFIGURATION_BOUNDED_OBSERVATION",
           "coordinateSemantics": "NONE",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1250, "sourceHeightPx": 1645, "sourceByteLength": 187186, "sourceSha256": "070df7beb19bfebdf72e957f7d327ce4b0b3bd52976a33da9eb2ebacd1e36a34", "displayWidthPx": 1250, "displayHeightPx": 1645, "displayByteLength": 187186, "displaySha256": "070df7beb19bfebdf72e957f7d327ce4b0b3bd52976a33da9eb2ebacd1e36a34" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1250,
+            "sourceHeightPx": 1645,
+            "sourceByteLength": 187186,
+            "sourceSha256": "070df7beb19bfebdf72e957f7d327ce4b0b3bd52976a33da9eb2ebacd1e36a34",
+            "displayWidthPx": 1250,
+            "displayHeightPx": 1645,
+            "displayByteLength": 187186,
+            "displaySha256": "070df7beb19bfebdf72e957f7d327ce4b0b3bd52976a33da9eb2ebacd1e36a34",
+            "displayPath": "renders/tm87766-p009-display.png",
+            "sourcePath": "renders/tm87766-p009-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "tm87766-results-p8",
@@ -404,13 +752,37 @@
           "eligibleClaim": "Reported mode behavior remains an observation for the initial and modified test pylons.",
           "ineligibleInference": "No production structural or control-law authority is supplied.",
           "uncertaintyQualification": "Mode observations are configuration-bounded; no production applicability or uncertainty model is supplied.",
-          "literalUnits": ["ft", "Mach", "Hz"],
+          "literalUnits": [
+            "ft",
+            "Mach",
+            "Hz"
+          ],
           "quantitySemantics": "CONFIGURATION_BOUNDED_OBSERVATION",
           "coordinateSemantics": "NONE",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1253, "sourceHeightPx": 1647, "sourceByteLength": 189642, "sourceSha256": "3c559a9690802ad13f35d1e2bb18b28b7735bc85ef9c644ace155a634f13d5fb", "displayWidthPx": 1253, "displayHeightPx": 1647, "displayByteLength": 189642, "displaySha256": "3c559a9690802ad13f35d1e2bb18b28b7735bc85ef9c644ace155a634f13d5fb" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1253,
+            "sourceHeightPx": 1647,
+            "sourceByteLength": 189642,
+            "sourceSha256": "3c559a9690802ad13f35d1e2bb18b28b7735bc85ef9c644ace155a634f13d5fb",
+            "displayWidthPx": 1253,
+            "displayHeightPx": 1647,
+            "displayByteLength": 189642,
+            "displaySha256": "3c559a9690802ad13f35d1e2bb18b28b7735bc85ef9c644ace155a634f13d5fb",
+            "displayPath": "renders/tm87766-p010-display.png",
+            "sourcePath": "renders/tm87766-p010-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "tm87766-results-p9",
@@ -420,13 +792,37 @@
           "eligibleClaim": "The modified-pylon result is bounded to the tested 10,000-ft and 5,000-ft conditions; the at-least-37-percent statement is a 10,000-ft comparison, and 4g remains observational.",
           "ineligibleInference": "No general flutter, structural, or maneuver envelope is established.",
           "uncertaintyQualification": "The comparator, altitude, configuration, and tested envelope are inseparable qualifications; no extrapolation is permitted.",
-          "literalUnits": ["ft", "percent-observation", "g-observation"],
+          "literalUnits": [
+            "ft",
+            "percent-observation",
+            "g-observation"
+          ],
           "quantitySemantics": "CONFIGURATION_BOUNDED_COMPARISON",
           "coordinateSemantics": "NONE",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1253, "sourceHeightPx": 1647, "sourceByteLength": 195655, "sourceSha256": "0b3bb921a25bb2e132b9631ccb1c553a30e8056d8bc8469859c1e3e293379707", "displayWidthPx": 1253, "displayHeightPx": 1647, "displayByteLength": 195655, "displaySha256": "0b3bb921a25bb2e132b9631ccb1c553a30e8056d8bc8469859c1e3e293379707" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1253,
+            "sourceHeightPx": 1647,
+            "sourceByteLength": 195655,
+            "sourceSha256": "0b3bb921a25bb2e132b9631ccb1c553a30e8056d8bc8469859c1e3e293379707",
+            "displayWidthPx": 1253,
+            "displayHeightPx": 1647,
+            "displayByteLength": 195655,
+            "displaySha256": "0b3bb921a25bb2e132b9631ccb1c553a30e8056d8bc8469859c1e3e293379707",
+            "displayPath": "renders/tm87766-p011-display.png",
+            "sourcePath": "renders/tm87766-p011-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         },
         {
           "id": "tm87766-single-ejection-p10",
@@ -436,13 +832,36 @@
           "eligibleClaim": "One GBU-8 ejection occurred from the loaded right modified decoupler pylon in straight-and-level flight at Mach 0.80 and 7,500 ft, with an unloaded left decoupler pylon and AIM-9J stores on both wingtips; the report describes clean separation and nominal trajectory for that event.",
           "ineligibleInference": "No release envelope, repeated-event statistics, or general compatibility is established.",
           "uncertaintyQualification": "Single asymmetrical event only; no repeated-event dispersion, separation margin, or release-envelope uncertainty is supplied.",
-          "literalUnits": ["ft", "Mach"],
+          "literalUnits": [
+            "ft",
+            "Mach"
+          ],
           "quantitySemantics": "SINGLE_EVENT_OBSERVATION",
           "coordinateSemantics": "NONE",
           "sourceOrientationDeg": 0,
           "appliedDisplayRotationDeg": 0,
-          "render": { "sourceWidthPx": 1246, "sourceHeightPx": 1642, "sourceByteLength": 173335, "sourceSha256": "d64e130fe486d49b0b3f7998aee25c9338c175588a0de1a096ff5181dc6ae217", "displayWidthPx": 1246, "displayHeightPx": 1642, "displayByteLength": 173335, "displaySha256": "d64e130fe486d49b0b3f7998aee25c9338c175588a0de1a096ff5181dc6ae217" },
-          "visualQa": { "status": "PENDING_HUMAN_REVIEW", "reviewer": null, "reviewDate": null, "orientationReadable": null, "legible": null, "unclipped": null, "note": "Agent preflight found the complete source page upright, legible, and unclipped; this is not human admission." }
+          "render": {
+            "sourceWidthPx": 1246,
+            "sourceHeightPx": 1642,
+            "sourceByteLength": 173335,
+            "sourceSha256": "d64e130fe486d49b0b3f7998aee25c9338c175588a0de1a096ff5181dc6ae217",
+            "displayWidthPx": 1246,
+            "displayHeightPx": 1642,
+            "displayByteLength": 173335,
+            "displaySha256": "d64e130fe486d49b0b3f7998aee25c9338c175588a0de1a096ff5181dc6ae217",
+            "displayPath": "renders/tm87766-p012-display.png",
+            "sourcePath": "renders/tm87766-p012-display.png"
+          },
+          "visualQa": {
+            "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+            "reviewerRole": "RELEASE_OWNER_REVIEW",
+            "reviewDate": "2026-08-25",
+            "reviewRecordPath": "release-owner-visual-review.v1.json",
+            "orientationReadable": true,
+            "legible": true,
+            "unclipped": true,
+            "note": "Technical semantic inspection of the exact declared full-page render; no legal approval, numeric transcription, equation transcription, or model admission."
+          }
         }
       ]
     }
@@ -462,5 +881,22 @@
     "No PAF Peace Drive I, Block 52, modern F-16, production F-16, or Su-30 applicability.",
     "No exhaustive station compatibility, loadout, complete 3D geometry, body datum, mass, CG, inertia, drag, release envelope, flutter envelope, or separation safety.",
     "No aerodynamic, propulsion, control-law, 3DOF, weapon, runtime, UI, VSR, database, or named-system capability."
-  ]
+  ],
+  "sourceTermsAuthority": {
+    "path": "source-terms-authority.v1.json",
+    "sha256": "03af846a698d6fcb461c5c82f3e2f352882edbffa2f08be2dae9523a672fa7ba"
+  },
+  "releaseOwnerReview": {
+    "path": "release-owner-visual-review.v1.json",
+    "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+    "reviewedPageCount": 16
+  },
+  "permissions": {
+    "adaptation": false,
+    "execution": false,
+    "modelAdmission": false,
+    "numericOrEquationTranscription": false,
+    "runtime": false
+  },
+  "canonicalDigest": "db4a8cd7fbdff99cc3f4653fe2d380980350afddaeba426051294963052b943a"
 }

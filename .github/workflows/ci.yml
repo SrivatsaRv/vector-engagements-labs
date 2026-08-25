@@ -360,6 +360,7 @@ jobs:
         run: |
           npm run build
           npm run generic-sensor:sources:verify
+          npm run policy:nasa-f16-store-source:verify
       - name: Verify PostGIS, migrations, API, and saved reports
         run: make integration-ci
       - name: Upload application log on failure

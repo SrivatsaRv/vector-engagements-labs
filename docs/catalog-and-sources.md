@@ -136,14 +136,20 @@ WGS84/vertical-datum declaration, coverage limitation, raw-byte checksum, and
 fail-closed parser. They are deliberately point-only and cannot be selected,
 compiled, or replayed as an area environment pack.
 
+### Historical F-16 external-store source-only quarantine
+
 The NASA historical F-16 external-store record in
 `governance/nasa-historical-f16-store-source` is an even narrower source freeze.
-It commits only a content-addressed manifest and instructions. Exact PDF,
-metadata, page-render, and display-rotation identities are recorded, but the
-source bytes are not redistributed while human use/export/redistribution
-decisions remain pending. The verifier performs no download and rejects an
-extra, missing, linked, changed, truncated, swapped, or wrongly rendered local
-artifact.
+It commits a content-addressed quarantine of the three exact PDFs, three NTRS
+metadata snapshots, 18 declared full-page render files, and the exact NASA
+Public Access Plan used by the source-terms record. That official policy and
+the three metadata digests authorize internal verification use and
+redistribution of exact frozen bytes and declared renders only; the record is
+not a repository-created licence or legal approval. A separate non-legal
+`RELEASE_OWNER_REVIEW` binds all 16 page/report/anchor mappings and records no
+numeric or equation transcription. The deny-all verifier performs no download
+and rejects an extra, missing, linked, changed, truncated, swapped, wrongly
+rendered, or authority/review-mismatched artifact.
 
 This record cannot seed `platform_weapon_compatibility`, stations, loadouts,
 model-pack quantities, or catalog assertions. The cited layouts and one
@@ -151,6 +157,10 @@ historical test configuration are not an exhaustive compatibility matrix. The
 single reported GBU-8 ejection is not a release envelope. Current F-16 station
 compatibility and teaching loadouts remain `UNVERIFIED` or
 `MODEL_ASSUMPTION`.
+
+Adaptation, execution, model admission, numeric/equation transcription and
+runtime permissions remain false. The exact-byte redistribution decision
+cannot seed a catalog row or expand any aircraft/store claim.
 
 ## Environment-pack installation coverage
 
