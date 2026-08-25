@@ -69,6 +69,7 @@ generic-sensor-sources-local:
 
 worker-local:
 	npm run build
+	npm run generic-sensor:sources:verify
 	npm run runtime:verify
 	npm run worker:verify
 

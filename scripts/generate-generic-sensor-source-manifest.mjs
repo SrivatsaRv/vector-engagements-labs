@@ -326,13 +326,16 @@ collectArtifact(authorityArtifact);
 const isolationEvidence = {
   schemaVersion: "vector.generic-sensor-verification-production-isolation-evidence.v1",
   subjectManifestId: manifestId,
-  measuredOn: "2026-08-24",
+  measuredOn: "2026-08-25",
   frozenArtifactCount: frozenArtifacts.size,
   frozenArtifactBytes: [...frozenArtifacts.values()].reduce((sum, candidate) => sum + candidate.sizeBytes, 0),
   productionRootsScannedByVerifier: [".next", ".output", "app", "build", "components", "db", "dist", "engine-rust", "fixtures/model-packs", "fixtures/vector-record", "lib", "out", "public", "worker"],
   expectedProductionExposures: 0,
   productionBuildImportPolicy: "FORBIDDEN",
-  regressionCommand: "node --test tests/generic-sensor-source-bundle.test.mjs",
+  networkPolicy: "DENY_ALL_NODE_NETWORK_APIS",
+  regressionCommand: "npm run generic-sensor:sources:verify",
+  productionBuildCommand: "npm run build",
+  postBuildRegressionCommand: "npm run generic-sensor:sources:verify",
   omittedRuntimeLayers: ["BROWSER", "DATABASE", "MIGRATION", "NUMERICAL_PARITY", "PERFORMANCE"],
   omissionReason: "STAGE_0_ADDS_NO_RUNTIME_BEHAVIOR",
 };

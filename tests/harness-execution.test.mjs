@@ -60,6 +60,12 @@ test("the generic sensor generator and verifier are mandatory quality gates", as
   const packageJson = JSON.parse(await readFile("package.json", "utf8"));
   assert.match(packageJson.scripts["generic-sensor:sources:verify"], /generate-generic-sensor-source-manifest\.mjs/);
   assert.match(packageJson.scripts["generic-sensor:sources:verify"], /verify-generic-sensor-source-bundle\.mjs/);
+  assert.match(packageJson.scripts["generic-sensor:sources:verify"], /generic-sensor-network-deny\.cjs/);
+  assert.match(packageJson.scripts["generic-sensor:sources:verify"], /generic-sensor-source-bundle\.test\.mjs/);
+
+  const worker = makefile.split(/^worker-local:/m)[1]?.split(/^frontend-local:/m)[0];
+  assert.ok(worker, "worker-local is not declared");
+  assert.match(worker, /npm run build[\s\S]*npm run generic-sensor:sources:verify/);
 });
 
 test("the clean-clone gate executes the context slice and built Worker verifier", async () => {

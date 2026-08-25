@@ -27,6 +27,14 @@ No pending family-specific entry.
 
 No pending family-specific entry.
 
+#### Generic sensor source freeze
+
+Added an immutable, offline-verifiable Stage-0 bundle for the exact Stone Soup
+v1.9.1 and four NASA generic sensor reference sources. The bundle remains
+outside every production runtime and model-pack boundary; execution,
+adaptation, and redistribution remain blocked pending separately authorized
+human decisions.
+
 #### Simulation physics
 
 No pending family-specific entry.

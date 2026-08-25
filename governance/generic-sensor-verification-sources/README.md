@@ -62,7 +62,10 @@ node --test tests/generic-sensor-source-bundle.test.mjs
 
 The first command is also a mandatory `make ci-quality` gate. It checks that
 generated records are current and then runs the full verifier; neither step
-performs network access. `--write` is reserved for an intentional, reviewed
+can perform network access because the command preloads the tracked deny-all
+Node guard and proves TCP, HTTP, and DNS calls fail. The same command is run
+again after the production application build so bundle exclusion is measured
+against populated output directories. `--write` is reserved for an intentional, reviewed
 regeneration from already frozen local bytes. The verifier pins the complete
 canonical manifest digest, so caller resealing cannot alter any manifest,
 source, artifact, render, claim, or policy field. It hashes every declared

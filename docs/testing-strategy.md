@@ -10,6 +10,11 @@ The verifier is offline and cannot fetch replacement evidence. Numeric transcrip
 
 `npm run generic-sensor:sources:verify` first proves the generated manifest and
 all derived governance records are current, then verifies the offline bundle.
+Every generator, verifier, and focused adversarial test process preloads the
+tracked deny-all Node network guard; the regression first proves that raw TCP,
+HTTP, and DNS calls fail. The same verifier runs again after `npm run build` in
+`worker-local` and hosted integration so `.next` and every other production
+output are present when source-bundle exclusion is measured.
 The verifier pins the complete canonical manifest digest and rejects
 caller-resealed source identities, substituted PDFs, relabelled renders, erased
 claims, and relaxed numeric/equation extraction policy even when every local
@@ -34,6 +39,11 @@ Testing is part of the implementation contract. An executable action is incomple
 Use the smallest complete set for a change. State why any applicable layer was omitted. A passing build is not a passing behavioral test.
 
 ## Existing baseline
+
+The generic sensor Stage-0 generator, deny-network verifier, and adversarial
+suite are mandatory quality checks. `worker-local` and hosted integration rerun
+that same verifier after the production build so production-output quarantine
+is measured rather than inferred from missing build directories.
 
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and
 production-audit checks. It first runs the same contract-documentation impact

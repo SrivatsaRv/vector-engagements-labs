@@ -326,7 +326,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Build application
-        run: npm run build
+        run: |
+          npm run build
+          npm run generic-sensor:sources:verify
       - name: Verify PostGIS, migrations, API, and saved reports
         run: make integration-ci
       - name: Upload application log on failure

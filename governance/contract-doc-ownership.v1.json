@@ -1022,6 +1022,168 @@
       "migrationSections": []
     },
     {
+      "id": "EVIDENCE_GENERIC_SENSOR_SOURCE_FREEZE",
+      "workstream": "verification-release",
+      "implementationRules": [
+        {
+          "kind": "PREFIX",
+          "value": "governance/generic-sensor-verification-sources/",
+          "facets": ["digest", "evidence", "validity", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "governance/generic-sensor-legal-authority-policy.v1.json",
+          "facets": ["admission", "digest", "evidence", "validity"]
+        },
+        {
+          "kind": "PREFIX",
+          "value": "governance/generic-sensor-legal-decision-evidence/",
+          "facets": ["admission", "evidence", "validity"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/generate-generic-sensor-source-manifest.mjs",
+          "facets": ["digest", "evidence", "validity", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/lib/generic-sensor-source-verifier.mjs",
+          "facets": ["admission", "digest", "evidence", "validity", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/lib/generic-sensor-network-deny.cjs",
+          "facets": ["validity", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-generic-sensor-source-bundle.mjs",
+          "facets": ["evidence", "verification"]
+        }
+      ],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/generic-sensor-source-bundle.test.mjs",
+          "facets": ["verification"]
+        }
+      ],
+      "generatedGroups": [
+        {
+          "id": "GENERIC_SENSOR_SOURCE_FREEZE_RECORDS",
+          "toolchainId": "NODE",
+          "outputRules": [
+            {
+              "kind": "EXACT",
+              "value": "governance/generic-sensor-verification-sources/archive-inventory.v1.json",
+              "facets": ["digest", "evidence"]
+            },
+            {
+              "kind": "EXACT",
+              "value": "governance/generic-sensor-verification-sources/legal-authority-registry.v1.json",
+              "facets": ["admission", "digest", "evidence", "validity"]
+            },
+            {
+              "kind": "EXACT",
+              "value": "governance/generic-sensor-verification-sources/legal-decisions.v1.json",
+              "facets": ["admission", "digest", "evidence", "validity"]
+            },
+            {
+              "kind": "EXACT",
+              "value": "governance/generic-sensor-verification-sources/manifest.v1.json",
+              "facets": ["admission", "digest", "evidence", "validity"]
+            },
+            {
+              "kind": "EXACT",
+              "value": "governance/generic-sensor-verification-sources/production-isolation-evidence.v1.json",
+              "facets": ["digest", "evidence", "verification"]
+            },
+            {
+              "kind": "EXACT",
+              "value": "governance/generic-sensor-verification-sources/visual-inspection.v1.json",
+              "facets": ["digest", "evidence", "verification"]
+            }
+          ],
+          "inputRules": [
+            {
+              "kind": "PREFIX",
+              "value": "governance/generic-sensor-verification-sources/extracted/",
+              "facets": ["digest", "evidence"]
+            },
+            {
+              "kind": "PREFIX",
+              "value": "governance/generic-sensor-verification-sources/raw/",
+              "facets": ["digest", "evidence"]
+            },
+            {
+              "kind": "PREFIX",
+              "value": "governance/generic-sensor-verification-sources/renders/",
+              "facets": ["digest", "evidence"]
+            },
+            {
+              "kind": "EXACT",
+              "value": "scripts/lib/generic-sensor-source-verifier.mjs",
+              "facets": ["digest", "verification"]
+            }
+          ],
+          "generatorRules": [
+            {
+              "kind": "EXACT",
+              "value": "scripts/generate-generic-sensor-source-manifest.mjs",
+              "facets": ["digest", "evidence", "validity", "verification"]
+            }
+          ],
+          "freshnessArgv": ["node", "scripts/generate-generic-sensor-source-manifest.mjs"]
+        }
+      ],
+      "owningSections": [
+        {
+          "sectionId": "GENERIC_SENSOR_SOURCE_CATALOG_BOUNDARY",
+          "path": "docs/catalog-and-sources.md",
+          "heading": "## Generic sensor verification source freeze",
+          "facets": ["admission", "digest", "evidence", "validity", "verification"]
+        },
+        {
+          "sectionId": "GENERIC_SENSOR_SOURCE_MODEL_PACK_BOUNDARY",
+          "path": "docs/model-pack-contract.md",
+          "heading": "## Stage-0 generic sensor references are not model-pack evidence",
+          "facets": ["admission", "evidence", "validity"]
+        },
+        {
+          "sectionId": "GENERIC_SENSOR_SOURCE_PHYSICS_BOUNDARY",
+          "path": "docs/physics-model.md",
+          "heading": "## Generic sensor source-only boundary",
+          "facets": ["evidence", "validity"]
+        },
+        {
+          "sectionId": "GENERIC_SENSOR_SOURCE_INFORMATION_BOUNDARY",
+          "path": "docs/rasp-state-machine.md",
+          "heading": "## Stage-0 source-freeze dependency",
+          "facets": ["admission", "validity"]
+        },
+        {
+          "sectionId": "GENERIC_SENSOR_SOURCE_SECURITY_BOUNDARY",
+          "path": "docs/security-boundaries.md",
+          "heading": "## Offline reference-source quarantine",
+          "facets": ["admission", "digest", "evidence", "validity", "verification"]
+        },
+        {
+          "sectionId": "GENERIC_SENSOR_SOURCE_TESTING_BOUNDARY",
+          "path": "docs/testing-strategy.md",
+          "heading": "## Generic sensor Stage-0 source freeze",
+          "facets": ["verification"]
+        }
+      ],
+      "migrationSections": [
+        {
+          "sectionId": "GENERIC_SENSOR_SOURCE_FREEZE_CHANGELOG",
+          "path": "CHANGELOG.md",
+          "heading": "#### Generic sensor source freeze",
+          "facets": ["admission", "digest", "evidence", "validity", "verification"]
+        }
+      ]
+    },
+    {
       "id": "PERSISTENCE_DATABASE_SCHEMA",
       "workstream": "platform-data",
       "implementationRules": [
@@ -4287,11 +4449,13 @@
     "docs/catalog-and-sources.md",
     "docs/cloudflare-architecture.md",
     "docs/container-release.md",
+    "docs/model-pack-contract.md",
     "docs/physics-model.md",
     "docs/rasp-state-machine.md",
     "docs/responsive-ui.md",
     "docs/scenario-builder.md",
     "docs/security-boundaries.md",
+    "docs/testing-strategy.md",
     "drizzle/0000_real_toad_men.sql",
     "drizzle/meta/0000_snapshot.json",
     "drizzle/meta/_journal.json",
@@ -4460,5 +4624,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "9fabcc12b14ec1d4cfa08ecd9a7cad30c96e117d1fb55fc5ec441e13027619d2"
+  "canonicalSha256": "7accb5eb5a8c1ba384d2c6e32ac3ba5bc19dd6dd4e6b0ce9980b9e850b584436"
 }

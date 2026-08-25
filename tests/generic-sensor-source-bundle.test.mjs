@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -302,6 +303,19 @@ test("the committed source freeze verifies exact immutable bytes and remains blo
   }
 });
 
+test("the focused gate denies network APIs before verifying frozen local bytes", () => {
+  const guard = resolve("scripts/lib/generic-sensor-network-deny.cjs");
+  for (const probe of [
+    "require('node:net').connect(9, '127.0.0.1')",
+    "require('node:http').get('http://127.0.0.1:9')",
+    "require('node:dns').lookup('example.invalid', () => {})",
+  ]) {
+    const result = spawnSync(process.execPath, ["--require", guard, "--eval", probe], { encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /NETWORK_ACCESS_DISABLED/);
+  }
+});
+
 test("one-byte mutation, wrong size, wrong report, wrong page, and withdrawn CR-160557 identity fail", () => {
   const pdfPath = "raw/nasa/19800011044.pdf";
   const pdf = readFileSync(resolve(root, pdfPath));
@@ -375,6 +389,20 @@ test("caller resealing cannot rewrite the canonical source, render, claim, or po
   finalizeIsolationOverride(substitutedPdf, pdfOverrides);
   assert.throws(
     () => verifyGenericSensorSourceBundle({ root, manifest: seal(substitutedPdf), artifactOverrides: pdfOverrides }),
+    /pinned canonical manifest/,
+  );
+
+  const communityArtifact = clone(manifest);
+  const communityOverrides = new Map();
+  replaceArtifact(
+    communityArtifact,
+    communityOverrides,
+    "raw/nasa/19660021027.pdf",
+    Buffer.from("DCS and War Thunder community dump substituted for an official source"),
+  );
+  finalizeIsolationOverride(communityArtifact, communityOverrides);
+  assert.throws(
+    () => verifyGenericSensorSourceBundle({ root, manifest: seal(communityArtifact), artifactOverrides: communityOverrides }),
     /pinned canonical manifest/,
   );
 

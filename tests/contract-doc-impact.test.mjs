@@ -2267,6 +2267,7 @@ test("the repository policy maps real simulation identities to their exact owner
   const modelPack = family("MODEL_PACK_COMPILER_RESOLVER");
   const engine = family("ENGINE_ABI_RUNTIME");
   const genericAam = family("GENERIC_AAM_VERIFICATION");
+  const genericSensorSources = family("EVIDENCE_GENERIC_SENSOR_SOURCE_FREEZE");
   const physics = family("SIMULATION_PHYSICS_RUNTIME");
   const vsr = family("RECORD_VSR_PERSISTENCE");
   const geospatial = family("GEOSPATIAL_ENVIRONMENT");
@@ -2310,7 +2311,22 @@ test("the repository policy maps real simulation identities to their exact owner
   assert.deepEqual(ownersOf("db/schema/blog-comments.ts").map((owner) => owner.id), ["PERSISTENCE_DATABASE_SCHEMA", "CONTENT_COMMENTS"]);
   assert.equal(new Set(repositoryPolicy.families.flatMap((owner) => owner.migrationSections)
     .filter((section) => section.path === "CHANGELOG.md")
-    .map((section) => section.heading)).size, 9, "each changelog-owning family must have a distinct section");
+    .map((section) => section.heading)).size, 10, "each changelog-owning family must have a distinct section");
+  assert.deepEqual(
+    ownersOf("scripts/lib/generic-sensor-network-deny.cjs").map((owner) => owner.id),
+    [genericSensorSources.id],
+  );
+  assert.deepEqual(
+    requiredSections(genericSensorSources, "scripts/lib/generic-sensor-network-deny.cjs"),
+    [
+      "GENERIC_SENSOR_SOURCE_CATALOG_BOUNDARY",
+      "GENERIC_SENSOR_SOURCE_INFORMATION_BOUNDARY",
+      "GENERIC_SENSOR_SOURCE_MODEL_PACK_BOUNDARY",
+      "GENERIC_SENSOR_SOURCE_PHYSICS_BOUNDARY",
+      "GENERIC_SENSOR_SOURCE_SECURITY_BOUNDARY",
+      "GENERIC_SENSOR_SOURCE_TESTING_BOUNDARY",
+    ],
+  );
   assert.equal(exactRule(securitySavedRuns, "app/api/blog-comments/route.ts"), undefined);
   assert.deepEqual(exactRule(contentComments, "app/api/blog-comments/route.ts").facets, ["admission", "storage", "validity"]);
   assert.deepEqual(requiredSections(contentComments, "app/api/blog-comments/route.ts"), ["CONTENT_COMMENTS"]);

@@ -6,6 +6,10 @@ Issue #143 freezes NASA-TP-1538, *Simulator study of stall/post-stall characteri
 
 This is source evidence for the later #142 generic-F-16 verification corpus. It is not a catalog aircraft model and cannot be assigned to a scenario or named F-16 variant.
 
+This aerodynamic source family remains distinct from the issue #148 generic
+sensor source freeze; neither artifact may supply evidence or authority to the
+other merely because both are offline verification inputs.
+
 The runtime catalog lives in PostgreSQL/PostGIS and separates:
 
 1. `sources`: publication identity and source class.

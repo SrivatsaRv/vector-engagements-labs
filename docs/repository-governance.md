@@ -101,6 +101,13 @@ its focused component regressions, and the dedicated responsive overlay
 contract section. Adding those exact paths and section is a semantic policy
 change; later edits must update the same owned documentation and evidence.
 
+Offline verification-source families register raw and rendered artifacts as
+generator inputs, derived manifests and inspection records as exact generated
+outputs, and the offline verifier as their freshness authority. This keeps a
+source freeze bound to its catalog, model-pack, physics, information-state,
+security, testing, and family-specific changelog sections without granting the
+source bundle production-runtime ownership.
+
 Governed `EXACT` implementation, test, or generated rules may leave the active
 inventory only through an append-only `ruleRetirements` tombstone. The
 tombstone binds the exact merge-base commit, canonical base-policy digest,
