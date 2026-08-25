@@ -2,9 +2,9 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  createProductionIsolationReport,
   loadAndVerifyGenericMissionPolicyGovernance,
   verifyExternalSourceBundle,
-  verifyProductionIsolation,
 } from "./lib/generic-mission-policy-source-verifier.mjs";
 
 function sourceDirectory(argv) {
@@ -21,12 +21,12 @@ export function verifyGenericMissionPolicySourceCommand(argv = process.argv.slic
   if (!externalSourceDirectory) throw new Error("VECTOR_GENERIC_MISSION_POLICY_SOURCE_DIR or --source-dir must identify exact user-supplied source bytes.");
   const governance = loadAndVerifyGenericMissionPolicyGovernance();
   const sources = verifyExternalSourceBundle(externalSourceDirectory);
-  const productionFilesScanned = verifyProductionIsolation();
+  const productionIsolation = createProductionIsolationReport(resolve("."), governance.manifest, governance.productionEvidence);
   return {
     schemaVersion: governance.manifest.schemaVersion,
     manifestCanonicalDigest: governance.manifest.canonicalDigest,
     ...sources,
-    productionFilesScanned,
+    productionIsolation,
   };
 }
 

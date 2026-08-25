@@ -21,6 +21,12 @@ value-less assumption classes, corrected FAA PDF/printed-page mapping, rejected
 alternate identity, hostile manifest cases and production/runtime-fixture
 isolation. It runs under the deny-all network guard before and after the Worker
 build. A missing external-source directory cannot become a skipped success.
+Isolation scans every production/runtime-fixture file for exact governed-byte
+hashes and SHA-256-confirmed raw or contiguous-base64 rolling fingerprints; a
+marker-free PDF, metadata response, page render or contact sheet still fails.
+The committed record is only a policy template. Each run generates PASS
+evidence bound to exact candidate/runtime heads and content digests for all
+attested inputs and the scanned production tree.
 
 `VECTOR_GENERIC_MISSION_POLICY_SOURCE_DIR=/absolute/path make
 generic-mission-policy-sources-local` is the separate mandatory completion

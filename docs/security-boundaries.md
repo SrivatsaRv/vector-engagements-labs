@@ -128,6 +128,14 @@ Source-freeze validators may recognize the `MODEL_ASSUMPTION` vocabulary only
 through issue-owned ledger exemptions that prove the records remain value-less
 governance assertions and cannot provide runtime or mission-policy authority.
 
+Issue #151's generic mission-policy source policy scans every production and
+runtime-fixture root for exact hashes and SHA-256-confirmed raw or
+contiguous-base64 embedded fingerprints of all governed external PDFs,
+metadata, renders, and contact sheets. Its committed record is a policy
+template; generated PASS output is content-addressed over the exact
+candidate/runtime heads, attested policy inputs, and scanned production tree,
+so neither marker removal nor reuse of an old PASS can authorize promotion.
+
 The hosted integration build reruns the issue #148 deny-network source verifier
 after creating the production output. A build that embeds a Stage-0 source
 marker, an exact frozen artifact, or frozen bytes inside a wrapper fails before

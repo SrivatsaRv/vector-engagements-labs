@@ -16,8 +16,13 @@ const EXPECTED_MANIFEST_DIGEST = "72c6a77c66e70b7c20059a0c1dd0b64ef6a22e43121de8
 const SOURCE_SET_DIGEST = "561f3f0760515aeb059fcc5e8929e63502ab8207f861505a217bbb132a0187f2";
 const SOURCE_TERMS_SHA256 = "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1";
 const RELEASE_REVIEW_SHA256 = "edde94faccbec1458d37facea7af20cd0997e3f2d0c086df911a3ee84fea3c76";
-const PRODUCTION_EVIDENCE_SHA256 = "bfeec03601bf53214b448a31fe25a5c499b0e11938ae1ee856a8ce321a4ae83b";
+const PRODUCTION_EVIDENCE_SHA256 = "f6d67a0976b2b4782faab1ab84b592049161f84501a40fdc59d0cc7e99dde152";
 const RENDER_SET_DIGEST = "6abfb14eac2355a3be6a7836a45a6a1a5740fbfd6c72455f42be4f2cfa31ee04";
+const ROLLING_HASH_BASE = 257;
+const PRODUCTION_POLICY_KEYS = ["schemaVersion", "status", "command", "runtimeReportSchema", "manifestCanonicalDigest", "scannedRoots", "forbiddenMarkers", "binaryScan", "attestedInputs", "runtimeGates"];
+const BINARY_SCAN_KEYS = ["algorithm", "rawWindowLength", "encodings", "forbiddenIdentities"];
+const BINARY_IDENTITY_KEYS = ["id", "kind", "byteLength", "sha256", "fingerprint"];
+const BINARY_FINGERPRINT_KEYS = ["offset", "length", "rawRollingHash32", "rawSha256", "base64RollingHash32", "base64Sha256"];
 
 const ROOT_KEYS = [
   "schemaVersion", "id", "version", "canonicalDigest", "sourceSetDigest", "stage", "intendedUse",
@@ -90,6 +95,38 @@ const FORBIDDEN_MARKERS = [
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+function rollingHash32(bytes) {
+  let hash = 0;
+  for (const byte of bytes) hash = (Math.imul(hash, ROLLING_HASH_BASE) + byte) >>> 0;
+  return hash;
+}
+
+function rollingHashHex(bytes) {
+  return rollingHash32(bytes).toString(16).padStart(8, "0");
+}
+
+export function createBinaryIsolationIdentity(id, bytes, offset, kind = "TEST_FIXTURE") {
+  if (!Buffer.isBuffer(bytes) || !Number.isInteger(offset) || offset < 0 || offset % 3 !== 0) throw new Error("Binary isolation fingerprint offset must be a non-negative three-byte boundary.");
+  const length = 192;
+  if (offset + length > bytes.length) throw new Error("Binary isolation fingerprint exceeds the governed bytes.");
+  const raw = bytes.subarray(offset, offset + length);
+  const encoded = Buffer.from(raw.toString("base64"));
+  return {
+    id,
+    kind,
+    byteLength: bytes.length,
+    sha256: sha256(bytes),
+    fingerprint: {
+      offset,
+      length,
+      rawRollingHash32: rollingHashHex(raw),
+      rawSha256: sha256(raw),
+      base64RollingHash32: rollingHashHex(encoded),
+      base64Sha256: sha256(encoded),
+    },
+  };
 }
 
 function exactKeys(value, expected, label) {
@@ -230,12 +267,38 @@ function verifyReleaseReview(root, manifest) {
   return review;
 }
 
-function verifyProductionEvidence(root, manifest) {
+function verifyProductionEvidence(root, manifest, review) {
   const bytes = governedFile(join(root, manifest.governanceBindings.productionIsolationEvidencePath), "Production-isolation evidence");
   if (sha256(bytes) !== PRODUCTION_EVIDENCE_SHA256) throw new Error("Production-isolation evidence byte identity mismatch.");
   const evidence = JSON.parse(bytes.toString("utf8"));
-  if (evidence.schemaVersion !== "vector.generic-mission-policy-production-isolation-evidence.v1" || evidence.status !== "PASS" || evidence.executedOn !== "2026-08-26" || evidence.command !== "npm run policy:generic-mission-policy-source:verify" || evidence.exactCommitBinding !== "PR_AND_ISSUE_COMPLETION_EVIDENCE_REQUIRED_AFTER_COMMIT" || evidence.manifestCanonicalDigest !== manifest.canonicalDigest) throw new Error("Production-isolation evidence scope or manifest binding mismatch.");
+  exactKeys(evidence, PRODUCTION_POLICY_KEYS, "Production-isolation policy");
+  if (evidence.schemaVersion !== "vector.generic-mission-policy-production-isolation-policy.v2" || evidence.status !== "POLICY_TEMPLATE" || evidence.command !== "npm run policy:generic-mission-policy-source:verify" || evidence.runtimeReportSchema !== "vector.generic-mission-policy-production-isolation-report.v1" || evidence.manifestCanonicalDigest !== manifest.canonicalDigest) throw new Error("Production-isolation policy scope or manifest binding mismatch.");
   if (JSON.stringify(evidence.scannedRoots) !== JSON.stringify(PRODUCTION_ROOTS) || JSON.stringify(evidence.forbiddenMarkers) !== JSON.stringify(FORBIDDEN_MARKERS)) throw new Error("Production-isolation evidence coverage mismatch.");
+  exactKeys(evidence.binaryScan, BINARY_SCAN_KEYS, "Production binary scan");
+  if (evidence.binaryScan.algorithm !== "ROLLING_HASH32_BASE257_SHA256_CONFIRM_V1" || evidence.binaryScan.rawWindowLength !== 192 || JSON.stringify(evidence.binaryScan.encodings) !== JSON.stringify(["RAW", "BASE64_CONTIGUOUS"])) throw new Error("Production binary scan algorithm mismatch.");
+  const identities = evidence.binaryScan.forbiddenIdentities;
+  if (!Array.isArray(identities) || identities.length !== 24) throw new Error("Production binary identity inventory must contain the exact 24 source, metadata, render, and contact-sheet identities.");
+  const expectedDigests = new Set([
+    ...manifest.artifacts.flatMap((artifact) => [artifact.pdf.sha256, artifact.metadata?.sha256].filter(Boolean)),
+    manifest.rejectedAlternates[0].sha256,
+    ...manifest.artifacts.flatMap((artifact) => artifact.pageMaps.map((page) => page.renderSha256)),
+    ...review.contactSheets.map((entry) => entry.sha256),
+  ]);
+  const seenIds = new Set();
+  const seenDigests = new Set();
+  for (const identity of identities) {
+    exactKeys(identity, BINARY_IDENTITY_KEYS, `Production binary identity ${identity?.id ?? "unknown"}`);
+    exactKeys(identity.fingerprint, BINARY_FINGERPRINT_KEYS, `Production binary fingerprint ${identity.id}`);
+    if (!/^[a-z0-9-]+$/u.test(identity.id) || seenIds.has(identity.id)) throw new Error("Production binary identity IDs must be unique and closed.");
+    if (!["SOURCE_PDF", "SOURCE_METADATA", "REJECTED_ALTERNATE_PDF", "PAGE_RENDER", "CONTACT_SHEET"].includes(identity.kind)) throw new Error(`${identity.id} binary identity kind is invalid.`);
+    if (!Number.isInteger(identity.byteLength) || identity.byteLength <= identity.fingerprint.length || !expectedDigests.has(identity.sha256) || seenDigests.has(identity.sha256)) throw new Error(`${identity.id} binary identity is not bound to the governed source/render set.`);
+    if (!Number.isInteger(identity.fingerprint.offset) || identity.fingerprint.offset < 0 || identity.fingerprint.offset % 3 !== 0 || identity.fingerprint.length !== 192 || identity.fingerprint.offset + identity.fingerprint.length > identity.byteLength) throw new Error(`${identity.id} binary fingerprint range is invalid.`);
+    if (!/^[0-9a-f]{8}$/u.test(identity.fingerprint.rawRollingHash32) || !/^[0-9a-f]{8}$/u.test(identity.fingerprint.base64RollingHash32) || !SHA256.test(identity.fingerprint.rawSha256) || !SHA256.test(identity.fingerprint.base64Sha256)) throw new Error(`${identity.id} binary fingerprint digest is invalid.`);
+    seenIds.add(identity.id);
+    seenDigests.add(identity.sha256);
+  }
+  if (seenDigests.size !== expectedDigests.size || [...expectedDigests].some((digest) => !seenDigests.has(digest))) throw new Error("Production binary identities do not exactly cover every governed source, metadata, render, alternate, and contact sheet.");
+  if (!Array.isArray(evidence.attestedInputs) || evidence.attestedInputs.length < 10 || new Set(evidence.attestedInputs).size !== evidence.attestedInputs.length || evidence.attestedInputs.some((path) => typeof path !== "string" || isAbsolute(path) || path.includes(".."))) throw new Error("Production-isolation attested input inventory is invalid.");
   return evidence;
 }
 
@@ -245,7 +308,7 @@ export function loadAndVerifyGenericMissionPolicyGovernance(rootDirectory = reso
   const sourceTerms = verifySourceTerms(root, manifest);
   const review = verifyReleaseReview(root, manifest);
   let productionEvidence = null;
-  if (requireProductionEvidence) productionEvidence = verifyProductionEvidence(root, manifest);
+  if (requireProductionEvidence) productionEvidence = verifyProductionEvidence(root, manifest, review);
   return { manifest, sourceTerms, review, productionEvidence };
 }
 
@@ -268,32 +331,174 @@ function renderPage(pdfPath, page, outputRoot) {
   const result = spawnSync("pdftoppm", ["-f", String(page.pdfPage), "-l", String(page.pdfPage), "-r", "150", "-png", "-singlefile", pdfPath, prefix], { encoding: "utf8" });
   if (result.status !== 0) throw new Error(`pdftoppm failed for ${basename(pdfPath)} page ${page.pdfPage}: ${result.stderr.trim()}`);
   const bytes = governedFile(`${prefix}.png`, `Rendered page ${page.pdfPage}`);
-  if (sha256(bytes) !== page.renderSha256) throw new Error(`Rendered page ${page.pdfPage} digest mismatch for ${basename(pdfPath)}.`);
-  return page.renderSha256;
+  const digest = sha256(bytes);
+  if (digest !== page.renderSha256) throw new Error(`Rendered page ${page.pdfPage} digest mismatch for ${basename(pdfPath)}.`);
+  return { bytes, digest };
+}
+
+export function verifyBinaryIsolationIdentity(bytes, identity) {
+  if (!Buffer.isBuffer(bytes) || bytes.length !== identity.byteLength || sha256(bytes) !== identity.sha256) throw new Error(`${identity.id} binary isolation identity does not match the governed whole bytes.`);
+  const { fingerprint } = identity;
+  const raw = bytes.subarray(fingerprint.offset, fingerprint.offset + fingerprint.length);
+  const encoded = Buffer.from(raw.toString("base64"));
+  if (rollingHashHex(raw) !== fingerprint.rawRollingHash32 || sha256(raw) !== fingerprint.rawSha256 || rollingHashHex(encoded) !== fingerprint.base64RollingHash32 || sha256(encoded) !== fingerprint.base64Sha256) throw new Error(`${identity.id} binary isolation fingerprint does not match the governed bytes.`);
+}
+
+function matchingFingerprint(bytes, length, targets) {
+  if (bytes.length < length || targets.size === 0) return null;
+  let rolling = rollingHash32(bytes.subarray(0, length));
+  let outgoingPower = 1;
+  for (let index = 1; index < length; index += 1) outgoingPower = Math.imul(outgoingPower, ROLLING_HASH_BASE) >>> 0;
+  for (let offset = 0; offset <= bytes.length - length; offset += 1) {
+    const candidates = targets.get(rolling);
+    if (candidates) {
+      const digest = sha256(bytes.subarray(offset, offset + length));
+      const match = candidates.find((candidate) => candidate.sha256 === digest);
+      if (match) return match;
+    }
+    if (offset < bytes.length - length) {
+      rolling = (rolling - Math.imul(bytes[offset], outgoingPower)) >>> 0;
+      rolling = (Math.imul(rolling, ROLLING_HASH_BASE) + bytes[offset + length]) >>> 0;
+    }
+  }
+  return null;
+}
+
+function addFingerprintTarget(targets, hash, target) {
+  const key = Number.parseInt(hash, 16);
+  const existing = targets.get(key) ?? [];
+  existing.push(target);
+  targets.set(key, existing);
+}
+
+function binaryScanPlan(identities) {
+  const plan = { exact: new Map(), raw: new Map(), base64: new Map(), rawLength: 192, base64Length: 256 };
+  for (const identity of identities) {
+    plan.exact.set(identity.sha256, identity);
+    addFingerprintTarget(plan.raw, identity.fingerprint.rawRollingHash32, { id: identity.id, sha256: identity.fingerprint.rawSha256 });
+    addFingerprintTarget(plan.base64, identity.fingerprint.base64RollingHash32, { id: identity.id, sha256: identity.fingerprint.base64Sha256 });
+  }
+  return plan;
+}
+
+function verifyNoGovernedBinary(bytes, plan, repositoryPath) {
+  const wholeDigest = sha256(bytes);
+  const exact = plan.exact.get(wholeDigest);
+  if (exact && bytes.length === exact.byteLength) throw new Error(`governed binary ${exact.id} was copied into ${repositoryPath}.`);
+  const raw = matchingFingerprint(bytes, plan.rawLength, plan.raw);
+  if (raw) throw new Error(`governed binary ${raw.id} raw bytes were embedded in ${repositoryPath}.`);
+  const base64 = matchingFingerprint(bytes, plan.base64Length, plan.base64);
+  if (base64) throw new Error(`governed binary ${base64.id} base64 bytes were embedded in ${repositoryPath}.`);
+}
+
+function productionInventory(repositoryRoot, identities) {
+  const inventory = [];
+  const plan = binaryScanPlan(identities);
+  for (const relativeRoot of PRODUCTION_ROOTS) {
+    const root = resolve(repositoryRoot, relativeRoot);
+    let rootStat;
+    try {
+      rootStat = lstatSync(root);
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        inventory.push({ path: `${relativeRoot}/`, state: "ABSENT" });
+        continue;
+      }
+      throw error;
+    }
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error(`Production isolation root ${relativeRoot} must be a regular non-symlink directory.`);
+    const pending = [root];
+    let filesInRoot = 0;
+    while (pending.length > 0) {
+      const directory = pending.pop();
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const path = join(directory, entry.name);
+        const repositoryPath = relative(repositoryRoot, path);
+        if (entry.isSymbolicLink()) throw new Error(`Production isolation rejects symlink ${repositoryPath}.`);
+        if (entry.isDirectory()) {
+          pending.push(path);
+          continue;
+        }
+        if (!entry.isFile()) throw new Error(`Production isolation rejects non-regular entry ${repositoryPath}.`);
+        const bytes = readFileSync(path);
+        if (FORBIDDEN_MARKERS.some((marker) => bytes.includes(Buffer.from(marker)))) throw new Error(`${relativeRoot.startsWith("fixtures/") ? "Runtime fixture" : "Production"} source-only mission-policy evidence leaked into ${repositoryPath}.`);
+        verifyNoGovernedBinary(bytes, plan, repositoryPath);
+        inventory.push({ path: repositoryPath, byteLength: bytes.length, sha256: sha256(bytes) });
+        filesInRoot += 1;
+      }
+    }
+    if (filesInRoot === 0) inventory.push({ path: `${relativeRoot}/`, state: "EMPTY" });
+  }
+  inventory.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
+  return inventory;
+}
+
+function digestInventory(inventory) {
+  return sha256(Buffer.from(inventory.map((entry) => entry.state ? `${entry.path}\0${entry.state}` : `${entry.path}\0${entry.byteLength}\0${entry.sha256}`).join("\n") + "\n"));
+}
+
+function verifyAttestedInputs(repositoryRoot, paths) {
+  const inventory = paths.map((repositoryPath) => {
+    const bytes = governedFile(resolve(repositoryRoot, repositoryPath), `Attested policy input ${repositoryPath}`);
+    return { path: repositoryPath, byteLength: bytes.length, sha256: sha256(bytes) };
+  }).sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
+  return { count: inventory.length, digest: digestInventory(inventory) };
+}
+
+function gitHead(repositoryRoot) {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot, encoding: "utf8" });
+  const head = result.stdout.trim();
+  if (result.status !== 0 || !/^[0-9a-f]{40}$/u.test(head)) throw new Error("Production-isolation report requires an exact Git runtime HEAD.");
+  return head;
+}
+
+function candidateHead(repositoryRoot, runtimeHead) {
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (!eventPath) return runtimeHead;
+  const event = JSON.parse(governedFile(eventPath, "GitHub event payload").toString("utf8"));
+  if (!event.pull_request) return runtimeHead;
+  const head = event.pull_request?.head?.sha;
+  if (typeof head !== "string" || !/^[0-9a-f]{40}$/u.test(head)) throw new Error("GitHub pull-request event is missing the exact candidate HEAD.");
+  return head;
+}
+
+function trackedChangesPresent(repositoryRoot) {
+  const result = spawnSync("git", ["status", "--porcelain", "--untracked-files=no"], { cwd: repositoryRoot, encoding: "utf8" });
+  if (result.status !== 0) throw new Error("Unable to inspect tracked changes for production-isolation evidence.");
+  return result.stdout.trim().length > 0;
 }
 
 export function verifyExternalSourceBundle(sourceDirectory, governanceRoot = resolve("governance/generic-mission-policy-verification-source")) {
   if (!sourceDirectory) throw new Error("VECTOR_GENERIC_MISSION_POLICY_SOURCE_DIR or --source-dir must identify exact user-supplied source bytes.");
-  const { manifest } = loadAndVerifyGenericMissionPolicyGovernance(governanceRoot);
+  const { manifest, productionEvidence } = loadAndVerifyGenericMissionPolicyGovernance(governanceRoot);
+  const binaryIdentityBySha256 = new Map(productionEvidence.binaryScan.forbiddenIdentities.map((identity) => [identity.sha256, identity]));
   verifyRendererVersion();
   const renderedPages = [];
+  let binaryFingerprintsVerified = 0;
   for (const artifact of manifest.artifacts) {
     const pdf = governedExternalFile(sourceDirectory, artifact.pdf.fileName, `${artifact.id} PDF`);
     verifyExactBytes(pdf.bytes, artifact.pdf, `${artifact.id} PDF`);
+    verifyBinaryIsolationIdentity(pdf.bytes, binaryIdentityBySha256.get(artifact.pdf.sha256));
+    binaryFingerprintsVerified += 1;
     if (createHash("md5").update(pdf.bytes).digest("hex") !== artifact.pdf.md5) throw new Error(`${artifact.id} PDF MD5/ETag mismatch.`);
     if (pdfPageCount(pdf.path) !== artifact.pdf.pageCount) throw new Error(`${artifact.id} PDF page count mismatch.`);
     if (artifact.metadata) {
       const metadata = governedExternalFile(sourceDirectory, artifact.metadata.fileName, `${artifact.id} metadata`);
       verifyExactBytes(metadata.bytes, artifact.metadata, `${artifact.id} metadata`);
+      verifyBinaryIsolationIdentity(metadata.bytes, binaryIdentityBySha256.get(artifact.metadata.sha256));
+      binaryFingerprintsVerified += 1;
       const parsed = JSON.parse(metadata.bytes.toString("utf8"));
       if (parsed.distribution !== artifact.rightsFacts.distribution || parsed.copyright?.determinationType !== artifact.rightsFacts.determinationType || parsed.exportControl?.isExportControl !== artifact.rightsFacts.isExportControl || parsed.exportControl?.ear !== artifact.rightsFacts.ear || parsed.exportControl?.itar !== artifact.rightsFacts.itar) throw new Error(`${artifact.id} metadata rights/export facts mismatch.`);
     }
     const outputRoot = mkdtempSync(join(tmpdir(), "vector-mission-policy-render-"));
     try {
       for (const page of artifact.pageMaps) {
+        const rendered = renderPage(pdf.path, page, outputRoot);
+        verifyBinaryIsolationIdentity(rendered.bytes, binaryIdentityBySha256.get(rendered.digest));
+        binaryFingerprintsVerified += 1;
         renderedPages.push({
           orderKey: `${artifact.id}:${String(page.pdfPage).padStart(3, "0")}`,
-          digest: renderPage(pdf.path, page, outputRoot),
+          digest: rendered.digest,
         });
       }
     } finally {
@@ -303,6 +508,8 @@ export function verifyExternalSourceBundle(sourceDirectory, governanceRoot = res
   const alternate = manifest.rejectedAlternates[0];
   const alternateBytes = governedExternalFile(sourceDirectory, alternate.fileName, "Rejected NASA alternate PDF");
   verifyExactBytes(alternateBytes.bytes, alternate, "Rejected NASA alternate PDF");
+  verifyBinaryIsolationIdentity(alternateBytes.bytes, binaryIdentityBySha256.get(alternate.sha256));
+  binaryFingerprintsVerified += 1;
   if (alternate.sha256 === manifest.artifacts[0].pdf.sha256 || alternate.byteLength === manifest.artifacts[0].pdf.byteLength) throw new Error("Alternate NASA copy was laundered into the admitted identity.");
   const sourceDigest = sha256(Buffer.from([
     manifest.artifacts[0].metadata.sha256,
@@ -315,26 +522,45 @@ export function verifyExternalSourceBundle(sourceDirectory, governanceRoot = res
   const renderDigests = renderedPages.sort((left, right) => left.orderKey < right.orderKey ? -1 : left.orderKey > right.orderKey ? 1 : 0).map(({ digest }) => digest);
   const renderDigest = sha256(Buffer.from(`${renderDigests.join("\n")}\n`));
   if (sourceDigest !== SOURCE_SET_DIGEST || renderDigest !== RENDER_SET_DIGEST) throw new Error("Source-set or render-set digest mismatch.");
-  return { artifactsVerified: 3, metadataSnapshotsVerified: 2, md5DigestsVerified: 3, pagesVerified: renderDigests.length, alternateCopiesRejected: 1, sourceSetDigest: sourceDigest, renderSetDigest: renderDigest };
+  return { artifactsVerified: 3, metadataSnapshotsVerified: 2, md5DigestsVerified: 3, pagesVerified: renderDigests.length, alternateCopiesRejected: 1, binaryFingerprintsVerified, sourceSetDigest: sourceDigest, renderSetDigest: renderDigest };
 }
 
-export function verifyProductionIsolation(repositoryRoot = process.cwd()) {
-  const examined = [];
-  for (const relativeRoot of PRODUCTION_ROOTS) {
-    const root = resolve(repositoryRoot, relativeRoot);
-    try {
-      for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
-        if (!entry.isFile()) continue;
-        const path = join(entry.parentPath, entry.name);
-        examined.push(path);
-        const bytes = readFileSync(path);
-        if (FORBIDDEN_MARKERS.some((marker) => bytes.includes(Buffer.from(marker)))) throw new Error(`${relativeRoot.startsWith("fixtures/") ? "Runtime fixture" : "Production"} source-only mission-policy evidence leaked into ${relative(repositoryRoot, path)}.`);
-      }
-    } catch (error) {
-      if (error?.code !== "ENOENT") throw error;
-    }
-  }
-  return examined.length;
+export function verifyProductionIsolation(repositoryRoot = process.cwd(), identities = []) {
+  if (!Array.isArray(identities)) throw new Error("Production binary identity inventory is required.");
+  const inventory = productionInventory(resolve(repositoryRoot), identities);
+  return {
+    filesScanned: inventory.filter((entry) => entry.sha256).length,
+    rootsScanned: PRODUCTION_ROOTS.length,
+    productionTreeDigest: digestInventory(inventory),
+    binaryIdentitiesDenied: identities.length,
+    embeddedFingerprintEncodings: ["RAW", "BASE64_CONTIGUOUS"],
+  };
+}
+
+export function createProductionIsolationReport(repositoryRoot, manifest, productionPolicy) {
+  const root = resolve(repositoryRoot);
+  const runtimeHead = gitHead(root);
+  const isolation = verifyProductionIsolation(root, productionPolicy.binaryScan.forbiddenIdentities);
+  const policyInputs = verifyAttestedInputs(root, productionPolicy.attestedInputs);
+  const report = {
+    schemaVersion: productionPolicy.runtimeReportSchema,
+    status: "PASS",
+    candidateHead: candidateHead(root, runtimeHead),
+    runtimeHead,
+    trackedChangesPresent: trackedChangesPresent(root),
+    manifestCanonicalDigest: manifest.canonicalDigest,
+    productionPolicySha256: PRODUCTION_EVIDENCE_SHA256,
+    policyInputsDigest: policyInputs.digest,
+    policyInputCount: policyInputs.count,
+    productionTreeDigest: isolation.productionTreeDigest,
+    productionFilesScanned: isolation.filesScanned,
+    productionRootsScanned: isolation.rootsScanned,
+    forbiddenMarkersDenied: FORBIDDEN_MARKERS.length,
+    binaryIdentitiesDenied: isolation.binaryIdentitiesDenied,
+    embeddedFingerprintEncodings: isolation.embeddedFingerprintEncodings,
+  };
+  report.evidenceContractDigest = sha256(Buffer.from(JSON.stringify(canonicalize(report))));
+  return report;
 }
 
 export const GENERIC_MISSION_POLICY_CONSTANTS = Object.freeze({

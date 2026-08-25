@@ -139,6 +139,12 @@ of that directory fails rather than skips. The external gate is recorded in PR
 evidence but its AIAA/FAA PDFs, metadata and renders are never uploaded to Git
 or hosted CI. The family owns the civil-context/nonpromotion sections in the
 catalog, model-pack, physics, mission-authority and testing contracts.
+Its committed isolation record is a content-addressed policy template, not a
+reusable PASS assertion. Runtime PASS output binds exact candidate/runtime Git
+heads, every attested policy/verifier/input byte, and the scanned production
+tree. Whole-file hashes and SHA-256-confirmed raw/base64 rolling fingerprints
+deny all governed source, metadata, render and contact-sheet identities even
+when their text markers are absent.
 
 Post-bootstrap contract additions use that same revision-bound mechanism when
 they extend an existing family. The `MODEL_PACK_COMPILER_RESOLVER` family owns

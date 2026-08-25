@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
+  createBinaryIsolationIdentity,
   loadAndVerifyGenericMissionPolicyGovernance,
   verifyExactBytes,
   verifyGenericMissionPolicyManifest,
@@ -52,6 +53,8 @@ test("the source gate is deny-all and has no download path", () => {
   assert.match(packageJson.scripts["generic-mission-policy:sources:verify"], /generic-sensor-network-deny\.cjs/u);
   const commandSource = readFileSync(resolve("scripts/verify-generic-mission-policy-source.mjs"), "utf8");
   const verifierSource = readFileSync(resolve("scripts/lib/generic-mission-policy-source-verifier.mjs"), "utf8");
+  assert.match(commandSource, /createProductionIsolationReport/u);
+  assert.doesNotMatch(commandSource, /verifyProductionIsolation\(\)/u);
   assert.doesNotMatch(`${commandSource}\n${verifierSource}`, /(?:from\s+["']node:(?:http|https|net|dns)|\bfetch\s*\()/u);
   const guarded = spawnSync(process.execPath, [
     "--require",
@@ -106,7 +109,12 @@ test("manifest tamper cannot forge roles, rights, decisions, or executable polic
 });
 
 test("production and every runtime fixture subtree reject source promotion", () => {
-  assert.ok(verifyProductionIsolation(resolve(".")) > 0);
+  const { productionEvidence } = loadAndVerifyGenericMissionPolicyGovernance(governanceRoot);
+  const result = verifyProductionIsolation(resolve("."), productionEvidence.binaryScan.forbiddenIdentities);
+  assert.ok(result.filesScanned > 0);
+  assert.equal(result.rootsScanned, 14);
+  assert.equal(result.binaryIdentitiesDenied, 24);
+  assert.match(result.productionTreeDigest, /^[0-9a-f]{64}$/u);
   for (const path of [
     "app/forbidden.tsx",
     "components/forbidden.tsx",
@@ -124,8 +132,75 @@ test("production and every runtime fixture subtree reject source promotion", () 
     const scratch = mkdtempSync(join(tmpdir(), "vector-mission-source-isolation-"));
     mkdirSync(join(scratch, path, ".."), { recursive: true });
     writeFileSync(join(scratch, path), "vector.generic-mission-policy-verification-source-manifest.v1");
-    assert.throws(() => verifyProductionIsolation(scratch), /production|runtime fixture|source-only/u, path);
+    assert.throws(() => verifyProductionIsolation(scratch, []), /production|runtime fixture|source-only/u, path);
     rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test("production PASS evidence is generated and bound to exact runtime content", () => {
+  const expectedHead = spawnSync("git", ["rev-parse", "HEAD"], { cwd: resolve("."), encoding: "utf8" }).stdout.trim();
+  const eventRoot = mkdtempSync(join(tmpdir(), "vector-mission-policy-event-"));
+  try {
+    const exactCandidate = "a".repeat(40);
+    for (const [name, event, expectedCandidate] of [
+      ["pull-request", { pull_request: { head: { sha: exactCandidate } } }, exactCandidate],
+      ["push", { ref: "refs/heads/main" }, expectedHead],
+    ]) {
+      const eventPath = join(eventRoot, `${name}.json`);
+      writeFileSync(eventPath, JSON.stringify(event));
+      const result = spawnSync(process.execPath, ["--require", "./scripts/lib/generic-sensor-network-deny.cjs", "scripts/verify-generic-mission-policy-governance.mjs"], {
+        cwd: resolve("."),
+        encoding: "utf8",
+        env: { ...process.env, GITHUB_EVENT_PATH: eventPath },
+      });
+      assert.equal(result.status, 0, result.stderr);
+      const report = JSON.parse(result.stdout).productionIsolation;
+      assert.equal(report.schemaVersion, "vector.generic-mission-policy-production-isolation-report.v1");
+      assert.equal(report.status, "PASS");
+      assert.equal(report.candidateHead, expectedCandidate);
+      assert.equal(report.runtimeHead, expectedHead);
+      assert.equal(report.binaryIdentitiesDenied, 24);
+      assert.deepEqual(report.embeddedFingerprintEncodings, ["RAW", "BASE64_CONTIGUOUS"]);
+      assert.match(report.policyInputsDigest, /^[0-9a-f]{64}$/u);
+      assert.match(report.productionTreeDigest, /^[0-9a-f]{64}$/u);
+      assert.match(report.evidenceContractDigest, /^[0-9a-f]{64}$/u);
+    }
+    const committedPolicy = JSON.parse(readFileSync(join(governanceRoot, "production-isolation-evidence.v1.json"), "utf8"));
+    assert.equal(committedPolicy.status, "POLICY_TEMPLATE");
+    assert.equal("exactCommitBinding" in committedPolicy, false);
+  } finally {
+    rmSync(eventRoot, { recursive: true, force: true });
+  }
+});
+
+test("production isolation rejects exact, embedded, and base64-embedded governed binary bytes", () => {
+  const governedBytes = Buffer.concat([
+    Buffer.from("%PDF-1.7 governed external fixture\n"),
+    Buffer.from(Array.from({ length: 768 }, (_, index) => (index * 73 + 19) % 256)),
+    Buffer.from("\n%%EOF"),
+  ]);
+  const identity = createBinaryIsolationIdentity("hostile-governed-binary", governedBytes, 288);
+  const cases = [
+    ["exact", governedBytes],
+    ["raw-embedded", Buffer.concat([Buffer.from("prefix"), governedBytes, Buffer.from("suffix")])],
+    ["base64-embedded", Buffer.from(`data:application/pdf;base64,${governedBytes.toString("base64")}`)],
+  ];
+  const roots = [
+    "app", "components", "lib", "server", "worker", "engine-rust/src", "public", "dist", ".next", ".open-next",
+    "fixtures/model-packs", "fixtures/vector-record", "fixtures/public-reference", "fixtures/performance",
+  ];
+  for (const root of roots) {
+    for (const [label, bytes] of cases) {
+      const scratch = mkdtempSync(join(tmpdir(), "vector-mission-binary-isolation-"));
+      mkdirSync(join(scratch, root), { recursive: true });
+      writeFileSync(join(scratch, root, `hostile-${label}.bin`), bytes);
+      assert.throws(
+        () => verifyProductionIsolation(scratch, [identity]),
+        /governed binary|source-only/u,
+        `${root}:${label}`,
+      );
+      rmSync(scratch, { recursive: true, force: true });
+    }
   }
 });
 
