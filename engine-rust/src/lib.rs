@@ -325,7 +325,7 @@ pub struct AircraftModel {
     pub maximum_command_g: f64,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AircraftGroundOperation {
     pub schema_version: String,
@@ -334,7 +334,55 @@ pub struct AircraftGroundOperation {
     pub mission_digest: String,
     pub runway_evidence_digest: String,
     pub execution_authority: String,
-    pub unavailability_reason: String,
+    pub ground_dynamics_digest: String,
+    pub maximum_takeoff_mass_kg: f64,
+    pub minimum_takeoff_fuel_kg: f64,
+    pub rolling_resistance_coefficient: f64,
+    pub rotation_speed_mps: f64,
+    pub liftoff_speed_mps: f64,
+    pub takeoff_lift_coefficient: f64,
+    pub climbout_speed_mps: f64,
+    pub climbout_flight_path_angle_rad: f64,
+    pub enroute_transition_height_m: f64,
+    pub maximum_tailwind_mps: f64,
+    pub maximum_crosswind_mps: f64,
+    pub runway_length_m: f64,
+    pub runway_heading_deg_true: f64,
+    pub runway_end_elevation_m: f64,
+}
+
+impl AircraftGroundOperation {
+    fn physically_valid(&self) -> bool {
+        self.release_time_seconds.is_finite()
+            && self.release_time_seconds >= 0.0
+            && self.maximum_takeoff_mass_kg.is_finite()
+            && self.maximum_takeoff_mass_kg > 0.0
+            && self.minimum_takeoff_fuel_kg.is_finite()
+            && self.minimum_takeoff_fuel_kg > 0.0
+            && self.rolling_resistance_coefficient.is_finite()
+            && (0.0..1.0).contains(&self.rolling_resistance_coefficient)
+            && self.rotation_speed_mps.is_finite()
+            && self.rotation_speed_mps > 0.0
+            && self.liftoff_speed_mps.is_finite()
+            && self.liftoff_speed_mps >= self.rotation_speed_mps
+            && self.takeoff_lift_coefficient.is_finite()
+            && self.takeoff_lift_coefficient > 0.0
+            && self.climbout_speed_mps.is_finite()
+            && self.climbout_speed_mps >= self.liftoff_speed_mps
+            && self.climbout_flight_path_angle_rad.is_finite()
+            && self.climbout_flight_path_angle_rad > 0.0
+            && self.climbout_flight_path_angle_rad < std::f64::consts::FRAC_PI_2
+            && self.enroute_transition_height_m.is_finite()
+            && self.enroute_transition_height_m > 0.0
+            && self.maximum_tailwind_mps.is_finite()
+            && self.maximum_tailwind_mps > 0.0
+            && self.maximum_crosswind_mps.is_finite()
+            && self.maximum_crosswind_mps > 0.0
+            && self.runway_length_m.is_finite()
+            && self.runway_length_m > 0.0
+            && self.runway_heading_deg_true.is_finite()
+            && self.runway_end_elevation_m.is_finite()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -737,17 +785,38 @@ pub struct AircraftControlFrame {
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AircraftControlLimiter {
+    GroundHold,
+    GroundForce,
+    Climbout,
     LoadFactor,
     None,
     RouteComplete,
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AircraftOperationalState {
     Parked,
     HoldShort,
+    TakeoffRoll,
+    Rotate,
+    Climbout,
     Enroute,
+    Aborted,
+}
+
+impl AircraftOperationalState {
+    fn key(self) -> &'static str {
+        match self {
+            Self::Parked => "PARKED",
+            Self::HoldShort => "HOLD_SHORT",
+            Self::TakeoffRoll => "TAKEOFF_ROLL",
+            Self::Rotate => "ROTATE",
+            Self::Climbout => "CLIMBOUT",
+            Self::Enroute => "ENROUTE",
+            Self::Aborted => "ABORTED",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1835,6 +1904,183 @@ fn active_wind(scenario: &EngineScenario, time: f64, base: Vec3) -> Vec3 {
     })
 }
 
+fn update_ground_aircraft(
+    state: &mut RuntimeState,
+    scenario: &EngineScenario,
+    time: f64,
+    dt: f64,
+    model: &AircraftModel,
+    operation: &AircraftGroundOperation,
+) -> Result<(), EngineError> {
+    let prior_velocity = state.velocity;
+    let runway_direction = Vec3 {
+        x: (90.0 - operation.runway_heading_deg_true)
+            .to_radians()
+            .cos(),
+        y: (90.0 - operation.runway_heading_deg_true)
+            .to_radians()
+            .sin(),
+        z: 0.0,
+    };
+    let (density, speed_of_sound, base_wind) = environment_sample(scenario, state.position, time)?;
+    let wind = active_wind(scenario, time, base_wind);
+    let tailwind_mps = wind.dot(runway_direction);
+    let crosswind_mps = (wind.x * -runway_direction.y + wind.y * runway_direction.x).abs();
+    if tailwind_mps > operation.maximum_tailwind_mps
+        || crosswind_mps > operation.maximum_crosswind_mps
+    {
+        return Err(EngineError::InvalidScenario(
+            "[GROUND_WIND_ENVELOPE_EXCEEDED] Effective runway wind exceeds the admitted projection."
+                .to_string(),
+        ));
+    }
+    let air_relative = state.velocity.subtract(wind);
+    let airspeed = air_relative.magnitude();
+    let dynamic_pressure = 0.5 * density * airspeed * airspeed;
+    let lift = dynamic_pressure * model.reference_area_m2 * operation.takeoff_lift_coefficient;
+    let drag_coefficient =
+        interpolate_table(&model.zero_lift_drag_by_mach, airspeed / speed_of_sound)?
+            + interpolate_table(&model.induced_drag_by_angle_of_attack_rad, 0.0)?
+                * operation.takeoff_lift_coefficient
+                * operation.takeoff_lift_coefficient;
+    let drag = dynamic_pressure * model.reference_area_m2 * drag_coefficient;
+    let thrust = interpolate_table(&model.thrust_by_throttle, 1.0)?;
+    let fuel_coefficient = interpolate_table(&model.fuel_flow_by_throttle, 1.0)?;
+    if thrust <= 0.0 || state.fuel_kg <= 0.0 {
+        return Err(EngineError::InvalidScenario(
+            "[GROUND_TAKEOFF_FUEL_EXHAUSTED] Admitted takeoff thrust is unavailable.".to_string(),
+        ));
+    }
+    let consumed = state.fuel_kg.min(thrust * fuel_coefficient * dt);
+    state.fuel_kg -= consumed;
+    state.mass_kg = model.empty_mass_kg + state.fuel_kg + state.store_mass_kg;
+    if state.fuel_kg < operation.minimum_takeoff_fuel_kg {
+        return Err(EngineError::InvalidScenario(
+            "[GROUND_TAKEOFF_FUEL_EXHAUSTED] Fuel fell below the admitted takeoff minimum."
+                .to_string(),
+        ));
+    }
+    state.drag_newtons = drag;
+    state.thrust_newtons = thrust;
+    state.available_g = model.maximum_command_g;
+
+    let current_ground_speed = state.velocity.dot(runway_direction).max(0.0);
+    let normal_force = (state.mass_kg * G0 - lift).max(0.0);
+    let rolling_resistance = operation.rolling_resistance_coefficient * normal_force;
+    let ground_acceleration = (thrust - drag - rolling_resistance) / state.mass_kg;
+    if ground_acceleration <= 0.0 {
+        return Err(EngineError::InvalidScenario(
+            "[GROUND_TAKEOFF_FORCE_INSUFFICIENT] Net runway force is not positive.".to_string(),
+        ));
+    }
+    let next_ground_speed = current_ground_speed + ground_acceleration * dt;
+    let distance_from_threshold = state
+        .position
+        .subtract(state.definition.initial.position)
+        .dot(runway_direction);
+    let next_distance = distance_from_threshold + next_ground_speed * dt;
+    let prior_operational_state = state.aircraft_operational_state;
+    let requested_speed =
+        if state.aircraft_operational_state == Some(AircraftOperationalState::Climbout) {
+            operation.climbout_speed_mps
+        } else {
+            operation.liftoff_speed_mps
+        };
+
+    if prior_operational_state != Some(AircraftOperationalState::Climbout) {
+        if next_distance > operation.runway_length_m + 1e-9 {
+            state.aircraft_operational_state = Some(AircraftOperationalState::Aborted);
+            return Err(EngineError::InvalidScenario(
+                "[GROUND_RUNWAY_OVERRUN] Liftoff was not achieved inside the admitted runway."
+                    .to_string(),
+            ));
+        }
+        let runway_fraction = (next_distance / operation.runway_length_m).min(1.0);
+        state.velocity = runway_direction.scale(next_ground_speed);
+        state.position = state.definition.initial.position.add(Vec3 {
+            x: runway_direction.x * next_distance,
+            y: runway_direction.y * next_distance,
+            z: (operation.runway_end_elevation_m - state.definition.initial.position.z)
+                * runway_fraction,
+        });
+        if prior_operational_state == Some(AircraftOperationalState::Rotate)
+            && airspeed >= operation.liftoff_speed_mps
+            && lift >= state.mass_kg * G0
+        {
+            state.aircraft_operational_state = Some(AircraftOperationalState::Climbout);
+        } else if prior_operational_state == Some(AircraftOperationalState::TakeoffRoll)
+            && airspeed >= operation.rotation_speed_mps
+        {
+            state.aircraft_operational_state = Some(AircraftOperationalState::Rotate);
+        } else if matches!(
+            prior_operational_state,
+            Some(AircraftOperationalState::Parked | AircraftOperationalState::HoldShort)
+        ) {
+            state.aircraft_operational_state = Some(AircraftOperationalState::TakeoffRoll);
+        } else if !matches!(
+            prior_operational_state,
+            Some(AircraftOperationalState::TakeoffRoll | AircraftOperationalState::Rotate)
+        ) {
+            return Err(EngineError::InvalidScenario(
+                "[GROUND_OPERATIONAL_TRANSITION_INVALID] Ground state cannot enter the takeoff sequence."
+                    .to_string(),
+            ));
+        }
+    } else {
+        let climb_speed = operation
+            .climbout_speed_mps
+            .min(current_ground_speed.max(state.velocity.magnitude()) + ground_acceleration * dt);
+        let horizontal_speed = climb_speed * operation.climbout_flight_path_angle_rad.cos();
+        state.velocity = Vec3 {
+            x: runway_direction.x * horizontal_speed,
+            y: runway_direction.y * horizontal_speed,
+            z: climb_speed * operation.climbout_flight_path_angle_rad.sin(),
+        };
+        state.position = state.position.add(state.velocity.scale(dt));
+        if state.position.z - state.definition.initial.position.z
+            >= operation.enroute_transition_height_m
+        {
+            state.aircraft_operational_state = Some(AircraftOperationalState::Enroute);
+        }
+    }
+
+    let requested_velocity =
+        if state.aircraft_operational_state == Some(AircraftOperationalState::Climbout) {
+            let horizontal = requested_speed * operation.climbout_flight_path_angle_rad.cos();
+            Vec3 {
+                x: runway_direction.x * horizontal,
+                y: runway_direction.y * horizontal,
+                z: requested_speed * operation.climbout_flight_path_angle_rad.sin(),
+            }
+        } else {
+            runway_direction.scale(requested_speed)
+        };
+    let requested_acceleration = requested_velocity.subtract(prior_velocity).scale(1.0 / dt);
+    let accepted_acceleration = state.velocity.subtract(prior_velocity).scale(1.0 / dt);
+    state.heading_rad = (90.0 - operation.runway_heading_deg_true).to_radians();
+    state.commanded_g = accepted_acceleration.magnitude() / G0;
+    let operational_state = state.aircraft_operational_state.ok_or_else(|| {
+        EngineError::InvalidScenario(
+            "[GROUND_OPERATIONAL_STATE_MISSING] Ground dynamics lost the admitted operational state."
+                .to_string(),
+        )
+    })?;
+    state.phase = operational_state.key().to_string();
+    state.aircraft_control = Some(AircraftControlFrame {
+        route_point_index: Some(state.route_point_index),
+        requested_velocity_mps: requested_velocity,
+        requested_steering_acceleration_mps2: requested_acceleration,
+        accepted_steering_acceleration_mps2: accepted_acceleration,
+        achieved_velocity_mps: state.velocity,
+        limiter: if state.aircraft_operational_state == Some(AircraftOperationalState::Climbout) {
+            AircraftControlLimiter::Climbout
+        } else {
+            AircraftControlLimiter::GroundForce
+        },
+    });
+    Ok(())
+}
+
 fn update_aircraft(
     state: &mut RuntimeState,
     scenario: &EngineScenario,
@@ -1847,24 +2093,34 @@ fn update_aircraft(
     if state.definition.kind != EntityKind::Aircraft {
         return Ok(());
     }
-    let Some(model) = state.definition.aircraft.as_ref() else {
+    let Some(model) = state.definition.aircraft.clone() else {
         return Ok(());
     };
-    if let Some(ground) = state.definition.ground_operation.as_ref() {
-        state.aircraft_operational_state = Some(
-            if ground.posture == "PARKING" || time < ground.release_time_seconds {
-                AircraftOperationalState::Parked
-            } else {
-                AircraftOperationalState::HoldShort
-            },
-        );
-        state.velocity = Vec3::default();
-        state.commanded_g = 0.0;
-        state.drag_newtons = 0.0;
-        state.thrust_newtons = 0.0;
-        state.aircraft_control = None;
-        state.phase = ground.unavailability_reason.clone();
-        return Ok(());
+    if let Some(ground) = state.definition.ground_operation.clone() {
+        if state.aircraft_operational_state != Some(AircraftOperationalState::Enroute) {
+            if time < ground.release_time_seconds {
+                state.aircraft_operational_state = Some(if ground.posture == "RUNWAY" {
+                    AircraftOperationalState::HoldShort
+                } else {
+                    AircraftOperationalState::Parked
+                });
+                state.velocity = Vec3::default();
+                state.commanded_g = 0.0;
+                state.drag_newtons = 0.0;
+                state.thrust_newtons = 0.0;
+                state.aircraft_control = Some(AircraftControlFrame {
+                    route_point_index: Some(state.route_point_index),
+                    requested_velocity_mps: Vec3::default(),
+                    requested_steering_acceleration_mps2: Vec3::default(),
+                    accepted_steering_acceleration_mps2: Vec3::default(),
+                    achieved_velocity_mps: Vec3::default(),
+                    limiter: AircraftControlLimiter::GroundHold,
+                });
+                state.phase = "GROUND_READINESS_HOLD".to_string();
+                return Ok(());
+            }
+            return update_ground_aircraft(state, scenario, time, dt, &model, &ground);
+        }
     }
     let speed = state.velocity.magnitude().max(1.0);
     while state.route_point_index < state.definition.route.len().saturating_sub(1) {
@@ -2280,17 +2536,11 @@ fn entity_frame(
         aircraft_movement_value_state: state.aircraft_operational_state.map(|_| {
             if state.lifecycle == EntityLifecycle::Terminated {
                 "TERMINATED"
-            } else if state.definition.ground_operation.is_some() {
-                "UNAVAILABLE"
             } else {
                 "VALID"
             }
         }),
-        aircraft_movement_unavailable_reason: state
-            .definition
-            .ground_operation
-            .as_ref()
-            .map(|_| "GROUND_DYNAMICS_MODEL_UNAVAILABLE"),
+        aircraft_movement_unavailable_reason: None,
         aircraft_control: state.aircraft_control.clone(),
     })
 }
@@ -2595,10 +2845,13 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                 ));
             };
             let since_launch = time - weapon.launch_time_seconds.unwrap_or(0.0);
-            if (since_launch > weapon.burn_seconds + 2.0 && speed < 80.0 && separation > 1000.0)
-                || (states[weapon_index].position.z
-                    <= terrain_elevation(&scenario, states[weapon_index].position)?
-                    && time > 1.0)
+            if states[weapon_index].lifecycle != EntityLifecycle::Stowed
+                && ((since_launch > weapon.burn_seconds + 2.0
+                    && speed < 80.0
+                    && separation > 1000.0)
+                    || (states[weapon_index].position.z
+                        <= terrain_elevation(&scenario, states[weapon_index].position)?
+                        && time > 1.0))
             {
                 termination = Termination::EnergyDepleted;
                 completed_this_tick = true;
@@ -2645,6 +2898,10 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
         }
         let before_updates: Vec<EntityLifecycle> =
             states.iter().map(|state| state.lifecycle).collect();
+        let before_operational_updates: Vec<Option<AircraftOperationalState>> = states
+            .iter()
+            .map(|state| state.aircraft_operational_state)
+            .collect();
         for state in states.iter_mut() {
             update_aircraft(state, &scenario, time, scenario.fixed_step_seconds)?;
         }
@@ -2673,6 +2930,26 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                 state.lifecycle,
             ))?;
         }
+        for (index, state) in states.iter().enumerate() {
+            let (Some(prior), Some(next), Some(operation)) = (
+                before_operational_updates[index],
+                state.aircraft_operational_state,
+                state.definition.ground_operation.as_ref(),
+            ) else {
+                continue;
+            };
+            if prior == next {
+                continue;
+            }
+            event_journal.emit(SimulationEventDraft::aircraft_operational_changed(
+                steps,
+                next_event_time,
+                &state.definition.id,
+                prior,
+                next,
+                &operation.ground_dynamics_digest,
+            ))?;
+        }
         let post_relative_position = states[target_index]
             .position
             .subtract(states[weapon_index].position);
@@ -2696,12 +2973,13 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                     )
                 })?;
             let since_launch = next_time - weapon.launch_time_seconds.unwrap_or(0.0);
-            if (since_launch > weapon.burn_seconds + 2.0
-                && speed < 80.0
-                && post_separation > 1000.0)
-                || (states[weapon_index].position.z
-                    <= terrain_elevation(&scenario, states[weapon_index].position)?
-                    && next_time > 1.0)
+            if states[weapon_index].lifecycle != EntityLifecycle::Stowed
+                && ((since_launch > weapon.burn_seconds + 2.0
+                    && speed < 80.0
+                    && post_separation > 1000.0)
+                    || (states[weapon_index].position.z
+                        <= terrain_elevation(&scenario, states[weapon_index].position)?
+                        && next_time > 1.0))
             {
                 termination = Termination::EnergyDepleted;
                 completed_this_tick = true;

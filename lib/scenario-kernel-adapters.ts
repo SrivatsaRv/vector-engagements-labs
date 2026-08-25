@@ -239,8 +239,86 @@ function validateCompiledAirMissionLineage(
   airExactKeys(envelope, [
     "schemaVersion", "id", "aircraftId", "aircraftModelId", "modelPackDigest",
     "minimumRunwayLengthM", "compatibleSurfaces", "maximumTailwindMps", "valueState",
-    "evidenceRefIds", "limitationIds", "digest",
+    "evidenceRefIds", "limitationIds", "groundDynamics", "digest",
   ], "$.compiledAirMission.assignment.groundEnvelope");
+  const groundDynamics = airRecord(
+    compiled.assignment.groundEnvelope.groundDynamics,
+    "$.compiledAirMission.assignment.groundEnvelope.groundDynamics",
+  );
+  airExactKeys(groundDynamics, [
+    "schemaVersion", "authority", "maximumTakeoffMassKg", "minimumTakeoffFuelKg",
+    "rollingResistanceCoefficient", "rotationSpeedMps", "liftoffSpeedMps",
+    "takeoffLiftCoefficient", "climboutSpeedMps", "climboutFlightPathAngleRad",
+    "enrouteTransitionHeightM", "maximumTailwindMps", "maximumCrosswindMps",
+    "validity", "valueState", "evidenceRefIds", "limitationIds", "digest",
+  ], "$.compiledAirMission.assignment.groundEnvelope.groundDynamics");
+  const groundValidity = airRecord(
+    compiled.assignment.groundEnvelope.groundDynamics.validity,
+    "$.compiledAirMission.assignment.groundEnvelope.groundDynamics.validity",
+  );
+  airExactKeys(
+    groundValidity,
+    ["schemaVersion", "intendedUse", "mechanism"],
+    "$.compiledAirMission.assignment.groundEnvelope.groundDynamics.validity",
+  );
+  if (compiled.assignment.groundEnvelope.groundDynamics.schemaVersion
+      !== "vector.compiled-aircraft-ground-dynamics.v1"
+    || compiled.assignment.groundEnvelope.groundDynamics.authority
+      !== "GENERIC_PUBLIC_EDUCATIONAL"
+    || compiled.assignment.groundEnvelope.groundDynamics.valueState !== "MODEL_ASSUMPTION"
+    || compiled.assignment.groundEnvelope.groundDynamics.validity.schemaVersion
+      !== "vector.aircraft-ground-dynamics-validity.v1"
+    || compiled.assignment.groundEnvelope.groundDynamics.validity.intendedUse
+      !== "PUBLIC_EDUCATIONAL"
+    || compiled.assignment.groundEnvelope.groundDynamics.validity.mechanism
+      !== "RUNWAY_ROLL_ROTATION_CLIMBOUT"
+    || !compiled.assignment.groundEnvelope.groundDynamics.evidenceRefIds.length
+    || !compiled.assignment.groundEnvelope.groundDynamics.limitationIds.length
+    || !Number.isFinite(compiled.assignment.groundEnvelope.groundDynamics.maximumTakeoffMassKg)
+    || compiled.assignment.groundEnvelope.groundDynamics.maximumTakeoffMassKg <= 0
+    || !Number.isFinite(compiled.assignment.groundEnvelope.groundDynamics.minimumTakeoffFuelKg)
+    || compiled.assignment.groundEnvelope.groundDynamics.minimumTakeoffFuelKg <= 0
+    || !Number.isFinite(compiled.assignment.groundEnvelope.groundDynamics.rollingResistanceCoefficient)
+    || compiled.assignment.groundEnvelope.groundDynamics.rollingResistanceCoefficient < 0
+    || compiled.assignment.groundEnvelope.groundDynamics.rollingResistanceCoefficient >= 1
+    || !Number.isFinite(compiled.assignment.groundEnvelope.groundDynamics.rotationSpeedMps)
+    || compiled.assignment.groundEnvelope.groundDynamics.rotationSpeedMps <= 0
+    || !Number.isFinite(compiled.assignment.groundEnvelope.groundDynamics.liftoffSpeedMps)
+    || compiled.assignment.groundEnvelope.groundDynamics.liftoffSpeedMps
+      < compiled.assignment.groundEnvelope.groundDynamics.rotationSpeedMps
+    || !Number.isFinite(compiled.assignment.groundEnvelope.groundDynamics.takeoffLiftCoefficient)
+    || compiled.assignment.groundEnvelope.groundDynamics.takeoffLiftCoefficient <= 0
+    || !Number.isFinite(compiled.assignment.groundEnvelope.groundDynamics.climboutSpeedMps)
+    || compiled.assignment.groundEnvelope.groundDynamics.climboutSpeedMps
+      < compiled.assignment.groundEnvelope.groundDynamics.liftoffSpeedMps
+    || !Number.isFinite(compiled.assignment.groundEnvelope.groundDynamics.climboutFlightPathAngleRad)
+    || compiled.assignment.groundEnvelope.groundDynamics.climboutFlightPathAngleRad <= 0
+    || compiled.assignment.groundEnvelope.groundDynamics.climboutFlightPathAngleRad >= Math.PI / 2
+    || !Number.isFinite(compiled.assignment.groundEnvelope.groundDynamics.enrouteTransitionHeightM)
+    || compiled.assignment.groundEnvelope.groundDynamics.enrouteTransitionHeightM <= 0
+    || !Number.isFinite(compiled.assignment.groundEnvelope.groundDynamics.maximumTailwindMps)
+    || compiled.assignment.groundEnvelope.groundDynamics.maximumTailwindMps <= 0
+    || !Number.isFinite(compiled.assignment.groundEnvelope.groundDynamics.maximumCrosswindMps)
+    || compiled.assignment.groundEnvelope.groundDynamics.maximumCrosswindMps <= 0) {
+    airFail(
+      "KERNEL_AIR_MISSION_INVALID",
+      "$.compiledAirMission.assignment.groundEnvelope.groundDynamics",
+      "Compiled ground-dynamics authority, validity, evidence, or limitations are unsupported.",
+    );
+  }
+  const groundDynamicsCopy = structuredClone(
+    compiled.assignment.groundEnvelope.groundDynamics,
+  ) as Record<string, unknown>;
+  const claimedGroundDynamicsDigest = groundDynamicsCopy.digest;
+  delete groundDynamicsCopy.digest;
+  if (typeof claimedGroundDynamicsDigest !== "string"
+    || sha256HexSync(groundDynamicsCopy) !== claimedGroundDynamicsDigest) {
+    airFail(
+      "KERNEL_AIR_MISSION_INVALID",
+      "$.compiledAirMission.assignment.groundEnvelope.groundDynamics.digest",
+      "Compiled ground-dynamics digest does not bind its exact published content.",
+    );
+  }
   const envelopeCopy = structuredClone(compiled.assignment.groundEnvelope) as Record<string, unknown>;
   const claimedEnvelopeDigest = envelopeCopy.digest;
   delete envelopeCopy.digest;

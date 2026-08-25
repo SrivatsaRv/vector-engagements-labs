@@ -46,6 +46,7 @@ const PAYLOAD_KINDS = [
   "RUN_STARTED",
   "ENTITY_ENTERED_WORLD",
   "ENTITY_LIFECYCLE_CHANGED",
+  "AIRCRAFT_OPERATIONAL_STATE_CHANGED",
   "RUN_COMPLETED",
   "TRACK_STATE_CHANGED",
 ] as const;
@@ -60,6 +61,7 @@ const ENTITY_KINDS = [
   "FIXED_OBJECTIVE",
 ] as const;
 const LIFECYCLES = ["STOWED", "ACTIVE", "TRACKING", "ENGAGING", "TERMINATED"] as const;
+const AIRCRAFT_OPERATIONAL_STATES = ["PARKED", "HOLD_SHORT", "TAKEOFF_ROLL", "ROTATE", "CLIMBOUT", "ENROUTE", "ABORTED"] as const;
 const ACTIVE_LIFECYCLES = ["ACTIVE", "TRACKING", "ENGAGING"] as const;
 const TERMINATIONS = [
   "threshold_reached",
@@ -201,11 +203,17 @@ function payloadSortKey(payload: SimulationEventPayload) {
   if (payload.kind === "ENTITY_LIFECYCLE_CHANGED") {
     return canonicalJson(["2", payload.schemaVersion, payload.entityKind, payload.from, payload.to]);
   }
+  if (payload.kind === "AIRCRAFT_OPERATIONAL_STATE_CHANGED") {
+    return canonicalJson([
+      "3", payload.schemaVersion, payload.from, payload.to,
+      payload.movementValueState, payload.groundDynamicsDigest,
+    ]);
+  }
   if (payload.kind === "RUN_COMPLETED") {
-    return canonicalJson(["3", payload.schemaVersion, payload.termination]);
+    return canonicalJson(["4", payload.schemaVersion, payload.termination]);
   }
   return canonicalJson([
-    "4", payload.schemaVersion, payload.perspective, payload.trackId,
+    "5", payload.schemaVersion, payload.perspective, payload.trackId,
     payload.from, payload.to, payload.cause, payload.sensorModelId,
     payload.sensorModelVersion, payload.modelPackDigest, payload.sourceSequence,
     payload.sourceTimeSeconds, payload.estimateValueState, payload.uncertaintyValueState,
@@ -272,6 +280,16 @@ function assertPayload(value: unknown, index: number): asserts value is Simulati
     exactKeys(value, ["kind", "schemaVersion", "termination"], [], `Simulation event ${index} payload`);
     if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_COMPLETED) throw new Error(`Simulation event ${index} payload schema is unsupported.`);
     member(value.termination, TERMINATIONS, `Simulation event ${index} termination`);
+  } else if (value.kind === "AIRCRAFT_OPERATIONAL_STATE_CHANGED") {
+    exactKeys(value, ["kind", "schemaVersion", "from", "to", "movementValueState", "groundDynamicsDigest"], [], `Simulation event ${index} payload`);
+    if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.AIRCRAFT_OPERATIONAL_STATE_CHANGED) throw new Error(`Simulation event ${index} payload schema is unsupported.`);
+    member(value.from, AIRCRAFT_OPERATIONAL_STATES, `Simulation event ${index} prior aircraft operational state`);
+    member(value.to, AIRCRAFT_OPERATIONAL_STATES, `Simulation event ${index} next aircraft operational state`);
+    if (value.from === value.to) throw new Error(`Simulation event ${index} records an unchanged aircraft operational state.`);
+    member(value.movementValueState, ["VALID", "TERMINATED"], `Simulation event ${index} movement value state`);
+    if (typeof value.groundDynamicsDigest !== "string" || !/^[a-f0-9]{64}$/.test(value.groundDynamicsDigest)) {
+      throw new Error(`Simulation event ${index} ground-dynamics digest is invalid.`);
+    }
   } else {
     exactKeys(value, [
       "kind", "schemaVersion", "perspective", "trackId", "from", "to", "cause",
@@ -439,6 +457,11 @@ export function assertSimulationEventStream(
     string,
     Array<{ frameIndex: number; from: EntityLifecycle; to: EntityLifecycle }>
   >();
+  const frameOperationalTransitionsByEntity = new Map<
+    string,
+    Array<{ frameIndex: number; from: NonNullable<EngineFrame["entities"][number]["aircraftOperationalState"]>; to: NonNullable<EngineFrame["entities"][number]["aircraftOperationalState"]> }>
+  >();
+  const finalOperationalStateByEntity = new Map<string, NonNullable<EngineFrame["entities"][number]["aircraftOperationalState"]>>();
   const frameTransitionsByTrack = new Map<
     string,
     Array<{
@@ -486,6 +509,15 @@ export function assertSimulationEventStream(
         frameTransitionsByEntity.set(entity.id, transitions);
       }
       finalLifecycleByEntity.set(entity.id, entity.lifecycle);
+      if (entity.aircraftOperationalState) {
+        const priorOperationalState = finalOperationalStateByEntity.get(entity.id);
+        if (priorOperationalState !== undefined && priorOperationalState !== entity.aircraftOperationalState) {
+          const transitions = frameOperationalTransitionsByEntity.get(entity.id) ?? [];
+          transitions.push({ frameIndex, from: priorOperationalState, to: entity.aircraftOperationalState });
+          frameOperationalTransitionsByEntity.set(entity.id, transitions);
+        }
+        finalOperationalStateByEntity.set(entity.id, entity.aircraftOperationalState);
+      }
     }
     for (const observer of frame.observerStates) {
       if (observer.schemaVersion !== "vector.observer-state.v3") continue;
@@ -502,6 +534,7 @@ export function assertSimulationEventStream(
     }
   }
   const consumedFrameTransitionsByEntity = new Map<string, number>();
+  const consumedOperationalTransitionsByEntity = new Map<string, number>();
   const seenIds = new Set<string>();
   const seenTransitions = new Set<string>();
   const seenLocalKeysByTick = new Map<number, Set<string>>();
@@ -522,7 +555,7 @@ export function assertSimulationEventStream(
     member(raw.phase, PHASES, `Simulation event ${index} phase`);
     if (!isRecord(raw.producer)) throw new Error(`Simulation event ${index} producer must be an object.`);
     exactKeys(raw.producer, ["subsystem"], ["entityId"], `Simulation event ${index} producer`);
-    member(raw.producer.subsystem, ["RUN_COORDINATOR", "ENTITY_LIFECYCLE", "SENSOR_TRACK"], `Simulation event ${index} producer subsystem`);
+    member(raw.producer.subsystem, ["RUN_COORDINATOR", "ENTITY_LIFECYCLE", "AIRCRAFT_DYNAMICS", "SENSOR_TRACK"], `Simulation event ${index} producer subsystem`);
     if (raw.producer.entityId !== undefined) nonEmptyString(raw.producer.entityId, `Simulation event ${index} producer entity`);
     member(raw.knowledgeScope, ["WORLD", "SIDE_OWNED"], `Simulation event ${index} knowledge scope`);
     if (raw.ownerAffiliation !== undefined) member(raw.ownerAffiliation, ["BLUE", "RED", "NEUTRAL"], `Simulation event ${index} owner affiliation`);
@@ -647,6 +680,27 @@ export function assertSimulationEventStream(
       ) throw new Error(`Simulation event ${event.id} has an invalid observation cause.`);
       consumedFrameTransitionsByTrack.set(key, transitionIndex + 1);
       lastEventIdByTrack.set(key, event.id);
+    } else if (event.payload.kind === "AIRCRAFT_OPERATIONAL_STATE_CHANGED") {
+      const entityId = event.producer.entityId;
+      const entity = entityId ? entityById.get(entityId) : undefined;
+      const frameEntity = entityId ? frame.entities.find((candidate) => candidate.id === entityId) : undefined;
+      const groundDynamicsDigest = entity?.groundOperation?.groundDynamicsDigest;
+      if (
+        event.phase !== "MISSION" || event.producer.subsystem !== "AIRCRAFT_DYNAMICS" ||
+        !entity || entity.kind !== "AIRCRAFT" || !frameEntity ||
+        event.participants.length !== 1 || event.participants[0]?.entityId !== entityId ||
+        event.participants[0]?.role !== "SUBJECT" ||
+        frameEntity.aircraftOperationalState !== event.payload.to ||
+        frameEntity.aircraftMovementValueState !== event.payload.movementValueState ||
+        groundDynamicsDigest !== event.payload.groundDynamicsDigest
+      ) throw new Error(`Simulation aircraft operational event ${event.id} has invalid ownership, authority, or frame state.`);
+      const transitionIndex = consumedOperationalTransitionsByEntity.get(entityId!) ?? 0;
+      const transition = frameOperationalTransitionsByEntity.get(entityId!)?.[transitionIndex];
+      if (
+        transition?.frameIndex !== event.frameIndex || transition.from !== event.payload.from ||
+        transition.to !== event.payload.to
+      ) throw new Error(`Simulation event ${event.id} does not reference the first retained frame for its aircraft operational transition.`);
+      consumedOperationalTransitionsByEntity.set(entityId!, transitionIndex + 1);
     } else {
       const entityId = event.producer.entityId;
       const entity = entityId ? entityById.get(entityId) : undefined;
@@ -729,6 +783,11 @@ export function assertSimulationEventStream(
       const retainedTransitions = frameTransitionsByEntity.get(entity.id)?.length ?? 0;
       if (consumedTransitions !== retainedTransitions) {
         throw new Error(`Simulation event stream is missing a retained lifecycle transition for ${entity.id}.`);
+      }
+      const consumedOperationalTransitions = consumedOperationalTransitionsByEntity.get(entity.id) ?? 0;
+      const retainedOperationalTransitions = frameOperationalTransitionsByEntity.get(entity.id)?.length ?? 0;
+      if (consumedOperationalTransitions !== retainedOperationalTransitions) {
+        throw new Error(`Simulation event stream is missing a retained aircraft operational transition for ${entity.id}.`);
       }
     }
     for (const [key, transitions] of frameTransitionsByTrack) {

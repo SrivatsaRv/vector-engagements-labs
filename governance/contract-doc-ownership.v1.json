@@ -4143,6 +4143,15 @@
         },
         {
           "kind": "EXACT",
+          "value": "scripts/generate-ground-dynamics-scenario-migration.ts",
+          "facets": [
+            "digest",
+            "schema",
+            "storage"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "app/api/catalog/route.ts",
           "facets": [
             "schema"
@@ -5312,5 +5321,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "330b380850dbdd192d7e12564e071db244326e59fd75a2fa5b01637a883c45f9"
+  "canonicalSha256": "ef2e0cf02ce74eaa790286fb8793590110783beab485b4f8be30ef5af94a69af"
 }

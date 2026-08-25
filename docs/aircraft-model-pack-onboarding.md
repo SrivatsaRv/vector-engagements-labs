@@ -301,6 +301,11 @@ measurements are not folded into Stage-B compile, publication or reuse timing.
 
 ## Nonclaims and deferred owners
 
+The #182 ground-dynamics projection is a separately bounded
+`MODEL_ASSUMPTION` for generic educational roll, rotation and climbout. It does
+not consume either isolated TP-1538 transcription, authorize a named aircraft,
+or close the #64 reference-aircraft, route, landing and recovery work.
+
 This foundation makes no named-aircraft, weapon, sensor, mission-policy, flight-
 control, or UI capability claim. Rust/WASM participation validates only the
 bounded compiled schema and digest; it does not admit the pack to execution or

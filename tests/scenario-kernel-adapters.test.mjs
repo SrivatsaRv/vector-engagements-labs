@@ -253,6 +253,28 @@ test("#60 adapter rejects forged compiled lineage, dangling mappings and absent 
       && error.path === "$.compiledAirMission.compiledDigest",
   );
 
+  const authorityMission = structuredClone(scenario.airMission);
+  const authorityForged = structuredClone(compiledAirMission);
+  authorityForged.assignment.groundEnvelope.groundDynamics.authority = "CALLER_ASSERTED";
+  const groundMaterial = structuredClone(authorityForged.assignment.groundEnvelope.groundDynamics);
+  delete groundMaterial.digest;
+  authorityForged.assignment.groundEnvelope.groundDynamics.digest = sha256HexSync(groundMaterial);
+  const envelopeMaterial = structuredClone(authorityForged.assignment.groundEnvelope);
+  delete envelopeMaterial.digest;
+  authorityForged.assignment.groundEnvelope.digest = sha256HexSync(envelopeMaterial);
+  authorityMission.assignments[0].groundCompatibility.envelopeDigest =
+    authorityForged.assignment.groundEnvelope.digest;
+  authorityForged.authored = structuredClone(authorityMission);
+  authorityForged.authoredDigest = sha256HexSync(authorityMission);
+  delete authorityForged.compiledDigest;
+  authorityForged.compiledDigest = sha256HexSync(authorityForged);
+  assert.throws(
+    () => bindAirMissionToScenarioKernel(kernel, authorityMission, authorityForged, mapping),
+    (error) => error instanceof ScenarioKernelAdapterError
+      && error.code === "KERNEL_AIR_MISSION_INVALID"
+      && error.path === "$.compiledAirMission.assignment.groundEnvelope.groundDynamics",
+  );
+
   const semanticallyForged = structuredClone(compiledAirMission);
   semanticallyForged.start.initialSpeedMps += 10;
   delete semanticallyForged.compiledDigest;

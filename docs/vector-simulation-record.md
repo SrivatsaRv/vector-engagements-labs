@@ -14,6 +14,11 @@ Primary references:
 
 ## Archive contents
 
+An admitted takeoff archive includes canonical operational frames and transition
+events beside the unchanged compiled Air-mission/model/environment identities.
+It records movement value state, controller values, fuel, total mass and
+installed-store identities; it does not store a presentation-generated path.
+
 The Rust crate's compiled-model-pack v2 identity validator is an offline
 publication/readback check only. Its result is not a VSR member and it does not
 change the archive envelope, manifest, required member set, or record schema.
@@ -102,21 +107,21 @@ it is not displayed as if it were a separate model sample.
 
 ## Frame contract
 
+Aircraft frames retain exact `aircraftOperationalState`,
+`aircraftMovementValueState`, SI speed/position/mass/fuel values, installed
+stores and requested/accepted/achieved controller vectors. Valid zero movement
+during hold is distinct from missing or rejected movement.
+
 Compiled-model-pack v2 publication validation adds no frame columns, entity
 state, event state, or replay-derived values.
 
-Mission lineage adds no parallel frame state. Ground starts are represented by
-the canonical aircraft entity at the runway threshold with zero speed in the
-first recorded frame. Frame v6 additionally records achieved operational state,
-movement value state, and the stable unavailable cause; it does not fabricate
-requested/accepted/achieved movement vectors while ground dynamics are absent.
-The compatibility `SimulationResult` projection identifies its primary entity
-as either `GUIDED_VEHICLE` or `GROUND_HELD_AIRCRAFT`. While a store remains
-stowed, live and replay projections use the actual recorded aircraft position,
-velocity, mass, fuel, and phase and never create a weapon frame. Movement
-authority remains the aircraft frame's explicit `UNAVAILABLE` value and stable
-cause; a recorded zero held velocity is not promoted into a valid movement
-capability.
+Mission lineage adds no parallel frame state. Ground starts use the canonical
+aircraft entity at the threshold with zero speed in the first frame. Frame v6
+records achieved operational and movement state plus controller
+requested/accepted/achieved vectors and limiter on subsequent fixed steps. The
+compatibility projection identifies an executing takeoff as `AIRCRAFT`; live
+and replay paths preserve recorded position, velocity, mass, fuel, installed
+stores and phase without creating a weapon frame or synthesizing movement.
 Recorded geographic/engine frames retain the exact environment-pack binding;
 sampled atmosphere and DEM effects are replay evidence, not recalculated fields.
 
@@ -152,6 +157,11 @@ Weapons remain loadout inventory before launch. Aircraft frames preserve the ins
 
 ## Integrity and replay
 
+Ground-operation replay verifies the mission and ground-dynamics lineage plus
+the canonical event/frame stream before exposing any phase or controller value.
+Tampered states, transition extrema, controller values or compact bindings fail
+closed rather than being recomputed.
+
 VSR integrity continues to validate only the model-pack identity already bound
 by the compiled scenario and manifest. The new offline v2 validator neither
 weakens that check nor lets replay resolve or substitute a model pack.
@@ -175,7 +185,11 @@ The manifest records SHA-256 hashes for the canonical scenario, compiled engine 
 `vector.simulation-event.v2` stream. It is not rebuilt from sampled frames and
 does not contain display-ready English. The current closed producer set is
 `RUN_STARTED`, `ENTITY_ENTERED_WORLD`, `ENTITY_LIFECYCLE_CHANGED`,
-`TRACK_STATE_CHANGED`, and `RUN_COMPLETED`. `TRACK_STATE_CHANGED` is available
+`AIRCRAFT_OPERATIONAL_STATE_CHANGED`, `TRACK_STATE_CHANGED`, and
+`RUN_COMPLETED`. The aircraft event is produced by `AIRCRAFT_DYNAMICS` at the
+exact retained frame for every governed hold/roll/rotate/climbout/enroute
+transition and binds the ground-dynamics digest plus movement value state.
+`TRACK_STATE_CHANGED` is available
 only for the source-authored generic engine-verification model and records an
 opaque side-owned track transition with exact source sequence/time and typed
 cause. Payload v3 retains the exact opaque observation ID for
@@ -254,6 +268,11 @@ authoritative v2 stream.
 
 ## Browser and interoperability boundary
 
+The Worker transfers the recorded runway lifecycle and controller/value-state
+fields through the existing VSR boundary. Browser map, 3D, telemetry, timeline
+and report consumers select the same frame and may not synthesize missing phase,
+speed, path or control values.
+
 The compiled-model-pack v2 identity validator is not a browser/Worker or VSR
 viewer API. No replay consumer, transfer payload, or interoperability adapter
 changes in this stage.
@@ -274,6 +293,11 @@ same aggregate persistence/API contract.
 VSR is designed for browser production and playback. Frames use a transferable columnar buffer so a Web Worker, TypeScript engine or Rust/WASM engine can produce the same record contract. An ACMI 2.2 exporter can be added as an interoperability adapter; ACMI is not used as VECTOR's internal source of model truth because it does not carry VECTOR's full coefficient, provenance and scenario contracts.
 
 ## Implemented replay boundary
+
+The implemented ground-operation replay covers the admitted generic roll,
+rotation and climbout sequence through `ENROUTE`, with exact events and
+fuel/mass/store continuity. Taxi, rejected-takeoff braking, landing, recovery
+and ground-held store release remain unavailable.
 
 No VSR version, persisted field, record writer/reader behavior, or replay
 authority changes with the offline compiled-model-pack v2 validator.
@@ -298,9 +322,9 @@ pictures for A2A runs, provenance, limitations, and report outcome. The
 from recorded frames and metadata without calling either physics backend. That
 read model is sufficient for the existing map, Three.js, telemetry, RASP,
 explanation, and report consumers.
-For a ground-held run, this reconstruction again selects the actual recorded
-aircraft as `GROUND_HELD_AIRCRAFT`; it does not require or synthesize the
-unlaunched primary store. This is the same path used by the browser Worker after
+For a governed runway run, reconstruction selects the recorded aircraft as
+`AIRCRAFT`; it does not require or synthesize the unlaunched primary store.
+This is the same path used by the browser Worker after
 it has produced and reopened the transferable record.
 
 `frames.arrow` currently contains the versioned VECTOR columnar codec
@@ -315,9 +339,10 @@ requires a new member schema version and fixture migration.
 
 Version 6 preserves the exhaustive observer state v2 and v3 from version 5 and
 adds optional achieved aircraft operational state plus explicit movement
-`VALID`/`UNAVAILABLE`/`TERMINATED` state. A held ground start records
-`GROUND_DYNAMICS_MODEL_UNAVAILABLE`; it is not presented as a valid zero-speed
-flight solution. Its
+`VALID`/`UNAVAILABLE`/`TERMINATED` state. An admitted readiness hold is a valid
+recorded zero movement with `GROUND_HOLD`; roll/rotate/climbout carry positive
+achieved movement. New runs reject absent authority, while historical v1
+records may retain `GROUND_DYNAMICS_MODEL_UNAVAILABLE`. Its
 `pictures.jsonl` member is `vector.pictures.v4`, which can preserve the generic
 verification observation, uncertainty, and side-owned track without a world
 entity identity. The reader keeps frames-v5/pictures-v4 for pre-aircraft-state

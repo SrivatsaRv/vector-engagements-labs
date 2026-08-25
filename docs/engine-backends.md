@@ -4,6 +4,12 @@ VECTOR has one engine contract and two browser implementations. The authored sce
 
 ## Rust / WebAssembly
 
+Ground-operation v2 is an exact cross-backend ABI: direct Rust/WASM reads the
+unchanged full compiled Air mission as independent authority, binds its generic
+projection to both compact runtime copies, and emits the same per-tick state,
+controller and transition-event fields as TypeScript. Compact-copy mutation or
+caller-visible digest resealing cannot promote an unavailable operation.
+
 `EngineScenario.airMission` is an optional compiled lineage envelope. A ground
 run also carries a compact compiler-owned copy of the exact
 `vector.aircraft-ground-operation.v1` artifact. Before ticks, both backends
@@ -73,6 +79,11 @@ It is not a separate product mode. Its purpose is controlled parity testing, dia
 
 ## Selection and provenance
 
+Generic runway execution does not select a backend or a named model. Both
+backends retain the same mission, model-pack, EnvironmentPack and optimized
+WASM content identities, and `ADMITTED_GENERIC_EDUCATIONAL` remains an explicit
+model-assumption authority rather than a deployment-capability selector.
+
 Air runs add authored and compiled mission digests to backend-independent
 provenance. Backend choice cannot create, migrate, or repair mission intent.
 Backend provenance now sits beside one content-addressed regional pack. A run
@@ -91,18 +102,30 @@ Validating a Stage-B v2 pack in Rust does not alter that selection or provenance
 authority; no deployment manifest currently admits v2 execution.
 Likewise, a TP-1538 verification digest records only an offline evaluator run;
 it cannot select a deployment backend or become `EngineRun` provenance.
-Ground-operation provenance is likewise backend-neutral: both implementations
-require the same mission, start posture, release time, and runway evidence
-digest and emit the same fail-closed operational/movement state.
+Ground-operation provenance is backend-neutral: both implementations require
+the same full mission, start posture, release time, runway/environment evidence
+and independently sealed ground-dynamics digest. They integrate the same
+fixed-step generic roll/rotation/climbout mechanism and emit identical
+operational frames and transition events; direct Rust/WASM rejects compact-copy
+promotion against the unchanged full Air-mission authority.
 
 ## Build and verification
 
 Rebuilding the artifact requires Rust stable, Cargo on `PATH`, and the
-`wasm32-unknown-unknown` target. The production application consumes the
-committed, integrity-checked artifact and does not install a compiler at runtime.
+`wasm32-unknown-unknown` target. The build then applies the exact
+`binaryen@131.0.0 -O3 -S2 rust-wasm-features-v1` post-link policy before
+content-addressing and embedding the module. The optimizer identity participates
+in the source digest and is recorded beside the artifact; verification rejects
+either source or optimizer drift. The feature policy admits only the Rust-emitted
+mutable-global, non-trapping conversion, bulk-memory, sign-extension and
+reference-type instruction families (plus Binaryen's bulk-memory optimization
+flag), and the generated module is validated by both Binaryen and the host
+WebAssembly runtime. The production application consumes the committed,
+integrity-checked artifact and does not install a compiler or optimizer at
+runtime.
 
-- `npm run engine:rust:build` compiles release WASM and regenerates the embedded artifact.
-- `npm run engine:rust:verify` recompiles and rejects a stale committed artifact.
+- `npm run engine:rust:build` compiles and deterministically optimizes release WASM, then regenerates the embedded artifact.
+- `npm run engine:rust:verify` repeats compilation and optimization and rejects a stale artifact or build-policy identity.
 - `npm run engine:rust:fmt` checks canonical Rust formatting.
 - `npm run engine:rust:clippy` runs strict Clippy across every target and feature.
 - `npm run engine:rust:test` runs native Rust tests.
@@ -115,6 +138,12 @@ committed, integrity-checked artifact and does not install a compiler at runtime
   verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
 
 ## Swap boundary
+
+The ground-to-air swap is achieved-state-driven: only the recorded `ENROUTE`
+transition releases the aircraft from the ground-operation integrator to the
+existing airborne route controller. A timer, scenario ID, actor name or compact
+caller claim cannot cross this boundary, and installed stores remain stowed
+until after it.
 
 The swap boundary consumes mission-authoritative start speed, fuel mass, and
 store count only after the compiler has reconciled them with the generic engine

@@ -312,6 +312,12 @@ The current map envelopes are `DECLARED`. The LOS fixture results are
 
 ## Verification and tolerances
 
+After forward migration 015 exists, `environment:migration:verify` treats
+`014_environment_pack_runways.sql` as a historical artifact frozen at SHA-256
+`c40e91b0fbbf2ee5110ae601dba676d2feec1957ebb440db81703c1696cbd227`.
+Current scenario-package bytes belong to the successor migration; regenerating
+or silently rewriting 014 is rejected.
+
 Regional gates cover 114 raw artifacts, independent planar/atmosphere fixtures,
 six-area contrast, no-data/datum/time failures, TS/Rust parity, PostGIS/API
 readback, Worker cancellation/recovery and bounded throughput/memory.

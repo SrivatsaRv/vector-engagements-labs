@@ -67,6 +67,15 @@ that prior digest and repeats the same no-build Compose operation.
 
 ## Migration, backup, and restore order
 
+Migration `015_generic_ground_dynamics.sql` deterministically upserts only the
+eight canonical v4 scenario-package rows and hashes affected by ground-envelope
+v2, so migrate-before-seed fresh installs and upgrades share one result.
+Its final expected-row table verifies every governed ID, version, schema, hash
+and environment description without rejecting unrelated user/historical rows.
+It runs after migration 014, which remains the sole owner of sourced runways and
+EnvironmentPacks; rollback continues to require restoring the pre-migration
+backup rather than mutating immutable rows in place.
+
 Scenario migration `013_air_mission_contract.sql` is forward-only. The preflight
 verifier accepts only a catalogue that is wholly v3 or wholly v4, the migration
 atomically installs the eight canonical v4 packages and hashes, and its final

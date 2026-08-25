@@ -137,7 +137,7 @@ export type Frame = {
   /** The canonical entity projected into the legacy interceptor presentation fields. */
   primaryEntityId: string;
   /** Distinguishes an active vehicle from an actual held aircraft; never implies store spawn. */
-  primaryEntityRole: "GUIDED_VEHICLE" | "GROUND_HELD_AIRCRAFT";
+  primaryEntityRole: "GUIDED_VEHICLE" | "AIRCRAFT" | "GROUND_HELD_AIRCRAFT";
   interceptor: Vec3;
   target: Vec3;
   speed: number;
@@ -579,28 +579,27 @@ export function buildSimulationResult(
     const weapon = engineFrame.entities.find(
       (entity) => entity.id === engineRun.primaryWeaponId,
     );
-    const heldAircraft = weapon
+    const launchAircraft = weapon
       ? undefined
       : engineFrame.entities.find(
           (entity) =>
             entity.kind === "AIRCRAFT" &&
-            entity.installedStoreIds.includes(engineRun.primaryWeaponId) &&
-            entity.aircraftMovementValueState === "UNAVAILABLE" &&
-            entity.aircraftMovementUnavailableReason ===
-              "GROUND_DYNAMICS_MODEL_UNAVAILABLE",
+            entity.installedStoreIds.includes(engineRun.primaryWeaponId),
         );
-    const primaryEntity = weapon ?? heldAircraft;
+    const primaryEntity = weapon ?? launchAircraft;
     const target = engineFrame.entities.find(
       (entity) => entity.id === engineRun.primaryTargetId,
     );
     if (!primaryEntity || !target) {
       throw new Error(
-        "Simulation result has no active guided vehicle or admitted ground-held aircraft and target.",
+        "Simulation result has no active guided vehicle or admitted runway aircraft and target.",
       );
     }
     const primaryEntityRole = weapon
       ? "GUIDED_VEHICLE" as const
-      : "GROUND_HELD_AIRCRAFT" as const;
+      : primaryEntity.aircraftMovementValueState === "UNAVAILABLE"
+        ? "GROUND_HELD_AIRCRAFT" as const
+        : "AIRCRAFT" as const;
     const atmosphere = environmentSampler.sample({
       eastM: primaryEntity.position.x,
       northM: primaryEntity.position.y,

@@ -45,6 +45,17 @@ fn mission_number(mission: &Value, pointer: &str) -> Result<f64, EngineError> {
         .ok_or_else(|| invalid("Air mission authority is invalid"))
 }
 
+fn canonical_json_digest_without_digest(value: &Value) -> Result<String, EngineError> {
+    let mut material = value.clone();
+    material
+        .as_object_mut()
+        .ok_or_else(|| invalid("Ground-dynamics authority is invalid"))?
+        .remove("digest");
+    let bytes = serde_json::to_vec(&material)
+        .map_err(|error| EngineError::Serialization(error.to_string()))?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
 pub(crate) fn validate_air_mission_authority(
     mission: Option<&Value>,
 ) -> Result<Option<GroundMissionAuthority>, EngineError> {
@@ -74,20 +85,161 @@ pub(crate) fn validate_air_mission_authority(
     {
         return Err(invalid("Air mission authority is invalid"));
     }
-    Ok(Some(GroundMissionAuthority {
-        binding: crate::AircraftGroundOperation {
-            schema_version: "vector.aircraft-ground-operation.v1".to_string(),
-            posture: posture.to_string(),
-            release_time_seconds: mission_number(mission, "/authored/start/readinessDelaySeconds")?,
-            mission_digest: compiled_digest.to_string(),
-            runway_evidence_digest: mission_string(
-                mission,
-                "/authored/start/runway/evidence/digest",
-            )?
+    let ground_dynamics_value = mission
+        .pointer("/assignment/groundEnvelope/groundDynamics")
+        .cloned()
+        .ok_or_else(|| invalid("Air mission authority is invalid"))?;
+    const GROUND_DYNAMICS_FIELDS: [&str; 18] = [
+        "authority",
+        "climboutFlightPathAngleRad",
+        "climboutSpeedMps",
+        "digest",
+        "enrouteTransitionHeightM",
+        "evidenceRefIds",
+        "liftoffSpeedMps",
+        "limitationIds",
+        "maximumCrosswindMps",
+        "maximumTailwindMps",
+        "maximumTakeoffMassKg",
+        "minimumTakeoffFuelKg",
+        "rollingResistanceCoefficient",
+        "rotationSpeedMps",
+        "schemaVersion",
+        "takeoffLiftCoefficient",
+        "validity",
+        "valueState",
+    ];
+    let ground_dynamics_digest =
+        mission_string(mission, "/assignment/groundEnvelope/groundDynamics/digest")?;
+    let ground_string_array_is_valid = |pointer: &str| {
+        mission
+            .pointer(pointer)
+            .and_then(Value::as_array)
+            .is_some_and(|values| {
+                !values.is_empty()
+                    && values
+                        .iter()
+                        .all(|value| value.as_str().is_some_and(|item| !item.is_empty()))
+            })
+    };
+    let exact_ground_fields = ground_dynamics_value.as_object().is_some_and(|object| {
+        object.len() == GROUND_DYNAMICS_FIELDS.len()
+            && GROUND_DYNAMICS_FIELDS
+                .iter()
+                .all(|field| object.contains_key(*field))
+    });
+    if !exact_ground_fields
+        || canonical_json_digest_without_digest(&ground_dynamics_value)? != ground_dynamics_digest
+        || mission_string(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/schemaVersion",
+        )? != "vector.compiled-aircraft-ground-dynamics.v1"
+        || mission_string(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/authority",
+        )? != "GENERIC_PUBLIC_EDUCATIONAL"
+        || mission_string(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/valueState",
+        )? != "MODEL_ASSUMPTION"
+        || mission_string(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/validity/schemaVersion",
+        )? != "vector.aircraft-ground-dynamics-validity.v1"
+        || mission_string(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/validity/intendedUse",
+        )? != "PUBLIC_EDUCATIONAL"
+        || mission_string(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/validity/mechanism",
+        )? != "RUNWAY_ROLL_ROTATION_CLIMBOUT"
+        || mission
+            .pointer("/assignment/groundEnvelope/groundDynamics/validity")
+            .and_then(Value::as_object)
+            .is_none_or(|object| object.len() != 3)
+        || !ground_string_array_is_valid("/assignment/groundEnvelope/groundDynamics/evidenceRefIds")
+        || !ground_string_array_is_valid("/assignment/groundEnvelope/groundDynamics/limitationIds")
+        || mission_number(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/maximumCrosswindMps",
+        )? <= 0.0
+    {
+        return Err(invalid(
+            "Air mission ground-dynamics digest does not bind its authoritative content",
+        ));
+    }
+    let binding = crate::AircraftGroundOperation {
+        schema_version: "vector.aircraft-ground-operation.v2".to_string(),
+        posture: posture.to_string(),
+        release_time_seconds: mission_number(mission, "/authored/start/readinessDelaySeconds")?,
+        mission_digest: compiled_digest.to_string(),
+        runway_evidence_digest: mission_string(mission, "/authored/start/runway/evidence/digest")?
             .to_string(),
-            execution_authority: "UNAVAILABLE".to_string(),
-            unavailability_reason: "GROUND_DYNAMICS_MODEL_UNAVAILABLE".to_string(),
-        },
+        execution_authority: "ADMITTED_GENERIC_EDUCATIONAL".to_string(),
+        ground_dynamics_digest: ground_dynamics_digest.to_string(),
+        maximum_takeoff_mass_kg: mission_number(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/maximumTakeoffMassKg",
+        )?,
+        minimum_takeoff_fuel_kg: mission_number(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/minimumTakeoffFuelKg",
+        )?,
+        rolling_resistance_coefficient: mission_number(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/rollingResistanceCoefficient",
+        )?,
+        rotation_speed_mps: mission_number(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/rotationSpeedMps",
+        )?,
+        liftoff_speed_mps: mission_number(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/liftoffSpeedMps",
+        )?,
+        takeoff_lift_coefficient: mission_number(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/takeoffLiftCoefficient",
+        )?,
+        climbout_speed_mps: mission_number(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/climboutSpeedMps",
+        )?,
+        climbout_flight_path_angle_rad: mission_number(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/climboutFlightPathAngleRad",
+        )?,
+        enroute_transition_height_m: mission_number(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/enrouteTransitionHeightM",
+        )?,
+        maximum_tailwind_mps: mission_number(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/maximumTailwindMps",
+        )?,
+        maximum_crosswind_mps: mission_number(
+            mission,
+            "/assignment/groundEnvelope/groundDynamics/maximumCrosswindMps",
+        )?,
+        runway_length_m: mission_number(mission, "/authored/start/runway/lengthM")?,
+        runway_heading_deg_true: mission_number(mission, "/start/runwayHeadingDegTrue")?,
+        runway_end_elevation_m: mission_number(
+            mission,
+            "/authored/start/runway/end/elevation/valueM",
+        )?,
+    };
+    if !binding.physically_valid()
+        || sha256_digest(
+            "airMission.runwayEvidenceDigest",
+            &binding.runway_evidence_digest,
+        )
+        .is_err()
+    {
+        return Err(invalid("Air mission authority is invalid"));
+    }
+    Ok(Some(GroundMissionAuthority {
+        binding,
         aircraft_source_object_id: aircraft_source_object_id.to_string(),
     }))
 }
@@ -1020,44 +1172,20 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
             let mission_matches = scenario
                 .air_mission_runtime
                 .as_ref()
-                .is_some_and(|binding| {
-                    binding.schema_version == ground.schema_version
-                        && binding.mission_digest == ground.mission_digest
-                        && binding.runway_evidence_digest == ground.runway_evidence_digest
-                        && binding.posture == ground.posture
-                        && binding.release_time_seconds == ground.release_time_seconds
-                        && binding.execution_authority == ground.execution_authority
-                        && binding.unavailability_reason == ground.unavailability_reason
-                });
+                .is_some_and(|binding| binding == ground);
             let authoritative_mission_matches = scenario
                 .air_mission_authority
                 .as_ref()
-                .is_some_and(|authority| {
-                    authority.schema_version == ground.schema_version
-                        && authority.mission_digest == ground.mission_digest
-                        && authority.runway_evidence_digest == ground.runway_evidence_digest
-                        && authority.posture == ground.posture
-                        && authority.release_time_seconds == ground.release_time_seconds
-                        && authority.execution_authority == ground.execution_authority
-                        && authority.unavailability_reason == ground.unavailability_reason
-                });
-            if ground.schema_version != "vector.aircraft-ground-operation.v1"
-                || !matches!(
-                    ground.posture.as_str(),
-                    "PARKING" | "RUNWAY" | "GROUND_ALERT_QRA"
-                )
-                || !ground.release_time_seconds.is_finite()
-                || ground.release_time_seconds < 0.0
-                || sha256_digest("groundOperation.missionDigest", &ground.mission_digest).is_err()
-                || sha256_digest(
-                    "groundOperation.runwayEvidenceDigest",
-                    &ground.runway_evidence_digest,
-                )
-                .is_err()
-                || ground.execution_authority != "UNAVAILABLE"
-                || ground.unavailability_reason != "GROUND_DYNAMICS_MODEL_UNAVAILABLE"
+                .is_some_and(|authority| authority == ground);
+            if !ground.physically_valid()
                 || !mission_matches
                 || !authoritative_mission_matches
+                || aircraft.initial.mass_kg > ground.maximum_takeoff_mass_kg
+                || aircraft.initial.fuel_kg < ground.minimum_takeoff_fuel_kg
+                || (aircraft.initial.heading_rad
+                    - (90.0 - ground.runway_heading_deg_true).to_radians())
+                .abs()
+                    > 1e-12
                 || aircraft.initial.velocity.magnitude() != 0.0
             {
                 return Err(invalid(format!(

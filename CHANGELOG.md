@@ -13,9 +13,10 @@ one family must not imply changes to unrelated contracts.
 
 - Bind the independent regional EnvironmentPack/runtime-grid digest beside the
   compiled model pack without changing named-system evidence authority.
-- Keep the scalar ground envelope release-blocking and non-promotable while the
-  compiler emits a separate exact `UNAVAILABLE` ground-operation safety binding;
-  no aerodynamic, propulsion, control, or named-aircraft evidence is added.
+- Add a content-addressed generic `MODEL_ASSUMPTION` ground-dynamics projection
+  and exact `ADMITTED_GENERIC_EDUCATIONAL` runtime binding. This authorizes only
+  bounded runway roll/rotation/climbout; no TP-1538 value, named-aircraft,
+  landing/recovery, store-release, named propulsion or control-law claim is added.
 
 Model-pack persistence table declarations now live in the domain-owned
 `db/schema/model-pack.ts` module behind the unchanged aggregate Drizzle facade.
@@ -48,6 +49,11 @@ promotion remain downstream under #154, later #161 stages and #155.
 
 #### Database schema
 
+- Add forward-only migration 015 to refresh immutable canonical v4 scenario
+  packages/hashes after the ground-envelope v2 digest change. It self-upserts
+  all eight rows before seed and reads back exact identity/schema/hash/environment
+  values while ignoring unrelated rows; migration 014 remains byte-frozen and
+  retains sole ownership of sourced runway and EnvironmentPack rows.
 - Add migration 014 for immutable PostGIS environment packs, sourced runway
   geometry/elevation/provenance, exact catalogue readback, and canonical v4
   scenario-package EnvironmentPack wording/hashes.
@@ -78,6 +84,14 @@ no exported simulation ABI, backend-selection rule or v2 runtime admission.
 - Register the value-free TP-1538 evaluator as another separately built
   verification artifact whose ABI and digest cannot enter production backend
   selection, `EngineScenario`, `EngineRun`, Worker, or VSR authority.
+- Add `vector.aircraft-ground-operation.v2` and the
+  `AIRCRAFT_OPERATIONAL_STATE_CHANGED` payload. TypeScript and direct Rust/WASM
+  bind compact tick fields to the full Air mission, then preserve exact
+  hold/roll/rotate/climbout/enroute transitions, fuel/mass/store histories and
+  controller requested/accepted/achieved values through Worker and VSR replay.
+- Pin the Rust/WASM post-link size policy to Binaryen 131.0.0 with an explicit
+  admitted feature set; bind that policy into the generated module identity and
+  keep the existing sub-550,000-byte browser artifact gate without relaxing it.
 - Admit the exact-key `vector.aircraft-ground-operation.v1` safety artifact in
   both backends and validate its mission/start/release/runway lineage before
   holding movement unavailable.
@@ -142,10 +156,11 @@ admission, or tick behavior.
   legacy zero-plane/educational atmosphere behavior remains distinct and is
   used only when no regional runtime projection exists.
 - Bind every admitted ground start to an exact versioned mission/runway/release
-  artifact and hold it at `PARKED`/`HOLD_SHORT` with movement explicitly
-  unavailable until governed ground dynamics exist. Ground-held aircraft retain
-  position, fuel, mass and stores and cannot launch a weapon; no taxi, runway,
-  takeoff, climbout or recovery physics is claimed.
+  artifact. A generic `MODEL_ASSUMPTION` projection now drives force-based
+  runway roll, achieved rotation/liftoff and bounded climbout with one state
+  transition per integer tick, exact fuel/mass/store continuity and explicit
+  controller values. Taxi, braking, landing, recovery, ground-held store release
+  and named-aircraft performance remain unavailable.
 - Require both runtimes to bind both compact ground-operation copies to the
   authoritative compiled Air mission, and make Worker/VSR presentation select
   the actual held aircraft instead of dereferencing or materializing its stowed
@@ -167,8 +182,9 @@ No pending family-specific entry.
 - Archive the complete regional pack/runtime projection and reject replay
   substitution by a later or superseding pack identity.
 - Add `vector.frames.columnar.v6` operational/movement value-state metadata for
-  fail-closed ground-held aircraft while retaining read-only v5/v4 and v4/v3
-  frame/picture compatibility.
+  ground-held and admitted takeoff aircraft, exact controller values and
+  lifecycle transition events while retaining read-only v5/v4 and v4/v3
+  frame/picture compatibility. Replay rejects tampered or synthesized movement.
 
 Saved-run record and admission tables now have separate domain-owned schema
 modules without changing their persisted representation.
@@ -194,8 +210,10 @@ Air templates advance to `vector.scenario.v4` with one authored
 All Air mission classes, overlays, flight plans, start postures, loadout/fuel,
 recovery, Worker/server admission, and VSR/report lineage share that contract.
 Ground starts additionally compile an exact mission/runway/release safety
-artifact; the current runtime reports only `PARKED`/`HOLD_SHORT` and does not
-claim taxi, takeoff, climbout, approach, or recovery.
+artifact plus a content-addressed generic educational ground-dynamics
+projection. The runtime can execute only governed runway roll, rotation,
+liftoff and climbout through `ENROUTE`; it does not claim taxi, braking,
+approach, landing, recovery, named performance or TP-1538 authority.
 Migration `013_air_mission_contract.sql` freezes exact upgraded template JSON
 and hashes; no production seed or fallback default performs the migration.
 - Add exact `vector.installation-origin.v2` runway starts and fail-closed
@@ -207,6 +225,10 @@ Scenario-template table declarations now live in `db/schema/scenarios.ts`
 behind the unchanged aggregate schema export.
 
 #### Scenario composition kernel
+
+The kernel adapter now exact-key validates the generic ground-dynamics
+projection and rejects unsupported authority or resealed compact promotion. It
+continues to own identity/admission only and does not execute takeoff physics.
 
 `vector.scenario-kernel.v1` now owns arbitrary affiliations, organization
 structure, multi-domain entity identities, authored task graphs and six-surface

@@ -58,6 +58,7 @@ export const SIMULATION_EVENT_PAYLOAD_SCHEMAS = {
   RUN_STARTED: "vector.simulation-event-payload.run-started.v1",
   ENTITY_ENTERED_WORLD: "vector.simulation-event-payload.entity-entered-world.v1",
   ENTITY_LIFECYCLE_CHANGED: "vector.simulation-event-payload.entity-lifecycle-changed.v1",
+  AIRCRAFT_OPERATIONAL_STATE_CHANGED: "vector.simulation-event-payload.aircraft-operational-state-changed.v1",
   RUN_COMPLETED: "vector.simulation-event-payload.run-completed.v1",
   TRACK_STATE_CHANGED: "vector.simulation-event-payload.track-state-changed.v3",
 } as const;
@@ -296,6 +297,14 @@ export type SimulationEventPayload =
       termination: EngineTermination;
     }
   | {
+      kind: "AIRCRAFT_OPERATIONAL_STATE_CHANGED";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.AIRCRAFT_OPERATIONAL_STATE_CHANGED;
+      from: AircraftOperationalState;
+      to: AircraftOperationalState;
+      movementValueState: "VALID" | "TERMINATED";
+      groundDynamicsDigest: string;
+    }
+  | {
       kind: "TRACK_STATE_CHANGED";
       schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.TRACK_STATE_CHANGED;
       perspective: ObserverPerspective;
@@ -331,7 +340,7 @@ export type SimulationEventV2 = {
     | "WEAPON"
     | "TERMINATION";
   producer: {
-    subsystem: "RUN_COORDINATOR" | "ENTITY_LIFECYCLE" | "SENSOR_TRACK";
+    subsystem: "RUN_COORDINATOR" | "ENTITY_LIFECYCLE" | "AIRCRAFT_DYNAMICS" | "SENSOR_TRACK";
     entityId?: string;
   };
   ownerAffiliation?: Affiliation;
@@ -390,14 +399,27 @@ export type AircraftOperationalState =
   | "DISABLED";
 
 export type AircraftGroundOperation = {
-  schemaVersion: "vector.aircraft-ground-operation.v1";
+  schemaVersion: "vector.aircraft-ground-operation.v2";
   posture: "PARKING" | "RUNWAY" | "GROUND_ALERT_QRA";
   releaseTimeSeconds: number;
   missionDigest: string;
   runwayEvidenceDigest: string;
-  /** Ground dynamics remain unavailable until a complete admitted model owns them. */
-  executionAuthority: "UNAVAILABLE";
-  unavailabilityReason: "GROUND_DYNAMICS_MODEL_UNAVAILABLE";
+  executionAuthority: "ADMITTED_GENERIC_EDUCATIONAL";
+  groundDynamicsDigest: string;
+  maximumTakeoffMassKg: number;
+  minimumTakeoffFuelKg: number;
+  rollingResistanceCoefficient: number;
+  rotationSpeedMps: number;
+  liftoffSpeedMps: number;
+  takeoffLiftCoefficient: number;
+  climboutSpeedMps: number;
+  climboutFlightPathAngleRad: number;
+  enrouteTransitionHeightM: number;
+  maximumTailwindMps: number;
+  maximumCrosswindMps: number;
+  runwayLengthM: number;
+  runwayHeadingDegTrue: number;
+  runwayEndElevationM: number;
 };
 
 /** Immutable one-axis SI table admitted before a simulation starts. */
@@ -608,7 +630,13 @@ export type EngineEntityFrame = {
     requestedSteeringAccelerationMps2: Vec3;
     acceptedSteeringAccelerationMps2: Vec3;
     achievedVelocityMps: Vec3;
-    limiter: "LOAD_FACTOR" | "NONE" | "ROUTE_COMPLETE";
+    limiter:
+      | "GROUND_HOLD"
+      | "GROUND_FORCE"
+      | "CLIMBOUT"
+      | "LOAD_FACTOR"
+      | "NONE"
+      | "ROUTE_COMPLETE";
   };
 };
 

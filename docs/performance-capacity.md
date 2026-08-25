@@ -240,6 +240,14 @@ proof, x86-64 capacity result, or named-sensor performance claim.
 
 ## Required performance test matrix
 
+#182 adds a focused regression workload: 12 already-admitted 50-second runway
+takeoff/climbout runs per TypeScript and Rust/WASM backend, each retaining fewer
+than 300 canonical frames and enforcing a 100 ms p95 ceiling. The gate measures
+engine execution after compilation; it is not named-aircraft, runway-capacity,
+browser-rendering or server-throughput evidence. Publication also retains the
+existing sub-550,000-byte optimized WASM gate and the complete repository
+performance matrix on the clean candidate SHA.
+
 Air mission delivery retains the existing engine/Worker capacity gates and adds
 no per-tick catalogue or database work. Mission compilation and Worker
 re-admission occur once before execution; the applicable local performance gate

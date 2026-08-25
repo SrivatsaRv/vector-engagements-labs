@@ -117,6 +117,11 @@ spending limits and abuse monitoring remain deployment duties.
 
 ## Delivery trust
 
+The Rust/WASM artifact now binds the exact Binaryen 131.0.0 optimization policy
+into its source identity and verifies optimized bytes, length and required ABI
+exports before embedding. The optimizer is build-time only and cannot be
+selected or supplied by a runtime scenario.
+
 The contract ownership registry now maps the one Air mission implementation and
 regression suite to new material mission-contract and record-storage sections.
 The registry canonical digest and exact semantic declaration bind that new
