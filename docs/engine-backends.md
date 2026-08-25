@@ -26,6 +26,9 @@ verification artifact and is callable only through the verification adapter,
 focused tests and benchmark. Production Rust exports, production WASM, backend
 selection and the built simulation Worker are scanned for its symbol, subject
 identity and adapter; any match fails the isolation gate.
+NASA TP-1538 aerodynamic verification follows the same separate-artifact rule:
+its `vector_tp1538_aero_*` ABI exists only in the verification crate and is
+prohibited from this production module.
 
 The build embeds the compiled module in the application with its SHA-256 digest and byte length. Loading fails closed if the required ABI or provenance is missing. VECTOR does not silently fall back to TypeScript after a Rust/WASM run has been selected.
 
@@ -73,6 +76,8 @@ remains independently executable through explicit verification manifests for
 parity checks. See [`deployment-capabilities.md`](deployment-capabilities.md).
 Validating a Stage-B v2 pack in Rust does not alter that selection or provenance
 authority; no deployment manifest currently admits v2 execution.
+Likewise, a TP-1538 verification digest records only an offline evaluator run;
+it cannot select a deployment backend or become `EngineRun` provenance.
 
 ## Build and verification
 
@@ -101,6 +106,9 @@ entity contract. No mission class, scenario ID, or named aircraft selects a
 backend or physics branch. Likewise, a successfully validated Stage-B v2
 identity cannot cross this swap boundary until #154 and the later
 Worker/runtime/VSR owner add a separate admission contract.
+The TP-1538 verification adapter is also outside this boundary: neither a
+complete synthetic batch nor a later admitted corpus can enter an
+`EngineScenario` without a separately owned production model-pack contract.
 The backend-neutral scenario owns the complete preprocessed environment
 projection. Implementations may optimize sampling but may not re-resolve area
 names, query remote terrain/database state, or substitute atmosphere defaults.

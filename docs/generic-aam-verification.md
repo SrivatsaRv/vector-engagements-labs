@@ -12,6 +12,10 @@ The current separate corpus is `governance/nasa-tm-109057-generic-aam-verificati
 
 The current governed bounded workload is `fixtures/public-reference/nasa-tm-109057/workload.v5.json`, 7,922 bytes, SHA-256 `b1f2092dc810909ffa0b4c9c1b2cf33102ca02f0a10a9bbb24d653ed2bc7c4be`. Its sorted 15-case cross-platform semantic batch digest is `430a2a8a5ffa120f86e9ea2d9e5128526a397d2aa4f53609b0aff9cfae2c87e2`. Immutable workload v2–v4 remain unchanged; v3 is exactly 8,223 bytes with SHA-256 `0b7f7ba1395ff58629c26aaa62e46c239121d37e4197a2246e1064aa8caeb556`, and reviewed v4 is exactly 7,922 bytes with SHA-256 `9df2c63309e22931deed24c2ee267b7efed2fc7783061ad84b2628f8e577012d`. Each evaluator run used by these workloads still owns raw `outputSha256` and `contentSha256` identities over all binary64 frames and terminal metadata. Those raw identities prove exact same-runtime repeatability and field tamper detection; they are deliberately not cross-host goldens. Exact arithmetic, boundary, convergence, parity, and controlled-configuration claims require the independent anchors below.
 
+The TP-1538 tooling introduced by #178 is a separate family with distinct
+source, schema, ABI prefix, artifact and record identities. It reuses no
+generic-AAM corpus value, workload, oracle or admission decision.
+
 ## Roles, ancestry, and exclusions
 
 - Appendix B, PDF pages 25–26: `SOURCE` for test-program initial values, grid bounds, and tick rates.
@@ -39,6 +43,8 @@ Any new output-affecting ambiguity requires a successor corpus and decision revi
 This completion keeps D01–D10 and every executable value unchanged; the new
 raw-file and benchmark checks cannot reconcile, average or default a source
 conflict.
+TP-1538 transcription or adjudication decisions cannot resolve or supersede
+any generic-AAM discrepancy.
 
 ## Executable contract
 
@@ -60,6 +66,10 @@ At integer tick `n`, time is `n/tickRateHz`. The evaluator advances the constant
 `vector.generic-aam-verification-run.v3` retains every tick: positions, speed, pitch/yaw and rates/signals, mass, thrust, drag, relative geometry, seeker angle, LOS rate, signed range rate, commands, closest approach, and state. Every integration stage rejects nonfinite or unsafe dynamic values. The output decoder is exact-key and exhaustive: every scalar and vector component must be a finite JSON number; nulls, strings, unknown keys/enums, invalid state/cause pairs, inconsistent ticks, inconsistent range/relative geometry, forged identity/digests, or missing limitations reject. `outputSha256` directly addresses frames plus terminal. Its encoding is closed: a big-endian 32-bit frame count; for each frame, the 19 scalar fields in declared contract order as big-endian IEEE-754 binary64, the four x/y/z vectors in declared contract order as binary64, and a one-byte closed state code; then terminal tick as binary64 plus closed one-byte state and cause codes. `contentSha256` addresses canonical identity/provenance/backend/role/limitations metadata plus `outputSha256`, thereby transitively binding the complete run except itself. Any field mutation without matching digest recomputation rejects. These hashes detect accidental/casual tamper and bind content; they do not establish cryptographic authenticity against an attacker who can alter content and recompute hashes.
 
 Rust verification is compiled from the separate `verification-rust/generic-aam` crate with serde_json `float_roundtrip`. Its generated adapter lives under `lib/validation`, is imported only by verification scripts, tests, and the benchmark, and deep-validates the decoded output. The production `engine-rust` crate, production WASM ABI, `lib/engine/backend.ts`, and built simulation Worker contain no generic-AAM module, export, subject string, or adapter. Rust uses a local strict generic DTO; the shared production `Vec3` remains byte-for-byte unchanged. `TABLE_THRUST_CONFLICT_SENSITIVITY` and `COMMAND_LIMIT_SENSITIVITY` are explicitly non-authoritative causal contrasts.
+
+The TP-1538 evaluator has its own exact-key table request/result DTO and
+`vector_tp1538_aero_*` exports. Neither evaluator accepts the other family’s
+input or artifact identity.
 
 ## Verification and performance
 
@@ -92,6 +102,9 @@ make clean-clone-local
 ```
 
 Product browser behavior, Worker execution of the verifier, VSR, UI, database, migration, integration, and visual tests are omitted because this evaluator is prohibited from those boundaries. The production build and Worker are nevertheless scanned as isolation falsifiers: verifier code or identities appearing there fail the gate.
+
+TP-1538 performance policy and results are independently identified and cannot
+satisfy or modify this family’s Apple M5 workload evidence.
 
 ## Claims boundary
 

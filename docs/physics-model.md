@@ -2,7 +2,9 @@
 
 ## TP-1538 source boundary
 
-The frozen NASA-TP-1538 *Simulator study of stall/post-stall characteristics of a fighter airplane with relaxed longitudinal static stability* pages are evidence inputs only. They do not create coefficient tables or executable aerodynamics. Future #142 stages must independently double-enter and adjudicate the printed cells before a verification-only evaluator can use them. Production dynamics must not import the source assets or infer missing cells, propulsion, control laws, altitude dependence, Reynolds corrections, or named-aircraft fidelity.
+The frozen NASA-TP-1538 *Simulator study of stall/post-stall characteristics of a fighter airplane with relaxed longitudinal static stability* pages are evidence inputs only. The issue #142 verification path defines a closed 48-table/14,705-position schema, isolated double-entry and adjudication, and a separate TypeScript/Rust-WASM evaluator, but no coefficient is executable until the complete corpus passes that admission. The evaluator is `ENGINE_VERIFICATION_ONLY`; production dynamics must not import its source, corpus, model-pack adapter, Worker or executable authority, and must not infer missing cells, propulsion, control laws, altitude dependence, Reynolds corrections, or named-aircraft fidelity.
+
+The verification evaluator performs exact-knot lookup and bounded multilinear interpolation only inside the published axes. Appendix B assembly preserves the printed body axes and control signs. The printed one-dimensional `CN_AILERON_INCREMENT` table remains independently look-up capable but is withheld from total-`Cn` assembly because the printed Appendix B equation does not reference it. That explicit source decision cannot be relaxed by a scenario, model-pack label, or fallback equation.
 
 The TP-1538 evidence chain is independent of the issue #148 generic sensor
 source freeze. The latter cannot satisfy aerodynamic evidence, and TP-1538

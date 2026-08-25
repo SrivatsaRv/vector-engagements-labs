@@ -382,6 +382,15 @@ A verification corpus with `runtimeAuthority: NONE` cannot satisfy a compiled
 aircraft component, expand a model validity domain, or be promoted through a
 catalog identity.
 
+The TP-1538 aerodynamic corpus uses a second, separately owned
+`NASA_GENERIC_F16` / `ENGINE_VERIFICATION_ONLY` adapter. Its identity binds the
+exact official-source manifest, both isolated manual transcripts, comparator,
+adjudication decisions, final corpus and evaluator contract. It is admitted
+only by the verification evaluator after all 14,705 cell states and values are
+validated. It is not an `AircraftModelDefinition`, governed production model
+pack, catalog entry, scenario patch, or alternative to the published model-pack
+compiler. Production admission cannot consume or relabel this adapter.
+
 ## Scenario binding and patches
 
 User-authored wind/temperature changes create a distinct environment-pack

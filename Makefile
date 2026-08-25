@@ -107,6 +107,7 @@ ci-quality:
 	npm run generic-sensor:sources:verify
 	npm run environment:migration:verify
 	npm run tp1538:sources:verify
+	npm run tp1538:aero:schema:verify
 	npm run policy:runtime-stubs:verify
 	npm run policy:aircraft-evidence:verify
 	npm run policy:nasa-generic-f16:verify
@@ -116,6 +117,7 @@ ci-quality:
 	npm run reference-aircraft:verify
 	npm run reference-aam:verify
 	npm run reference-aam:rust:fmt
+	npm run tp1538:aero:rust:fmt
 	npm run engine:rust:fmt
 	npm run lint
 	npm run typecheck
@@ -124,6 +126,10 @@ ci-tests:
 	npm run engine:rust:clippy
 	npm run engine:rust:verify
 	npm run reference-aam:rust:clippy
+	npm run tp1538:aero:rust:clippy
+	npm run tp1538:aero:rust:verify
+	npm run tp1538:aero:rust:test
+	npm run tp1538:aero:rust:doc
 	npm run reference-aam:rust:verify
 	npm run reference-aam:rust:test
 	npm run reference-aam:rust:doc

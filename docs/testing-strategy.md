@@ -6,6 +6,12 @@
 
 The verifier is offline and cannot fetch replacement evidence. Numeric transcription, interpolation, and runtime tests belong to later #142 children and must not be credited to #143.
 
+## Value-free TP-1538 aerodynamic tooling
+
+The #142 gate separately admits two complete, isolated manual transcripts, reports every structural/state/printed-string mismatch, requires source-page adjudication for each difference, and validates one immutable 48-table/14,705-position corpus. Focused tests reject OCR/imported numeric methods, missing/reordered/duplicate coordinates, altered pages or configurations, unavailable-cell coercion, forged recomputed digests, caller mutation, extrapolation, and production imports or bundles. Independent source-page oracles cover exact knots, interior interpolation, increments, derivatives, configuration selection, published symmetry, Appendix B assembly order, and the explicitly withheld one-dimensional `CN_AILERON_INCREMENT` assembly term.
+
+The admitted corpus must then replay identical full-state results through TypeScript and the generated-schema Rust/WASM verifier, survive bounded UTF-8 record readback, and recover a separate verification-only Worker from the same corpus after termination. Corpus admission replays each resolved state/value and `AGREED_DOUBLE_ENTRY` or `SOURCE_ADJUDICATED` label from the exact embedded transcripts and decisions, so a recomputed top-level digest cannot detach a value from its evidence lineage. The immutable performance workload binds its corpus, requests, expected results and runtime identity; its executable policy rejects dirty or unidentified measurement state and validates every complete measured output against the frozen result digest. Pre-optimization admission, 4,096-operation batch, Worker, memory and WASM-size limits are maintained in [`tp1538-aero-verification.md`](tp1538-aero-verification.md). `make ci-local`, exact-SHA clean-clone execution, and built-bundle isolation remain completion gates rather than substitutes for the independent numeric workflow.
+
 ## Generic sensor Stage-0 source freeze
 
 `npm run generic-sensor:sources:verify` first proves the generated manifest and
@@ -84,6 +90,13 @@ frozen PDFs with the pinned Poppler recipe, compares exact PNG bytes, rejects
 blank or structurally invalid images, reproduces the three upright display
 derivatives, and checks every source/display mapping. It never extracts numeric
 values or equations, and source PDFs remain authoritative.
+
+The value-free TP-1538 tooling baseline verifies the complete empty coordinate
+inventory, exact-key admission, bounded immutable storage, synthetic
+TypeScript/Rust-WASM full-state parity, isolated Worker recovery, generated
+artifact freshness and performance-evidence policy. These tests cannot be
+credited as either real transcript, page-grounded numeric oracle, comparison,
+adjudication or final-corpus evidence for parent #142.
 
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and
 production-audit checks. It first runs the same contract-documentation impact
