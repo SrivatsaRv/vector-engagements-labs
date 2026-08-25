@@ -1,0 +1,180 @@
+{
+  "schemaVersion": "vector.generic-sensor-verification-source-terms-authority.v1",
+  "authorityArtifactId": "generic-sensor-source-terms-authority-v1",
+  "subjectManifestId": "generic-sensor-source-freeze-v1",
+  "scope": "REDISTRIBUTE_FROZEN_SOURCE_BYTES",
+  "authorityKind": "AUTHORITATIVE_SOURCE_TERMS",
+  "authorizations": [
+    {
+      "sourceId": "dstl-stone-soup-v1.9.1",
+      "decisionRecordId": "source-terms-authorization:dstl-stone-soup-v1.9.1",
+      "basis": "ZENODO_OPEN_ACCESS_AND_PINNED_MIT_LICENSE",
+      "evidence": [
+        {
+          "path": "raw/stone-soup/zenodo-record-20830467.json",
+          "role": "OFFICIAL_METADATA",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 7178,
+          "sha256": "63095125c8a978dbac9125c29197e112c8ae7e5be80b2c60c358462af283bee0"
+        },
+        {
+          "path": "extracted/stone-soup-v1.9.1/LICENSE",
+          "role": "LICENSE",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 1494,
+          "sha256": "2462f3d8a857f601e266f048a4ff051366c1e05f098cf3a1524eaf922f879815"
+        }
+      ],
+      "requiredFacts": [
+        "ZENODO_ACCESS_OPEN",
+        "ZENODO_LICENSE_MIT",
+        "MIT_PUBLISH_AND_DISTRIBUTE_GRANT",
+        "MIT_NOTICE_PRESERVED"
+      ],
+      "conditions": [
+        "PRESERVE_MIT_COPYRIGHT_AND_PERMISSION_NOTICE",
+        "EXACT_FROZEN_BYTES_AND_DECLARED_EXTRACTIONS_ONLY"
+      ]
+    },
+    {
+      "sourceId": "nasa-cr-66097",
+      "decisionRecordId": "source-terms-authorization:nasa-cr-66097",
+      "basis": "NASA_NTRS_PUBLIC_GOV_PUBLIC_USE_PERMITTED",
+      "evidence": [
+        {
+          "path": "raw/nasa/19660021027.metadata.json",
+          "role": "OFFICIAL_METADATA",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 2445,
+          "sha256": "7eced126f3df081c374d670819baa5698e1f725a0fe2c19ea978c3e887662267"
+        },
+        {
+          "path": "raw/nasa/19660021027.pdf",
+          "role": "SOURCE_PDF",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 13132979,
+          "sha256": "2bacd3004112db0ce40bd5e3202e26fc5c880787cf072f111aa94a9c51c010de"
+        }
+      ],
+      "requiredFacts": [
+        "DISTRIBUTION_PUBLIC",
+        "GOV_PUBLIC_USE_PERMITTED",
+        "NO_COPYRIGHT_INDICATION",
+        "NO_THIRD_PARTY_MATERIAL",
+        "EXPORT_EAR_ITAR_NO",
+        "DOCUMENT_AND_METADATA_DISSEMINATED",
+        "DOWNLOADS_AVAILABLE",
+        "OFFICIAL_DOWNLOAD_IDENTITY"
+      ],
+      "conditions": [
+        "EXACT_NTRS_PUBLIC_USE_RECORD_AND_FROZEN_BYTES_ONLY",
+        "DECLARED_NON_AUTHORITATIVE_FULL_PAGE_RENDERS_ONLY"
+      ]
+    },
+    {
+      "sourceId": "nasa-cr-151497",
+      "decisionRecordId": "source-terms-authorization:nasa-cr-151497",
+      "basis": "NASA_NTRS_PUBLIC_GOV_PUBLIC_USE_PERMITTED",
+      "evidence": [
+        {
+          "path": "raw/nasa/19770023372.metadata.json",
+          "role": "OFFICIAL_METADATA",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 3918,
+          "sha256": "a12f96902c6d522c9836ae343f5b269677d7d95eb406f6a0c8c0156068aaae71"
+        },
+        {
+          "path": "raw/nasa/19770023372.pdf",
+          "role": "SOURCE_PDF",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 11481762,
+          "sha256": "a2826966045c4d293e4655d5ef70f87d59c07361fee7765415eeba4e8ea57a06"
+        }
+      ],
+      "requiredFacts": [
+        "DISTRIBUTION_PUBLIC",
+        "GOV_PUBLIC_USE_PERMITTED",
+        "NO_COPYRIGHT_INDICATION",
+        "NO_THIRD_PARTY_MATERIAL",
+        "EXPORT_EAR_ITAR_NO",
+        "DOCUMENT_AND_METADATA_DISSEMINATED",
+        "DOWNLOADS_AVAILABLE",
+        "OFFICIAL_DOWNLOAD_IDENTITY"
+      ],
+      "conditions": [
+        "EXACT_NTRS_PUBLIC_USE_RECORD_AND_FROZEN_BYTES_ONLY",
+        "DECLARED_NON_AUTHORITATIVE_FULL_PAGE_RENDERS_ONLY"
+      ]
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "decisionRecordId": "source-terms-authorization:nasa-cr-168347",
+      "basis": "NASA_NTRS_PUBLIC_GOV_PUBLIC_USE_PERMITTED",
+      "evidence": [
+        {
+          "path": "raw/nasa/19840019990.metadata.json",
+          "role": "OFFICIAL_METADATA",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 2922,
+          "sha256": "0fe15b44240eaad9b4203f2b212b231c94191176010642af5eca5be699de672a"
+        },
+        {
+          "path": "raw/nasa/19840019990.pdf",
+          "role": "SOURCE_PDF",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 5881573,
+          "sha256": "cf94168c14cdd944cddaf22450db9405cf8a226163433d2b60ee35036ceb7747"
+        }
+      ],
+      "requiredFacts": [
+        "DISTRIBUTION_PUBLIC",
+        "GOV_PUBLIC_USE_PERMITTED",
+        "NO_COPYRIGHT_INDICATION",
+        "NO_THIRD_PARTY_MATERIAL",
+        "EXPORT_EAR_ITAR_NO",
+        "DOCUMENT_AND_METADATA_DISSEMINATED",
+        "DOWNLOADS_AVAILABLE",
+        "OFFICIAL_DOWNLOAD_IDENTITY"
+      ],
+      "conditions": [
+        "EXACT_NTRS_PUBLIC_USE_RECORD_AND_FROZEN_BYTES_ONLY",
+        "DECLARED_NON_AUTHORITATIVE_FULL_PAGE_RENDERS_ONLY"
+      ]
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "decisionRecordId": "source-terms-authorization:nasa-cr-160557",
+      "basis": "NASA_NTRS_PUBLIC_GOV_PUBLIC_USE_PERMITTED",
+      "evidence": [
+        {
+          "path": "raw/nasa/19800011044.metadata.json",
+          "role": "OFFICIAL_METADATA",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 3417,
+          "sha256": "f9b837ba6724c114389efc4c1158d27812f8be86022d4c168330a2af0bf2dda3"
+        },
+        {
+          "path": "raw/nasa/19800011044.pdf",
+          "role": "SOURCE_PDF",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 1220660,
+          "sha256": "516547a9ea42ed46b20c348105ebbbbce1628f3e3eb96d6ec517a42647be4456"
+        }
+      ],
+      "requiredFacts": [
+        "DISTRIBUTION_PUBLIC",
+        "GOV_PUBLIC_USE_PERMITTED",
+        "NO_COPYRIGHT_INDICATION",
+        "NO_THIRD_PARTY_MATERIAL",
+        "EXPORT_EAR_ITAR_NO",
+        "DOCUMENT_AND_METADATA_DISSEMINATED",
+        "DOWNLOADS_AVAILABLE",
+        "OFFICIAL_DOWNLOAD_IDENTITY"
+      ],
+      "conditions": [
+        "EXACT_NTRS_PUBLIC_USE_RECORD_AND_FROZEN_BYTES_ONLY",
+        "DECLARED_NON_AUTHORITATIVE_FULL_PAGE_RENDERS_ONLY"
+      ]
+    }
+  ]
+}

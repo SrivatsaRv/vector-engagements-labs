@@ -41,6 +41,7 @@ The canonical public title is **Vector Engagement Labs by Reach Defence**. Site-
 - [`../governance/aircraft-evidence-registry.v1.json`](../governance/aircraft-evidence-registry.v1.json): preserved predecessor for compatibility verification.
 - [`../governance/environment-sources/`](../governance/environment-sources): immutable, checksum-verified offline source artifacts. Point-only source snapshots are ingestion evidence, not runtime regional environment packs.
 - [`../governance/sources/nasa-tp1538/`](../governance/sources/nasa-tp1538): frozen official TP-1538 source, corrected 59-page map, lossless crops, offline verifier, and verification-only nonclaims.
+- [`../governance/generic-sensor-verification-sources/README.md`](../governance/generic-sensor-verification-sources/README.md): immutable, offline-only generic sensor verification-source freeze, legal-decision gates, render mappings, and production quarantine.
 - [`container-release.md`](container-release.md): authoritative Compose topology, immutable GHCR images, promotion, rollback, backup, and restore.
 - [`blog-publishing.md`](blog-publishing.md): markdown frontmatter, thumbnail assets, canonical metadata, and ops publishing flow.
 - [`security-boundaries.md`](security-boundaries.md): anonymous API admission, saved-run integrity, metrics protection, caching, and delivery trust.

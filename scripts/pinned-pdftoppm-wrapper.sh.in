@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+exec docker run --rm --network none \
+  --user "$(id -u):$(id -g)" \
+  --volume "@@GITHUB_WORKSPACE@@:@@GITHUB_WORKSPACE@@:ro" \
+  --volume "/tmp:/tmp" \
+  --workdir "${PWD}" \
+  "@@IMAGE_TAG@@" "$@"

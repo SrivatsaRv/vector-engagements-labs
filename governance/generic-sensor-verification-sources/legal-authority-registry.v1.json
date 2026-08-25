@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "vector.generic-sensor-verification-legal-authority-registry.v1",
+  "registryId": "generic-sensor-source-legal-authority-registry-v1",
+  "subjectDecisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+  "authorityPolicyId": "generic-sensor-legal-authority-policy-v1",
+  "externalTrustRootRequired": true,
+  "status": "NO_SIGNED_DECISION_RECORDS_REGISTERED",
+  "decisionRecords": [],
+  "blockingReason": "PINNED_EXTERNAL_AUTHORITY_POLICY_SIGNED_RECORD_AND_RESOLVABLE_EVIDENCE_REQUIRED"
+}

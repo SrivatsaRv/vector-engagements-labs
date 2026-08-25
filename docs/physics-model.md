@@ -4,6 +4,12 @@
 
 The frozen NASA-TP-1538 *Simulator study of stall/post-stall characteristics of a fighter airplane with relaxed longitudinal static stability* pages are evidence inputs only. They do not create coefficient tables or executable aerodynamics. Future #142 stages must independently double-enter and adjudicate the printed cells before a verification-only evaluator can use them. Production dynamics must not import the source assets or infer missing cells, propulsion, control laws, altitude dependence, Reynolds corrections, or named-aircraft fidelity.
 
+The TP-1538 evidence chain is independent of the issue #148 generic sensor
+source freeze. The latter cannot satisfy aerodynamic evidence, and TP-1538
+cannot authorize sensor equations, parameters, execution, or adaptation. The
+#148 source terms authorize repository redistribution of its exact frozen bytes
+and declared derivatives only; they do not change either physics boundary.
+
 Vector currently uses a deterministic three-dimensional point-mass reference engine intended for inspectable sensitivity research, not verified prediction of named-system performance.
 
 ## Integrated model
@@ -163,3 +169,28 @@ Complete nonlinear aircraft coefficient-table and engine-map execution; store dr
 ## Rust/WASM gate
 
 The Rust integrator may replace the TypeScript numerical loop only after deterministic parity, numerical-tolerance, malformed-package, extreme-condition, lifecycle, and benchmark tests pass. JavaScript remains responsible for product state and rendering; batches will use a browser Worker.
+
+## Generic sensor source-only boundary
+
+The frozen generic radar, measurement, filtering, and association references
+under `governance/generic-sensor-verification-sources/` are verification-source
+locations only. This Stage-0 record executes no reference implementation,
+transcribes no equation or coefficient, generates no vector, and changes no
+tick. It does not supply detection or minimum range, RCS, antenna, power, loss,
+noise, covariance, probability, false-alarm, clutter, scan, gate, assignment,
+filter, CFAR, EW, or track behavior.
+
+The CR-160557 record is negative-scope evidence only; no threshold model or
+detection consequence is admitted from it. Rendered pages and extracted text
+are non-authoritative navigation aids. Future numerical work remains blocked by
+the exact frozen-source machine-verification gate, the manifest-bound non-legal
+`RELEASE_OWNER_REVIEW`, an approved human
+reference-execution decision,
+an externally rooted detached attestation for that exact decision/evidence,
+resolution of the exact signed evidence bytes through the pinned external
+authority policy,
+independent expected values, and its owning model/admission contracts. Source
+availability never creates a generic or named production radar. Pinned NASA
+public-use and Stone Soup open/MIT terms authorize redistribution of the exact
+frozen records and declared derivatives only; that state admits no equation,
+parameter, executable reference, adaptation, or runtime behavior.

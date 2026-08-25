@@ -6,6 +6,54 @@
 
 The verifier is offline and cannot fetch replacement evidence. Numeric transcription, interpolation, and runtime tests belong to later #142 children and must not be credited to #143.
 
+## Generic sensor Stage-0 source freeze
+
+`npm run generic-sensor:sources:verify` first proves the generated manifest and
+all derived governance records are current, then verifies the offline bundle.
+Every generator, verifier, and focused adversarial test process preloads the
+tracked deny-all Node network guard; the regression first proves that raw TCP,
+HTTP, and every callback, promise, resolver-instance, and ESM DNS lookup,
+`resolve*`, and reverse call fail. The same verifier runs again after `npm run build` in
+`worker-local` and hosted integration so `.next` and every other production
+output are present when source-bundle exclusion is measured.
+The verifier pins the complete canonical manifest digest and rejects
+caller-resealed source identities, substituted PDFs, relabelled renders, erased
+claims, and relaxed numeric/equation extraction policy even when every local
+hash, byte total, and dependent artifact is updated consistently. This command
+is mandatory in `make ci-quality`; `make generic-sensor-sources-local` exposes
+the same focused gate.
+
+The same command independently rerenders all 44 declared NASA source pages
+from the exact PDFs with the closed Poppler profile selected by operating
+system and architecture, requires byte-identical PNG output within that
+profile, rejects blank or structurally invalid images, reproduces the three
+upright display derivatives, and checks every source/display page mapping.
+Darwin arm64 and Linux amd64 are separately content-addressed because Poppler's
+lossless PNG bytes are not cross-platform identical. No tolerance or
+cross-platform-byte claim is used. The manifest binds the release owner's
+semantic review to both exact 44-page render sets and all eight profile/contact
+sheet identities, including cross-profile mapping, structure, orientation, and
+limitation consistency. It does not use OCR or extracted text to supply numeric
+values or equations.
+
+A dedicated hosted renderer job builds Poppler 26.05.0 once from the official
+release archive through `scripts/install-pinned-poppler-ubuntu.sh`, inside the
+Ubuntu 24.04 image pinned at
+`sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517`.
+The bootstrap rejects any source digest except
+`6fef27ff04f37db43054c86bcdff6128c9fb1f6af4ef3c8b369a7e9abd68d0bb`.
+Its Docker image is cached under a key derived from the installer, Dockerfile,
+and network-denied wrapper, then restored by quality and post-build integration
+instead of compiling twice. The cold x86-emulated reproduction completed in
+6m31s; the setup job has a 15-minute budget while the existing 20-minute
+quality/integration budgets remain unchanged. The verifier container has no
+network and every Linux render must match its committed profile byte-for-byte.
+The built executable and its Poppler shared library live under `/opt/poppler`;
+they cannot be placed below `/tmp`, because the network-denied wrapper mounts
+the host temporary tree there for exact input and output paths. Bootstrap also
+expands every workspace placeholder before the wrapper's version probe, so no
+literal template token can survive into a hosted mount target.
+
 Testing is part of the implementation contract. An executable action is incomplete until its behavior is covered at the appropriate test layers and the result is recorded. The project uses focused tests for fast feedback and staged integration evidence for release confidence.
 
 ## Required layers
@@ -23,6 +71,16 @@ Testing is part of the implementation contract. An executable action is incomple
 Use the smallest complete set for a change. State why any applicable layer was omitted. A passing build is not a passing behavioral test.
 
 ## Existing baseline
+
+The generic sensor Stage-0 generator, deny-network verifier, and adversarial
+suite are mandatory quality checks. `worker-local` and hosted integration rerun
+that same verifier after the production build so production-output quarantine
+is measured rather than inferred from missing build directories.
+The focused gate also rerenders all 44 declared NASA source pages from the exact
+frozen PDFs with the pinned Poppler recipe, compares exact PNG bytes, rejects
+blank or structurally invalid images, reproduces the three upright display
+derivatives, and checks every source/display mapping. It never extracts numeric
+values or equations, and source PDFs remain authoritative.
 
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and
 production-audit checks. It first runs the same contract-documentation impact

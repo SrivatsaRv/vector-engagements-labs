@@ -6,6 +6,10 @@ Issue #143 freezes NASA-TP-1538, *Simulator study of stall/post-stall characteri
 
 This is source evidence for the later #142 generic-F-16 verification corpus. It is not a catalog aircraft model and cannot be assigned to a scenario or named F-16 variant.
 
+This aerodynamic source family remains distinct from the issue #148 generic
+sensor source freeze; neither artifact may supply evidence or authority to the
+other merely because both are offline verification inputs.
+
 The runtime catalog lives in PostgreSQL/PostGIS and separates:
 
 1. `sources`: publication identity and source class.
@@ -155,3 +159,45 @@ gaps and an explicit `TEXT_ONLY_OR_ABSENT` runway-evidence state. It must never
 be rendered or validated as a complete IAF/PAF base catalogue. PostGIS remains
 the canonical geometry source for published points; the Phase A pack binds the
 same immutable coverage identity required by future ground-start admission.
+
+## Generic sensor verification source freeze
+
+`governance/generic-sensor-verification-sources/manifest.v1.json` is a separate
+Stage-0, content-addressed research-source record with intended use
+`ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE`. It preserves exact public reference
+bytes and locations for isolated future verification work. It is not a catalog
+source row, model-pack source, compiled model, or production asset, and catalog
+admission must not resolve or import it.
+
+The verifier pins the complete canonical manifest digest rather than trusting a
+caller-recomputed digest. This closes every manifest field—including source
+identity and URLs, artifact bytes and hashes, render identity, eligible and
+ineligible claims, extracted-text policy, and the source-only policy—as one
+reviewed authority table. Replacing a PDF or render and updating every local
+hash or total still fails. Generator freshness plus full bundle verification is
+mandatory in `make ci-quality` through `generic-sensor:sources:verify`.
+
+The corresponding legal artifact keeps redistribution, reference execution,
+and adaptation as independent decisions. Redistribution is
+`SOURCE_TERMS_AUTHORIZED` only for exact frozen bytes and declared derivatives:
+the verifier binds each decision to the pinned NASA public/public-use metadata
+or the Zenodo open/MIT metadata and preserved MIT notice. Missing or changed
+source evidence fails closed. Reference execution and adaptation remain
+`PENDING_REVIEW`; missing, pending, forged, agent-authored, wrong-jurisdiction,
+or wrong-scope authority fails closed. `AUTHORIZED_HUMAN` is not a self-proving
+string: approval also requires an allowlisted reviewer and decision record whose
+canonical payload and evidence digest have a detached Ed25519 signature verified
+against `governance/generic-sensor-legal-authority-policy.v1.json`. That policy
+is outside the source bundle, pinned by digest in the verifier, and cannot be
+replaced by a request-supplied key or allowlist. It currently registers no
+approval authority. Each decision field has one exact scope; evidence must
+resolve to exact bytes below the separately governed evidence root. The bundle
+registry is empty and can carry only signed records, never authority. Public
+availability or an open licence does not imply local execution, adaptation,
+model, or installation authority beyond the exact recorded redistribution
+grant. Named platform and radar
+claims, game/community artifacts, and dynamic unpinned sources are expressly
+ineligible. Downstream #26 work remains blocked until this freeze is
+machine-verified, its exact-render-set `RELEASE_OWNER_REVIEW` is complete, and
+the specifically required execution decision is approved. That technical
+visual role is not a legal reviewer or approval authority.

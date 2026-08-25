@@ -1,0 +1,1794 @@
+{
+  "schemaVersion": "vector.generic-sensor-verification-source-manifest.v1",
+  "manifestId": "generic-sensor-source-freeze-v1",
+  "subjectId": "generic-sensor-verification-reference-sources",
+  "intendedUse": "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE",
+  "status": "BLOCKED_PENDING_HUMAN_EXECUTION_AND_ADAPTATION_REVIEW",
+  "generatedBy": {
+    "script": "generate-generic-sensor-source-manifest.mjs",
+    "mode": "OFFLINE_ONLY"
+  },
+  "sourcePolicy": {
+    "immutableContentAddressingRequired": true,
+    "redistributionPermitted": true,
+    "productionRuntimeUsePermitted": false,
+    "stoneSoupExecutionPermitted": false,
+    "stoneSoupAdaptationPermitted": false,
+    "numericModelTranscriptionPermitted": false,
+    "namedSystemClaimsPermitted": false
+  },
+  "renderRecipe": {
+    "sourceRender": {
+      "tool": "pdftoppm",
+      "version": "26.05.0",
+      "dpi": 150,
+      "colourMode": "GRAYSCALE",
+      "extent": "FULL_PAGE",
+      "arguments": [
+        "-r",
+        "150",
+        "-gray",
+        "-f",
+        "${PDF_PAGE}",
+        "-l",
+        "${PDF_PAGE}",
+        "-singlefile",
+        "-png"
+      ],
+      "profiles": [
+        {
+          "id": "darwin-arm64-conda-forge-26.05.0",
+          "nodePlatform": "darwin",
+          "nodeArchitecture": "arm64",
+          "distribution": "conda-forge",
+          "packageSpec": "poppler=26.05.0=hd83632c_3",
+          "executableSha256": "98ac4fedc4258b7125ad1048034c1448dccc58503614eb105f19d12cdb3a2d0d"
+        },
+        {
+          "id": "linux-amd64-ubuntu-24.04-26.05.0",
+          "nodePlatform": "linux",
+          "nodeArchitecture": "x64",
+          "distribution": "OFFICIAL_SOURCE_BUILD_ON_PINNED_UBUNTU",
+          "ubuntuImageDigest": "sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517",
+          "sourceArchiveSha256": "6fef27ff04f37db43054c86bcdff6128c9fb1f6af4ef3c8b369a7e9abd68d0bb",
+          "installerPath": "scripts/install-pinned-poppler-ubuntu.sh"
+        }
+      ]
+    },
+    "uprightDisplayRender": {
+      "tool": "sharp",
+      "version": "0.35.0",
+      "operation": "ROTATE_90_DEGREES_CLOCKWISE",
+      "pngEncoder": {
+        "compressionLevel": 9,
+        "adaptiveFiltering": false,
+        "palette": false
+      },
+      "sourcePreserved": true
+    },
+    "state": "NON_AUTHORITATIVE_DISCOVERY_AID"
+  },
+  "visualInspection": {
+    "path": "visual-inspection.v1.json",
+    "role": "PRIMARY_VISUAL_INSPECTION_RECORD",
+    "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+    "sizeBytes": 19166,
+    "sha256": "ba9a7d1bf4130835629f7fd0323a1571e4e00cc3b84d58a1a704dc8f117d8ccd"
+  },
+  "legalDecisions": {
+    "path": "legal-decisions.v1.json",
+    "role": "LEGAL_AND_EXPORT_DECISIONS",
+    "state": "REFERENCE_ONLY",
+    "sizeBytes": 7116,
+    "sha256": "817fba5abfbc265ec37872f428b12de69e78a7e64a9ebc2e4cc7d423c9266b21"
+  },
+  "legalAuthorityRegistry": {
+    "path": "legal-authority-registry.v1.json",
+    "role": "SIGNED_LEGAL_DECISION_RECORD_REGISTRY",
+    "state": "REFERENCE_ONLY",
+    "sizeBytes": 517,
+    "sha256": "a13e3aadab956c431e862dfed1dce7f7036ee4edc917ae22344f36b23ac11e9a"
+  },
+  "redistributionAuthority": {
+    "path": "redistribution-authority.v1.json",
+    "role": "AUTHORITATIVE_SOURCE_TERMS_REDISTRIBUTION_RECORD",
+    "state": "REFERENCE_ONLY",
+    "sizeBytes": 6206,
+    "sha256": "0f4c155e74b4923af36712b71cb2cdddcf707020f17b91ab22fe6182135aae74"
+  },
+  "decisionReferences": [
+    {
+      "sourceId": "dstl-stone-soup-v1.9.1",
+      "decisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+      "authorityRegistryId": "generic-sensor-source-legal-authority-registry-v1",
+      "fields": [
+        "redistribution",
+        "referenceExecution",
+        "adaptation"
+      ]
+    },
+    {
+      "sourceId": "nasa-cr-66097",
+      "decisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+      "authorityRegistryId": "generic-sensor-source-legal-authority-registry-v1",
+      "fields": [
+        "redistribution",
+        "referenceExecution",
+        "adaptation"
+      ]
+    },
+    {
+      "sourceId": "nasa-cr-151497",
+      "decisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+      "authorityRegistryId": "generic-sensor-source-legal-authority-registry-v1",
+      "fields": [
+        "redistribution",
+        "referenceExecution",
+        "adaptation"
+      ]
+    },
+    {
+      "sourceId": "nasa-cr-168347",
+      "decisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+      "authorityRegistryId": "generic-sensor-source-legal-authority-registry-v1",
+      "fields": [
+        "redistribution",
+        "referenceExecution",
+        "adaptation"
+      ]
+    },
+    {
+      "sourceId": "nasa-cr-160557",
+      "decisionArtifactId": "generic-sensor-source-legal-decisions-v1",
+      "authorityRegistryId": "generic-sensor-source-legal-authority-registry-v1",
+      "fields": [
+        "redistribution",
+        "referenceExecution",
+        "adaptation"
+      ]
+    }
+  ],
+  "isolationEvidence": {
+    "path": "production-isolation-evidence.v1.json",
+    "role": "PRODUCTION_ISOLATION_SIZE_EVIDENCE",
+    "state": "REFERENCE_ONLY",
+    "sizeBytes": 959,
+    "sha256": "837a876593fa7d9e950b9b14dc750b28d4a40bbe47cb5f6d7c11e37c1d792acf"
+  },
+  "sources": [
+    {
+      "id": "dstl-stone-soup-v1.9.1",
+      "publisher": "Defence Science and Technology Laboratory (Dstl)",
+      "title": "Stone Soup",
+      "version": "v1.9.1",
+      "doi": "10.5281/zenodo.20830467",
+      "canonicalUrl": "https://zenodo.org/records/20830467",
+      "state": "REFERENCE_ONLY",
+      "archiveSha256": "728449aeac17bf2a233cd052b42f8306a7742fad26715be3f780abfbaf50abab",
+      "rights": {
+        "licence": "MIT",
+        "access": "OPEN",
+        "exportControl": "NOT_STATED",
+        "ear": "NOT_STATED",
+        "itar": "NOT_STATED"
+      },
+      "artifacts": [
+        {
+          "path": "raw/stone-soup/Stone-Soup-v1.9.1.zip",
+          "role": "SOURCE_ARCHIVE",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 24412569,
+          "sha256": "728449aeac17bf2a233cd052b42f8306a7742fad26715be3f780abfbaf50abab"
+        },
+        {
+          "path": "raw/stone-soup/zenodo-record-20830467.json",
+          "role": "OFFICIAL_METADATA",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 7178,
+          "sha256": "63095125c8a978dbac9125c29197e112c8ae7e5be80b2c60c358462af283bee0"
+        }
+      ],
+      "archiveLimits": {
+        "maxArchiveBytes": 33554432,
+        "maxExpandedBytes": 67108864,
+        "maxEntries": 2000
+      },
+      "archiveInventory": {
+        "path": "archive-inventory.v1.json",
+        "role": "COMPLETE_ARCHIVE_INVENTORY",
+        "state": "REFERENCE_ONLY",
+        "sizeBytes": 235345,
+        "sha256": "cbfbda5d093dbebb0e000aeed3599d786d7d96f2afd5554e98cb1eaffb0dc402"
+      },
+      "vcs": {
+        "annotatedTag": "v1.9.1",
+        "annotatedTagObject": "d9e6fb16f5ae176817aeb6a6fc3a39f544694408",
+        "annotatedTagSigned": false,
+        "resolvedCommit": "a4336b920a799cfe0a77ecb05867c5deeb371c7a",
+        "resolvedCommitSignature": "VERIFIED"
+      },
+      "extractedMembers": [
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/LICENSE",
+          "role": "LICENSE",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/LICENSE",
+            "role": "LICENSE",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 1494,
+            "sha256": "2462f3d8a857f601e266f048a4ff051366c1e05f098cf3a1524eaf922f879815"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/CITATION.cff",
+          "role": "CITATION",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/CITATION.cff",
+            "role": "CITATION",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 4304,
+            "sha256": "196887eaf79c03ebe33bbb4b8ee372c82a84f3dcae3160f01f8b8ac0c52bdbc4"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/sensor/radar/radar.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/sensor/radar/radar.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 37256,
+            "sha256": "8e926d708edcfae7cf5f9334b27dc7483875cebb8c464d38fe7b8def3d3689c6"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/sensor/action/base.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/sensor/action/base.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 6441,
+            "sha256": "ec3c61478e34289a5376579cffb9b21cf320923286d7522212536586dac4bcc1"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/sensor/action/dwell_action.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/sensor/action/dwell_action.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 3105,
+            "sha256": "82e7650bc7589f2e096625f350d1e28eb391fe1d736a6fee35e323512f4fc9f5"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/models/measurement/nonlinear.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/models/measurement/nonlinear.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 53186,
+            "sha256": "705328e367ade1c26fa43c0b4c22fedcdc87e58a111571ec681de8ab7e42cfdc"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/models/clutter/clutter.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/models/clutter/clutter.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 5498,
+            "sha256": "b72125e955ce6c8d37c4a0b659336115144dfd80e4eaaf27e2c91bade37d4835"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/simulator/simple.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/simulator/simple.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 13441,
+            "sha256": "17a896ca25f9b063e4a98fb9bf0f4f9b9a1779a9981affe536b418d68013aba1"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/measures/state.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/measures/state.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 17714,
+            "sha256": "89b0d26f1fa8ce5c538e13c7a0a42df35e6f2c1e6137079d2ac0355a304e202d"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/hypothesiser/distance.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/hypothesiser/distance.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 3887,
+            "sha256": "4ecd955d185a8f29074027ad02ffa9979fffcc6734f240e3b8ad0d387d4662e1"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/dataassociator/neighbour.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/dataassociator/neighbour.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 9499,
+            "sha256": "bf1cde7dce3ba132cc6039248d842e2ef7cb9e4384272ca2be5c5a91251130f4"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/dataassociator/_assignment.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/dataassociator/_assignment.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 4427,
+            "sha256": "a08042e9e654c74212ae0c8943f150ebaa7f93ce4924115c857a35847dc48c22"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/predictor/kalman.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/predictor/kalman.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 28050,
+            "sha256": "a4bbf4827c53c278b3ff764210ff1536c85e24bfbdf09eaafa429f07a278e5bf"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/updater/kalman.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/updater/kalman.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 42916,
+            "sha256": "7fb3eff7972ab85da85d4ceed82d142828f164e1161f4b63c33a66042e722794"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/stonesoup/models/transition/linear.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/stonesoup/models/transition/linear.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 25650,
+            "sha256": "750919652bea4e9b09b704534044f9e6e83d0c6d5474e83888c4ea1a75f28fdb"
+          }
+        },
+        {
+          "archivePath": "dstl-Stone-Soup-d9e6fb1/docs/tutorials/05_DataAssociation-Clutter.py",
+          "role": "SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "extractedArtifact": {
+            "path": "extracted/stone-soup-v1.9.1/docs/tutorials/05_DataAssociation-Clutter.py",
+            "role": "SOURCE_LOCATION_ONLY",
+            "state": "REFERENCE_ONLY",
+            "sizeBytes": 10449,
+            "sha256": "461bd4a924a2c38ee0b4224b6c3d9066c211e9194ccfed5ed76b4b665cd9ce6a"
+          }
+        }
+      ],
+      "eligibleClaims": [
+        {
+          "kind": "BIBLIOGRAPHIC_OR_SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "text": "Source-location pointers to public generic sensor, measurement, filtering, and association reference material."
+        }
+      ],
+      "ineligibleClaims": [
+        {
+          "state": "INELIGIBLE",
+          "text": "Execution, import, translation, adaptation, generated vectors, parameters, calibration, applicability, and production model behavior."
+        }
+      ],
+      "extractedTextPolicy": {
+        "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+        "maySupplyNumericValues": false,
+        "maySupplyEquations": false
+      }
+    },
+    {
+      "id": "nasa-cr-66097",
+      "publisher": "NASA",
+      "title": "An analytical investigation of radio frequency interference and acquisition probability for a combination radar and telemetry system  Final report, May 14, 1965 - May 31, 1965",
+      "ntrsId": "19660021027",
+      "reportNumber": "NASA-CR-66097",
+      "canonicalUrl": "https://ntrs.nasa.gov/citations/19660021027",
+      "state": "REFERENCE_ONLY",
+      "rights": {
+        "distribution": "PUBLIC",
+        "publicUse": "GOV_PUBLIC_USE_PERMITTED",
+        "exportControl": "NO",
+        "ear": "NO",
+        "itar": "NO"
+      },
+      "artifacts": [
+        {
+          "path": "raw/nasa/19660021027.metadata.json",
+          "role": "OFFICIAL_METADATA",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 2445,
+          "sha256": "7eced126f3df081c374d670819baa5698e1f725a0fe2c19ea978c3e887662267"
+        },
+        {
+          "path": "raw/nasa/19660021027.pdf",
+          "role": "SOURCE_PDF",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 13132979,
+          "sha256": "2bacd3004112db0ce40bd5e3202e26fc5c880787cf072f111aa94a9c51c010de"
+        }
+      ],
+      "relevantLocations": [
+        {
+          "pdfPages": [
+            143,
+            144
+          ],
+          "reportPages": [
+            "134",
+            "135"
+          ]
+        }
+      ],
+      "renderPages": [
+        {
+          "sourcePdfPage": 1,
+          "reportPage": null,
+          "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19660021027/pdf-001.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 63574,
+              "sha256": "23f129ea66dc5ec3e6ce4e99a9115ad3eca9634f53d35e46b87e0d4bd3f5ca4b"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19660021027/pdf-001.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 63574,
+              "sha256": "23f129ea66dc5ec3e6ce4e99a9115ad3eca9634f53d35e46b87e0d4bd3f5ca4b"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 143,
+          "reportPage": "134",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19660021027/pdf-143.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 72564,
+              "sha256": "4baa32f43815cc4fa51c98cdcd3804642827248affb19e302ad16fb30ac826c1"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19660021027/pdf-143.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 72564,
+              "sha256": "4baa32f43815cc4fa51c98cdcd3804642827248affb19e302ad16fb30ac826c1"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 144,
+          "reportPage": "135",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19660021027/pdf-144.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 113259,
+              "sha256": "a1c2d721227158a7f328d633699e98b5d665624bda5aa2eac6e2c63f4f111e84"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19660021027/pdf-144.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 113259,
+              "sha256": "a1c2d721227158a7f328d633699e98b5d665624bda5aa2eac6e2c63f4f111e84"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        }
+      ],
+      "eligibleClaims": [
+        {
+          "kind": "BIBLIOGRAPHIC_OR_SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "text": "Source-location evidence for conditional single-look detection and false-alarm concepts."
+        }
+      ],
+      "ineligibleClaims": [
+        {
+          "state": "INELIGIBLE",
+          "text": "Spatial false-plot generation, calibrated detection behavior, parameters, applicability, and model implementation."
+        }
+      ],
+      "negativeScopeOnly": false,
+      "extractedTextPolicy": {
+        "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+        "maySupplyNumericValues": false,
+        "maySupplyEquations": false
+      }
+    },
+    {
+      "id": "nasa-cr-151497",
+      "publisher": "NASA",
+      "title": "Study to investigate and evaluate means of optimizing the Ku-band combined radar/communication functions for the space shuttle",
+      "ntrsId": "19770023372",
+      "reportNumber": "NASA-CR-151497",
+      "canonicalUrl": "https://ntrs.nasa.gov/citations/19770023372",
+      "state": "REFERENCE_ONLY",
+      "rights": {
+        "distribution": "PUBLIC",
+        "publicUse": "GOV_PUBLIC_USE_PERMITTED",
+        "exportControl": "NO",
+        "ear": "NO",
+        "itar": "NO"
+      },
+      "artifacts": [
+        {
+          "path": "raw/nasa/19770023372.metadata.json",
+          "role": "OFFICIAL_METADATA",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 3918,
+          "sha256": "a12f96902c6d522c9836ae343f5b269677d7d95eb406f6a0c8c0156068aaae71"
+        },
+        {
+          "path": "raw/nasa/19770023372.pdf",
+          "role": "SOURCE_PDF",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 11481762,
+          "sha256": "a2826966045c4d293e4655d5ef70f87d59c07361fee7765415eeba4e8ea57a06"
+        }
+      ],
+      "relevantLocations": [
+        {
+          "pdfPages": [
+            53,
+            54,
+            55,
+            56
+          ],
+          "reportPages": [
+            "2",
+            "3",
+            "4",
+            "5"
+          ]
+        }
+      ],
+      "renderPages": [
+        {
+          "sourcePdfPage": 1,
+          "reportPage": null,
+          "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19770023372/pdf-001.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 135687,
+              "sha256": "133f36e493b62f80c4ef05444fca144840e356224de66e7802ac6348510cdfb6"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19770023372/pdf-001.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 124003,
+              "sha256": "71e9ef418779e3987c6cdbb8400d840718534ba1cfd829c1f1fd4b3aadbc2add"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 2,
+          "reportPage": null,
+          "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19770023372/pdf-002.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 1793885,
+              "sha256": "dda2b98667b63ee326f58cfb4105a14bca5b48bb3ba76bfd9639153691b256d5"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19770023372/pdf-002.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 1793885,
+              "sha256": "dda2b98667b63ee326f58cfb4105a14bca5b48bb3ba76bfd9639153691b256d5"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 3,
+          "reportPage": null,
+          "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19770023372/pdf-003.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 52694,
+              "sha256": "824269fabb3d209f05077189a6cd3cf929b35e453c32f3c4cf3358cfba7907b7"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19770023372/pdf-003.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 52694,
+              "sha256": "824269fabb3d209f05077189a6cd3cf929b35e453c32f3c4cf3358cfba7907b7"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 4,
+          "reportPage": null,
+          "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19770023372/pdf-004.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 91981,
+              "sha256": "7b0a56aefcb2aeb150ee9326726dbc5da43f86e2c3e352dab67dd156d2f19208"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19770023372/pdf-004.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 91981,
+              "sha256": "7b0a56aefcb2aeb150ee9326726dbc5da43f86e2c3e352dab67dd156d2f19208"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 53,
+          "reportPage": "2",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19770023372/pdf-053.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 113388,
+              "sha256": "6e407c8a72ebf9d47a4bfb7281ae35e5c1f65b31bafbe2471d99bff887bbd867"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19770023372/pdf-053.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 113388,
+              "sha256": "6e407c8a72ebf9d47a4bfb7281ae35e5c1f65b31bafbe2471d99bff887bbd867"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 54,
+          "reportPage": "3",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19770023372/pdf-054.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 105364,
+              "sha256": "4370536fd679206e50983b446c030f42eed1e3a5e1002c5d09941a4a92eccd01"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19770023372/pdf-054.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 105364,
+              "sha256": "4370536fd679206e50983b446c030f42eed1e3a5e1002c5d09941a4a92eccd01"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 55,
+          "reportPage": "4",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19770023372/pdf-055.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 100825,
+              "sha256": "9fdeb8e5e72d28a3d3cf7010bef37adf637660d450862937f6220294489c1514"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19770023372/pdf-055.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 100825,
+              "sha256": "9fdeb8e5e72d28a3d3cf7010bef37adf637660d450862937f6220294489c1514"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 56,
+          "reportPage": "5",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19770023372/pdf-056.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 78534,
+              "sha256": "e508461c45426424ae922925474ff965b80150b6c0af98cabe559655d224a014"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19770023372/pdf-056.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 78534,
+              "sha256": "e508461c45426424ae922925474ff965b80150b6c0af98cabe559655d224a014"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        }
+      ],
+      "eligibleClaims": [
+        {
+          "kind": "BIBLIOGRAPHIC_OR_SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "text": "Source-location evidence for the monostatic inverse-fourth-power range relation and its defined terms."
+        }
+      ],
+      "ineligibleClaims": [
+        {
+          "state": "INELIGIBLE",
+          "text": "Every Shuttle-specific value, parameter, result, installation claim, calibration, applicability claim, and model behavior."
+        }
+      ],
+      "negativeScopeOnly": false,
+      "extractedTextPolicy": {
+        "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+        "maySupplyNumericValues": false,
+        "maySupplyEquations": false
+      }
+    },
+    {
+      "id": "nasa-cr-168347",
+      "publisher": "NASA",
+      "title": "Radar data smoothing filter study",
+      "ntrsId": "19840019990",
+      "reportNumber": "NASA-CR-168347",
+      "canonicalUrl": "https://ntrs.nasa.gov/citations/19840019990",
+      "state": "REFERENCE_ONLY",
+      "rights": {
+        "distribution": "PUBLIC",
+        "publicUse": "GOV_PUBLIC_USE_PERMITTED",
+        "exportControl": "NO",
+        "ear": "NO",
+        "itar": "NO"
+      },
+      "artifacts": [
+        {
+          "path": "raw/nasa/19840019990.metadata.json",
+          "role": "OFFICIAL_METADATA",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 2922,
+          "sha256": "0fe15b44240eaad9b4203f2b212b231c94191176010642af5eca5be699de672a"
+        },
+        {
+          "path": "raw/nasa/19840019990.pdf",
+          "role": "SOURCE_PDF",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 5881573,
+          "sha256": "cf94168c14cdd944cddaf22450db9405cf8a226163433d2b60ee35036ceb7747"
+        }
+      ],
+      "relevantLocations": [
+        {
+          "pdfPages": [
+            82,
+            83,
+            84,
+            85,
+            86,
+            87,
+            88,
+            89,
+            90,
+            91,
+            92,
+            93,
+            94,
+            95,
+            96,
+            97,
+            98
+          ],
+          "reportPages": [
+            "5-25",
+            "5-26",
+            "5-27",
+            "5-28",
+            "5-29",
+            "5-30",
+            "5-31",
+            "5-32",
+            "5-33",
+            "5-34",
+            "5-35",
+            "5-36",
+            "5-37",
+            "5-38",
+            "5-39",
+            "5-40",
+            "5-41"
+          ]
+        }
+      ],
+      "renderPages": [
+        {
+          "sourcePdfPage": 1,
+          "reportPage": null,
+          "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-001.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 30047,
+              "sha256": "b7c9f97fbc1a28a95aa0704537d320ad0770e054633e8f97517cb8b4fd00450c"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-001.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 30047,
+              "sha256": "b7c9f97fbc1a28a95aa0704537d320ad0770e054633e8f97517cb8b4fd00450c"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 82,
+          "reportPage": "5-25",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-082.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 73349,
+              "sha256": "8937c1bec60e6105955ca089e9b90161b536ae96736b3351e32a61a65b772ef3"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-082.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 73349,
+              "sha256": "8937c1bec60e6105955ca089e9b90161b536ae96736b3351e32a61a65b772ef3"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 83,
+          "reportPage": "5-26",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-083.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 88618,
+              "sha256": "24702214ab6aa74879c325746896341e0d7c429c5cd0af1b4cea0347bf1b046f"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-083.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 88618,
+              "sha256": "24702214ab6aa74879c325746896341e0d7c429c5cd0af1b4cea0347bf1b046f"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 84,
+          "reportPage": "5-27",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-084.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 113653,
+              "sha256": "a073fcb118c41ca0fb44f06195f28db898b4d9a87bbd94e0f6871cf0c44d6cd3"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-084.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 113653,
+              "sha256": "a073fcb118c41ca0fb44f06195f28db898b4d9a87bbd94e0f6871cf0c44d6cd3"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 85,
+          "reportPage": "5-28",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-085.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 82882,
+              "sha256": "b1248e899e490d90491049f3fa6a0b928435725e646010f7d6a934823a519c00"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-085.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 82882,
+              "sha256": "b1248e899e490d90491049f3fa6a0b928435725e646010f7d6a934823a519c00"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 86,
+          "reportPage": "5-29",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-086.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 82806,
+              "sha256": "e7a489016d05b30dc502f400f4d36b22cf8f3194f7c4eab8bbc1b7aaaf7cc205"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-086.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 82806,
+              "sha256": "e7a489016d05b30dc502f400f4d36b22cf8f3194f7c4eab8bbc1b7aaaf7cc205"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 87,
+          "reportPage": "5-30",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-087.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 64065,
+              "sha256": "013b177419da1a88d156bb4878a358aad98473ed47e993f3f945901b6a807fca"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-087.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 64065,
+              "sha256": "013b177419da1a88d156bb4878a358aad98473ed47e993f3f945901b6a807fca"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 88,
+          "reportPage": "5-31",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-088.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 82466,
+              "sha256": "291e7ff17d2ace9caf078b3a5c4e2096889ca4c37a958b05efb6cfca795989fa"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-088.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 82466,
+              "sha256": "291e7ff17d2ace9caf078b3a5c4e2096889ca4c37a958b05efb6cfca795989fa"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 89,
+          "reportPage": "5-32",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-089.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 87594,
+              "sha256": "4ead0ed8a18bbe232f65f2367a4c3476629bff42220b5d03cd2e715c2d995728"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-089.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 87594,
+              "sha256": "4ead0ed8a18bbe232f65f2367a4c3476629bff42220b5d03cd2e715c2d995728"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 90,
+          "reportPage": "5-33",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-090.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 70800,
+              "sha256": "8673b5a4f4cfd0733905dda46d31636e597f14ee5e0253a2d1ec815251ff1983"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-090.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 70800,
+              "sha256": "8673b5a4f4cfd0733905dda46d31636e597f14ee5e0253a2d1ec815251ff1983"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 91,
+          "reportPage": "5-34",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-091.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 90172,
+              "sha256": "80a7da8e0afc4a593e35fc114ad4af70fcf2d2c150d055caaf6c60bb5d9cdaf7"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-091.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 90172,
+              "sha256": "80a7da8e0afc4a593e35fc114ad4af70fcf2d2c150d055caaf6c60bb5d9cdaf7"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 92,
+          "reportPage": "5-35",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-092.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 95360,
+              "sha256": "dcad12ab35613df93894c88a9d0864ec1a4611b9772887ab35129431867b80c2"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-092.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 95360,
+              "sha256": "dcad12ab35613df93894c88a9d0864ec1a4611b9772887ab35129431867b80c2"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 93,
+          "reportPage": "5-36",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-093.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 71384,
+              "sha256": "3dc160f90b855861ff00bfbf841dc404046273ee434ad4791bf223ae5c92e937"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-093.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 71384,
+              "sha256": "3dc160f90b855861ff00bfbf841dc404046273ee434ad4791bf223ae5c92e937"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 94,
+          "reportPage": "5-37",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-094.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 90516,
+              "sha256": "7dc1c99909fc9c7c684bea62647963c9f5af87de768c116f00b768b77c858de6"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-094.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 90516,
+              "sha256": "7dc1c99909fc9c7c684bea62647963c9f5af87de768c116f00b768b77c858de6"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 95,
+          "reportPage": "5-38",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-095.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 83913,
+              "sha256": "6f815edc21187d8165b8e962938777b5c90475cae1b2451da121906388686d96"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-095.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 83913,
+              "sha256": "6f815edc21187d8165b8e962938777b5c90475cae1b2451da121906388686d96"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 96,
+          "reportPage": "5-39",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-096.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 97478,
+              "sha256": "1a69f01df3efe5d0880a22da868971e20e92aeb1645042f5b13c92fb766776fb"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-096.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 97478,
+              "sha256": "1a69f01df3efe5d0880a22da868971e20e92aeb1645042f5b13c92fb766776fb"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 97,
+          "reportPage": "5-40",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-097.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 99716,
+              "sha256": "1ee14041877d3896a0922624f293bb0c8b72d50bb0ca2abfef5009f3ea685207"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-097.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 99716,
+              "sha256": "1ee14041877d3896a0922624f293bb0c8b72d50bb0ca2abfef5009f3ea685207"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 98,
+          "reportPage": "5-41",
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19840019990/pdf-098.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 96694,
+              "sha256": "5fc4898f92b48143ff2303db0306d180cb5b93fe03bdcc925c129127cd038472"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19840019990/pdf-098.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 96694,
+              "sha256": "5fc4898f92b48143ff2303db0306d180cb5b93fe03bdcc925c129127cd038472"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        }
+      ],
+      "eligibleClaims": [
+        {
+          "kind": "BIBLIOGRAPHIC_OR_SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "text": "Source-location evidence for coordinate-transform, covariance, innovation, and Kalman-equation context."
+        }
+      ],
+      "ineligibleClaims": [
+        {
+          "state": "INELIGIBLE",
+          "text": "Site-specific radar values, payload data, error statistics, tuning, calibration, applicability, and model behavior."
+        }
+      ],
+      "negativeScopeOnly": false,
+      "extractedTextPolicy": {
+        "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+        "maySupplyNumericValues": false,
+        "maySupplyEquations": false
+      }
+    },
+    {
+      "id": "nasa-cr-160557",
+      "publisher": "NASA",
+      "title": "Ku-band radar threshold analysis",
+      "ntrsId": "19800011044",
+      "reportNumber": "NASA-CR-160557",
+      "canonicalUrl": "https://ntrs.nasa.gov/citations/19800011044",
+      "state": "REFERENCE_ONLY",
+      "rights": {
+        "distribution": "PUBLIC",
+        "publicUse": "GOV_PUBLIC_USE_PERMITTED",
+        "exportControl": "NO",
+        "ear": "NO",
+        "itar": "NO"
+      },
+      "artifacts": [
+        {
+          "path": "raw/nasa/19800011044.metadata.json",
+          "role": "OFFICIAL_METADATA",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 3417,
+          "sha256": "f9b837ba6724c114389efc4c1158d27812f8be86022d4c168330a2af0bf2dda3"
+        },
+        {
+          "path": "raw/nasa/19800011044.pdf",
+          "role": "SOURCE_PDF",
+          "state": "REFERENCE_ONLY",
+          "sizeBytes": 1220660,
+          "sha256": "516547a9ea42ed46b20c348105ebbbbce1628f3e3eb96d6ec517a42647be4456"
+        }
+      ],
+      "relevantLocations": [
+        {
+          "pdfPages": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "reportPages": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ],
+      "renderPages": [
+        {
+          "sourcePdfPage": 1,
+          "reportPage": null,
+          "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-001.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 60078,
+              "sha256": "688bd7a4c3b088daca25689e4ff3249700c83e9ade07100d850f07ba8aa07de4"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-001.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 43524,
+              "sha256": "fdf6eb30afd8f303994b76b2de769e12362fe6abf25a29beac27d6df91131b6f"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 2,
+          "reportPage": null,
+          "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-002.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 92023,
+              "sha256": "7b219680d3121391e0512ee6f8d60fea4a2fec8f83e69ed062bb0a72f1d3fb17"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-002.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 92023,
+              "sha256": "7b219680d3121391e0512ee6f8d60fea4a2fec8f83e69ed062bb0a72f1d3fb17"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 3,
+          "reportPage": null,
+          "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-003.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 53246,
+              "sha256": "2d760622a7fb63e77519b834b1572b53cd8ea917c34629d40a81eede40ede3ee"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-003.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 53246,
+              "sha256": "2d760622a7fb63e77519b834b1572b53cd8ea917c34629d40a81eede40ede3ee"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 4,
+          "reportPage": null,
+          "purpose": "IDENTITY_OR_LIMITATION_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-004.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 99584,
+              "sha256": "1e15ae31ff477ff113cfcbc4232512c24b8372fda22f6246fd57ea3560d1211e"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-004.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 99584,
+              "sha256": "1e15ae31ff477ff113cfcbc4232512c24b8372fda22f6246fd57ea3560d1211e"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 5,
+          "reportPage": null,
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-005.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 97969,
+              "sha256": "a0b5ee461d271c443cabc8af5e6de970cff4fd42d9aa27bd4f4f2d35ea2ac54f"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-005.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 97969,
+              "sha256": "a0b5ee461d271c443cabc8af5e6de970cff4fd42d9aa27bd4f4f2d35ea2ac54f"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 6,
+          "reportPage": null,
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-006.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 73320,
+              "sha256": "3929af880987f498588eeb0b7e32ace9c0c2edd6939ad318685ea9e4275c253e"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-006.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 73320,
+              "sha256": "3929af880987f498588eeb0b7e32ace9c0c2edd6939ad318685ea9e4275c253e"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 7,
+          "reportPage": null,
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-007.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 110491,
+              "sha256": "807404fabe44da022ac662ec37fd1c12bd70ff90746fc7817de378abbc38794c"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-007.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 110491,
+              "sha256": "807404fabe44da022ac662ec37fd1c12bd70ff90746fc7817de378abbc38794c"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 8,
+          "reportPage": null,
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-008.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 91740,
+              "sha256": "f297d4e0626cc0cba737a651fe4c4b29edffebac8f0d454a05af19c94e438702"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-008.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 91740,
+              "sha256": "f297d4e0626cc0cba737a651fe4c4b29edffebac8f0d454a05af19c94e438702"
+            }
+          },
+          "displayTransform": "ROTATE_90_DEGREES_CLOCKWISE",
+          "displayRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-008-display-upright.png",
+              "role": "OFFLINE_UPRIGHT_DISPLAY_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 61093,
+              "sha256": "48a80618d25d896ae66ac18064185108f8eb9e7b73233fd4090184a123a347bb"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-008-display-upright.png",
+              "role": "OFFLINE_UPRIGHT_DISPLAY_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 61093,
+              "sha256": "48a80618d25d896ae66ac18064185108f8eb9e7b73233fd4090184a123a347bb"
+            }
+          }
+        },
+        {
+          "sourcePdfPage": 9,
+          "reportPage": null,
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-009.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 121208,
+              "sha256": "189bf8d4056b2aea92e25fb9ecbf0be713c1ddc4ee1db971f8c5d5ba6a96bd6a"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-009.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 121208,
+              "sha256": "189bf8d4056b2aea92e25fb9ecbf0be713c1ddc4ee1db971f8c5d5ba6a96bd6a"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 10,
+          "reportPage": null,
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-010.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 83669,
+              "sha256": "fdcf8b7fdb068e1f69becd39f0be9c61fae86c0d157443fe30b3f846ffa212c0"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-010.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 83669,
+              "sha256": "fdcf8b7fdb068e1f69becd39f0be9c61fae86c0d157443fe30b3f846ffa212c0"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 11,
+          "reportPage": null,
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-011.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 84542,
+              "sha256": "23b32824dabead081eccaa15d36b50d7065b0869c241037c2182ccc811a802ac"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-011.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 84542,
+              "sha256": "23b32824dabead081eccaa15d36b50d7065b0869c241037c2182ccc811a802ac"
+            }
+          },
+          "displayTransform": "ROTATE_90_DEGREES_CLOCKWISE",
+          "displayRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-011-display-upright.png",
+              "role": "OFFLINE_UPRIGHT_DISPLAY_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 62155,
+              "sha256": "ee679a69d95e950d81441fcadcd107082893d6f789e8f5953e2d0c1dc33c5f4e"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-011-display-upright.png",
+              "role": "OFFLINE_UPRIGHT_DISPLAY_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 62155,
+              "sha256": "ee679a69d95e950d81441fcadcd107082893d6f789e8f5953e2d0c1dc33c5f4e"
+            }
+          }
+        },
+        {
+          "sourcePdfPage": 12,
+          "reportPage": null,
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-012.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 147276,
+              "sha256": "4e3bb6299c0a294c256e803dd6ab17a1cc72926cebbe346ffe80a2829cf0e599"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-012.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 147276,
+              "sha256": "4e3bb6299c0a294c256e803dd6ab17a1cc72926cebbe346ffe80a2829cf0e599"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 13,
+          "reportPage": null,
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-013.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 63616,
+              "sha256": "c91253c4bd464971008f8eb1277dad38c323c8833cb40df148b517eeec98c945"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-013.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 63616,
+              "sha256": "c91253c4bd464971008f8eb1277dad38c323c8833cb40df148b517eeec98c945"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        },
+        {
+          "sourcePdfPage": 14,
+          "reportPage": null,
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-014.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 71357,
+              "sha256": "9f4f11c1776f4a02fb935156dcc974dc343b9bcd23c7f468947e6e77e9f0fa21"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-014.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 71357,
+              "sha256": "9f4f11c1776f4a02fb935156dcc974dc343b9bcd23c7f468947e6e77e9f0fa21"
+            }
+          },
+          "displayTransform": "ROTATE_90_DEGREES_CLOCKWISE",
+          "displayRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-014-display-upright.png",
+              "role": "OFFLINE_UPRIGHT_DISPLAY_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 52817,
+              "sha256": "9a19dc67569d5a7a6bd09e578e86143c8048de92d2a8300a409c71125d9ee30a"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-014-display-upright.png",
+              "role": "OFFLINE_UPRIGHT_DISPLAY_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 52817,
+              "sha256": "9a19dc67569d5a7a6bd09e578e86143c8048de92d2a8300a409c71125d9ee30a"
+            }
+          }
+        },
+        {
+          "sourcePdfPage": 15,
+          "reportPage": null,
+          "purpose": "RELEVANT_SOURCE_CONTEXT",
+          "sourceRenders": {
+            "darwin-arm64-conda-forge-26.05.0": {
+              "path": "renders/19800011044/pdf-015.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 53527,
+              "sha256": "41dc458e138ea6f7bab2da07592fe1186dd67d0dc764c74c5c90bb6ccd7b3a68"
+            },
+            "linux-amd64-ubuntu-24.04-26.05.0": {
+              "path": "renders-linux-amd64/19800011044/pdf-015.png",
+              "role": "OFFLINE_FULL_PAGE_RENDER",
+              "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+              "sizeBytes": 53527,
+              "sha256": "41dc458e138ea6f7bab2da07592fe1186dd67d0dc764c74c5c90bb6ccd7b3a68"
+            }
+          },
+          "displayTransform": "NONE",
+          "displayRenders": null
+        }
+      ],
+      "eligibleClaims": [
+        {
+          "kind": "BIBLIOGRAPHIC_OR_SOURCE_LOCATION_ONLY",
+          "state": "REFERENCE_ONLY",
+          "text": "Negative-scope source-location evidence for unresolved threshold-analysis limitations."
+        }
+      ],
+      "ineligibleClaims": [
+        {
+          "state": "INELIGIBLE",
+          "text": "CFAR implementation, threshold behavior, detection-probability consequence, numeric parameters, calibration, applicability, and model behavior."
+        }
+      ],
+      "negativeScopeOnly": true,
+      "extractedTextPolicy": {
+        "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
+        "maySupplyNumericValues": false,
+        "maySupplyEquations": false
+      }
+    }
+  ],
+  "canonicalManifestDigest": "efbce4b0478c89754d2b366354823a2c30a6b5ad1bcfa89b66f8fdcfafbdce90"
+}

@@ -111,6 +111,11 @@ regression suite to new material mission-contract and record-storage sections.
 The registry canonical digest and exact semantic declaration bind that new
 authority; no old heading is relabelled and no unrelated schema is introduced.
 
+The hosted integration build reruns the issue #148 deny-network source verifier
+after creating the production output. A build that embeds a Stage-0 source
+marker, an exact frozen artifact, or frozen bytes inside a wrapper fails before
+API verification; a pre-build scan alone is not release evidence.
+
 Release workflows run from the trusted `main` definition and accept only an
 existing semantic tag in reviewed `main` history. They run the full gate,
 generate checksums and an SPDX SBOM, and attest archives before protected
@@ -152,3 +157,73 @@ same structural renderer or a separately versioned, tested sanitization policy.
 This slice does not provide a nonce/hash CSP, comment moderation, operator
 identity, retention, or a production CSP report endpoint; those remain open
 items in #70.
+
+## Offline reference-source quarantine
+
+The issue #148 source freeze is quarantined under
+`governance/generic-sensor-verification-sources/`. Production TypeScript,
+Rust/WASM, backend, Worker, browser, model-pack, VSR, fixture, public, and built
+assets must contain no Stage-0 subject/schema/export marker or source-bundle
+import. The offline verifier scans those boundaries and treats any exposure as
+a release failure. It scans every production file as bytes, including symlink
+targets and `.next`, `.output`, `build`, `out`, `dist`, Rust/WASM, public, Worker,
+and browser artifacts. It rejects Stage-0 markers, exact frozen-artifact files,
+and frozen bytes embedded inside a larger file; a wrapper, suffix, file
+extension, symlink, or alternate build root cannot bypass the quarantine.
+The complete canonical source-manifest digest is verifier-pinned. A caller
+cannot replace a governed PDF or render, alter a source identity, erase scope
+claims, relax extracted-text policy, update local hashes and totals, and then
+promote the resealed manifest. Generator freshness and this full verification
+run as a required `make ci-quality` gate.
+
+ZIP handling is verification-only and never writes archive-selected paths. It
+parses declared bytes with fixed archive, member-count, and expanded-size
+limits, validates local and central records, CRC and sizes, and rejects
+traversal, absolute or non-UTF-8 paths, backslashes, symlinks, duplicates,
+encryption, unsupported compression, and undeclared inventory changes before a
+selected member is compared. Stone Soup is never imported or executed.
+
+The legal artifact is authority data, not an agent recommendation. Each source
+has separate redistribution, reference-execution, and adaptation states.
+Redistribution may be `SOURCE_TERMS_AUTHORIZED` only when the digest-pinned
+source-terms artifact proves the exact NASA public/public-use metadata or the
+exact Zenodo open/MIT record and preserved MIT notice. That source grant has no
+reviewer identity and cannot authorize execution or adaptation. Only an
+allowlisted human record with identity, canonical calendar date, closed
+jurisdiction and scope, conditions, and evidence digest can represent those
+separate approvals.
+The complete decision payload must carry a detached Ed25519 signature verified
+against the digest-pinned policy at
+`governance/generic-sensor-legal-authority-policy.v1.json`, outside the source
+bundle. Caller-supplied roots or allowlists are ignored. The policy binds an
+exact reviewer, source, decision field, jurisdiction, scope, validity interval,
+and public key; each field has one fixed scope. Signed evidence identity must
+resolve to the exact bytes of a regular file below the governed external
+evidence root. Repository-local or self-declared keys, reviewer-kind strings,
+invented or unresolved records/evidence, malformed dates, pending, missing,
+forged, agent-authored, and out-of-scope decisions fail closed. Decision,
+reviewer, registry, policy, evidence, and attestation objects use exact keys.
+Pending and rejected states carry no reviewer, date, jurisdiction, scope,
+conditions, record, evidence, or alternate authority field. Source-terms
+authority uses an exact closed redistribution scope and evidence digest, with
+no reviewer, decision date, or jurisdiction. Network access is unnecessary
+for verification. The mandatory focused command preloads a deny-all network
+guard and proves TCP, HTTP, and every callback, promise, resolver-instance, and
+ESM DNS resolution method fail before inspecting only committed bytes. The DNS
+inventory is discovered from Node's `lookup*`, `resolve*`, and `reverse`
+surfaces so newly exposed resolver variants fail the regression instead of
+silently escaping the guard. The verifier runs again after the production build so missing output
+directories cannot stand in for bundle-exclusion evidence. Dynamic unpinned or
+substituted community/game material is rejected.
+
+Visual release review is a separate technical boundary. `RELEASE_OWNER_REVIEW`
+is manifest-bound to separately content-addressed Darwin-arm64 and Linux-amd64
+44-page render sets and their eight profile/contact-sheet identities. It
+records title/report identity, declared mapping, context category,
+limitations/nonclaims, and cross-profile mapping, nonblank structure,
+orientation, and limitation consistency. Each profile must reproduce exact
+bytes; the contract makes no cross-platform PNG byte-identity claim. It is not
+`AUTHORIZED_HUMAN`, cannot create legal authority, and records that no numeric
+value or equation was transcribed. Production isolation scans the entire
+`fixtures/` tree, so frozen or embedded quarantine bytes cannot hide in
+public-reference or performance fixtures.

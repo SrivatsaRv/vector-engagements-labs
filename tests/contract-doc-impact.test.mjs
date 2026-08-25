@@ -2267,6 +2267,7 @@ test("the repository policy maps real simulation identities to their exact owner
   const modelPack = family("MODEL_PACK_COMPILER_RESOLVER");
   const engine = family("ENGINE_ABI_RUNTIME");
   const genericAam = family("GENERIC_AAM_VERIFICATION");
+  const genericSensorSources = family("EVIDENCE_GENERIC_SENSOR_SOURCE_FREEZE");
   const physics = family("SIMULATION_PHYSICS_RUNTIME");
   const vsr = family("RECORD_VSR_PERSISTENCE");
   const geospatial = family("GEOSPATIAL_ENVIRONMENT");
@@ -2316,6 +2317,28 @@ test("the repository policy maps real simulation identities to their exact owner
   assert.deepEqual(exactRule(scenarioKernel, "lib/scenario-kernel.ts").facets, ["admission", "digest", "schema", "ui"]);
   assert.deepEqual(requiredSections(scenarioKernel, "lib/scenario-kernel.ts"), ["SCENARIO_COMPOSITION_KERNEL_CONTRACT"]);
   assert.deepEqual(ownersOf("lib/scenario-kernel.ts").map((owner) => owner.id), ["SCENARIO_COMPOSITION_KERNEL"]);
+  assert.deepEqual(
+    ownersOf("scripts/lib/generic-sensor-network-deny.cjs").map((owner) => owner.id),
+    [genericSensorSources.id],
+  );
+  for (const rendererPath of [
+    "scripts/install-pinned-poppler-ubuntu.sh",
+    "scripts/pinned-pdftoppm-wrapper.sh.in",
+    "scripts/pinned-poppler-ubuntu.Dockerfile",
+  ]) {
+    assert.deepEqual(ownersOf(rendererPath).map((owner) => owner.id), [genericSensorSources.id]);
+  }
+  assert.deepEqual(
+    requiredSections(genericSensorSources, "scripts/lib/generic-sensor-network-deny.cjs"),
+    [
+      "GENERIC_SENSOR_SOURCE_CATALOG_BOUNDARY",
+      "GENERIC_SENSOR_SOURCE_INFORMATION_BOUNDARY",
+      "GENERIC_SENSOR_SOURCE_MODEL_PACK_BOUNDARY",
+      "GENERIC_SENSOR_SOURCE_PHYSICS_BOUNDARY",
+      "GENERIC_SENSOR_SOURCE_SECURITY_BOUNDARY",
+      "GENERIC_SENSOR_SOURCE_TESTING_BOUNDARY",
+    ],
+  );
   assert.equal(exactRule(securitySavedRuns, "app/api/blog-comments/route.ts"), undefined);
   assert.deepEqual(exactRule(contentComments, "app/api/blog-comments/route.ts").facets, ["admission", "storage", "validity"]);
   assert.deepEqual(requiredSections(contentComments, "app/api/blog-comments/route.ts"), ["CONTENT_COMMENTS"]);

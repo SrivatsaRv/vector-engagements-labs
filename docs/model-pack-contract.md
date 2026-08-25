@@ -463,3 +463,27 @@ digest.
 - Rust native tests consume the same fixture and reject digest/index tampering.
 - migration, seed, and live catalog behavior are checked by `db:verify` and
   `app:verify`.
+
+## Stage-0 generic sensor references are not model-pack evidence
+
+The issue #148 generic sensor source freeze is outside every source-pack,
+compiled-pack, credibility, validation, and aircraft installation admission
+chain defined here. Its manifest permits only bibliographic and exact
+source-location evidence. It contains no admitted numeric radar, measurement,
+covariance, detection, clutter, filter, gate, or association parameter and may
+not satisfy a `vector.sensor-evidence-admission.v1` field.
+
+Reference execution remains blocked while its human decision is
+`PENDING_REVIEW`; code copying or adaptation requires a separate approved
+adaptation decision. Exact-byte redistribution is separately
+`SOURCE_TERMS_AUTHORIZED` by pinned NASA public-use records and Stone Soup's
+open/MIT record with its notice preserved; it creates no model-pack authority.
+Human approval additionally requires the separately governed
+digest-pinned reviewer/key policy, an externally rooted detached attestation,
+and exact resolution of the signed evidence bytes. The required scope is fixed
+per decision field and cannot be substituted. Even later approval would
+authorize only its recorded
+jurisdiction, scope, and conditions. It would not promote a source into a model
+pack or establish target, platform, radar, or installation applicability.
+Production pack generation and admission reject any import of the Stage-0
+subject, schema, legal artifact, or source-bundle path.

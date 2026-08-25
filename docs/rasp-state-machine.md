@@ -179,3 +179,27 @@ Compiled entity admission is canonical by entity ID in TypeScript and Rust,
 and VSR serialization defensively canonicalizes entity/frame/source projections.
 Reversing same-side definitions must therefore preserve the full VSR bytes,
 not merely a sorted test projection.
+
+## Stage-0 source-freeze dependency
+
+The issue #148 generic sensor source manifest is deliberately outside the RASP
+state machine. It cannot create `SensorState`, an observation, a PLOT, a track,
+visibility, data-link state, EW state, support authority, or an event. Neither
+the browser nor replay may import or project its source, render, archive,
+manifest, or decision artifacts.
+
+Later generic verification implementation remains blocked until the exact
+source-freeze commit passes deterministic source-to-render machine verification
+and the exact-render-set `RELEASE_OWNER_REVIEW`, and an authorized human approves
+reference execution for the required jurisdiction and scope through an
+allowlisted record in the digest-pinned external authority policy, an externally
+rooted detached attestation, and resolvable exact evidence bytes. Stone Soup
+adaptation additionally requires its distinct adaptation approval. Those gates
+still do not admit runtime behavior: #26 must separately implement and validate
+the owned information-state contracts. Pending, rejected, self-declared, or
+untrusted decisions continue to yield the existing unsupported/no-track
+behavior, never a fallback.
+
+The separate `SOURCE_TERMS_AUTHORIZED` redistribution state is bound to exact
+NASA public-use and Stone Soup open/MIT evidence. It permits repository
+redistribution only and is intentionally absent from every RASP admission path.
