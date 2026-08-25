@@ -87,12 +87,21 @@ selector/role coverage yields `INCOMPLETE`; optional uncovered requirements are
 `NOT_APPLICABLE`; only closed coverage yields `SATISFIED`. Authors cannot write
 the result or an `ADMITTED` value.
 
-The compiler enumerates every authored executable scalar, table axis value,
-table cell, configuration, and station property. Requirement selectors are
+The compiler enumerates every authored executable numeric and categorical
+authority: sensor kind; weapon seeker, support, and launch state; every table
+axis value and cell; station group, capacity, and compatible-store membership;
+and compatibility status/capacity. Requirement selectors are
 component-relative RFC-6901 pointers whose object-array tokens are stable IDs or
 closed axis semantics, never insertion-sensitive component indexes. Each
 available row also binds a canonical `valueDigest`; editing an authored value
 without rebuilding its lineage fails closed.
+
+Stable component, station, store, rule, and table IDs are already canonical
+structural identity and are not redundantly governed as scalar values. A
+compatible-store set member is executable permission rather than mere identity,
+so it is bound with a stable ID-token selector. Compatibility-rule lineage uses
+the exact rule subject and inherits the owning loadout configuration/validity
+domain; it does not acquire a parallel configuration schema.
 
 Each field-lineage row preserves one of `AVAILABLE`, `UNKNOWN`, `UNAVAILABLE`,
 `ASSUMPTION`, `REFERENCE_ONLY`, `UNSUPPORTED`, or `NOT_APPLICABLE`. Only
@@ -130,7 +139,7 @@ absence.
    recipe and tool semantic versions, exact arguments, environment digest,
    unit/frame/datum transforms, uncertainty propagation, output identity, media
    type, byte length, and SHA-256.
-5. Add v2 field-lineage rows for every enumerated physical field selector and
+5. Add v2 field-lineage rows for every enumerated executable field selector and
    every configuration in the owning component validity domain. Preserve the
    canonical authored-value digest, source URI, and page/record identity.
    Cross-subject, cross-configuration, cross-capability, changed-locator,
@@ -139,7 +148,12 @@ absence.
    derivative bindings reject. Source and validation roles that
    reuse the same raw or derivative identity do not satisfy independent
    validation coverage.
-6. Call `compileGovernedModelPack`. It validates exact v2 keys and bounds,
+6. Call `compileGovernedModelPack`. It validates exact v2 keys and performs a
+   length-only table preflight before source serialization or field
+   materialization. The preflight rejects more than six axes, empty axes,
+   unsafe-integer axis products, flattened-value cardinality mismatch, and more
+   than 2,000,000 cumulative cells with stable code/path diagnostics. It then
+   validates the remaining bounds,
    rebuilds the existing v1 SI projection for compatibility, computes closed
    requirement completeness, then binds source, lineage, legacy projection, and
    compiled digests into one frozen v2 bundle. Before publication,
@@ -201,8 +215,10 @@ digests all change. Neither anonymous pack is production-admitted.
 
 Stage B rejects before publication when any artifact exceeds 32 MiB, either raw
 or derivative corpus exceeds 64 MiB total, the v2 source exceeds 8 MiB,
-governed records exceed 2,048, configurations exceed 128,
-or compiled table cells exceed 2,000,000. These are admission-safety bounds, not
+governed records exceed 2,048, configurations exceed 128, a table exceeds six
+axes, or cumulative compiled table cells exceed 2,000,000. Axis products must
+also remain safe integers and exactly match flattened values. These checks run
+before governed-field materialization and are admission-safety bounds, not
 performance claims. Decompression is not supported, so compressed or
 decompression-bomb payloads cannot enter this port.
 
@@ -223,11 +239,11 @@ accepts only complete foundation identities.
 
 The immutable workload
 `fixtures/performance/model-pack-foundation-workload.v1.json` has digest
-`3477e7d3ba75b7daa62be382194a87484817f2c1bbb946e5f819aa67ab4aee78`
+`8a438546acdfc3d3bf49d8052e26865c275f2d3fa9b935763e1271438f706e5c`
 and measures compile, atomic publish, exact lookup, research export/import and
 1/10/100/500-instance compiled reuse. On 2026-08-25, Node v24.3.0 on an Apple M5
-arm64 with 10 logical cores and 16 GiB memory measured p99 values of 67.116,
-56.000, 10.980, 15.727, 50.554 and 0.013/0.007/0.068/0.120 ms respectively.
+arm64 with 10 logical cores and 16 GiB memory measured p99 values of 68.618,
+66.911, 16.251, 18.935, 64.383 and 0.012/0.007/0.079/0.122 ms respectively.
 All p50, p95, p99, and maximum measurements were below their committed
 regression budgets. These are local
 foundation measurements, not browser/runtime throughput, x86-64 capacity, or a

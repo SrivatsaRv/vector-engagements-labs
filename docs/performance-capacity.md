@@ -247,12 +247,12 @@ must pass on the frozen completion candidate beside TypeScript/Rust parity.
 
 The Stage-B #170 workload is separately frozen at
 `fixtures/performance/model-pack-foundation-workload.v1.json`, digest
-`3477e7d3ba75b7daa62be382194a87484817f2c1bbb946e5f819aa67ab4aee78`.
+`8a438546acdfc3d3bf49d8052e26865c275f2d3fa9b935763e1271438f706e5c`.
 Measured on 2026-08-25 using Node.js v24.3.0 on an Apple M5 arm64 with 10
 logical cores and 16 GiB memory, its compile/publish/exact-lookup/research-
-export/research-import p99 values were 67.116/56.000/10.980/15.727/50.554 ms.
+export/research-import p99 values were 68.618/66.911/16.251/18.935/64.383 ms.
 Compiled-pack reuse at 1/10/100/500 instances measured
-0.013/0.007/0.068/0.120 ms p99. All measurements passed the workload's declared
+0.012/0.007/0.079/0.122 ms p99. All measurements passed the workload's declared
 p50, p95, p99 and maximum budgets. These results cover only the non-runtime Stage-B
 compiler, immutable reference repository, backup/readback and already-compiled
 reuse paths; they are not browser, Worker, physics-tick, named-aircraft or

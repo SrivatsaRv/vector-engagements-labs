@@ -12,6 +12,7 @@ import {
   ModelPackValidationError,
   compileGovernedModelPack,
   compileModelPack,
+  preflightGovernedModelPackTables,
   readLegacyCompiledModelPack,
   rebuildAircraftDerivative,
   sha256ArtifactBytes,
@@ -505,6 +506,32 @@ test("two serialized anonymous packs import through the identical compiler and e
   assert.notEqual(bravo.pack.propulsion[0].thrustTable.values[0], alpha.pack.propulsion[0].thrustTable.values[0]);
   assert.notEqual(bravo.pack.digest, alpha.pack.digest);
   assert.doesNotMatch(JSON.stringify(archives), /"(?:su-30|f-16|mirage|jf-17|astra|aim-120)/i);
+
+  const alphaPublication = archives[0].publications[0];
+  const unchangedLineageMutation = {
+    source: structuredClone(alphaPublication.source),
+    rawArtifactBytes: alphaPublication.rawArtifactBytes.map((item) => ({
+      digest: item.digest,
+      bytes: Uint8Array.from(item.bytes),
+    })),
+    derivativeBytes: alphaPublication.derivativeBytes.map((item) => ({
+      digest: item.digest,
+      bytes: Uint8Array.from(item.bytes),
+    })),
+  };
+  const weapon = unchangedLineageMutation.source.weapons[0];
+  const supportLineage = unchangedLineageMutation.source.governance.fieldLineage.filter((item) =>
+    item.componentId === weapon.id && item.selector === "/supportRequirement"
+  );
+  assert.deepEqual(supportLineage.map((item) => item.evidenceRole).sort(), ["SOURCE", "SOURCE", "VALIDATION", "VALIDATION"]);
+  assert.equal(new Set(supportLineage.map((item) => item.rawArtifactDigest)).size, 4);
+  assert.equal(new Set(supportLineage.map((item) => item.derivativeDigest)).size, 4);
+  assert.equal(weapon.supportRequirement, "UNAVAILABLE");
+  weapon.supportRequirement = "NONE";
+  await assert.rejects(
+    compileGovernedModelPack(unchangedLineageMutation),
+    /valueDigest does not match the authored scalar value/,
+  );
 });
 
 test("governed raw, derivative, source, and compiled identities fail closed and publish atomically", async () => {
@@ -754,6 +781,53 @@ test("every authored physical scalar and table cell requires component and confi
   );
 });
 
+test("every executable categorical aircraft authority is bound to unchanged source and validation lineage", async () => {
+  const mutations = [
+    {
+      label: "sensor kind",
+      mutate: (source) => { source.sensors[0].sensorKind = "RADAR"; },
+    },
+    {
+      label: "weapon seeker mode",
+      mutate: (source) => { source.weapons[0].seekerMode = "ACTIVE_RADAR"; },
+    },
+    {
+      label: "weapon support requirement",
+      mutate: (source) => { source.weapons[0].supportRequirement = "NONE"; },
+    },
+    {
+      label: "weapon launch authorization",
+      mutate: (source) => { source.weapons[0].launchAuthorization = "TRACK_REQUIRED"; },
+    },
+    {
+      label: "station group",
+      mutate: (source) => { source.loadouts[0].stations[0].stationGroup = "INVENTED_GROUP"; },
+    },
+    {
+      label: "station compatible-store membership",
+      mutate: (source) => { source.loadouts[0].stations[0].compatibleStoreModelIds = []; },
+    },
+    {
+      label: "compatibility status",
+      mutate: (source) => { source.compatibility[0].status = "UNSUPPORTED"; },
+    },
+    {
+      label: "compatibility capacity",
+      mutate: (source) => { source.compatibility[0].maximumQuantity += 1; },
+    },
+  ];
+
+  for (const { label, mutate } of mutations) {
+    const input = await createAnonymousGovernedPublication(`anonymous-pack-categorical-${label.replaceAll(" ", "-")}`);
+    mutate(input.source);
+    await assert.rejects(
+      compileGovernedModelPack(input),
+      /valueDigest does not match|selector does not resolve|absent from the closed requirement profile/,
+      `${label} changed while all raw, derivative, requirement, and lineage records remained unchanged`,
+    );
+  }
+});
+
 test("changing one raw artifact invalidates every downstream identity until rebuilt", async () => {
   const originalInput = await createAnonymousGovernedPublication("anonymous-pack-rebuild");
   const original = await compileGovernedModelPack(originalInput);
@@ -852,6 +926,94 @@ test("governed source bounds and incomplete closed requirements fail without all
       .find((item) => item.requirementId.startsWith("aerodynamics-coverage-")).gapReasons.join("\n"),
     /VALIDATION\/INDEPENDENT/,
   );
+});
+
+test("governed table preflight rejects pathological shapes before value materialization", async () => {
+  const lengthOnlyArray = (length) => {
+    let indexedReads = 0;
+    const values = new Proxy([], {
+      get(target, property, receiver) {
+        if (property === "length") return length;
+        if (typeof property === "string" && /^(?:0|[1-9][0-9]*)$/.test(property)) {
+          indexedReads += 1;
+          throw new Error("table values were materialized before bounded preflight");
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    return { values, indexedReads: () => indexedReads };
+  };
+
+  const oversized = await createAnonymousGovernedPublication("anonymous-pack-oversized-table");
+  const oversizedAxis = lengthOnlyArray(2_000_001);
+  const oversizedValues = lengthOnlyArray(2_000_001);
+  oversized.source.aerodynamics[0].coefficientTables[0].axes = [{
+    semantic: "MACH",
+    unit: "1",
+    values: oversizedAxis.values,
+  }];
+  oversized.source.aerodynamics[0].coefficientTables[0].values = oversizedValues.values;
+  await assert.rejects(
+    compileGovernedModelPack(oversized),
+    /\[MODEL_PACK_TABLE_BOUNDS\] source\.aerodynamics\[0\]\.coefficientTables\[0\] exceeds 2000000 total governed table cells/,
+  );
+  assert.equal(oversizedAxis.indexedReads(), 0);
+  assert.equal(oversizedValues.indexedReads(), 0);
+
+  const cumulative = await createAnonymousGovernedPublication("anonymous-pack-cumulative-table-bound");
+  const cumulativeAxisA = lengthOnlyArray(1_000_000);
+  const cumulativeValuesA = lengthOnlyArray(1_000_000);
+  const cumulativeAxisB = lengthOnlyArray(1_000_001);
+  const cumulativeValuesB = lengthOnlyArray(1_000_001);
+  cumulative.source.aerodynamics[0].coefficientTables[0].axes = [{
+    semantic: "MACH", unit: "1", values: cumulativeAxisA.values,
+  }];
+  cumulative.source.aerodynamics[0].coefficientTables[0].values = cumulativeValuesA.values;
+  cumulative.source.aerodynamics[0].coefficientTables[1].axes = [{
+    semantic: "ANGLE_OF_ATTACK", unit: "rad", values: cumulativeAxisB.values,
+  }];
+  cumulative.source.aerodynamics[0].coefficientTables[1].values = cumulativeValuesB.values;
+  assert.throws(
+    () => preflightGovernedModelPackTables(cumulative.source),
+    /\[MODEL_PACK_TABLE_BOUNDS\] source\.aerodynamics\[0\]\.coefficientTables\[1\] exceeds 2000000 total governed table cells/,
+  );
+  assert.deepEqual([
+    cumulativeAxisA.indexedReads(), cumulativeValuesA.indexedReads(),
+    cumulativeAxisB.indexedReads(), cumulativeValuesB.indexedReads(),
+  ], [0, 0, 0, 0]);
+
+  const mismatched = await createAnonymousGovernedPublication("anonymous-pack-mismatched-table");
+  mismatched.source.aerodynamics[0].coefficientTables[0].axes[0].values = [0, 1];
+  mismatched.source.aerodynamics[0].coefficientTables[0].values = [0, 1, 2];
+  assert.throws(
+    () => preflightGovernedModelPackTables(mismatched.source),
+    /\[MODEL_PACK_TABLE_SHAPE\] source\.aerodynamics\[0\]\.coefficientTables\[0\]\.values length 3 does not match axis cardinality product 2/,
+  );
+
+  const unsafeValueCardinality = await createAnonymousGovernedPublication("anonymous-pack-unsafe-value-cardinality");
+  const unsafeValues = lengthOnlyArray(Number.MAX_SAFE_INTEGER + 1);
+  unsafeValueCardinality.source.aerodynamics[0].coefficientTables[0].axes[0].values = [0];
+  unsafeValueCardinality.source.aerodynamics[0].coefficientTables[0].values = unsafeValues.values;
+  assert.throws(
+    () => preflightGovernedModelPackTables(unsafeValueCardinality.source),
+    /\[MODEL_PACK_TABLE_SHAPE\] source\.aerodynamics\[0\]\.coefficientTables\[0\]\.values must have a non-negative safe-integer length/,
+  );
+  assert.equal(unsafeValues.indexedReads(), 0);
+
+  const overflow = await createAnonymousGovernedPublication("anonymous-pack-overflow-table");
+  const hugeAxisA = lengthOnlyArray(100_000_000);
+  const hugeAxisB = lengthOnlyArray(100_000_000);
+  overflow.source.propulsion[0].thrustTable.axes = [
+    { semantic: "THROTTLE", unit: "1", values: hugeAxisA.values },
+    { semantic: "ALTITUDE", unit: "m", values: hugeAxisB.values },
+  ];
+  overflow.source.propulsion[0].thrustTable.values = [];
+  assert.throws(
+    () => preflightGovernedModelPackTables(overflow.source),
+    /\[MODEL_PACK_TABLE_SHAPE\] source\.propulsion\[0\]\.thrustTable axis cardinality product exceeds Number\.MAX_SAFE_INTEGER/,
+  );
+  assert.equal(hugeAxisA.indexedReads(), 0);
+  assert.equal(hugeAxisB.indexedReads(), 0);
 });
 
 test("explicit missing states remain distinct, zero remains available, and optional gaps are not admitted", async () => {

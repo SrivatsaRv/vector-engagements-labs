@@ -107,8 +107,10 @@ that regenerates the compiled digest; it is not inferred from scenario demand.
 `ModelPackSourceV2` preserves that executable source projection and adds one
 strict `governance` member containing the intended-use requirement profile,
 raw-source artifact metadata, lawful derivative records, and per-field lineage.
-The compiler enumerates every executable scalar, table axis/cell and station
-property. Stable component-relative selectors bind each value and every owning
+The compiler enumerates every executable scalar and categorical authority,
+including sensor kind, weapon seeker/support/launch state, every table axis/cell,
+station group/capacity/store membership, and compatibility status/capacity.
+Stable component-relative selectors bind each value and every owning
 configuration to an exact value digest, component, evidence role,
 raw and derivative digest, URI and record locator, unit, frame, datum,
 uncertainty, and validity. The derivative ancestry and transformation selector
@@ -130,6 +132,12 @@ compile error. Coefficient tables declare output units, ordered axes, axis
 units, evidence, and their own validity domain. The product of all axis lengths
 must equal the flattened value length; axes must be finite and strictly
 increasing.
+
+Stable model, station, store, rule, and table IDs are structural references and
+are already bound once by canonical source identity; scalar lineage does not
+duplicate those IDs as values. Set-like compatible-store membership is different:
+each member is executable permission and therefore has its own stable ID-token
+selector and lineage.
 
 Every model and table carries a non-empty validity domain:
 
@@ -216,6 +224,14 @@ table dimensions, derivative inputs, recipe arguments and coefficient values.
 The result binds requirement-profile, source, lineage, legacy SI
 projection, and final compiled digests. A raw-byte change rejects against the
 old chain and changes every downstream identity after a lawful rebuild.
+
+Before source serialization or governed-field materialization, one bounded
+table preflight checks 1..6 axes, positive axis cardinalities, safe-integer axis
+products, exact flattened-value cardinality, and the cumulative 2,000,000-cell
+limit. Shape failures use `[MODEL_PACK_TABLE_SHAPE]` with the exact table path;
+cumulative capacity failures use `[MODEL_PACK_TABLE_BOUNDS]`. The preflight
+reads array lengths only, so an oversized or overflow-shaped table cannot force
+millions of lineage objects or requirement matches before rejection.
 
 The digest excludes only the outer `digest` member. Object keys use Unicode
 code-point order. Semantically ordered arrays retain authored order; registry
@@ -435,7 +451,9 @@ compiled-only export accepts complete foundation identities, contains bounded
 lineage, and excludes raw/derivative corpora and recipes.
 
 Admission bounds are 32 MiB per artifact, 64 MiB per raw or derivative corpus,
-8 MiB per v2 source, 2,048 governed records, 128 configurations, and 2,000,000 table cells. The port accepts no
+8 MiB per v2 source, 2,048 governed records, 128 configurations, six axes per
+table, and 2,000,000 cumulative table cells. Shape/cardinality and table-cell
+bounds reject before source serialization or lineage materialization. The port accepts no
 compression. Durable database/blob adapters, cache lifecycle, Worker recovery,
 and runtime cache/load remain later-stage dependencies. The immutable Stage-B
 performance workload covers compile, publish, exact lookup, research
@@ -556,7 +574,11 @@ digest.
   compiler/resolver, closed completeness, subject/configuration and locator
   laundering, raw/derivative tampering, downstream rebuild invalidation,
   insertion permutation, atomic publication, exact export/import/readback,
-  compiled-only corpus isolation, v1 read-only migration, and nonpromotion.
+  compiled-only corpus isolation, v1 read-only migration, and nonpromotion. It
+  also uses length-only hostile arrays to prove oversized, cumulative, mismatched,
+  and safe-integer-overflow table shapes reject without value materialization,
+  and mutates every executable categorical authority while retaining the old
+  source/validation lineage to prove completeness cannot be laundered.
 - `tests/scenario-draft.test.mjs` covers stable IDs, draft revisions, and patch
   preservation.
 - `tests/engine-backends.test.mjs` checks model-pack and entity-provenance parity.

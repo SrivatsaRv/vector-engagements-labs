@@ -20,6 +20,7 @@ import {
   type ModelPackSourceV2,
   type ModelPackRequirementProfile,
   type SourceUnit,
+  type ValidityDomain,
 } from "../../lib/model-pack.ts";
 import { createCurrentModelPackSource } from "../../lib/reference-model-pack.ts";
 
@@ -146,7 +147,8 @@ function anonymousSource(packId: string, thrustDelta: number) {
 
 type Specification = {
   dataFamily: AircraftDataFamily;
-  component: ModelPackSourceV2["aerodynamics"][number];
+  componentId: string;
+  validityDomain: ValidityDomain;
   fields: Array<{ selector: string; unit: SourceUnit; value: string | number | boolean }>;
 };
 
@@ -155,16 +157,13 @@ export async function createAnonymousGovernedPublication(
   thrustDelta = 0,
 ): Promise<GovernedModelPackCompileInput> {
   const source = anonymousSource(packId, thrustDelta);
-  const components = new Map([
-    ...source.aerodynamics, ...source.propulsion, ...source.sensors,
-    ...source.aircraft, ...source.weapons, ...source.loadouts,
-  ].map((component) => [component.id, component]));
   const specifications = new Map<string, Specification>();
   for (const field of listGovernedAircraftScalarFields(source)) {
     const key = `${field.dataFamily}\u0000${field.componentId}`;
     const specification = specifications.get(key) ?? {
       dataFamily: field.dataFamily,
-      component: components.get(field.componentId) as Specification["component"],
+      componentId: field.componentId,
+      validityDomain: field.validityDomain,
       fields: [],
     };
     specification.fields.push({ selector: field.selector, unit: field.unit, value: field.value });
@@ -176,10 +175,10 @@ export async function createAnonymousGovernedPublication(
     id: `${packId}-engine-verification-requirements`,
     version: "1.0.0",
     intendedUse: { id: "vector.intended-use.engine-verification" as const, version: "1.0.0" },
-    requirements: familySpecifications.map(({ dataFamily, component, fields }, index) => ({
+    requirements: familySpecifications.map(({ dataFamily, componentId, validityDomain, fields }, index) => ({
       id: `${dataFamily.toLowerCase().replaceAll("_", "-")}-coverage-${index}`,
       dataFamily,
-      applicability: { componentIds: [component.id], configurations: [...component.validityDomain.configurations] },
+      applicability: { componentIds: [componentId], configurations: [...validityDomain.configurations] },
       fieldSelectors: fields.map((field) => field.selector),
       requiredEvidenceRoles: ["SOURCE", "VALIDATION"] as AircraftEvidenceRole[],
       required: true,
@@ -190,8 +189,8 @@ export async function createAnonymousGovernedPublication(
   const rawSourceArtifacts: ModelPackSourceV2["governance"]["rawSourceArtifacts"] = [];
   const derivatives: ModelPackSourceV2["governance"]["derivatives"] = [];
   const fieldLineage: ModelPackSourceV2["governance"]["fieldLineage"] = [];
-  for (const [familyIndex, { dataFamily, component, fields }] of familySpecifications.entries()) {
-    for (const configurationId of component.validityDomain.configurations) {
+  for (const [familyIndex, { dataFamily, componentId, validityDomain, fields }] of familySpecifications.entries()) {
+    for (const configurationId of validityDomain.configurations) {
       for (const evidenceRole of ["SOURCE", "VALIDATION"] as const) {
         const configurationSlug = configurationId.toLowerCase().replaceAll("_", "-");
         const slug = `family-${familyIndex}-${configurationSlug}-${evidenceRole.toLowerCase()}`;
@@ -202,7 +201,7 @@ export async function createAnonymousGovernedPublication(
         rawSourceArtifacts.push({
           schemaVersion: AIRCRAFT_RAW_SOURCE_SCHEMA_VERSION,
           id: `${packId}-${slug}-raw`, version: "1.0.0",
-          subject: { id: component.id, configurationId },
+          subject: { id: componentId, configurationId },
           locator: { uri: locator, retrievedAt: "2026-08-25T00:00:00.000Z", record: sourceRecord },
           mediaType: "application/octet-stream", byteLength: rawBytes.byteLength, contentDigest: rawDigest,
           rights: { licenseId: "CC0-1.0", redistribution: "PERMITTED", exportDisposition: "PUBLIC" },
@@ -214,7 +213,7 @@ export async function createAnonymousGovernedPublication(
         const derivative: AircraftDerivativeRecord = {
           schemaVersion: AIRCRAFT_DERIVATIVE_SCHEMA_VERSION,
           id: `${packId}-${slug}-derivative`, version: "1.0.0",
-          subject: { id: component.id, configurationId }, orderedInputDigests: [rawDigest],
+          subject: { id: componentId, configurationId }, orderedInputDigests: [rawDigest],
           recipe: {
             id: AIRCRAFT_DERIVATIVE_RECIPE_ID, version: AIRCRAFT_DERIVATIVE_RECIPE_VERSION,
             tool: { id: AIRCRAFT_DERIVATIVE_TOOL_ID, version: AIRCRAFT_DERIVATIVE_TOOL_VERSION },
@@ -232,14 +231,14 @@ export async function createAnonymousGovernedPublication(
         derivatives.push(derivative);
         for (const [fieldIndex, { selector, unit, value }] of fields.entries()) fieldLineage.push({
           id: `${packId}-${slug}-lineage-${fieldIndex}`, selector, dataFamily,
-          componentId: component.id, configurationId, valueState: "AVAILABLE", evidenceRole,
+          componentId, configurationId, valueState: "AVAILABLE", evidenceRole,
           valueDigest: await aircraftLineageValueDigest({
             selector, value, unit, frame: "NOT_APPLICABLE", datum: "NOT_APPLICABLE",
           }),
           rawArtifactDigest: rawDigest, derivativeDigest, sourceLocator: locator, sourceRecord, unit,
           frame: "NOT_APPLICABLE", datum: "NOT_APPLICABLE",
           uncertainty: { state: "KNOWN", magnitude: 0, unit },
-          validityDomain: structuredClone(component.validityDomain),
+          validityDomain: structuredClone(validityDomain),
         });
         rawArtifactBytes.push({ digest: rawDigest, bytes: rawBytes });
         derivativeBytes.push({ digest: derivativeDigest, bytes: derivativeOutput });

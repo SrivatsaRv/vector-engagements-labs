@@ -2108,7 +2108,7 @@ mod tests {
         let identity = validate_compiled_model_pack_v2_json(&serde_json::to_string(&pack)?)?;
         assert_eq!(
             identity.digest,
-            "8c012597c59d082c1cd92f0be075eeab90ddef4d07e94dd0a613dc5a13e66376"
+            "2a6ba318448b85fa2231da4e48d5d21dacdfe2407d453ac527a39b35e2c0de82"
         );
         assert_eq!(identity.id, "anonymous-pack-alpha");
 

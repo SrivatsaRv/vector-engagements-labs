@@ -1659,6 +1659,7 @@ const MAX_GOVERNED_CORPUS_BYTES = 64 * 1024 * 1024;
 const MAX_GOVERNED_RECORDS = 2_048;
 const MAX_GOVERNED_CONFIGURATIONS = 128;
 const MAX_GOVERNED_TABLE_CELLS = 2_000_000;
+const MAX_GOVERNED_TABLE_AXES = 6;
 
 const compareCanonicalText = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0;
 const pointerToken = (value: string) => value.replaceAll("~", "~0").replaceAll("/", "~1");
@@ -1670,22 +1671,115 @@ export type GovernedAircraftScalarField = {
   unit: SourceUnit;
   value: string | number | boolean;
   configurations: string[];
+  validityDomain: ValidityDomain;
 };
+
+type GovernedComponentAuthority = {
+  component: unknown;
+  validityDomain: ValidityDomain;
+  families: Set<AircraftDataFamily>;
+};
+
+function governedComponentAuthorities(source: ModelPackSourceV2) {
+  const authorities = new Map<string, GovernedComponentAuthority>();
+  const register = (values: ModelSourceBase[], families: AircraftDataFamily[]) => values.forEach((component) => {
+    authorities.set(component.id, {
+      component,
+      validityDomain: component.validityDomain,
+      families: new Set(families),
+    });
+  });
+  register(source.aerodynamics, ["AERODYNAMICS"]);
+  register(source.propulsion, ["PROPULSION"]);
+  register(source.sensors, ["SENSORS"]);
+  register(source.aircraft, ["FLIGHT_CONTROLS", "MASS_PROPERTIES"]);
+  register(source.weapons, ["STATIONS_STORES"]);
+  register(source.loadouts, ["STATIONS_STORES"]);
+  for (const rule of source.compatibility) {
+    const loadout = source.loadouts.find((candidate) => candidate.id === rule.loadoutModelId);
+    if (!loadout) continue;
+    authorities.set(rule.id, {
+      component: rule,
+      validityDomain: loadout.validityDomain,
+      families: new Set(["STATIONS_STORES"]),
+    });
+  }
+  return authorities;
+}
+
+export function preflightGovernedModelPackTables(source: Pick<ModelPackSourceV2, "aerodynamics" | "propulsion">) {
+  let totalCells = 0;
+  const inspect = (path: string, table: CoefficientTableSource) => {
+    if (!Array.isArray(table.axes) || table.axes.length < 1 || table.axes.length > MAX_GOVERNED_TABLE_AXES) {
+      throw new ModelPackValidationError([
+        `[MODEL_PACK_TABLE_SHAPE] ${path}.axes must contain 1..${MAX_GOVERNED_TABLE_AXES} axes`,
+      ]);
+    }
+    if (!Array.isArray(table.values)) {
+      throw new ModelPackValidationError([`[MODEL_PACK_TABLE_SHAPE] ${path}.values must be an array`]);
+    }
+    const valueCount = table.values.length;
+    if (!Number.isSafeInteger(valueCount) || valueCount < 0) {
+      throw new ModelPackValidationError([
+        `[MODEL_PACK_TABLE_SHAPE] ${path}.values must have a non-negative safe-integer length`,
+      ]);
+    }
+    let product = 1;
+    for (const [axisIndex, axis] of table.axes.entries()) {
+      if (!Array.isArray(axis.values) || !Number.isSafeInteger(axis.values.length) || axis.values.length < 1) {
+        throw new ModelPackValidationError([
+          `[MODEL_PACK_TABLE_SHAPE] ${path}.axes[${axisIndex}].values must have a positive safe-integer length`,
+        ]);
+      }
+      if (product > Number.MAX_SAFE_INTEGER / axis.values.length) {
+        throw new ModelPackValidationError([
+          `[MODEL_PACK_TABLE_SHAPE] ${path} axis cardinality product exceeds Number.MAX_SAFE_INTEGER`,
+        ]);
+      }
+      product *= axis.values.length;
+    }
+    if (valueCount !== product) {
+      throw new ModelPackValidationError([
+        `[MODEL_PACK_TABLE_SHAPE] ${path}.values length ${valueCount} does not match axis cardinality product ${product}`,
+      ]);
+    }
+    if (product > MAX_GOVERNED_TABLE_CELLS || totalCells > MAX_GOVERNED_TABLE_CELLS - product) {
+      throw new ModelPackValidationError([
+        `[MODEL_PACK_TABLE_BOUNDS] ${path} exceeds ${MAX_GOVERNED_TABLE_CELLS} total governed table cells`,
+      ]);
+    }
+    totalCells += product;
+  };
+  source.aerodynamics.forEach((model, modelIndex) => {
+    model.coefficientTables.forEach((table, tableIndex) => inspect(
+      `source.aerodynamics[${modelIndex}].coefficientTables[${tableIndex}]`,
+      table,
+    ));
+  });
+  source.propulsion.forEach((model, modelIndex) => {
+    inspect(`source.propulsion[${modelIndex}].thrustTable`, model.thrustTable);
+    inspect(`source.propulsion[${modelIndex}].fuelFlowTable`, model.fuelFlowTable);
+  });
+  return totalCells;
+}
 
 export function listGovernedAircraftScalarFields(source: ModelPackSourceV2): GovernedAircraftScalarField[] {
   const fields: GovernedAircraftScalarField[] = [];
   const add = (
-    component: ModelSourceBase,
+    componentId: string,
+    component: unknown,
+    validityDomain: ValidityDomain,
     dataFamily: AircraftDataFamily,
     selector: string,
     unit: SourceUnit,
   ) => fields.push({
-    componentId: component.id,
+    componentId,
     dataFamily,
     selector,
     unit,
     value: resolveGovernedScalarSelector(component, selector) as string | number | boolean,
-    configurations: [...component.validityDomain.configurations].sort(compareCanonicalText),
+    configurations: [...validityDomain.configurations].sort(compareCanonicalText),
+    validityDomain: structuredClone(validityDomain),
   });
   const addTable = (
     component: ModelSourceBase,
@@ -1695,52 +1789,81 @@ export function listGovernedAircraftScalarFields(source: ModelPackSourceV2): Gov
   ) => {
     for (const axis of table.axes) {
       axis.values.forEach((_value, index) => add(
+        component.id,
         component,
+        component.validityDomain,
         dataFamily,
         `${root}/axes/${pointerToken(axis.semantic)}/values/${index}`,
         axis.unit,
       ));
     }
-    table.values.forEach((_value, index) => add(component, dataFamily, `${root}/values/${index}`, table.outputUnit));
+    table.values.forEach((_value, index) => add(
+      component.id,
+      component,
+      component.validityDomain,
+      dataFamily,
+      `${root}/values/${index}`,
+      table.outputUnit,
+    ));
   };
   for (const model of source.aerodynamics) {
-    add(model, "AERODYNAMICS", "/referenceArea/value", model.referenceArea.unit);
-    add(model, "AERODYNAMICS", "/referenceChord/value", model.referenceChord.unit);
-    add(model, "AERODYNAMICS", "/referenceSpan/value", model.referenceSpan.unit);
+    add(model.id, model, model.validityDomain, "AERODYNAMICS", "/referenceArea/value", model.referenceArea.unit);
+    add(model.id, model, model.validityDomain, "AERODYNAMICS", "/referenceChord/value", model.referenceChord.unit);
+    add(model.id, model, model.validityDomain, "AERODYNAMICS", "/referenceSpan/value", model.referenceSpan.unit);
     for (const table of model.coefficientTables) {
       addTable(model, "AERODYNAMICS", `/coefficientTables/${pointerToken(table.id)}`, table);
     }
   }
   for (const model of source.propulsion) {
-    add(model, "PROPULSION", "/engineCount", "1");
-    add(model, "PROPULSION", "/spoolTime/value", model.spoolTime.unit);
+    add(model.id, model, model.validityDomain, "PROPULSION", "/engineCount", "1");
+    add(model.id, model, model.validityDomain, "PROPULSION", "/spoolTime/value", model.spoolTime.unit);
     addTable(model, "PROPULSION", "/thrustTable", model.thrustTable);
     addTable(model, "PROPULSION", "/fuelFlowTable", model.fuelFlowTable);
   }
   for (const model of source.sensors) {
+    add(model.id, model, model.validityDomain, "SENSORS", "/sensorKind", "1");
     for (const field of [
       "detectionRange", "minimumRange", "scanPeriod", "azimuthFieldOfView", "elevationFieldOfView",
-    ] as const) add(model, "SENSORS", `/${field}/value`, model[field].unit);
+    ] as const) add(model.id, model, model.validityDomain, "SENSORS", `/${field}/value`, model[field].unit);
   }
   for (const model of source.aircraft) {
-    add(model, "FLIGHT_CONTROLS", "/maximumCommandLoadFactor/value", model.maximumCommandLoadFactor.unit);
-    add(model, "MASS_PROPERTIES", "/emptyMass/value", model.emptyMass.unit);
-    add(model, "MASS_PROPERTIES", "/fuelCapacity/value", model.fuelCapacity.unit);
+    add(model.id, model, model.validityDomain, "FLIGHT_CONTROLS", "/maximumCommandLoadFactor/value", model.maximumCommandLoadFactor.unit);
+    add(model.id, model, model.validityDomain, "MASS_PROPERTIES", "/emptyMass/value", model.emptyMass.unit);
+    add(model.id, model, model.validityDomain, "MASS_PROPERTIES", "/fuelCapacity/value", model.fuelCapacity.unit);
   }
   for (const model of source.weapons) {
+    for (const field of ["seekerMode", "supportRequirement", "launchAuthorization"] as const) {
+      add(model.id, model, model.validityDomain, "STATIONS_STORES", `/${field}`, "1");
+    }
     for (const field of [
       "launchMass", "dryMass", "maximumCommandLoadFactor", "seekerActivationRange",
       "datalinkUpdatePeriod", "thrustTaperSpeed", "navigationConstant",
-    ] as const) add(model, "STATIONS_STORES", `/${field}/value`, model[field].unit);
+    ] as const) add(model.id, model, model.validityDomain, "STATIONS_STORES", `/${field}/value`, model[field].unit);
   }
   for (const model of source.loadouts) {
     for (const station of model.stations) {
       const root = `/stations/${pointerToken(station.id)}`;
-      add(model, "STATIONS_STORES", `${root}/positionBody/x/value`, station.positionBody.x.unit);
-      add(model, "STATIONS_STORES", `${root}/positionBody/y/value`, station.positionBody.y.unit);
-      add(model, "STATIONS_STORES", `${root}/positionBody/z/value`, station.positionBody.z.unit);
-      add(model, "STATIONS_STORES", `${root}/maximumQuantity`, "1");
+      add(model.id, model, model.validityDomain, "STATIONS_STORES", `${root}/stationGroup`, "1");
+      add(model.id, model, model.validityDomain, "STATIONS_STORES", `${root}/positionBody/x/value`, station.positionBody.x.unit);
+      add(model.id, model, model.validityDomain, "STATIONS_STORES", `${root}/positionBody/y/value`, station.positionBody.y.unit);
+      add(model.id, model, model.validityDomain, "STATIONS_STORES", `${root}/positionBody/z/value`, station.positionBody.z.unit);
+      add(model.id, model, model.validityDomain, "STATIONS_STORES", `${root}/maximumQuantity`, "1");
+      for (const storeModelId of station.compatibleStoreModelIds) add(
+        model.id,
+        model,
+        model.validityDomain,
+        "STATIONS_STORES",
+        `${root}/compatibleStoreModelIds/${pointerToken(storeModelId)}`,
+        "1",
+      );
     }
+  }
+  for (const rule of source.compatibility) {
+    const loadout = source.loadouts.find((candidate) => candidate.id === rule.loadoutModelId);
+    if (!loadout) continue;
+    for (const [selector, unit] of [
+      ["/stationGroup", "1"], ["/status", "1"], ["/maximumQuantity", "1"],
+    ] as const) add(rule.id, rule, loadout.validityDomain, "STATIONS_STORES", selector, unit);
   }
   return fields.sort((left, right) => compareCanonicalText(
     `${left.dataFamily}\u0000${left.componentId}\u0000${left.selector}`,
@@ -1763,11 +1886,19 @@ function resolveGovernedScalarSelector(component: unknown, selector: string) {
   for (const encodedToken of selector.slice(1).split("/")) {
     const token = encodedToken.replaceAll("~1", "/").replaceAll("~0", "~");
     if (Array.isArray(value)) {
-      const keyed = value.filter((item): item is Record<string, unknown> =>
-        Boolean(item) && typeof item === "object" && !Array.isArray(item)
-      );
-      if (keyed.length === value.length && keyed.length > 0) {
-        const matches = keyed.filter((item) => item.id === token || item.semantic === token);
+      if (value.length > 0 && typeof value[0] === "string") {
+        const index = value.indexOf(token);
+        if (index < 0 || value.indexOf(token, index + 1) >= 0) return undefined;
+        value = value[index];
+        continue;
+      }
+      if (value.length > 0 && value[0] && typeof value[0] === "object" && !Array.isArray(value[0])) {
+        const matches = value.filter((item): item is Record<string, unknown> =>
+          Boolean(item)
+          && typeof item === "object"
+          && !Array.isArray(item)
+          && (item.id === token || item.semantic === token)
+        );
         if (matches.length !== 1) return undefined;
         [value] = matches;
       } else {
@@ -2188,6 +2319,7 @@ async function validateGovernedLineage(input: GovernedModelPackCompileInput) {
   }
   validateGovernedExactKeys(source, issues);
   if (issues.length > 0) throw new ModelPackValidationError(issues);
+  preflightGovernedModelPackTables(source);
   const encodedSource = new TextEncoder().encode(JSON.stringify(source));
   if (encodedSource.byteLength > MAX_GOVERNED_SOURCE_BYTES) {
     issues.push(`source exceeds ${MAX_GOVERNED_SOURCE_BYTES} bytes`);
@@ -2339,23 +2471,7 @@ async function validateGovernedLineage(input: GovernedModelPackCompileInput) {
     );
   };
 
-  const componentAuthorities = new Map<string, {
-    component: ModelSourceBase;
-    families: Set<AircraftDataFamily>;
-  }>();
-  const registerComponentAuthorities = (
-    values: ModelSourceBase[],
-    families: AircraftDataFamily[],
-  ) => values.forEach((item) => componentAuthorities.set(item.id, {
-    component: item,
-    families: new Set(families),
-  }));
-  registerComponentAuthorities(source.aerodynamics, ["AERODYNAMICS"]);
-  registerComponentAuthorities(source.propulsion, ["PROPULSION"]);
-  registerComponentAuthorities(source.sensors, ["SENSORS"]);
-  registerComponentAuthorities(source.aircraft, ["FLIGHT_CONTROLS", "MASS_PROPERTIES"]);
-  registerComponentAuthorities(source.weapons, ["STATIONS_STORES"]);
-  registerComponentAuthorities(source.loadouts, ["STATIONS_STORES"]);
+  const componentAuthorities = governedComponentAuthorities(source);
   const validComponentIds = new Set(componentAuthorities.keys());
   const governedFields = listGovernedAircraftScalarFields(source);
   const governedFieldByKey = new Map(governedFields.map((field) => [
@@ -2393,7 +2509,7 @@ async function validateGovernedLineage(input: GovernedModelPackCompileInput) {
     normalizeValidityDomain(issues, `${path}.validityDomain`, lineage.validityDomain);
     if (componentAuthority && !validityDomainCovers(
       normalizeValidityDomain([], `${path}.validityDomain`, lineage.validityDomain),
-      normalizeValidityDomain([], `${path}.componentValidityDomain`, componentAuthority.component.validityDomain),
+      normalizeValidityDomain([], `${path}.componentValidityDomain`, componentAuthority.validityDomain),
     )) issues.push(`${path}.validityDomain does not cover the owning component validity domain`);
     if (lineage.uncertainty.state === "KNOWN") {
       finite(issues, `${path}.uncertainty.magnitude`, lineage.uncertainty.magnitude);
@@ -2478,7 +2594,7 @@ async function validateGovernedLineage(input: GovernedModelPackCompileInput) {
         }
       }
       for (const configuration of requirement.applicability.configurations) {
-        if (!authority.component.validityDomain.configurations.includes(configuration)) {
+        if (!authority.validityDomain.configurations.includes(configuration)) {
           issues.push(`requirement ${requirement.id} configuration ${configuration} is outside component validity ${id}`);
         }
       }
@@ -2512,11 +2628,6 @@ async function validateGovernedLineage(input: GovernedModelPackCompileInput) {
     }
   }
   if (allConfigurations.size > MAX_GOVERNED_CONFIGURATIONS) issues.push(`configuration count exceeds ${MAX_GOVERNED_CONFIGURATIONS}`);
-  const tableCellCount = [
-    ...source.aerodynamics.flatMap((model) => model.coefficientTables),
-    ...source.propulsion.flatMap((model) => [model.thrustTable, model.fuelFlowTable]),
-  ].reduce((total, table) => total + table.values.length, 0);
-  if (tableCellCount > MAX_GOVERNED_TABLE_CELLS) issues.push(`table cell count exceeds ${MAX_GOVERNED_TABLE_CELLS}`);
 
   if (issues.length > 0) throw new ModelPackValidationError(issues);
   const rebuiltDerivatives = new Map<string, Uint8Array>();
