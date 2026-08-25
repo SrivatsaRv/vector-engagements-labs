@@ -23,6 +23,8 @@ import { DEFAULT_SCENARIO_DEFINITION, SCENARIO_LIBRARY } from "../lib/scenarios.
 import { validateSavedScenario } from "../lib/security/saved-run.ts";
 import {
   createVectorSimulationRecord,
+  decodeColumnarFrames,
+  encodeColumnarFrames,
   openVectorSimulationRecord,
   serializeVectorRecord,
 } from "../lib/record/vector-record.ts";
@@ -31,7 +33,25 @@ import {
   admitRuntimeModelPack,
 } from "../lib/runtime/model-pack-adapter.ts";
 import { runEngine } from "../lib/engine/core.ts";
+import { runEngineBackend } from "../lib/engine/backend.ts";
 import { enginePositionToGeographic } from "../lib/scenario-spatial.ts";
+import { VECTOR_ENGINE_WASM_BASE64 } from "../lib/engine/generated/vector-engine-wasm.ts";
+
+function runRawRustWasm(scenario) {
+  const bytes = Buffer.from(VECTOR_ENGINE_WASM_BASE64, "base64");
+  const instance = new WebAssembly.Instance(new WebAssembly.Module(bytes));
+  const engine = instance.exports;
+  const input = new TextEncoder().encode(JSON.stringify(scenario));
+  const pointer = engine.vector_input_reserve(input.byteLength);
+  new Uint8Array(engine.memory.buffer, pointer, input.byteLength).set(input);
+  const accepted = engine.vector_run_json() === 1;
+  const output = new TextDecoder().decode(new Uint8Array(
+    engine.memory.buffer,
+    engine.vector_output_ptr(),
+    engine.vector_output_len(),
+  ));
+  return { accepted, output };
+}
 
 function fixture(missionClass = "TACTICAL_INTERCEPT") {
   const scenario = structuredClone(DEFAULT_SCENARIO);
@@ -407,6 +427,214 @@ test("airborne and ground/runway starts are first-class and unsupported evidence
     () => prepareSimulation(reciprocalScenario),
     /Runway threshold and admitted DEM elevations conflict outside the declared reconciliation envelope/,
   );
+});
+
+test("ground-alert readiness remains causally parked before the admitted release boundary", () => {
+  const scenario = admittedGroundFixture("GROUND_ALERT_QRA");
+  const prepared = prepareSimulation(scenario).engineScenario;
+  const aircraft = prepared.entities.find((entity) => entity.id === "blue-platform-1");
+  const run = runEngine({ ...prepared, durationSeconds: 1 });
+  const samples = run.frames.map((frame) =>
+    frame.entities.find((entity) => entity.id === aircraft.id));
+
+  assert.ok(samples.length > 1, "the causal hold must be observed beyond the initial frame");
+  for (const sample of samples) {
+    assert.equal(sample.aircraftOperationalState, "PARKED");
+    assert.equal(sample.aircraftOperationalStateValueState, "VALID");
+    assert.equal(sample.aircraftMovementValueState, "UNAVAILABLE");
+    assert.equal(sample.aircraftMovementUnavailableReason, "GROUND_DYNAMICS_MODEL_UNAVAILABLE");
+    assert.equal(sample.speedMps, 0);
+    assert.deepEqual(sample.velocity, { x: 0, y: 0, z: 0 });
+    assert.deepEqual(sample.position, aircraft.initial.position);
+    assert.equal(sample.fuelKg, aircraft.initial.fuelKg);
+    assert.equal(sample.massKg, aircraft.initial.massKg);
+    assert.equal(sample.aircraftControl, undefined);
+  }
+  const replayed = decodeColumnarFrames(encodeColumnarFrames(run.frames));
+  assert.deepEqual(
+    replayed.map((frame) => frame.entities.find((entity) => entity.id === aircraft.id)),
+    samples,
+  );
+  const rust = runEngineBackend({ ...structuredClone(prepared), durationSeconds: 1 }, "rust-wasm");
+  assert.deepEqual(
+    rust.frames.map((frame) => frame.entities.find((entity) => entity.id === aircraft.id)),
+    samples,
+  );
+});
+
+test("ground-operation admission fails closed with TypeScript and Rust parity", () => {
+  const base = prepareSimulation(admittedGroundFixture("GROUND_ALERT_QRA")).engineScenario;
+  const cases = [
+    ["mission digest", (ground) => { ground.missionDigest = "0".repeat(64); }],
+    ["forged release", (ground) => { ground.releaseTimeSeconds += 1; }],
+    ["runway digest", (ground) => { ground.runwayEvidenceDigest = "0".repeat(64); }],
+    ["start posture", (ground) => { ground.posture = "RUNWAY"; }],
+    ["unknown authority", (ground) => { ground.hiddenTakeoffSpeedMps = 75; }],
+  ];
+  for (const [name, mutate] of cases) {
+    const scenario = structuredClone(base);
+    const aircraft = scenario.entities.find((entity) => entity.id === "blue-platform-1");
+    mutate(aircraft.groundOperation);
+    for (const backend of ["typescript", "rust-wasm"]) {
+      assert.throws(
+        () => runEngineBackend(structuredClone(scenario), backend),
+        /ground-operation|groundOperation|unknown field/i,
+        `${name} ${backend}`,
+      );
+    }
+  }
+
+  const missingEntityBinding = structuredClone(base);
+  delete missingEntityBinding.entities.find(
+    (entity) => entity.id === "blue-platform-1",
+  ).groundOperation;
+  const missingRuntimeBinding = structuredClone(base);
+  delete missingRuntimeBinding.airMissionRuntime;
+  const hostileScenarios = [
+    ["missing entity binding", missingEntityBinding],
+    ["missing runtime binding", missingRuntimeBinding],
+  ];
+  for (const [name, mutate] of [
+    ["mission digest", (binding) => { binding.missionDigest = "a".repeat(64); }],
+    ["runway digest", (binding) => { binding.runwayEvidenceDigest = "b".repeat(64); }],
+    ["posture", (binding) => { binding.posture = "RUNWAY"; }],
+    ["release", (binding) => { binding.releaseTimeSeconds += 3; }],
+  ]) {
+    const forgedCompactCopies = structuredClone(base);
+    for (const binding of [
+      forgedCompactCopies.airMissionRuntime,
+      forgedCompactCopies.entities.find(
+        (entity) => entity.id === "blue-platform-1",
+      ).groundOperation,
+    ]) {
+      mutate(binding);
+    }
+    hostileScenarios.push([
+      `compact ${name} copies diverge from authoritative Air mission`,
+      forgedCompactCopies,
+    ]);
+  }
+  const forgedMissionAircraft = structuredClone(base);
+  forgedMissionAircraft.airMission.assignment.aircraftId = "forged-aircraft";
+  hostileScenarios.push([
+    "authoritative mission aircraft diverges from runtime source identity",
+    forgedMissionAircraft,
+  ]);
+  const callerSuppliedSeal = structuredClone(base);
+  for (const binding of [
+    callerSuppliedSeal.airMissionRuntime,
+    callerSuppliedSeal.entities.find(
+      (entity) => entity.id === "blue-platform-1",
+    ).groundOperation,
+  ]) {
+    binding.posture = "RUNWAY";
+    binding.releaseTimeSeconds += 3;
+  }
+  callerSuppliedSeal.airMission.authoredDigest = sha256HexSync(
+    callerSuppliedSeal.airMission.authored,
+  );
+  const callerMissionContent = structuredClone(callerSuppliedSeal.airMission);
+  delete callerMissionContent.compiledDigest;
+  callerSuppliedSeal.airMission.compiledDigest = sha256HexSync(callerMissionContent);
+  for (const binding of [
+    callerSuppliedSeal.airMissionRuntime,
+    callerSuppliedSeal.entities.find(
+      (entity) => entity.id === "blue-platform-1",
+    ).groundOperation,
+  ]) {
+    binding.missionDigest = callerSuppliedSeal.airMission.compiledDigest;
+  }
+  callerSuppliedSeal.airMissionAuthority = structuredClone(
+    callerSuppliedSeal.airMissionRuntime,
+  );
+  callerSuppliedSeal.airMissionAircraftSourceObjectId =
+    callerSuppliedSeal.airMission.assignment.aircraftId;
+  hostileScenarios.push([
+    "caller-supplied compact seal cannot replace full mission lineage",
+    callerSuppliedSeal,
+  ]);
+  const rawForgery = runRawRustWasm(callerSuppliedSeal);
+  assert.equal(rawForgery.accepted, false);
+  assert.match(rawForgery.output, /ground-operation|authoritative/i);
+  for (const compiledDigest of ["wrong", "a".repeat(64)]) {
+    const digestAttack = structuredClone(base);
+    digestAttack.airMission.compiledDigest = compiledDigest;
+    const rawDigestAttack = runRawRustWasm(digestAttack);
+    assert.equal(rawDigestAttack.accepted, false);
+    assert.match(rawDigestAttack.output, /digest|ground-operation/i);
+  }
+  for (const [name, scenario] of hostileScenarios) {
+    for (const backend of ["typescript", "rust-wasm"]) {
+      assert.throws(
+        () => runEngineBackend(structuredClone(scenario), backend),
+        /ground-operation|ground operation|authoritative|Air mission/i,
+        `${name} ${backend}`,
+      );
+    }
+  }
+});
+
+test("released ground alert advances only to hold-short while movement authority is unavailable", () => {
+  const scenario = admittedGroundFixture("GROUND_ALERT_QRA");
+  scenario.airMission.start.readinessDelaySeconds = 0;
+  const prepared = prepareSimulation(scenario).engineScenario;
+  const aircraft = prepared.entities.find((entity) => entity.id === "blue-platform-1");
+  const runs = ["typescript", "rust-wasm"].map((backend) =>
+    runEngineBackend({ ...structuredClone(prepared), durationSeconds: 1 }, backend));
+
+  for (const run of runs) {
+    const samples = run.frames.map((frame) =>
+      frame.entities.find((entity) => entity.id === aircraft.id));
+    assert.equal(samples[0].aircraftOperationalState, "PARKED");
+    assert.ok(samples.slice(1).every((sample) => sample.aircraftOperationalState === "HOLD_SHORT"));
+    assert.ok(samples.every((sample) => sample.aircraftMovementValueState === "UNAVAILABLE"));
+    assert.ok(samples.every((sample) => sample.speedMps === 0));
+    assert.ok(samples.every((sample) => sample.massKg === aircraft.initial.massKg));
+    assert.ok(samples.every((sample) => sample.installedStoreIds.length > 0));
+  }
+  assert.deepEqual(
+    runs[1].frames.map((frame) => frame.entities.find((entity) => entity.id === aircraft.id)),
+    runs[0].frames.map((frame) => frame.entities.find((entity) => entity.id === aircraft.id)),
+  );
+});
+
+test("ground-held runway state survives the complete VSR write and read boundary", async () => {
+  const scenario = admittedGroundFixture("RUNWAY");
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  const record = await createVectorSimulationRecord(
+    prepared,
+    result,
+    "2026-08-26T00:00:00.000Z",
+  );
+  const serialized = serializeVectorRecord(record);
+  const opened = await openVectorSimulationRecord(
+    serialized.buffer,
+    serialized.byteLength,
+  );
+  const aircraftId = prepared.engineScenario.entities.find(
+    (entity) => entity.groundOperation,
+  ).id;
+  const samples = opened.result.engineRun.frames.map((frame) =>
+    frame.entities.find((entity) => entity.id === aircraftId),
+  );
+  for (const projected of [result, opened.result]) {
+    assert.ok(projected.frames.length > 1);
+    assert.ok(projected.frames.every((frame) => frame.primaryEntityId === aircraftId));
+    assert.ok(projected.frames.every((frame) => frame.primaryEntityRole === "GROUND_HELD_AIRCRAFT"));
+    assert.ok(projected.frames.every((frame) =>
+      frame.entities.every((entity) => entity.id !== projected.engineRun.primaryWeaponId)));
+    assert.ok(projected.frames.every((frame) => {
+      const heldAircraft = frame.entities.find((entity) => entity.id === aircraftId);
+      return frame.interceptor.x === heldAircraft.position.x &&
+        frame.interceptor.y === heldAircraft.position.y &&
+        frame.interceptor.z === heldAircraft.position.z &&
+        frame.speed === heldAircraft.speedMps;
+    }));
+  }
+  assert.ok(samples.every((sample) => sample.aircraftOperationalState === "HOLD_SHORT"));
+  assert.ok(samples.every((sample) => sample.aircraftMovementValueState === "UNAVAILABLE"));
+  assert.ok(samples.every((sample) => sample.aircraftMovementUnavailableReason === "GROUND_DYNAMICS_MODEL_UNAVAILABLE"));
 });
 
 test("unknown schema, dangling references, AGL without terrain, impossible time and reserve fail closed", () => {

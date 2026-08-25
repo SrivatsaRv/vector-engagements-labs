@@ -368,6 +368,38 @@ export type ModelValueState =
   | "USER_PROVIDED"
   | "UNKNOWN";
 
+/**
+ * Aircraft mission phase achieved by the runtime. This is distinct from the
+ * world-entity lifecycle: an ACTIVE aircraft can still be PARKED or held short.
+ */
+export type AircraftOperationalState =
+  | "PARKED"
+  | "STARTING"
+  | "TAXI"
+  | "HOLD_SHORT"
+  | "TAKEOFF_ROLL"
+  | "ROTATE"
+  | "CLIMBOUT"
+  | "ENROUTE"
+  | "ON_STATION"
+  | "ENGAGED"
+  | "EGRESS"
+  | "APPROACH"
+  | "LANDING_ROLL"
+  | "ABORTED"
+  | "DISABLED";
+
+export type AircraftGroundOperation = {
+  schemaVersion: "vector.aircraft-ground-operation.v1";
+  posture: "PARKING" | "RUNWAY" | "GROUND_ALERT_QRA";
+  releaseTimeSeconds: number;
+  missionDigest: string;
+  runwayEvidenceDigest: string;
+  /** Ground dynamics remain unavailable until a complete admitted model owns them. */
+  executionAuthority: "UNAVAILABLE";
+  unavailabilityReason: "GROUND_DYNAMICS_MODEL_UNAVAILABLE";
+};
+
 /** Immutable one-axis SI table admitted before a simulation starts. */
 export type EngineTable1D = {
   id: string;
@@ -451,6 +483,7 @@ export type EngineEntityDefinition = {
     fuelFlowByThrottle: EngineTable1D;
     maximumCommandG: number;
   };
+  groundOperation?: AircraftGroundOperation;
   provenance: {
     sourceObjectId: string;
     modelId: string;
@@ -470,6 +503,8 @@ export type EngineScenario = {
   fixedStepSeconds: number;
   /** Present for scenarios authored through vector.air-mission.v1. */
   airMission?: CompiledAirMission;
+  /** Compact engine-owned cross-binding for a compiled ground operation. */
+  airMissionRuntime?: AircraftGroundOperation;
   modelPack: {
     schemaVersion: "vector.compiled-model-pack.v1";
     id: string;
@@ -563,6 +598,10 @@ export type EngineEntityFrame = {
   phase: string;
   weaponFlightState?: WeaponFlightState;
   valueState: ModelValueState;
+  aircraftOperationalState?: AircraftOperationalState;
+  aircraftOperationalStateValueState?: "VALID" | "TERMINATED";
+  aircraftMovementValueState?: "VALID" | "UNAVAILABLE" | "NOT_APPLICABLE" | "TERMINATED";
+  aircraftMovementUnavailableReason?: "GROUND_DYNAMICS_MODEL_UNAVAILABLE";
   aircraftControl?: {
     routePointIndex: number | null;
     requestedVelocityMps: Vec3;

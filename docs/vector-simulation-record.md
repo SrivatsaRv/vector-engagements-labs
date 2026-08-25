@@ -25,6 +25,9 @@ SHA-256 digests.
 `compiled.json` now includes the full regional EnvironmentPack and bounded
 runtime terrain/atmosphere projection, including source time, datums, catalogue
 digest, limitations and per-field provenance.
+For a ground start it also includes the exact `vector.aircraft-ground-operation.v1`
+mission/runway/release binding whose unavailable authority produced the held
+frames.
 
 Saved-run snapshot table declarations are isolated in
 `db/schema/vector-record.ts`; admission quota tables are separately declared in
@@ -104,7 +107,16 @@ state, event state, or replay-derived values.
 
 Mission lineage adds no parallel frame state. Ground starts are represented by
 the canonical aircraft entity at the runway threshold with zero speed in the
-first recorded frame; later motion remains the ordinary engine-frame contract.
+first recorded frame. Frame v6 additionally records achieved operational state,
+movement value state, and the stable unavailable cause; it does not fabricate
+requested/accepted/achieved movement vectors while ground dynamics are absent.
+The compatibility `SimulationResult` projection identifies its primary entity
+as either `GUIDED_VEHICLE` or `GROUND_HELD_AIRCRAFT`. While a store remains
+stowed, live and replay projections use the actual recorded aircraft position,
+velocity, mass, fuel, and phase and never create a weapon frame. Movement
+authority remains the aircraft frame's explicit `UNAVAILABLE` value and stable
+cause; a recorded zero held velocity is not promoted into a valid movement
+capability.
 Recorded geographic/engine frames retain the exact environment-pack binding;
 sampled atmosphere and DEM effects are replay evidence, not recalculated fields.
 
@@ -149,6 +161,8 @@ and environment pack and requires exact equality across scenario, compiled,
 manifest, and report members before returning replay data.
 Regional replay verifies the embedded pack content digest, runtime-grid parent
 binding and installation-catalogue digest before any archived frame is exposed.
+Ground replay also validates the exact compiled mission, posture, release time,
+and runway-evidence digest before exposing its operational/value-state fields.
 
 Record digests and replay verification are unchanged by the persistence-module
 ownership split.
@@ -247,6 +261,9 @@ changes in this stage.
 Browsers receive the verified optional compiled mission envelope through the
 existing VSR reader. Unknown mission schemas or missing viewer-feature identity
 fail closed; presentation code cannot synthesize mission authority.
+They also consume recorded ground movement availability directly: map, 3D, and
+telemetry may show the held location and unsupported state but may not animate
+an authored route or zero-fill missing controller outputs.
 The viewer validates the archived pack locally and requires no terrain provider
 or database. Unsupported future pack/runtime schemas fail before replay data is
 exposed.
@@ -265,6 +282,8 @@ Current replay preserves mission class/regime, start posture, flight-plan,
 compiled aircraft ground envelope, exact station/rule loadout, fuel, and exact
 authored/compiled/model-pack digests as immutable provenance. It does not execute a
 virtual pilot or derive policy decisions during replay.
+For v6 frames it also preserves the ground operational/movement value state and
+cause without rerunning the ground admission or airborne controller.
 Regional VSR replay is independent of later pack publication or supersession;
 tests create a distinct later digest and prove the archived digest is retained.
 
@@ -279,10 +298,14 @@ pictures for A2A runs, provenance, limitations, and report outcome. The
 from recorded frames and metadata without calling either physics backend. That
 read model is sufficient for the existing map, Three.js, telemetry, RASP,
 explanation, and report consumers.
+For a ground-held run, this reconstruction again selects the actual recorded
+aircraft as `GROUND_HELD_AIRCRAFT`; it does not require or synthesize the
+unlaunched primary store. This is the same path used by the browser Worker after
+it has produced and reopened the transferable record.
 
 `frames.arrow` currently contains the versioned VECTOR columnar codec
-`vector.frames.columnar.v5`: string/lifecycle and installed-store identity
-metadata is encoded once in a
+`vector.frames.columnar.v6`: string/lifecycle, installed-store identity, and
+aircraft operational/movement value-state metadata is encoded once in a
 canonical header and all numerical entity fields are stored as contiguous f64
 columns, including total installed-store mass. The historical path is retained
 for compatibility, but this
@@ -290,19 +313,24 @@ implementation is not Apache Arrow IPC. An Arrow IPC adapter and downloadable
 ZIP container remain follow-up interoperability work; changing the frame codec
 requires a new member schema version and fixture migration.
 
-Version 5 records exhaustive observer state v2 and v3. Its
+Version 6 preserves the exhaustive observer state v2 and v3 from version 5 and
+adds optional achieved aircraft operational state plus explicit movement
+`VALID`/`UNAVAILABLE`/`TERMINATED` state. A held ground start records
+`GROUND_DYNAMICS_MODEL_UNAVAILABLE`; it is not presented as a valid zero-speed
+flight solution. Its
 `pictures.jsonl` member is `vector.pictures.v4`, which can preserve the generic
 verification observation, uncertainty, and side-owned track without a world
-entity identity. The reader keeps the prior frames-v4/pictures-v3 pair as a
-read-only v2-only format and rejects v3 state in those legacy members. The
-reader admits only the v5/v4 and v4/v3 pairs; every cross-pair or missing/extra
+entity identity. The reader keeps frames-v5/pictures-v4 for pre-aircraft-state
+records and the prior frames-v4/pictures-v3 pair as a read-only v2-only format,
+rejecting v3 state in v4 members. The reader admits only v6/v4, v5/v4, and
+v4/v3 pairs; every cross-pair or missing/extra
 version fails before replay. Both
 formats reject any reconstructed observed-world identity or truth position.
 The requested
 steering-acceleration vector remains a recorded pre-limit route-controller
 demand, not an aerodynamic capability claim. A prior record is rejected with
 an explicit incomplete-observer-state error; it must be regenerated from its
-immutable scenario with a v4-capable runtime. VECTOR
+immutable scenario with a v6-capable runtime. VECTOR
 does not synthesize a missing requested command during replay.
 
 Authoritative events are ordered within each tick by phase, typed payload,

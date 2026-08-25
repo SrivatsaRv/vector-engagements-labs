@@ -527,6 +527,25 @@ export function compileScenario(
         fuelKg: blueFuelKg,
       },
       aircraft: blueAircraft,
+      ...(compiledAirMission?.start.entryState === "GROUND"
+        ? {
+            groundOperation: {
+              schemaVersion: "vector.aircraft-ground-operation.v1" as const,
+              posture: compiledAirMission.start.posture as "PARKING" | "RUNWAY" | "GROUND_ALERT_QRA",
+              releaseTimeSeconds:
+                compiledAirMission.authored.start.posture === "AIRBORNE"
+                  ? 0
+                  : compiledAirMission.authored.start.readinessDelaySeconds,
+              missionDigest: compiledAirMission.compiledDigest,
+              runwayEvidenceDigest:
+                compiledAirMission.authored.start.posture === "AIRBORNE"
+                  ? ""
+                  : compiledAirMission.authored.start.runway.evidence.digest,
+              executionAuthority: "UNAVAILABLE" as const,
+              unavailabilityReason: "GROUND_DYNAMICS_MODEL_UNAVAILABLE" as const,
+            },
+          }
+        : {}),
       observerSensor: blueIsAircraft
         ? compiledObserverSensorRuntime(blueObject.id, runtimeBlueRadarMode ?? "SILENT")
         : undefined,
@@ -743,6 +762,9 @@ export function compileScenario(
     durationSeconds: input.domain === "G2G" ? 240 : 140,
     fixedStepSeconds: 0.05,
     ...(compiledAirMission ? { airMission: compiledAirMission } : {}),
+    ...(bluePlatform.groundOperation
+      ? { airMissionRuntime: structuredClone(bluePlatform.groundOperation) }
+      : {}),
     modelPack: bindRuntimeModelPackDigest({
       schemaVersion: COMPILED_MODEL_PACK_SCHEMA_VERSION,
       id: CURRENT_MODEL_PACK_ID,

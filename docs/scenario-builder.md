@@ -56,6 +56,10 @@ The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-eas
 The artifact binds one exact regional environment-pack ID/version/digest and an
 optional exact `vector.installation-origin.v2` runway identity. Compilation
 fails before producing a runnable artifact when either binding is stale.
+For a ground start the compiled engine artifact additionally binds the exact
+mission digest, runway-evidence digest, posture, and readiness release time in
+`vector.aircraft-ground-operation.v1`; unknown or conflicting fields fail
+admission.
 
 The persisted scenario-template table is declared by
 `db/schema/scenarios.ts` and re-exported from the one aggregate Drizzle schema.
@@ -93,6 +97,9 @@ aircraft ground-performance envelope remains a declared model assumption.
 Scenario cards and Air-mission validity limits name the sourced pack's
 coverage, time, resolution and uncertainty instead of claiming a standard
 atmosphere or absent terrain.
+Until #64 admits governed ground forces, the compiled ground-operation artifact
+declares movement unavailable. The runtime can show `PARKED`/`HOLD_SHORT`, but
+cannot infer taxi, rotation, takeoff, climbout, approach, or landing behavior.
 
 Version 1 currently admits the BLUE launcher-side mission only; `RED` fails
 with `MISSION_SIDE_UNSUPPORTED` until an explicit opposing-side runtime mapping
@@ -271,6 +278,11 @@ all-fly-by semantics: an omitted transition array is compiled as `START` then
 `FLY_BY` for every remaining route point. New authoring always emits v2; a
 present but malformed v2 transition array is rejected rather than downgraded.
 
+Ground-authored routes do not activate the airborne controller while ground
+dynamics are unavailable. The canonical record exposes the held operational
+state and cause; the builder must not render the authored route as achieved
+movement or synthesize a takeoff path.
+
 Air mission authoring uses one route-edit adapter. `AirMissionDefinition` is the
 authority; the existing `spatialPlan.blue` route is an atomic compatibility
 projection for legacy validators and non-Air/red-route consumers. The compiler
@@ -328,6 +340,10 @@ the existing Run gate all edit or consume the same authored artifact.
 Construct shows the admitted pack version/digest and only offers runway-backed
 bases available inside that pack; unsupported installations remain visibly
 airborne-placement-only.
+After a run, Current Geometry is a read-only Observe projection. A ground-held
+aircraft presents the operational and movement value states recorded in the
+selected frame; the component cannot synthesize movement or promote its
+installed store into a launched world entity.
 
 The builder is one persistent desktop workspace, not a page-per-field wizard. The left rail owns the five Construct sections, the center owns the geographic placement surface and form for the selected object, and the right rail owns the selected entity, validation state, and compiled-summary preview. From 1280×720 upward all three remain visible; QHD and 4K expand the task surface, controls, map and typography rather than adding empty margins. On phones the same five-step state is presented as a single column with persistent actions; desktop rails are removed and no scenario state is discarded. Drawers may extend a rail but may not replace the map.
 
@@ -377,7 +393,8 @@ runway admission checks.
 - Validate canonicalizes the package and records a content hash.
 - Simulate compiles catalog references into an immutable engine scenario.
 - The engine owns lifecycle changes and produces ordered frames and events.
-- Observe reads frames; it never writes entity positions.
+- Observe reads frames; it never writes entity positions, invents ground
+  movement, or turns stowed inventory into a world entity.
 - Save records the authored package identity, compiled scenario, frame hash and report together.
 - Overlay open state, focus ownership, placement, and Disclosure expansion are
   presentation-only and are absent from the draft, compiled scenario, Worker

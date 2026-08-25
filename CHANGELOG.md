@@ -13,6 +13,9 @@ one family must not imply changes to unrelated contracts.
 
 - Bind the independent regional EnvironmentPack/runtime-grid digest beside the
   compiled model pack without changing named-system evidence authority.
+- Keep the scalar ground envelope release-blocking and non-promotable while the
+  compiler emits a separate exact `UNAVAILABLE` ground-operation safety binding;
+  no aerodynamic, propulsion, control, or named-aircraft evidence is added.
 
 Model-pack persistence table declarations now live in the domain-owned
 `db/schema/model-pack.ts` module behind the unchanged aggregate Drizzle facade.
@@ -75,6 +78,9 @@ no exported simulation ABI, backend-selection rule or v2 runtime admission.
 - Register the value-free TP-1538 evaluator as another separately built
   verification artifact whose ABI and digest cannot enter production backend
   selection, `EngineScenario`, `EngineRun`, Worker, or VSR authority.
+- Admit the exact-key `vector.aircraft-ground-operation.v1` safety artifact in
+  both backends and validate its mission/start/release/runway lineage before
+  holding movement unavailable.
 
 No pending family-specific entry.
 
@@ -126,6 +132,15 @@ admission, or tick behavior.
 - Stop TypeScript and Rust/WASM at the same first unavailable regional sample;
   legacy zero-plane/educational atmosphere behavior remains distinct and is
   used only when no regional runtime projection exists.
+- Bind every admitted ground start to an exact versioned mission/runway/release
+  artifact and hold it at `PARKED`/`HOLD_SHORT` with movement explicitly
+  unavailable until governed ground dynamics exist. Ground-held aircraft retain
+  position, fuel, mass and stores and cannot launch a weapon; no taxi, runway,
+  takeoff, climbout or recovery physics is claimed.
+- Require both runtimes to bind both compact ground-operation copies to the
+  authoritative compiled Air mission, and make Worker/VSR presentation select
+  the actual held aircraft instead of dereferencing or materializing its stowed
+  primary store.
 
 No pending family-specific entry.
 
@@ -142,6 +157,9 @@ No pending family-specific entry.
 
 - Archive the complete regional pack/runtime projection and reject replay
   substitution by a later or superseding pack identity.
+- Add `vector.frames.columnar.v6` operational/movement value-state metadata for
+  fail-closed ground-held aircraft while retaining read-only v5/v4 and v4/v3
+  frame/picture compatibility.
 
 Saved-run record and admission tables now have separate domain-owned schema
 modules without changing their persisted representation.
@@ -166,6 +184,9 @@ Air templates advance to `vector.scenario.v4` with one authored
 `vector.air-mission.v1` and content-addressed `vector.compiled-air-mission.v1`.
 All Air mission classes, overlays, flight plans, start postures, loadout/fuel,
 recovery, Worker/server admission, and VSR/report lineage share that contract.
+Ground starts additionally compile an exact mission/runway/release safety
+artifact; the current runtime reports only `PARKED`/`HOLD_SHORT` and does not
+claim taxi, takeoff, climbout, approach, or recovery.
 Migration `013_air_mission_contract.sql` freezes exact upgraded template JSON
 and hashes; no production seed or fallback default performs the migration.
 - Add exact `vector.installation-origin.v2` runway starts and fail-closed

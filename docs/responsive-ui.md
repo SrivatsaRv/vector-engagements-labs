@@ -108,6 +108,11 @@ digests without changing synchronized map/3D playback, telemetry, or timeline
 ownership.
 Observe presents the exact pack identity used by runtime and reports while
 terrain/environment loading remains Worker-owned and cancellable.
+For an admitted ground-held aircraft, Current Geometry consumes only the
+selected VSR frame and presents the recorded operational state, movement value
+state, and stable unavailable reason. It keeps the installed store stowed: the
+surface does not create a weapon entity or turn zero motion into movement
+capability.
 
 The Observe workspace uses one centre-column grid. The Map or 3D surface owns
 the remaining row after the control strip and playback rail; it does not own a
@@ -146,6 +151,11 @@ The governed five-viewport journey edits CAP defaults, clears and restores an
 installation identity, authors a runway start, exercises keyboard route inputs,
 observes admission, and completes the production Worker. Focused record tests
 prove the same lineage survives report/VSR readback.
+After Worker completion, the same journey selects a recorded frame and proves
+Current Geometry renders `HOLD_SHORT`, `UNAVAILABLE`, and
+`GROUND_DYNAMICS_MODEL_UNAVAILABLE` from the held aircraft while no launched
+store exists. The proof runs at phone, tablet, laptop, desktop, and full-HD
+viewports; it does not substitute a UI fixture for the Worker/VSR boundary.
 The browser matrix switches to Rajasthan, selects the eligible Jodhpur runway,
 proves unsupported-point labelling, then completes a real Worker run across the
 supported viewports without error overlays or overflow.
