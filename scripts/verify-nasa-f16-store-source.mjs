@@ -20,7 +20,10 @@ export const MANIFEST_PATH = resolve(
 
 // This is an external anchor for the immutable manifest bytes. Contract changes
 // require both the governed record and this verifier constant to be reviewed.
-const EXPECTED_CANONICAL_DIGEST = "ee777c79ec2b2d8a00a152b91a85cfafdedf8db07f94cb6cf2d7524bc574c602";
+const EXPECTED_CANONICAL_DIGEST = "db4a8cd7fbdff99cc3f4653fe2d380980350afddaeba426051294963052b943a";
+const EXPECTED_AUTHORITY_DIGEST = "03af846a698d6fcb461c5c82f3e2f352882edbffa2f08be2dae9523a672fa7ba";
+const EXPECTED_VISUAL_REVIEW_DIGEST = "2548025eae965906ace12f40bfa3b33d1c2968155cf04dc322026f8e7b4a6ef9";
+const EXPECTED_POLICY_DIGEST = "f22cf0cbebebadaea5c13e6b57ef8ccd883175cb93444cf4c77d6bac0c8e3d61";
 const SHA256 = /^[a-f0-9]{64}$/;
 const ROTATIONS = new Set([0, 90, 180, 270]);
 const BANNED_PROMOTION = /\b(?:PAF|Block[ -]?52|Peace Drive|Su-30|DCS|War Thunder|game dump|community dump|stationCompatibility|loadout|dragCoefficient|modelPackParameter|runtimeCapability)\b/i;
@@ -32,6 +35,7 @@ const FROZEN_FILE_NAMES = new Set([
   "19780003061.json",
   "19870000632.json",
   "19860022096.json",
+  "NASA_Public_Access_Plan.pdf",
 ]);
 
 const FROZEN_BINARY_HASHES = new Set([
@@ -59,6 +63,7 @@ const FROZEN_BINARY_HASHES = new Set([
   "3c559a9690802ad13f35d1e2bb18b28b7735bc85ef9c644ace155a634f13d5fb",
   "0b3bb921a25bb2e132b9631ccb1c553a30e8056d8bc8469859c1e3e293379707",
   "d64e130fe486d49b0b3f7998aee25c9338c175588a0de1a096ff5181dc6ae217",
+  EXPECTED_POLICY_DIGEST,
 ]);
 
 const TOP_LEVEL_KEYS = [
@@ -73,21 +78,59 @@ const TOP_LEVEL_KEYS = [
   "id",
   "intendedUse",
   "nonclaims",
+  "permissions",
   "redistributionDecision",
   "referenceUseDecision",
+  "releaseOwnerReview",
   "renderRecipe",
   "schemaVersion",
+  "sourceTermsAuthority",
   "version",
 ];
 
 const DECISION_KEYS = [
-  "authorityBasis",
+  "authorityKind",
+  "authorityRecordId",
   "decisionDate",
   "evidenceDigest",
-  "reviewer",
+  "legalApproval",
   "scope",
   "value",
 ];
+
+const EXPECTED_DECISIONS = {
+  referenceUseDecision: {
+    value: "SOURCE_TERMS_AUTHORIZED_INTERNAL_VERIFICATION_ONLY",
+    scope: "EXACT_FROZEN_SOURCES_AND_DECLARED_REVIEW_RENDERS_FOR_INTERNAL_ENGINE_VERIFICATION_RESEARCH_ONLY",
+  },
+  redistributionDecision: {
+    value: "SOURCE_TERMS_AUTHORIZED_EXACT_BYTES_AND_DECLARED_RENDERS",
+    scope: "EXACT_FROZEN_NASA_BYTES_METADATA_POLICY_AND_DECLARED_FULL_PAGE_REVIEW_RENDERS_ONLY",
+  },
+  exportReviewDecision: {
+    value: "SOURCE_METADATA_NO_RESTRICTION",
+    scope: "EXACT_THREE_DIGEST_PINNED_NTRS_RECORDS_ONLY",
+  },
+};
+
+const EXPECTED_PAGE_CATEGORIES = new Map([
+  ["tm74078-figure2-loadings", "HISTORICAL_LOADING_FIGURE_NONEXHAUSTIVE"],
+  ["tm74078-nine-stations", "HISTORICAL_STATION_COUNT_CONTEXT"],
+  ["tm74078-figure4-span-fractions", "HISTORICAL_NONDIMENSIONAL_SPAN_CONTEXT"],
+  ["cr172354-station-map", "HISTORICAL_STATION_MAPPING_CONTEXT"],
+  ["cr172354-store-configuration", "CONFIGURATION_BOUNDED_STORE_ARRANGEMENT"],
+  ["cr172354-table2-qualifications", "LEGACY_TABLE_QUALIFICATIONS"],
+  ["cr172354-final-pylon-force", "FINAL_PYLON_FORCE_AND_ANALYSIS_QUALIFICATION"],
+  ["cr172354-table2-values", "LEGACY_TABLE_LOCATION_AND_UNIT_CONTEXT"],
+  ["cr172354-figure19-side-view", "TWO_DIMENSIONAL_SOURCE_DIAGRAM_ONLY"],
+  ["tm87766-fsd-configuration", "CONFIGURATION_IDENTITY"],
+  ["tm87766-test-conditions-p5", "TEST_CONDITION_BOUNDARY"],
+  ["tm87766-test-conditions-p6", "SINGLE_EJECTION_SETUP_CONTEXT"],
+  ["tm87766-results-p7", "INITIAL_PYLON_OBSERVATION"],
+  ["tm87766-results-p8", "MODIFIED_PYLON_OBSERVATION"],
+  ["tm87766-results-p9", "TEST_ENVELOPE_OBSERVATION"],
+  ["tm87766-single-ejection-p10", "SINGLE_EJECTION_OBSERVATION"],
+]);
 
 const ARTIFACT_KEYS = [
   "authors",
@@ -158,12 +201,17 @@ function assertSha256(value, label) {
   if (!SHA256.test(value)) fail(`${label} must be a lowercase SHA-256`);
 }
 
-function assertPendingDecision(decision, label) {
+function assertAuthorizedDecision(decision, expected, label) {
   exactKeys(decision, DECISION_KEYS, label);
-  if (decision.value !== "PENDING") fail(`${label} may not be approved by this source-freeze issue`);
-  for (const key of DECISION_KEYS.filter((key) => key !== "value")) {
-    if (decision[key] !== null) fail(`${label}.${key} must remain null while pending`);
-  }
+  if (
+    decision.value !== expected.value ||
+    decision.scope !== expected.scope ||
+    decision.authorityKind !== "AUTHORITATIVE_SOURCE_TERMS" ||
+    decision.authorityRecordId !== "nasa-historical-f16-store-source-terms-authority-20260825" ||
+    decision.decisionDate !== "2026-08-25" ||
+    decision.evidenceDigest !== EXPECTED_AUTHORITY_DIGEST ||
+    decision.legalApproval !== false
+  ) fail(`${label} is not bound to the reviewed source-terms authority`);
 }
 
 function assertRender(page, label) {
@@ -172,8 +220,10 @@ function assertRender(page, label) {
     "displayHeightPx",
     "displaySha256",
     "displayWidthPx",
+    "displayPath",
     "sourceByteLength",
     "sourceHeightPx",
+    "sourcePath",
     "sourceSha256",
     "sourceWidthPx",
   ], `${label}.render`);
@@ -182,6 +232,9 @@ function assertRender(page, label) {
   }
   assertSha256(page.render.sourceSha256, `${label}.render.sourceSha256`);
   assertSha256(page.render.displaySha256, `${label}.render.displaySha256`);
+  for (const path of [page.render.sourcePath, page.render.displayPath]) {
+    if (typeof path !== "string" || !path.startsWith("renders/") || path.includes("..")) fail(`${label} has an unsafe render path`);
+  }
   if (!ROTATIONS.has(page.sourceOrientationDeg) || !ROTATIONS.has(page.appliedDisplayRotationDeg)) {
     fail(`${label} uses an unsupported orientation`);
   }
@@ -203,17 +256,23 @@ function assertVisualQa(page, label) {
     "note",
     "orientationReadable",
     "reviewDate",
-    "reviewer",
+    "reviewerRole",
+    "reviewRecordPath",
     "status",
     "unclipped",
   ], `${label}.visualQa`);
-  if (page.visualQa.status !== "PENDING_HUMAN_REVIEW") fail(`${label} cannot assert completed human QA`);
-  for (const key of ["reviewer", "reviewDate", "orientationReadable", "legible", "unclipped"]) {
-    if (page.visualQa[key] !== null) fail(`${label}.visualQa.${key} must remain null while pending`);
-  }
-  if (typeof page.visualQa.note !== "string" || !page.visualQa.note.includes("not human admission")) {
-    fail(`${label}.visualQa note must preserve the agent-preflight limitation`);
-  }
+  if (
+    page.visualQa.status !== "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE" ||
+    page.visualQa.reviewerRole !== "RELEASE_OWNER_REVIEW" ||
+    page.visualQa.reviewDate !== "2026-08-25" ||
+    page.visualQa.reviewRecordPath !== "release-owner-visual-review.v1.json" ||
+    page.visualQa.orientationReadable !== true ||
+    page.visualQa.legible !== true ||
+    page.visualQa.unclipped !== true ||
+    typeof page.visualQa.note !== "string" ||
+    !page.visualQa.note.includes("no legal approval") ||
+    !page.visualQa.note.includes("numeric transcription")
+  ) fail(`${label}.visualQa is not the reviewed technical release-owner record`);
 }
 
 export function verifyManifest(manifest) {
@@ -231,9 +290,15 @@ export function verifyManifest(manifest) {
   if (JSON.stringify(manifest.availabilityStates) !== JSON.stringify(["REFERENCE_ONLY", "UNSUPPORTED", "MODEL_ASSUMPTION", "UNAVAILABLE"])) {
     fail("availability states differ from the closed source-only set");
   }
-  assertPendingDecision(manifest.referenceUseDecision, "reference use decision");
-  assertPendingDecision(manifest.redistributionDecision, "redistribution decision");
-  assertPendingDecision(manifest.exportReviewDecision, "export review decision");
+  assertAuthorizedDecision(manifest.referenceUseDecision, EXPECTED_DECISIONS.referenceUseDecision, "reference use decision");
+  assertAuthorizedDecision(manifest.redistributionDecision, EXPECTED_DECISIONS.redistributionDecision, "redistribution decision");
+  assertAuthorizedDecision(manifest.exportReviewDecision, EXPECTED_DECISIONS.exportReviewDecision, "export review decision");
+  exactKeys(manifest.sourceTermsAuthority, ["path", "sha256"], "sourceTermsAuthority");
+  if (manifest.sourceTermsAuthority.path !== "source-terms-authority.v1.json" || manifest.sourceTermsAuthority.sha256 !== EXPECTED_AUTHORITY_DIGEST) fail("source-terms authority reference differs");
+  exactKeys(manifest.releaseOwnerReview, ["path", "reviewedPageCount", "status"], "releaseOwnerReview");
+  if (manifest.releaseOwnerReview.path !== "release-owner-visual-review.v1.json" || manifest.releaseOwnerReview.status !== "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE" || manifest.releaseOwnerReview.reviewedPageCount !== 16) fail("release-owner review reference differs");
+  exactKeys(manifest.permissions, ["adaptation", "execution", "modelAdmission", "numericOrEquationTranscription", "runtime"], "permissions");
+  if (Object.values(manifest.permissions).some((value) => value !== false)) fail("source-only permissions must all remain false");
 
   exactKeys(manifest.renderRecipe, ["arguments", "displayRotation", "dpi", "format", "renderer", "rendererVersion"], "renderRecipe");
   exactKeys(manifest.renderRecipe.displayRotation, ["operation", "pngOptions", "tool", "toolVersion"], "renderRecipe.displayRotation");
@@ -247,14 +312,15 @@ export function verifyManifest(manifest) {
   const subjects = new Set();
   const roles = new Set();
   let pageMaps = 0;
-  let visualQaPending = 0;
+  let visualQaReviewed = 0;
   for (const artifact of manifest.artifacts) {
     exactKeys(artifact, ARTIFACT_KEYS, `artifact ${artifact.id}`);
     if (subjects.has(artifact.subject) || roles.has(artifact.role)) fail(`artifact ${artifact.id} launders a subject or role`);
     subjects.add(artifact.subject);
     roles.add(artifact.role);
-    exactKeys(artifact.pdf, ["byteLength", "fileName", "mediaType", "pageCount", "sha256", "url"], `${artifact.id}.pdf`);
-    exactKeys(artifact.metadata, ["byteLength", "fileName", "mediaType", "sha256", "url"], `${artifact.id}.metadata`);
+    exactKeys(artifact.pdf, ["byteLength", "fileName", "mediaType", "pageCount", "repositoryPath", "sha256", "url"], `${artifact.id}.pdf`);
+    exactKeys(artifact.metadata, ["byteLength", "fileName", "mediaType", "repositoryPath", "sha256", "url"], `${artifact.id}.metadata`);
+    if (artifact.pdf.repositoryPath !== `sources/${artifact.pdf.fileName}` || artifact.metadata.repositoryPath !== `sources/${artifact.metadata.fileName}`) fail(`${artifact.id} repository paths differ from the quarantine layout`);
     exactKeys(artifact.rightsFacts, ["containsThirdPartyMaterial", "determinationType", "distribution", "ear", "isExportControl", "itar", "repositoryLicenseInference"], `${artifact.id}.rightsFacts`);
     assertSha256(artifact.pdf.sha256, `${artifact.id}.pdf.sha256`);
     assertSha256(artifact.metadata.sha256, `${artifact.id}.metadata.sha256`);
@@ -274,7 +340,7 @@ export function verifyManifest(manifest) {
       assertRender(page, `${artifact.id}.${page.id}`);
       assertVisualQa(page, `${artifact.id}.${page.id}`);
       pageMaps += 1;
-      visualQaPending += 1;
+      visualQaReviewed += 1;
     }
   }
   if (pageMaps !== 16) fail(`expected 16 governed page maps, received ${pageMaps}`);
@@ -308,25 +374,170 @@ export function verifyManifest(manifest) {
 
   return {
     artifacts: manifest.artifacts.length,
-    decisionsPending: 3,
+    decisionsAuthorized: 3,
     id: manifest.id,
     pageMaps,
     schemaVersion: manifest.schemaVersion,
-    visualQaPending,
+    visualQaReviewed,
   };
+}
+
+function renderedObjectDigest(value) {
+  return sha256(Buffer.from(`${JSON.stringify(value, null, 2)}\n`));
+}
+
+export function verifySourceTermsAuthority(manifest, authority, policyBytes, metadataFiles) {
+  verifyManifest(manifest);
+  exactKeys(authority, [
+    "authorityKind",
+    "conditions",
+    "decidedOn",
+    "decisions",
+    "humanReviewerRequired",
+    "id",
+    "legalApproval",
+    "metadataEvidence",
+    "policyArtifact",
+    "policyBasis",
+    "schemaVersion",
+  ], "source-terms authority");
+  if (
+    renderedObjectDigest(authority) !== EXPECTED_AUTHORITY_DIGEST ||
+    authority.schemaVersion !== "vector.nasa-historical-f16-store-source-terms-authority.v1" ||
+    authority.id !== "nasa-historical-f16-store-source-terms-authority-20260825" ||
+    authority.authorityKind !== "AUTHORITATIVE_SOURCE_TERMS" ||
+    authority.decidedOn !== "2026-08-25" ||
+    authority.humanReviewerRequired !== false ||
+    authority.legalApproval !== false
+  ) fail("source-terms authority identity or digest differs");
+  exactKeys(authority.policyArtifact, ["accessedOn", "byteLength", "mediaType", "pageCount", "repositoryPath", "sha256", "title", "url"], "source-terms policy artifact");
+  if (
+    authority.policyArtifact.title !== "NASA's public access plan" ||
+    authority.policyArtifact.url !== "https://sti.nasa.gov/docs/NASA_Public_Access_Plan.pdf" ||
+    authority.policyArtifact.repositoryPath !== "source-terms/NASA_Public_Access_Plan.pdf" ||
+    authority.policyArtifact.mediaType !== "application/pdf" ||
+    authority.policyArtifact.byteLength !== 1081214 ||
+    authority.policyArtifact.sha256 !== EXPECTED_POLICY_DIGEST ||
+    authority.policyArtifact.pageCount !== 27 ||
+    authority.policyArtifact.accessedOn !== "2026-08-25" ||
+    policyBytes.length !== authority.policyArtifact.byteLength ||
+    sha256(policyBytes) !== authority.policyArtifact.sha256
+  ) fail("official NASA public-access policy bytes or identity differ");
+  exactKeys(authority.policyBasis, ["section", "state", "summary"], "source-terms policy basis");
+  if (authority.policyBasis.section !== "Rights and Distribution" || authority.policyBasis.state !== "OFFICIAL_NASA_PUBLIC_ACCESS_PLAN" || !authority.policyBasis.summary.includes("without further NASA permission")) fail("source-terms policy basis differs");
+
+  if (!Array.isArray(authority.metadataEvidence) || authority.metadataEvidence.length !== manifest.artifacts.length) fail("source-terms metadata evidence inventory differs");
+  for (const [index, evidence] of authority.metadataEvidence.entries()) {
+    exactKeys(evidence, ["citationId", "containsThirdPartyMaterial", "determinationType", "distribution", "ear", "isExportControl", "itar", "repositoryPath", "sha256"], `source-terms metadata evidence ${index}`);
+    const artifact = manifest.artifacts[index];
+    const bytes = metadataFiles[evidence.repositoryPath];
+    if (
+      evidence.citationId !== artifact.citationId ||
+      evidence.repositoryPath !== artifact.metadata.repositoryPath ||
+      evidence.sha256 !== artifact.metadata.sha256 ||
+      evidence.distribution !== artifact.rightsFacts.distribution ||
+      evidence.determinationType !== artifact.rightsFacts.determinationType ||
+      evidence.containsThirdPartyMaterial !== artifact.rightsFacts.containsThirdPartyMaterial ||
+      evidence.isExportControl !== artifact.rightsFacts.isExportControl ||
+      evidence.ear !== artifact.rightsFacts.ear ||
+      evidence.itar !== artifact.rightsFacts.itar ||
+      !Buffer.isBuffer(bytes) ||
+      sha256(bytes) !== evidence.sha256
+    ) fail(`source-terms metadata evidence differs for ${artifact.id}`);
+  }
+  exactKeys(authority.decisions, ["exportReview", "redistribution", "referenceUse"], "source-terms decisions");
+  for (const [authorityField, manifestField] of [
+    ["referenceUse", "referenceUseDecision"],
+    ["redistribution", "redistributionDecision"],
+    ["exportReview", "exportReviewDecision"],
+  ]) {
+    exactKeys(authority.decisions[authorityField], ["scope", "value"], `source-terms decision ${authorityField}`);
+    if (
+      authority.decisions[authorityField].value !== manifest[manifestField].value ||
+      authority.decisions[authorityField].scope !== manifest[manifestField].scope
+    ) fail(`source-terms decision ${authorityField} is not bound to the manifest`);
+  }
+  const expectedConditions = [
+    "PRESERVE_EXACT_SOURCE_AND_METADATA_DIGESTS",
+    "PRESERVE_NASA_SOURCE_IDENTITY_AND_POLICY_PROVENANCE",
+    "NO_NUMERIC_OR_EQUATION_TRANSCRIPTION",
+    "NO_ADAPTATION_OR_EXECUTION_AUTHORITY",
+    "NO_MODEL_PACK_OR_RUNTIME_ADMISSION",
+  ];
+  if (JSON.stringify(authority.conditions) !== JSON.stringify(expectedConditions)) fail("source-terms conditions differ");
+  return { authorityKind: authority.authorityKind, legalApproval: false, metadataRecords: authority.metadataEvidence.length };
+}
+
+export function verifyReleaseOwnerVisualReview(manifest, review) {
+  verifyManifest(manifest);
+  exactKeys(review, ["findings", "legalApproval", "note", "numericOrEquationTranscriptionPerformed", "reviewedOn", "reviewedPages", "reviewerRole", "schemaVersion", "status", "subject"], "release-owner visual review");
+  if (
+    renderedObjectDigest(review) !== EXPECTED_VISUAL_REVIEW_DIGEST ||
+    review.schemaVersion !== "vector.nasa-historical-f16-store-release-owner-visual-review.v1" ||
+    review.status !== "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE" ||
+    review.reviewerRole !== "RELEASE_OWNER_REVIEW" ||
+    review.reviewedOn !== "2026-08-25" ||
+    review.legalApproval !== false ||
+    review.numericOrEquationTranscriptionPerformed !== false
+  ) fail("release-owner visual review identity, role, boundary, or digest differs");
+  exactKeys(review.subject, ["intendedUse", "manifestCanonicalDigest", "manifestId", "pageCount"], "release-owner visual review subject");
+  if (
+    review.subject.manifestId !== manifest.id ||
+    review.subject.manifestCanonicalDigest !== manifest.canonicalDigest ||
+    review.subject.intendedUse !== manifest.intendedUse ||
+    review.subject.pageCount !== 16
+  ) fail("release-owner visual review is bound to a different manifest");
+  exactKeys(review.findings, ["declaredPageAndAnchorMapping", "eligibleContextCategory", "limitationsAndNonclaims", "orientationLegibilityAndClipping", "titleAndReportIdentity"], "release-owner visual review findings");
+  if (
+    review.findings.titleAndReportIdentity !== "CONSISTENT" ||
+    review.findings.declaredPageAndAnchorMapping !== "CONSISTENT" ||
+    review.findings.orientationLegibilityAndClipping !== "CONSISTENT" ||
+    review.findings.eligibleContextCategory !== "CONSISTENT_WITH_SOURCE_LOCATION_ONLY_SCOPE" ||
+    review.findings.limitationsAndNonclaims !== "CONSISTENT"
+  ) fail("release-owner semantic findings differ");
+  const expectedPages = manifest.artifacts.flatMap((artifact) => artifact.pageMaps.map((page) => ({ artifact, page })));
+  if (!Array.isArray(review.reviewedPages) || review.reviewedPages.length !== expectedPages.length) fail("release-owner page inventory differs");
+  for (const [index, reviewed] of review.reviewedPages.entries()) {
+    exactKeys(reviewed, ["anchor", "artifactId", "citationId", "displayRender", "eligibleCategory", "eligibleClaimDigest", "ineligibleInferenceDigest", "legible", "limitationsAndNonclaimsConsistent", "orientationReadable", "pageId", "pageMappingConsistent", "pdfPage", "printedPage", "qualificationDigest", "reportIdentityConsistent", "reportNumbers", "sourceRender", "unclipped"], `reviewed page ${index}`);
+    exactKeys(reviewed.sourceRender, ["byteLength", "heightPx", "path", "sha256", "widthPx"], `reviewed page ${index} source render`);
+    exactKeys(reviewed.displayRender, ["byteLength", "heightPx", "path", "sha256", "widthPx"], `reviewed page ${index} display render`);
+    const { artifact, page } = expectedPages[index];
+    if (
+      reviewed.artifactId !== artifact.id ||
+      reviewed.citationId !== artifact.citationId ||
+      JSON.stringify(reviewed.reportNumbers) !== JSON.stringify(artifact.reportNumbers) ||
+      reviewed.pageId !== page.id ||
+      reviewed.pdfPage !== page.pdfPage ||
+      reviewed.printedPage !== page.printedPage ||
+      reviewed.anchor !== page.anchor ||
+      reviewed.eligibleCategory !== EXPECTED_PAGE_CATEGORIES.get(page.id) ||
+      reviewed.eligibleClaimDigest !== sha256(Buffer.from(page.eligibleClaim)) ||
+      reviewed.ineligibleInferenceDigest !== sha256(Buffer.from(page.ineligibleInference)) ||
+      reviewed.qualificationDigest !== sha256(Buffer.from(page.uncertaintyQualification)) ||
+      reviewed.sourceRender.path !== page.render.sourcePath ||
+      reviewed.sourceRender.sha256 !== page.render.sourceSha256 ||
+      reviewed.sourceRender.byteLength !== page.render.sourceByteLength ||
+      reviewed.sourceRender.widthPx !== page.render.sourceWidthPx ||
+      reviewed.sourceRender.heightPx !== page.render.sourceHeightPx ||
+      reviewed.displayRender.path !== page.render.displayPath ||
+      reviewed.displayRender.sha256 !== page.render.displaySha256 ||
+      reviewed.displayRender.byteLength !== page.render.displayByteLength ||
+      reviewed.displayRender.widthPx !== page.render.displayWidthPx ||
+      reviewed.displayRender.heightPx !== page.render.displayHeightPx ||
+      reviewed.orientationReadable !== true ||
+      reviewed.legible !== true ||
+      reviewed.unclipped !== true ||
+      reviewed.reportIdentityConsistent !== true ||
+      reviewed.pageMappingConsistent !== true ||
+      reviewed.limitationsAndNonclaimsConsistent !== true
+    ) fail(`release-owner visual review differs for ${page.id}`);
+  }
+  if (typeof review.note !== "string" || !review.note.includes("no value, equation, model parameter") || !review.note.includes("runtime capability")) fail("release-owner review note weakens the source-only boundary");
+  return { legalApproval: false, reviewedPages: review.reviewedPages.length, reviewerRole: review.reviewerRole };
 }
 
 export function assertSourceAdmissionEligible(manifest) {
   verifyManifest(manifest);
-  for (const [label, decision] of [
-    ["reference use", manifest.referenceUseDecision],
-    ["redistribution", manifest.redistributionDecision],
-    ["export review", manifest.exportReviewDecision],
-  ]) {
-    if (decision.value === "PENDING") fail(`${label} decision is PENDING`);
-  }
-  const pendingPage = manifest.artifacts.flatMap(({ pageMaps }) => pageMaps).find(({ visualQa }) => visualQa.status !== "APPROVED_HUMAN_REVIEW");
-  if (pendingPage) fail(`visual QA is pending for ${pendingPage.id}`);
   fail("source-only manifest cannot admit executable behavior");
 }
 
@@ -483,15 +694,65 @@ export function verifyCommittedInventory(repositoryRoot) {
   const repositoryReal = realpathSync(repositoryRoot);
   const directoryReal = realpathSync(directory);
   if (!directoryReal.startsWith(`${repositoryReal}${sep}`)) fail("committed source directory escapes the repository");
-  const files = readdirSync(directory).sort();
-  const expected = ["README.md", "manifest.v1.json"];
+  const readGovernedMember = (member, expectedDigest = null) => {
+    if (typeof member !== "string" || member.startsWith("/") || member.includes("..")) fail(`unsafe committed source member ${member}`);
+    const path = resolve(directory, member);
+    const info = lstatSync(path);
+    if (!info.isFile() || info.isSymbolicLink() || !realpathSync(path).startsWith(`${directoryReal}${sep}`)) fail(`committed source member ${member} must be a contained regular non-symlink file`);
+    const bytes = readFileSync(path);
+    if (expectedDigest && sha256(bytes) !== expectedDigest) fail(`committed source member ${member} digest differs`);
+    return bytes;
+  };
+  const manifest = JSON.parse(readGovernedMember("manifest.v1.json").toString("utf8"));
+  verifyManifest(manifest);
+  const authority = JSON.parse(readGovernedMember(manifest.sourceTermsAuthority.path, EXPECTED_AUTHORITY_DIGEST).toString("utf8"));
+  const review = JSON.parse(readGovernedMember(manifest.releaseOwnerReview.path, EXPECTED_VISUAL_REVIEW_DIGEST).toString("utf8"));
+  const expectedMembers = new Map([
+    ["README.md", null],
+    ["manifest.v1.json", null],
+    [manifest.sourceTermsAuthority.path, { sha256: EXPECTED_AUTHORITY_DIGEST }],
+    [manifest.releaseOwnerReview.path, { sha256: EXPECTED_VISUAL_REVIEW_DIGEST }],
+    [authority.policyArtifact.repositoryPath, authority.policyArtifact],
+  ]);
+  for (const artifact of manifest.artifacts) {
+    expectedMembers.set(artifact.pdf.repositoryPath, artifact.pdf);
+    expectedMembers.set(artifact.metadata.repositoryPath, artifact.metadata);
+    for (const page of artifact.pageMaps) {
+      expectedMembers.set(page.render.sourcePath, {
+        byteLength: page.render.sourceByteLength,
+        sha256: page.render.sourceSha256,
+      });
+      expectedMembers.set(page.render.displayPath, {
+        byteLength: page.render.displayByteLength,
+        sha256: page.render.displaySha256,
+      });
+    }
+  }
+  const files = walkFiles(directory).map((path) => relative(directory, path)).sort();
+  const expected = [...expectedMembers.keys()].sort();
   if (JSON.stringify(files) !== JSON.stringify(expected)) {
-    fail(`committed source directory must contain only ${expected.join(", ")}; received ${files.join(", ")}`);
+    fail(`committed source directory inventory differs: expected ${expected.join(", ")}; received ${files.join(", ")}`);
   }
-  for (const file of files) {
-    const info = lstatSync(resolve(directory, file));
-    if (!info.isFile() || info.isSymbolicLink()) fail(`committed source member ${file} must be a regular non-symlink file`);
+  for (const [file, identity] of expectedMembers) {
+    const path = resolve(directory, file);
+    const info = lstatSync(path);
+    if (!info.isFile() || info.isSymbolicLink() || !realpathSync(path).startsWith(`${directoryReal}${sep}`)) fail(`committed source member ${file} must be a contained regular non-symlink file`);
+    if (identity) {
+      const bytes = readFileSync(path);
+      if ((identity.byteLength !== undefined && bytes.length !== identity.byteLength) || sha256(bytes) !== identity.sha256) fail(`committed source member ${file} size or digest differs`);
+    }
   }
+  const metadataFiles = Object.fromEntries(manifest.artifacts.map((artifact) => [
+    artifact.metadata.repositoryPath,
+    readFileSync(resolve(directory, artifact.metadata.repositoryPath)),
+  ]));
+  verifySourceTermsAuthority(
+    manifest,
+    authority,
+    readFileSync(resolve(directory, authority.policyArtifact.repositoryPath)),
+    metadataFiles,
+  );
+  verifyReleaseOwnerVisualReview(manifest, review);
   const excludedNames = new Set([".git", ".next", ".open-next", ".vercel", ".wrangler", "dist", "build", "out", "node_modules", "target"]);
   for (const path of walkFiles(repositoryRoot, excludedNames)) {
     if (path.startsWith(`${directoryReal}${sep}`)) continue;
@@ -501,7 +762,7 @@ export function verifyCommittedInventory(repositoryRoot) {
       fail(`raw source or render identity is committed at ${relative(repositoryRoot, path)}`);
     }
   }
-  return { files, rawArtifactsCommitted: 0 };
+  return { files: files.length, governedQuarantineFiles: files.length - 2 };
 }
 
 export function verifyProductionIsolation(repositoryRoot) {
@@ -551,10 +812,11 @@ async function run() {
   const manifest = loadManifest();
   const result = verifyManifest(manifest);
   const inventory = verifyCommittedInventory(resolve("."));
-  const sourceArgument = process.argv.indexOf("--source-dir");
-  const sources = sourceArgument >= 0
-    ? await verifySourceDirectory(manifest, resolve(process.argv[sourceArgument + 1] ?? fail("--source-dir requires a path")))
-    : null;
+  const arguments_ = process.argv.slice(2);
+  if (arguments_.length !== 2 || arguments_[0] !== "--source-dir" || !arguments_[1]) {
+    fail("CLI verification requires exactly --source-dir <committed-source-directory>");
+  }
+  const sources = await verifySourceDirectory(manifest, resolve(arguments_[1]));
   const isolation = verifyProductionIsolation(resolve("."));
   process.stdout.write(`${JSON.stringify({ ...result, inventory, isolation, sources })}\n`);
 }

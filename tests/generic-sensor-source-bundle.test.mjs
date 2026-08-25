@@ -28,24 +28,37 @@ function clone(value) {
 
 function assertHostedRendererProvisioning(workflow, installer, dockerfile, wrapper) {
   const setupJob = workflow.slice(workflow.indexOf("  generic_sensor_renderer:\n"), workflow.indexOf("  quality:\n"));
+  assert.match(setupJob, /needs\.classify\.outputs\.web_tests == 'true'/u);
   assert.match(setupJob, /actions\/cache@0057852bfaa89a56745cba8c7296529d2fc39830/u);
   assert.match(setupJob, /Build or load the pinned renderer once/u);
   assert.match(setupJob, /scripts\/install-pinned-poppler-ubuntu\.sh/u);
   const jobSlices = [
-    workflow.slice(workflow.indexOf("  quality:\n"), workflow.indexOf("  security_js:\n")),
-    workflow.slice(workflow.indexOf("  integration:\n"), workflow.indexOf("  container:\n")),
+    {
+      job: workflow.slice(workflow.indexOf("  quality:\n"), workflow.indexOf("  security_js:\n")),
+      verifyCommand: "npm run generic-sensor:sources:verify",
+    },
+    {
+      job: workflow.slice(workflow.indexOf("  web_tests:\n"), workflow.indexOf("  rust_tests:\n")),
+      verifyCommand: "run: npm test",
+    },
+    {
+      job: workflow.slice(workflow.indexOf("  integration:\n"), workflow.indexOf("  container:\n")),
+      verifyCommand: "npm run generic-sensor:sources:verify",
+    },
   ];
-  for (const job of jobSlices) {
+  for (const { job, verifyCommand } of jobSlices) {
     const installAt = job.indexOf("run: scripts/install-pinned-poppler-ubuntu.sh");
-    const verifyAt = job.indexOf("npm run generic-sensor:sources:verify");
+    const verifyAt = job.indexOf(verifyCommand);
     assert.ok(installAt >= 0 && verifyAt > installAt, "each hosted verifier job must provision the renderer first");
   }
+  assert.match(jobSlices[1].job, /needs: \[classify, generic_sensor_renderer\]/u);
   assert.match(installer, /readonly poppler_version="26\.05\.0"/u);
   assert.match(installer, /readonly poppler_sha256="6fef27ff04f37db43054c86bcdff6128c9fb1f6af4ef3c8b369a7e9abd68d0bb"/u);
   assert.match(installer, /sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517/u);
   assert.match(installer, /https:\/\/poppler\.freedesktop\.org\/poppler-\$\{poppler_version\}\.tar\.xz/u);
   assert.match(installer, /sha256sum --check --strict/u);
-  assert.match(installer, /pdftoppm" -v/u);
+  assert.match(installer, /for tool in pdftoppm pdfinfo/u);
+  assert.match(installer, /"\$\{bin_dir\}\/\$\{tool\}" -v/u);
   assert.match(
     installer,
     /s\|@@GITHUB_WORKSPACE@@\|\$\{GITHUB_WORKSPACE\}\|g/u,
@@ -53,19 +66,21 @@ function assertHostedRendererProvisioning(workflow, installer, dockerfile, wrapp
   );
   assert.match(dockerfile, /^FROM @@UBUNTU_IMAGE@@/u);
   assert.match(dockerfile, /@@POPPLER_SHA256@@/u);
-  assert.match(dockerfile, /cmake --build \/tmp\/poppler\/build --target pdftoppm --parallel 2/u);
+  assert.match(dockerfile, /cmake --build \/tmp\/poppler\/build --target pdftoppm pdfinfo --parallel 2/u);
   assert.doesNotMatch(
     dockerfile,
     /ENTRYPOINT \["\/tmp\//u,
     "the renderer executable cannot live below /tmp because the wrapper bind-mounts that path",
   );
   assert.match(dockerfile, /cp \/tmp\/poppler\/build\/utils\/pdftoppm \/opt\/poppler\/bin\/pdftoppm/u);
+  assert.match(dockerfile, /cp \/tmp\/poppler\/build\/utils\/pdfinfo \/opt\/poppler\/bin\/pdfinfo/u);
   assert.match(dockerfile, /cp -a \/tmp\/poppler\/build\/libpoppler\.so\* \/opt\/poppler\/lib\//u);
   assert.match(dockerfile, /ENV LD_LIBRARY_PATH=\/opt\/poppler\/lib/u);
   assert.match(dockerfile, /ENTRYPOINT \["\/opt\/poppler\/bin\/pdftoppm"\]/u);
   assert.match(wrapper, /docker run --rm --network none/u);
+  assert.match(wrapper, /--entrypoint "\/opt\/poppler\/bin\/@@TOOL@@"/u);
   assert.match(wrapper, /--volume "\/tmp:\/tmp"/u);
-  assert.equal((workflow.match(/Restore the content-keyed renderer image/gu) ?? []).length, 3);
+  assert.equal((workflow.match(/Restore the content-keyed renderer image/gu) ?? []).length, 4);
 }
 
 function seal(value) {

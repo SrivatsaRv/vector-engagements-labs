@@ -48,6 +48,14 @@ Measured locally on 2026-08-12 using Node.js v24.3.0 on Apple M5 arm64:
 
 These numbers are a local regression record, not an x86-64, browser rendering, capacity or named-aircraft performance claim.
 
+The separate issue #150 historical external-store source quarantine adds
+16,435,557 bytes of exact NASA source, metadata, policy, and declared full-page
+render assets under `governance/nasa-historical-f16-store-source/`. Those bytes
+are verification evidence storage only: production isolation rejects them from
+TypeScript, Rust/WASM, backend, Worker, browser, fixture, and built-output
+roots. They do not change this executable Case 11 fixture, its benchmark, or
+any aircraft admission state.
+
 ## Deliberate limitations and next causal step
 
 This slice validates evidence ingestion, unit normalization, trim propagation, six-state telemetry, force/moment/control metadata, external time-history comparison, bounded execution and backend parity. It does not yet execute every nonlinear DAVE-ML coefficient table, propulsion map or controller transient. It does not validate departure, high-angle-of-attack, supersonic, damage or combat behavior.

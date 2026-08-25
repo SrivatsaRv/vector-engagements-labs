@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import {
+  cpSync,
   copyFileSync,
   mkdirSync,
   mkdtempSync,
@@ -19,13 +21,38 @@ import {
   verifyCommittedInventory,
   verifyManifest,
   verifyProductionIsolation,
+  verifyReleaseOwnerVisualReview,
   verifySourceDirectory,
+  verifySourceTermsAuthority,
 } from "../scripts/verify-nasa-f16-store-source.mjs";
 
 const manifestPath = resolve(
   "governance/nasa-historical-f16-store-source/manifest.v1.json",
 );
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+const governedRoot = resolve("governance/nasa-historical-f16-store-source");
+const authority = JSON.parse(readFileSync(resolve(governedRoot, "source-terms-authority.v1.json"), "utf8"));
+const visualReview = JSON.parse(readFileSync(resolve(governedRoot, "release-owner-visual-review.v1.json"), "utf8"));
+const policyBytes = readFileSync(resolve(governedRoot, authority.policyArtifact.repositoryPath));
+const metadataFiles = Object.fromEntries(manifest.artifacts.map((artifact) => [
+  artifact.metadata.repositoryPath,
+  readFileSync(resolve(governedRoot, artifact.metadata.repositoryPath)),
+]));
+
+test("the required policy command cannot omit committed-source rerender verification", () => {
+  const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
+  assert.match(
+    packageJson.scripts["policy:nasa-f16-store-source:verify"],
+    /scripts\/verify-nasa-f16-store-source\.mjs --source-dir governance\/nasa-historical-f16-store-source\/sources/u,
+  );
+  const omitted = spawnSync(
+    process.execPath,
+    ["--require", "./scripts/lib/generic-sensor-network-deny.cjs", "scripts/verify-nasa-f16-store-source.mjs"],
+    { encoding: "utf8" },
+  );
+  assert.notEqual(omitted.status, 0);
+  assert.match(omitted.stderr, /CLI verification requires exactly --source-dir/u);
+});
 
 const mutate = (apply) => {
   const candidate = structuredClone(manifest);
@@ -33,24 +60,83 @@ const mutate = (apply) => {
   return candidate;
 };
 
-test("the historical F-16 store corpus is immutable, source-only, and pending human admission", () => {
+test("the historical F-16 store corpus is immutable, source-terms authorized, visually reviewed, and source-only", () => {
   const result = verifyManifest(manifest);
   assert.deepEqual(result, {
     artifacts: 3,
-    decisionsPending: 3,
+    decisionsAuthorized: 3,
     id: "nasa-historical-f16-store-source-20260824",
     pageMaps: 16,
     schemaVersion: "vector.nasa-historical-f16-store-source-manifest.v1",
-    visualQaPending: 16,
+    visualQaReviewed: 16,
   });
   assert.throws(
     () => assertSourceAdmissionEligible(manifest),
-    /reference use decision is PENDING/,
+    /source-only manifest cannot admit executable behavior/,
   );
-  assert.equal(manifest.referenceUseDecision.value, "PENDING");
-  assert.equal(manifest.redistributionDecision.value, "PENDING");
-  assert.equal(manifest.exportReviewDecision.value, "PENDING");
+  assert.equal(manifest.referenceUseDecision.value, "SOURCE_TERMS_AUTHORIZED_INTERNAL_VERIFICATION_ONLY");
+  assert.equal(manifest.redistributionDecision.value, "SOURCE_TERMS_AUTHORIZED_EXACT_BYTES_AND_DECLARED_RENDERS");
+  assert.equal(manifest.exportReviewDecision.value, "SOURCE_METADATA_NO_RESTRICTION");
+  assert.deepEqual(manifest.permissions, {
+    adaptation: false,
+    execution: false,
+    modelAdmission: false,
+    numericOrEquationTranscription: false,
+    runtime: false,
+  });
   assert.equal(manifest.decisions, undefined);
+});
+
+test("source terms and release-owner review are exact, separate, non-legal, and fail closed", () => {
+  assert.deepEqual(verifySourceTermsAuthority(manifest, authority, policyBytes, metadataFiles), {
+    authorityKind: "AUTHORITATIVE_SOURCE_TERMS",
+    legalApproval: false,
+    metadataRecords: 3,
+  });
+  assert.deepEqual(verifyReleaseOwnerVisualReview(manifest, visualReview), {
+    legalApproval: false,
+    reviewedPages: 16,
+    reviewerRole: "RELEASE_OWNER_REVIEW",
+  });
+
+  const authorityAttacks = [
+    ["fabricated human requirement", (value) => { value.humanReviewerRequired = true; }],
+    ["fabricated legal approval", (value) => { value.legalApproval = true; }],
+    ["changed policy URL", (value) => { value.policyArtifact.url = "https://example.invalid/policy.pdf"; }],
+    ["changed metadata evidence", (value) => { value.metadataEvidence[0].sha256 = "0".repeat(64); }],
+    ["broadened redistribution scope", (value) => { value.decisions.redistribution.scope = "ANY_DERIVATIVE"; }],
+  ];
+  for (const [name, apply] of authorityAttacks) {
+    const candidate = structuredClone(authority);
+    apply(candidate);
+    assert.throws(() => verifySourceTermsAuthority(manifest, candidate, policyBytes, metadataFiles), undefined, name);
+  }
+  assert.throws(
+    () => verifySourceTermsAuthority(manifest, authority, Buffer.from("changed"), metadataFiles),
+    /policy bytes or identity differ/,
+  );
+  assert.throws(
+    () => verifySourceTermsAuthority(manifest, authority, policyBytes, {
+      ...metadataFiles,
+      "sources/19780003061.json": Buffer.from("changed"),
+    }),
+    /metadata evidence differs/,
+  );
+
+  const visualAttacks = [
+    ["human/legal role laundering", (value) => { value.reviewerRole = "AUTHORIZED_HUMAN"; }],
+    ["fabricated visual legal approval", (value) => { value.legalApproval = true; }],
+    ["numeric transcription claim", (value) => { value.numericOrEquationTranscriptionPerformed = true; }],
+    ["different manifest", (value) => { value.subject.manifestCanonicalDigest = "0".repeat(64); }],
+    ["changed page mapping", (value) => { value.reviewedPages[0].pdfPage = 5; }],
+    ["changed render identity", (value) => { value.reviewedPages[0].displayRender.sha256 = "0".repeat(64); }],
+    ["broadened semantic category", (value) => { value.reviewedPages[0].eligibleCategory = "COMPATIBILITY_MATRIX"; }],
+  ];
+  for (const [name, apply] of visualAttacks) {
+    const candidate = structuredClone(visualReview);
+    apply(candidate);
+    assert.throws(() => verifyReleaseOwnerVisualReview(manifest, candidate), undefined, name);
+  }
 });
 
 test("the manifest rejects identity, decision, role, page, unit, datum, and executable-field drift", () => {
@@ -113,14 +199,12 @@ test("the manifest rejects identity, decision, role, page, unit, datum, and exec
   }
 });
 
-test("the verifier rejects changed, truncated, swapped, linked, and undeclared local artifacts", async (t) => {
-  const sourceDirectory = process.env.VECTOR_F16_SOURCE_DIR;
-  if (!sourceDirectory) {
-    t.skip("set VECTOR_F16_SOURCE_DIR to the reviewed six-file offline bundle");
-    return;
-  }
+test("the verifier rejects changed, truncated, swapped, linked, and undeclared local artifacts", async () => {
+  const sourceDirectory = process.env.VECTOR_F16_SOURCE_DIR
+    ? resolve(process.env.VECTOR_F16_SOURCE_DIR)
+    : resolve(governedRoot, "sources");
 
-  const result = await verifySourceDirectory(manifest, resolve(sourceDirectory));
+  const result = await verifySourceDirectory(manifest, sourceDirectory);
   assert.equal(result.artifacts, 3);
   assert.equal(result.metadataRecords, 3);
   assert.equal(result.admissionEligible, false);
@@ -154,9 +238,8 @@ test("the verifier rejects changed, truncated, swapped, linked, and undeclared l
 
   const compressedRoot = mkdtempSync(join(tmpdir(), "vector-f16-compressed-source-"));
   try {
-    mkdirSync(resolve(compressedRoot, "governance", "nasa-historical-f16-store-source"), { recursive: true });
-    copyFileSync(manifestPath, resolve(compressedRoot, "governance", "nasa-historical-f16-store-source", "manifest.v1.json"));
-    writeFileSync(resolve(compressedRoot, "governance", "nasa-historical-f16-store-source", "README.md"), "source-only");
+    mkdirSync(resolve(compressedRoot, "governance"), { recursive: true });
+    cpSync(governedRoot, resolve(compressedRoot, "governance", "nasa-historical-f16-store-source"), { recursive: true });
     mkdirSync(resolve(compressedRoot, "docs"), { recursive: true });
     writeFileSync(resolve(compressedRoot, "docs", "innocuous.bin"), gzipSync(readFileSync(resolve(sourceDirectory, "TM74078.pdf"))));
     assert.throws(() => verifyCommittedInventory(compressedRoot), /raw source or render identity/);
@@ -167,8 +250,8 @@ test("the verifier rejects changed, truncated, swapped, linked, and undeclared l
 
 test("production code and built runtime inputs cannot import or name the source-only contract", () => {
   assert.deepEqual(verifyCommittedInventory(resolve(".")), {
-    files: ["README.md", "manifest.v1.json"],
-    rawArtifactsCommitted: 0,
+    files: 29,
+    governedQuarantineFiles: 27,
   });
   const result = verifyProductionIsolation(resolve("."));
   assert.equal(result.forbiddenReferences, 0);
@@ -188,12 +271,37 @@ test("production code and built runtime inputs cannot import or name the source-
   }
 });
 
+test("the committed quarantine rejects missing, extra, linked, changed, or mismatched governed evidence", () => {
+  const attack = (apply, pattern) => {
+    const attackRoot = mkdtempSync(join(tmpdir(), "vector-f16-committed-attack-"));
+    try {
+      mkdirSync(resolve(attackRoot, "governance"), { recursive: true });
+      const attackBundle = resolve(attackRoot, "governance", "nasa-historical-f16-store-source");
+      cpSync(governedRoot, attackBundle, { recursive: true });
+      apply(attackBundle);
+      assert.throws(() => verifyCommittedInventory(attackRoot), pattern);
+    } finally {
+      rmSync(attackRoot, { recursive: true, force: true });
+    }
+  };
+
+  attack((bundle) => unlinkSync(resolve(bundle, manifest.artifacts[0].pdf.repositoryPath)), /inventory differs/);
+  attack((bundle) => writeFileSync(resolve(bundle, "renders", "undeclared.png"), "x"), /inventory differs/);
+  attack((bundle) => writeFileSync(resolve(bundle, manifest.artifacts[0].pageMaps[0].render.displayPath), "changed"), /size or digest differs/);
+  attack((bundle) => writeFileSync(resolve(bundle, "source-terms-authority.v1.json"), "{}\n"), undefined);
+  attack((bundle) => writeFileSync(resolve(bundle, "release-owner-visual-review.v1.json"), "{}\n"), undefined);
+  attack((bundle) => {
+    const path = resolve(bundle, manifest.artifacts[2].metadata.repositoryPath);
+    unlinkSync(path);
+    symlinkSync(resolve(governedRoot, manifest.artifacts[2].metadata.repositoryPath), path);
+  }, /symlink/);
+});
+
 test("raw source or render identities cannot be hidden elsewhere in the repository", () => {
   const attackRoot = mkdtempSync(join(tmpdir(), "vector-f16-raw-attack-"));
   try {
-    mkdirSync(resolve(attackRoot, "governance", "nasa-historical-f16-store-source"), { recursive: true });
-    copyFileSync(manifestPath, resolve(attackRoot, "governance", "nasa-historical-f16-store-source", "manifest.v1.json"));
-    writeFileSync(resolve(attackRoot, "governance", "nasa-historical-f16-store-source", "README.md"), "source-only");
+    mkdirSync(resolve(attackRoot, "governance"), { recursive: true });
+    cpSync(governedRoot, resolve(attackRoot, "governance", "nasa-historical-f16-store-source"), { recursive: true });
     mkdirSync(resolve(attackRoot, "docs"), { recursive: true });
     writeFileSync(resolve(attackRoot, "docs", "TM74078.pdf"), Buffer.from(manifest.artifacts[0].pdf.sha256, "hex"));
     assert.throws(() => verifyCommittedInventory(attackRoot), /raw source or render identity/);

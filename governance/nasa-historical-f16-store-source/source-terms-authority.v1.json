@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "vector.nasa-historical-f16-store-source-terms-authority.v1",
+  "id": "nasa-historical-f16-store-source-terms-authority-20260825",
+  "authorityKind": "AUTHORITATIVE_SOURCE_TERMS",
+  "decidedOn": "2026-08-25",
+  "humanReviewerRequired": false,
+  "legalApproval": false,
+  "policyArtifact": {
+    "title": "NASA's public access plan",
+    "url": "https://sti.nasa.gov/docs/NASA_Public_Access_Plan.pdf",
+    "repositoryPath": "source-terms/NASA_Public_Access_Plan.pdf",
+    "mediaType": "application/pdf",
+    "byteLength": 1081214,
+    "sha256": "f22cf0cbebebadaea5c13e6b57ef8ccd883175cb93444cf4c77d6bac0c8e3d61",
+    "pageCount": 27,
+    "accessedOn": "2026-08-25"
+  },
+  "policyBasis": {
+    "section": "Rights and Distribution",
+    "state": "OFFICIAL_NASA_PUBLIC_ACCESS_PLAN",
+    "summary": "NTRS documents not marked copyrighted may be reproduced and distributed without further NASA permission; the exact NTRS metadata records below identify government public use and no third-party material."
+  },
+  "metadataEvidence": [
+    {
+      "citationId": "19780003061",
+      "repositoryPath": "sources/19780003061.json",
+      "sha256": "14293d25ca78af273df30ed1f9891f7acd3f1999bc8af49b33e837662a6423cb",
+      "distribution": "PUBLIC",
+      "determinationType": "GOV_PUBLIC_USE_PERMITTED",
+      "containsThirdPartyMaterial": false,
+      "isExportControl": "NO",
+      "ear": "NO",
+      "itar": "NO"
+    },
+    {
+      "citationId": "19870000632",
+      "repositoryPath": "sources/19870000632.json",
+      "sha256": "c826c0626027eeb3e8ae252ac75b97f49602a903befd4bc4cb86a8578c8e03fe",
+      "distribution": "PUBLIC",
+      "determinationType": "GOV_PUBLIC_USE_PERMITTED",
+      "containsThirdPartyMaterial": false,
+      "isExportControl": "NO",
+      "ear": "NO",
+      "itar": "NO"
+    },
+    {
+      "citationId": "19860022096",
+      "repositoryPath": "sources/19860022096.json",
+      "sha256": "4274d309f1d150853a16b01a39476e48c846f02beeacd8a9a8f7b33ddd5b9f32",
+      "distribution": "PUBLIC",
+      "determinationType": "GOV_PUBLIC_USE_PERMITTED",
+      "containsThirdPartyMaterial": false,
+      "isExportControl": "NO",
+      "ear": "NO",
+      "itar": "NO"
+    }
+  ],
+  "decisions": {
+    "referenceUse": {
+      "value": "SOURCE_TERMS_AUTHORIZED_INTERNAL_VERIFICATION_ONLY",
+      "scope": "EXACT_FROZEN_SOURCES_AND_DECLARED_REVIEW_RENDERS_FOR_INTERNAL_ENGINE_VERIFICATION_RESEARCH_ONLY"
+    },
+    "redistribution": {
+      "value": "SOURCE_TERMS_AUTHORIZED_EXACT_BYTES_AND_DECLARED_RENDERS",
+      "scope": "EXACT_FROZEN_NASA_BYTES_METADATA_POLICY_AND_DECLARED_FULL_PAGE_REVIEW_RENDERS_ONLY"
+    },
+    "exportReview": {
+      "value": "SOURCE_METADATA_NO_RESTRICTION",
+      "scope": "EXACT_THREE_DIGEST_PINNED_NTRS_RECORDS_ONLY"
+    }
+  },
+  "conditions": [
+    "PRESERVE_EXACT_SOURCE_AND_METADATA_DIGESTS",
+    "PRESERVE_NASA_SOURCE_IDENTITY_AND_POLICY_PROVENANCE",
+    "NO_NUMERIC_OR_EQUATION_TRANSCRIPTION",
+    "NO_ADAPTATION_OR_EXECUTION_AUTHORITY",
+    "NO_MODEL_PACK_OR_RUNTIME_ADMISSION"
+  ]
+}

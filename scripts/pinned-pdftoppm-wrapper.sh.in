@@ -7,4 +7,5 @@ exec docker run --rm --network none \
   --volume "@@GITHUB_WORKSPACE@@:@@GITHUB_WORKSPACE@@:ro" \
   --volume "/tmp:/tmp" \
   --workdir "${PWD}" \
+  --entrypoint "/opt/poppler/bin/@@TOOL@@" \
   "@@IMAGE_TAG@@" "$@"

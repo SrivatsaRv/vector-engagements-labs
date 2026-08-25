@@ -28,9 +28,10 @@ RUN printf '%s  %s\n' "@@POPPLER_SHA256@@" /tmp/poppler.tar.xz | sha256sum --che
       -DBUILD_QT6_TESTS=OFF \
       -DBUILD_CPP_TESTS=OFF \
       -DBUILD_MANUAL_TESTS=OFF \
-  && cmake --build /tmp/poppler/build --target pdftoppm --parallel 2 \
+  && cmake --build /tmp/poppler/build --target pdftoppm pdfinfo --parallel 2 \
   && mkdir -p /opt/poppler/bin /opt/poppler/lib \
   && cp /tmp/poppler/build/utils/pdftoppm /opt/poppler/bin/pdftoppm \
+  && cp /tmp/poppler/build/utils/pdfinfo /opt/poppler/bin/pdfinfo \
   && cp -a /tmp/poppler/build/libpoppler.so* /opt/poppler/lib/
 
 ENV LD_LIBRARY_PATH=/opt/poppler/lib
