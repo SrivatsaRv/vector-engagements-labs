@@ -58,6 +58,8 @@
     "policy:aircraft-evidence:verify": "node scripts/verify-aircraft-evidence-registry.mjs",
     "policy:nasa-generic-f16:verify": "node scripts/verify-nasa-generic-f16-reference.mjs",
     "policy:nasa-f16-store-source:verify": "node --require ./scripts/lib/generic-sensor-network-deny.cjs scripts/generate-nasa-f16-store-source-evidence.mjs && node --require ./scripts/lib/generic-sensor-network-deny.cjs scripts/verify-nasa-f16-store-source.mjs --source-dir governance/nasa-historical-f16-store-source/sources && node --require ./scripts/lib/generic-sensor-network-deny.cjs --test tests/nasa-f16-store-source.test.mjs",
+    "policy:generic-mission-policy-source:verify": "node --require ./scripts/lib/generic-sensor-network-deny.cjs scripts/verify-generic-mission-policy-governance.mjs && node --require ./scripts/lib/generic-sensor-network-deny.cjs --test tests/generic-mission-policy-source.test.mjs",
+    "generic-mission-policy:sources:verify": "node --require ./scripts/lib/generic-sensor-network-deny.cjs scripts/verify-generic-mission-policy-source.mjs",
     "policy:contract-docs:verify": "node scripts/verify-contract-doc-impact.mjs",
     "policy:contract-docs:template": "node scripts/verify-contract-doc-impact.mjs --print-template",
     "environment:sources:verify": "node scripts/verify-environment-source-assets.mjs",

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "vector.generic-mission-policy-release-owner-visual-review.v1",
+  "status": "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+  "reviewerRole": "RELEASE_OWNER_REVIEW",
+  "reviewKind": "TECHNICAL_SEMANTIC_NON_LEGAL",
+  "reviewedOn": "2026-08-26",
+  "subject": {
+    "manifestId": "generic-mission-policy-verification-source-freeze-20260826",
+    "manifestCanonicalDigest": "72c6a77c66e70b7c20059a0c1dd0b64ef6a22e43121de8247aac2a4cb1f89b57",
+    "sourceSetDigest": "561f3f0760515aeb059fcc5e8929e63502ab8207f861505a217bbb132a0187f2",
+    "renderProfileId": "darwin-arm64-poppler-26.05.0-150dpi-rgb8-png",
+    "renderSetDigest": "6abfb14eac2355a3be6a7836a45a6a1a5740fbfd6c72455f42be4f2cfa31ee04",
+    "pageCount": 15
+  },
+  "contactSheets": [
+    {
+      "artifactId": "nasa-ntrs-20190029195",
+      "externalPathHint": "nasa-2019-contact.png",
+      "sha256": "e3587c7e3fabc306ce34c31871ae9d3be1f7de32472a94845ba5db0c0a04e628",
+      "committed": false
+    },
+    {
+      "artifactId": "nasa-ntrs-20205011183",
+      "externalPathHint": "nasa-2020-contact.png",
+      "sha256": "1ae051102aeceddc5d4c5a491e107e82c2216aa1c469869c602bd2b82bcfdd63",
+      "committed": false
+    },
+    {
+      "artifactId": "faa-h-8083-2a",
+      "externalPathHint": "faa-risk-contact.png",
+      "sha256": "fa077b2d9a15ef78f6c4e9c132a02906f6443ad257e234f03f849a696c90bff6",
+      "committed": false
+    }
+  ],
+  "attestations": {
+    "exactSourceIdentityConsistent": true,
+    "reportAndTitleIdentityConsistent": true,
+    "declaredPageMappingConsistent": true,
+    "printedAndPdfPageNumberingConsistent": true,
+    "legible": true,
+    "orientationReadable": true,
+    "visibleRightsNoticeRecorded": true,
+    "limitationsAndNonclaimsConsistent": true,
+    "numericValuesOrEquationsTranscribed": false,
+    "legalApprovalGranted": false
+  },
+  "boundary": "NO_RIGHTS_GRANT_NO_REDISTRIBUTION_NO_ADAPTATION_NO_EXECUTION_NO_RUNTIME_NO_MODEL_PROMOTION"
+}

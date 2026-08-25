@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "vector.generic-mission-policy-source-terms-evidence.v1",
+  "id": "generic-mission-policy-source-terms-evidence-20260826",
+  "evidenceClass": "SOURCE_TERMS_EVIDENCE",
+  "legalAdvice": false,
+  "reviewedOn": "2026-08-26",
+  "officialEvidence": [
+    {
+      "authority": "NASA_NTRS",
+      "url": "https://ntrs.nasa.gov/api/citations/20190029195",
+      "artifactSha256": "cc0f3b75b87951656f0ea623bcebc0acde2dc78b9d85318875609654a8e35ea1",
+      "facts": {
+        "distribution": "PUBLIC",
+        "copyrightDetermination": "PUBLIC_USE_PERMITTED",
+        "exportControl": "NO",
+        "ear": "NO",
+        "itar": "NO"
+      },
+      "permissionInference": "NONE"
+    },
+    {
+      "authority": "NASA_NTRS",
+      "url": "https://ntrs.nasa.gov/api/citations/20205011183",
+      "artifactSha256": "1004549fd5f797daef6af98987043e34e78a7eafb918fab835dc3ccb76d18a57",
+      "facts": {
+        "distribution": "PUBLIC",
+        "copyrightDetermination": "PUBLIC_USE_PERMITTED",
+        "exportControl": "NO",
+        "ear": "NO",
+        "itar": "NO"
+      },
+      "permissionInference": "NONE"
+    },
+    {
+      "authority": "NASA_MEDIA_USAGE_GUIDELINES",
+      "url": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+      "artifactSha256": null,
+      "facts": {
+        "thirdPartyCopyrightedMaterialMayBeHosted": true,
+        "nasaHostingConveysThirdPartyRights": false
+      },
+      "permissionInference": "NONE"
+    },
+    {
+      "authority": "FAA",
+      "url": "https://www.faa.gov/regulationspolicies/handbooksmanuals/risk-management-handbook-faa-h-8083-2a",
+      "artifactSha256": null,
+      "facts": {
+        "publicLandingPage": true,
+        "title": "Risk Management Handbook (FAA-H-8083-2A)",
+        "linkedPdfByteLength": 15344860,
+        "lastUpdated": "2022-06-02"
+      },
+      "permissionInference": "NONE"
+    }
+  ],
+  "visibleRightsEvidence": [
+    {
+      "artifactId": "nasa-ntrs-20190029195",
+      "pdfPage": 1,
+      "finding": "AIAA_COPYRIGHT_ALL_RIGHTS_RESERVED_VISIBLE",
+      "permissionInference": "NONE"
+    }
+  ],
+  "boundary": "AUTHORITATIVE_FACTS_ONLY_NON_LEGAL_NO_REDISTRIBUTION_OR_ADAPTATION_GRANT"
+}

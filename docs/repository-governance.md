@@ -130,6 +130,22 @@ source freeze bound to its catalog, model-pack, physics, information-state,
 security, testing, and family-specific changelog sections without granting the
 source bundle production-runtime ownership.
 
+The generic mission-policy source family is deliberately external-byte-only.
+`ci-quality` runs its canonical governance, hostile-tamper and production
+isolation gate under the deny-all network guard, and `worker-local` repeats it
+after production bundles exist. Exact source reproduction is a separate
+completion gate requiring `VECTOR_GENERIC_MISSION_POLICY_SOURCE_DIR`; absence
+of that directory fails rather than skips. The external gate is recorded in PR
+evidence but its AIAA/FAA PDFs, metadata and renders are never uploaded to Git
+or hosted CI. The family owns the civil-context/nonpromotion sections in the
+catalog, model-pack, physics, mission-authority and testing contracts.
+Its committed isolation record is a content-addressed policy template, not a
+reusable PASS assertion. Runtime PASS output binds exact candidate/runtime Git
+heads, every attested policy/verifier/input byte, and the scanned production
+tree. Whole-file hashes and SHA-256-confirmed raw/base64 rolling fingerprints
+deny all governed source, metadata, render and contact-sheet identities even
+when their text markers are absent.
+
 Post-bootstrap contract additions use that same revision-bound mechanism when
 they extend an existing family. The `MODEL_PACK_COMPILER_RESOLVER` family owns
 the registered authority, schema/migration, requirement/evidence, procedure,

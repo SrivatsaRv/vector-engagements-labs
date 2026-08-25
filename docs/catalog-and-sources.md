@@ -162,6 +162,34 @@ Adaptation, execution, model admission, numeric/equation transcription and
 runtime permissions remain false. The exact-byte redistribution decision
 cannot seed a catalog row or expand any aircraft/store claim.
 
+## Generic mission-policy verification source-only quarantine
+
+`governance/generic-mission-policy-verification-source` freezes immutable
+identities and 15 page roles for two NASA civil-autonomy research papers and
+the FAA human-pilot Risk Management Handbook. Every PDF, NASA metadata
+snapshot, alternate copy, render and contact sheet remains external. The
+network-denied verifier accepts only user-supplied exact bytes and rejects the
+different NASA copy as a substitute. The release-owner record is a digest-bound
+technical inspection of title/report identity, page numbering, orientation,
+legibility, rights notice and limitations; it is neither a legal decision nor
+a source-content licence.
+
+NASA metadata rights/export values remain source facts only. The visible AIAA
+rights notice and absence of complete FAA redistribution terms produce closed
+negative redistribution and adaptation decisions. That is a successful
+fail-closed Stage-0 governance result: it does not admit source bytes to Git or
+grant any downstream permission. Reference-only offline checking of external
+bytes is the sole positive permission. Execution, runtime, model-pack,
+production and catalog permissions are false.
+
+The civil page roles cannot populate catalog policy, doctrine, action, command,
+fuel, geometry, track/support, weapon, sensor or named-platform fields. Every
+cadence, threshold, priority, tie-break, hysteresis, timeout, fuel/reserve
+value, route geometry, action mapping and command bound remains a value-less
+`MODEL_ASSUMPTION`. AFDP rows are unacquired discovery-only pointers; CJCSI
+3121.01(S) is permanently ineligible and no content from it may be acquired or
+stored.
+
 ## Environment-pack installation coverage
 
 Installation and study-area table definitions are owned by
