@@ -7,7 +7,7 @@ import type { PreparedSimulation } from "../simulation.ts";
 import type { RuntimeModelPackAdapter } from "./protocol.ts";
 import { assertRuntimeModelPackDigest } from "../engine/runtime-model-pack.ts";
 import { compileAirMissionDefinition } from "../air-mission.ts";
-import { admitPhaseAEnvironmentPack } from "../geospatial/environment-pack.ts";
+import { admitEnvironmentPack } from "../geospatial/environment-pack.ts";
 import { CURRENT_COMPILED_MODEL_PACK } from "../engine/weapon-admission.ts";
 
 export async function adaptPreparedSimulation(
@@ -50,7 +50,7 @@ export async function admitRuntimeModelPack(
     if (!scenario.airMission || !engineScenario.airMission) {
       throw new Error("The Worker requires matching authored and compiled Air mission artifacts.");
     }
-    const admittedEnvironment = admitPhaseAEnvironmentPack({
+    const admittedEnvironment = admitEnvironmentPack({
       studyAreaId: scenario.studyAreaId,
       weatherPresetId: scenario.weatherPresetId,
       effectiveWeather: {

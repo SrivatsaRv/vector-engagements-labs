@@ -592,12 +592,80 @@ pub struct EnvironmentPackBinding {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RuntimeTerrainGrid {
+    pub west_deg: f64,
+    pub south_deg: f64,
+    pub longitude_step_deg: f64,
+    pub latitude_step_deg: f64,
+    pub columns: usize,
+    pub rows: usize,
+    pub surface_elevation_msl_m: Vec<f64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeAtmosphereGrid {
+    pub interval_seconds: f64,
+    pub sample_count: usize,
+    pub west_deg: f64,
+    pub south_deg: f64,
+    pub longitude_step_deg: f64,
+    pub latitude_step_deg: f64,
+    pub columns: usize,
+    pub rows: usize,
+    pub temperature_c: Vec<f64>,
+    pub surface_pressure_kpa: Vec<f64>,
+    pub relative_humidity_percent: Vec<f64>,
+    pub wind_east_mps: Vec<f64>,
+    pub wind_north_mps: Vec<f64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeGrid<T> {
+    pub id: String,
+    pub version: String,
+    pub digest: String,
+    pub grid: T,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeDatasetIdentity {
+    pub id: String,
+    pub version: String,
+    pub digest: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthoredEnvironmentModifiers {
+    pub temperature_offset_c: f64,
+    pub wind_east_mps: f64,
+    pub wind_north_mps: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeEnvironmentProjection {
+    pub schema_version: String,
+    pub environment_pack: RuntimeDatasetIdentity,
+    pub anchor: StudyAreaAnchor,
+    pub terrain: RuntimeGrid<RuntimeTerrainGrid>,
+    pub atmosphere: RuntimeGrid<RuntimeAtmosphereGrid>,
+    pub authored_modifiers: AuthoredEnvironmentModifiers,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Environment {
     pub gravity_mps2: f64,
     pub temperature_offset_c: f64,
     pub wind_mps: Vec3,
     pub atmosphere: AtmosphereModel,
     pub environment_pack: EnvironmentPackBinding,
+    #[serde(default)]
+    pub runtime_environment: Option<RuntimeEnvironmentProjection>,
     pub study_area: StudyArea,
 }
 
@@ -1499,20 +1567,173 @@ fn atmosphere(altitude_m: f64, offset_c: f64) -> (f64, f64) {
     (density, speed_of_sound)
 }
 
-fn active_wind(scenario: &EngineScenario, time: f64) -> Vec3 {
+fn local_to_geographic(position: Vec3, anchor: &StudyAreaAnchor) -> (f64, f64) {
+    const A: f64 = 6_378_137.0;
+    const INV_F: f64 = 298.257_223_563;
+    let f = 1.0 / INV_F;
+    let e2 = f * (2.0 - f);
+    let b = A * (1.0 - f);
+    let ep2 = (A * A - b * b) / (b * b);
+    let lon = anchor.longitude.to_radians();
+    let lat = anchor.latitude.to_radians();
+    let sin_lat = lat.sin();
+    let cos_lat = lat.cos();
+    let normal = A / (1.0 - e2 * sin_lat * sin_lat).sqrt();
+    let ox = normal * cos_lat * lon.cos();
+    let oy = normal * cos_lat * lon.sin();
+    let oz = normal * (1.0 - e2) * sin_lat;
+    let dx = -lon.sin() * position.x - sin_lat * lon.cos() * position.y
+        + cos_lat * lon.cos() * position.z;
+    let dy = lon.cos() * position.x - sin_lat * lon.sin() * position.y
+        + cos_lat * lon.sin() * position.z;
+    let dz = cos_lat * position.y + sin_lat * position.z;
+    let x = ox + dx;
+    let y = oy + dy;
+    let z = oz + dz;
+    let p = x.hypot(y);
+    let theta = (z * A).atan2(p * b);
+    let latitude = (z + ep2 * b * theta.sin().powi(3)).atan2(p - e2 * A * theta.cos().powi(3));
+    (y.atan2(x).to_degrees(), latitude.to_degrees())
+}
+
+fn axis(value: f64, start: f64, step: f64, count: usize) -> Option<(usize, f64)> {
+    let coordinate = (value - start) / step;
+    if coordinate < -1e-9 || coordinate > count as f64 - 1.0 + 1e-9 || count < 2 {
+        return None;
+    }
+    let bounded = coordinate.clamp(0.0, count as f64 - 1.0);
+    let lower = (bounded.floor() as usize).min(count - 2);
+    Some((lower, bounded - lower as f64))
+}
+
+fn bilinear_at_axes(
+    values: &[f64],
+    grid: &RuntimeAtmosphereGrid,
+    x: usize,
+    fx: f64,
+    y: usize,
+    fy: f64,
+    time_index: usize,
+) -> Option<f64> {
+    let stride = grid.columns * grid.rows;
+    let at = |row: usize, column: usize| {
+        values
+            .get(time_index * stride + row * grid.columns + column)
+            .copied()
+    };
+    let south = at(y, x)? * (1.0 - fx) + at(y, x + 1)? * fx;
+    let north = at(y + 1, x)? * (1.0 - fx) + at(y + 1, x + 1)? * fx;
+    Some(south * (1.0 - fy) + north * fy)
+}
+
+fn terrain_sample(runtime: &RuntimeEnvironmentProjection, position: Vec3) -> Option<f64> {
+    let grid = &runtime.terrain.grid;
+    let (lon, lat) = local_to_geographic(Vec3 { z: 0.0, ..position }, &runtime.anchor);
+    terrain_sample_at_geographic(grid, lon, lat)
+}
+
+fn terrain_sample_at_geographic(grid: &RuntimeTerrainGrid, lon: f64, lat: f64) -> Option<f64> {
+    let (x, fx) = axis(lon, grid.west_deg, grid.longitude_step_deg, grid.columns)?;
+    let (y, fy) = axis(lat, grid.south_deg, grid.latitude_step_deg, grid.rows)?;
+    let at = |row: usize, column: usize| {
+        grid.surface_elevation_msl_m
+            .get(row * grid.columns + column)
+            .copied()
+    };
+    let south = at(y, x)? * (1.0 - fx) + at(y, x + 1)? * fx;
+    let north = at(y + 1, x)? * (1.0 - fx) + at(y + 1, x + 1)? * fx;
+    Some(south * (1.0 - fy) + north * fy)
+}
+
+fn environment_sample(scenario: &EngineScenario, position: Vec3, time: f64) -> (f64, f64, Vec3) {
+    let Some(runtime) = scenario.environment.runtime_environment.as_ref() else {
+        let (density, sound) = atmosphere(position.z, scenario.environment.temperature_offset_c);
+        return (density, sound, scenario.environment.wind_mps);
+    };
+    let grid = &runtime.atmosphere.grid;
+    let (lon, lat) = local_to_geographic(Vec3 { z: 0.0, ..position }, &runtime.anchor);
+    let Some((x, fx)) = axis(lon, grid.west_deg, grid.longitude_step_deg, grid.columns) else {
+        return (f64::NAN, f64::NAN, Vec3::default());
+    };
+    let Some((y, fy)) = axis(lat, grid.south_deg, grid.latitude_step_deg, grid.rows) else {
+        return (f64::NAN, f64::NAN, Vec3::default());
+    };
+    let coordinate = time / grid.interval_seconds;
+    if time < 0.0 || coordinate > grid.sample_count as f64 - 1.0 || grid.sample_count < 2 {
+        return (
+            f64::NAN,
+            f64::NAN,
+            Vec3 {
+                x: f64::NAN,
+                y: f64::NAN,
+                z: 0.0,
+            },
+        );
+    }
+    let lower = (coordinate.floor() as usize).min(grid.sample_count - 2);
+    let fraction = coordinate - lower as f64;
+    let temporal = |values: &[f64]| -> Option<f64> {
+        Some(
+            bilinear_at_axes(values, grid, x, fx, y, fy, lower)? * (1.0 - fraction)
+                + bilinear_at_axes(values, grid, x, fx, y, fy, lower + 1)? * fraction,
+        )
+    };
+    let Some(surface_temperature_c) = temporal(&grid.temperature_c) else {
+        return (f64::NAN, f64::NAN, Vec3::default());
+    };
+    let Some(surface_pressure_kpa) = temporal(&grid.surface_pressure_kpa) else {
+        return (f64::NAN, f64::NAN, Vec3::default());
+    };
+    let Some(humidity) = temporal(&grid.relative_humidity_percent) else {
+        return (f64::NAN, f64::NAN, Vec3::default());
+    };
+    let terrain = terrain_sample_at_geographic(&runtime.terrain.grid, lon, lat).unwrap_or(f64::NAN);
+    let surface_temperature_k =
+        surface_temperature_c + runtime.authored_modifiers.temperature_offset_c + 273.15;
+    let temperature_k = surface_temperature_k - 0.0065 * (position.z - terrain);
+    let pressure_kpa = surface_pressure_kpa
+        * (temperature_k / surface_temperature_k).powf(9.80665 / (287.05 * 0.0065));
+    let temperature_c = temperature_k - 273.15;
+    let saturation = 0.61094 * (17.625 * temperature_c / (temperature_c + 243.04)).exp();
+    let vapour = pressure_kpa.min(saturation * humidity / 100.0);
+    let density = ((pressure_kpa - vapour) * 1000.0) / (287.05 * temperature_k)
+        + (vapour * 1000.0) / (461.495 * temperature_k);
+    let sound = (1.4 * 287.05 * temperature_k).sqrt();
+    let east = temporal(&grid.wind_east_mps).unwrap_or(f64::NAN)
+        + runtime.authored_modifiers.wind_east_mps;
+    let north = temporal(&grid.wind_north_mps).unwrap_or(f64::NAN)
+        + runtime.authored_modifiers.wind_north_mps;
+    (
+        density,
+        sound,
+        Vec3 {
+            x: east,
+            y: north,
+            z: 0.0,
+        },
+    )
+}
+
+fn terrain_elevation(scenario: &EngineScenario, position: Vec3) -> f64 {
     scenario
-        .events
-        .iter()
-        .fold(scenario.environment.wind_mps, |wind, event| {
-            if event.event_type == EngineEventType::WindShift
-                && time >= event.start_seconds
-                && time < event.start_seconds + event.duration_seconds
-            {
-                wind.add(event.vector_mps)
-            } else {
-                wind
-            }
-        })
+        .environment
+        .runtime_environment
+        .as_ref()
+        .and_then(|runtime| terrain_sample(runtime, position))
+        .unwrap_or(0.0)
+}
+
+fn active_wind(scenario: &EngineScenario, time: f64, base: Vec3) -> Vec3 {
+    scenario.events.iter().fold(base, |wind, event| {
+        if event.event_type == EngineEventType::WindShift
+            && time >= event.start_seconds
+            && time < event.start_seconds + event.duration_seconds
+        {
+            wind.add(event.vector_mps)
+        } else {
+            wind
+        }
+    })
 }
 
 fn update_aircraft(
@@ -1591,11 +1812,10 @@ fn update_aircraft(
     }
     let accepted_steering = requested_steering.clamp_magnitude(model.maximum_command_g * G0);
     let steering_limited = requested_steering.magnitude() > accepted_steering.magnitude() + 1e-9;
-    let (density, speed_of_sound) =
-        atmosphere(state.position.z, scenario.environment.temperature_offset_c);
+    let (density, speed_of_sound, base_wind) = environment_sample(scenario, state.position, time);
     let airspeed = state
         .velocity
-        .subtract(active_wind(scenario, time))
+        .subtract(active_wind(scenario, time, base_wind))
         .magnitude()
         .max(1.0);
     let longitudinal_acceleration = {
@@ -1785,8 +2005,8 @@ fn update_weapon(
     let los_rate_vector = relative_position
         .cross(relative_velocity)
         .scale(1.0 / (separation * separation));
-    let (density, _) = atmosphere(state.position.z, scenario.environment.temperature_offset_c);
-    let wind = active_wind(scenario, time);
+    let (density, _, base_wind) = environment_sample(scenario, state.position, time);
+    let wind = active_wind(scenario, time, base_wind);
     let air_relative = state.velocity.subtract(wind);
     let airspeed = air_relative.magnitude().max(1.0);
     let direction = state.velocity.normalize();
@@ -1872,7 +2092,13 @@ fn update_weapon(
         .add(guidance);
     state.velocity = state.velocity.add(acceleration.scale(dt));
     state.position = state.position.add(state.velocity.scale(dt));
-    state.position.z = state.position.z.max(0.0);
+    let terrain = scenario
+        .environment
+        .runtime_environment
+        .as_ref()
+        .and_then(|runtime| terrain_sample(runtime, state.position))
+        .unwrap_or(0.0);
+    state.position.z = state.position.z.max(terrain);
     state.heading_rad = state.velocity.y.atan2(state.velocity.x);
     state.commanded_g = guidance.magnitude() / G0;
     state.available_g = weapon.maximum_command_g;
@@ -1895,10 +2121,9 @@ fn update_weapon(
     });
 }
 
-fn entity_frame(state: &RuntimeState, scenario: &EngineScenario) -> EntityFrame {
+fn entity_frame(state: &RuntimeState, scenario: &EngineScenario, time: f64) -> EntityFrame {
     let speed = state.velocity.magnitude();
-    let (_, speed_of_sound) =
-        atmosphere(state.position.z, scenario.environment.temperature_offset_c);
+    let (_, speed_of_sound, _) = environment_sample(scenario, state.position, time);
     EntityFrame {
         id: state.definition.id.clone(),
         rddf_id: state.definition.rddf_id.clone(),
@@ -1946,7 +2171,7 @@ fn sampled_engine_frame(
         entities: states
             .iter()
             .filter(|state| state.lifecycle != EntityLifecycle::Stowed)
-            .map(|state| entity_frame(state, scenario))
+            .map(|state| entity_frame(state, scenario, time))
             .collect(),
         primary_weapon_id: weapon_id.to_string(),
         primary_target_id: target_id.to_string(),
@@ -2230,7 +2455,9 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             };
             let since_launch = time - weapon.launch_time_seconds.unwrap_or(0.0);
             if (since_launch > weapon.burn_seconds + 2.0 && speed < 80.0 && separation > 1000.0)
-                || (states[weapon_index].position.z <= 0.0 && time > 1.0)
+                || (states[weapon_index].position.z
+                    <= terrain_elevation(&scenario, states[weapon_index].position)
+                    && time > 1.0)
             {
                 termination = Termination::EnergyDepleted;
                 completed_this_tick = true;
@@ -2331,7 +2558,9 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             if (since_launch > weapon.burn_seconds + 2.0
                 && speed < 80.0
                 && post_separation > 1000.0)
-                || (states[weapon_index].position.z <= 0.0 && next_time > 1.0)
+                || (states[weapon_index].position.z
+                    <= terrain_elevation(&scenario, states[weapon_index].position)
+                    && next_time > 1.0)
             {
                 termination = Termination::EnergyDepleted;
                 completed_this_tick = true;
@@ -2660,6 +2889,7 @@ mod tests {
                     version: "1.0.0".to_string(),
                     digest: format!("sha256:{}", "a".repeat(64)),
                 },
+                runtime_environment: None,
                 study_area: StudyArea {
                     id: "test-area".to_string(),
                     name: "Test area".to_string(),

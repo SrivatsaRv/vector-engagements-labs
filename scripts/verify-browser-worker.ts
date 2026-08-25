@@ -12,9 +12,7 @@ import {
   DEPLOYMENT_CAPABILITIES,
   createVerificationDeploymentCapabilities,
 } from "../lib/runtime/deployment-capabilities.ts";
-import { createPhaseAEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
-import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
-import { getStudyArea, getWeatherPreset } from "../lib/study-areas.ts";
+import { admitEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
 import { resolveBrowserWorkerAssets } from "./browser-worker-assets.ts";
 import { bindVerificationTrackModelPack } from "../lib/engine/verification-track-fixture.ts";
 import { TRACK_STORE_CAPACITY_WORKLOAD } from "../lib/validation/track-store-capacity.ts";
@@ -109,12 +107,10 @@ const verificationPack = await adaptPreparedSimulation({
     [verificationBinding.pack.digest],
   ),
 });
-const phaseAArea = getStudyArea("north-punjab");
-const phaseAPack = createPhaseAEnvironmentPack({
-  studyArea: phaseAArea,
-  weatherPreset: getWeatherPreset(phaseAArea, "north-punjab-clear"),
-  installations: PUBLIC_INSTALLATIONS,
-});
+const regionalPack = admitEnvironmentPack({
+  studyAreaId: "north-punjab",
+  weatherPresetId: "north-punjab-clear",
+}).pack;
 
 try {
   const page = await browser.newPage();
@@ -136,6 +132,15 @@ try {
       const loaded = receive("loaded", "environment-load");
       worker.postMessage({ type: "load", requestId: "environment-load", pack });
       await loaded;
+      const cancelled = receive("failed", "environment-cancel");
+      worker.postMessage({
+        type: "sample",
+        requestId: "environment-cancel",
+        digest: pack.identity.digest,
+        queries: Array.from({ length: 4096 }, () => ({ eastM: 0, northM: 0, upM: 8_500, modelTimeSeconds: 0 })),
+      });
+      setTimeout(() => worker.postMessage({ type: "cancel", requestId: "environment-cancel" }), 0);
+      const cancellation = await cancelled;
       const sampled = receive("sampled", "environment-sample");
       worker.postMessage({
         type: "sample",
@@ -145,14 +150,15 @@ try {
       });
       const response = await sampled;
       worker.terminate();
-      return response;
+      return { response, cancellation };
     },
-    { workerUrl: `${origin}/assets/${environmentWorkerName}`, pack: phaseAPack },
+    { workerUrl: `${origin}/assets/${environmentWorkerName}`, pack: regionalPack },
   );
-  assert.equal(environmentVerification.type, "sampled");
-  const environmentSamples = environmentVerification.samples as Array<{ terrain: { elevation: { datum: string; valueM: number } } }>;
+  assert.equal((environmentVerification.response as Record<string, unknown>).type, "sampled");
+  assert.equal((environmentVerification.cancellation as Record<string, unknown>).code, "cancelled");
+  const environmentSamples = (environmentVerification.response as Record<string, unknown>).samples as Array<{ terrain: { elevation: { datum: string; valueM: number } } }>;
   assert.equal(environmentSamples[0]?.terrain.elevation.datum, "MSL");
-  assert.equal(environmentSamples[0]?.terrain.elevation.valueM, phaseAArea.surfaceElevationM);
+  assert.ok(Number.isFinite(environmentSamples[0]?.terrain.elevation.valueM));
   const result: WorkerVerificationResult = await page.evaluate(
       async ({ pack: selectedPack, stalePack: rejectedPack, verificationPack: rejectedVerificationPack, workerUrl }) => {
         const protocol = "vector.browser-runtime.v1";

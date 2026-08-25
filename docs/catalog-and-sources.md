@@ -94,6 +94,10 @@ The S-200 template is a historical public-reference case and does not claim curr
 
 ## Template-to-report version chain
 
+The chain now preserves PostGIS-authenticated environment-pack and runway
+identities through authored draft, compiler, runtime, VSR and report. A later
+catalogue version cannot change an archived result.
+
 1. A template is stored under immutable `(id, version)` identity with `vector.scenario.v4`, intended-use identity, compiled model-pack identity/digest, exact authored Air mission when applicable, engine version, canonical JSON package, study-area identity, weather-preset identity, and SHA-256 content hash.
 2. `/api/catalog` returns that exact package. The browser recomputes the hash before allowing a run.
 3. Construct edits produce a draft revision derived from the loaded package without mutating the template row.
@@ -113,13 +117,16 @@ No missing value may be silently promoted to sourced truth.
 
 ## Synthetic-environment identity
 
-Catalog object identity remains separate from the run's synthetic-environment
-identity. Compilation freezes transform, geoid, terrain, weather, atmosphere,
+Catalog object identity remains separate from the run's environment identity.
+Compilation freezes transform, geoid, terrain, weather, atmosphere,
 study-area, route, installation and airspace dataset versions/digests in
-`vector.synthetic-environment.v1`. The current reference terrain and zero-geoid
-fixtures are `MODEL_ASSUMPTION`; they do not upgrade PostGIS installation points
-or public-source assertions. A future production terrain/geoid ingest publishes
-new content identities rather than mutating a saved run.
+`vector.synthetic-environment.v1` and embeds the complete regional
+`vector.environment-pack.v1` content version `2.0.0`. ETOPO terrain, NASA POWER
+surface fields and OurAirports runway records remain separately sourced;
+derived atmosphere and runway/DEM reconciliation retain their own provenance.
+The deterministic zero-geoid conversion is still a visible `MODEL_ASSUMPTION`.
+Any source, preprocessing or policy change publishes a new content identity
+rather than mutating a PostGIS row or saved run.
 
 The committed NASA POWER point snapshots in
 `governance/environment-sources/nasa-power-hourly-20200115` are separately
@@ -151,14 +158,17 @@ Installation and study-area table definitions are owned by
 `db/schema/geospatial.ts`; this module split does not change their PostGIS
 columns, constraints, or catalog identities.
 
-Phase A publishes `vector.environment-pack.v1` with the exact
-`vector.installation-catalogue.v1` ID/version/digest, the per-record source and
-WGS84 provenance, and an explicit `BOUNDED_PUBLIC_REFERENCE_FIXTURE` coverage
-identity. Its included record count is the maintained fixture count, with known
-gaps and an explicit `TEXT_ONLY_OR_ABSENT` runway-evidence state. It must never
-be rendered or validated as a complete IAF/PAF base catalogue. PostGIS remains
-the canonical geometry source for published points; the Phase A pack binds the
-same immutable coverage identity required by future ground-start admission.
+Regional packs bind exact `vector.installation-catalogue.v2@2.0.0` identity,
+per-record source/WGS84 provenance and an explicit
+`BOUNDED_PUBLIC_REFERENCE_FIXTURE` coverage identity. The declared fixture is
+21 installation points (6 IAF, 15 PAF), 24 sourced runway rows and 12 runways
+eligible by evidence completeness. Known gaps prohibit presenting that set as
+all IAF/PAF bases or current operational status. PostGIS is the published
+geometry authority; catalog admission compares every point, runway and pack
+row to immutable governed artifacts. Only a selected runway with geometry,
+threshold elevation, dimensions, surface and admitted coverage can become
+`vector.installation-origin.v2`; unsupported points remain
+airborne-placement-only.
 
 ## Generic sensor verification source freeze
 

@@ -136,9 +136,11 @@ describe("SpatialEntityEditor", () => {
     const installationEntity: ScenarioSpatialEntity = {
       ...initialEntity,
       originReference: {
-        schemaVersion: "vector.installation-origin.v1",
+        schemaVersion: "vector.installation-origin.v2",
         installationId: "pathankot-afs",
         sourceId: "public-reference:iaf-installations-v1",
+        startKind: "RUNWAY",
+        runwayId: "runway:test",
         environment: {
           studyAreaId: area.id,
           weatherPresetId: area.defaultWeatherPresetId,

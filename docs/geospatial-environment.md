@@ -1,7 +1,8 @@
-# Geospatial and synthetic-environment contract
+# Geospatial and executable-environment contract
 
-Status: versioned foundation implemented. This is an educational synthetic
-environment, not an operational-precision terrain installation.
+Status: regional EnvironmentPack v2 implemented for public-educational use.
+It is sourced and executable, but is not operational weather, a navigation
+dataset, or a claim about current installation status.
 
 The six public-educational study-area records are governed catalog data. A
 forward-only migration upserts their EPSG:4326 anchors/bounds and versioned
@@ -18,6 +19,10 @@ allowed only when an operator explicitly creates or changes a draft; they are
 not error recovery for stale or imported identities.
 
 ## Coordinate authority
+
+Regional sampling resolves WGS84 longitude/latitude from the declared local ENU
+anchor and retains EGM2008 source heights as an explicit MSL runtime boundary;
+datum disagreement is never silently coerced.
 
 VECTOR uses the WGS84 ellipsoid (`EPSG:7030`) and the transform contract
 `vector.wgs84-ecef-local.v1`:
@@ -53,15 +58,22 @@ Every new geographic altitude is `{ valueM, datum }`, where datum is
   MSL ground sample.
 - A datum mismatch throws; there is no unit- or label-based inference.
 
-Configured `vector.scenario.v2` authoring is explicitly MSL. The current
-foundation uses `vector.synthetic-zero-geoid@1.0.0` as a deterministic
-educational operation, not as a claim that geoid undulation is zero in the real
-study areas. Legacy v2 saved inputs documented as ASL are admitted only by a
-boundary compatibility adapter that writes `MSL`; any declared non-MSL value is
-rejected. A production geoid grid must be introduced as a new content-addressed
-dataset and operation version.
+Configured `vector.scenario.v4` authoring is explicitly MSL. Regional terrain
+admits ETOPO's EGM2008 orthometric elevations as the pack's declared MSL
+reference, with that conversion policy and limitation frozen in the source
+manifest. Runtime coordinates use scenario-origin ENU east/north with an
+explicit metres-MSL vertical component; recording performs the inverse
+horizontal solve and retains that MSL value. The separately versioned
+`vector.synthetic-zero-geoid@1.0.0` operation remains only for the current
+ellipsoid/MSL display conversion and is not a claim that real geoid undulation
+is zero. A non-zero production geoid grid requires a new content-addressed
+dataset and operation version; undeclared datum changes fail closed.
 
 ## Synthetic-environment manifest
+
+The manifest now includes the complete regional EnvironmentPack and exact
+terrain, atmosphere and installation/runway catalogue digests. The historical
+synthetic identities remain only for replay compatibility.
 
 Every compiled run carries `vector.synthetic-environment.v1`, including:
 
@@ -90,14 +102,75 @@ cache, expiry, size, and failure bounds.
 
 Weather uses a versioned ENU vector-field interface sampled by geographic
 position and model time. Atmosphere uses a separate versioned field interface.
-The current point-mass adapter samples scenario-local up relative to the
-ellipsoid-datum origin, matching the implemented engine; it does not mislabel
-that tangent-plane coordinate as MSL or AGL. The current adapters are spatially
-uniform presets and the educational standard atmosphere. The interfaces permit
-later explicit-datum geographic fields and bounded grids without changing
-entity contracts.
+The current regional point-mass adapter samples the frozen horizontal grids and
+an explicit metres-MSL vertical coordinate; it derives AGL only from the same
+admitted DEM. Spatially uniform presets and the educational standard atmosphere
+remain Phase A replay compatibility paths and cannot silently replace a missing
+regional grid.
+
+## Regional executable EnvironmentPack v2
+
+Every governed study-area/weather selection now admits one immutable
+`vector.environment-pack.v1` artifact at content version `2.0.0`. The offline
+source boundary is `governance/environment-sources/regional-environment-v1`:
+
+- NOAA ETOPO 2022 v1 15 arc-second relief, public-domain US-government data,
+  WGS84 horizontal coordinates and EGM2008 orthometric heights, preprocessed
+  into bounded 0.1-degree regular grids. Runtime declares those heights as the
+  pack MSL reference; use for navigation is prohibited.
+- NASA POWER hourly surface analysis, NASA CC0, WGS84/UTC, frozen as 3x3 grids
+  with 24 samples for every governed weather identity. Temperature, pressure,
+  relative humidity and 10 m ENU wind are sourced; the vertical atmosphere is
+  explicitly derived with a bounded hypsometric standard-lapse method from
+  -500 through 20,000 m MSL.
+- OurAirports at exact Git revision
+  `7d6886315f6c249b3818930030871d9329cc3445`, Unlicense/public domain, supplies
+  available runway endpoints, dimensions, headings, surface and reported
+  elevations. It does not establish present operation, fitness or occupancy.
+
+The manifest binds all 114 exact raw artifacts, provider URLs, retrieval date,
+licence decisions, datums, source resolution, preprocessing, no-data policy,
+uncertainty/limitations, and the normalized bundle digest. Normal CI is
+offline; `--refresh-regional` is the explicit maintainer action and requires
+the exact admitted OurAirports checkout.
+
+Worker, TypeScript and Rust/WASM consumers implement the same WGS84 ENU-to-grid
+horizontal transform and explicit metres-MSL runtime vertical axis. Recorded
+positions invert that hybrid coordinate contract against the exact scenario
+origin, preserving WGS84 longitude/latitude and the runtime MSL altitude.
+They also share bilinear spatial interpolation, linear hourly interpolation,
+and moist-air density and speed-of-sound derivation. The compiler copies a bounded
+runtime projection into the engine input, so ticks read no database, network or
+provider response. Source wind and atmosphere affect aircraft and weapon
+dynamics. The same terrain grid supplies MSL ground, AGL, initial/route
+below-terrain rejection, guided-vehicle collision and geometric LOS. Missing,
+outside-coverage/time/altitude, corrupt or stale identities fail closed.
+
+`vector.installation-catalogue.v2` retains the bounded 6 IAF / 15 PAF public
+fixture and adds 24 sourced runway records. Twelve contain the minimum
+public-educational geometry/elevation evidence. That count is evidence
+completeness, never an operational-status claim. `vector.installation-origin.v2`
+requires a specific eligible runway; unsupported installation points are
+labelled airborne-placement-only and cannot become a base spawn. Manual
+airborne placement has no installation identity. At compilation the sourced
+runway threshold is compared with the sampled DEM. The higher elevation plus
+0.01 m is used only when disagreement is at most 30 m; this reconciliation is
+declared as `MODEL_ASSUMPTION`, and a larger conflict fails admission.
+
+Forward migration `014_environment_pack_runways.sql` adds immutable PostGIS
+environment-pack rows and sourced runway geometry. Seed and catalog admission
+verify pack, terrain, atmosphere, installation-catalogue and per-runway content
+digests. It also replaces the v4 scenario cards and Air-mission validity limits
+with exact sourced EnvironmentPack wording and canonical content hashes;
+`environment:migration:verify` rejects generated SQL drift. A content change is
+a new version; a trigger prohibits mutating archived pack content. VSR embeds
+the full admitted pack, so a deleted or superseded current catalogue cannot
+alter replay. API, map, 3D and report show the same pack digest, time and datum.
 
 ## Phase A executable EnvironmentPack
+
+This section documents the retained historical v1 compatibility contract; the
+regional v2 path above is the current executable authority.
 
 The installation and study-area persistence declarations live in
 `db/schema/geospatial.ts` behind the unchanged aggregate Drizzle facade.
@@ -131,16 +204,15 @@ weather can be admitted.
 
 The bounded EnvironmentSampler materializes a pack wholly in the browser
 Worker. It accepts only finite local coordinates and model time, rejects a
-request over the pack maximum, supports cancellation at batch boundaries, and
+request over the pack maximum, supports cancellation between bounded scheduling chunks, and
 does not access a network, database, or map tile during sampling. The dedicated
 `environment-sampler.worker.ts` caches at most four packs and rejects a missing
-or malformed pack. The current engine continues to use its existing compiled
-atmosphere adapter; #64 will bind the admitted pack to ground and route
-admission and runtime sampling.
+or malformed pack. The regional v2 engine path supersedes this historical
+synthetic runtime authority while retaining Phase A replay compatibility.
 
 Installation coverage is separately declared as
 `BOUNDED_PUBLIC_REFERENCE_FIXTURE` and binds
-`vector.installation-catalogue.v1` by ID/version/SHA-256 digest. The manifest
+historical `vector.installation-catalogue.v1` by ID/version/SHA-256 digest. The manifest
 contains record count, sources/license state, known gaps, validity/review state,
 and per-installation WGS84 datum, positional-uncertainty state, and provenance.
 The current 21 public-reference points are not all IAF or PAF bases. The API
@@ -150,7 +222,7 @@ is text-only or absent; therefore no Phase A installation is eligible to prove a
 ground/runway start. A future
 runway record must include the required geometry, MSL elevation, datum,
 provenance, uncertainty, and mission-start evidence before it can be offered.
-An `vector.installation-origin.v1` airborne reference may identify a selected
+The historical `vector.installation-origin.v1` airborne reference could identify a selected
 public installation, its source and the selected environment, but it cannot
 assert runway use. Compilation resolves it against the governed catalog and
 rejects missing, stale, out-of-area, cross-environment and runway identities;
@@ -161,7 +233,8 @@ which is retained in the VSR and report provenance.
 
 ## Phase B source-ingestion admission boundary
 
-The first Phase B slice commits a small, lawful offline source artifact under
+Before the regional v2 bundle, the first source-admission slice committed a
+small, lawful offline source artifact under
 [`governance/environment-sources/nasa-power-hourly-20200115`](../governance/environment-sources/nasa-power-hourly-20200115).
 It contains two exact NASA POWER Hourly Point API responses for the governed
 North Punjab and Ladakh anchors, for 2020-01-15 UTC. NASA Earthdata's data-use
@@ -178,17 +251,21 @@ mismatch, no-data fill value, invalid datum declaration, and incomplete hourly
 parameter series. The committed verifier runs in `make ci-local`; sampling
 and verification use no network, database, map tile, or simulation tick path.
 
-This is an ingestion and integrity proof only. The source is explicitly
+That precursor remains an ingestion and integrity proof only. The source is explicitly
 `POINT_ONLY` and `INELIGIBLE` for area-environment admission. It is not
-connected to the current Phase A pack or its runtime sampler. It supplies no
+connected to the executable regional pack or its runtime sampler. It supplies no
 terrain, geoid, runway, atmospheric profile, area weather field, ground start,
 terrain collision, or terrain masking. An attempted area-pack use throws
 rather than interpolating or promoting two anchor observations to regional
 truth. A later immutable source version must add licensed, bounded
 area-covering datasets and the required datum/uncertainty evidence before it
-can replace any Phase A assumption.
+can replace any regional source identity.
 
 ## Terrain and geometric line of sight
+
+Regional AGL, below-terrain admission, impact and geometric LOS all call the
+same admitted ETOPO grid sampler. Raising a synthetic ridge changes collision
+and LOS, while detection probability remains outside this contract.
 
 `TerrainSampler` is a local interface with content identity, declared rectangular
 coverage and a hard maximum sample count. `geometricLineOfSight`:
@@ -214,6 +291,10 @@ The current map envelopes are `DECLARED`. The LOS fixture results are
 `GEOMETRIC`. No current result is labeled `SENSOR_COMPUTED`.
 
 ## Verification and tolerances
+
+Regional gates cover 114 raw artifacts, independent planar/atmosphere fixtures,
+six-area contrast, no-data/datum/time failures, TS/Rust parity, PostGIS/API
+readback, Worker cancellation/recovery and bounded throughput/memory.
 
 Automated tests cover equator, both poles, the dateline, high altitude,
 study-area edges, invalid/non-finite input rejection, known WGS84

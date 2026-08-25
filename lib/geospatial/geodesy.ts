@@ -173,6 +173,44 @@ export function localFrameToGeographic(
   return ecefToGeodetic(localToEcef(position, origin));
 }
 
+/**
+ * Prepare the invariant WGS84 origin terms once for a high-volume local-frame
+ * sampler. The returned conversion is numerically identical to
+ * `localFrameToGeographic`; only repeated origin ECEF/trigonometry work is
+ * removed.
+ */
+export function createLocalFrameToGeographic(origin: ScenarioOrigin) {
+  const originEcef = geodeticToEcef(origin.geographic);
+  const longitude = origin.geographic.longitudeDeg * DEG_TO_RAD;
+  const latitude = origin.geographic.latitudeDeg * DEG_TO_RAD;
+  const sinLongitude = Math.sin(longitude);
+  const cosLongitude = Math.cos(longitude);
+  const sinLatitude = Math.sin(latitude);
+  const cosLatitude = Math.cos(latitude);
+  return (position: LocalPosition) => {
+    assertLocal(position);
+    const enu = origin.frame === "ENU"
+      ? position
+      : { x: position.y, y: position.x, z: -position.z };
+    const delta = {
+      xM:
+        -sinLongitude * enu.x
+        - sinLatitude * cosLongitude * enu.y
+        + cosLatitude * cosLongitude * enu.z,
+      yM:
+        cosLongitude * enu.x
+        - sinLatitude * sinLongitude * enu.y
+        + cosLatitude * sinLongitude * enu.z,
+      zM: cosLatitude * enu.y + sinLatitude * enu.z,
+    };
+    return ecefToGeodetic({
+      xM: originEcef.xM + delta.xM,
+      yM: originEcef.yM + delta.yM,
+      zM: originEcef.zM + delta.zM,
+    });
+  };
+}
+
 export function convertLocalFrame(
   position: LocalPosition,
   from: LocalFrame,

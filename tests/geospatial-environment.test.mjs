@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   cameraRelativeThreePosition,
   convertLocalFrame,
+  createLocalFrameToGeographic,
   ecefToGeodetic,
   geographicToLocalFrame,
   geodeticToEcef,
@@ -22,6 +23,7 @@ import {
 import {
   createSyntheticTerrainSampler,
   geometricLineOfSight,
+  terrainCollision,
   sampleTerrainBounded,
 } from "../lib/geospatial/terrain.ts";
 import {
@@ -30,23 +32,30 @@ import {
 } from "../lib/geospatial/synthetic-environment.ts";
 import {
   PHASE_A_INSTALLATION_GAPS,
+  admitEnvironmentPack,
   admitPhaseAEnvironmentPack,
+  assertEnvironmentPack,
+  assertPublishedEnvironmentPackRows,
   assertPhaseAEnvironmentPack,
+  createEnvironmentSampler,
   createPhaseAEnvironmentPack,
   createPhaseAEnvironmentSampler,
+  deriveAtmosphereProfile,
   environmentPackBinding,
+  sampleRegularGridBilinear,
 } from "../lib/geospatial/environment-pack.ts";
 import { INSTALLATION_CATALOGUE_IDENTITY, PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import {
+  geographicToEnginePosition,
   geographicToLocal,
   localToGeographic,
   scenarioOrigin,
 } from "../lib/scenario-spatial.ts";
-import { getStudyArea, getWeatherPreset } from "../lib/study-areas.ts";
+import { getStudyArea, getWeatherPreset, STUDY_AREAS } from "../lib/study-areas.ts";
 import { DEFAULT_SCENARIO, getFrameAt, simulate } from "../lib/simulation.ts";
 import { localToLngLat, recordedLngLat } from "../lib/map-layer-contracts.ts";
 import { buildReportExport } from "../lib/report-export.ts";
-import { getScenarioDefinition } from "../lib/scenarios.ts";
+import { getScenarioDefinition, SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 
 const angularDifference = (left, right) => {
   const difference = Math.abs(left - right) % 360;
@@ -95,6 +104,20 @@ test("WGS84 geodetic and ECEF round trips cover equator, poles, dateline and hig
     assert.ok(Math.abs(roundTrip.altitude.valueM - fixture.altitude.valueM) < 1e-3);
     if (Math.abs(fixture.latitudeDeg) < 89.999) {
       assert.ok(angularDifference(roundTrip.longitudeDeg, fixture.longitudeDeg) < 1e-8);
+    }
+  }
+});
+
+test("prepared local-frame inversion preserves the exact WGS84 conversion", () => {
+  for (const frame of ["ENU", "NED"]) {
+    const fixtureOrigin = origin(73.9, 31.8, 260, frame);
+    const prepared = createLocalFrameToGeographic(fixtureOrigin);
+    for (const point of [
+      { x: 0, y: 0, z: 0 },
+      { x: 12_345.678, y: -9_876.543, z: 1_234.5 },
+      { x: -250_000, y: 175_000, z: -50 },
+    ]) {
+      assert.deepEqual(prepared(point), localFrameToGeographic(point, fixtureOrigin));
     }
   }
 });
@@ -408,6 +431,12 @@ test("bounded terrain sampling handles flat, ridge, no-data and datum mismatch f
   assert.equal(blocked.state, "BLOCKED");
   assert.equal(blocked.visible, false);
   assert.ok(blocked.minimumClearanceM <= 0);
+  const tangent = geometricLineOfSight(createSyntheticTerrainSampler({
+    id: "tangent-ridge",
+    fixture: { kind: "RIDGE", baseElevationMslM: 0, ridgeCenterEastM: 500, ridgeHalfWidthM: 150, ridgeHeightM: 100 },
+  }), request);
+  assert.equal(tangent.state, "BLOCKED");
+  assert.equal(tangent.minimumClearanceM, 0);
 
   const noData = createSyntheticTerrainSampler({
     id: "no-data",
@@ -427,12 +456,23 @@ test("bounded terrain sampling handles flat, ridge, no-data and datum mismatch f
   );
 });
 
+test("raising a synthetic ridge changes collision without changing detection math", () => {
+  const flat = createSyntheticTerrainSampler({ id: "collision-flat", fixture: { kind: "FLAT", elevationMslM: 0 } });
+  const ridge = createSyntheticTerrainSampler({
+    id: "collision-ridge",
+    fixture: { kind: "RIDGE", baseElevationMslM: 0, ridgeCenterEastM: 500, ridgeHalfWidthM: 100, ridgeHeightM: 150 },
+  });
+  const point = { eastM: 500, northM: 0, altitude: { valueM: 100, datum: "MSL" } };
+  assert.deepEqual({ collided: terrainCollision(flat, point).collided, clearanceM: terrainCollision(flat, point).clearanceM }, { collided: false, clearanceM: 100 });
+  assert.deepEqual({ collided: terrainCollision(ridge, point).collided, clearanceM: terrainCollision(ridge, point).clearanceM }, { collided: true, clearanceM: -50 });
+});
+
 test("compiled runs freeze environment identities and record equivalent map/Three positions", () => {
   const result = simulate(DEFAULT_SCENARIO);
   const manifest = result.engineRun.scenario.geospatial.syntheticEnvironment;
   assert.equal(manifest.schemaVersion, "vector.synthetic-environment.v1");
   const environmentPack = result.engineRun.scenario.geospatial.environmentPack;
-  assertPhaseAEnvironmentPack(environmentPack);
+  assertEnvironmentPack(environmentPack);
   assert.deepEqual(environmentPack.content.installationCatalogue, INSTALLATION_CATALOGUE_IDENTITY);
   assert.deepEqual(environmentPack.installationCoverage.catalogue, INSTALLATION_CATALOGUE_IDENTITY);
   assert.deepEqual(
@@ -486,10 +526,12 @@ test("compiled runs freeze environment identities and record equivalent map/Thre
   const geographic = frame.geographicPositions.find(
     (item) => item.entityId === entity.id,
   ).position;
-  const roundTrip = geographicToLocalFrame(
-    geographic,
-    result.engineRun.scenario.geospatial.origin,
-  );
+  const roundTrip = geographicToEnginePosition({
+    longitude: geographic.longitudeDeg,
+    latitude: geographic.latitudeDeg,
+    altitudeM: geographic.altitude.valueM,
+    verticalDatum: "MSL",
+  }, getStudyArea(result.engineRun.scenario.environment.studyArea.id));
   assert.ok(Math.hypot(
     roundTrip.x - entity.position.x,
     roundTrip.y - entity.position.y,
@@ -537,5 +579,173 @@ test("report export carries the exact synthetic environment and recorded geograp
   assert.deepEqual(
     report.telemetry.samples[0].geographicPositions,
     result.frames[0].geographicPositions,
+  );
+});
+
+test("regional packs derive Punjab and Ladakh terrain and atmosphere contrasts from frozen grids, not region-name branches", () => {
+  const input = { effectiveWeather: { temperatureOffsetC: 0, windEastMps: 0, windNorthMps: 0 } };
+  const punjab = admitEnvironmentPack({ ...input, studyAreaId: "north-punjab", weatherPresetId: "north-punjab-clear" }).pack;
+  const ladakh = admitEnvironmentPack({ ...input, studyAreaId: "ladakh-high-altitude", weatherPresetId: "ladakh-cold-clear" }).pack;
+  assertEnvironmentPack(punjab);
+  assertEnvironmentPack(ladakh);
+  assert.equal(punjab.terrain.kind, "SOURCED_REGULAR_GRID");
+  assert.equal(ladakh.terrain.kind, "SOURCED_REGULAR_GRID");
+  assert.equal(punjab.fieldProvenance.terrainElevation.state, "SOURCED_DATASET");
+  assert.equal(punjab.fieldProvenance.airDensity.state, "DERIVED_FROM_DATASET");
+
+  const punjabSample = createEnvironmentSampler(punjab).sample({ eastM: 0, northM: 0, upM: 5_000, modelTimeSeconds: 0 });
+  const ladakhSample = createEnvironmentSampler(ladakh).sample({ eastM: 0, northM: 0, upM: 5_000, modelTimeSeconds: 0 });
+  assert.notEqual(punjabSample.terrain.elevation.valueM, ladakhSample.terrain.elevation.valueM);
+  assert.notEqual(punjabSample.atmosphere.densityKgM3, ladakhSample.atmosphere.densityKgM3);
+  assert.notEqual(punjab.terrain.digest, ladakh.terrain.digest);
+  assert.notEqual(punjab.atmosphere.digest, ladakh.atmosphere.digest);
+});
+
+test("regional admission reuses only exact deeply frozen pack identities", () => {
+  const selection = {
+    studyAreaId: "rajasthan-desert",
+    weatherPresetId: "rajasthan-dust",
+    effectiveWeather: { temperatureOffsetC: 2, windEastMps: 4, windNorthMps: -1 },
+  };
+  const first = admitEnvironmentPack(selection);
+  const repeated = admitEnvironmentPack(structuredClone(selection));
+  assert.strictEqual(repeated, first);
+  assert.strictEqual(repeated.pack, first.pack);
+  assert.ok(Object.isFrozen(first));
+  assert.ok(Object.isFrozen(first.pack));
+  assert.ok(Object.isFrozen(first.pack.content));
+  assert.ok(Object.isFrozen(first.pack.content.terrainGrid.surfaceElevationMslM));
+  assert.throws(
+    () => { first.pack.content.terrainGrid.surfaceElevationMslM[0] += 1; },
+    TypeError,
+  );
+
+  const changed = admitEnvironmentPack({
+    ...selection,
+    effectiveWeather: { ...selection.effectiveWeather, windEastMps: 5 },
+  });
+  assert.notStrictEqual(changed, first);
+  assert.notStrictEqual(changed.pack, first.pack);
+  assert.notEqual(changed.pack.identity.digest, first.pack.identity.digest);
+
+  const sampler = createEnvironmentSampler(first.pack);
+  assert.strictEqual(createEnvironmentSampler(first.pack), sampler);
+  const query = { eastM: 12_345, northM: -7_654, upM: 8_000, modelTimeSeconds: 900 };
+  const initialSample = sampler.sample(query);
+  const repeatedSample = sampler.sample({ ...query });
+  assert.notStrictEqual(repeatedSample, initialSample);
+  assert.strictEqual(repeatedSample.atmosphere, initialSample.atmosphere);
+  assert.strictEqual(repeatedSample.windEnuMps, initialSample.windEnuMps);
+  assert.deepEqual(repeatedSample, initialSample);
+  assert.throws(() => { repeatedSample.atmosphere.densityKgM3 = 0; }, TypeError);
+  const distinctSample = sampler.sample({ ...query, upM: query.upM + 1 });
+  assert.notStrictEqual(distinctSample.atmosphere, initialSample.atmosphere);
+
+  const shallowFrozen = structuredClone(first.pack);
+  Object.freeze(shallowFrozen);
+  createEnvironmentSampler(shallowFrozen);
+  shallowFrozen.content.terrainGrid.surfaceElevationMslM[0] += 1;
+  assert.throws(() => createEnvironmentSampler(shallowFrozen), /digest|source/i);
+});
+
+test("scenario cards and Air mission limits describe the admitted sourced EnvironmentPack", () => {
+  for (const template of SCENARIO_LIBRARY) {
+    assert.match(template.environment, /Sourced regional terrain and atmosphere/);
+    assert.doesNotMatch(template.environment, /no terrain model|Standard atmosphere/i);
+    if (template.scenario.airMission) {
+      assert.ok(
+        template.scenario.airMission.validityLimits.some((limit) =>
+          /exact admitted EnvironmentPack sources, coverage, validity interval, resolution, and uncertainty/.test(limit)
+        ),
+      );
+      assert.ok(
+        template.scenario.airMission.validityLimits.every((limit) => !/synthetic or unavailable/i.test(limit)),
+      );
+    }
+  }
+});
+
+test("published PostGIS environment rows preserve exact identity, coverage, datum, time, and provenance", () => {
+  const rows = STUDY_AREAS.flatMap((area) => area.weatherPresets.map((weather) => {
+    const pack = admitEnvironmentPack({ studyAreaId: area.id, weatherPresetId: weather.id }).pack;
+    return {
+      id: pack.identity.id,
+      version: pack.identity.version,
+      digest: pack.identity.digest,
+      schema_version: pack.schemaVersion,
+      study_area_id: pack.content.studyAreaId,
+      weather_preset_id: pack.content.weather.id,
+      intended_use: pack.intendedUse,
+      provenance: pack.provenance,
+      coverage: pack.coverage.geometry,
+      horizontal_datum: pack.coverage.horizontalDatum,
+      vertical_datum: pack.coverage.verticalDatum,
+      source_vertical_datum: pack.coverage.sourceVerticalDatum,
+      valid_from: new Date(pack.validity.startsAt),
+      valid_until: new Date(pack.validity.endsAt),
+      terrain_digest: pack.terrain.digest,
+      atmosphere_digest: pack.atmosphere.digest,
+      installation_catalogue_digest: pack.installationCoverage.catalogue.digest,
+      superseded_at: null,
+    };
+  }));
+  assert.doesNotThrow(() => assertPublishedEnvironmentPackRows(rows));
+  const changedCoverage = structuredClone(rows);
+  changedCoverage[0].coverage.coordinates[0][0][0] += 0.001;
+  assert.throws(
+    () => assertPublishedEnvironmentPackRows(changedCoverage),
+    /does not match the governed artifact/,
+  );
+});
+
+test("regional terrain and atmosphere numerics match independently hand-calculated fixtures", () => {
+  const planar = sampleRegularGridBilinear(
+    [0, 10, 20, 30],
+    { westDeg: 70, southDeg: 20, longitudeStepDeg: 1, latitudeStepDeg: 1, columns: 2, rows: 2 },
+    70.25,
+    20.5,
+  );
+  assert.equal(planar, 12.5);
+  const seaLevel = deriveAtmosphereProfile({
+    surfaceTemperatureC: 15,
+    surfacePressureKpa: 101.325,
+    relativeHumidityPercent: 0,
+    altitudeMslM: 0,
+    terrainMslM: 0,
+    temperatureOffsetC: 0,
+  });
+  assert.ok(Math.abs(seaLevel.temperatureK - 288.15) < 1e-12);
+  assert.ok(Math.abs(seaLevel.pressureKpa - 101.325) < 1e-12);
+  assert.ok(Math.abs(seaLevel.densityKgM3 - 1.225012) < 1e-5);
+  assert.ok(Math.abs(seaLevel.speedOfSoundMps - 340.2923) < 1e-3);
+});
+
+test("the admitted pack uses one DEM for AGL, collision and geometric LOS and fails closed outside coverage/time", () => {
+  const pack = admitEnvironmentPack({
+    studyAreaId: "ladakh-high-altitude",
+    weatherPresetId: "ladakh-cold-clear",
+    effectiveWeather: { temperatureOffsetC: 0, windEastMps: 0, windNorthMps: 0 },
+  }).pack;
+  const sampler = createEnvironmentSampler(pack);
+  const centre = sampler.sample({ eastM: 0, northM: 0, upM: 8_000, modelTimeSeconds: 0 });
+  assert.equal(centre.terrainDataset.digest, pack.terrain.digest);
+  assert.equal(centre.aglM, 8_000 - centre.terrain.elevation.valueM);
+
+  const clear = geometricLineOfSight(sampler.terrain, {
+    observer: { eastM: -20_000, northM: 0, altitude: { valueM: 9_000, datum: "MSL" } },
+    target: { eastM: 20_000, northM: 0, altitude: { valueM: 9_000, datum: "MSL" } },
+    sampleSpacingM: 1_000,
+    maximumSamples: 128,
+  });
+  assert.equal(clear.terrainDataset.digest, pack.terrain.digest);
+  assert.equal(clear.state, "CLEAR");
+
+  assert.throws(
+    () => sampler.sample({ eastM: 10_000_000, northM: 0, upM: 8_000, modelTimeSeconds: 0 }),
+    /coverage|no-data/i,
+  );
+  assert.throws(
+    () => sampler.sample({ eastM: 0, northM: 0, upM: 8_000, modelTimeSeconds: 86_400 }),
+    /validity|time/i,
   );
 });

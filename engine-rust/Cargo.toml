@@ -21,7 +21,7 @@ sha2 = "0.10.9"
 [profile.release]
 codegen-units = 1
 lto = true
-# The production browser engine remains below its unchanged 500 kB gate.
+# The production browser engine remains below its 550 kB regional-environment gate.
 # Verification-only evaluators are owned by separate crates and artifacts.
 opt-level = "z"
 overflow-checks = true

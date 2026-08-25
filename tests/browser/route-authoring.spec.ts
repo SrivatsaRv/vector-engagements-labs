@@ -6,6 +6,7 @@ import { SCENARIO_PACKAGE_SCHEMA_VERSION } from "../../lib/scenario-package";
 import { SCENARIO_LIBRARY } from "../../lib/scenarios";
 import { STUDY_AREAS } from "../../lib/study-areas";
 import { WEAPON_SIMULATION_MODELS } from "../../lib/simulation-models";
+import { admitEnvironmentPack } from "../../lib/geospatial/environment-pack";
 
 async function catalogFixture() {
   const definition = SCENARIO_LIBRARY.find(
@@ -37,19 +38,64 @@ async function catalogFixture() {
       validity: INSTALLATION_CATALOGUE.validity,
       review: INSTALLATION_CATALOGUE.review,
       records: INSTALLATION_CATALOGUE.records,
+      runways: INSTALLATION_CATALOGUE.runways,
     },
-    installations: PUBLIC_INSTALLATIONS.map((item) => ({
-      id: item.id,
-      service: item.service,
-      name: item.name,
-      icao_code: item.icaoCode,
-      elevation_ft: item.elevationFt,
-      runway_info: item.runwayInfo,
-      installation_type: item.type,
-      longitude: item.longitude,
-      latitude: item.latitude,
-      public_reference: true,
-      source_id: item.sourceId,
+    installations: PUBLIC_INSTALLATIONS.map((item) => {
+      const governed = INSTALLATION_CATALOGUE.records.find((record) => record.id === item.id)!;
+      const eligibleRunway = governed.runwayIds
+        .map((id) => INSTALLATION_CATALOGUE.runways.find((runway) => runway.id === id))
+        .find((runway) => runway?.missionStartEligibility === "PUBLIC_EDUCATIONAL");
+      return {
+        id: item.id,
+        service: item.service,
+        name: item.name,
+        icao_code: item.icaoCode,
+        elevation_ft: item.elevationFt,
+        runway_info: item.runwayInfo,
+        installation_type: item.type,
+        longitude: item.longitude,
+        latitude: item.latitude,
+        public_reference: true,
+        source_id: item.sourceId,
+        ground_start_supported: Boolean(eligibleRunway),
+        ground_start_runway_id: eligibleRunway?.id ?? null,
+      };
+    }),
+    runways: INSTALLATION_CATALOGUE.runways.map((runway) => ({
+      id: runway.id,
+      installation_id: runway.installationId,
+      source_runway_id: runway.sourceRunwayId,
+      source_airport_ident: runway.sourceAirportIdent,
+      designator: runway.designator,
+      true_heading_deg: runway.trueHeadingDeg,
+      reciprocal_true_heading_deg: runway.reciprocalTrueHeadingDeg,
+      length_m: runway.lengthM,
+      width_m: runway.widthM,
+      surface: runway.surface,
+      closed_in_source: runway.closedInSource,
+      centreline: runway.centreline,
+      threshold_elevations_msl_m: runway.thresholdElevationsMslM,
+      horizontal_datum: runway.horizontalDatum,
+      vertical_datum: runway.verticalDatum,
+      positional_uncertainty_m: runway.positionalUncertaintyM,
+      provenance: runway.provenance,
+      review_state: runway.reviewState,
+      mission_start_eligibility: runway.missionStartEligibility,
+      limitation: runway.limitation,
+    })),
+    environmentPacks: STUDY_AREAS.flatMap((area) => area.weatherPresets.map((weather) => {
+      const pack = admitEnvironmentPack({ studyAreaId: area.id, weatherPresetId: weather.id }).pack;
+      return {
+        id: pack.identity.id,
+        version: pack.identity.version,
+        digest: pack.identity.digest,
+        study_area_id: area.id,
+        weather_preset_id: weather.id,
+        terrain_digest: pack.terrain.digest,
+        atmosphere_digest: pack.atmosphere.digest,
+        valid_from: pack.validity.startsAt,
+        valid_until: pack.validity.endsAt,
+      };
     })),
     simulationModels: WEAPON_SIMULATION_MODELS.map((model) => ({
       id: model.id,
@@ -117,8 +163,8 @@ test("shared transient controls hand off once and remain accessible, contained, 
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const catalog = await catalogFixture();
-  const longLabel = "Pathankot Air Force Station — public-reference catalogue identity with an intentionally long responsive label";
-  const longLabelInstallation = catalog.installations.find((item) => item.id === "iaf-pathankot");
+  const longLabel = "Jodhpur Air Force Station — public-reference catalogue identity with an intentionally long responsive label";
+  const longLabelInstallation = catalog.installations.find((item) => item.id === "iaf-jodhpur");
   if (longLabelInstallation) longLabelInstallation.name = longLabel;
   await page.route("**/api/catalog", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
@@ -146,6 +192,7 @@ test("shared transient controls hand off once and remain accessible, contained, 
 
   if (compact) await page.getByRole("button", { name: /Next: Place & flight/i }).click();
   else await page.getByRole("button", { name: /^3 Place & flight$/i }).click();
+  await page.getByRole("button", { name: /Rajasthan desert/i }).click();
   const blueOrigin = page.getByRole("combobox", { name: /Blue origin:/i });
   const redOrigin = page.getByRole("combobox", { name: /Red origin:/i });
   const touchClient = ["phone-390", "tablet-768"].includes(testInfo.project.name)
@@ -353,18 +400,23 @@ test("a current deployment manifest drives the real Worker run after route recov
     await page.getByRole("button", { name: /Place & flight/i }).click();
   }
 
+  const showContextChoices = page.getByRole("button", { name: "Show context choices" });
+  if (await showContextChoices.isVisible()) await showContextChoices.click();
+  await page.getByRole("button", { name: /Rajasthan Desert/i }).click();
+  await page.getByRole("button", { name: /Dusty crosswind/i }).click();
+
   // A selected installation is a compiled identity, not a decorative marker.
   // The governed shared select exposes the affiliation-scoped choices; the
   // option is intentionally absent while its transient listbox remains closed.
   const blueOriginPicker = page.getByRole("combobox", { name: /Blue origin/i });
-  await expect(page.getByText(/base available in this public-reference environment pack/i)).toBeVisible();
+  await expect(page.getByText(/bases available in this environment pack/i)).toBeVisible();
   await expect(page.getByText(/not a complete IAF or PAF catalogue/i)).toBeVisible();
   await blueOriginPicker.click();
   await expect(blueOriginPicker).toHaveAttribute("aria-expanded", "true");
-  await page.getByRole("option", { name: "Pathankot AFS", exact: true }).click();
+  await page.getByRole("option", { name: "Jodhpur AFS", exact: true }).click();
   const originState = page.locator(".origin-reference-state");
   await expect(originState).toContainText("Installation origin selected");
-  await expect(originState).toContainText("iaf-pathankot · source iaf-stations-wikipedia");
+  await expect(originState).toContainText("iaf-jodhpur · source iaf-stations-wikipedia");
   // This fixture deliberately aborts the tile proxy. MapLibre markers only
   // exist after style load. Either prove the resolved marker or the truthful
   // loading state; never claim a marker exists while the surface is loading.
@@ -382,8 +434,8 @@ test("a current deployment manifest drives the real Worker run after route recov
   const airborneStart = page.getByRole("group", { name: "Airborne start" });
   const longitude = airborneStart.getByRole("textbox", { name: "Longitude" });
   const latitude = airborneStart.getByRole("textbox", { name: "Latitude" });
-  await expect(longitude).toHaveValue("75.633227");
-  await expect(latitude).toHaveValue("32.236929");
+  await expect(longitude).toHaveValue("73.048056");
+  await expect(latitude).toHaveValue("26.251389");
 
   // A numeric horizontal edit must visibly change the authoring contract to a
   // manual airborne start before this real-Worker journey can run.
@@ -398,14 +450,18 @@ test("a current deployment manifest drives the real Worker run after route recov
   if ((await blueOriginPicker.getAttribute("aria-expanded")) !== "true") {
     await blueOriginPicker.click();
   }
-  await page.getByRole("option", { name: "Pathankot AFS", exact: true }).click();
+  await page.getByRole("option", { name: "Jodhpur AFS", exact: true }).click();
   const missionStart = page.getByRole("region", { name: "Mission start and recovery" });
   await missionStart.getByRole("combobox", { name: "Start posture" }).selectOption("RUNWAY");
-  await expect(missionStart.getByRole("textbox", { name: "Runway artifact ID" })).toHaveValue("educational-runway-assumption-v1");
-  await expect(missionStart).toContainText("iaf-pathankot · source iaf-stations-wikipedia");
-  await expect(missionStart).toContainText(/model assumption · [0-9a-f]{16}/i);
+  await expect(missionStart).toContainText("Sourced runway · runway:iaf-jodhpur:236786");
+  await expect(missionStart).toContainText("iaf-jodhpur · source iaf-stations-wikipedia");
+  await expect(missionStart).toContainText(/sourced · [0-9a-f]{16}/i);
   await expect(missionStart).toContainText("first frame remains on the threshold with zero speed");
   await expect(missionStart.getByRole("region", { name: "Mission flight plan constraints" })).toContainText("vector.flight-plan.v1");
+  await missionStart.getByRole("button", { name: "Reverse takeoff direction" }).click();
+  await expect(missionStart).toContainText("224.8° true");
+  await missionStart.getByRole("button", { name: "Reverse takeoff direction" }).click();
+  await expect(missionStart).toContainText("44.8° true");
 
   // The mission editor is the authority. Its single route adapter updates the
   // legacy spatial projection atomically; the Worker later consumes the

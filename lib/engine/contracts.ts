@@ -16,7 +16,11 @@ import type {
   ScenarioOrigin,
 } from "../geospatial/contracts.ts";
 import type { SyntheticEnvironmentManifest } from "../geospatial/synthetic-environment.ts";
-import type { EnvironmentPack, EnvironmentPackBinding } from "../geospatial/environment-pack.ts";
+import type {
+  EnvironmentPack,
+  EnvironmentPackBinding,
+  RuntimeEnvironmentProjection,
+} from "../geospatial/environment-pack.ts";
 import type { InstallationOriginReference } from "../mission-admission.ts";
 import type { CompiledAirMission } from "../air-mission.ts";
 
@@ -507,6 +511,7 @@ export type EngineScenario = {
     temperatureOffsetC: number;
     windMps: Vec3;
     atmosphere: "NASA_EDUCATIONAL_STANDARD";
+    runtimeEnvironment?: RuntimeEnvironmentProjection;
     /** Rust/WASM validates this compact binding before it accepts the run. */
     environmentPack: EnvironmentPackBinding;
     studyArea: {

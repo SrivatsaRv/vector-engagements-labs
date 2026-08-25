@@ -33,9 +33,11 @@ function originReference(
   weatherPresetId: string,
 ) {
   return {
-    schemaVersion: "vector.installation-origin.v1" as const,
+    schemaVersion: "vector.installation-origin.v2" as const,
     installationId: installation.id,
     sourceId: installation.source_id,
+    startKind: "RUNWAY" as const,
+    runwayId: installation.ground_start_runway_id!,
     environment: {
       studyAreaId,
       weatherPresetId,
@@ -323,6 +325,7 @@ export function ScenarioAuthoringMap({
           const element = document.createElement("button");
           element.type = "button";
           element.className = `authoring-installation-marker ${installation.service === "IAF" ? "blue" : "red"}`;
+          element.disabled = !installation.ground_start_supported;
           element.innerHTML = `${tacticalSymbolMarkup(presentTacticalSymbol({
             id: installation.id,
             designation: installation.name,
@@ -331,10 +334,13 @@ export function ScenarioAuthoringMap({
             lifecycle: "ACTIVE",
             symbolRole: "AIR_BASE",
             valueState: "WORLD",
-          }))}<span>${installation.name}${installation.icao_code ? ` · ${installation.icao_code}` : ""}</span>`;
-          element.title = `Use ${installation.name} as ${installation.service === "IAF" ? "Blue" : "Red"} origin`;
+          }))}<span>${installation.name}${installation.icao_code ? ` · ${installation.icao_code}` : ""}${installation.ground_start_supported ? " · runway start" : " · airborne placement only"}</span>`;
+          element.title = installation.ground_start_supported
+            ? `Use ${installation.name} as ${installation.service === "IAF" ? "Blue" : "Red"} runway origin`
+            : `${installation.name} has no sufficiently evidenced runway start in this environment pack`;
           element.addEventListener("click", (event) => {
             event.stopPropagation();
+            if (!installation.ground_start_supported) return;
             const team: TeamKey = installation.service === "IAF" ? "blue" : "red";
             const current = planRef.current;
             const point = {
@@ -544,7 +550,7 @@ export function ScenarioAuthoringMap({
   const selectedEntity = plan[selected];
   const selectedObject = selected === "blue" ? blueObject : redObject;
   const availableOrigins = installations.filter((installation) =>
-    isPointInsideStudyArea(
+    installation.ground_start_supported && isPointInsideStudyArea(
       {
         longitude: installation.longitude,
         latitude: installation.latitude,
@@ -588,11 +594,13 @@ export function ScenarioAuthoringMap({
           <span>MAP AUTHORING</span>
           <strong>Place the selected forces inside {studyArea.shortName}.</strong>
           <p>
-            Choose a base available in this public-reference environment pack,
+            Choose a base available in this environment pack with sourced runway
+            geometry and elevation,
             or drag either aircraft to a manual placement. This is not a
             complete IAF or PAF catalogue. Altitude, heading, speed, and any
             planned route compile into the same scenario state.
           </p>
+          <small>{availableOrigins.length} runway-backed bases available in this environment pack; unsupported points are labelled airborne-placement only.</small>
         </div>
         <div className="origin-pickers" aria-label="Team origin selection">
           {(["blue", "red"] as const).map((team) => {

@@ -104,6 +104,24 @@ export function sampleTerrainBounded(
   return queries.map((query) => sampler.sample(query));
 }
 
+export function terrainCollision(
+  sampler: TerrainSampler,
+  point: TerrainQuery & { altitude: Altitude },
+) {
+  requireMsl(point.altitude.datum);
+  const terrain = sampler.sample(point);
+  if (!terrain.elevation) {
+    return Object.freeze({ collided: false, state: "NO_DATA" as const, clearanceM: null, terrain });
+  }
+  const clearanceM = point.altitude.valueM - terrain.elevation.valueM;
+  return Object.freeze({
+    collided: clearanceM <= 0,
+    state: clearanceM <= 0 ? "COLLIDED" as const : "CLEAR" as const,
+    clearanceM,
+    terrain,
+  });
+}
+
 export type GeometricLineOfSightRequest = {
   observer: TerrainQuery & { altitude: Altitude };
   target: TerrainQuery & { altitude: Altitude };

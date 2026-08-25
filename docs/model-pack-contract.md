@@ -10,6 +10,10 @@ recording, reports, and both engine backends.
 
 ## Artifact boundaries
 
+The object/model pack and EnvironmentPack remain separate immutable artifacts.
+The compiler binds both digests; neither may absorb or silently override the
+other's source authority.
+
 Persistence declarations for intended use, source packs, credibility, and
 compiled packs are isolated in `db/schema/model-pack.ts`; `db/schema.ts`
 remains the single aggregate Drizzle export.
@@ -47,8 +51,12 @@ limitations. The authored mission retains only
 `vector.aircraft-ground-envelope-binding.v1` identity/digest fields. Imported
 runway minima, surface lists, tailwind limits, or self-labelled
 `SOURCED`/`CALIBRATED` values are not executable authority. This remains the
-explicit `MODEL_ASSUMPTION` allowed by STUB-30 until #61/#64 replace it with
-governed aircraft/runway performance evidence.
+explicit `MODEL_ASSUMPTION` allowed by STUB-24 until #64 replaces it with
+governed aircraft ground-performance evidence. Issue #61 separately replaces
+the runway geometry/provenance boundary with a sourced immutable catalogue.
+Engine scenarios now additionally carry `vector.environment-runtime-grid.v1`;
+this does not change model-pack schemas or authorize environmental values as
+named-platform evidence.
 
 The schema-module split changes ownership granularity only. Existing table,
 column, constraint, and JSON payload contracts are unchanged.
@@ -85,6 +93,9 @@ Worker/runtime/VSR admission stages land. See the normative
 [`aircraft onboarding guide`](aircraft-model-pack-onboarding.md).
 
 ## Source definition
+
+ETOPO, NASA POWER and OurAirports citations belong to the EnvironmentPack
+source manifest. They are not aircraft, weapon, sensor or performance sources.
 
 The immutable source-definition row remains represented by
 `modelPackSources`; only its TypeScript declaration moved to the domain module.
@@ -193,6 +204,9 @@ TrackStore mechanics only; no named aircraft sensor is thereby available.
 
 ## Compilation and digest
 
+Compilation verifies model-pack and environment-pack digests independently,
+then freezes their exact runtime projections without mutable catalog lookups.
+
 `compileModelPack(source)` performs all work before the engine starts:
 
 1. validates versions, stable IDs, evidence, units, ranges, table dimensions,
@@ -257,6 +271,8 @@ database.
 Every Air mission declares `PUBLIC_EDUCATIONAL`, explicit assumptions and
 validity limits. A mission/task label cannot promote context evidence or a
 named-aircraft association into executable performance authority.
+Both artifacts remain `PUBLIC_EDUCATIONAL`; environment source provenance does
+not raise named-system credibility or remove model-pack limitations.
 
 The current intended-use identity is
 `vector.intended-use.geometry-teaching@1.0.0`. It supports geometry teaching and
@@ -358,6 +374,9 @@ catalog identity.
 
 ## Scenario binding and patches
 
+User-authored wind/temperature changes create a distinct environment-pack
+digest. They are not model-pack patches and cannot rewrite sourced grid fields.
+
 Every `vector.scenario.v4` package contains:
 
 ```text
@@ -401,6 +420,8 @@ The shared `validateScenarioModelInstance` validator is the station membership,
 store compatibility, station capacity, and rule-capacity authority. Compilation rejects
 missing or mismatched compatibility before store count can affect entity count,
 aircraft mass, or endurance.
+Runway eligibility and terrain coverage do not assert platform occupancy,
+readiness or loadout compatibility; those remain independently admitted.
 
 Compatibility is explicit and four-part: platform catalog identity, compiled
 loadout, compiled store, and station group. A `SUPPORTED` rule and station
@@ -435,6 +456,8 @@ Air scenario packages persist the authored mission and exact model-pack digest
 inside canonical v4 JSON. Saved runs and VSRs additionally retain the compiled
 mission digests; readback revalidates them against the archived pack rather than
 the current catalogue.
+PostGIS stores immutable environment packs separately from compiled model packs,
+with an update-rejection trigger and content-addressed runway binding.
 
 Model-pack storage consumers import the unchanged aggregate schema facade,
 while contract-document ownership follows `db/schema/model-pack.ts` directly.
@@ -540,6 +563,8 @@ Mission/capability consumers import the exported `AirMissionDefinition` and
 `CompiledAirMission` types from `lib/air-mission.ts`. They may attach downstream
 behavior to those stable IDs and references but must not create a parallel
 mission, flight-plan, fuel, loadout, or start schema.
+Consumers receive exact model and environment artifacts. Simulation ticks may
+sample the precompiled environment grid but may not query PostGIS or providers.
 
 1. Import schema constants and types from `lib/model-pack.ts`; do not duplicate
    them in a feature directory.
@@ -573,6 +598,8 @@ exact station/rule/capacity admission, immutable ground-envelope binding,
 runway and fuel/loadout rejection, Worker/server parity, runtime
 mass/endurance effects, and VSR readback against the current compiled model-pack
 digest.
+The release gate now pairs existing model-pack checks with exact environment
+source verification, TS/Rust runtime parity and corrupt-binding rejection.
 
 - `npm run models:verify` rejects a stale generated fixture.
 - `npm run models:aircraft-foundation:verify` regenerates both anonymous

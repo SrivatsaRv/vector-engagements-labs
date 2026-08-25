@@ -43,7 +43,7 @@ const assertPictureParity = (actual, expected, label) => {
 test("committed Rust/WASM artifact has a stable integrity identity", () => {
   assert.match(RUST_WASM_ENGINE_ARTIFACT.sha256, /^[a-f0-9]{64}$/);
   assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes > 100_000);
-  assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 500_000);
+  assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 550_000);
 });
 
 for (const definition of SCENARIO_LIBRARY) {

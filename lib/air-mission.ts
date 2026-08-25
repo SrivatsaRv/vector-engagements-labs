@@ -1,5 +1,10 @@
 import { sha256HexSync } from "./geospatial/digest.ts";
-import { PUBLIC_INSTALLATIONS } from "./installations.ts";
+import {
+  admitGroundStart,
+  findRunwayCatalogueRecord,
+  INSTALLATION_CATALOGUE_IDENTITY,
+  PUBLIC_INSTALLATIONS,
+} from "./installations.ts";
 import { isPointInsideStudyArea } from "./scenario-spatial.ts";
 import { getStudyArea } from "./study-areas.ts";
 import type { Scenario } from "./simulation.ts";
@@ -91,6 +96,64 @@ export function bindRunwayEvidence(
     ...runway,
     evidence: { ...evidence, digest: runwayEvidenceDigest(runway, evidence) },
   };
+}
+
+/** Build the only Air-mission runway artifact executable by a regional pack. */
+export function bindAdmittedEnvironmentRunway(input: {
+  environmentPack: Readonly<EnvironmentPack>;
+  installationId: string;
+  runwayId: string;
+  direction?: "FORWARD" | "RECIPROCAL";
+}): RunwayGeometry {
+  const start = admitGroundStart({
+    pack: input.environmentPack,
+    installationId: input.installationId,
+    runwayId: input.runwayId,
+  });
+  const source = findRunwayCatalogueRecord(start.runwayId);
+  if (!source?.centreline || !source.thresholdElevationsMslM) {
+    throw new TypeError("Admitted runway source geometry is incomplete.");
+  }
+  if (!Number.isFinite(source.reciprocalTrueHeadingDeg)) {
+    throw new TypeError("Admitted runway reciprocal heading is incomplete.");
+  }
+  if (!["ASP", "CON", "PEM", "PAV"].includes(source.surface ?? "")) {
+    throw new TypeError("Admitted runway surface is not mapped to the current paved ground envelope.");
+  }
+  const reciprocal = input.direction === "RECIPROCAL";
+  const thresholdIndex = reciprocal ? 1 : 0;
+  const endIndex = reciprocal ? 0 : 1;
+  return bindRunwayEvidence({
+    id: source.id,
+    threshold: {
+      longitude: source.centreline.coordinates[thresholdIndex][0],
+      latitude: source.centreline.coordinates[thresholdIndex][1],
+      elevation: {
+        valueM: reciprocal
+          ? source.thresholdElevationsMslM.high
+          : source.thresholdElevationsMslM.low,
+        datum: "MSL",
+      },
+    },
+    end: {
+      longitude: source.centreline.coordinates[endIndex][0],
+      latitude: source.centreline.coordinates[endIndex][1],
+      elevation: {
+        valueM: reciprocal
+          ? source.thresholdElevationsMslM.low
+          : source.thresholdElevationsMslM.high,
+        datum: "MSL",
+      },
+    },
+    headingDeg: reciprocal ? Number(source.reciprocalTrueHeadingDeg) : start.trueHeadingDeg,
+    lengthM: start.runwayLengthM,
+    widthM: start.runwayWidthM,
+    surface: "PAVED",
+    operationalState: "OPEN",
+  }, {
+    state: "SOURCED",
+    sourceId: `${INSTALLATION_CATALOGUE_IDENTITY.id}@${INSTALLATION_CATALOGUE_IDENTITY.version}:${source.sourceRunwayId}:${INSTALLATION_CATALOGUE_IDENTITY.digest}`,
+  });
 }
 
 export type AirMissionStart =
@@ -558,7 +621,9 @@ export function createDefaultAirMissionDefinition(input: {
     intendedUse: "PUBLIC_EDUCATIONAL",
     provenance: { valueState: "MODEL_ASSUMPTION", sourceIds: [] },
     assumptions: ["Current mission policy is authored and recorded; autonomous mission behaviour is outside this contract."],
-    validityLimits: ["Current terrain and runway fidelity is synthetic or unavailable and must be admitted explicitly."],
+    validityLimits: [
+      "Terrain, atmosphere, and runway fidelity is bounded by the exact admitted EnvironmentPack sources, coverage, validity interval, resolution, and uncertainty.",
+    ],
   };
 }
 
@@ -903,6 +968,20 @@ export function compileAirMissionDefinition(
     if (runway.evidence.state === "UNKNOWN" || !runway.evidence.sourceId || !/^[0-9a-f]{64}$/.test(runway.evidence.digest)) fail("MISSION_RUNWAY_EVIDENCE_MISSING", "start.runway.evidence", "Ground/runway start requires exact runway evidence identity.", "Admit a source, calibrated artifact, explicit model assumption, or user-authored artifact with SHA-256 identity.");
     const { evidence, ...runwayMaterial } = runway;
     if (evidence.digest !== runwayEvidenceDigest(runwayMaterial, evidence)) fail("MISSION_RUNWAY_EVIDENCE_MISSING", "start.runway.evidence.digest", "Runway evidence digest does not bind the exact geometry and classification.", "Recompute vector.runway-evidence.v1 after every runway edit.");
+    let admittedRunways: RunwayGeometry[];
+    try {
+      if (!context.environmentPack) throw new TypeError("Environment pack unavailable.");
+      admittedRunways = (["FORWARD", "RECIPROCAL"] as const).map((direction) =>
+        bindAdmittedEnvironmentRunway({
+          environmentPack: context.environmentPack!,
+          installationId: groundStart.installationId,
+          runwayId: runway.id,
+          direction,
+        }),
+      );
+    } catch {
+      fail("MISSION_RUNWAY_INVALID", "start.runway.id", "Ground start does not resolve to an eligible runway in the exact environment pack.", "Select an eligible sourced runway exposed by the selected environment pack.");
+    }
     const heading = runway.headingDeg;
     if (runway.operationalState !== "OPEN") fail("MISSION_RUNWAY_INVALID", "start.runway.operationalState", "A closed runway cannot admit a ground start.", "Select an open runway artifact or use an airborne start.");
     if (!Number.isFinite(heading) || heading < 0 || heading >= 360 || !Number.isFinite(runway.lengthM) || runway.lengthM <= 0 || !Number.isFinite(runway.widthM) || runway.widthM <= 0 || runway.threshold.elevation.datum !== "MSL" || runway.end.elevation.datum !== "MSL") fail("MISSION_RUNWAY_INVALID", "start.runway", "Runway geometry, dimensions, heading, or MSL datum is invalid.", "Provide finite WGS84 threshold/end geometry and explicit metres MSL.");
@@ -910,11 +989,6 @@ export function compileAirMissionDefinition(
     for (const [name, point] of [["threshold", runway.threshold], ["end", runway.end]] as const) {
       if (!isPointInsideStudyArea({ longitude: point.longitude, latitude: point.latitude, altitudeM: point.elevation.valueM, verticalDatum: "MSL" }, area)) fail("MISSION_RUNWAY_INVALID", `start.runway.${name}`, "Runway geometry is outside environment coverage.", "Select a runway fully covered by the admitted environment pack.");
     }
-    const installationOffsetM = distanceM(
-      { longitude: installation.longitude, latitude: installation.latitude, altitude: runway.threshold.elevation },
-      { longitude: runway.threshold.longitude, latitude: runway.threshold.latitude, altitude: runway.threshold.elevation },
-    );
-    if (installationOffsetM > 1) fail("MISSION_RUNWAY_INVALID", "start.runway.threshold", "Runway threshold does not bind the selected installation coordinate.", "Select or author runway evidence for the exact installation identity; coordinate-only substitution is rejected.");
     if (
       Math.abs(runway.threshold.longitude - firstPoint.position.longitude) > 1e-9 ||
       Math.abs(runway.threshold.latitude - firstPoint.position.latitude) > 1e-9 ||
@@ -939,6 +1013,11 @@ export function compileAirMissionDefinition(
     const tailwindMps = context.scenario.wind * Math.sin(headingRad) + context.scenario.windNorth * Math.cos(headingRad);
     if (tailwindMps > groundEnvelope.maximumTailwindMps) fail("MISSION_RUNWAY_INVALID", "start.runway.headingDeg", "Tailwind exceeds the assigned aircraft ground envelope.", "Reverse takeoff direction, select another runway, or change admitted weather.");
     if (!Number.isFinite(groundStart.readinessDelaySeconds) || groundStart.readinessDelaySeconds < 0) fail("MISSION_RUNWAY_INVALID", "start.readinessDelaySeconds", "Readiness delay must be finite and non-negative.", "Provide seconds from model start.");
+    if (!admittedRunways!.some((admittedRunway) =>
+      sha256HexSync(runway) === sha256HexSync(admittedRunway)
+    )) {
+      fail("MISSION_RUNWAY_INVALID", "start.runway", "Ground-start runway fields or provenance differ from the exact admitted environment artifact.", "Rebind the ground start from the selected immutable environment pack; authored runway substitutions are rejected.");
+    }
     start = {
       posture: groundStart.posture,
       entryState: "GROUND",

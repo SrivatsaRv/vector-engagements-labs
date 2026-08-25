@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import type { EngineBackendId, EngineEntityDefinition, EngineRun, EngineScenario } from "../engine/contracts.ts";
 import { runEngineBackend } from "../engine/backend.ts";
-import { localFrameToGeographic } from "../geospatial/geodesy.ts";
+import { enginePositionToGeographic } from "../scenario-spatial.ts";
 import { simulateWithCapabilitiesForVerification } from "../simulation.ts";
 import { SCENARIO_LIBRARY } from "../scenarios.ts";
 import { createVerificationDeploymentCapabilities } from "../runtime/deployment-capabilities.ts";
@@ -166,7 +166,7 @@ export function createCapacityBaselineScenario(): EngineScenario {
       ...base.geospatial,
       initialPositions: entities.map((entity) => ({
         entityId: entity.id,
-        position: localFrameToGeographic(entity.initial.position, base.geospatial.origin),
+        position: enginePositionToGeographic(entity.initial.position, base.geospatial.origin),
       })),
     },
   };

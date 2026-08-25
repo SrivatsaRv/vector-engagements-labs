@@ -160,21 +160,20 @@ function installationOriginReference(
     throw new PublicApiError(400, `invalid_${field}_environment`);
   }
   const environmentInput = environment as Record<string, unknown>;
-  if (input.schemaVersion !== "vector.installation-origin.v1") {
+  if (input.schemaVersion !== "vector.installation-origin.v2" || input.startKind !== "RUNWAY") {
     throw new PublicApiError(400, `invalid_${field}_schema_version`);
   }
   const reference: InstallationOriginReference = {
     schemaVersion: input.schemaVersion,
     installationId: shortString(input.installationId, 120, `${field}_installation_id`),
     sourceId: shortString(input.sourceId, 160, `${field}_source_id`),
+    startKind: "RUNWAY",
+    runwayId: shortString(input.runwayId, 120, `${field}_runway_id`),
     environment: {
       studyAreaId: shortString(environmentInput.studyAreaId, 80, `${field}_study_area_id`),
       weatherPresetId: shortString(environmentInput.weatherPresetId, 80, `${field}_weather_preset_id`),
     },
   };
-  if (input.runwayId !== undefined) {
-    reference.runwayId = shortString(input.runwayId, 120, `${field}_runway_id`);
-  }
   return reference;
 }
 

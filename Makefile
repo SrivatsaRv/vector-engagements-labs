@@ -52,6 +52,7 @@ observability-local: compose-up
 performance-local:
 	npm run performance:verify
 	npm run performance:model-pack-foundation:verify
+	npm run performance:environment:verify
 	npm run performance:track-store:verify
 	npm run capacity:baseline:verify
 	npm run reference-aam:performance
@@ -102,6 +103,7 @@ ci-quality:
 	npm run policy:contract-docs:verify
 	npm run environment:sources:verify
 	npm run generic-sensor:sources:verify
+	npm run environment:migration:verify
 	npm run tp1538:sources:verify
 	npm run policy:runtime-stubs:verify
 	npm run policy:aircraft-evidence:verify

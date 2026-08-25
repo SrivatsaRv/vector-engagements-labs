@@ -126,13 +126,70 @@ try {
     ),
   );
   assert.equal(catalog.installations.length, 21);
-  assert.equal(catalog.installationCatalogue.schemaVersion, "vector.installation-catalogue.v1");
+  assert.equal(catalog.installationCatalogue.schemaVersion, "vector.installation-catalogue.v2");
   assert.equal(catalog.installationCatalogue.id, "vector.public-reference-installations");
-  assert.equal(catalog.installationCatalogue.version, "1.0.0");
+  assert.equal(catalog.installationCatalogue.version, "2.0.0");
   assert.match(catalog.installationCatalogue.digest, /^sha256:[0-9a-f]{64}$/);
   assert.equal(catalog.installationCatalogue.coverage.declaredServiceCoverage, "BOUNDED_PUBLIC_REFERENCE_FIXTURE");
   assert.equal(catalog.installationCatalogue.coverage.includedRecordCount, catalog.installations.length);
+  assert.equal(catalog.installationCatalogue.coverage.runwayRecordCount, 24);
+  assert.equal(catalog.installationCatalogue.coverage.eligibleRunwayRecordCount, 12);
   assert.ok(catalog.installationCatalogue.coverage.knownGaps.some((gap) => gap.includes("not a complete IAF or PAF")));
+  assert.equal(catalog.installationCatalogue.runways.length, 24);
+  assert.equal(
+    catalog.installationCatalogue.runways.filter(
+      (runway) => runway.missionStartEligibility === "PUBLIC_EDUCATIONAL",
+    ).length,
+    12,
+  );
+  assert.equal(catalog.runways.length, 24);
+  assert.equal(
+    catalog.runways.filter(
+      (runway) => runway.mission_start_eligibility === "PUBLIC_EDUCATIONAL",
+    ).length,
+    12,
+  );
+  assert.ok(
+    catalog.runways.every(
+      (runway) =>
+        runway.horizontal_datum === "WGS84" &&
+        runway.vertical_datum === "MSL_REPORTED_BY_SOURCE" &&
+        runway.provenance === "SOURCED_DATASET" &&
+        /^sha256:[0-9a-f]{64}$/.test(runway.content_hash),
+    ),
+  );
+  assert.ok(
+    catalog.runways
+      .filter((runway) => runway.mission_start_eligibility === "PUBLIC_EDUCATIONAL")
+      .every(
+        (runway) =>
+          runway.centreline?.type === "LineString" &&
+          runway.threshold_elevations_msl_m &&
+          runway.closed_in_source === false,
+      ),
+  );
+  assert.equal(catalog.environmentPacks.length, 12);
+  assert.ok(
+    catalog.environmentPacks.every(
+      (environmentPack) =>
+        environmentPack.schema_version === "vector.environment-pack.v1" &&
+        environmentPack.version === "2.0.0" &&
+        environmentPack.intended_use === "PUBLIC_EDUCATIONAL" &&
+        environmentPack.provenance === "MIXED_SOURCE" &&
+        environmentPack.coverage?.type === "Polygon" &&
+        environmentPack.horizontal_datum === "WGS84" &&
+        environmentPack.vertical_datum === "MSL" &&
+        environmentPack.source_vertical_datum === "EGM2008" &&
+        environmentPack.installation_catalogue_digest ===
+          catalog.installationCatalogue.digest &&
+        /^sha256:[0-9a-f]{64}$/.test(environmentPack.digest) &&
+        /^sha256:[0-9a-f]{64}$/.test(environmentPack.terrain_digest) &&
+        /^sha256:[0-9a-f]{64}$/.test(environmentPack.atmosphere_digest) &&
+        environmentPack.valid_from &&
+        environmentPack.valid_until &&
+        environmentPack.superseded_at === null,
+    ),
+  );
   assert.deepEqual(
     catalog.studyAreas.map((item) => item.id).sort(),
     [

@@ -7,7 +7,9 @@ import {
   WEAPONS,
   catalogReviewState,
 } from "../lib/capability-data.ts";
-import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
+import { INSTALLATION_CATALOGUE, PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
+import { admitEnvironmentPack, type RegionalEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
+import { sha256Identity } from "../lib/geospatial/digest.ts";
 import { OBJECT_CATALOG } from "../lib/object-catalog.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { WEAPON_SIMULATION_MODELS } from "../lib/simulation-models.ts";
@@ -151,9 +153,10 @@ try {
         ON CONFLICT (id) DO UPDATE SET weapon_id=EXCLUDED.weapon_id,version=EXCLUDED.version,domains=EXCLUDED.domains,propulsion_kind=EXCLUDED.propulsion_kind,launch_mass_kg=EXCLUDED.launch_mass_kg,dry_mass_kg=EXCLUDED.dry_mass_kg,powered_flight_seconds=EXCLUDED.powered_flight_seconds,thrust_newtons=EXCLUDED.thrust_newtons,thrust_taper_speed_mps=EXCLUDED.thrust_taper_speed_mps,reference_area_m2=EXCLUDED.reference_area_m2,drag_coefficient=EXCLUDED.drag_coefficient,navigation_constant=EXCLUDED.navigation_constant,maximum_command_g=EXCLUDED.maximum_command_g,seeker_activation_range_m=EXCLUDED.seeker_activation_range_m,datalink_update_seconds=EXCLUDED.datalink_update_seconds,value_state=EXCLUDED.value_state,rationale=EXCLUDED.rationale`;
     }
     for (const item of PUBLIC_INSTALLATIONS) {
-      await tx`INSERT INTO installations (id,service,name,icao_code,elevation_ft,runway_info,installation_type,location,public_reference,source_id)
-        VALUES (${item.id},${item.service},${item.name},${item.icaoCode ?? null},${item.elevationFt ?? null},${item.runwayInfo ?? null},${item.type},ST_SetSRID(ST_MakePoint(${item.longitude},${item.latitude}),4326),true,${item.sourceId})
-        ON CONFLICT (id) DO UPDATE SET service=EXCLUDED.service,name=EXCLUDED.name,icao_code=EXCLUDED.icao_code,elevation_ft=EXCLUDED.elevation_ft,runway_info=EXCLUDED.runway_info,installation_type=EXCLUDED.installation_type,location=EXCLUDED.location,public_reference=EXCLUDED.public_reference,source_id=EXCLUDED.source_id`;
+      const governed = INSTALLATION_CATALOGUE.records.find((record) => record.id === item.id)!;
+      await tx`INSERT INTO installations (id,service,name,icao_code,elevation_ft,runway_info,installation_type,location,public_reference,source_id,coordinate_datum,positional_uncertainty_m,provenance,review_state)
+        VALUES (${item.id},${item.service},${item.name},${item.icaoCode ?? null},${item.elevationFt ?? null},${item.runwayInfo ?? null},${item.type},ST_SetSRID(ST_MakePoint(${item.longitude},${item.latitude}),4326),true,${item.sourceId},${governed.coordinateDatum},${governed.positionalUncertaintyM},${governed.provenance},${governed.reviewState})
+        ON CONFLICT (id) DO UPDATE SET service=EXCLUDED.service,name=EXCLUDED.name,icao_code=EXCLUDED.icao_code,elevation_ft=EXCLUDED.elevation_ft,runway_info=EXCLUDED.runway_info,installation_type=EXCLUDED.installation_type,location=EXCLUDED.location,public_reference=EXCLUDED.public_reference,source_id=EXCLUDED.source_id,coordinate_datum=EXCLUDED.coordinate_datum,positional_uncertainty_m=EXCLUDED.positional_uncertainty_m,provenance=EXCLUDED.provenance,review_state=EXCLUDED.review_state`;
     }
     const pafInstallationIds = PUBLIC_INSTALLATIONS.filter((item) => item.service === "PAF").map((item) => item.id);
     await tx`DELETE FROM installations WHERE service='PAF' AND id NOT IN ${tx(pafInstallationIds)}`;
@@ -172,6 +175,27 @@ try {
           terrain_class=EXCLUDED.terrain_class,surface_elevation_m=EXCLUDED.surface_elevation_m,
           anchor=EXCLUDED.anchor,boundary=EXCLUDED.boundary,environment_presets=EXCLUDED.environment_presets,
           default_environment_preset_id=EXCLUDED.default_environment_preset_id,source_class=EXCLUDED.source_class`;
+    }
+    for (const runway of INSTALLATION_CATALOGUE.runways) {
+      await tx`INSERT INTO installation_runways
+        (id,installation_id,source_runway_id,source_airport_ident,designator,true_heading_deg,reciprocal_true_heading_deg,length_m,width_m,surface,closed_in_source,centreline,threshold_elevations_msl_m,horizontal_datum,vertical_datum,positional_uncertainty_m,provenance,review_state,mission_start_eligibility,limitation,content_hash)
+        VALUES (${runway.id},${runway.installationId},${runway.sourceRunwayId},${runway.sourceAirportIdent},${runway.designator},${runway.trueHeadingDeg},${runway.reciprocalTrueHeadingDeg},${runway.lengthM},${runway.widthM},${runway.surface},${runway.closedInSource},ST_SetSRID(ST_GeomFromGeoJSON(${runway.centreline ? JSON.stringify(runway.centreline) : null}),4326),${json(runway.thresholdElevationsMslM)},${runway.horizontalDatum},${runway.verticalDatum},${runway.positionalUncertaintyM},${runway.provenance},${runway.reviewState},${runway.missionStartEligibility},${runway.limitation},${sha256Identity(runway)})
+        ON CONFLICT (id) DO UPDATE SET installation_id=EXCLUDED.installation_id,source_runway_id=EXCLUDED.source_runway_id,source_airport_ident=EXCLUDED.source_airport_ident,designator=EXCLUDED.designator,true_heading_deg=EXCLUDED.true_heading_deg,reciprocal_true_heading_deg=EXCLUDED.reciprocal_true_heading_deg,length_m=EXCLUDED.length_m,width_m=EXCLUDED.width_m,surface=EXCLUDED.surface,closed_in_source=EXCLUDED.closed_in_source,centreline=EXCLUDED.centreline,threshold_elevations_msl_m=EXCLUDED.threshold_elevations_msl_m,horizontal_datum=EXCLUDED.horizontal_datum,vertical_datum=EXCLUDED.vertical_datum,positional_uncertainty_m=EXCLUDED.positional_uncertainty_m,provenance=EXCLUDED.provenance,review_state=EXCLUDED.review_state,mission_start_eligibility=EXCLUDED.mission_start_eligibility,limitation=EXCLUDED.limitation,content_hash=EXCLUDED.content_hash`;
+    }
+    for (const area of STUDY_AREAS) {
+      for (const preset of area.weatherPresets) {
+        const pack = admitEnvironmentPack({
+          studyAreaId: area.id,
+          weatherPresetId: preset.id,
+          effectiveWeather: preset,
+        }).pack;
+        if (pack.terrain.kind !== "SOURCED_REGULAR_GRID") throw new Error("Regional seed pack was not admitted.");
+        const regional = pack as RegionalEnvironmentPack;
+        await tx`INSERT INTO environment_packs
+          (id,version,digest,schema_version,study_area_id,weather_preset_id,intended_use,provenance,coverage,horizontal_datum,vertical_datum,source_vertical_datum,valid_from,valid_until,terrain_digest,atmosphere_digest,installation_catalogue_digest,payload)
+          VALUES (${regional.identity.id},${regional.identity.version},${regional.identity.digest},${regional.schemaVersion},${area.id},${preset.id},${regional.intendedUse},${regional.provenance},ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(regional.coverage.geometry)}),4326),${regional.coverage.horizontalDatum},${regional.coverage.verticalDatum},${regional.coverage.sourceVerticalDatum},${regional.validity.startsAt},${regional.validity.endsAt},${regional.terrain.digest},${regional.atmosphere.digest},${regional.installationCoverage.catalogue.digest},${json(regional)})
+          ON CONFLICT DO NOTHING`;
+      }
     }
     for (const item of SCENARIO_LIBRARY) {
       const contentHash = createHash("sha256")
@@ -195,7 +219,7 @@ try {
     ...WEAPONS.map((item) => item.id),
     ...WEAPON_SIMULATION_MODELS.map((item) => item.weaponId),
   ]).size;
-  process.stdout.write(`seeded ${PLATFORMS.length} platforms, ${weaponCount} weapons, ${WEAPON_SIMULATION_MODELS.length} models, 1 compiled model pack, ${PUBLIC_INSTALLATIONS.length} installations, ${STUDY_AREAS.length} study areas, ${SCENARIO_LIBRARY.length} scenarios\n`);
+  process.stdout.write(`seeded ${PLATFORMS.length} platforms, ${weaponCount} weapons, ${WEAPON_SIMULATION_MODELS.length} models, 1 compiled model pack, ${PUBLIC_INSTALLATIONS.length} installations, ${INSTALLATION_CATALOGUE.runways.length} runways, 12 environment packs, ${STUDY_AREAS.length} study areas, ${SCENARIO_LIBRARY.length} scenarios\n`);
 } finally {
   await sql.end();
 }

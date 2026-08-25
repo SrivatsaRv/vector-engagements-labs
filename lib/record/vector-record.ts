@@ -23,7 +23,7 @@ import {
 import { assertRecordedSidePictures, attachRecordedObserverStates } from "../information-state.ts";
 import { assertRuntimeModelPackDigest } from "../engine/runtime-model-pack.ts";
 import {
-  assertPhaseAEnvironmentPack,
+  assertEnvironmentPack,
   environmentPackBinding,
 } from "../geospatial/environment-pack.ts";
 import {
@@ -793,7 +793,7 @@ export async function openVectorSimulationRecord(
   if (!environmentPack) {
     throw new Error("VECTOR record has no admitted environment pack.");
   }
-  assertPhaseAEnvironmentPack(environmentPack);
+  assertEnvironmentPack(environmentPack);
   const environmentBinding = environmentPackBinding(environmentPack);
   const recordedBinding = compiled.engineScenario.environment?.environmentPack;
   if (

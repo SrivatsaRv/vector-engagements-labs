@@ -9,7 +9,7 @@ import {
   VECTOR_ENGINE_WASM_BYTES,
   VECTOR_ENGINE_WASM_SHA256,
 } from "./generated/vector-engine-wasm.ts";
-import { localFrameToGeographic } from "../geospatial/geodesy.ts";
+import { enginePositionToGeographic } from "../scenario-spatial.ts";
 import { assertSimulationEventStream } from "./simulation-events.ts";
 import type {
   PublicAircraftReferenceInput,
@@ -52,7 +52,7 @@ function withGeospatialRecord(
       geographicPositions: frame.geographicPositions
         ?? frame.entities.map((entity) => ({
           entityId: entity.id,
-          position: localFrameToGeographic(
+          position: enginePositionToGeographic(
             entity.position,
             scenario.geospatial.origin,
           ),

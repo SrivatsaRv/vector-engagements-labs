@@ -205,7 +205,8 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     scope: "One launcher, one manoeuvring target and one interceptor.",
     tags: ["fighter vs fighter", "crossing geometry", "energy"],
     targetMotion: "moving",
-    environment: "Standard atmosphere · no terrain model",
+    environment:
+      "Sourced regional terrain and atmosphere · exact EnvironmentPack identity recorded",
     focusOptions: movingFocus,
     runVariants: movingRuns,
     presetRationale: {
@@ -247,7 +248,8 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     scope: "Single engagement with a prepared target manoeuvre.",
     tags: ["fighter vs fighter", "defensive manoeuvre", "timing"],
     targetMotion: "moving",
-    environment: "Standard atmosphere · no terrain model",
+    environment:
+      "Sourced regional terrain and atmosphere · exact EnvironmentPack identity recorded",
     focusOptions: movingFocus,
     runVariants: movingRuns,
     presetRationale: {
@@ -292,7 +294,8 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       "One Su-30MKI, one Kh-31P model object, and one fixed P-18 radar object. Radar detection and air-defence response are not calculated.",
     tags: ["aircraft vs sensor", "fixed target", "approach"],
     targetMotion: "fixed",
-    environment: "Standard atmosphere · fixed objective · no terrain masking",
+    environment:
+      "Sourced regional terrain and atmosphere · fixed objective · geometric LOS only",
     focusOptions: fixedFocus,
     runVariants: fixedRuns,
     presetRationale: {
@@ -341,7 +344,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     tags: ["aircraft vs ground", "protected objective", "route timing"],
     targetMotion: "fixed",
     environment:
-      "Standard atmosphere · fixed objective · air-defence response not calculated",
+      "Sourced regional terrain and atmosphere · fixed objective · air-defence response not calculated",
     focusOptions: fixedFocus,
     runVariants: fixedRuns,
     presetRationale: {
@@ -389,7 +392,8 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       "One ground launcher, one sensor-quality assumption and one airborne target.",
     tags: ["SAM scenario", "point defence", "crossing target"],
     targetMotion: "moving",
-    environment: "Standard atmosphere · one active air-defence layer",
+    environment:
+      "Sourced regional terrain and atmosphere · one active air-defence layer",
     focusOptions: movingFocus,
     runVariants: movingRuns,
     presetRationale: {
@@ -437,7 +441,8 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       "Layer sequencing is represented in the run plan; the current physics run resolves one active layer at a time.",
     tags: ["layered SAM", "sensor hand-off", "run files"],
     targetMotion: "moving",
-    environment: "Standard atmosphere · one active layer resolved per run",
+    environment:
+      "Sourced regional terrain and atmosphere · one active layer resolved per run",
     focusOptions: movingFocus,
     runVariants: movingRuns,
     presetRationale: {
@@ -485,7 +490,8 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       "Public-data conceptual trajectory only; no named system, precise site or operational route.",
     tags: ["ground strike", "supersonic class", "trajectory"],
     targetMotion: "fixed",
-    environment: "Standard atmosphere · fixed objective · no terrain model",
+    environment:
+      "Sourced regional terrain and atmosphere · fixed objective",
     focusOptions: fixedFocus,
     runVariants: fixedRuns,
     presetRationale: {
@@ -535,7 +541,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     tags: ["ground to ground", "defended corridor", "comparison"],
     targetMotion: "fixed",
     environment:
-      "Standard atmosphere · fixed objective · defence interaction not modeled",
+      "Sourced regional terrain and atmosphere · fixed objective · defence interaction not modeled",
     focusOptions: fixedFocus,
     runVariants: fixedRuns,
     presetRationale: {

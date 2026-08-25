@@ -1,8 +1,5 @@
 import { compileScenario } from "./engine/compiler.ts";
 import { runEngineBackend } from "./engine/backend.ts";
-import {
-  standardAtmosphere,
-} from "./engine/atmosphere.ts";
 import type {
   CoverageEnvelope,
   EngineEntityDefinition,
@@ -28,8 +25,9 @@ import type {
   Vec3,
 } from "./engine/primitives.ts";
 import type { ScenarioSpatialPlan } from "./scenario-spatial.ts";
-import { geographicToLocal } from "./scenario-spatial.ts";
+import { geographicToEnginePosition } from "./scenario-spatial.ts";
 import { getStudyArea } from "./study-areas.ts";
+import { createEnvironmentSampler } from "./geospatial/environment-pack.ts";
 import {
   assertRecordedSidePictures,
   projectObserverStates,
@@ -487,11 +485,11 @@ export function prepareSimulation(
   const studyArea = getStudyArea(input.studyAreaId);
   const placement = input.spatialPlan
     ? {
-        blueStart: geographicToLocal(
+        blueStart: geographicToEnginePosition(
           input.spatialPlan.blue.position,
           studyArea,
         ),
-        redStart: geographicToLocal(
+        redStart: geographicToEnginePosition(
           input.spatialPlan.red.position,
           studyArea,
         ),
@@ -500,14 +498,14 @@ export function prepareSimulation(
         redHeadingRad:
           ((90 - input.spatialPlan.red.headingDeg) * Math.PI) / 180,
         blueRoute: input.spatialPlan.blue.route.map((point) =>
-          geographicToLocal(point, studyArea),
+          geographicToEnginePosition(point, studyArea),
         ),
         blueRouteAcceptanceRadiiM: [...input.spatialPlan.blue.routeAcceptanceRadiiM],
         blueRouteWaypointTransitions: input.spatialPlan.blue.routeWaypointTransitions
           ? [...input.spatialPlan.blue.routeWaypointTransitions]
           : undefined,
         redRoute: input.spatialPlan.red.route.map((point) =>
-          geographicToLocal(point, studyArea),
+          geographicToEnginePosition(point, studyArea),
         ),
         redRouteAcceptanceRadiiM: [...input.spatialPlan.red.routeAcceptanceRadiiM],
         redRouteWaypointTransitions: input.spatialPlan.red.routeWaypointTransitions
@@ -572,6 +570,7 @@ export function buildSimulationResult(
   recordedPictures?: RaspTrack[],
 ): SimulationResult {
   const { scenario: input, profile, engineScenario } = prepared;
+  const environmentSampler = createEnvironmentSampler(engineRun.scenario.geospatial.environmentPack);
   const frames: Frame[] = engineRun.frames.map((engineFrame) => {
     const weapon = engineFrame.entities.find(
       (entity) => entity.id === engineRun.primaryWeaponId,
@@ -579,10 +578,12 @@ export function buildSimulationResult(
     const target = engineFrame.entities.find(
       (entity) => entity.id === engineRun.primaryTargetId,
     )!;
-    const atmosphere = standardAtmosphere(
-      weapon.position.z,
-      input.temperatureOffset,
-    );
+    const atmosphere = environmentSampler.sample({
+      eastM: weapon.position.x,
+      northM: weapon.position.y,
+      upM: weapon.position.z,
+      modelTimeSeconds: engineFrame.t,
+    }).atmosphere;
     return {
       t: engineFrame.t,
       interceptor: weapon.position,

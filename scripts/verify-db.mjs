@@ -21,6 +21,9 @@ try {
     (SELECT count(*)::int FROM credibility_manifests) AS credibility_manifests,
     (SELECT count(*)::int FROM intended_use_contracts) AS intended_uses,
     (SELECT count(*)::int FROM installations) AS installations,
+    (SELECT count(*)::int FROM installation_runways) AS runways,
+    (SELECT count(*)::int FROM installation_runways WHERE mission_start_eligibility='PUBLIC_EDUCATIONAL') AS eligible_runways,
+    (SELECT count(*)::int FROM environment_packs) AS environment_packs,
     (SELECT count(*)::int FROM study_areas) AS study_areas,
     (SELECT count(*)::int FROM scenario_templates WHERE status='VALIDATED') AS scenarios`;
   assert.equal(counts.platforms, 4);
@@ -30,6 +33,9 @@ try {
   assert.ok(counts.credibility_manifests >= 2, "current credibility manifests are missing");
   assert.ok(counts.intended_uses >= 1, "current intended use is missing");
   assert.equal(counts.installations, 21);
+  assert.equal(counts.runways, 24);
+  assert.equal(counts.eligible_runways, 12);
+  assert.equal(counts.environment_packs, 12);
   assert.equal(counts.study_areas, 6);
   assert.equal(counts.scenarios, 8);
 
@@ -58,6 +64,32 @@ try {
   assert.equal(studyArea.anchor_srid, 4326);
   assert.equal(studyArea.boundary_valid, true);
   assert.equal(studyArea.has_area, true);
+
+  const [regional] = await sql`SELECT
+    count(*) FILTER (WHERE ST_SRID(coverage)=4326 AND ST_IsValid(coverage))::int AS valid_packs,
+    count(DISTINCT study_area_id)::int AS covered_areas,
+    bool_and(digest ~ '^sha256:[0-9a-f]{64}$' AND terrain_digest ~ '^sha256:[0-9a-f]{64}$' AND atmosphere_digest ~ '^sha256:[0-9a-f]{64}$') AS content_addressed
+    FROM environment_packs`;
+  assert.equal(regional.valid_packs, 12);
+  assert.equal(regional.covered_areas, 6);
+  assert.equal(regional.content_addressed, true);
+
+  await assert.rejects(
+    sql.begin(async (transaction) => {
+      await transaction`UPDATE environment_packs
+        SET payload='{}'::jsonb
+        WHERE (id, version)=(SELECT id, version FROM environment_packs LIMIT 1)`;
+    }),
+    /environment pack content is immutable/u,
+    "published environment pack content must reject in-place mutation",
+  );
+
+  const [runwayGeometry] = await sql`SELECT
+    count(*) FILTER (WHERE centreline IS NOT NULL AND ST_SRID(centreline)=4326 AND ST_IsValid(centreline))::int AS sourced_geometry,
+    count(*) FILTER (WHERE mission_start_eligibility='PUBLIC_EDUCATIONAL' AND centreline IS NOT NULL AND threshold_elevations_msl_m IS NOT NULL)::int AS eligible_complete
+    FROM installation_runways`;
+  assert.ok(runwayGeometry.sourced_geometry >= 12);
+  assert.equal(runwayGeometry.eligible_complete, 12);
 
   const missingStudyAreas = await sql`SELECT id, version
     FROM scenario_templates

@@ -1,20 +1,16 @@
-import { PUBLIC_INSTALLATIONS } from "./installations.ts";
+import { admitGroundStart, PUBLIC_INSTALLATIONS } from "./installations.ts";
+import { admitEnvironmentPack, type EnvironmentPack } from "./geospatial/environment-pack.ts";
 import { isPointInsideStudyArea } from "./scenario-spatial.ts";
 import { getStudyArea, getWeatherPreset } from "./study-areas.ts";
 
-/**
- * The only installation identity that the current airborne authoring surface
- * can retain. It deliberately does not describe a ground/runway start: the
- * governed catalog has point locations and text-only runway notes, not runway
- * geometry or start evidence.
- */
+/** Exact governed runway-start identity retained by authoring and replay. */
 export type InstallationOriginReference = {
-  schemaVersion: "vector.installation-origin.v1";
+  schemaVersion: "vector.installation-origin.v2";
   installationId: string;
   sourceId: string;
+  startKind: "RUNWAY";
   environment: { studyAreaId: string; weatherPresetId: string };
-  /** A supplied runway is rejected until a runway dataset is admitted. */
-  runwayId?: string;
+  runwayId: string;
 };
 
 export type MissionAdmissionCode =
@@ -39,7 +35,7 @@ export class MissionAdmissionError extends Error {
 }
 
 /**
- * Resolve an optional airborne-origin reference. Manual airborne placement has
+ * Resolve an optional runway-origin reference. Manual airborne placement has
  * no reference and stays valid. This function never selects a substitute area,
  * weather preset, installation, or runway.
  */
@@ -48,6 +44,7 @@ export function resolveInstallationOriginReference(input: {
   studyAreaId: string;
   weatherPresetId: string;
   fieldPath: string;
+  environmentPack?: EnvironmentPack;
 }) {
   const area = getStudyArea(input.studyAreaId);
   getWeatherPreset(area, input.weatherPresetId);
@@ -59,9 +56,6 @@ export function resolveInstallationOriginReference(input: {
   if (input.reference.environment.weatherPresetId !== input.weatherPresetId) {
     throw new MissionAdmissionError("MISSION_INSTALLATION_ENVIRONMENT_MISMATCH", `${referencePath}.environment.weatherPresetId`, input.reference.environment.weatherPresetId);
   }
-  if (input.reference.runwayId !== undefined) {
-    throw new MissionAdmissionError("MISSION_RUNWAY_UNAVAILABLE", `${referencePath}.runwayId`, input.reference.runwayId);
-  }
   const installation = PUBLIC_INSTALLATIONS.find((candidate) => candidate.id === input.reference!.installationId);
   if (!installation) {
     throw new MissionAdmissionError("MISSION_INSTALLATION_UNKNOWN", `${referencePath}.installationId`, input.reference.installationId);
@@ -72,5 +66,18 @@ export function resolveInstallationOriginReference(input: {
   if (!isPointInsideStudyArea({ longitude: installation.longitude, latitude: installation.latitude, altitudeM: 0, verticalDatum: "MSL" }, area)) {
     throw new MissionAdmissionError("MISSION_INSTALLATION_OUTSIDE_STUDY_AREA", `${referencePath}.installationId`, installation.id);
   }
-  return installation;
+  try {
+    const pack = input.environmentPack ?? admitEnvironmentPack({
+      studyAreaId: input.studyAreaId,
+      weatherPresetId: input.weatherPresetId,
+    }).pack;
+    const groundStart = admitGroundStart({
+      pack,
+      installationId: installation.id,
+      runwayId: input.reference.runwayId,
+    });
+    return { installation, groundStart };
+  } catch {
+    throw new MissionAdmissionError("MISSION_RUNWAY_UNAVAILABLE", `${referencePath}.runwayId`, input.reference.runwayId);
+  }
 }

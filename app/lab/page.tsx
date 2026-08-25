@@ -110,7 +110,6 @@ import {
   createDefaultAirMissionDefinition,
   synchronizeScenarioAirMission,
   updateScenarioAirMissionRoutePoint,
-  type RunwayGeometry,
 } from "@/lib/air-mission";
 import { CURRENT_COMPILED_MODEL_PACK } from "@/lib/engine/weapon-admission";
 
@@ -139,6 +138,33 @@ function formatDistanceKm(distanceM: number) {
   const kilometers = distanceM / 1000;
   return Number.isInteger(kilometers) ? `${kilometers}` : kilometers.toFixed(1);
 }
+
+type CatalogEnvironmentPack = {
+  id: string;
+  version: string;
+  digest: string;
+  study_area_id: string;
+  weather_preset_id: string;
+  terrain_digest: string;
+  atmosphere_digest: string;
+  valid_from: string;
+  valid_until: string;
+};
+
+type CatalogRunway = {
+  id: string;
+  installation_id: string;
+  source_runway_id: string;
+  true_heading_deg: number | string;
+  reciprocal_true_heading_deg: number | string;
+  length_m: number | string;
+  width_m: number | string;
+  surface: string;
+  closed_in_source: boolean;
+  centreline: { type: "LineString"; coordinates: [[number, number], [number, number]] };
+  threshold_elevations_msl_m: { low: number; high: number };
+  mission_start_eligibility: "PUBLIC_EDUCATIONAL" | "INELIGIBLE";
+};
 
 export default function LabPage() {
   const searchParams = useSearchParams();
@@ -246,6 +272,8 @@ function LabWorkbench({
     "loading",
   );
   const [catalogInstallations, setCatalogInstallations] = useState<MapInstallation[]>([]);
+  const [catalogRunways, setCatalogRunways] = useState<CatalogRunway[]>([]);
+  const [catalogEnvironmentPacks, setCatalogEnvironmentPacks] = useState<CatalogEnvironmentPack[]>([]);
   const [catalogStudyAreas, setCatalogStudyAreas] = useState<StudyArea[]>([]);
   const [catalogCredibility, setCatalogCredibility] =
     useState<CatalogCredibilityAdmission | null>(null);
@@ -300,16 +328,19 @@ function LabWorkbench({
         const payload = data as {
           state?: string;
           installations?: MapInstallation[];
+          runways?: CatalogRunway[];
+          environmentPacks?: CatalogEnvironmentPack[];
           simulationModels?: Parameters<typeof registerDatabaseSimulationModels>[0];
           scenarioTemplates?: StoredScenarioPackage[];
           credibilityAdmissions?: CatalogCredibilityAdmission[];
           installationCatalogue?: {
-            schemaVersion: "vector.installation-catalogue.v1";
+            schemaVersion: "vector.installation-catalogue.v2";
             id: string;
             version: string;
             digest: string;
             coverage: { declaredServiceCoverage: string; includedRecordCount: number };
             records: Array<{ id: string; sourceId: string; longitude: number; latitude: number }>;
+            runways: Array<{ id: string; installationId: string; missionStartEligibility: string }>;
           };
           studyAreas?: Array<{
             id: StudyArea["id"];
@@ -349,13 +380,15 @@ function LabWorkbench({
             !isScenarioDefinition(template.package) ||
             !payload.simulationModels?.length ||
             !payload.installationCatalogue ||
-            payload.installationCatalogue.schemaVersion !== "vector.installation-catalogue.v1" ||
+            payload.installationCatalogue.schemaVersion !== "vector.installation-catalogue.v2" ||
             payload.installationCatalogue.id !== INSTALLATION_CATALOGUE_IDENTITY.id ||
             payload.installationCatalogue.version !== INSTALLATION_CATALOGUE_IDENTITY.version ||
             payload.installationCatalogue.digest !== INSTALLATION_CATALOGUE_IDENTITY.digest ||
             payload.installationCatalogue.coverage.declaredServiceCoverage !== "BOUNDED_PUBLIC_REFERENCE_FIXTURE" ||
             payload.installationCatalogue.coverage.includedRecordCount !== payload.installations?.length ||
             payload.installationCatalogue.records.length !== payload.installations?.length ||
+            payload.installationCatalogue.runways.length !== payload.runways?.length ||
+            payload.environmentPacks?.length !== 12 ||
             payload.installations?.some((installation) => {
               const record = payload.installationCatalogue?.records.find((candidate) => candidate.id === installation.id);
               return !record
@@ -385,6 +418,8 @@ function LabWorkbench({
           setCatalogState("POSTGIS");
           setCatalogCredibility(credibility);
           setCatalogInstallations(payload.installations ?? []);
+          setCatalogRunways(payload.runways ?? []);
+          setCatalogEnvironmentPacks(payload.environmentPacks ?? []);
           setCatalogStudyAreas(
             payload.studyAreas.map((area) => ({
               id: area.id,
@@ -767,6 +802,8 @@ function LabWorkbench({
           catalogState={catalogState}
           credibility={catalogCredibility}
           installations={catalogInstallations}
+          runways={catalogRunways}
+          environmentPacks={catalogEnvironmentPacks}
           spatialInputsValid={spatialInputsValid}
           onSpatialValidityChange={setSpatialInputsValid}
           run={run}
@@ -866,6 +903,9 @@ function LabWorkbench({
             <div
               className={`scene-wrap ${playbackSurface === "MAP" ? "map-surface" : "three-d-surface"}`}
             >
+              <div className="environment-pack-identity" role="status">
+                Environment {result.engineRun.scenario.geospatial.environmentPack.identity.version} · {result.engineRun.scenario.geospatial.environmentPack.identity.digest.slice(0, 20)}… · {result.engineRun.scenario.geospatial.environmentPack.coverage.verticalDatum} · {result.engineRun.scenario.geospatial.environmentPack.validity.startsAt}
+              </div>
               {playbackSurface === "MAP" ? (
                 <EngagementMap
                   result={result}
@@ -1005,6 +1045,8 @@ function ConfigureWorkspace({
   catalogState,
   credibility,
   installations,
+  runways,
+  environmentPacks,
   spatialInputsValid,
   onSpatialValidityChange,
   run,
@@ -1021,6 +1063,8 @@ function ConfigureWorkspace({
   catalogState: "loading" | "POSTGIS" | "error";
   credibility: CatalogCredibilityAdmission | null;
   installations: MapInstallation[];
+  runways: CatalogRunway[];
+  environmentPacks: CatalogEnvironmentPack[];
   spatialInputsValid: boolean;
   onSpatialValidityChange: (valid: boolean) => void;
   run: () => void;
@@ -1061,6 +1105,11 @@ function ConfigureWorkspace({
   const selectedWeather = selectedStudyArea?.weatherPresets.find(
     (preset) => preset.id === scenario.weatherPresetId,
   );
+  const selectedEnvironmentPack = environmentPacks.find((pack) =>
+    pack.study_area_id === scenario.studyAreaId && pack.weather_preset_id === scenario.weatherPresetId);
+  const blueGroundStartAvailable = runways.some((runway) =>
+    runway.id === scenario.spatialPlan?.blue.originReference?.runwayId
+    && runway.mission_start_eligibility === "PUBLIC_EDUCATIONAL");
   const update = <K extends keyof Scenario>(key: K, value: Scenario[K]) =>
     setScenario((current) => ({ ...current, [key]: value }));
   const applySpatialPlan = (plan: ScenarioSpatialPlan) => {
@@ -1095,19 +1144,25 @@ function ConfigureWorkspace({
       }
       const origin = current.spatialPlan.blue.originReference;
       const installation = installations.find((item) => item.id === origin?.installationId);
-      const elevationM = installation?.elevation_ft !== undefined && installation.elevation_ft !== null
-        ? Number(installation.elevation_ft) * 0.3048
-        : selectedStudyArea?.surfaceElevationM ?? 0;
-      const longitude = installation ? Number(installation.longitude) : current.spatialPlan.blue.position.longitude;
-      const latitude = installation ? Number(installation.latitude) : current.spatialPlan.blue.position.latitude;
+      const sourceRunway = runways.find((item) => item.id === origin?.runwayId
+        && item.installation_id === installation?.id
+        && item.mission_start_eligibility === "PUBLIC_EDUCATIONAL");
+      if (!origin || !installation || !sourceRunway?.centreline || !sourceRunway.threshold_elevations_msl_m) return current;
+      const elevationM = Number(sourceRunway.threshold_elevations_msl_m.low);
+      const longitude = Number(sourceRunway.centreline.coordinates[0][0]);
+      const latitude = Number(sourceRunway.centreline.coordinates[0][1]);
       const threshold = { longitude, latitude, elevation: { valueM: elevationM, datum: "MSL" as const } };
       const runwayMaterial = {
-        id: "educational-runway-assumption-v1",
+        id: sourceRunway.id,
         threshold,
-        end: { longitude: longitude + 0.01, latitude, elevation: { valueM: elevationM, datum: "MSL" as const } },
-        headingDeg: 90,
-        lengthM: 1_000,
-        widthM: 30,
+        end: {
+          longitude: Number(sourceRunway.centreline.coordinates[1][0]),
+          latitude: Number(sourceRunway.centreline.coordinates[1][1]),
+          elevation: { valueM: Number(sourceRunway.threshold_elevations_msl_m.high), datum: "MSL" as const },
+        },
+        headingDeg: Number(sourceRunway.true_heading_deg),
+        lengthM: Number(sourceRunway.length_m),
+        widthM: Number(sourceRunway.width_m),
         surface: "PAVED" as const,
         operationalState: "OPEN" as const,
       };
@@ -1135,8 +1190,8 @@ function ConfigureWorkspace({
             installationId: origin?.installationId ?? "",
             installationSourceId: origin?.sourceId ?? "",
             runway: bindRunwayEvidence(runwayMaterial, {
-              state: "MODEL_ASSUMPTION",
-              sourceId: "visible-authoring:educational-runway-assumption-v1",
+              state: "SOURCED",
+              sourceId: `${INSTALLATION_CATALOGUE_IDENTITY.id}@${INSTALLATION_CATALOGUE_IDENTITY.version}:${sourceRunway.source_runway_id}:${INSTALLATION_CATALOGUE_IDENTITY.digest}`,
             }),
             readinessDelaySeconds: posture === "GROUND_ALERT_QRA" ? 300 : 0,
             taxiFidelity: "ABSTRACTED",
@@ -1147,19 +1202,84 @@ function ConfigureWorkspace({
       };
     });
   };
-  const updateGroundRunway = (patch: Partial<Omit<RunwayGeometry, "evidence">>) => {
+  const reverseMissionRunwayDirection = () => {
     setScenario((current) => {
-      if (!current.airMission || current.airMission.start.posture === "AIRBORNE") return current;
-      const { evidence, ...material } = current.airMission.start.runway;
-      const runway = bindRunwayEvidence(
-        { ...material, ...patch },
-        { state: evidence.state, sourceId: evidence.sourceId },
+      if (
+        !current.airMission ||
+        !current.spatialPlan ||
+        current.domain !== "A2A"
+      ) return current;
+      const mission = current.airMission;
+      if (mission.start.posture === "AIRBORNE") return current;
+      const start = mission.start;
+      const sourceRunway = runways.find((item) =>
+        item.id === start.runway.id &&
+        item.installation_id === start.installationId &&
+        item.mission_start_eligibility === "PUBLIC_EDUCATIONAL",
       );
-      return {
+      if (!sourceRunway?.centreline || !sourceRunway.threshold_elevations_msl_m) return current;
+      const currentlyForward = Math.abs(
+        start.runway.headingDeg - Number(sourceRunway.true_heading_deg),
+      ) < 1e-6;
+      const thresholdIndex = currentlyForward ? 1 : 0;
+      const endIndex = currentlyForward ? 0 : 1;
+      const thresholdElevationM = Number(
+        currentlyForward
+          ? sourceRunway.threshold_elevations_msl_m.high
+          : sourceRunway.threshold_elevations_msl_m.low,
+      );
+      const endElevationM = Number(
+        currentlyForward
+          ? sourceRunway.threshold_elevations_msl_m.low
+          : sourceRunway.threshold_elevations_msl_m.high,
+      );
+      const longitude = Number(sourceRunway.centreline.coordinates[thresholdIndex][0]);
+      const latitude = Number(sourceRunway.centreline.coordinates[thresholdIndex][1]);
+      const runway = bindRunwayEvidence({
+        id: sourceRunway.id,
+        threshold: {
+          longitude,
+          latitude,
+          elevation: { valueM: thresholdElevationM, datum: "MSL" },
+        },
+        end: {
+          longitude: Number(sourceRunway.centreline.coordinates[endIndex][0]),
+          latitude: Number(sourceRunway.centreline.coordinates[endIndex][1]),
+          elevation: { valueM: endElevationM, datum: "MSL" },
+        },
+        headingDeg: Number(
+          currentlyForward
+            ? sourceRunway.reciprocal_true_heading_deg
+            : sourceRunway.true_heading_deg,
+        ),
+        lengthM: Number(sourceRunway.length_m),
+        widthM: Number(sourceRunway.width_m),
+        surface: "PAVED",
+        operationalState: "OPEN",
+      }, {
+        state: "SOURCED",
+        sourceId: `${INSTALLATION_CATALOGUE_IDENTITY.id}@${INSTALLATION_CATALOGUE_IDENTITY.version}:${sourceRunway.source_runway_id}:${INSTALLATION_CATALOGUE_IDENTITY.digest}`,
+      });
+      const spatialPlan: ScenarioSpatialPlan = {
+        ...current.spatialPlan,
+        blue: {
+          ...current.spatialPlan.blue,
+          position: { longitude, latitude, altitudeM: thresholdElevationM, verticalDatum: "MSL" },
+          route: current.spatialPlan.blue.route.map((point, index) => index === 0
+            ? { longitude, latitude, altitudeM: thresholdElevationM, verticalDatum: "MSL" }
+            : point),
+        },
+      };
+      const synchronized = synchronizeScenarioAirMission({
         ...current,
+        spatialPlan,
+        altitude: thresholdElevationM,
+      }, CURRENT_COMPILED_MODEL_PACK);
+      return {
+        ...synchronized,
         airMission: {
-          ...current.airMission,
-          start: { ...current.airMission.start, runway },
+          ...synchronized.airMission!,
+          start: { ...start, runway },
         },
       };
     });
@@ -1726,6 +1846,11 @@ function ConfigureWorkspace({
                     <small>
                       {selectedStudyArea.terrainClass.toLowerCase().replaceAll("_", " ")} · {selectedStudyArea.surfaceElevationM} m reference terrain · ISA {selectedWeather.temperatureOffsetC >= 0 ? "+" : ""}{selectedWeather.temperatureOffsetC} °C · wind {selectedWeather.windEastMps} E / {selectedWeather.windNorthMps} N m/s
                     </small>
+                    <small>
+                      {selectedEnvironmentPack
+                        ? `Environment ${selectedEnvironmentPack.version} · ${selectedEnvironmentPack.digest.slice(0, 20)}… · terrain ${selectedEnvironmentPack.terrain_digest.slice(0, 16)}… · atmosphere ${selectedEnvironmentPack.atmosphere_digest.slice(0, 16)}…`
+                        : "Selected environment pack is not admitted by PostGIS."}
+                    </small>
                   </div>
                   <button
                     type="button"
@@ -1803,7 +1928,7 @@ function ConfigureWorkspace({
                 <header>
                   <span>START & RECOVERY</span>
                   <strong>One compiled start posture; no coordinate-only base or runway substitution.</strong>
-                  <p>Ground geometry is an explicit educational model assumption until sourced runway evidence is admitted. Its exact classification and digest are frozen with the run.</p>
+                  <p>Ground geometry is the exact sourced runway artifact admitted by the selected immutable environment pack. Aircraft ground-performance limits remain separately labelled model assumptions.</p>
                 </header>
                 <label className="field">
                   <span>Start posture</span>
@@ -1814,9 +1939,9 @@ function ConfigureWorkspace({
                     onChange={(event) => setMissionStartPosture(event.target.value as NonNullable<Scenario["airMission"]>["start"]["posture"])}
                   >
                     <option value="AIRBORNE">Airborne</option>
-                    <option value="PARKING">Parking / ground start</option>
-                    <option value="RUNWAY">Runway start</option>
-                    <option value="GROUND_ALERT_QRA">Ground alert / QRA</option>
+                    <option value="PARKING" disabled={!blueGroundStartAvailable}>Parking / ground start</option>
+                    <option value="RUNWAY" disabled={!blueGroundStartAvailable}>Runway start</option>
+                    <option value="GROUND_ALERT_QRA" disabled={!blueGroundStartAvailable}>Ground alert / QRA</option>
                   </select>
                 </label>
                 {scenario.airMission.start.posture === "AIRBORNE" ? (
@@ -1833,53 +1958,13 @@ function ConfigureWorkspace({
                       </div>
                     )}
                     <div className="advanced-grid">
-                      <label className="field">
-                        <span>Runway artifact ID</span>
-                        <input
-                          aria-label="Runway artifact ID"
-                          value={scenario.airMission.start.runway.id}
-                          onChange={(event) => updateGroundRunway({ id: event.target.value })}
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Heading</span>
-                        <input
-                          type="number"
-                          aria-label="Runway heading"
-                          value={scenario.airMission.start.runway.headingDeg}
-                          onChange={(event) => updateGroundRunway({ headingDeg: Number(event.target.value) })}
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Length (m)</span>
-                        <input
-                          type="number"
-                          aria-label="Runway length"
-                          value={scenario.airMission.start.runway.lengthM}
-                          onChange={(event) => updateGroundRunway({ lengthM: Number(event.target.value) })}
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Width (m)</span>
-                        <input
-                          type="number"
-                          aria-label="Runway width"
-                          value={scenario.airMission.start.runway.widthM}
-                          onChange={(event) => updateGroundRunway({ widthM: Number(event.target.value) })}
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Surface</span>
-                        <select
-                          aria-label="Runway surface"
-                          data-vector-overlay-exempt="ua-native-select"
-                          value={scenario.airMission.start.runway.surface}
-                          onChange={(event) => updateGroundRunway({ surface: event.target.value as RunwayGeometry["surface"] })}
-                        >
-                          <option value="PAVED">Paved</option>
-                          <option value="UNPAVED">Unpaved</option>
-                        </select>
-                      </label>
+                      <div className="fixed-condition">
+                        <strong>Sourced runway · {scenario.airMission.start.runway.id}</strong>
+                        <p>{scenario.airMission.start.runway.headingDeg.toFixed(1)}° true · {scenario.airMission.start.runway.lengthM.toFixed(1)} × {scenario.airMission.start.runway.widthM.toFixed(1)} m · {scenario.airMission.start.runway.surface.toLowerCase()}</p>
+                        <button type="button" className="tool-button" onClick={reverseMissionRunwayDirection}>
+                          Reverse takeoff direction
+                        </button>
+                      </div>
                       <label className="field">
                         <span>Readiness delay (s)</span>
                         <input

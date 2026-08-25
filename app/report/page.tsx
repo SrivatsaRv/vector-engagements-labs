@@ -22,7 +22,8 @@ import {
   type ReportData,
   type ReportLibraryScenario,
 } from "@/lib/report-export";
-import { simulate, standardAtmosphere } from "@/lib/simulation";
+import { simulate } from "@/lib/simulation";
+import { createEnvironmentSampler } from "@/lib/geospatial/environment-pack";
 import { ENGINE_VERSION } from "@/lib/engine/version";
 import { getStudyArea, getWeatherPreset } from "@/lib/study-areas";
 
@@ -176,10 +177,15 @@ export default function ReportPage() {
     ...(redPlatform?.sourceIds ?? redObject.sourceIds ?? []),
     ...(redWeapon?.sourceIds ?? []),
   ];
-  const atmosphere = standardAtmosphere(
-    scenario.altitude,
-    scenario.temperatureOffset,
-  );
+  const environmentPack = result.engineRun.scenario.geospatial.environmentPack;
+  const initialBlue = result.engineRun.scenario.entities.find((entity) => entity.affiliation === "BLUE")!.initial.position;
+  const environmentSample = createEnvironmentSampler(environmentPack).sample({
+    eastM: initialBlue.x,
+    northM: initialBlue.y,
+    upM: initialBlue.z,
+    modelTimeSeconds: 0,
+  });
+  const atmosphere = environmentSample.atmosphere;
   const studyArea = getStudyArea(scenario.studyAreaId);
   const weatherPreset = getWeatherPreset(studyArea, scenario.weatherPresetId);
   const driver = `${scenario.guidance} trajectory and initial range`;
@@ -480,8 +486,12 @@ export default function ReportPage() {
                   <dd>{studyArea.shortName}</dd>
                   <dt>Weather preset</dt>
                   <dd>{weatherPreset.label}</dd>
-                  <dt>Reference</dt>
-                  <dd>NASA educational standard atmosphere</dd>
+                  <dt>Environment pack</dt>
+                  <dd>{environmentPack.identity.id}@{environmentPack.identity.version} · {environmentPack.identity.digest}</dd>
+                  <dt>Reference time / datum</dt>
+                  <dd>{environmentPack.validity.startsAt} · {environmentPack.coverage.verticalDatum}</dd>
+                  <dt>Terrain / atmosphere</dt>
+                  <dd>{environmentPack.terrain.digest} / {environmentPack.atmosphere.digest}</dd>
                   <dt>Temperature</dt>
                   <dd>{(atmosphere.temperatureK - 273.15).toFixed(1)} °C</dd>
                   <dt>Pressure</dt>
