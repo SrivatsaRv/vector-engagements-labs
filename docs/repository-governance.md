@@ -113,6 +113,19 @@ source freeze bound to its catalog, model-pack, physics, information-state,
 security, testing, and family-specific changelog sections without granting the
 source bundle production-runtime ownership.
 
+Post-bootstrap contract additions use that same revision-bound mechanism when
+they extend an existing family. The `MODEL_PACK_COMPILER_RESOLVER` family owns
+the registered authority, schema/migration, requirement/evidence, procedure,
+anonymous-proof, storage/recovery, and nonclaim sections in
+`aircraft-model-pack-onboarding.md`. Its introducing revision changes that exact
+document and declares those sections `SEMANTIC`; the guide does not create a
+parallel aircraft schema or inherit authority from an unchanged heading.
+Its existing `COMPILED_MODEL_PACK_FIXTURES` generated group remains the single
+prefix owner for model-pack fixtures and retains the original freshness command.
+That command now verifies both the legacy v1 fixture and the two v2 anonymous
+research archives through registered generator and input rules, so one clean
+archive check detects drift across the whole model-pack fixture family.
+
 Governed `EXACT` implementation, test, or generated rules may leave the active
 inventory only through an append-only `ruleRetirements` tombstone. The
 tombstone binds the exact merge-base commit, canonical base-policy digest,

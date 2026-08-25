@@ -51,6 +51,7 @@ observability-local: compose-up
 
 performance-local:
 	npm run performance:verify
+	npm run performance:model-pack-foundation:verify
 	npm run performance:track-store:verify
 	npm run capacity:baseline:verify
 	npm run reference-aam:performance

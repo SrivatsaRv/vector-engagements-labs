@@ -390,6 +390,35 @@
         },
         {
           "kind": "EXACT",
+          "value": "scripts/generate-aircraft-model-pack-foundation-fixtures.ts",
+          "facets": [
+            "digest",
+            "evidence",
+            "schema",
+            "storage",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/lib/anonymous-model-pack-foundation.ts",
+          "facets": [
+            "digest",
+            "evidence",
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-model-pack-foundation.ts",
+          "facets": [
+            "storage",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "scripts/verify-governed-catalog-data.ts",
           "facets": [
             "admission"
@@ -535,12 +564,35 @@
               "facets": [
                 "digest"
               ]
+            },
+            {
+              "kind": "EXACT",
+              "value": "lib/model-pack.ts",
+              "facets": [
+                "digest",
+                "schema"
+              ]
+            },
+            {
+              "kind": "EXACT",
+              "value": "scripts/lib/anonymous-model-pack-foundation.ts",
+              "facets": [
+                "digest",
+                "evidence"
+              ]
             }
           ],
           "generatorRules": [
             {
               "kind": "EXACT",
               "value": "scripts/generate-model-pack-fixture.ts",
+              "facets": [
+                "digest"
+              ]
+            },
+            {
+              "kind": "EXACT",
+              "value": "scripts/generate-aircraft-model-pack-foundation-fixtures.ts",
               "facets": [
                 "digest"
               ]
@@ -552,10 +604,84 @@
             "--check"
           ]
         }
-      ],
-      "owningSections": [
-        {
-          "sectionId": "MODEL_PACK_ARTIFACT_BOUNDARIES",
+    ],
+    "owningSections": [
+      {
+        "sectionId": "MODEL_PACK_ONBOARDING_AUTHORITY_LAYERS",
+        "path": "docs/aircraft-model-pack-onboarding.md",
+        "heading": "## Authority layers",
+        "facets": [
+          "digest",
+          "evidence",
+          "schema"
+        ]
+      },
+      {
+        "sectionId": "MODEL_PACK_ONBOARDING_SCHEMA_MIGRATION",
+        "path": "docs/aircraft-model-pack-onboarding.md",
+        "heading": "## Schema and migration reference",
+        "facets": [
+          "schema"
+        ]
+      },
+      {
+        "sectionId": "MODEL_PACK_ONBOARDING_REQUIREMENTS_EVIDENCE",
+        "path": "docs/aircraft-model-pack-onboarding.md",
+        "heading": "## Closed requirements and evidence states",
+        "facets": [
+          "admission",
+          "datum",
+          "evidence",
+          "unit",
+          "validity"
+        ]
+      },
+      {
+        "sectionId": "MODEL_PACK_ONBOARDING_PROCEDURE",
+        "path": "docs/aircraft-model-pack-onboarding.md",
+        "heading": "## Step-by-step onboarding",
+        "facets": [
+          "digest",
+          "evidence",
+          "schema",
+          "storage"
+        ]
+      },
+      {
+        "sectionId": "MODEL_PACK_ONBOARDING_ANONYMOUS_PROOF",
+        "path": "docs/aircraft-model-pack-onboarding.md",
+        "heading": "## Anonymous worked example",
+        "facets": [
+          "verification"
+        ]
+      },
+      {
+        "sectionId": "MODEL_PACK_ONBOARDING_STORAGE_RECOVERY",
+        "path": "docs/aircraft-model-pack-onboarding.md",
+        "heading": "## Bounds, storage, and recovery",
+        "facets": [
+          "storage"
+        ]
+      },
+      {
+        "sectionId": "MODEL_PACK_ONBOARDING_PERFORMANCE",
+        "path": "docs/aircraft-model-pack-onboarding.md",
+        "heading": "## Performance evidence",
+        "facets": [
+          "verification"
+        ]
+      },
+      {
+        "sectionId": "MODEL_PACK_ONBOARDING_NONCLAIMS",
+        "path": "docs/aircraft-model-pack-onboarding.md",
+        "heading": "## Nonclaims and deferred owners",
+        "facets": [
+          "admission",
+          "runtime"
+        ]
+      },
+      {
+        "sectionId": "MODEL_PACK_ARTIFACT_BOUNDARIES",
           "path": "docs/model-pack-contract.md",
           "heading": "## Artifact boundaries",
           "facets": [
@@ -4838,5 +4964,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "c3ecb86eda4cc95d876f0dba14e0c570ce4c7ee279c865378a364f9e66588092"
+  "canonicalSha256": "335b23bacdcee505f6678e9811a3734760951f5483f153ab34393d7c72557b5e"
 }

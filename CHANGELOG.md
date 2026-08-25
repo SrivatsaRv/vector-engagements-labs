@@ -15,6 +15,30 @@ Model-pack persistence table declarations now live in the domain-owned
 `db/schema/model-pack.ts` module behind the unchanged aggregate Drizzle facade.
 Air flight assignments bind exact model-pack, aircraft and compatible
 station/store identities; mission authoring does not duplicate model schemas.
+The existing model-pack family now also defines the non-promotable v2 aircraft
+onboarding foundation: closed intended-use requirements, immutable raw and
+derivative lineage, deterministic completeness and digest chaining, exact
+multi-pack resolution, atomic append-only publication, byte-exact research
+export/import, compiled-only export, and two anonymous regression packs. V1
+remains readable but cannot be promoted through the v2 onboarding boundary.
+The completion slice now covers every authored physical scalar and valid
+configuration with stable selectors and value digests. This includes executable
+sensor/weapon admission categories, station/store membership, and compatibility
+status/capacity; canonical structural IDs remain singly bound as identity rather
+than duplicated scalar lineage. A length-only safe-integer table preflight now
+rejects pathological shapes and more than 2,000,000 cumulative cells before
+source serialization or lineage materialization. Repository publication now
+binds canonical content digests for every independently versioned intended-use
+contract, requirement profile, raw-source record, derivative, and credibility
+manifest across staged and prior batches, so a
+reused `(schema, id, version)` can share only identical content. Research import
+preflights exact entry counts and length-only per-entry and cumulative corpus
+bounds before scanning or copying archive bytes. The slice reproduces derivative
+bytes through one pinned offline recipe, validates the compiled v2 identity in
+both TypeScript and Rust/WASM, publishes two generated anonymous research
+archives, and gates compile/publish/lookup/export/import plus 1/10/100/500 reuse
+against an immutable measured workload. Scenario, Worker, runtime, VSR and UI
+promotion remain downstream under #154, later #161 stages and #155.
 
 #### Database schema
 
@@ -28,6 +52,9 @@ packages/hashes with canonical v4 packages and rejects mixed or residual rows.
 Engine scenarios carry an optional compiled Air mission lineage envelope. The
 generic physics ABI is unchanged; Rust/WASM results reattach the verified
 envelope for backend-independent VSR provenance.
+The WASM-capable Rust core also validates the exact-key compiled model-pack v2
+schema and reproduces the TypeScript digest on an anonymous fixture. This adds
+no exported simulation ABI, backend-selection rule or v2 runtime admission.
 
 #### Generic AAM verification
 
@@ -55,6 +82,9 @@ including public-reference and performance subtrees.
 Compiled Air start, route speed, fuel and installed-store quantity now drive
 generic initial state, mass and endurance without mission-class or named-case
 physics branches.
+The Rust compiled-model-pack v2 identity validator is schema-only offline
+publication/readback support; it changes no equation, numerical path, runtime
+admission, or tick behavior.
 
 #### Browser Worker protocol
 
@@ -67,6 +97,8 @@ Saved-run record and admission tables now have separate domain-owned schema
 modules without changing their persisted representation.
 Air VSRs bind authored and compiled mission identities across scenario,
 compiled, manifest and report members and revalidate them before replay.
+The Rust compiled-model-pack v2 identity validator adds no VSR schema, member,
+writer/reader, Worker, or replay behavior.
 
 #### Capability descriptors
 

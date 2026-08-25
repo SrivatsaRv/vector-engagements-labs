@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "vector.model-pack-foundation-performance-workload.v1",
+  "fixture": {
+    "path": "fixtures/model-packs/anonymous-pack-alpha.governed.v2.json",
+    "id": "anonymous-pack-alpha",
+    "version": "2.0.0",
+    "digest": "2a6ba318448b85fa2231da4e48d5d21dacdfe2407d453ac527a39b35e2c0de82"
+  },
+  "warmupRuns": 2,
+  "sampleRuns": 12,
+  "operations": [
+    { "id": "compile", "p50BudgetMs": 750, "p95BudgetMs": 900, "p99BudgetMs": 1000, "maxBudgetMs": 2000 },
+    { "id": "publish", "p50BudgetMs": 1000, "p95BudgetMs": 1250, "p99BudgetMs": 1500, "maxBudgetMs": 2500 },
+    { "id": "exactLookup", "p50BudgetMs": 50, "p95BudgetMs": 75, "p99BudgetMs": 100, "maxBudgetMs": 250 },
+    { "id": "researchExport", "p50BudgetMs": 125, "p95BudgetMs": 200, "p99BudgetMs": 250, "maxBudgetMs": 500 },
+    { "id": "researchImport", "p50BudgetMs": 1000, "p95BudgetMs": 1250, "p99BudgetMs": 1500, "maxBudgetMs": 2500 },
+    { "id": "compiledReuse1", "p50BudgetMs": 5, "p95BudgetMs": 8, "p99BudgetMs": 10, "maxBudgetMs": 25 },
+    { "id": "compiledReuse10", "p50BudgetMs": 5, "p95BudgetMs": 8, "p99BudgetMs": 10, "maxBudgetMs": 25 },
+    { "id": "compiledReuse100", "p50BudgetMs": 10, "p95BudgetMs": 20, "p99BudgetMs": 25, "maxBudgetMs": 75 },
+    { "id": "compiledReuse500", "p50BudgetMs": 30, "p95BudgetMs": 60, "p99BudgetMs": 75, "maxBudgetMs": 200 }
+  ],
+  "workloadDigest": "8a438546acdfc3d3bf49d8052e26865c275f2d3fa9b935763e1271438f706e5c"
+}

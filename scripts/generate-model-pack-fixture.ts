@@ -19,3 +19,5 @@ if (process.argv.includes("--check")) {
   await writeFile(outputPath, output);
   process.stdout.write(`generated ${bundle.pack.digest}\n`);
 }
+
+await import("./generate-aircraft-model-pack-foundation-fixtures.ts");

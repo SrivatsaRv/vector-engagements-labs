@@ -1,6 +1,7 @@
 # Executable model-pack and credibility contract
 
-Status: implemented foundation, schema family v1, 2026-08-06.
+Status: v1 runtime foundation plus non-promotable governed-aircraft Stage B,
+schema family v2, 2026-08-25.
 
 This contract makes VECTOR object data executable without claiming that the
 current scalar assumptions are a flight model. It is the shared boundary for
@@ -17,6 +18,9 @@ The following artifacts have different owners and must not be collapsed:
 
 | Artifact | Identity | Mutable | Responsibility |
 | --- | --- | --- | --- |
+| Intended-use requirement profile | `(id, version, digest)` | no after publication | Closed data families, selectors, applicability, evidence roles, and computed completeness |
+| Raw source artifact | `(id, version)` plus exact byte digest | no | Subject/configuration, locator/retrieval, rights/export state, eligibility and nonclaims; bytes stay in research storage |
+| Lawful derivative | `(id, version)` plus ordered input/output digests | no | Reproducible recipe/tool/environment, transforms, uncertainty propagation, and normalized bytes |
 | Catalog identity | `catalogObjectId` | only by a new catalog revision | Human-facing object identity, designation, source assertions, and public facts |
 | Model-pack source | `(id, version)` plus source hash | no after publication | Human-readable quantities with units, evidence, component references, domains, and limitations |
 | Compiled model pack | `(id, version, digest)` | no | Resolved indexes and SI-normalized numeric arrays used to construct runtime inputs |
@@ -53,6 +57,13 @@ column, constraint, and JSON payload contracts are unchanged.
 | --- | --- | --- |
 | source | `vector.model-pack-source.v1` | `ModelPackSource` |
 | compiled pack | `vector.compiled-model-pack.v1` | `CompiledModelPack` |
+| governed aircraft requirements | `vector.model-pack-requirement-profile.v1` | `ModelPackRequirementProfile` |
+| governed raw artifact | `vector.aircraft-raw-source-artifact.v1` | `AircraftRawSourceArtifact` |
+| governed derivative | `vector.aircraft-derivative.v1` | `AircraftDerivativeRecord` |
+| governed source | `vector.model-pack-source.v2` | `ModelPackSourceV2` |
+| governed compiled pack | `vector.compiled-model-pack.v2` | `CompiledModelPackV2` |
+| governed research export | `vector.governed-model-pack-export.v1` | `GovernedModelPackResearchExport` |
+| compiled-only export | `vector.compiled-model-pack-export.v1` | `CompiledModelPackExport` |
 | intended use | `vector.intended-use.v1` | `IntendedUseContract` |
 | credibility | `vector.credibility-manifest.v1` | `CredibilityManifest` |
 | scenario patch | `vector.model-patch.v1` | `ScenarioModelPatch` |
@@ -64,6 +75,14 @@ the same compiled JSON contract in
 [`engine-rust/src/model_pack.rs`](../engine-rust/src/model_pack.rs). The committed
 cross-language fixture is
 [`fixtures/model-packs/vector-scalar-study-v0.8.compiled.json`](../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json).
+
+The v2 contracts extend this family for generic aircraft onboarding. V1 remains
+digest-verifiable and readable for its existing declared uses, but it cannot be
+promoted through the v2 onboarding boundary because it lacks closed requirement,
+raw-byte, derivative, and field-lineage semantics. Stage-B v2 packs are likewise
+foundation-only: deployment resolution rejects until #154 and the later
+Worker/runtime/VSR admission stages land. See the normative
+[`aircraft onboarding guide`](aircraft-model-pack-onboarding.md).
 
 ## Source definition
 
@@ -85,6 +104,27 @@ and its matching supported compatibility rule because every canonical template
 already authors two stores. Any future quantity change is a source-model change
 that regenerates the compiled digest; it is not inferred from scenario demand.
 
+`ModelPackSourceV2` preserves that executable source projection and adds one
+strict `governance` member containing the intended-use requirement profile,
+raw-source artifact metadata, lawful derivative records, and per-field lineage.
+The compiler enumerates every executable scalar and categorical authority,
+including sensor kind, weapon seeker/support/launch state, every table axis/cell,
+station group/capacity/store membership, and compatibility status/capacity.
+Stable component-relative selectors bind each value and every owning
+configuration to an exact value digest, component, evidence role,
+raw and derivative digest, URI and record locator, unit, frame, datum,
+uncertainty, and validity. The derivative ancestry and transformation selector
+must preserve the same subject, configuration, unit, frame, and datum;
+the selector must resolve inside the component/data-family authority rather
+than naming a conceptual, missing, object, or array value. Transformation
+selectors are unique within a derivative.
+`REFERENCE_ONLY` or `INELIGIBLE` evidence cannot satisfy executable coverage.
+When both roles are required, validation must use raw and derivative identities
+independent from source evidence.
+`UNKNOWN`, `UNAVAILABLE`, `ASSUMPTION`, `REFERENCE_ONLY`, `UNSUPPORTED`, and
+`NOT_APPLICABLE` require a gap reason and cannot carry executable lineage. Zero
+never represents missing data.
+
 Every physical quantity is `{ value, unit, evidenceRefIds }`. Supported source
 units are deliberately closed: dimensionless, kg/g, m/km/ft, m²/cm², s/ms,
 N/kN, m/s or km/h, rad/deg, g0, and kg/(N·s). Unsupported or absent units are a
@@ -92,6 +132,12 @@ compile error. Coefficient tables declare output units, ordered axes, axis
 units, evidence, and their own validity domain. The product of all axis lengths
 must equal the flattened value length; axes must be finite and strictly
 increasing.
+
+Stable model, station, store, rule, and table IDs are structural references and
+are already bound once by canonical source identity; scalar lineage does not
+duplicate those IDs as values. Set-like compatible-store membership is different:
+each member is executable permission and therefore has its own stable ID-token
+selector and lineage.
 
 Every model and table carries a non-empty validity domain:
 
@@ -167,14 +213,38 @@ envelope resolver hashes only governed `MODEL_ASSUMPTION` values plus the
 compiled aircraft evidence/limitation identity; it does not parse authored
 performance values.
 
+`compileGovernedModelPack(input)` is the v2 Stage-B compiler. Before invoking
+the unchanged v1 SI projection it enforces exact v2 keys, immutable byte hashes,
+subject/configuration/locator equality, ordered derivative ancestry, recipe and
+tool identity, explicit units/frames/datums/uncertainty/validity, eligibility,
+and admission bounds. It reruns the one pinned offline derivative recipe and
+requires byte-exact output. It canonicalizes model registries, governance arrays
+and nested sets whose order has no authored meaning while retaining ordered
+table dimensions, derivative inputs, recipe arguments and coefficient values.
+The result binds requirement-profile, source, lineage, legacy SI
+projection, and final compiled digests. A raw-byte change rejects against the
+old chain and changes every downstream identity after a lawful rebuild.
+
+Before source serialization or governed-field materialization, one bounded
+table preflight checks 1..6 axes, positive axis cardinalities, safe-integer axis
+products, exact flattened-value cardinality, and the cumulative 2,000,000-cell
+limit. Shape failures use `[MODEL_PACK_TABLE_SHAPE]` with the exact table path;
+cumulative capacity failures use `[MODEL_PACK_TABLE_BOUNDS]`. The preflight
+reads array lengths only, so an oversized or overflow-shaped table cannot force
+millions of lineage objects or requirement matches before rejection.
+
 The digest excludes only the outer `digest` member. Object keys use Unicode
-code-point order. Arrays retain authored order. To avoid JavaScript/Rust
+code-point order. Semantically ordered arrays retain authored order; registry
+and set-like arrays are ordered canonically before compilation. To avoid JavaScript/Rust
 floating-point formatting differences, numbers are hashed as normalized
 scientific strings with 12 digits after the decimal point and a normalized
 exponent. The compiled payload still contains numbers, not strings. Changing a
 governed value at that precision changes the digest. TypeScript
-`verifyCompiledModelPackDigest` and Rust `validate_model_pack_json` implement the
-same rule.
+`validateCompiledModelPackV2` and Rust
+`validate_compiled_model_pack_v2_json` enforce exact keys, the v1 projection,
+closed completeness/admission identity and the same final digest. The Rust
+function is schema/identity parity inside the WASM-capable core, not independent
+physical validation or runtime admission.
 
 Compiled component references are zero-based indexes into the corresponding
 pack array. An index outside the array is invalid. The compiler and Rust loader
@@ -205,6 +275,12 @@ The current pack and engine manifests are intentionally `DRAFT`. Their blocking
 limitation states that the v0.5 scalar assumptions cannot be interpreted as
 named-system performance. Reports load this limitation from the manifest; they
 do not maintain independent technical wording.
+
+For v2, completeness is computed rather than authored. Every closed requirement
+is `SATISFIED`, `INCOMPLETE`, or `NOT_APPLICABLE` according to its exact field,
+component, configuration, and `SOURCE`/`VALIDATION` role coverage. A complete
+profile produces only `COMPLETE_FOUNDATION_NON_PROMOTABLE`; an incomplete one
+produces `INCOMPLETE`. Neither state is deployment admission.
 
 ### Named-aircraft performance admission
 
@@ -296,6 +372,12 @@ Every entity provenance contains `sourceObjectId`, `modelId`, `modelVersion`,
 digest. Stable entity IDs survive draft editing, compilation, runtime state,
 recording, save, and report replay.
 
+Stage B adds `ExactModelPackReference` only to the foundation repository port;
+it does not change this scenario schema or its compiler. #154 retains sole
+authority for scenario pack, configuration, and station migration. No Stage-B
+v2 bundle is promoted through scenario binding merely because the repository
+can resolve its exact identity.
+
 A scenario-local patch never edits catalog or compiled-pack data. It records:
 
 - stable patch ID;
@@ -333,6 +415,11 @@ aircraft exactly once at release. Store drag, station moments, and jettison
 remain outside the current model and must not be inferred from compatibility
 metadata.
 
+The v2 governance configuration IDs and exact resolver do not alter these v1
+station/loadout rules, create a scenario configuration selector, or infer
+station geometry or compatibility. That authority remains excluded from Stage
+B and owned by #154 and the existing station/store contracts.
+
 Each compiled weapon also declares a closed seeker mode, support requirement,
 and launch authorization. The current reference pack declares all three as
 unavailable or scheduled-test-only. This is explicit admission evidence, not an
@@ -351,6 +438,36 @@ the current catalogue.
 
 Model-pack storage consumers import the unchanged aggregate schema facade,
 while contract-document ownership follows `db/schema/model-pack.ts` directly.
+
+Stage B also provides `InMemoryModelPackRepository` as the exact resolver and
+storage-port reference, not as durable production persistence. Metadata and
+immutable bytes remain separate. `publishBatch` recompiles every member before
+atomically publishing any; published pack `(id, version)` identities cannot
+change digest. The same transaction stages canonical content-digest identities
+for every independently versioned intended-use contract, requirement profile,
+raw-source artifact, derivative, and credibility manifest. A same-batch or
+later publication may share an exact
+`(schema, id, version)` only when canonical content is identical; conflict
+rejects atomically before any staged member becomes visible. `resolveExact`
+accepts only exact `(id, version, digest)` and rejects
+malformed, missing, stale, corrupt, or incomplete packs. Research export/import
+preserves exact bytes for offline backup/restore/readback, including incomplete
+gap-bearing publications through a separate integrity-only read path;
+compiled-only export accepts complete foundation identities, contains bounded
+lineage, and excludes raw/derivative corpora and recipes.
+
+Admission bounds are 32 MiB per artifact, 64 MiB per raw or derivative corpus,
+8 MiB per v2 source, 2,048 governed records, 128 configurations, six axes per
+table, and 2,000,000 cumulative table cells. Shape/cardinality and table-cell
+bounds reject before source serialization or lineage materialization. The port accepts no
+compression. Research import applies the same 32/64 MiB byte limits across the
+entire archive corpus and a 2,048-entry cap before it scans any byte or calls
+the bounded owned-byte allocator; malformed or unsafe lengths fail with stable
+archive codes.
+Durable database/blob adapters, cache lifecycle, Worker recovery,
+and runtime cache/load remain later-stage dependencies. The immutable Stage-B
+performance workload covers compile, publish, exact lookup, research
+export/import, and 1/10/100/500-instance compiled reuse.
 
 Forward migration
 [`db/migrations/007_model_pack_foundation.sql`](../db/migrations/007_model_pack_foundation.sql)
@@ -401,6 +518,11 @@ digest:  199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73
 state:   DRAFT
 ```
 
+`CURRENT_MODEL_PACK_SOURCE` and `CURRENT_COMPILED_MODEL_PACK` remain the legacy
+v1 reference authority for their existing consumers only. The Stage-B v2
+compiler and repository never import or fall back to either singleton; this
+slice does not migrate their scenario or production-runtime consumers.
+
 It contains the existing four aircraft scalar assumption records, eight weapon
 scalar assumption records, explicit aerodynamic/propulsion/sensor/loadout
 components, and the eight configured compatibility relationships. The declared
@@ -432,6 +554,9 @@ mission, flight-plan, fuel, loadout, or start schema.
 7. Do not add presentation-only properties to the physical model.
 8. Preserve the blocking named-performance limitation until representative
    verification and validation cases pass against the new digest.
+9. For v2 onboarding resolve only the exact triple; never import `CURRENT_*`
+   authority. Do not pass Stage-B v2 packs to scenarios, Workers, ticks, or VSR
+   until their owning later stages explicitly admit that schema.
 
 Aircraft admission also proves that every selected aerodynamic model and its
 tables, propulsion model and thrust/fuel tables, sensor model, and loadout
@@ -450,9 +575,20 @@ mass/endurance effects, and VSR readback against the current compiled model-pack
 digest.
 
 - `npm run models:verify` rejects a stale generated fixture.
+- `npm run models:aircraft-foundation:verify` regenerates both anonymous
+  serialized research archives and rejects identity drift.
 - `tests/model-pack.test.mjs` covers units, validity domains, canonical digests,
   evidence invalidation, malformed inputs, cycles, references, compatibility,
   patches, immutability, and 1/10/100/500-object instantiation.
+- The same suite covers v2 exact keys and bounds, two anonymous packs through one
+  compiler/resolver, closed completeness, subject/configuration and locator
+  laundering, raw/derivative tampering, downstream rebuild invalidation,
+  insertion permutation, atomic publication, exact export/import/readback,
+  compiled-only corpus isolation, v1 read-only migration, and nonpromotion. It
+  also uses length-only hostile arrays to prove oversized, cumulative, mismatched,
+  and safe-integer-overflow table shapes reject without value materialization,
+  and mutates every executable categorical authority while retaining the old
+  source/validation lineage to prove completeness cannot be laundered.
 - `tests/scenario-draft.test.mjs` covers stable IDs, draft revisions, and patch
   preservation.
 - `tests/engine-backends.test.mjs` checks model-pack and entity-provenance parity.
@@ -461,6 +597,11 @@ digest.
 - `db:credibility:verify` proves immutable-update and malformed-insert rejection
   against live PostGIS without retaining test mutations.
 - Rust native tests consume the same fixture and reject digest/index tampering.
+- Rust v2 tests consume the TypeScript-generated anonymous fixture, reproduce
+  its exact digest and reject unknown-key and last-field tampering.
+- `npm run performance:model-pack-foundation:verify` enforces the immutable
+  compile/publish/lookup/export/import/reuse p99 and maximum budgets recorded in
+  `docs/performance-capacity.md`.
 - migration, seed, and live catalog behavior are checked by `db:verify` and
   `app:verify`.
 

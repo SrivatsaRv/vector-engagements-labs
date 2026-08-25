@@ -14,6 +14,11 @@ Vector currently uses a deterministic three-dimensional point-mass reference eng
 
 ## Integrated model
 
+The Rust compiled-model-pack v2 validator checks exact schema and content
+identity only. It does not admit the artifact into a run, execute model values,
+change an equation or integration step, or alter TypeScript/Rust numerical
+behavior.
+
 Air mission compilation changes only admitted initial/route inputs to this
 generic model: airborne/Mach speed, zero-speed runway entry, fuel mass and
 installed store count. Existing point-mass equations, fixed-step integration,

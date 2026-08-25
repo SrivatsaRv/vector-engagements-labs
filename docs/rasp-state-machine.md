@@ -106,6 +106,10 @@ hides entities while this state is selected.
 
 ## Record and replay
 
+The Rust compiled-model-pack v2 identity validator is confined to offline
+publication/readback. It adds no RASP event, picture, observer state, VSR field,
+or replay authority.
+
 Separating saved-record and admission table declarations does not change RASP
 event, picture, or replay authority.
 Air mission lineage extends record admission only; it does not permit replay to
