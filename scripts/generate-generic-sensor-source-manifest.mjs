@@ -134,24 +134,42 @@ const inventory = {
 const visualPages = [];
 const visualInspection = {
   schemaVersion: "vector.generic-sensor-verification-visual-inspection.v1",
-  status: "PRIMARY_INSPECTION_COMPLETE_INDEPENDENT_REVIEW_REQUIRED",
-  inspectionDate: "2026-08-24",
-  inspectionMethod: "FULL_PAGE_RENDER_VISUAL_REVIEW",
-  reviewerRole: "PRIMARY_SOURCE_FREEZE_IMPLEMENTER",
+  status: "DETERMINISTIC_MACHINE_INSPECTION_COMPLETE",
+  inspectionDate: "2026-08-25",
+  inspectionMethod: "INDEPENDENT_SOURCE_TO_RENDER_REPRODUCTION_AND_STRUCTURAL_IMAGE_CHECK",
+  reviewerRole: null,
+  verificationCommand: "node --require ./scripts/lib/generic-sensor-network-deny.cjs scripts/verify-generic-sensor-source-bundle.mjs",
   limitations: [
     "This record is not an authorized human legal or export decision.",
-    "An independent exact-commit review remains required before publication.",
+    "Machine inspection proves exact source-page reproduction, mapping, orientation, dimensions, and non-blank visual content; it does not interpret or transcribe equations.",
     "Rendered images and any OCR are navigation aids; source PDF bytes remain authoritative.",
   ],
+  releaseOwnerReview: null,
   pages: visualPages,
 };
 
 const legalDecision = (sourceId) => ({
   sourceId,
-  redistribution: pending("AUTHORIZED_HUMAN_REDISTRIBUTION_REVIEW_REQUIRED"),
+  redistribution: sourceTermsAuthorized(sourceId),
   referenceExecution: pending("AUTHORIZED_HUMAN_REFERENCE_EXECUTION_REVIEW_REQUIRED"),
   adaptation: pending("AUTHORIZED_HUMAN_ADAPTATION_REVIEW_REQUIRED"),
 });
+
+function sourceTermsAuthorized(sourceId) {
+  return {
+    state: "SOURCE_TERMS_AUTHORIZED",
+    reviewer: null,
+    decisionRecordId: `source-terms-authorization:${sourceId}`,
+    decidedOn: null,
+    jurisdiction: null,
+    scope: ["REDISTRIBUTE_FROZEN_SOURCE_BYTES"],
+    conditions: sourceId === "dstl-stone-soup-v1.9.1"
+      ? ["PRESERVE_MIT_COPYRIGHT_AND_PERMISSION_NOTICE", "EXACT_FROZEN_BYTES_AND_DECLARED_EXTRACTIONS_ONLY"]
+      : ["EXACT_NTRS_PUBLIC_USE_RECORD_AND_FROZEN_BYTES_ONLY", "DECLARED_NON_AUTHORITATIVE_FULL_PAGE_RENDERS_ONLY"],
+    evidenceSha256: null,
+    blockingReason: null,
+  };
+}
 
 function pending(blockingReason) {
   return {
@@ -230,13 +248,51 @@ for (const source of nasaSources) {
       sourcePdfPage: page.sourcePdfPage,
       reportPage: page.reportPage,
       purpose: page.purpose,
-      titleAndReportIdentityChecked: true,
-      equationContextChecked: true,
-      limitationsChecked: true,
-      result: "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE",
+      sourceIdentityBound: true,
+      renderReproductionRequired: true,
+      structuralImageCheckRequired: true,
+      result: "EXACT_SOURCE_RENDER_AND_DECLARED_MAPPING_VERIFIED",
     });
   }
 }
+
+const reviewedRenderSet = nasaSources.flatMap((source) => source.renderPages.map((page) => ({
+  sourceId: source.id,
+  ntrsId: source.ntrsId,
+  sourcePdfPage: page.sourcePdfPage,
+  reportPage: page.reportPage,
+  purpose: page.purpose,
+  sourceRender: page.sourceRender,
+  displayTransform: page.displayTransform,
+  displayRender: page.displayRender,
+})));
+visualInspection.releaseOwnerReview = {
+  schemaVersion: "vector.generic-sensor-verification-release-owner-visual-review.v1",
+  status: "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
+  reviewerRole: "RELEASE_OWNER_REVIEW",
+  reviewedOn: "2026-08-25",
+  subject: {
+    renderSetSha256: sha256(Buffer.from(canonicalJson(reviewedRenderSet))),
+    pageCount: reviewedRenderSet.length,
+    manifestId,
+    intendedUse: "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE",
+  },
+  reviewedContactSheets: [
+    { ntrsId: "19660021027", sha256: "b71a77725e47a3638221aba5cc07e89000e538434aac586278209d0dddb10ea2", widthPixels: 1200, heightPixels: 422 },
+    { ntrsId: "19770023372", sha256: "04bb59783d9dbbae687fdd5f11aef975e03d2f4b23a7c71db9459d6cd9a38493", widthPixels: 1200, heightPixels: 844 },
+    { ntrsId: "19800011044", sha256: "f15477ce6708dfe050993cec18a5308e579d40cce146d6f8c241a2a10f8bda66", widthPixels: 1200, heightPixels: 1688 },
+    { ntrsId: "19840019990", sha256: "562b8d4577805d115318b0417274cf471e7e185bb1c52eb86dde553bd28d1648", widthPixels: 1200, heightPixels: 2110 },
+  ],
+  findings: {
+    titleAndReportIdentity: "CONSISTENT",
+    declaredPageMapping: "CONSISTENT",
+    equationAndContextCategory: "CONSISTENT_WITH_DECLARED_SOURCE_LOCATION_ONLY_SCOPE",
+    limitationsAndNonclaims: "CONSISTENT",
+  },
+  legalApproval: false,
+  numericOrEquationTranscriptionPerformed: false,
+  note: "Technical release review only. Exact source PDF bytes remain authoritative; no equation or numeric value was transcribed or admitted.",
+};
 
 const output = (path, value) => {
   const rendered = `${JSON.stringify(value, null, 2)}\n`;
@@ -247,15 +303,47 @@ const output = (path, value) => {
 output("archive-inventory.v1.json", inventory);
 output("visual-inspection.v1.json", visualInspection);
 
+const redistributionAuthority = {
+  schemaVersion: "vector.generic-sensor-verification-source-terms-authority.v1",
+  authorityArtifactId: "generic-sensor-source-terms-authority-v1",
+  subjectManifestId: manifestId,
+  scope: "REDISTRIBUTE_FROZEN_SOURCE_BYTES",
+  authorityKind: "AUTHORITATIVE_SOURCE_TERMS",
+  authorizations: [
+    {
+      sourceId: "dstl-stone-soup-v1.9.1",
+      decisionRecordId: "source-terms-authorization:dstl-stone-soup-v1.9.1",
+      basis: "ZENODO_OPEN_ACCESS_AND_PINNED_MIT_LICENSE",
+      evidence: [
+        artifact("raw/stone-soup/zenodo-record-20830467.json", "OFFICIAL_METADATA"),
+        artifact("extracted/stone-soup-v1.9.1/LICENSE", "LICENSE"),
+      ],
+      requiredFacts: ["ZENODO_ACCESS_OPEN", "ZENODO_LICENSE_MIT", "MIT_PUBLISH_AND_DISTRIBUTE_GRANT", "MIT_NOTICE_PRESERVED"],
+      conditions: ["PRESERVE_MIT_COPYRIGHT_AND_PERMISSION_NOTICE", "EXACT_FROZEN_BYTES_AND_DECLARED_EXTRACTIONS_ONLY"],
+    },
+    ...nasaSources.map((source) => ({
+      sourceId: source.id,
+      decisionRecordId: `source-terms-authorization:${source.id}`,
+      basis: "NASA_NTRS_PUBLIC_GOV_PUBLIC_USE_PERMITTED",
+      evidence: source.artifacts,
+      requiredFacts: ["DISTRIBUTION_PUBLIC", "GOV_PUBLIC_USE_PERMITTED", "NO_COPYRIGHT_INDICATION", "NO_THIRD_PARTY_MATERIAL", "EXPORT_EAR_ITAR_NO", "DOCUMENT_AND_METADATA_DISSEMINATED", "DOWNLOADS_AVAILABLE", "OFFICIAL_DOWNLOAD_IDENTITY"],
+      conditions: ["EXACT_NTRS_PUBLIC_USE_RECORD_AND_FROZEN_BYTES_ONLY", "DECLARED_NON_AUTHORITATIVE_FULL_PAGE_RENDERS_ONLY"],
+    })),
+  ],
+};
+output("redistribution-authority.v1.json", redistributionAuthority);
+const redistributionAuthorityArtifact = artifact("redistribution-authority.v1.json", "AUTHORITATIVE_SOURCE_TERMS_REDISTRIBUTION_RECORD");
+
 const sourceIds = ["dstl-stone-soup-v1.9.1", ...nasaSources.map((source) => source.id)];
 const decisions = {
   schemaVersion: "vector.generic-sensor-verification-legal-decisions.v1",
   decisionArtifactId: "generic-sensor-source-legal-decisions-v1",
   subjectManifestId: manifestId,
   intendedUse: "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE",
-  authorityBoundary: "APPROVAL_REQUIRES_AN_ALLOWLISTED_HUMAN_AND_AN_EXTERNALLY_ROOTED_DETACHED_ATTESTATION",
+  authorityBoundary: "REDISTRIBUTION_MAY_BE_SOURCE_TERMS_AUTHORIZED; EXECUTION_AND_ADAPTATION_APPROVAL_REQUIRE_AN_ALLOWLISTED_HUMAN_AND_EXTERNALLY_ROOTED_DETACHED_ATTESTATION",
   decisions: sourceIds.map(legalDecision),
 };
+for (const decision of decisions.decisions) decision.redistribution.evidenceSha256 = redistributionAuthorityArtifact.sha256;
 output("legal-decisions.v1.json", decisions);
 
 const authorityRegistry = {
@@ -323,6 +411,7 @@ for (const source of [stoneSource, ...nasaSources]) {
 collectArtifact(visualArtifact);
 collectArtifact(legalArtifact);
 collectArtifact(authorityArtifact);
+collectArtifact(redistributionAuthorityArtifact);
 const isolationEvidence = {
   schemaVersion: "vector.generic-sensor-verification-production-isolation-evidence.v1",
   subjectManifestId: manifestId,
@@ -347,11 +436,11 @@ const manifest = {
   manifestId,
   subjectId: "generic-sensor-verification-reference-sources",
   intendedUse: "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE",
-  status: "BLOCKED_PENDING_HUMAN_REVIEW",
+  status: "BLOCKED_PENDING_HUMAN_EXECUTION_AND_ADAPTATION_REVIEW",
   generatedBy: { script: basename(import.meta.filename), mode: "OFFLINE_ONLY" },
   sourcePolicy: {
     immutableContentAddressingRequired: true,
-    redistributionPermitted: false,
+    redistributionPermitted: true,
     productionRuntimeUsePermitted: false,
     stoneSoupExecutionPermitted: false,
     stoneSoupAdaptationPermitted: false,
@@ -372,6 +461,7 @@ const manifest = {
   visualInspection: visualArtifact,
   legalDecisions: legalArtifact,
   legalAuthorityRegistry: authorityArtifact,
+  redistributionAuthority: redistributionAuthorityArtifact,
   decisionReferences: sourceIds.map((sourceId) => ({
     sourceId,
     decisionArtifactId: decisions.decisionArtifactId,

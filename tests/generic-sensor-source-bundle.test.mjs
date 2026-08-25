@@ -32,7 +32,7 @@ function seal(value) {
 }
 
 function artifactDescriptor(manifestValue, path) {
-  const candidates = [manifestValue.visualInspection, manifestValue.legalDecisions, manifestValue.legalAuthorityRegistry, manifestValue.isolationEvidence];
+  const candidates = [manifestValue.visualInspection, manifestValue.legalDecisions, manifestValue.legalAuthorityRegistry, manifestValue.redistributionAuthority, manifestValue.isolationEvidence];
   for (const source of manifestValue.sources) {
     candidates.push(...source.artifacts, source.archiveInventory);
     for (const member of source.extractedMembers ?? []) candidates.push(member.extractedArtifact);
@@ -68,6 +68,7 @@ function finalizeIsolationOverride(manifestValue, overrides, mutate = () => {}) 
   collect(manifestValue.visualInspection);
   collect(manifestValue.legalDecisions);
   collect(manifestValue.legalAuthorityRegistry);
+  collect(manifestValue.redistributionAuthority);
   isolation.frozenArtifactCount = artifacts.size;
   isolation.frozenArtifactBytes = [...artifacts.values()].reduce((sum, artifact) => sum + artifact.sizeBytes, 0);
   const bytes = Buffer.from(`${JSON.stringify(isolation, null, 2)}\n`);
@@ -433,7 +434,7 @@ test("caller resealing cannot rewrite the canonical source, render, claim, or po
   finalizeIsolationOverride(rewrittenIdentity, identityOverrides, (isolation) => { isolation.subjectManifestId = rewrittenIdentity.manifestId; });
   assert.throws(
     () => verifyGenericSensorSourceBundle({ root, manifest: seal(rewrittenIdentity), artifactOverrides: identityOverrides }),
-    /pinned canonical manifest/,
+    /release-owner visual review|source-terms authority identity|pinned canonical manifest/,
   );
 
   const substitutedPdf = clone(manifest);
@@ -447,7 +448,7 @@ test("caller resealing cannot rewrite the canonical source, render, claim, or po
   finalizeIsolationOverride(substitutedPdf, pdfOverrides);
   assert.throws(
     () => verifyGenericSensorSourceBundle({ root, manifest: seal(substitutedPdf), artifactOverrides: pdfOverrides }),
-    /pinned canonical manifest/,
+    /size mismatch|pinned canonical manifest/,
   );
 
   const communityArtifact = clone(manifest);
@@ -461,7 +462,7 @@ test("caller resealing cannot rewrite the canonical source, render, claim, or po
   finalizeIsolationOverride(communityArtifact, communityOverrides);
   assert.throws(
     () => verifyGenericSensorSourceBundle({ root, manifest: seal(communityArtifact), artifactOverrides: communityOverrides }),
-    /pinned canonical manifest/,
+    /size mismatch|pinned canonical manifest/,
   );
 
   const relabelledRender = clone(manifest);
@@ -475,7 +476,7 @@ test("caller resealing cannot rewrite the canonical source, render, claim, or po
   finalizeIsolationOverride(relabelledRender, renderOverrides);
   assert.throws(
     () => verifyGenericSensorSourceBundle({ root, manifest: seal(relabelledRender), artifactOverrides: renderOverrides }),
-    /pinned canonical manifest/,
+    /release-owner visual review|pinned canonical manifest/,
   );
 });
 
@@ -611,13 +612,58 @@ test("missing licence, wrong commit, forged approval, pending decisions, and out
   const callerForgedBundle = forgedBundleWithCallerRoot();
   assert.throws(
     () => verifyGenericSensorSourceBundle({ root, ...callerForgedBundle }),
-    /external authority policy|field-specific scope|evidence artifact/,
+    /source terms|external authority policy|field-specific scope|evidence artifact/,
   );
   const fieldCorrectCallerForgedBundle = forgedBundleWithCallerRoot({ useFieldSpecificScopes: true });
   assert.throws(
     () => verifyGenericSensorSourceBundle({ root, ...fieldCorrectCallerForgedBundle }),
-    /pinned external authority policy/,
+    /source terms|pinned external authority policy/,
   );
+});
+
+test("source-terms redistribution authority is exact, scoped, and fail closed", () => {
+  const sourceTerms = JSON.parse(readFileSync(resolve(root, manifest.redistributionAuthority.path), "utf8"));
+  const rewritten = clone(manifest);
+  const overrides = new Map();
+  sourceTerms.authorizations.find((entry) => entry.sourceId === "nasa-cr-168347").basis = "CALLER_ASSERTED_PUBLIC_USE";
+  const sourceTermsBytes = Buffer.from(`${JSON.stringify(sourceTerms, null, 2)}\n`);
+  replaceArtifact(rewritten, overrides, rewritten.redistributionAuthority.path, sourceTermsBytes);
+  const rewrittenDecisions = clone(decisions);
+  for (const decision of rewrittenDecisions.decisions) decision.redistribution.evidenceSha256 = sha256(sourceTermsBytes);
+  replaceArtifact(rewritten, overrides, rewritten.legalDecisions.path, Buffer.from(`${JSON.stringify(rewrittenDecisions, null, 2)}\n`));
+  finalizeIsolationOverride(rewritten, overrides);
+  assert.throws(
+    () => verifyGenericSensorSourceBundle({ root, manifest: seal(rewritten), artifactOverrides: overrides }),
+    /NASA source-terms basis is incomplete/,
+  );
+
+  const executionBySourceTerms = clone(decisions.decisions[0]);
+  executionBySourceTerms.referenceExecution = clone(executionBySourceTerms.redistribution);
+  assert.throws(
+    () => assertAuthorizedDecision(executionBySourceTerms, "referenceExecution"),
+    /source terms may authorize redistribution only/,
+  );
+});
+
+test("release-owner semantic review is non-legal and bound to the exact render set", () => {
+  for (const mutate of [
+    (review) => { review.reviewerRole = "AUTHORIZED_HUMAN"; },
+    (review) => { review.legalApproval = true; },
+    (review) => { review.subject.renderSetSha256 = "1".repeat(64); },
+    (review) => { review.reviewedContactSheets[0].sha256 = "2".repeat(64); },
+    (review) => { review.numericOrEquationTranscriptionPerformed = true; },
+  ]) {
+    const candidate = clone(manifest);
+    const overrides = new Map();
+    const inspection = JSON.parse(readFileSync(resolve(root, candidate.visualInspection.path), "utf8"));
+    mutate(inspection.releaseOwnerReview);
+    replaceArtifact(candidate, overrides, candidate.visualInspection.path, Buffer.from(`${JSON.stringify(inspection, null, 2)}\n`));
+    finalizeIsolationOverride(candidate, overrides);
+    assert.throws(
+      () => verifyGenericSensorSourceBundle({ root, manifest: seal(candidate), artifactOverrides: overrides }),
+      /release-owner visual review is missing, altered, or bound to a different render set/,
+    );
+  }
 });
 
 test("community/game artifacts, dynamic sources, model claims, and production exposure are rejected", () => {

@@ -3,20 +3,25 @@
   "decisionArtifactId": "generic-sensor-source-legal-decisions-v1",
   "subjectManifestId": "generic-sensor-source-freeze-v1",
   "intendedUse": "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE",
-  "authorityBoundary": "APPROVAL_REQUIRES_AN_ALLOWLISTED_HUMAN_AND_AN_EXTERNALLY_ROOTED_DETACHED_ATTESTATION",
+  "authorityBoundary": "REDISTRIBUTION_MAY_BE_SOURCE_TERMS_AUTHORIZED; EXECUTION_AND_ADAPTATION_APPROVAL_REQUIRE_AN_ALLOWLISTED_HUMAN_AND_EXTERNALLY_ROOTED_DETACHED_ATTESTATION",
   "decisions": [
     {
       "sourceId": "dstl-stone-soup-v1.9.1",
       "redistribution": {
-        "state": "PENDING_REVIEW",
+        "state": "SOURCE_TERMS_AUTHORIZED",
         "reviewer": null,
-        "decisionRecordId": null,
+        "decisionRecordId": "source-terms-authorization:dstl-stone-soup-v1.9.1",
         "decidedOn": null,
         "jurisdiction": null,
-        "scope": [],
-        "conditions": [],
-        "evidenceSha256": null,
-        "blockingReason": "AUTHORIZED_HUMAN_REDISTRIBUTION_REVIEW_REQUIRED"
+        "scope": [
+          "REDISTRIBUTE_FROZEN_SOURCE_BYTES"
+        ],
+        "conditions": [
+          "PRESERVE_MIT_COPYRIGHT_AND_PERMISSION_NOTICE",
+          "EXACT_FROZEN_BYTES_AND_DECLARED_EXTRACTIONS_ONLY"
+        ],
+        "evidenceSha256": "0f4c155e74b4923af36712b71cb2cdddcf707020f17b91ab22fe6182135aae74",
+        "blockingReason": null
       },
       "referenceExecution": {
         "state": "PENDING_REVIEW",
@@ -44,15 +49,20 @@
     {
       "sourceId": "nasa-cr-66097",
       "redistribution": {
-        "state": "PENDING_REVIEW",
+        "state": "SOURCE_TERMS_AUTHORIZED",
         "reviewer": null,
-        "decisionRecordId": null,
+        "decisionRecordId": "source-terms-authorization:nasa-cr-66097",
         "decidedOn": null,
         "jurisdiction": null,
-        "scope": [],
-        "conditions": [],
-        "evidenceSha256": null,
-        "blockingReason": "AUTHORIZED_HUMAN_REDISTRIBUTION_REVIEW_REQUIRED"
+        "scope": [
+          "REDISTRIBUTE_FROZEN_SOURCE_BYTES"
+        ],
+        "conditions": [
+          "EXACT_NTRS_PUBLIC_USE_RECORD_AND_FROZEN_BYTES_ONLY",
+          "DECLARED_NON_AUTHORITATIVE_FULL_PAGE_RENDERS_ONLY"
+        ],
+        "evidenceSha256": "0f4c155e74b4923af36712b71cb2cdddcf707020f17b91ab22fe6182135aae74",
+        "blockingReason": null
       },
       "referenceExecution": {
         "state": "PENDING_REVIEW",
@@ -80,15 +90,20 @@
     {
       "sourceId": "nasa-cr-151497",
       "redistribution": {
-        "state": "PENDING_REVIEW",
+        "state": "SOURCE_TERMS_AUTHORIZED",
         "reviewer": null,
-        "decisionRecordId": null,
+        "decisionRecordId": "source-terms-authorization:nasa-cr-151497",
         "decidedOn": null,
         "jurisdiction": null,
-        "scope": [],
-        "conditions": [],
-        "evidenceSha256": null,
-        "blockingReason": "AUTHORIZED_HUMAN_REDISTRIBUTION_REVIEW_REQUIRED"
+        "scope": [
+          "REDISTRIBUTE_FROZEN_SOURCE_BYTES"
+        ],
+        "conditions": [
+          "EXACT_NTRS_PUBLIC_USE_RECORD_AND_FROZEN_BYTES_ONLY",
+          "DECLARED_NON_AUTHORITATIVE_FULL_PAGE_RENDERS_ONLY"
+        ],
+        "evidenceSha256": "0f4c155e74b4923af36712b71cb2cdddcf707020f17b91ab22fe6182135aae74",
+        "blockingReason": null
       },
       "referenceExecution": {
         "state": "PENDING_REVIEW",
@@ -116,15 +131,20 @@
     {
       "sourceId": "nasa-cr-168347",
       "redistribution": {
-        "state": "PENDING_REVIEW",
+        "state": "SOURCE_TERMS_AUTHORIZED",
         "reviewer": null,
-        "decisionRecordId": null,
+        "decisionRecordId": "source-terms-authorization:nasa-cr-168347",
         "decidedOn": null,
         "jurisdiction": null,
-        "scope": [],
-        "conditions": [],
-        "evidenceSha256": null,
-        "blockingReason": "AUTHORIZED_HUMAN_REDISTRIBUTION_REVIEW_REQUIRED"
+        "scope": [
+          "REDISTRIBUTE_FROZEN_SOURCE_BYTES"
+        ],
+        "conditions": [
+          "EXACT_NTRS_PUBLIC_USE_RECORD_AND_FROZEN_BYTES_ONLY",
+          "DECLARED_NON_AUTHORITATIVE_FULL_PAGE_RENDERS_ONLY"
+        ],
+        "evidenceSha256": "0f4c155e74b4923af36712b71cb2cdddcf707020f17b91ab22fe6182135aae74",
+        "blockingReason": null
       },
       "referenceExecution": {
         "state": "PENDING_REVIEW",
@@ -152,15 +172,20 @@
     {
       "sourceId": "nasa-cr-160557",
       "redistribution": {
-        "state": "PENDING_REVIEW",
+        "state": "SOURCE_TERMS_AUTHORIZED",
         "reviewer": null,
-        "decisionRecordId": null,
+        "decisionRecordId": "source-terms-authorization:nasa-cr-160557",
         "decidedOn": null,
         "jurisdiction": null,
-        "scope": [],
-        "conditions": [],
-        "evidenceSha256": null,
-        "blockingReason": "AUTHORIZED_HUMAN_REDISTRIBUTION_REVIEW_REQUIRED"
+        "scope": [
+          "REDISTRIBUTE_FROZEN_SOURCE_BYTES"
+        ],
+        "conditions": [
+          "EXACT_NTRS_PUBLIC_USE_RECORD_AND_FROZEN_BYTES_ONLY",
+          "DECLARED_NON_AUTHORITATIVE_FULL_PAGE_RENDERS_ONLY"
+        ],
+        "evidenceSha256": "0f4c155e74b4923af36712b71cb2cdddcf707020f17b91ab22fe6182135aae74",
+        "blockingReason": null
       },
       "referenceExecution": {
         "state": "PENDING_REVIEW",

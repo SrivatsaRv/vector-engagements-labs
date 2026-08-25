@@ -189,7 +189,8 @@ the browser nor replay may import or project its source, render, archive,
 manifest, or decision artifacts.
 
 Later generic verification implementation remains blocked until the exact
-source-freeze commit passes independent review and an authorized human approves
+source-freeze commit passes deterministic source-to-render machine verification
+and the exact-render-set `RELEASE_OWNER_REVIEW`, and an authorized human approves
 reference execution for the required jurisdiction and scope through an
 allowlisted record in the digest-pinned external authority policy, an externally
 rooted detached attestation, and resolvable exact evidence bytes. Stone Soup
@@ -198,3 +199,7 @@ still do not admit runtime behavior: #26 must separately implement and validate
 the owned information-state contracts. Pending, rejected, self-declared, or
 untrusted decisions continue to yield the existing unsupported/no-track
 behavior, never a fallback.
+
+The separate `SOURCE_TERMS_AUTHORIZED` redistribution state is bound to exact
+NASA public-use and Stone Soup open/MIT evidence. It permits repository
+redistribution only and is intentionally absent from every RASP admission path.

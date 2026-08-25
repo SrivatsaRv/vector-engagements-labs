@@ -8,6 +8,7 @@ const REPORT_SCHEMA = "vector.generic-sensor-verification-source-report.v1";
 const LEGAL_SCHEMA = "vector.generic-sensor-verification-legal-decisions.v1";
 const AUTHORITY_SCHEMA = "vector.generic-sensor-verification-legal-authority-registry.v1";
 const AUTHORITY_POLICY_SCHEMA = "vector.generic-sensor-legal-authority-policy.v1";
+const SOURCE_TERMS_SCHEMA = "vector.generic-sensor-verification-source-terms-authority.v1";
 const ATTESTATION_SCHEMA = "vector.generic-sensor-verification-legal-attestation-payload.v1";
 const INTENDED_USE = "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE";
 const WITHDRAWN_CR_160557_PREFIX = ["99cc", "854a"].join("");
@@ -23,12 +24,12 @@ const FIELD_SCOPE = Object.freeze({
 });
 const APPROVAL_SCOPES = new Set(Object.values(FIELD_SCOPE));
 const AUTHORITY_POLICY_PATH = "governance/generic-sensor-legal-authority-policy.v1.json";
-const AUTHORITY_POLICY_SHA256 = "da1870627682a7db5582622ee829f045f8e99cf6bcfc7b6d462af34028d98961";
+const AUTHORITY_POLICY_SHA256 = "265aa74cac85e075e8b10e6b5c1519e1c42d65b20c9a54e5b81a7f60f84a5c1f";
 const AUTHORITY_POLICY_ID = "generic-sensor-legal-authority-policy-v1";
 const AUTHORITY_EVIDENCE_ROOT = "governance/generic-sensor-legal-decision-evidence";
-const CANONICAL_MANIFEST_DIGEST = "c16f180702857f2586bf233a60041edbeaf332db749b27b9f196b5a3cfa03402";
+const CANONICAL_MANIFEST_DIGEST = "9d9026867faac751a391dd8e364aa06d066feb50156dd838815c09a30454213a";
 const PRODUCTION_ROOTS = [".next", ".output", "app", "build", "components", "db", "dist", "engine-rust", "fixtures/model-packs", "fixtures/vector-record", "lib", "out", "public", "worker"];
-const PRODUCTION_MARKERS = [MANIFEST_SCHEMA, LEGAL_SCHEMA, AUTHORITY_SCHEMA, AUTHORITY_POLICY_SCHEMA, AUTHORITY_POLICY_ID, AUTHORITY_EVIDENCE_ROOT, INTENDED_USE, "generic-sensor-verification-sources", "generic-sensor-source-freeze-v1"];
+const PRODUCTION_MARKERS = [MANIFEST_SCHEMA, LEGAL_SCHEMA, AUTHORITY_SCHEMA, AUTHORITY_POLICY_SCHEMA, SOURCE_TERMS_SCHEMA, AUTHORITY_POLICY_ID, AUTHORITY_EVIDENCE_ROOT, INTENDED_USE, "generic-sensor-verification-sources", "generic-sensor-source-freeze-v1"];
 const NASA_IDENTITIES = {
   "nasa-cr-66097": { ntrsId: "19660021027", reportNumber: "NASA-CR-66097", pages: [143, 144], reportPages: ["134", "135"], renderPages: [1, 143, 144] },
   "nasa-cr-151497": { ntrsId: "19770023372", reportNumber: "NASA-CR-151497", pages: [53, 54, 55, 56], reportPages: ["2", "3", "4", "5"], renderPages: [1, 2, 3, 4, 53, 54, 55, 56] },
@@ -202,12 +203,15 @@ function verifyDecisionField(decision, field) {
   requireExactKeys(decision, ["sourceId", "redistribution", "referenceExecution", "adaptation"], `legal decision ${decision?.sourceId ?? "unknown"}`);
   const value = decision[field];
   requireExactKeys(value, ["state", "reviewer", "decisionRecordId", "decidedOn", "jurisdiction", "scope", "conditions", "evidenceSha256", "blockingReason"], `${field} decision for ${decision.sourceId}`);
-  if (!value || !["PENDING_REVIEW", "APPROVED", "REJECTED", "NOT_APPLICABLE"].includes(value.state)) fail(`invalid ${field} decision for ${decision.sourceId}`);
+  if (!value || !["PENDING_REVIEW", "SOURCE_TERMS_AUTHORIZED", "APPROVED", "REJECTED", "NOT_APPLICABLE"].includes(value.state)) fail(`invalid ${field} decision for ${decision.sourceId}`);
   if (value.state === "APPROVED") {
     requireExactKeys(value.reviewer, ["kind", "id"], `${field} reviewer`);
     if (value.reviewer.kind !== "AUTHORIZED_HUMAN" || !stableId(value.reviewer.id)) fail(`${field} approval requires an authorized human reviewer`);
     if (value.blockingReason !== null) fail(`${field} approval must not carry a blocking reason`);
     if (!stableId(value.decisionRecordId) || !canonicalDate(value.decidedOn) || !/^[A-Z]{2}$/.test(value.jurisdiction ?? "") || canonicalJson(value.scope) !== canonicalJson([FIELD_SCOPE[field]]) || !closedStringArray(value.scope, APPROVAL_SCOPES) || !closedStringArray(value.conditions) || !SHA256.test(value.evidenceSha256 ?? "") || /^0{64}$/.test(value.evidenceSha256)) fail(`${field} approval is incomplete, has an invalid date, or violates the field-specific scope contract`);
+  } else if (value.state === "SOURCE_TERMS_AUTHORIZED") {
+    if (field !== "redistribution") fail(`source terms may authorize redistribution only for ${decision.sourceId}`);
+    if (value.reviewer !== null || !stableId(value.decisionRecordId) || value.decidedOn !== null || value.jurisdiction !== null || canonicalJson(value.scope) !== canonicalJson([FIELD_SCOPE.redistribution]) || !closedStringArray(value.conditions) || !SHA256.test(value.evidenceSha256 ?? "") || /^0{64}$/.test(value.evidenceSha256) || value.blockingReason !== null) fail(`source-terms redistribution authority is malformed for ${decision.sourceId}`);
   } else if (value.reviewer !== null || value.decisionRecordId !== null || value.decidedOn !== null || value.jurisdiction !== null || !Array.isArray(value.scope) || value.scope.length !== 0 || !Array.isArray(value.conditions) || value.conditions.length !== 0 || value.evidenceSha256 !== null || typeof value.blockingReason !== "string" || value.blockingReason.length === 0) {
     fail(`${field} non-approval must not carry approval authority`);
   }
@@ -271,8 +275,10 @@ function loadPinnedAuthorityPolicy(repositoryRoot) {
   const bytes = readFileSync(resolve(repositoryRoot, AUTHORITY_POLICY_PATH));
   if (sha256(bytes) !== AUTHORITY_POLICY_SHA256) fail("external authority policy digest mismatch");
   const policy = JSON.parse(bytes.toString("utf8"));
-  requireExactKeys(policy, ["schemaVersion", "policyId", "subjectDecisionArtifactId", "status", "evidenceRoot", "trustRoots", "reviewerGrants", "changeAuthority"], "external authority policy");
+  requireExactKeys(policy, ["schemaVersion", "policyId", "subjectDecisionArtifactId", "status", "evidenceRoot", "sourceTermsAuthority", "trustRoots", "reviewerGrants", "changeAuthority"], "external authority policy");
   if (policy.schemaVersion !== AUTHORITY_POLICY_SCHEMA || policy.policyId !== AUTHORITY_POLICY_ID || policy.subjectDecisionArtifactId !== "generic-sensor-source-legal-decisions-v1" || policy.evidenceRoot !== AUTHORITY_EVIDENCE_ROOT || !Array.isArray(policy.trustRoots) || !Array.isArray(policy.reviewerGrants)) fail("external authority policy identity is invalid");
+  requireExactKeys(policy.sourceTermsAuthority, ["artifactPath", "authorityKind", "decisionField", "decisionState", "scope", "humanReviewerRequired", "failClosedOnMissingOrChangedEvidence"], "source-terms authority policy");
+  if (policy.sourceTermsAuthority.artifactPath !== "governance/generic-sensor-verification-sources/redistribution-authority.v1.json" || policy.sourceTermsAuthority.authorityKind !== "AUTHORITATIVE_SOURCE_TERMS" || policy.sourceTermsAuthority.decisionField !== "redistribution" || policy.sourceTermsAuthority.decisionState !== "SOURCE_TERMS_AUTHORIZED" || policy.sourceTermsAuthority.scope !== FIELD_SCOPE.redistribution || policy.sourceTermsAuthority.humanReviewerRequired !== false || policy.sourceTermsAuthority.failClosedOnMissingOrChangedEvidence !== true || policy.changeAuthority !== "RELEASE_OWNER_REVIEWED_COMMIT_AND_PINNED_DIGEST_UPDATE_REQUIRED") fail("source-terms authority policy is invalid");
   const expectedStatus = policy.trustRoots.length === 0 && policy.reviewerGrants.length === 0 ? "NO_APPROVAL_AUTHORITIES_REGISTERED" : "APPROVAL_AUTHORITIES_REGISTERED";
   if (policy.status !== expectedStatus) fail("external authority policy status is inconsistent");
   if (new Set(policy.trustRoots.map((root) => root.keyId)).size !== policy.trustRoots.length) fail("duplicate external authority trust root");
@@ -378,7 +384,28 @@ function verifyVisualInspection(root, manifest, overrides) {
   artifactBytes(root, record, overrides);
   const inspection = JSON.parse((overrides?.get(record.path) ?? readFileSync(resolve(root, record.path))).toString("utf8"));
   if (inspection.schemaVersion !== "vector.generic-sensor-verification-visual-inspection.v1") fail("wrong visual-inspection schema");
-  if (inspection.status !== "PRIMARY_INSPECTION_COMPLETE_INDEPENDENT_REVIEW_REQUIRED") fail("visual inspection must preserve independent-review requirement");
+  if (inspection.status !== "DETERMINISTIC_MACHINE_INSPECTION_COMPLETE" || inspection.inspectionMethod !== "INDEPENDENT_SOURCE_TO_RENDER_REPRODUCTION_AND_STRUCTURAL_IMAGE_CHECK" || inspection.reviewerRole !== null || inspection.verificationCommand !== "node --require ./scripts/lib/generic-sensor-network-deny.cjs scripts/verify-generic-sensor-source-bundle.mjs") fail("visual inspection must identify the deterministic independent machine gate");
+  const review = inspection.releaseOwnerReview;
+  requireExactKeys(review, ["schemaVersion", "status", "reviewerRole", "reviewedOn", "subject", "reviewedContactSheets", "findings", "legalApproval", "numericOrEquationTranscriptionPerformed", "note"], "release-owner visual review");
+  requireExactKeys(review.subject, ["renderSetSha256", "pageCount", "manifestId", "intendedUse"], "release-owner visual review subject");
+  requireExactKeys(review.findings, ["titleAndReportIdentity", "declaredPageMapping", "equationAndContextCategory", "limitationsAndNonclaims"], "release-owner visual review findings");
+  const reviewedRenderSet = manifest.sources.filter((source) => source.publisher === "NASA").flatMap((source) => source.renderPages.map((page) => ({
+    sourceId: source.id,
+    ntrsId: source.ntrsId,
+    sourcePdfPage: page.sourcePdfPage,
+    reportPage: page.reportPage,
+    purpose: page.purpose,
+    sourceRender: page.sourceRender,
+    displayTransform: page.displayTransform,
+    displayRender: page.displayRender,
+  })));
+  const expectedContactSheets = [
+    { ntrsId: "19660021027", sha256: "b71a77725e47a3638221aba5cc07e89000e538434aac586278209d0dddb10ea2", widthPixels: 1200, heightPixels: 422 },
+    { ntrsId: "19770023372", sha256: "04bb59783d9dbbae687fdd5f11aef975e03d2f4b23a7c71db9459d6cd9a38493", widthPixels: 1200, heightPixels: 844 },
+    { ntrsId: "19800011044", sha256: "f15477ce6708dfe050993cec18a5308e579d40cce146d6f8c241a2a10f8bda66", widthPixels: 1200, heightPixels: 1688 },
+    { ntrsId: "19840019990", sha256: "562b8d4577805d115318b0417274cf471e7e185bb1c52eb86dde553bd28d1648", widthPixels: 1200, heightPixels: 2110 },
+  ];
+  if (review.schemaVersion !== "vector.generic-sensor-verification-release-owner-visual-review.v1" || review.status !== "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE" || review.reviewerRole !== "RELEASE_OWNER_REVIEW" || !canonicalDate(review.reviewedOn) || review.subject.renderSetSha256 !== sha256(Buffer.from(canonicalJson(reviewedRenderSet))) || review.subject.pageCount !== reviewedRenderSet.length || review.subject.manifestId !== manifest.manifestId || review.subject.intendedUse !== INTENDED_USE || canonicalJson(review.reviewedContactSheets) !== canonicalJson(expectedContactSheets) || review.findings.titleAndReportIdentity !== "CONSISTENT" || review.findings.declaredPageMapping !== "CONSISTENT" || review.findings.equationAndContextCategory !== "CONSISTENT_WITH_DECLARED_SOURCE_LOCATION_ONLY_SCOPE" || review.findings.limitationsAndNonclaims !== "CONSISTENT" || review.legalApproval !== false || review.numericOrEquationTranscriptionPerformed !== false) fail("release-owner visual review is missing, altered, or bound to a different render set");
   const inspected = new Map(inspection.pages.map((page) => [`${page.sourceId}:${page.sourcePdfPage}`, page]));
   const expectedPageCount = manifest.sources.reduce((sum, source) => sum + (source.renderPages?.length ?? 0), 0);
   if (inspection.pages.length !== expectedPageCount || inspected.size !== expectedPageCount) fail("visual-inspection page coverage is not exact");
@@ -388,9 +415,39 @@ function verifyVisualInspection(root, manifest, overrides) {
       if (page.displayRender) artifactBytes(root, page.displayRender, overrides);
       const inspectedPage = inspected.get(`${source.id}:${page.sourcePdfPage}`);
       if (!inspectedPage) fail(`uninspected source page ${source.id}:${page.sourcePdfPage}`);
-      if (inspectedPage.reportPage !== page.reportPage || inspectedPage.purpose !== page.purpose || inspectedPage.titleAndReportIdentityChecked !== true || inspectedPage.equationContextChecked !== true || inspectedPage.limitationsChecked !== true || inspectedPage.result !== "CONSISTENT_WITH_DECLARED_SOURCE_ONLY_SCOPE") fail(`visual-inspection mapping mismatch for ${source.id}:${page.sourcePdfPage}`);
+      if (inspectedPage.reportPage !== page.reportPage || inspectedPage.purpose !== page.purpose || inspectedPage.sourceIdentityBound !== true || inspectedPage.renderReproductionRequired !== true || inspectedPage.structuralImageCheckRequired !== true || inspectedPage.result !== "EXACT_SOURCE_RENDER_AND_DECLARED_MAPPING_VERIFIED") fail(`visual-inspection mapping mismatch for ${source.id}:${page.sourcePdfPage}`);
       const uprightExpected = source.id === "nasa-cr-160557" && [8, 11, 14].includes(page.sourcePdfPage);
       if (uprightExpected !== Boolean(page.displayRender) || (uprightExpected && page.displayTransform !== "ROTATE_90_DEGREES_CLOCKWISE") || (!uprightExpected && page.displayTransform !== "NONE")) fail(`wrong display mapping for ${source.id}:${page.sourcePdfPage}`);
+    }
+  }
+}
+
+function verifySourceTermsAuthority(root, manifest, legal, overrides) {
+  const artifact = manifest.redistributionAuthority;
+  const bytes = artifactBytes(root, artifact, overrides);
+  const authority = JSON.parse(bytes.toString("utf8"));
+  requireExactKeys(authority, ["schemaVersion", "authorityArtifactId", "subjectManifestId", "scope", "authorityKind", "authorizations"], "source-terms authority");
+  if (authority.schemaVersion !== SOURCE_TERMS_SCHEMA || authority.authorityArtifactId !== "generic-sensor-source-terms-authority-v1" || authority.subjectManifestId !== manifest.manifestId || authority.scope !== FIELD_SCOPE.redistribution || authority.authorityKind !== "AUTHORITATIVE_SOURCE_TERMS" || authority.authorizations?.length !== manifest.sources.length) fail("invalid source-terms authority identity");
+  if (new Set(authority.authorizations.map((entry) => entry.sourceId)).size !== manifest.sources.length) fail("source-terms authority does not uniquely cover every source");
+  for (const source of manifest.sources) {
+    const authorization = authority.authorizations.find((entry) => entry.sourceId === source.id);
+    const decision = legal.decisions.find((entry) => entry.sourceId === source.id)?.redistribution;
+    requireExactKeys(authorization, ["sourceId", "decisionRecordId", "basis", "evidence", "requiredFacts", "conditions"], `source-terms authorization ${source.id}`);
+    if (!decision || decision.state !== "SOURCE_TERMS_AUTHORIZED" || decision.decisionRecordId !== authorization.decisionRecordId || decision.evidenceSha256 !== artifact.sha256 || canonicalJson(decision.conditions) !== canonicalJson(authorization.conditions)) fail(`redistribution decision is not bound to source terms for ${source.id}`);
+    for (const evidence of authorization.evidence) artifactBytes(root, evidence, overrides);
+    if (source.publisher === "NASA") {
+      const metadataArtifact = source.artifacts.find((entry) => entry.role === "OFFICIAL_METADATA");
+      const pdfArtifact = source.artifacts.find((entry) => entry.role === "SOURCE_PDF");
+      if (authorization.basis !== "NASA_NTRS_PUBLIC_GOV_PUBLIC_USE_PERMITTED" || canonicalJson(authorization.evidence) !== canonicalJson([metadataArtifact, pdfArtifact]) || canonicalJson(authorization.requiredFacts) !== canonicalJson(["DISTRIBUTION_PUBLIC", "GOV_PUBLIC_USE_PERMITTED", "NO_COPYRIGHT_INDICATION", "NO_THIRD_PARTY_MATERIAL", "EXPORT_EAR_ITAR_NO", "DOCUMENT_AND_METADATA_DISSEMINATED", "DOWNLOADS_AVAILABLE", "OFFICIAL_DOWNLOAD_IDENTITY"])) fail(`NASA source-terms basis is incomplete for ${source.id}`);
+      const metadata = JSON.parse(artifactBytes(root, metadataArtifact, overrides).toString("utf8"));
+      if (metadata.distribution !== "PUBLIC" || metadata.copyright?.determinationType !== "GOV_PUBLIC_USE_PERMITTED" || metadata.copyright?.containsIndication !== false || metadata.copyright?.containsThirdPartyMaterial !== false || metadata.copyright?.belongsToContractor !== false || metadata.copyright?.belongsToPublisher !== false || metadata.copyright?.belongsToAuthors !== false || metadata.exportControl?.isExportControl !== "NO" || metadata.exportControl?.ear !== "NO" || metadata.exportControl?.itar !== "NO" || metadata.disseminated !== "DOCUMENT_AND_METADATA" || metadata.downloadsAvailable !== true) fail(`NASA source terms do not authorize the frozen public-use scope for ${source.id}`);
+    } else {
+      const metadataArtifact = source.artifacts.find((entry) => entry.role === "OFFICIAL_METADATA");
+      const licenceArtifact = source.extractedMembers.find((entry) => entry.role === "LICENSE")?.extractedArtifact;
+      if (authorization.basis !== "ZENODO_OPEN_ACCESS_AND_PINNED_MIT_LICENSE" || canonicalJson(authorization.evidence) !== canonicalJson([metadataArtifact, licenceArtifact]) || canonicalJson(authorization.requiredFacts) !== canonicalJson(["ZENODO_ACCESS_OPEN", "ZENODO_LICENSE_MIT", "MIT_PUBLISH_AND_DISTRIBUTE_GRANT", "MIT_NOTICE_PRESERVED"])) fail("Stone Soup source-terms basis is incomplete");
+      const metadata = JSON.parse(artifactBytes(root, metadataArtifact, overrides).toString("utf8"));
+      const licence = artifactBytes(root, licenceArtifact, overrides).toString("utf8");
+      if (metadata.metadata?.access_right !== "open" || metadata.metadata?.license?.id !== "mit-license" || !licence.includes("publish, distribute") || !licence.includes("copyright notice and this permission notice shall be included")) fail("Stone Soup redistribution terms are missing or altered");
     }
   }
 }
@@ -416,6 +473,7 @@ function verifyIsolationEvidence(root, manifest, overrides) {
   collect(manifest.visualInspection);
   collect(manifest.legalDecisions);
   collect(manifest.legalAuthorityRegistry);
+  collect(manifest.redistributionAuthority);
   const measuredBytes = [...artifacts.values()].reduce((sum, artifact) => sum + artifact.sizeBytes, 0);
   if (evidence.frozenArtifactCount !== artifacts.size || evidence.frozenArtifactBytes !== measuredBytes) fail("production-isolation size evidence mismatch");
 }
@@ -462,7 +520,7 @@ export function verifyGenericSensorSourceBundle(options = {}) {
   if (manifest.schemaVersion !== MANIFEST_SCHEMA || manifest.intendedUse !== INTENDED_USE) fail("wrong manifest schema or intended use");
   if (manifest.canonicalManifestDigest !== canonicalManifestDigest(manifest)) fail("manifest digest mismatch");
   if (manifest.sources?.length !== 5 || new Set(manifest.sources.map((source) => source.id)).size !== 5) fail("source set must contain exactly five unique records");
-  if (manifest.status !== "BLOCKED_PENDING_HUMAN_REVIEW" || manifest.sourcePolicy?.productionRuntimeUsePermitted !== false || manifest.sourcePolicy?.stoneSoupExecutionPermitted !== false || manifest.sourcePolicy?.stoneSoupAdaptationPermitted !== false || manifest.sourcePolicy?.numericModelTranscriptionPermitted !== false || manifest.sourcePolicy?.namedSystemClaimsPermitted !== false || manifest.sourcePolicy?.redistributionPermitted !== false) fail("source-only policy must fail closed");
+  if (manifest.status !== "BLOCKED_PENDING_HUMAN_EXECUTION_AND_ADAPTATION_REVIEW" || manifest.sourcePolicy?.productionRuntimeUsePermitted !== false || manifest.sourcePolicy?.stoneSoupExecutionPermitted !== false || manifest.sourcePolicy?.stoneSoupAdaptationPermitted !== false || manifest.sourcePolicy?.numericModelTranscriptionPermitted !== false || manifest.sourcePolicy?.namedSystemClaimsPermitted !== false || manifest.sourcePolicy?.redistributionPermitted !== true) fail("source-only policy must authorize redistribution only and fail closed for runtime use");
   const sharpRecipe = manifest.renderRecipe?.uprightDisplayRender;
   if (manifest.renderRecipe?.sourceRender?.tool !== "pdftoppm" || manifest.renderRecipe.sourceRender.version !== "26.05.0" || manifest.renderRecipe.sourceRender.dpi !== 150 || manifest.renderRecipe.sourceRender.extent !== "FULL_PAGE" || sharpRecipe?.tool !== "sharp" || sharpRecipe.version !== "0.35.0" || sharpRecipe.pngEncoder?.compressionLevel !== 9 || sharpRecipe.pngEncoder?.adaptiveFiltering !== false || sharpRecipe.pngEncoder?.palette !== false || manifest.renderRecipe.state !== "NON_AUTHORITATIVE_DISCOVERY_AID") fail("wrong offline render recipe");
   if (FORBIDDEN_CLAIM.test(serialized)) fail("forbidden named, community, or game claim in manifest");
@@ -498,6 +556,7 @@ export function verifyGenericSensorSourceBundle(options = {}) {
   const authorityRegistry = validateAuthorityRegistryShape(JSON.parse(authorityBytes.toString("utf8")));
   if (authorityRegistry.subjectDecisionArtifactId !== legal.decisionArtifactId || authorityRegistry.authorityPolicyId !== authorityPolicy.policyId) fail("legal-authority registry is bound to the wrong decision artifact or external policy");
   if (legal.decisions?.length !== manifest.sources.length || new Set(legal.decisions.map((decision) => decision.sourceId)).size !== manifest.sources.length) fail("legal decisions do not cover the frozen source set");
+  verifySourceTermsAuthority(root, manifest, legal, options.artifactOverrides);
   const approvedCount = legal.decisions.reduce((sum, decision) => sum + ["redistribution", "referenceExecution", "adaptation"].filter((field) => decision[field]?.state === "APPROVED").length, 0);
   if (authorityRegistry.decisionRecords.length !== approvedCount) fail("legal authority registry does not exactly cover approved decisions");
   for (const source of manifest.sources) {
@@ -541,6 +600,7 @@ export function verifyGenericSensorSourceBundle(options = {}) {
   collectFrozenArtifact(manifest.visualInspection);
   collectFrozenArtifact(manifest.legalDecisions);
   collectFrozenArtifact(manifest.legalAuthorityRegistry);
+  collectFrozenArtifact(manifest.redistributionAuthority);
   collectFrozenArtifact(manifest.isolationEvidence);
   const exposure = assertNoProductionExposure({ repositoryRoot, forbiddenArtifactDigests: frozenArtifactDigests, forbiddenArtifactBytes: frozenArtifactBytes });
   return {
@@ -559,16 +619,19 @@ export function summarizeLegalDecisionState(decisions, authority = {}) {
   if (states.includes("REJECTED")) return "BLOCKED_REJECTED";
   if (states.includes("PENDING_REVIEW")) return "BLOCKED_PENDING_HUMAN_REVIEW";
   if (states.includes("NOT_APPLICABLE")) return "BLOCKED_NOT_APPLICABLE";
-  if (states.length > 0 && states.every((state) => state === "APPROVED")) {
+  if (states.length > 0 && states.every((state) => state === "APPROVED" || state === "SOURCE_TERMS_AUTHORIZED")) {
     try {
       for (const decision of decisions) {
-        for (const field of ["redistribution", "referenceExecution", "adaptation"]) assertAuthorizedDecision(decision, field, {
-          sourceId: decision.sourceId,
-          jurisdiction: decision[field].jurisdiction,
-          scope: FIELD_SCOPE[field],
-          authorityRegistry: authority.authorityRegistry,
-          repositoryRoot: authority.repositoryRoot,
-        });
+        for (const field of ["redistribution", "referenceExecution", "adaptation"]) {
+          if (decision[field]?.state === "SOURCE_TERMS_AUTHORIZED") verifyDecisionField(decision, field);
+          else assertAuthorizedDecision(decision, field, {
+            sourceId: decision.sourceId,
+            jurisdiction: decision[field].jurisdiction,
+            scope: FIELD_SCOPE[field],
+            authorityRegistry: authority.authorityRegistry,
+            repositoryRoot: authority.repositoryRoot,
+          });
+        }
       }
       return "AUTHORIZED_DECISIONS_PRESENT";
     } catch {

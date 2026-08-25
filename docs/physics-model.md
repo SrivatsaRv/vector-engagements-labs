@@ -6,7 +6,9 @@ The frozen NASA-TP-1538 *Simulator study of stall/post-stall characteristics of 
 
 The TP-1538 evidence chain is independent of the issue #148 generic sensor
 source freeze. The latter cannot satisfy aerodynamic evidence, and TP-1538
-cannot authorize sensor equations, parameters, execution, or adaptation.
+cannot authorize sensor equations, parameters, execution, or adaptation. The
+#148 source terms authorize repository redistribution of its exact frozen bytes
+and declared derivatives only; they do not change either physics boundary.
 
 Vector currently uses a deterministic three-dimensional point-mass reference engine intended for inspectable sensitivity research, not verified prediction of named-system performance.
 
@@ -181,9 +183,14 @@ filter, CFAR, EW, or track behavior.
 The CR-160557 record is negative-scope evidence only; no threshold model or
 detection consequence is admitted from it. Rendered pages and extracted text
 are non-authoritative navigation aids. Future numerical work remains blocked by
-the exact frozen-source review, an approved human reference-execution decision,
+the exact frozen-source machine-verification gate, the manifest-bound non-legal
+`RELEASE_OWNER_REVIEW`, an approved human
+reference-execution decision,
 an externally rooted detached attestation for that exact decision/evidence,
 resolution of the exact signed evidence bytes through the pinned external
 authority policy,
 independent expected values, and its owning model/admission contracts. Source
-availability never creates a generic or named production radar.
+availability never creates a generic or named production radar. Pinned NASA
+public-use and Stone Soup open/MIT terms authorize redistribution of the exact
+frozen records and declared derivatives only; that state admits no equation,
+parameter, executable reference, adaptation, or runtime behavior.

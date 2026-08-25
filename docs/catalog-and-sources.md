@@ -178,7 +178,11 @@ hash or total still fails. Generator freshness plus full bundle verification is
 mandatory in `make ci-quality` through `generic-sensor:sources:verify`.
 
 The corresponding legal artifact keeps redistribution, reference execution,
-and adaptation as independent decisions. They currently remain
+and adaptation as independent decisions. Redistribution is
+`SOURCE_TERMS_AUTHORIZED` only for exact frozen bytes and declared derivatives:
+the verifier binds each decision to the pinned NASA public/public-use metadata
+or the Zenodo open/MIT metadata and preserved MIT notice. Missing or changed
+source evidence fails closed. Reference execution and adaptation remain
 `PENDING_REVIEW`; missing, pending, forged, agent-authored, wrong-jurisdiction,
 or wrong-scope authority fails closed. `AUTHORIZED_HUMAN` is not a self-proving
 string: approval also requires an allowlisted reviewer and decision record whose
@@ -189,8 +193,11 @@ replaced by a request-supplied key or allowlist. It currently registers no
 approval authority. Each decision field has one exact scope; evidence must
 resolve to exact bytes below the separately governed evidence root. The bundle
 registry is empty and can carry only signed records, never authority. Public
-availability or an open licence does not imply local execution,
-adaptation, export, model, or installation authority. Named platform and radar
+availability or an open licence does not imply local execution, adaptation,
+model, or installation authority beyond the exact recorded redistribution
+grant. Named platform and radar
 claims, game/community artifacts, and dynamic unpinned sources are expressly
 ineligible. Downstream #26 work remains blocked until this freeze is
-independently reviewed and the specifically required human decision is approved.
+machine-verified, its exact-render-set `RELEASE_OWNER_REVIEW` is complete, and
+the specifically required execution decision is approved. That technical
+visual role is not a legal reviewer or approval authority.

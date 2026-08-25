@@ -475,7 +475,10 @@ not satisfy a `vector.sensor-evidence-admission.v1` field.
 
 Reference execution remains blocked while its human decision is
 `PENDING_REVIEW`; code copying or adaptation requires a separate approved
-adaptation decision. Approval additionally requires the separately governed
+adaptation decision. Exact-byte redistribution is separately
+`SOURCE_TERMS_AUTHORIZED` by pinned NASA public-use records and Stone Soup's
+open/MIT record with its notice preserved; it creates no model-pack authority.
+Human approval additionally requires the separately governed
 digest-pinned reviewer/key policy, an externally rooted detached attestation,
 and exact resolution of the signed evidence bytes. The required scope is fixed
 per decision field and cannot be substituted. Even later approval would

@@ -2,8 +2,8 @@
   "schemaVersion": "vector.generic-sensor-verification-production-isolation-evidence.v1",
   "subjectManifestId": "generic-sensor-source-freeze-v1",
   "measuredOn": "2026-08-25",
-  "frozenArtifactCount": 77,
-  "frozenArtifactBytes": 62376284,
+  "frozenArtifactCount": 78,
+  "frozenArtifactBytes": 62386345,
   "productionRootsScannedByVerifier": [
     ".next",
     ".output",

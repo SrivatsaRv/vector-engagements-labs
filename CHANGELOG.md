@@ -38,8 +38,12 @@ No pending family-specific entry.
 Added an immutable, offline-verifiable Stage-0 bundle for the exact Stone Soup
 v1.9.1 and four NASA generic sensor reference sources. The bundle remains
 outside every production runtime and model-pack boundary; execution,
-adaptation, and redistribution remain blocked pending separately authorized
-human decisions.
+and adaptation remain blocked pending separately authorized human decisions.
+Redistribution of the exact frozen records and declared derivatives is bound to
+pinned NASA public-use and Stone Soup open/MIT source terms, and deterministic
+machine inspection independently reproduces every declared page render. A
+non-legal release-owner semantic review is bound to the exact render set and
+contact-sheet digests without admitting numeric values or equations.
 
 #### Simulation physics
 

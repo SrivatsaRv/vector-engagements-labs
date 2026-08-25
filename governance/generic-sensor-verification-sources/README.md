@@ -9,10 +9,14 @@ this directory is imported by production code.
 
 ## Current authority state
 
-All redistribution, reference-execution, and adaptation decisions are
-`PENDING_REVIEW`. That state fails closed. The committed authority registry has
-no authorized reviewer or decision record. An approval requires an allowlisted
-human reviewer, canonical calendar date, closed jurisdiction and scope,
+Redistribution is `SOURCE_TERMS_AUTHORIZED` for the exact frozen artifacts and
+declared derivatives only. `redistribution-authority.v1.json` binds that state
+to the exact official NASA `PUBLIC` / `GOV_PUBLIC_USE_PERMITTED` metadata and
+the exact Zenodo open/MIT metadata plus preserved MIT notice. Missing or changed
+source evidence fails closed; this is a direct source grant, not a human or
+agent-authored legal approval. Reference execution and adaptation remain
+`PENDING_REVIEW`. A human approval requires an allowlisted reviewer, canonical
+calendar date, closed jurisdiction and scope,
 conditions, evidence digest, and a detached Ed25519 decision attestation
 verified through the digest-pinned policy at
 `../generic-sensor-legal-authority-policy.v1.json`. The policy is outside this
@@ -39,8 +43,17 @@ identity; it exists only in a rejection regression.
   policy and cannot declare reviewers, grants, trusted keys, or evidence bytes.
 - `archive-inventory.v1.json` declares every member of the frozen Stone Soup
   archive before bounded extraction.
-- `visual-inspection.v1.json` records the primary full-page visual inspection
-  and the still-required independent exact-commit review.
+- `redistribution-authority.v1.json` records the exact authoritative source
+  terms that permit repository redistribution without permitting execution or
+  adaptation.
+- `visual-inspection.v1.json` records deterministic full-page machine
+  inspection. The independent gate rerenders every declared PDF page, compares
+  exact PNG bytes, checks valid non-blank image structure, reproduces each
+  upright derivative, and verifies the source/display mapping. Its distinct
+  `RELEASE_OWNER_REVIEW` section binds the non-legal semantic inspection to the
+  exact render-set and contact-sheet digests and records identity, context
+  category, mapping, and limitation/nonclaim consistency without transcribing
+  equations or numeric values.
 - `production-isolation-evidence.v1.json` measures the frozen artifact set and
   declares the production-import regression boundary.
 - `raw/` contains exact official artifacts; `extracted/` contains only declared

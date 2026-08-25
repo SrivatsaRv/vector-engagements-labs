@@ -3,14 +3,14 @@
   "manifestId": "generic-sensor-source-freeze-v1",
   "subjectId": "generic-sensor-verification-reference-sources",
   "intendedUse": "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE",
-  "status": "BLOCKED_PENDING_HUMAN_REVIEW",
+  "status": "BLOCKED_PENDING_HUMAN_EXECUTION_AND_ADAPTATION_REVIEW",
   "generatedBy": {
     "script": "generate-generic-sensor-source-manifest.mjs",
     "mode": "OFFLINE_ONLY"
   },
   "sourcePolicy": {
     "immutableContentAddressingRequired": true,
-    "redistributionPermitted": false,
+    "redistributionPermitted": true,
     "productionRuntimeUsePermitted": false,
     "stoneSoupExecutionPermitted": false,
     "stoneSoupAdaptationPermitted": false,
@@ -53,15 +53,15 @@
     "path": "visual-inspection.v1.json",
     "role": "PRIMARY_VISUAL_INSPECTION_RECORD",
     "state": "NON_AUTHORITATIVE_DISCOVERY_AID",
-    "sizeBytes": 14925,
-    "sha256": "db0413f418ac05ebc5a4c37aada86d8203e0e91e63b16a2e9f30a6d8addd962a"
+    "sizeBytes": 17442,
+    "sha256": "264c30e05c891e665bba12992eb8ff774b2f11ebb61a033f811c191003181692"
   },
   "legalDecisions": {
     "path": "legal-decisions.v1.json",
     "role": "LEGAL_AND_EXPORT_DECISIONS",
     "state": "REFERENCE_ONLY",
-    "sizeBytes": 5778,
-    "sha256": "76764b0f63ecf7d49ef6aa592a5c583e06f357a891c0552f1ed3b22850df27bc"
+    "sizeBytes": 7116,
+    "sha256": "817fba5abfbc265ec37872f428b12de69e78a7e64a9ebc2e4cc7d423c9266b21"
   },
   "legalAuthorityRegistry": {
     "path": "legal-authority-registry.v1.json",
@@ -69,6 +69,13 @@
     "state": "REFERENCE_ONLY",
     "sizeBytes": 517,
     "sha256": "a13e3aadab956c431e862dfed1dce7f7036ee4edc917ae22344f36b23ac11e9a"
+  },
+  "redistributionAuthority": {
+    "path": "redistribution-authority.v1.json",
+    "role": "AUTHORITATIVE_SOURCE_TERMS_REDISTRIBUTION_RECORD",
+    "state": "REFERENCE_ONLY",
+    "sizeBytes": 6206,
+    "sha256": "0f4c155e74b4923af36712b71cb2cdddcf707020f17b91ab22fe6182135aae74"
   },
   "decisionReferences": [
     {
@@ -127,7 +134,7 @@
     "role": "PRODUCTION_ISOLATION_SIZE_EVIDENCE",
     "state": "REFERENCE_ONLY",
     "sizeBytes": 1000,
-    "sha256": "50e74ff86897551d8241054864ec2e7f3fd99feee1aa927dcf68ce3a2440fae6"
+    "sha256": "3e7cd7e2e0652565dd34b3e3c403648a23c3f3f5fcecb5c761398af705bdbbb1"
   },
   "sources": [
     {
@@ -1341,5 +1348,5 @@
       }
     }
   ],
-  "canonicalManifestDigest": "c16f180702857f2586bf233a60041edbeaf332db749b27b9f196b5a3cfa03402"
+  "canonicalManifestDigest": "9d9026867faac751a391dd8e364aa06d066feb50156dd838815c09a30454213a"
 }

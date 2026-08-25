@@ -184,9 +184,14 @@ encryption, unsupported compression, and undeclared inventory changes before a
 selected member is compared. Stone Soup is never imported or executed.
 
 The legal artifact is authority data, not an agent recommendation. Each source
-has separate redistribution, reference-execution, and adaptation states. Only
-an allowlisted human record with identity, canonical calendar date, closed
-jurisdiction and scope, conditions, and evidence digest can represent approval.
+has separate redistribution, reference-execution, and adaptation states.
+Redistribution may be `SOURCE_TERMS_AUTHORIZED` only when the digest-pinned
+source-terms artifact proves the exact NASA public/public-use metadata or the
+exact Zenodo open/MIT record and preserved MIT notice. That source grant has no
+reviewer identity and cannot authorize execution or adaptation. Only an
+allowlisted human record with identity, canonical calendar date, closed
+jurisdiction and scope, conditions, and evidence digest can represent those
+separate approvals.
 The complete decision payload must carry a detached Ed25519 signature verified
 against the digest-pinned policy at
 `governance/generic-sensor-legal-authority-policy.v1.json`, outside the source
@@ -198,8 +203,10 @@ evidence root. Repository-local or self-declared keys, reviewer-kind strings,
 invented or unresolved records/evidence, malformed dates, pending, missing,
 forged, agent-authored, and out-of-scope decisions fail closed. Decision,
 reviewer, registry, policy, evidence, and attestation objects use exact keys.
-Non-approval states carry no reviewer, date, jurisdiction, scope, conditions,
-record, evidence, or alternate authority field. Network access is unnecessary
+Pending and rejected states carry no reviewer, date, jurisdiction, scope,
+conditions, record, evidence, or alternate authority field. Source-terms
+authority uses an exact closed redistribution scope and evidence digest, with
+no reviewer, decision date, or jurisdiction. Network access is unnecessary
 for verification. The mandatory focused command preloads a deny-all network
 guard and proves TCP, HTTP, and every callback, promise, resolver-instance, and
 ESM DNS resolution method fail before inspecting only committed bytes. The DNS
@@ -208,3 +215,9 @@ surfaces so newly exposed resolver variants fail the regression instead of
 silently escaping the guard. The verifier runs again after the production build so missing output
 directories cannot stand in for bundle-exclusion evidence. Dynamic unpinned or
 substituted community/game material is rejected.
+
+Visual release review is a separate technical boundary. `RELEASE_OWNER_REVIEW`
+is manifest-bound to the exact source-render set and four contact-sheet digests;
+it records title/report identity, declared mapping, context category, and
+limitations/nonclaims consistency. It is not `AUTHORIZED_HUMAN`, cannot create
+legal authority, and records that no numeric value or equation was transcribed.

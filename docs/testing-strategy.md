@@ -23,6 +23,15 @@ hash, byte total, and dependent artifact is updated consistently. This command
 is mandatory in `make ci-quality`; `make generic-sensor-sources-local` exposes
 the same focused gate.
 
+The same command independently rerenders all 44 declared NASA source pages
+from the exact PDFs with the pinned Poppler recipe, requires byte-identical PNG
+output, rejects blank or structurally invalid images, reproduces the three
+upright display derivatives, and checks every source/display page mapping. It
+does not use OCR or extracted text to supply numeric values or equations. The
+manifest separately binds the release owner's semantic contact-sheet review to
+the exact render-set digest and records the four required consistency findings;
+the verifier rejects a missing, altered, or differently bound review.
+
 Testing is part of the implementation contract. An executable action is incomplete until its behavior is covered at the appropriate test layers and the result is recorded. The project uses focused tests for fast feedback and staged integration evidence for release confidence.
 
 ## Required layers
@@ -45,6 +54,11 @@ The generic sensor Stage-0 generator, deny-network verifier, and adversarial
 suite are mandatory quality checks. `worker-local` and hosted integration rerun
 that same verifier after the production build so production-output quarantine
 is measured rather than inferred from missing build directories.
+The focused gate also rerenders all 44 declared NASA source pages from the exact
+frozen PDFs with the pinned Poppler recipe, compares exact PNG bytes, rejects
+blank or structurally invalid images, reproduces the three upright display
+derivatives, and checks every source/display mapping. It never extracts numeric
+values or equations, and source PDFs remain authoritative.
 
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and
 production-audit checks. It first runs the same contract-documentation impact
