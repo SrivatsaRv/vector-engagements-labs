@@ -61,24 +61,37 @@ function renderArtifact(path) {
   return artifact(path, "OFFLINE_FULL_PAGE_RENDER", "NON_AUTHORITATIVE_DISCOVERY_AID");
 }
 
+const DARWIN_RENDER_PROFILE = "darwin-arm64-conda-forge-26.05.0";
+const LINUX_RENDER_PROFILE = "linux-amd64-ubuntu-24.04-26.05.0";
+const renderProfileIds = [DARWIN_RENDER_PROFILE, LINUX_RENDER_PROFILE];
+
 function renderPages(ntrsId, pages, relevantPages, reportPage) {
   return pages.map((sourcePdfPage) => {
     const stem = String(sourcePdfPage).padStart(3, "0");
-    const sourceRender = renderArtifact(`renders/${ntrsId}/pdf-${stem}.png`);
-    const displayPath = `renders/${ntrsId}/pdf-${stem}-display-upright.png`;
+    const sourceRenders = {
+      [DARWIN_RENDER_PROFILE]: renderArtifact(`renders/${ntrsId}/pdf-${stem}.png`),
+      [LINUX_RENDER_PROFILE]: renderArtifact(`renders-linux-amd64/${ntrsId}/pdf-${stem}.png`),
+    };
     const result = {
       sourcePdfPage,
       reportPage: reportPage(sourcePdfPage),
       purpose: relevantPages.includes(sourcePdfPage) ? "RELEVANT_SOURCE_CONTEXT" : "IDENTITY_OR_LIMITATION_CONTEXT",
-      sourceRender,
+      sourceRenders,
       displayTransform: "NONE",
-      displayRender: null,
+      displayRenders: null,
     };
-    try {
-      result.displayRender = artifact(displayPath, "OFFLINE_UPRIGHT_DISPLAY_RENDER", "NON_AUTHORITATIVE_DISCOVERY_AID");
+    const displayRenders = {};
+    for (const [profileId, renderRoot] of [[DARWIN_RENDER_PROFILE, "renders"], [LINUX_RENDER_PROFILE, "renders-linux-amd64"]]) {
+      const displayPath = `${renderRoot}/${ntrsId}/pdf-${stem}-display-upright.png`;
+      try {
+        displayRenders[profileId] = artifact(displayPath, "OFFLINE_UPRIGHT_DISPLAY_RENDER", "NON_AUTHORITATIVE_DISCOVERY_AID");
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+      }
+    }
+    if (Object.keys(displayRenders).length > 0) {
+      result.displayRenders = displayRenders;
       result.displayTransform = "ROTATE_90_DEGREES_CLOCKWISE";
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
     }
     return result;
   });
@@ -256,38 +269,51 @@ for (const source of nasaSources) {
   }
 }
 
-const reviewedRenderSet = nasaSources.flatMap((source) => source.renderPages.map((page) => ({
-  sourceId: source.id,
-  ntrsId: source.ntrsId,
-  sourcePdfPage: page.sourcePdfPage,
-  reportPage: page.reportPage,
-  purpose: page.purpose,
-  sourceRender: page.sourceRender,
-  displayTransform: page.displayTransform,
-  displayRender: page.displayRender,
-})));
+const reviewedRenderSets = renderProfileIds.map((profileId) => ({
+  profileId,
+  pages: nasaSources.flatMap((source) => source.renderPages.map((page) => ({
+    sourceId: source.id,
+    ntrsId: source.ntrsId,
+    sourcePdfPage: page.sourcePdfPage,
+    reportPage: page.reportPage,
+    purpose: page.purpose,
+    sourceRender: page.sourceRenders[profileId],
+    displayTransform: page.displayTransform,
+    displayRender: page.displayRenders?.[profileId] ?? null,
+  }))),
+}));
 visualInspection.releaseOwnerReview = {
   schemaVersion: "vector.generic-sensor-verification-release-owner-visual-review.v1",
   status: "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE",
   reviewerRole: "RELEASE_OWNER_REVIEW",
   reviewedOn: "2026-08-25",
   subject: {
-    renderSetSha256: sha256(Buffer.from(canonicalJson(reviewedRenderSet))),
-    pageCount: reviewedRenderSet.length,
+    renderProfiles: reviewedRenderSets.map(({ profileId, pages }) => ({
+      profileId,
+      renderSetSha256: sha256(Buffer.from(canonicalJson(pages))),
+      pageCount: pages.length,
+    })),
     manifestId,
     intendedUse: "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE",
   },
   reviewedContactSheets: [
-    { ntrsId: "19660021027", sha256: "b71a77725e47a3638221aba5cc07e89000e538434aac586278209d0dddb10ea2", widthPixels: 1200, heightPixels: 422 },
-    { ntrsId: "19770023372", sha256: "04bb59783d9dbbae687fdd5f11aef975e03d2f4b23a7c71db9459d6cd9a38493", widthPixels: 1200, heightPixels: 844 },
-    { ntrsId: "19800011044", sha256: "f15477ce6708dfe050993cec18a5308e579d40cce146d6f8c241a2a10f8bda66", widthPixels: 1200, heightPixels: 1688 },
-    { ntrsId: "19840019990", sha256: "562b8d4577805d115318b0417274cf471e7e185bb1c52eb86dde553bd28d1648", widthPixels: 1200, heightPixels: 2110 },
+    { profileId: DARWIN_RENDER_PROFILE, ntrsId: "19660021027", sha256: "b71a77725e47a3638221aba5cc07e89000e538434aac586278209d0dddb10ea2", widthPixels: 1200, heightPixels: 422 },
+    { profileId: DARWIN_RENDER_PROFILE, ntrsId: "19770023372", sha256: "04bb59783d9dbbae687fdd5f11aef975e03d2f4b23a7c71db9459d6cd9a38493", widthPixels: 1200, heightPixels: 844 },
+    { profileId: DARWIN_RENDER_PROFILE, ntrsId: "19800011044", sha256: "f15477ce6708dfe050993cec18a5308e579d40cce146d6f8c241a2a10f8bda66", widthPixels: 1200, heightPixels: 1688 },
+    { profileId: DARWIN_RENDER_PROFILE, ntrsId: "19840019990", sha256: "562b8d4577805d115318b0417274cf471e7e185bb1c52eb86dde553bd28d1648", widthPixels: 1200, heightPixels: 2110 },
+    { profileId: LINUX_RENDER_PROFILE, ntrsId: "19660021027", sha256: "b71a77725e47a3638221aba5cc07e89000e538434aac586278209d0dddb10ea2", widthPixels: 1200, heightPixels: 422 },
+    { profileId: LINUX_RENDER_PROFILE, ntrsId: "19770023372", sha256: "62b6f3cd951a8b837daee14aa61c8c7e92e869768d1db69f53a864ccd6d80664", widthPixels: 1200, heightPixels: 844 },
+    { profileId: LINUX_RENDER_PROFILE, ntrsId: "19800011044", sha256: "a2ce85ea7af40678c3cb446fe5002eb072faff2cdc381ff35c8907ae232db8b8", widthPixels: 1200, heightPixels: 1688 },
+    { profileId: LINUX_RENDER_PROFILE, ntrsId: "19840019990", sha256: "562b8d4577805d115318b0417274cf471e7e185bb1c52eb86dde553bd28d1648", widthPixels: 1200, heightPixels: 2110 },
   ],
   findings: {
     titleAndReportIdentity: "CONSISTENT",
     declaredPageMapping: "CONSISTENT",
     equationAndContextCategory: "CONSISTENT_WITH_DECLARED_SOURCE_LOCATION_ONLY_SCOPE",
     limitationsAndNonclaims: "CONSISTENT",
+    crossProfilePageAndReportMapping: "CONSISTENT",
+    crossProfileNonblankStructure: "CONSISTENT",
+    crossProfileOrientationAndLimitations: "CONSISTENT",
   },
   legalApproval: false,
   numericOrEquationTranscriptionPerformed: false,
@@ -404,8 +430,8 @@ for (const source of [stoneSource, ...nasaSources]) {
   collectArtifact(source.archiveInventory);
   for (const member of source.extractedMembers ?? []) collectArtifact(member.extractedArtifact);
   for (const page of source.renderPages ?? []) {
-    collectArtifact(page.sourceRender);
-    collectArtifact(page.displayRender);
+    for (const candidate of Object.values(page.sourceRenders)) collectArtifact(candidate);
+    for (const candidate of Object.values(page.displayRenders ?? {})) collectArtifact(candidate);
   }
 }
 collectArtifact(visualArtifact);
@@ -418,7 +444,7 @@ const isolationEvidence = {
   measuredOn: "2026-08-25",
   frozenArtifactCount: frozenArtifacts.size,
   frozenArtifactBytes: [...frozenArtifacts.values()].reduce((sum, candidate) => sum + candidate.sizeBytes, 0),
-  productionRootsScannedByVerifier: [".next", ".output", "app", "build", "components", "db", "dist", "engine-rust", "fixtures/model-packs", "fixtures/vector-record", "lib", "out", "public", "worker"],
+  productionRootsScannedByVerifier: [".next", ".output", "app", "build", "components", "db", "dist", "engine-rust", "fixtures", "lib", "out", "public", "worker"],
   expectedProductionExposures: 0,
   productionBuildImportPolicy: "FORBIDDEN",
   networkPolicy: "DENY_ALL_NODE_NETWORK_APIS",
@@ -448,7 +474,33 @@ const manifest = {
     namedSystemClaimsPermitted: false,
   },
   renderRecipe: {
-    sourceRender: { tool: "pdftoppm", version: "26.05.0", dpi: 150, colourMode: "GRAYSCALE", extent: "FULL_PAGE", arguments: ["-r", "150", "-gray", "-f", "${PDF_PAGE}", "-l", "${PDF_PAGE}", "-singlefile", "-png"] },
+    sourceRender: {
+      tool: "pdftoppm",
+      version: "26.05.0",
+      dpi: 150,
+      colourMode: "GRAYSCALE",
+      extent: "FULL_PAGE",
+      arguments: ["-r", "150", "-gray", "-f", "${PDF_PAGE}", "-l", "${PDF_PAGE}", "-singlefile", "-png"],
+      profiles: [
+        {
+          id: DARWIN_RENDER_PROFILE,
+          nodePlatform: "darwin",
+          nodeArchitecture: "arm64",
+          distribution: "conda-forge",
+          packageSpec: "poppler=26.05.0=hd83632c_3",
+          executableSha256: "98ac4fedc4258b7125ad1048034c1448dccc58503614eb105f19d12cdb3a2d0d",
+        },
+        {
+          id: LINUX_RENDER_PROFILE,
+          nodePlatform: "linux",
+          nodeArchitecture: "x64",
+          distribution: "OFFICIAL_SOURCE_BUILD_ON_PINNED_UBUNTU",
+          ubuntuImageDigest: "sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517",
+          sourceArchiveSha256: "6fef27ff04f37db43054c86bcdff6128c9fb1f6af4ef3c8b369a7e9abd68d0bb",
+          installerPath: "scripts/install-pinned-poppler-ubuntu.sh",
+        },
+      ],
+    },
     uprightDisplayRender: {
       tool: "sharp",
       version: "0.35.0",

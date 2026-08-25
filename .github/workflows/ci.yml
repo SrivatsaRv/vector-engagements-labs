@@ -121,10 +121,27 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/verify-contract-doc-impact.mjs --github-event
 
+  generic_sensor_renderer:
+    if: needs.classify.outputs.quality == 'true' || needs.classify.outputs.integration == 'true'
+    name: "Stage 0.7: Pinned Generic Sensor Renderer"
+    needs: classify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Restore the content-keyed renderer image
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.tool_cache }}/vector-poppler-26.05.0-ubuntu24-amd64
+          key: vector-poppler-ubuntu24-amd64-${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh', 'scripts/pinned-poppler-ubuntu.Dockerfile', 'scripts/pinned-pdftoppm-wrapper.sh.in') }}
+      - name: Build or load the pinned renderer once
+        run: scripts/install-pinned-poppler-ubuntu.sh
+
   quality:
     if: needs.classify.outputs.quality == 'true'
     name: "Stage 1A: Web Quality"
-    needs: classify
+    needs: [classify, generic_sensor_renderer]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -137,6 +154,13 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Restore the content-keyed renderer image
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.tool_cache }}/vector-poppler-26.05.0-ubuntu24-amd64
+          key: vector-poppler-ubuntu24-amd64-${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh', 'scripts/pinned-poppler-ubuntu.Dockerfile', 'scripts/pinned-pdftoppm-wrapper.sh.in') }}
+      - name: Install the pinned offline PDF renderer
+        run: scripts/install-pinned-poppler-ubuntu.sh
       - name: Verify generated assets, lint, and types
         run: |
           npm run environment:sources:verify
@@ -294,7 +318,7 @@ jobs:
   integration:
     if: needs.classify.outputs.integration == 'true'
     name: "Stage 3A: Database and API Integration"
-    needs: classify
+    needs: [classify, generic_sensor_renderer]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
@@ -325,6 +349,13 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Restore the content-keyed renderer image
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.tool_cache }}/vector-poppler-26.05.0-ubuntu24-amd64
+          key: vector-poppler-ubuntu24-amd64-${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh', 'scripts/pinned-poppler-ubuntu.Dockerfile', 'scripts/pinned-pdftoppm-wrapper.sh.in') }}
+      - name: Install the pinned offline PDF renderer
+        run: scripts/install-pinned-poppler-ubuntu.sh
       - name: Build application
         run: |
           npm run build
@@ -361,6 +392,7 @@ jobs:
       - classify
       - policy
       - contract_docs
+      - generic_sensor_renderer
       - quality
       - security_js
       - web_tests
@@ -376,6 +408,7 @@ jobs:
       POLICY_RESULT: ${{ needs.policy.result }}
       CONTRACT_DOCS_RESULT: ${{ needs.contract_docs.result }}
       CONTRACT_DOC_IMPACT_STATE: ${{ needs.contract_docs.outputs.contract_docs_state }}
+      GENERIC_SENSOR_RENDERER_RESULT: ${{ needs.generic_sensor_renderer.result }}
       PR_REVIEW_KIND: ${{ needs.policy.outputs.pr_review_kind }}
       QUALITY_SELECTED: ${{ needs.classify.outputs.quality }}
       QUALITY_RESULT: ${{ needs.quality.result }}

@@ -1057,6 +1057,21 @@
         },
         {
           "kind": "EXACT",
+          "value": "scripts/install-pinned-poppler-ubuntu.sh",
+          "facets": ["verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/pinned-pdftoppm-wrapper.sh.in",
+          "facets": ["verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/pinned-poppler-ubuntu.Dockerfile",
+          "facets": ["verification"]
+        },
+        {
+          "kind": "EXACT",
           "value": "scripts/verify-generic-sensor-source-bundle.mjs",
           "facets": ["evidence", "verification"]
         }
@@ -4823,5 +4838,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "9826433b0eec2042eb31bd30f8a4befb18f3b0a7cee14f87d26932e25104e214"
+  "canonicalSha256": "c3ecb86eda4cc95d876f0dba14e0c570ce4c7ee279c865378a364f9e66588092"
 }

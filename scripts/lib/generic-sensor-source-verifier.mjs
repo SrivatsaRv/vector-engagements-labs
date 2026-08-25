@@ -27,8 +27,24 @@ const AUTHORITY_POLICY_PATH = "governance/generic-sensor-legal-authority-policy.
 const AUTHORITY_POLICY_SHA256 = "265aa74cac85e075e8b10e6b5c1519e1c42d65b20c9a54e5b81a7f60f84a5c1f";
 const AUTHORITY_POLICY_ID = "generic-sensor-legal-authority-policy-v1";
 const AUTHORITY_EVIDENCE_ROOT = "governance/generic-sensor-legal-decision-evidence";
-const CANONICAL_MANIFEST_DIGEST = "9d9026867faac751a391dd8e364aa06d066feb50156dd838815c09a30454213a";
-const PRODUCTION_ROOTS = [".next", ".output", "app", "build", "components", "db", "dist", "engine-rust", "fixtures/model-packs", "fixtures/vector-record", "lib", "out", "public", "worker"];
+const CANONICAL_MANIFEST_DIGEST = "efbce4b0478c89754d2b366354823a2c30a6b5ad1bcfa89b66f8fdcfafbdce90";
+const PRODUCTION_ROOTS = [".next", ".output", "app", "build", "components", "db", "dist", "engine-rust", "fixtures", "lib", "out", "public", "worker"];
+const DARWIN_RENDER_PROFILE = "darwin-arm64-conda-forge-26.05.0";
+const LINUX_RENDER_PROFILE = "linux-amd64-ubuntu-24.04-26.05.0";
+const RENDER_PROFILE_PATHS = Object.freeze({
+  [DARWIN_RENDER_PROFILE]: "renders",
+  [LINUX_RENDER_PROFILE]: "renders-linux-amd64",
+});
+const REVIEWED_CONTACT_SHEETS = Object.freeze([
+  { profileId: DARWIN_RENDER_PROFILE, ntrsId: "19660021027", sha256: "b71a77725e47a3638221aba5cc07e89000e538434aac586278209d0dddb10ea2", widthPixels: 1200, heightPixels: 422 },
+  { profileId: DARWIN_RENDER_PROFILE, ntrsId: "19770023372", sha256: "04bb59783d9dbbae687fdd5f11aef975e03d2f4b23a7c71db9459d6cd9a38493", widthPixels: 1200, heightPixels: 844 },
+  { profileId: DARWIN_RENDER_PROFILE, ntrsId: "19800011044", sha256: "f15477ce6708dfe050993cec18a5308e579d40cce146d6f8c241a2a10f8bda66", widthPixels: 1200, heightPixels: 1688 },
+  { profileId: DARWIN_RENDER_PROFILE, ntrsId: "19840019990", sha256: "562b8d4577805d115318b0417274cf471e7e185bb1c52eb86dde553bd28d1648", widthPixels: 1200, heightPixels: 2110 },
+  { profileId: LINUX_RENDER_PROFILE, ntrsId: "19660021027", sha256: "b71a77725e47a3638221aba5cc07e89000e538434aac586278209d0dddb10ea2", widthPixels: 1200, heightPixels: 422 },
+  { profileId: LINUX_RENDER_PROFILE, ntrsId: "19770023372", sha256: "62b6f3cd951a8b837daee14aa61c8c7e92e869768d1db69f53a864ccd6d80664", widthPixels: 1200, heightPixels: 844 },
+  { profileId: LINUX_RENDER_PROFILE, ntrsId: "19800011044", sha256: "a2ce85ea7af40678c3cb446fe5002eb072faff2cdc381ff35c8907ae232db8b8", widthPixels: 1200, heightPixels: 1688 },
+  { profileId: LINUX_RENDER_PROFILE, ntrsId: "19840019990", sha256: "562b8d4577805d115318b0417274cf471e7e185bb1c52eb86dde553bd28d1648", widthPixels: 1200, heightPixels: 2110 },
+]);
 const PRODUCTION_MARKERS = [MANIFEST_SCHEMA, LEGAL_SCHEMA, AUTHORITY_SCHEMA, AUTHORITY_POLICY_SCHEMA, SOURCE_TERMS_SCHEMA, AUTHORITY_POLICY_ID, AUTHORITY_EVIDENCE_ROOT, INTENDED_USE, "generic-sensor-verification-sources", "generic-sensor-source-freeze-v1"];
 const NASA_IDENTITIES = {
   "nasa-cr-66097": { ntrsId: "19660021027", reportNumber: "NASA-CR-66097", pages: [143, 144], reportPages: ["134", "135"], renderPages: [1, 143, 144] },
@@ -180,15 +196,22 @@ function verifyNasaMetadata(source, bytes) {
   if (canonicalJson(source.renderPages?.map((page) => page.sourcePdfPage)) !== canonicalJson(identity.renderPages)) fail(`wrong render page mapping for ${source.id}`);
   for (const page of source.renderPages) {
     const stem = String(page.sourcePdfPage).padStart(3, "0");
-    const expectedSourcePath = `renders/${source.ntrsId}/pdf-${stem}.png`;
-    if (page.sourceRender?.path !== expectedSourcePath) fail(`render artifact does not match source page for ${source.id}:${page.sourcePdfPage}`);
+    if (canonicalJson(Object.keys(page.sourceRenders ?? {})) !== canonicalJson(Object.keys(RENDER_PROFILE_PATHS))) fail(`render profiles are incomplete for ${source.id}:${page.sourcePdfPage}`);
+    for (const [profileId, renderRoot] of Object.entries(RENDER_PROFILE_PATHS)) {
+      const expectedSourcePath = `${renderRoot}/${source.ntrsId}/pdf-${stem}.png`;
+      if (page.sourceRenders[profileId]?.path !== expectedSourcePath) fail(`render artifact does not match source page for ${source.id}:${page.sourcePdfPage}:${profileId}`);
+    }
     const relevantIndex = identity.pages.indexOf(page.sourcePdfPage);
     const expectedReportPage = relevantIndex === -1 ? null : identity.reportPages[relevantIndex];
     const expectedPurpose = relevantIndex === -1 ? "IDENTITY_OR_LIMITATION_CONTEXT" : "RELEVANT_SOURCE_CONTEXT";
     if (page.reportPage !== expectedReportPage || page.purpose !== expectedPurpose) fail(`wrong source/display page context for ${source.id}:${page.sourcePdfPage}`);
     const uprightExpected = source.id === "nasa-cr-160557" && [8, 11, 14].includes(page.sourcePdfPage);
-    const expectedDisplayPath = uprightExpected ? `renders/${source.ntrsId}/pdf-${stem}-display-upright.png` : null;
-    if ((page.displayRender?.path ?? null) !== expectedDisplayPath) fail(`wrong upright display artifact for ${source.id}:${page.sourcePdfPage}`);
+    const expectedDisplayProfiles = uprightExpected ? Object.keys(RENDER_PROFILE_PATHS) : [];
+    if (canonicalJson(Object.keys(page.displayRenders ?? {})) !== canonicalJson(expectedDisplayProfiles)) fail(`wrong upright display profiles for ${source.id}:${page.sourcePdfPage}`);
+    for (const [profileId, renderRoot] of Object.entries(RENDER_PROFILE_PATHS)) {
+      const expectedDisplayPath = uprightExpected ? `${renderRoot}/${source.ntrsId}/pdf-${stem}-display-upright.png` : null;
+      if ((page.displayRenders?.[profileId]?.path ?? null) !== expectedDisplayPath) fail(`wrong upright display artifact for ${source.id}:${page.sourcePdfPage}:${profileId}`);
+    }
   }
   const metadata = JSON.parse(bytes.toString("utf8"));
   if (String(metadata.id) !== source.ntrsId) fail(`wrong NASA record for ${source.id}`);
@@ -387,37 +410,34 @@ function verifyVisualInspection(root, manifest, overrides) {
   if (inspection.status !== "DETERMINISTIC_MACHINE_INSPECTION_COMPLETE" || inspection.inspectionMethod !== "INDEPENDENT_SOURCE_TO_RENDER_REPRODUCTION_AND_STRUCTURAL_IMAGE_CHECK" || inspection.reviewerRole !== null || inspection.verificationCommand !== "node --require ./scripts/lib/generic-sensor-network-deny.cjs scripts/verify-generic-sensor-source-bundle.mjs") fail("visual inspection must identify the deterministic independent machine gate");
   const review = inspection.releaseOwnerReview;
   requireExactKeys(review, ["schemaVersion", "status", "reviewerRole", "reviewedOn", "subject", "reviewedContactSheets", "findings", "legalApproval", "numericOrEquationTranscriptionPerformed", "note"], "release-owner visual review");
-  requireExactKeys(review.subject, ["renderSetSha256", "pageCount", "manifestId", "intendedUse"], "release-owner visual review subject");
-  requireExactKeys(review.findings, ["titleAndReportIdentity", "declaredPageMapping", "equationAndContextCategory", "limitationsAndNonclaims"], "release-owner visual review findings");
-  const reviewedRenderSet = manifest.sources.filter((source) => source.publisher === "NASA").flatMap((source) => source.renderPages.map((page) => ({
-    sourceId: source.id,
-    ntrsId: source.ntrsId,
-    sourcePdfPage: page.sourcePdfPage,
-    reportPage: page.reportPage,
-    purpose: page.purpose,
-    sourceRender: page.sourceRender,
-    displayTransform: page.displayTransform,
-    displayRender: page.displayRender,
-  })));
-  const expectedContactSheets = [
-    { ntrsId: "19660021027", sha256: "b71a77725e47a3638221aba5cc07e89000e538434aac586278209d0dddb10ea2", widthPixels: 1200, heightPixels: 422 },
-    { ntrsId: "19770023372", sha256: "04bb59783d9dbbae687fdd5f11aef975e03d2f4b23a7c71db9459d6cd9a38493", widthPixels: 1200, heightPixels: 844 },
-    { ntrsId: "19800011044", sha256: "f15477ce6708dfe050993cec18a5308e579d40cce146d6f8c241a2a10f8bda66", widthPixels: 1200, heightPixels: 1688 },
-    { ntrsId: "19840019990", sha256: "562b8d4577805d115318b0417274cf471e7e185bb1c52eb86dde553bd28d1648", widthPixels: 1200, heightPixels: 2110 },
-  ];
-  if (review.schemaVersion !== "vector.generic-sensor-verification-release-owner-visual-review.v1" || review.status !== "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE" || review.reviewerRole !== "RELEASE_OWNER_REVIEW" || !canonicalDate(review.reviewedOn) || review.subject.renderSetSha256 !== sha256(Buffer.from(canonicalJson(reviewedRenderSet))) || review.subject.pageCount !== reviewedRenderSet.length || review.subject.manifestId !== manifest.manifestId || review.subject.intendedUse !== INTENDED_USE || canonicalJson(review.reviewedContactSheets) !== canonicalJson(expectedContactSheets) || review.findings.titleAndReportIdentity !== "CONSISTENT" || review.findings.declaredPageMapping !== "CONSISTENT" || review.findings.equationAndContextCategory !== "CONSISTENT_WITH_DECLARED_SOURCE_LOCATION_ONLY_SCOPE" || review.findings.limitationsAndNonclaims !== "CONSISTENT" || review.legalApproval !== false || review.numericOrEquationTranscriptionPerformed !== false) fail("release-owner visual review is missing, altered, or bound to a different render set");
+  requireExactKeys(review.subject, ["renderProfiles", "manifestId", "intendedUse"], "release-owner visual review subject");
+  requireExactKeys(review.findings, ["titleAndReportIdentity", "declaredPageMapping", "equationAndContextCategory", "limitationsAndNonclaims", "crossProfilePageAndReportMapping", "crossProfileNonblankStructure", "crossProfileOrientationAndLimitations"], "release-owner visual review findings");
+  const reviewedRenderProfiles = Object.keys(RENDER_PROFILE_PATHS).map((profileId) => {
+    const pages = manifest.sources.filter((source) => source.publisher === "NASA").flatMap((source) => source.renderPages.map((page) => ({
+      sourceId: source.id,
+      ntrsId: source.ntrsId,
+      sourcePdfPage: page.sourcePdfPage,
+      reportPage: page.reportPage,
+      purpose: page.purpose,
+      sourceRender: page.sourceRenders[profileId],
+      displayTransform: page.displayTransform,
+      displayRender: page.displayRenders?.[profileId] ?? null,
+    })));
+    return { profileId, renderSetSha256: sha256(Buffer.from(canonicalJson(pages))), pageCount: pages.length };
+  });
+  if (review.schemaVersion !== "vector.generic-sensor-verification-release-owner-visual-review.v1" || review.status !== "RELEASE_OWNER_SEMANTIC_INSPECTION_COMPLETE" || review.reviewerRole !== "RELEASE_OWNER_REVIEW" || !canonicalDate(review.reviewedOn) || canonicalJson(review.subject.renderProfiles) !== canonicalJson(reviewedRenderProfiles) || review.subject.manifestId !== manifest.manifestId || review.subject.intendedUse !== INTENDED_USE || canonicalJson(review.reviewedContactSheets) !== canonicalJson(REVIEWED_CONTACT_SHEETS) || review.findings.titleAndReportIdentity !== "CONSISTENT" || review.findings.declaredPageMapping !== "CONSISTENT" || review.findings.equationAndContextCategory !== "CONSISTENT_WITH_DECLARED_SOURCE_LOCATION_ONLY_SCOPE" || review.findings.limitationsAndNonclaims !== "CONSISTENT" || review.findings.crossProfilePageAndReportMapping !== "CONSISTENT" || review.findings.crossProfileNonblankStructure !== "CONSISTENT" || review.findings.crossProfileOrientationAndLimitations !== "CONSISTENT" || review.legalApproval !== false || review.numericOrEquationTranscriptionPerformed !== false) fail("release-owner visual review is missing, altered, or bound to a different render set");
   const inspected = new Map(inspection.pages.map((page) => [`${page.sourceId}:${page.sourcePdfPage}`, page]));
   const expectedPageCount = manifest.sources.reduce((sum, source) => sum + (source.renderPages?.length ?? 0), 0);
   if (inspection.pages.length !== expectedPageCount || inspected.size !== expectedPageCount) fail("visual-inspection page coverage is not exact");
   for (const source of manifest.sources.filter((candidate) => candidate.publisher === "NASA")) {
     for (const page of source.renderPages) {
-      artifactBytes(root, page.sourceRender, overrides);
-      if (page.displayRender) artifactBytes(root, page.displayRender, overrides);
+      for (const artifact of Object.values(page.sourceRenders)) artifactBytes(root, artifact, overrides);
+      for (const artifact of Object.values(page.displayRenders ?? {})) artifactBytes(root, artifact, overrides);
       const inspectedPage = inspected.get(`${source.id}:${page.sourcePdfPage}`);
       if (!inspectedPage) fail(`uninspected source page ${source.id}:${page.sourcePdfPage}`);
       if (inspectedPage.reportPage !== page.reportPage || inspectedPage.purpose !== page.purpose || inspectedPage.sourceIdentityBound !== true || inspectedPage.renderReproductionRequired !== true || inspectedPage.structuralImageCheckRequired !== true || inspectedPage.result !== "EXACT_SOURCE_RENDER_AND_DECLARED_MAPPING_VERIFIED") fail(`visual-inspection mapping mismatch for ${source.id}:${page.sourcePdfPage}`);
       const uprightExpected = source.id === "nasa-cr-160557" && [8, 11, 14].includes(page.sourcePdfPage);
-      if (uprightExpected !== Boolean(page.displayRender) || (uprightExpected && page.displayTransform !== "ROTATE_90_DEGREES_CLOCKWISE") || (!uprightExpected && page.displayTransform !== "NONE")) fail(`wrong display mapping for ${source.id}:${page.sourcePdfPage}`);
+      if (uprightExpected !== Boolean(page.displayRenders) || (uprightExpected && page.displayTransform !== "ROTATE_90_DEGREES_CLOCKWISE") || (!uprightExpected && page.displayTransform !== "NONE")) fail(`wrong display mapping for ${source.id}:${page.sourcePdfPage}`);
     }
   }
 }
@@ -466,8 +486,8 @@ function verifyIsolationEvidence(root, manifest, overrides) {
     collect(source.archiveInventory);
     for (const member of source.extractedMembers ?? []) collect(member.extractedArtifact);
     for (const page of source.renderPages ?? []) {
-      collect(page.sourceRender);
-      collect(page.displayRender);
+      for (const candidate of Object.values(page.sourceRenders)) collect(candidate);
+      for (const candidate of Object.values(page.displayRenders ?? {})) collect(candidate);
     }
   }
   collect(manifest.visualInspection);
@@ -522,7 +542,12 @@ export function verifyGenericSensorSourceBundle(options = {}) {
   if (manifest.sources?.length !== 5 || new Set(manifest.sources.map((source) => source.id)).size !== 5) fail("source set must contain exactly five unique records");
   if (manifest.status !== "BLOCKED_PENDING_HUMAN_EXECUTION_AND_ADAPTATION_REVIEW" || manifest.sourcePolicy?.productionRuntimeUsePermitted !== false || manifest.sourcePolicy?.stoneSoupExecutionPermitted !== false || manifest.sourcePolicy?.stoneSoupAdaptationPermitted !== false || manifest.sourcePolicy?.numericModelTranscriptionPermitted !== false || manifest.sourcePolicy?.namedSystemClaimsPermitted !== false || manifest.sourcePolicy?.redistributionPermitted !== true) fail("source-only policy must authorize redistribution only and fail closed for runtime use");
   const sharpRecipe = manifest.renderRecipe?.uprightDisplayRender;
-  if (manifest.renderRecipe?.sourceRender?.tool !== "pdftoppm" || manifest.renderRecipe.sourceRender.version !== "26.05.0" || manifest.renderRecipe.sourceRender.dpi !== 150 || manifest.renderRecipe.sourceRender.extent !== "FULL_PAGE" || sharpRecipe?.tool !== "sharp" || sharpRecipe.version !== "0.35.0" || sharpRecipe.pngEncoder?.compressionLevel !== 9 || sharpRecipe.pngEncoder?.adaptiveFiltering !== false || sharpRecipe.pngEncoder?.palette !== false || manifest.renderRecipe.state !== "NON_AUTHORITATIVE_DISCOVERY_AID") fail("wrong offline render recipe");
+  const sourceRecipe = manifest.renderRecipe?.sourceRender;
+  const expectedProfiles = [
+    { id: DARWIN_RENDER_PROFILE, nodePlatform: "darwin", nodeArchitecture: "arm64", distribution: "conda-forge", packageSpec: "poppler=26.05.0=hd83632c_3", executableSha256: "98ac4fedc4258b7125ad1048034c1448dccc58503614eb105f19d12cdb3a2d0d" },
+    { id: LINUX_RENDER_PROFILE, nodePlatform: "linux", nodeArchitecture: "x64", distribution: "OFFICIAL_SOURCE_BUILD_ON_PINNED_UBUNTU", ubuntuImageDigest: "sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517", sourceArchiveSha256: "6fef27ff04f37db43054c86bcdff6128c9fb1f6af4ef3c8b369a7e9abd68d0bb", installerPath: "scripts/install-pinned-poppler-ubuntu.sh" },
+  ];
+  if (sourceRecipe?.tool !== "pdftoppm" || sourceRecipe.version !== "26.05.0" || sourceRecipe.dpi !== 150 || sourceRecipe.extent !== "FULL_PAGE" || canonicalJson(sourceRecipe.profiles) !== canonicalJson(expectedProfiles) || sharpRecipe?.tool !== "sharp" || sharpRecipe.version !== "0.35.0" || sharpRecipe.pngEncoder?.compressionLevel !== 9 || sharpRecipe.pngEncoder?.adaptiveFiltering !== false || sharpRecipe.pngEncoder?.palette !== false || manifest.renderRecipe.state !== "NON_AUTHORITATIVE_DISCOVERY_AID") fail("wrong offline render recipe");
   if (FORBIDDEN_CLAIM.test(serialized)) fail("forbidden named, community, or game claim in manifest");
   for (const source of manifest.sources) {
     if (!source.canonicalUrl || /(?:\/latest\b|[?&](?:latest|version)=latest)/i.test(source.canonicalUrl)) fail(`dynamic source URL for ${source.id}`);
@@ -593,8 +618,8 @@ export function verifyGenericSensorSourceBundle(options = {}) {
     collectFrozenArtifact(source.archiveInventory);
     for (const member of source.extractedMembers ?? []) collectFrozenArtifact(member.extractedArtifact);
     for (const page of source.renderPages ?? []) {
-      collectFrozenArtifact(page.sourceRender);
-      collectFrozenArtifact(page.displayRender);
+      for (const candidate of Object.values(page.sourceRenders)) collectFrozenArtifact(candidate);
+      for (const candidate of Object.values(page.displayRenders ?? {})) collectFrozenArtifact(candidate);
     }
   }
   collectFrozenArtifact(manifest.visualInspection);

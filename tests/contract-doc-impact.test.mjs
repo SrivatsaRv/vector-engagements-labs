@@ -2321,6 +2321,13 @@ test("the repository policy maps real simulation identities to their exact owner
     ownersOf("scripts/lib/generic-sensor-network-deny.cjs").map((owner) => owner.id),
     [genericSensorSources.id],
   );
+  for (const rendererPath of [
+    "scripts/install-pinned-poppler-ubuntu.sh",
+    "scripts/pinned-pdftoppm-wrapper.sh.in",
+    "scripts/pinned-poppler-ubuntu.Dockerfile",
+  ]) {
+    assert.deepEqual(ownersOf(rendererPath).map((owner) => owner.id), [genericSensorSources.id]);
+  }
   assert.deepEqual(
     requiredSections(genericSensorSources, "scripts/lib/generic-sensor-network-deny.cjs"),
     [

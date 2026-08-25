@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -26,6 +26,33 @@ function clone(value) {
   return structuredClone(value);
 }
 
+function assertHostedRendererProvisioning(workflow, installer, dockerfile, wrapper) {
+  const setupJob = workflow.slice(workflow.indexOf("  generic_sensor_renderer:\n"), workflow.indexOf("  quality:\n"));
+  assert.match(setupJob, /actions\/cache@0057852bfaa89a56745cba8c7296529d2fc39830/u);
+  assert.match(setupJob, /Build or load the pinned renderer once/u);
+  assert.match(setupJob, /scripts\/install-pinned-poppler-ubuntu\.sh/u);
+  const jobSlices = [
+    workflow.slice(workflow.indexOf("  quality:\n"), workflow.indexOf("  security_js:\n")),
+    workflow.slice(workflow.indexOf("  integration:\n"), workflow.indexOf("  container:\n")),
+  ];
+  for (const job of jobSlices) {
+    const installAt = job.indexOf("run: scripts/install-pinned-poppler-ubuntu.sh");
+    const verifyAt = job.indexOf("npm run generic-sensor:sources:verify");
+    assert.ok(installAt >= 0 && verifyAt > installAt, "each hosted verifier job must provision the renderer first");
+  }
+  assert.match(installer, /readonly poppler_version="26\.05\.0"/u);
+  assert.match(installer, /readonly poppler_sha256="6fef27ff04f37db43054c86bcdff6128c9fb1f6af4ef3c8b369a7e9abd68d0bb"/u);
+  assert.match(installer, /sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517/u);
+  assert.match(installer, /https:\/\/poppler\.freedesktop\.org\/poppler-\$\{poppler_version\}\.tar\.xz/u);
+  assert.match(installer, /sha256sum --check --strict/u);
+  assert.match(installer, /pdftoppm" -v/u);
+  assert.match(dockerfile, /^FROM @@UBUNTU_IMAGE@@/u);
+  assert.match(dockerfile, /@@POPPLER_SHA256@@/u);
+  assert.match(dockerfile, /cmake --build \/tmp\/poppler\/build --target pdftoppm --parallel 2/u);
+  assert.match(wrapper, /docker run --rm --network none/u);
+  assert.equal((workflow.match(/Restore the content-keyed renderer image/gu) ?? []).length, 3);
+}
+
 function seal(value) {
   value.canonicalManifestDigest = canonicalManifestDigest(value);
   return value;
@@ -36,7 +63,9 @@ function artifactDescriptor(manifestValue, path) {
   for (const source of manifestValue.sources) {
     candidates.push(...source.artifacts, source.archiveInventory);
     for (const member of source.extractedMembers ?? []) candidates.push(member.extractedArtifact);
-    for (const page of source.renderPages ?? []) candidates.push(page.sourceRender, page.displayRender);
+    for (const page of source.renderPages ?? []) {
+      candidates.push(...Object.values(page.sourceRenders), ...Object.values(page.displayRenders ?? {}));
+    }
   }
   return candidates.find((candidate) => candidate?.path === path);
 }
@@ -61,8 +90,8 @@ function finalizeIsolationOverride(manifestValue, overrides, mutate = () => {}) 
     collect(source.archiveInventory);
     for (const member of source.extractedMembers ?? []) collect(member.extractedArtifact);
     for (const page of source.renderPages ?? []) {
-      collect(page.sourceRender);
-      collect(page.displayRender);
+      for (const candidate of Object.values(page.sourceRenders)) collect(candidate);
+      for (const candidate of Object.values(page.displayRenders ?? {})) collect(candidate);
     }
   }
   collect(manifestValue.visualInspection);
@@ -649,7 +678,7 @@ test("release-owner semantic review is non-legal and bound to the exact render s
   for (const mutate of [
     (review) => { review.reviewerRole = "AUTHORIZED_HUMAN"; },
     (review) => { review.legalApproval = true; },
-    (review) => { review.subject.renderSetSha256 = "1".repeat(64); },
+    (review) => { review.subject.renderProfiles[0].renderSetSha256 = "1".repeat(64); },
     (review) => { review.reviewedContactSheets[0].sha256 = "2".repeat(64); },
     (review) => { review.numericOrEquationTranscriptionPerformed = true; },
   ]) {
@@ -664,6 +693,37 @@ test("release-owner semantic review is non-legal and bound to the exact render s
       /release-owner visual review is missing, altered, or bound to a different render set/,
     );
   }
+});
+
+test("hosted jobs provision the exact renderer before entering the offline gate", () => {
+  const workflow = readFileSync(resolve(".github/workflows/ci.yml"), "utf8");
+  const installerPath = resolve("scripts/install-pinned-poppler-ubuntu.sh");
+  const installer = readFileSync(installerPath, "utf8");
+  const dockerfile = readFileSync(resolve("scripts/pinned-poppler-ubuntu.Dockerfile"), "utf8");
+  const wrapper = readFileSync(resolve("scripts/pinned-pdftoppm-wrapper.sh.in"), "utf8");
+  assertHostedRendererProvisioning(workflow, installer, dockerfile, wrapper);
+  assert.ok((statSync(installerPath).mode & 0o111) !== 0, "the hosted renderer bootstrap must be executable");
+
+  assert.throws(
+    () => assertHostedRendererProvisioning(workflow, installer.replace("26.05.0", "26.05.1"), dockerfile, wrapper),
+    /poppler_version/,
+  );
+  const qualityWithLateInstall = workflow.replace(
+    "      - name: Install the pinned offline PDF renderer\n        run: scripts/install-pinned-poppler-ubuntu.sh",
+    "      - name: Enter the offline gate too early\n        run: npm run generic-sensor:sources:verify\n      - name: Install the pinned offline PDF renderer\n        run: scripts/install-pinned-poppler-ubuntu.sh",
+  );
+  assert.throws(
+    () => assertHostedRendererProvisioning(qualityWithLateInstall, installer, dockerfile, wrapper),
+    /provision the renderer first/,
+  );
+  assert.throws(
+    () => assertHostedRendererProvisioning(workflow, installer.replace("33ceb719", "03ceb719"), dockerfile, wrapper),
+    /33ceb719/,
+  );
+  assert.throws(
+    () => assertHostedRendererProvisioning(workflow.replace("actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830", "actions/cache@main"), installer, dockerfile, wrapper),
+    /actions\/cache/,
+  );
 });
 
 test("community/game artifacts, dynamic sources, model claims, and production exposure are rejected", () => {
@@ -708,6 +768,27 @@ test("community/game artifacts, dynamic sources, model claims, and production ex
     }),
     /embedded frozen artifact/,
   );
+  for (const previouslyOmittedRuntimeFixture of [
+    "fixtures/public-reference/forbidden-reference.pdf",
+    "fixtures/performance/forbidden-reference.bin",
+  ]) {
+    assert.throws(
+      () => assertNoProductionExposure({
+        repositoryRoot: resolve("."),
+        virtualFiles: new Map([[previouslyOmittedRuntimeFixture, frozenPdf]]),
+        forbiddenArtifactDigests: new Set([sha256(frozenPdf)]),
+      }),
+      /production exposure frozen artifact/,
+    );
+    assert.throws(
+      () => assertNoProductionExposure({
+        repositoryRoot: resolve("."),
+        virtualFiles: new Map([[previouslyOmittedRuntimeFixture, Buffer.concat([Buffer.from("prefix"), frozenPdf, Buffer.from("suffix")])]]),
+        forbiddenArtifactBytes: [frozenPdf],
+      }),
+      /production exposure embedded frozen artifact/,
+    );
+  }
 
   const temporaryRepository = mkdtempSync(join(tmpdir(), "vector-source-quarantine-"));
   try {

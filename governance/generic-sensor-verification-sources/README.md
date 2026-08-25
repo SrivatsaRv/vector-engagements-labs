@@ -57,8 +57,10 @@ identity; it exists only in a rejection regression.
 - `production-isolation-evidence.v1.json` measures the frozen artifact set and
   declares the production-import regression boundary.
 - `raw/` contains exact official artifacts; `extracted/` contains only declared
-  reference files; `renders/` contains non-authoritative full-page navigation
-  images and three explicitly mapped upright display derivatives.
+  reference files; `renders/` contains the Darwin-arm64 non-authoritative
+  full-page navigation images and three explicitly mapped upright display
+  derivatives; `renders-linux-amd64/` contains the separately
+  content-addressed Linux-amd64 profile over the same exact 44 PDF pages.
 
 OCR and extracted text, if produced during review, are
 `NON_AUTHORITATIVE_DISCOVERY_AID` material. They cannot supply numeric values or
@@ -85,14 +87,31 @@ canonical manifest digest, so caller resealing cannot alter any manifest,
 source, artifact, render, claim, or policy field. It hashes every declared
 artifact, parses the ZIP with bounded expansion, compares all archive members and selected
 extractions, validates official metadata and page mappings, validates pending
-decision structure, and scans production roots for exposure.
+decision structure, and scans production roots for exposure. The governed
+boundary includes the entire `fixtures/` tree, including public-reference and
+performance workloads; frozen source bytes are forbidden in every runtime
+fixture subtree.
 
 The render recipe is Poppler `pdftoppm` 26.05.0 at 150 DPI, grayscale, full
-page. CR-160557 PDF pages 8, 11, and 14 are intrinsically rotated; their source
-renders are preserved and separate Sharp 0.35.0 90-degree-clockwise display
-derivatives are manifest-hashed. Sharp uses deterministic PNG options
+page. Its Darwin-arm64 conda-forge and Linux-amd64 pinned-Ubuntu profiles each
+reproduce exact bytes within the profile; the manifest does not assert that
+Poppler emits identical PNG bytes across platforms. Both profiles cover the
+same exact 44 pages and are bound to the release-owner review. CR-160557 PDF
+pages 8, 11, and 14 are intrinsically rotated; their source renders are
+preserved and separate Sharp 0.35.0 90-degree-clockwise display derivatives are
+manifest-hashed. Sharp uses deterministic PNG options
 `compressionLevel: 9`, `adaptiveFiltering: false`, and `palette: false`. The
 display derivative never replaces the source-page identity.
+
+GitHub's Ubuntu runner does not provide this pinned renderer. A dedicated job
+runs `scripts/install-pinned-poppler-ubuntu.sh` once, builds inside the exact
+Ubuntu image digest recorded in the manifest, and rejects any Poppler source
+archive digest other than
+`6fef27ff04f37db43054c86bcdff6128c9fb1f6af4ef3c8b369a7e9abd68d0bb`.
+A digest-keyed Actions cache supplies that image to quality and integration;
+the runtime wrapper disables container networking. The networked source
+bootstrap is separate from the deny-all source verifier and cannot replace or
+fetch any governed source artifact.
 
 ## Explicitly omitted layers
 

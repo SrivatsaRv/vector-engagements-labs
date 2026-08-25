@@ -217,7 +217,13 @@ directories cannot stand in for bundle-exclusion evidence. Dynamic unpinned or
 substituted community/game material is rejected.
 
 Visual release review is a separate technical boundary. `RELEASE_OWNER_REVIEW`
-is manifest-bound to the exact source-render set and four contact-sheet digests;
-it records title/report identity, declared mapping, context category, and
-limitations/nonclaims consistency. It is not `AUTHORIZED_HUMAN`, cannot create
-legal authority, and records that no numeric value or equation was transcribed.
+is manifest-bound to separately content-addressed Darwin-arm64 and Linux-amd64
+44-page render sets and their eight profile/contact-sheet identities. It
+records title/report identity, declared mapping, context category,
+limitations/nonclaims, and cross-profile mapping, nonblank structure,
+orientation, and limitation consistency. Each profile must reproduce exact
+bytes; the contract makes no cross-platform PNG byte-identity claim. It is not
+`AUTHORIZED_HUMAN`, cannot create legal authority, and records that no numeric
+value or equation was transcribed. Production isolation scans the entire
+`fixtures/` tree, so frozen or embedded quarantine bytes cannot hide in
+public-reference or performance fixtures.

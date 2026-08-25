@@ -15,6 +15,12 @@ const inspection = JSON.parse(readFileSync(resolve(root, manifest.visualInspecti
 const scratch = mkdtempSync(join(tmpdir(), "vector-generic-sensor-visual-"));
 let verifiedPages = 0;
 
+const matchingProfiles = manifest.renderRecipe.sourceRender.profiles.filter(
+  (profile) => profile.nodePlatform === process.platform && profile.nodeArchitecture === process.arch,
+);
+if (matchingProfiles.length !== 1) fail(`no unique closed render profile for ${process.platform}/${process.arch}`);
+const activeProfile = matchingProfiles[0];
+
 function fail(message) {
   throw new Error(`generic sensor machine visual verification failed: ${message}`);
 }
@@ -37,14 +43,14 @@ try {
       const prefix = join(scratch, `${source.ntrsId}-${String(page.sourcePdfPage).padStart(3, "0")}`);
       execFileSync("pdftoppm", ["-r", String(manifest.renderRecipe.sourceRender.dpi), "-gray", "-f", String(page.sourcePdfPage), "-l", String(page.sourcePdfPage), "-singlefile", "-png", resolve(root, pdf.path), prefix], { stdio: "ignore" });
       const reproduced = readFileSync(`${prefix}.png`);
-      const frozen = exactArtifact(page.sourceRender);
-      if (!reproduced.equals(frozen)) fail(`source render is not an exact independent reproduction: ${page.sourceRender.path}`);
+      const frozen = exactArtifact(page.sourceRenders[activeProfile.id]);
+      if (!reproduced.equals(frozen)) fail(`source render is not an exact independent reproduction: ${page.sourceRenders[activeProfile.id].path}`);
       const image = sharp(frozen, { limitInputPixels: 60_000_000 });
       const [metadata, statistics] = await Promise.all([image.metadata(), image.stats()]);
-      if (metadata.format !== "png" || !metadata.width || !metadata.height || metadata.width * metadata.height < 100_000 || statistics.channels.every((channel) => channel.min === channel.max)) fail(`render is blank or structurally invalid: ${page.sourceRender.path}`);
-      if (page.displayRender) {
+      if (metadata.format !== "png" || !metadata.width || !metadata.height || metadata.width * metadata.height < 100_000 || statistics.channels.every((channel) => channel.min === channel.max)) fail(`render is blank or structurally invalid: ${page.sourceRenders[activeProfile.id].path}`);
+      if (page.displayRenders) {
         const display = await sharp(frozen).rotate(90).png({ compressionLevel: 9, adaptiveFiltering: false, palette: false }).toBuffer();
-        if (!display.equals(exactArtifact(page.displayRender))) fail(`upright display render is not reproducible: ${page.displayRender.path}`);
+        if (!display.equals(exactArtifact(page.displayRenders[activeProfile.id]))) fail(`upright display render is not reproducible: ${page.displayRenders[activeProfile.id].path}`);
       }
       const record = inspection.pages.find((candidate) => candidate.sourceId === source.id && candidate.sourcePdfPage === page.sourcePdfPage);
       if (!record || record.reportPage !== page.reportPage || record.purpose !== page.purpose) fail(`inspection mapping is absent or inconsistent: ${source.id}:${page.sourcePdfPage}`);
@@ -60,6 +66,7 @@ const report = {
   ...verifyGenericSensorSourceBundle(),
   machineVisual: {
     verifiedPages,
+    renderProfileId: activeProfile.id,
     sourceRenderRecipe: "EXACT_BYTE_REPRODUCTION",
     displayRenderRecipe: "EXACT_BYTE_REPRODUCTION",
     structuralImageResult: "NON_BLANK_VALID_PNG",

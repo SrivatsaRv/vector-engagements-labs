@@ -24,13 +24,30 @@ is mandatory in `make ci-quality`; `make generic-sensor-sources-local` exposes
 the same focused gate.
 
 The same command independently rerenders all 44 declared NASA source pages
-from the exact PDFs with the pinned Poppler recipe, requires byte-identical PNG
-output, rejects blank or structurally invalid images, reproduces the three
-upright display derivatives, and checks every source/display page mapping. It
-does not use OCR or extracted text to supply numeric values or equations. The
-manifest separately binds the release owner's semantic contact-sheet review to
-the exact render-set digest and records the four required consistency findings;
-the verifier rejects a missing, altered, or differently bound review.
+from the exact PDFs with the closed Poppler profile selected by operating
+system and architecture, requires byte-identical PNG output within that
+profile, rejects blank or structurally invalid images, reproduces the three
+upright display derivatives, and checks every source/display page mapping.
+Darwin arm64 and Linux amd64 are separately content-addressed because Poppler's
+lossless PNG bytes are not cross-platform identical. No tolerance or
+cross-platform-byte claim is used. The manifest binds the release owner's
+semantic review to both exact 44-page render sets and all eight profile/contact
+sheet identities, including cross-profile mapping, structure, orientation, and
+limitation consistency. It does not use OCR or extracted text to supply numeric
+values or equations.
+
+A dedicated hosted renderer job builds Poppler 26.05.0 once from the official
+release archive through `scripts/install-pinned-poppler-ubuntu.sh`, inside the
+Ubuntu 24.04 image pinned at
+`sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517`.
+The bootstrap rejects any source digest except
+`6fef27ff04f37db43054c86bcdff6128c9fb1f6af4ef3c8b369a7e9abd68d0bb`.
+Its Docker image is cached under a key derived from the installer, Dockerfile,
+and network-denied wrapper, then restored by quality and post-build integration
+instead of compiling twice. The cold x86-emulated reproduction completed in
+6m31s; the setup job has a 15-minute budget while the existing 20-minute
+quality/integration budgets remain unchanged. The verifier container has no
+network and every Linux render must match its committed profile byte-for-byte.
 
 Testing is part of the implementation contract. An executable action is incomplete until its behavior is covered at the appropriate test layers and the result is recorded. The project uses focused tests for fast feedback and staged integration evidence for release confidence.
 
