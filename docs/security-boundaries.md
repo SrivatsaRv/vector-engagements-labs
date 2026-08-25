@@ -111,6 +111,11 @@ regression suite to new material mission-contract and record-storage sections.
 The registry canonical digest and exact semantic declaration bind that new
 authority; no old heading is relabelled and no unrelated schema is introduced.
 
+The hosted integration build reruns the issue #148 deny-network source verifier
+after creating the production output. A build that embeds a Stage-0 source
+marker, an exact frozen artifact, or frozen bytes inside a wrapper fails before
+API verification; a pre-build scan alone is not release evidence.
+
 Release workflows run from the trusted `main` definition and accept only an
 existing semantic tag in reviewed `main` history. They run the full gate,
 generate checksums and an SPDX SBOM, and attest archives before protected
@@ -195,5 +200,8 @@ forged, agent-authored, and out-of-scope decisions fail closed. Decision,
 reviewer, registry, policy, evidence, and attestation objects use exact keys.
 Non-approval states carry no reviewer, date, jurisdiction, scope, conditions,
 record, evidence, or alternate authority field. Network access is unnecessary
-for verification, and dynamic unpinned or substituted community/game material
-is rejected.
+for verification. The mandatory focused command preloads a deny-all network
+guard and proves TCP, HTTP, and DNS calls fail before inspecting only committed
+bytes. The verifier runs again after the production build so missing output
+directories cannot stand in for bundle-exclusion evidence. Dynamic unpinned or
+substituted community/game material is rejected.

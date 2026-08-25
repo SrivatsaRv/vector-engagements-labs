@@ -1,7 +1,7 @@
 {
   "schemaVersion": "vector.generic-sensor-verification-production-isolation-evidence.v1",
   "subjectManifestId": "generic-sensor-source-freeze-v1",
-  "measuredOn": "2026-08-24",
+  "measuredOn": "2026-08-25",
   "frozenArtifactCount": 77,
   "frozenArtifactBytes": 62376284,
   "productionRootsScannedByVerifier": [
@@ -22,7 +22,10 @@
   ],
   "expectedProductionExposures": 0,
   "productionBuildImportPolicy": "FORBIDDEN",
-  "regressionCommand": "node --test tests/generic-sensor-source-bundle.test.mjs",
+  "networkPolicy": "DENY_ALL_NODE_NETWORK_APIS",
+  "regressionCommand": "npm run generic-sensor:sources:verify",
+  "productionBuildCommand": "npm run build",
+  "postBuildRegressionCommand": "npm run generic-sensor:sources:verify",
   "omittedRuntimeLayers": [
     "BROWSER",
     "DATABASE",

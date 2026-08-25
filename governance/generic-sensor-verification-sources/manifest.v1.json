@@ -126,8 +126,8 @@
     "path": "production-isolation-evidence.v1.json",
     "role": "PRODUCTION_ISOLATION_SIZE_EVIDENCE",
     "state": "REFERENCE_ONLY",
-    "sizeBytes": 851,
-    "sha256": "617b4d9fdfeb996a0afe33c5b5115d53b8369b2d1475979ba0ec78f8ab2c7887"
+    "sizeBytes": 1000,
+    "sha256": "50e74ff86897551d8241054864ec2e7f3fd99feee1aa927dcf68ce3a2440fae6"
   },
   "sources": [
     {
@@ -1341,5 +1341,5 @@
       }
     }
   ],
-  "canonicalManifestDigest": "353a666538a3dca2cf5fc4c1af907784a3a11da0f2f5795cc3ddbc0aefb456c4"
+  "canonicalManifestDigest": "c16f180702857f2586bf233a60041edbeaf332db749b27b9f196b5a3cfa03402"
 }

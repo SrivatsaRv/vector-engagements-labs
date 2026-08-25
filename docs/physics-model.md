@@ -4,6 +4,10 @@
 
 The frozen NASA-TP-1538 *Simulator study of stall/post-stall characteristics of a fighter airplane with relaxed longitudinal static stability* pages are evidence inputs only. They do not create coefficient tables or executable aerodynamics. Future #142 stages must independently double-enter and adjudicate the printed cells before a verification-only evaluator can use them. Production dynamics must not import the source assets or infer missing cells, propulsion, control laws, altitude dependence, Reynolds corrections, or named-aircraft fidelity.
 
+The TP-1538 evidence chain is independent of the issue #148 generic sensor
+source freeze. The latter cannot satisfy aerodynamic evidence, and TP-1538
+cannot authorize sensor equations, parameters, execution, or adaptation.
+
 Vector currently uses a deterministic three-dimensional point-mass reference engine intended for inspectable sensitivity research, not verified prediction of named-system performance.
 
 ## Integrated model
