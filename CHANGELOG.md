@@ -72,11 +72,18 @@ and hashes; no production seed or fallback default performs the migration.
 
 #### Scenario composition kernel
 
-The new in-memory `vector.scenario-kernel.v1` contract canonicalizes arbitrary
-affiliations, organization structure, multi-domain entity identities, authored
-task graphs, non-authoritative capability descriptors and perspective-safe
-composition projections. The current Air authoring/compiler path and persisted
-scenario/VSR formats are unchanged; no database migration is required.
+`vector.scenario-kernel.v1` now owns arbitrary affiliations, organization
+structure, multi-domain entity identities, authored task graphs and six-surface
+perspective projections. Owner-controlled content-addressed capability
+descriptors replace scenario-authored descriptor authority. Canonical bytes,
+iterative bounded graph admission, typed atomic mutation history, undo/redo,
+request/draft/perspective stale-response guards, exact blank/template/import
+intake, identity-only V1 migration and projection-only workspace discovery are
+versioned and tested. An identity-only adapter closes exact task/entity and
+capability references around #60's published authored/compiled Air mission
+digests without copying mission fields or execution authority. #60 retains Air
+compile/runtime authority; no database migration or new domain physics is
+introduced.
 
 ### Added
 

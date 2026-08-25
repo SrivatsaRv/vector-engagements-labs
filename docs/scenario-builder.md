@@ -96,87 +96,137 @@ Deployment does not depend on a seed mutation.
 
 ## Cross-domain scenario composition kernel
 
-`lib/scenario-kernel.ts` owns the first bounded
-`vector.scenario-kernel.v1` composition contract. It is the upstream authored
-identity and reference authority for arbitrary affiliations, explicit directed
-affiliation relationships, coalition/force/organization/group structure,
-multi-domain entity identities, authored scenario-level tasks, declarative
-capability descriptors and perspective policies. `BLUE`, `RED`, array order,
-display colour, a scenario name and a platform name have no semantic role in
-this contract. Hostility exists only as an explicit relationship record.
+The `SCENARIO_COMPOSITION_KERNEL` family owns one coordinated TypeScript
+contract set: `vector.scenario-kernel.v1`, the governed capability
+descriptor/registry/evidence records, typed command/history and
+request/response records, intake/workspace projections, and the identity-only
+Air mission map/binding. It is the single upstream authored identity
+and reference authority for arbitrary affiliations, explicit directed
+relationships, coalition/force/organization/group structure, multi-domain
+entities, authored scenario-level tasks and information perspectives. `BLUE`,
+`RED`, colour, array position, scenario name and platform name have no semantic
+role. Hostility exists only in an explicit affiliation-relationship record.
 
-Kernel import is exact-key and fail closed. Stable IDs, semantic versions,
-closed enums, typed references, unique collection membership, task and
-organization acyclicity, finite task timing and capability dependency
-acyclicity are validated with stable code/path issues. Stable identifiers are
-bounded to 128 characters, other strings are bounded according to role, and
-every collection has a 10,000-item admission ceiling; oversized input rejects
-before member traversal. Capability descriptors must match the scenario's
-intended-use identity. Compilation sorts every
-unordered identity collection and reference set before deriving SHA-256 over
-canonical JSON with locale-independent code-unit comparison. Reversing
-affiliation, organization, entity, task, capability
-or perspective insertion order therefore produces the same immutable bytes and
-digest. Perspective projection revalidates that content address before applying
-policy, so a mutated or stale compiled kernel cannot reach a selector. The
-current v1 has no persistence migration: it is an in-memory
-contract slice and is not yet stored in `vector.scenario.v3` or a VSR.
+Admission is exact-key and fail closed. Stable IDs, semantic versions, closed
+enums, unique membership, finite task timing and typed affiliation,
+organization, entity, task and capability references report stable code/path
+issues. Organization parents and the combined task dependency/objective graph
+are checked iteratively, including at the documented 10,000-node/edge bound;
+oversize graphs reject as `KERNEL_GRAPH_LIMIT_EXCEEDED` rather than overflowing
+the JavaScript stack. A task is only authored intent (`lifecycle: AUTHORED`): an
+accepted controller request or achieved runtime state belongs to its domain
+owner and cannot be inserted into this kernel.
 
-Capability descriptors are discovery metadata, not model or runtime authority.
-They declare contract owner, intended-use identity, admission reason, unit and
-datum-bearing authoring fields, unavailable output identities, dependency/reset
-semantics and inspectors drawn from a closed canonical selector list. Every v1
-descriptor has `runtimeAuthority: NONE`, and every derived/model/runtime output
-has `availability: UNAVAILABLE`. Exact-key admission rejects component/module
-names, renderer formulas, arbitrary selector paths and other executable or
-feature-local fields. Inspector localization keys are stable data identifiers;
-future presentation consumers must continue to treat resolved display strings
-as untrusted text.
+Compilation sorts every unordered identity collection and reference set with
+locale-independent code-unit comparison. It publishes the exact canonical JSON
+bytes and their SHA-256 digest, and verification checks both. Object-key order
+and reversed affiliation, relationship, organization, entity, task,
+capability-reference, surface and perspective insertion order therefore return
+identical bytes, digest and workspace identity. V1 is the first owned version:
+`migrateScenarioKernelInput` records an identity admission with no migration
+steps, while a legacy or unknown schema fails with
+`KERNEL_INTAKE_MIGRATION_UNAVAILABLE`. No legacy Blue/Red draft is guessed into
+the new contract.
 
-Perspective projection occurs before any presentation selector receives the
-composition. A projection contains only explicitly visible affiliations and
-relationships, organizations whose complete parent chain remains visible,
-entities whose organization remains visible, and tasks whose owner,
-participants, objective and dependency closure all remain visible. Capability
-descriptors are omitted unless the active policy permits them and are then
-limited to the visible entities/tasks plus dependency closure. Hidden purpose,
-identities, task counts and dangling references are absent rather than masked
-after selection. Each projection has a perspective-bound digest, so changing
-perspective changes cache identity. This projects authored composition only; it
-does not admit or redact runtime truth, side-owned tracks, events, explanations,
-compare results or exports.
+Capability authority is owner-controlled in
+`lib/scenario-capabilities.ts`. A scenario may carry only an exact reference to
+a registered descriptor: capability ID/version, owner-contract ID/version,
+descriptor digest and intended-use ID/version must all match. Descriptors use
+closed selector, unit, datum, value-domain, admission and evidence domains;
+publish dependency/reset policy; and are themselves canonical and immutable.
+They cannot be authored inside a scenario. Every V1 descriptor has
+`runtimeAuthority: NONE`, and every derived/model/runtime output remains
+`UNAVAILABLE`. Unknown selectors, open fields, renderer formulas, source
+coefficients, unsupported output claims and foreign owner/intended-use bindings
+reject. Changing a capability reference invalidates only projections that may
+consume it; a public projection that exposes no capability references retains
+the same digest.
 
-The adapter ownership is explicit:
+Perspective is explicit for `CONSTRUCT`, `OBSERVE`, `EXPLAIN`, `COMPARE`,
+`REPLAY`, and `EXPORT`. Projection first re-verifies the compiled bytes/digest,
+then removes hidden affiliations and relationships, incomplete organization
+parent chains, entities with hidden placement, and tasks whose owner,
+participants, objective or task-dependency closure is hidden. Scenario identity,
+purpose, capability references and descriptors are omitted according to policy,
+not replaced with counts or disabled-state hints. Capability dependency closure
+is resolved iteratively from only visible references. Each output includes its
+surface and an opaque perspective-policy digest. An unauthorized surface fails
+closed before a selector or workspace adapter runs.
 
-- #60 remains the sole owner of the Air mission/entity projection into the
-  current compiled engine contract. `vector.scenario-draft.v1` and the live
-  configured Air path are unchanged and do not silently consume the kernel.
-- #154 must migrate template, blank and import intake onto this kernel and then
-  bind validation to the exact draft digest; it cannot create a second force,
-  task or capability schema.
-- #155 may consume perspective projections and declarative selectors for its
-  navigator/inspectors. React, MapLibre and Three.js may not read the unfiltered
-  kernel to decide visibility or infer executable capability.
+The full kernel is sensitive adjudication input. It stays in a trusted process;
+untrusted browser/rendering consumers receive only a serialized projection.
+Callers must not expose projection computation timing as a cross-trust response
+oracle. This contract removes hidden values, labels, counts, filters, inspector
+metadata, explanation inputs, compare inputs and export inputs, but JavaScript
+execution timing is not an authorization mechanism.
 
-This first slice admits composition, canonical identity, descriptor discovery
-and authored-policy projection only. It does not add typed mutation history,
-deletion/reassignment commands, accepted-controller or achieved task state,
-domain physics, sensor/track/weapon/support authority, runtime land/maritime
-execution, UI completion, database storage, VSR projection or TypeScript/Rust
-runtime parity. Those remain follow-on acceptance work under #156 and the named
-adapter issues.
+Authoring history lives in `lib/scenario-kernel-history.ts`. `ADD`, `REMOVE`,
+`MOVE`, `REORDER`, `GROUP`, `ASSIGN`, `BULK_EDIT`, `IMPORT`, and
+`TEMPLATE_APPLY` have a closed patch grammar and are bound to the current draft
+digest. A command is applied to a clone and compiled once; a dangling or cyclic
+result rejects without changing history. Remove commands identify exactly one
+record and carry any explicit reference-resolution assignments in the same
+atomic command. Undo and redo store canonical authored before/after bytes,
+restore the identical digest, cover bulk edits/imports/capability resets, clear
+redo on a new branch and stop at the 1,000-command/patch bounds.
+
+Async work uses `lib/scenario-kernel-requests.ts`. Its immutable token binds a
+stable request ID, draft digest, perspective ID and policy digest, surface and
+projection digest under a token digest. Response admission validates the exact
+token before payload consumption. Draft edits, rapid perspective changes,
+Observe/Replay switches, token tampering and mismatched response IDs reject
+with distinct stable errors, so cached selectors and in-flight playback or
+validation cannot be accepted into a different context.
+
+The adapter ownership is explicit and does not duplicate domain records:
+
+- `admitScenarioKernelIntake` is the #154 boundary. Blank, template and import
+  carry exact source bytes/digest and matching provenance through the same
+  compiler with no default recovery. The adapter returns the canonical typed
+  history; it defines no second draft.
+- `projectScenarioKernelWorkspace` is the #155 boundary. It returns the
+  redacted canonical projection plus stable navigator references, selection
+  state and inspectors discovered only from visible governed descriptors. It
+  cannot create entities, truth, movement, events, decisions or comparison
+  results, and a hidden selection becomes `REDACTED` without retaining its ID.
+- `bindAirMissionToScenarioKernel` is the #60 consumer boundary. It accepts the
+  published `AirMissionDefinition` and `CompiledAirMission`, verifies their
+  exact authored/compiled and ground-envelope lineage, then closes kernel task,
+  assignment-entity, target-entity and `capability.air-mission@1.0.0`
+  references. Its output contains identity and digest fields only. #60 remains
+  the sole owner of Air mission fields, compilation, route/loadout/policy
+  consequence, run/VSR identity and executable admission; the kernel does not
+  translate through legacy `Scenario`, infer missing Air values or create a
+  parallel mission schema.
+
+The kernel does not add domain physics, operational C2 semantics, doctrine,
+ROE, force generation, sensor/track/weapon/support admission, land or maritime
+runtime execution, renderer truth, database storage or UI completion. Because
+the kernel and discovery projections are TypeScript-only and no Rust runtime
+consumes them, TypeScript/Rust parity is not applicable. Domain-owned compiled
+artifacts retain their own parity gates.
 
 ### Verification
 
-`tests/scenario-kernel.test.mjs` is the contract and regression fixture. It
-proves third-force, neutral and civil composition; Air/Land/Maritime identities;
-insertion-order invariance; descriptor poisoning rejection; duplicate, cyclic,
-self and dangling reference rejection with stable code/path issues; stale digest
-rejection before perspective selection; hidden-objective redaction; selective
-capability-projection invalidation; and deterministic 12-, 75-, 100- and
-250-entity tiers. Runtime parity, browser, visual, database/migration and engine
-performance layers are omitted for this bounded slice because no such consumer
-or persisted format changes.
+The five `tests/scenario-kernel*.test.mjs` and
+`tests/scenario-capabilities.test.mjs` suites cover the schema, registry,
+history, request guards and the exact #60 Air mission, #154 intake and #155
+workspace boundaries. Required falsifiers include
+third-force/neutral/civil and Air/Land/Maritime composition, insertion and key
+permutation, duplicate/self/dangling/cyclic references, task-objective cycles,
+10,000-node iterative traversal, descriptor poisoning, deletion with atomic
+reassignment, undo/redo across bulk/reset/import, all six surfaces, hidden
+selection, stale draft/perspective/playback responses and legacy migration
+rejection.
+
+`npx tsx scripts/benchmark-scenario-kernel.ts` runs 30 measured samples after
+three warm-ups at 12 entities/3 organizations and 75, 100 and 250 entities/12
+organizations. Each sample compiles the canonical kernel, bulk-edits every
+entity, verifies exact-byte undo/redo and projects all six workspace surfaces;
+digest drift fails immediately and each tier has a 100 ms p95 ceiling. This is
+pure contract/projection capacity evidence, not DOM,
+MapLibre, Three.js, browser-frame, Worker or engine-runtime performance. Those
+layers remain with #155, #87, #60 and the runtime owners.
 
 ## Builder expansion boundary
 

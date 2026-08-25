@@ -105,6 +105,21 @@ finite content-addressed run decoding, isolated production-bundle scans, exact n
 explicit p95 limits and makes no Worker or product-capacity claim. See
 [`generic-aam-verification.md`](generic-aam-verification.md).
 
+Scenario-composition verification runs the focused
+`tests/scenario-kernel*.test.mjs` and `tests/scenario-capabilities.test.mjs`
+suites for exact schema admission, content-addressed descriptors, graph bounds,
+canonical bytes, atomic typed history, six-surface redaction, stale async
+response rejection and exact #154 intake, #155 workspace and #60 published-Air
+adapter boundaries. The #60 proof rejects forged compiled lineage, dangling
+assignment/target identities and missing governed capability admission while
+emitting no duplicated mission fields. The reproducible
+`npx tsx scripts/benchmark-scenario-kernel.ts` workload measures 12, 75, 100
+and 250 entities over compilation, all-entity bulk edit, exact-byte undo/redo
+and all six workspace projections after warm-up, rejects digest drift, and
+enforces p95 at or below 100 ms for every tier. It is contract/projection
+evidence only; it does not substitute for the
+browser, Worker, renderer, memory or runtime capacity gates owned downstream.
+
 GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
 automated gate from merge-base-relative `--name-status -z` records. Rename and
 copy records use `--find-copies-harder` and retain both endpoints without

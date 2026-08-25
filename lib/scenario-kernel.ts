@@ -1,17 +1,36 @@
-import { sha256HexSync } from "./geospatial/digest.ts";
+import { canonicalJson } from "./canonical-json.ts";
+import { sha256Utf8HexSync } from "./geospatial/digest.ts";
+import {
+  type GovernedScenarioCapabilityDescriptor,
+  resolveScenarioCapability,
+} from "./scenario-capabilities.ts";
 
 /**
  * Scenario-independent composition authority. This contract intentionally owns
  * authored identity, references, and safe presentation discovery only. It does
  * not authorize a model, controller, sensor, weapon, renderer, or engine path.
- * The existing ScenarioDraft remains the current Air authoring adapter until an
- * explicit #60 projection consumes this kernel.
+ * The #60 Air authoring/compiler contract remains the execution owner; the
+ * explicit identity-only adapter in scenario-kernel-adapters.ts binds it.
  */
 export const SCENARIO_KERNEL_SCHEMA_VERSION = "vector.scenario-kernel.v1" as const;
 export const SCENARIO_KERNEL_PROJECTION_SCHEMA_VERSION =
   "vector.scenario-kernel-projection.v1" as const;
 
-export type ScenarioKernelCapabilityRef = { id: string; version: string };
+export type ScenarioKernelSurface =
+  | "CONSTRUCT"
+  | "OBSERVE"
+  | "EXPLAIN"
+  | "COMPARE"
+  | "REPLAY"
+  | "EXPORT";
+
+export type ScenarioKernelCapabilityRef = {
+  id: string;
+  version: string;
+  ownerContract: { id: string; version: string };
+  descriptorDigest: `sha256:${string}`;
+  intendedUse: { id: string; version: string };
+};
 
 export type ScenarioKernelInput = {
   schemaVersion: typeof SCENARIO_KERNEL_SCHEMA_VERSION;
@@ -61,70 +80,39 @@ export type ScenarioKernelInput = {
     capabilityRefs: ScenarioKernelCapabilityRef[];
     lifecycle: "AUTHORED";
   }>;
-  capabilityDescriptors: Array<{
-    id: string;
-    version: string;
-    owner:
-      | "SCENARIO_KERNEL"
-      | "MISSION_CONTRACT"
-      | "MODEL_PACK"
-      | "INFORMATION_CONTRACT"
-      | "PRESENTATION_CONTRACT";
-    intendedUseId: string;
-    admission: {
-      state: "UNAVAILABLE" | "AUTHORING_ONLY" | "INSPECTION_ONLY";
-      reasonCode: string;
-    };
-    runtimeAuthority: "NONE";
-    authoredInputs: Array<{
-      id: string;
-      scope: "SCENARIO" | "ENTITY" | "TASK";
-      unit: "1" | "m" | "m/s" | "s" | "deg" | "rad" | "kg";
-      datum: "NONE" | "WGS84" | "MSL" | "AGL";
-      required: boolean;
-    }>;
-    outputs: Array<{
-      id: string;
-      source: "DERIVED" | "MODEL" | "RUNTIME";
-      availability: "UNAVAILABLE";
-      selector: "SCENARIO_IDENTITY" | "ENTITY_IDENTITY" | "TASK_IDENTITY" | "CAPABILITY_ADMISSION";
-    }>;
-    inspectors: Array<{
-      id: string;
-      localizationKey: string;
-      selector: "SCENARIO_IDENTITY" | "ENTITY_IDENTITY" | "TASK_IDENTITY" | "CAPABILITY_ADMISSION";
-    }>;
-    dependencies: ScenarioKernelCapabilityRef[];
-    invalidation: "DEPENDENTS_ONLY";
-    reset: "REMOVE_DEPENDENT_VALUES";
-  }>;
   perspectives: Array<{
     id: string;
     kind: "AUTHORING_ADMIN" | "ADJUDICATOR" | "FORCE_OBSERVED" | "REDACTED_PUBLIC";
     ownerAffiliationId?: string;
     visibleAffiliationIds: string[];
+    exposeScenarioIdentity: boolean;
     exposeScenarioPurpose: boolean;
-    exposeCapabilityDescriptors: boolean;
+    capabilityVisibility: "NONE" | "VISIBLE_REFERENCES";
+    surfaces: ScenarioKernelSurface[];
   }>;
 };
 
-export type CompiledScenarioKernel = ScenarioKernelInput & { digest: string };
+export type CompiledScenarioKernel = ScenarioKernelInput & {
+  capabilityDescriptors: readonly GovernedScenarioCapabilityDescriptor[];
+  canonicalBytes: string;
+  digest: string;
+};
 
 export type ScenarioKernelProjection = {
   schemaVersion: typeof SCENARIO_KERNEL_PROJECTION_SCHEMA_VERSION;
-  kernelId: string;
-  kernelVersion: string;
+  scenario: { id: string; version: string } | null;
   perspective: {
-    id: string;
     kind: ScenarioKernelInput["perspectives"][number]["kind"];
+    policyDigest: string;
   };
+  surface: ScenarioKernelSurface;
   purpose: string | null;
   affiliations: ScenarioKernelInput["affiliations"];
   relationships: ScenarioKernelInput["relationships"];
   organizations: ScenarioKernelInput["organizations"];
   entities: ScenarioKernelInput["entities"];
   tasks: ScenarioKernelInput["tasks"];
-  capabilityDescriptors: ScenarioKernelInput["capabilityDescriptors"];
+  capabilityDescriptors?: readonly GovernedScenarioCapabilityDescriptor[];
   digest: string;
 };
 
@@ -144,9 +132,7 @@ export type ScenarioKernelIssue = {
     | "KERNEL_SELF_REFERENCE"
     | "KERNEL_ORGANIZATION_CYCLE"
     | "KERNEL_TASK_CYCLE"
-    | "KERNEL_CAPABILITY_CYCLE"
-    | "KERNEL_DESCRIPTOR_CONTEXT_FORBIDDEN"
-    | "KERNEL_RUNTIME_AUTHORITY_FORBIDDEN"
+    | "KERNEL_GRAPH_LIMIT_EXCEEDED"
     | "KERNEL_PERSPECTIVE_POLICY_INVALID";
   path: string;
   message: string;
@@ -167,7 +153,8 @@ type KernelIssueCode = ScenarioKernelIssue["code"];
 
 const KERNEL_ID = /^[a-z0-9]+(?:[._:/-][a-z0-9]+)*$/;
 const KERNEL_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[a-z0-9.-]+)?$/;
-const REASON_CODE = /^[A-Z][A-Z0-9_]*$/;
+const SHA256_IDENTITY = /^sha256:[0-9a-f]{64}$/;
+const MAX_KERNEL_GRAPH_EDGES = 10_000;
 
 function kernelIssue(
   issues: ScenarioKernelIssue[],
@@ -231,20 +218,20 @@ function kernelString(
   value: unknown,
   path: string,
   issues: ScenarioKernelIssue[],
-  options: { id?: boolean; version?: boolean; reason?: boolean; nonEmpty?: boolean } = {},
+  options: { id?: boolean; version?: boolean; nonEmpty?: boolean } = {},
 ) {
   if (typeof value !== "string") {
     kernelIssue(issues, "KERNEL_INVALID_TYPE", path, `${path} must be a string.`);
     return;
   }
-  const maximumLength = options.id ? 128 : options.version ? 64 : options.reason ? 128 : 4096;
+  const maximumLength = options.id ? 128 : options.version ? 64 : 4096;
   if (value.length > maximumLength) {
     kernelIssue(issues, "KERNEL_INVALID_VALUE", path, `${path} exceeds the ${maximumLength}-character admission bound.`);
   }
   if (options.nonEmpty && !value.trim()) {
     kernelIssue(issues, "KERNEL_INVALID_VALUE", path, `${path} must not be empty.`);
   }
-  const pattern = options.id ? KERNEL_ID : options.version ? KERNEL_VERSION : options.reason ? REASON_CODE : null;
+  const pattern = options.id ? KERNEL_ID : options.version ? KERNEL_VERSION : null;
   if (pattern && !pattern.test(value)) {
     kernelIssue(issues, "KERNEL_INVALID_ID", path, `${path} has an invalid stable identifier.`);
   }
@@ -308,10 +295,31 @@ function kernelUniqueStringArray(
   return values;
 }
 
+function kernelUniqueEnumArray(
+  value: unknown,
+  path: string,
+  allowed: readonly string[],
+  issues: ScenarioKernelIssue[],
+  maximumLength = 10_000,
+) {
+  const values = kernelArray(value, path, issues, maximumLength);
+  const seen = new Set<string>();
+  values.forEach((item, index) => {
+    kernelEnum(item, `${path}[${index}]`, allowed, issues);
+    if (typeof item !== "string") return;
+    if (seen.has(item)) {
+      kernelIssue(issues, "KERNEL_DUPLICATE_REFERENCE", `${path}[${index}]`, `${item} is duplicated.`);
+    }
+    seen.add(item);
+  });
+  return values;
+}
+
 function validateCapabilityRefs(
   value: unknown,
   path: string,
   issues: ScenarioKernelIssue[],
+  intendedUse: KernelRecord | null,
 ) {
   const refs = kernelArray(value, path, issues);
   const seen = new Set<string>();
@@ -319,36 +327,93 @@ function validateCapabilityRefs(
     const refPath = `${path}[${index}]`;
     const ref = kernelRecord(candidate, refPath, issues);
     if (!ref) return;
-    kernelExactKeys(ref, refPath, ["id", "version"], [], issues);
+    kernelExactKeys(ref, refPath, ["id", "version", "ownerContract", "descriptorDigest", "intendedUse"], [], issues);
     kernelString(ref.id, `${refPath}.id`, issues, { id: true });
     kernelString(ref.version, `${refPath}.version`, issues, { version: true });
+    const ownerContract = kernelRecord(ref.ownerContract, `${refPath}.ownerContract`, issues);
+    if (ownerContract) {
+      kernelExactKeys(ownerContract, `${refPath}.ownerContract`, ["id", "version"], [], issues);
+      kernelString(ownerContract.id, `${refPath}.ownerContract.id`, issues, { id: true });
+      kernelString(ownerContract.version, `${refPath}.ownerContract.version`, issues, { version: true });
+    }
+    if (typeof ref.descriptorDigest !== "string" || !SHA256_IDENTITY.test(ref.descriptorDigest)) {
+      kernelIssue(
+        issues,
+        "KERNEL_INVALID_VALUE",
+        `${refPath}.descriptorDigest`,
+        `${refPath}.descriptorDigest must be a lowercase SHA-256 content identity.`,
+      );
+    }
+    const refIntendedUse = kernelRecord(ref.intendedUse, `${refPath}.intendedUse`, issues);
+    if (refIntendedUse) {
+      kernelExactKeys(refIntendedUse, `${refPath}.intendedUse`, ["id", "version"], [], issues);
+      kernelString(refIntendedUse.id, `${refPath}.intendedUse.id`, issues, { id: true });
+      kernelString(refIntendedUse.version, `${refPath}.intendedUse.version`, issues, { version: true });
+      if (typeof intendedUse?.id === "string"
+        && typeof intendedUse.version === "string"
+        && (refIntendedUse.id !== intendedUse.id || refIntendedUse.version !== intendedUse.version)) {
+        kernelIssue(
+          issues,
+          "KERNEL_INVALID_VALUE",
+          `${refPath}.intendedUse`,
+          "Capability reference intended use must match the scenario intended use identity and version.",
+        );
+      }
+    }
     if (typeof ref.id === "string" && typeof ref.version === "string") {
       const key = `${ref.id}@${ref.version}`;
       if (seen.has(key)) {
         kernelIssue(issues, "KERNEL_DUPLICATE_REFERENCE", refPath, `${key} is duplicated.`);
       }
       seen.add(key);
+      const descriptor = resolveScenarioCapability(ref.id, ref.version);
+      if (!descriptor) {
+        kernelIssue(issues, "KERNEL_DANGLING_REFERENCE", refPath, `${key} is not present in the governed capability registry.`);
+      } else {
+        if (ref.descriptorDigest !== descriptor.digest) {
+          kernelIssue(issues, "KERNEL_DIGEST_MISMATCH", `${refPath}.descriptorDigest`, "Capability reference digest does not match its governed descriptor.");
+        }
+        if (canonicalJson(ref.ownerContract) !== canonicalJson(descriptor.ownerContract)) {
+          kernelIssue(issues, "KERNEL_INVALID_VALUE", `${refPath}.ownerContract`, "Capability owner contract does not match its governed descriptor.");
+        }
+        if (canonicalJson(ref.intendedUse) !== canonicalJson(descriptor.intendedUse)) {
+          kernelIssue(issues, "KERNEL_INVALID_VALUE", `${refPath}.intendedUse`, "Capability intended use does not match its governed descriptor.");
+        }
+      }
     }
   });
   return refs;
 }
 
-function validateKernelGraphCycle(
+function validateKernelGraph(
   ids: Iterable<string>,
   edges: (id: string) => readonly string[],
 ) {
-  const state = new Map<string, "VISITING" | "VISITED">();
-  const visit = (id: string): boolean => {
-    if (state.get(id) === "VISITING") return true;
-    if (state.get(id) === "VISITED") return false;
-    state.set(id, "VISITING");
-    for (const next of edges(id)) {
-      if (visit(next)) return true;
+  const idSet = new Set(ids);
+  const adjacency = new Map<string, string[]>();
+  const indegree = new Map([...idSet].map((id) => [id, 0]));
+  let edgeCount = 0;
+  for (const id of idSet) {
+    const admittedEdges = [...new Set(edges(id))].filter((target) => idSet.has(target));
+    edgeCount += admittedEdges.length;
+    if (edgeCount > MAX_KERNEL_GRAPH_EDGES) return "LIMIT_EXCEEDED" as const;
+    adjacency.set(id, admittedEdges);
+    for (const target of admittedEdges) indegree.set(target, (indegree.get(target) ?? 0) + 1);
+  }
+  const queue = [...idSet].filter((id) => indegree.get(id) === 0);
+  let cursor = 0;
+  let visited = 0;
+  while (cursor < queue.length) {
+    const id = queue[cursor];
+    cursor += 1;
+    visited += 1;
+    for (const target of adjacency.get(id) ?? []) {
+      const remaining = (indegree.get(target) ?? 0) - 1;
+      indegree.set(target, remaining);
+      if (remaining === 0) queue.push(target);
     }
-    state.set(id, "VISITED");
-    return false;
-  };
-  return [...ids].some(visit);
+  }
+  return visited === idSet.size ? "ACYCLIC" as const : "CYCLIC" as const;
 }
 
 function validateScenarioKernel(input: unknown): asserts input is ScenarioKernelInput {
@@ -357,7 +422,7 @@ function validateScenarioKernel(input: unknown): asserts input is ScenarioKernel
   if (!root) throw new ScenarioKernelValidationError(issues);
   kernelExactKeys(root, "$", [
     "schemaVersion", "id", "version", "purpose", "provenance", "intendedUse", "affiliations",
-    "relationships", "organizations", "entities", "tasks", "capabilityDescriptors", "perspectives",
+    "relationships", "organizations", "entities", "tasks", "perspectives",
   ], [], issues);
   if (root.schemaVersion !== SCENARIO_KERNEL_SCHEMA_VERSION) {
     kernelIssue(issues, "KERNEL_INVALID_SCHEMA", "$.schemaVersion", "Scenario kernel schema is not supported.");
@@ -448,125 +513,11 @@ function validateScenarioKernel(input: unknown): asserts input is ScenarioKernel
       organizationParents.set(value.id, typeof value.parentOrganizationId === "string" ? [value.parentOrganizationId] : []);
     }
   });
-  if (validateKernelGraphCycle(organizationIds, (id) => organizationParents.get(id) ?? [])) {
+  const organizationGraph = validateKernelGraph(organizationIds, (id) => organizationParents.get(id) ?? []);
+  if (organizationGraph === "LIMIT_EXCEEDED") {
+    kernelIssue(issues, "KERNEL_GRAPH_LIMIT_EXCEEDED", "$.organizations", "Organization graph exceeds the 10,000-edge admission bound.");
+  } else if (organizationGraph === "CYCLIC") {
     kernelIssue(issues, "KERNEL_ORGANIZATION_CYCLE", "$.organizations", "Organization parent references must be acyclic.");
-  }
-
-  const capabilityDescriptors = kernelArray(root.capabilityDescriptors, "$.capabilityDescriptors", issues);
-  kernelUniqueIds(capabilityDescriptors, "$.capabilityDescriptors", issues);
-  const capabilityKeys = new Set<string>();
-  const capabilityDependencies = new Map<string, string[]>();
-  capabilityDescriptors.forEach((candidate, index) => {
-    const path = `$.capabilityDescriptors[${index}]`;
-    const value = kernelRecord(candidate, path, issues);
-    if (!value) return;
-    kernelExactKeys(value, path, [
-      "id", "version", "owner", "intendedUseId", "admission", "runtimeAuthority", "authoredInputs",
-      "outputs", "inspectors", "dependencies", "invalidation", "reset",
-    ], [], issues);
-    kernelString(value.id, `${path}.id`, issues, { id: true });
-    kernelString(value.version, `${path}.version`, issues, { version: true });
-    kernelEnum(value.owner, `${path}.owner`, [
-      "SCENARIO_KERNEL", "MISSION_CONTRACT", "MODEL_PACK", "INFORMATION_CONTRACT", "PRESENTATION_CONTRACT",
-    ], issues);
-    kernelString(value.intendedUseId, `${path}.intendedUseId`, issues, { id: true });
-    if (typeof value.intendedUseId === "string"
-      && typeof intendedUse?.id === "string"
-      && value.intendedUseId !== intendedUse.id) {
-      kernelIssue(
-        issues,
-        "KERNEL_INVALID_VALUE",
-        `${path}.intendedUseId`,
-        "Capability intended use must match the scenario intended use.",
-      );
-    }
-    const admission = kernelRecord(value.admission, `${path}.admission`, issues);
-    if (admission) {
-      kernelExactKeys(admission, `${path}.admission`, ["state", "reasonCode"], [], issues);
-      kernelEnum(admission.state, `${path}.admission.state`, ["UNAVAILABLE", "AUTHORING_ONLY", "INSPECTION_ONLY"], issues);
-      kernelString(admission.reasonCode, `${path}.admission.reasonCode`, issues, { reason: true });
-    }
-    if (value.runtimeAuthority !== "NONE") {
-      kernelIssue(issues, "KERNEL_RUNTIME_AUTHORITY_FORBIDDEN", `${path}.runtimeAuthority`, "Scenario capabilities cannot grant runtime authority.");
-    }
-    const inputs = kernelArray(value.authoredInputs, `${path}.authoredInputs`, issues);
-    kernelUniqueIds(inputs, `${path}.authoredInputs`, issues);
-    inputs.forEach((inputCandidate, inputIndex) => {
-      const inputPath = `${path}.authoredInputs[${inputIndex}]`;
-      const inputValue = kernelRecord(inputCandidate, inputPath, issues);
-      if (!inputValue) return;
-      kernelExactKeys(inputValue, inputPath, ["id", "scope", "unit", "datum", "required"], [], issues);
-      kernelString(inputValue.id, `${inputPath}.id`, issues, { id: true });
-      kernelEnum(inputValue.scope, `${inputPath}.scope`, ["SCENARIO", "ENTITY", "TASK"], issues);
-      kernelEnum(inputValue.unit, `${inputPath}.unit`, ["1", "m", "m/s", "s", "deg", "rad", "kg"], issues);
-      kernelEnum(inputValue.datum, `${inputPath}.datum`, ["NONE", "WGS84", "MSL", "AGL"], issues);
-      kernelBoolean(inputValue.required, `${inputPath}.required`, issues);
-      if (inputValue.datum === "WGS84" && inputValue.unit !== "deg") {
-        kernelIssue(issues, "KERNEL_INVALID_VALUE", `${inputPath}.unit`, "WGS84 authored inputs must use degrees.");
-      }
-      if (["MSL", "AGL"].includes(String(inputValue.datum)) && inputValue.unit !== "m") {
-        kernelIssue(issues, "KERNEL_INVALID_VALUE", `${inputPath}.unit`, "Vertical datum inputs must use metres.");
-      }
-    });
-    const outputs = kernelArray(value.outputs, `${path}.outputs`, issues);
-    kernelUniqueIds(outputs, `${path}.outputs`, issues);
-    outputs.forEach((outputCandidate, outputIndex) => {
-      const outputPath = `${path}.outputs[${outputIndex}]`;
-      const output = kernelRecord(outputCandidate, outputPath, issues);
-      if (!output) return;
-      kernelExactKeys(output, outputPath, ["id", "source", "availability", "selector"], [], issues);
-      kernelString(output.id, `${outputPath}.id`, issues, { id: true });
-      kernelEnum(output.source, `${outputPath}.source`, ["DERIVED", "MODEL", "RUNTIME"], issues);
-      if (output.availability !== "UNAVAILABLE") {
-        kernelIssue(issues, "KERNEL_RUNTIME_AUTHORITY_FORBIDDEN", `${outputPath}.availability`, "Kernel descriptors cannot advertise an available output.");
-      }
-      kernelEnum(output.selector, `${outputPath}.selector`, [
-        "SCENARIO_IDENTITY", "ENTITY_IDENTITY", "TASK_IDENTITY", "CAPABILITY_ADMISSION",
-      ], issues);
-    });
-    const inspectors = kernelArray(value.inspectors, `${path}.inspectors`, issues);
-    kernelUniqueIds(inspectors, `${path}.inspectors`, issues);
-    inspectors.forEach((inspectorCandidate, inspectorIndex) => {
-      const inspectorPath = `${path}.inspectors[${inspectorIndex}]`;
-      const inspector = kernelRecord(inspectorCandidate, inspectorPath, issues);
-      if (!inspector) return;
-      kernelExactKeys(inspector, inspectorPath, ["id", "localizationKey", "selector"], [], issues);
-      kernelString(inspector.id, `${inspectorPath}.id`, issues, { id: true });
-      kernelString(inspector.localizationKey, `${inspectorPath}.localizationKey`, issues, { id: true });
-      kernelEnum(inspector.selector, `${inspectorPath}.selector`, [
-        "SCENARIO_IDENTITY", "ENTITY_IDENTITY", "TASK_IDENTITY", "CAPABILITY_ADMISSION",
-      ], issues);
-    });
-    const dependencies = validateCapabilityRefs(value.dependencies, `${path}.dependencies`, issues);
-    kernelEnum(value.invalidation, `${path}.invalidation`, ["DEPENDENTS_ONLY"], issues);
-    kernelEnum(value.reset, `${path}.reset`, ["REMOVE_DEPENDENT_VALUES"], issues);
-    if (typeof value.id === "string" && typeof value.version === "string") {
-      const key = `${value.id}@${value.version}`;
-      capabilityKeys.add(key);
-      capabilityDependencies.set(key, dependencies.flatMap((dependency, dependencyIndex) => {
-        const ref = kernelRecord(dependency, `${path}.dependencies[${dependencyIndex}]`, []);
-        if (!ref) return [];
-        return typeof ref.id === "string" && typeof ref.version === "string" ? [`${ref.id}@${ref.version}`] : [];
-      }));
-    }
-  });
-  capabilityDescriptors.forEach((candidate, index) => {
-    const value = kernelRecord(candidate, `$.capabilityDescriptors[${index}]`, []);
-    if (!value) return;
-    const dependencies = Array.isArray(value.dependencies) ? value.dependencies : [];
-    dependencies.forEach((dependency, dependencyIndex) => {
-      const ref = kernelRecord(dependency, `$.capabilityDescriptors[${index}].dependencies[${dependencyIndex}]`, []);
-      if (!ref) return;
-      if (typeof ref.id === "string" && typeof ref.version === "string" && !capabilityKeys.has(`${ref.id}@${ref.version}`)) {
-        kernelIssue(issues, "KERNEL_DANGLING_REFERENCE", `$.capabilityDescriptors[${index}].dependencies[${dependencyIndex}]`, "Capability dependency is not declared.");
-      }
-      if (ref.id === value.id && ref.version === value.version) {
-        kernelIssue(issues, "KERNEL_SELF_REFERENCE", `$.capabilityDescriptors[${index}].dependencies[${dependencyIndex}]`, "A capability cannot depend on itself.");
-      }
-    });
-  });
-  if (validateKernelGraphCycle(capabilityKeys, (id) => capabilityDependencies.get(id) ?? [])) {
-    kernelIssue(issues, "KERNEL_CAPABILITY_CYCLE", "$.capabilityDescriptors", "Capability dependencies must be acyclic.");
   }
 
   const entities = kernelArray(root.entities, "$.entities", issues);
@@ -590,66 +541,7 @@ function validateScenarioKernel(input: unknown): asserts input is ScenarioKernel
         kernelIssue(issues, "KERNEL_DANGLING_REFERENCE", `${path}.organizationId`, "Entity organization is not declared.");
       }
     }
-    const refs = validateCapabilityRefs(value.capabilityRefs, `${path}.capabilityRefs`, issues);
-    refs.forEach((refCandidate, refIndex) => {
-      const ref = kernelRecord(refCandidate, `${path}.capabilityRefs[${refIndex}]`, []);
-      if (!ref) return;
-      if (typeof ref.id === "string" && typeof ref.version === "string" && !capabilityKeys.has(`${ref.id}@${ref.version}`)) {
-        kernelIssue(issues, "KERNEL_DANGLING_REFERENCE", `${path}.capabilityRefs[${refIndex}]`, "Entity capability is not declared.");
-      }
-    });
-  });
-
-  const descriptorContextTokens = new Set<string>();
-  const addContextToken = (value: unknown) => {
-    if (typeof value !== "string") return;
-    const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    if (normalized.length >= 4) descriptorContextTokens.add(normalized);
-  };
-  addContextToken(root.id);
-  entities.forEach((candidate, index) => {
-    const entity = kernelRecord(candidate, `$.entities[${index}]`, []);
-    if (!entity) return;
-    addContextToken(entity.id);
-    addContextToken(entity.displayName);
-  });
-  capabilityDescriptors.forEach((candidate, descriptorIndex) => {
-    const descriptor = kernelRecord(candidate, `$.capabilityDescriptors[${descriptorIndex}]`, []);
-    if (!descriptor) return;
-    const guardedValues: Array<[unknown, string]> = [
-      [descriptor.id, `$.capabilityDescriptors[${descriptorIndex}].id`],
-      ...kernelArray(descriptor.authoredInputs, `$.capabilityDescriptors[${descriptorIndex}].authoredInputs`, [])
-        .map((input, inputIndex) => {
-          const path = `$.capabilityDescriptors[${descriptorIndex}].authoredInputs[${inputIndex}]`;
-          return [kernelRecord(input, path, [])?.id, `${path}.id`] as [unknown, string];
-        }),
-      ...kernelArray(descriptor.outputs, `$.capabilityDescriptors[${descriptorIndex}].outputs`, [])
-        .map((output, outputIndex) => {
-          const path = `$.capabilityDescriptors[${descriptorIndex}].outputs[${outputIndex}]`;
-          return [kernelRecord(output, path, [])?.id, `${path}.id`] as [unknown, string];
-        }),
-      ...kernelArray(descriptor.inspectors, `$.capabilityDescriptors[${descriptorIndex}].inspectors`, [])
-        .flatMap((inspector, inspectorIndex) => {
-          const path = `$.capabilityDescriptors[${descriptorIndex}].inspectors[${inspectorIndex}]`;
-          const value = kernelRecord(inspector, path, []);
-          return [
-            [value?.id, `${path}.id`],
-            [value?.localizationKey, `${path}.localizationKey`],
-          ] as Array<[unknown, string]>;
-        }),
-    ];
-    for (const [guarded, path] of guardedValues) {
-      if (typeof guarded !== "string") continue;
-      const normalized = guarded.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      if ([...descriptorContextTokens].some((token) => normalized.includes(token))) {
-        kernelIssue(
-          issues,
-          "KERNEL_DESCRIPTOR_CONTEXT_FORBIDDEN",
-          path,
-          "Capability descriptors cannot branch on scenario or entity identity.",
-        );
-      }
-    }
+    validateCapabilityRefs(value.capabilityRefs, `${path}.capabilityRefs`, issues, intendedUse);
   });
 
   const tasks = kernelArray(root.tasks, "$.tasks", issues);
@@ -676,6 +568,7 @@ function validateScenarioKernel(input: unknown): asserts input is ScenarioKernel
       }
     });
     const objective = kernelRecord(value.objective, `${path}.objective`, issues);
+    let objectiveTaskId: string | null = null;
     if (objective) {
       kernelExactKeys(objective, `${path}.objective`, ["kind", "id"], [], issues);
       kernelEnum(objective.kind, `${path}.objective.kind`, ["ENTITY", "ORGANIZATION", "TASK"], issues);
@@ -687,6 +580,7 @@ function validateScenarioKernel(input: unknown): asserts input is ScenarioKernel
       if (objective.kind === "TASK" && objective.id === value.id) {
         kernelIssue(issues, "KERNEL_SELF_REFERENCE", `${path}.objective.id`, "A task cannot target itself.");
       }
+      if (objective.kind === "TASK" && typeof objective.id === "string") objectiveTaskId = objective.id;
     }
     const timing = kernelRecord(value.timing, `${path}.timing`, issues);
     if (timing) {
@@ -705,31 +599,34 @@ function validateScenarioKernel(input: unknown): asserts input is ScenarioKernel
         kernelIssue(issues, "KERNEL_DANGLING_REFERENCE", `${path}.dependencyTaskIds[${dependencyIndex}]`, "Task dependency is not declared.");
       }
     });
-    const refs = validateCapabilityRefs(value.capabilityRefs, `${path}.capabilityRefs`, issues);
-    refs.forEach((refCandidate, refIndex) => {
-      const ref = kernelRecord(refCandidate, `${path}.capabilityRefs[${refIndex}]`, []);
-      if (!ref) return;
-      if (typeof ref.id === "string" && typeof ref.version === "string" && !capabilityKeys.has(`${ref.id}@${ref.version}`)) {
-        kernelIssue(issues, "KERNEL_DANGLING_REFERENCE", `${path}.capabilityRefs[${refIndex}]`, "Task capability is not declared.");
-      }
-    });
+    validateCapabilityRefs(value.capabilityRefs, `${path}.capabilityRefs`, issues, intendedUse);
     kernelEnum(value.lifecycle, `${path}.lifecycle`, ["AUTHORED"], issues);
     if (typeof value.id === "string") {
-      taskDependencies.set(value.id, dependencies.filter((dependency): dependency is string => typeof dependency === "string"));
+      taskDependencies.set(value.id, [
+        ...dependencies.filter((dependency): dependency is string => typeof dependency === "string"),
+        ...(objectiveTaskId ? [objectiveTaskId] : []),
+      ]);
     }
   });
-  if (validateKernelGraphCycle(taskIds, (id) => taskDependencies.get(id) ?? [])) {
+  const taskGraph = validateKernelGraph(taskIds, (id) => taskDependencies.get(id) ?? []);
+  if (taskGraph === "LIMIT_EXCEEDED") {
+    kernelIssue(issues, "KERNEL_GRAPH_LIMIT_EXCEEDED", "$.tasks", "Task graph exceeds the 10,000-edge admission bound.");
+  } else if (taskGraph === "CYCLIC") {
     kernelIssue(issues, "KERNEL_TASK_CYCLE", "$.tasks", "Task dependencies must be acyclic.");
   }
 
   const perspectives = kernelArray(root.perspectives, "$.perspectives", issues);
+  if (perspectives.length === 0) {
+    kernelIssue(issues, "KERNEL_PERSPECTIVE_POLICY_INVALID", "$.perspectives", "A scenario kernel must declare at least one information perspective.");
+  }
   kernelUniqueIds(perspectives, "$.perspectives", issues);
   perspectives.forEach((candidate, index) => {
     const path = `$.perspectives[${index}]`;
     const value = kernelRecord(candidate, path, issues);
     if (!value) return;
     kernelExactKeys(value, path, [
-      "id", "kind", "visibleAffiliationIds", "exposeScenarioPurpose", "exposeCapabilityDescriptors",
+      "id", "kind", "visibleAffiliationIds", "exposeScenarioIdentity", "exposeScenarioPurpose", "capabilityVisibility",
+      "surfaces",
     ], ["ownerAffiliationId"], issues);
     kernelString(value.id, `${path}.id`, issues, { id: true });
     kernelEnum(value.kind, `${path}.kind`, ["AUTHORING_ADMIN", "ADJUDICATOR", "FORCE_OBSERVED", "REDACTED_PUBLIC"], issues);
@@ -739,13 +636,30 @@ function validateScenarioKernel(input: unknown): asserts input is ScenarioKernel
         kernelIssue(issues, "KERNEL_DANGLING_REFERENCE", `${path}.visibleAffiliationIds[${affiliationIndex}]`, "Visible affiliation is not declared.");
       }
     });
+    kernelBoolean(value.exposeScenarioIdentity, `${path}.exposeScenarioIdentity`, issues);
     kernelBoolean(value.exposeScenarioPurpose, `${path}.exposeScenarioPurpose`, issues);
-    kernelBoolean(value.exposeCapabilityDescriptors, `${path}.exposeCapabilityDescriptors`, issues);
+    kernelEnum(value.capabilityVisibility, `${path}.capabilityVisibility`, ["NONE", "VISIBLE_REFERENCES"], issues);
+    const surfaces = kernelUniqueEnumArray(
+      value.surfaces,
+      `${path}.surfaces`,
+      ["CONSTRUCT", "OBSERVE", "EXPLAIN", "COMPARE", "REPLAY", "EXPORT"],
+      issues,
+      6,
+    );
+    if (surfaces.length === 0) {
+      kernelIssue(issues, "KERNEL_PERSPECTIVE_POLICY_INVALID", `${path}.surfaces`, "A perspective must authorize at least one named surface.");
+    }
     const unrestricted = value.kind === "AUTHORING_ADMIN" || value.kind === "ADJUDICATOR";
     if (unrestricted) {
       const declared = new Set(visible.filter((id): id is string => typeof id === "string"));
       if (declared.size !== affiliationIds.size || [...affiliationIds].some((id) => !declared.has(id))) {
         kernelIssue(issues, "KERNEL_PERSPECTIVE_POLICY_INVALID", `${path}.visibleAffiliationIds`, "Administrative and adjudicator perspectives must explicitly include every affiliation.");
+      }
+      if (value.exposeScenarioIdentity !== true || value.exposeScenarioPurpose !== true) {
+        kernelIssue(issues, "KERNEL_PERSPECTIVE_POLICY_INVALID", path, "Administrative and adjudicator perspectives must expose scenario identity and purpose.");
+      }
+      if (value.capabilityVisibility !== "VISIBLE_REFERENCES") {
+        kernelIssue(issues, "KERNEL_PERSPECTIVE_POLICY_INVALID", `${path}.capabilityVisibility`, "Administrative and adjudicator perspectives must expose governed capability references.");
       }
     }
     if (value.kind === "FORCE_OBSERVED") {
@@ -755,6 +669,9 @@ function validateScenarioKernel(input: unknown): asserts input is ScenarioKernel
       }
     } else if (Object.hasOwn(value, "ownerAffiliationId")) {
       kernelIssue(issues, "KERNEL_PERSPECTIVE_POLICY_INVALID", `${path}.ownerAffiliationId`, "Only force-observed perspectives declare an owner affiliation.");
+    }
+    if (value.kind === "REDACTED_PUBLIC" && value.capabilityVisibility !== "NONE") {
+      kernelIssue(issues, "KERNEL_PERSPECTIVE_POLICY_INVALID", `${path}.capabilityVisibility`, "Public perspectives cannot expose capability references.");
     }
   });
 
@@ -785,17 +702,12 @@ function canonicalScenarioKernel(input: ScenarioKernelInput): ScenarioKernelInpu
         capabilityRefs: [...task.capabilityRefs].sort(compareKernelIdentity),
       }))
       .sort(compareKernelIdentity),
-    capabilityDescriptors: [...copy.capabilityDescriptors]
-      .map((descriptor) => ({
-        ...descriptor,
-        authoredInputs: [...descriptor.authoredInputs].sort(compareKernelIdentity),
-        outputs: [...descriptor.outputs].sort(compareKernelIdentity),
-        inspectors: [...descriptor.inspectors].sort(compareKernelIdentity),
-        dependencies: [...descriptor.dependencies].sort(compareKernelIdentity),
-      }))
-      .sort(compareKernelIdentity),
     perspectives: [...copy.perspectives]
-      .map((perspective) => ({ ...perspective, visibleAffiliationIds: [...perspective.visibleAffiliationIds].sort() }))
+      .map((perspective) => ({
+        ...perspective,
+        visibleAffiliationIds: [...perspective.visibleAffiliationIds].sort(),
+        surfaces: [...perspective.surfaces].sort(),
+      }))
       .sort(compareKernelIdentity),
   };
 }
@@ -808,22 +720,64 @@ function deepFreezeKernel<T>(value: T): T {
   return value;
 }
 
+function resolveKernelCapabilityDescriptors(input: ScenarioKernelInput) {
+  const required = new Set([
+    ...input.entities.flatMap((entity) => entity.capabilityRefs.map((ref) => `${ref.id}@${ref.version}`)),
+    ...input.tasks.flatMap((task) => task.capabilityRefs.map((ref) => `${ref.id}@${ref.version}`)),
+  ]);
+  const resolved = new Map<string, GovernedScenarioCapabilityDescriptor>();
+  const queue = [...required];
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const key = queue[cursor];
+    if (resolved.has(key)) continue;
+    const separator = key.lastIndexOf("@");
+    const descriptor = resolveScenarioCapability(key.slice(0, separator), key.slice(separator + 1));
+    if (!descriptor) continue;
+    resolved.set(key, descriptor);
+    for (const dependency of descriptor.dependencies) {
+      const dependencyKey = `${dependency.id}@${dependency.version}`;
+      if (!resolved.has(dependencyKey)) queue.push(dependencyKey);
+    }
+    if (queue.length > MAX_KERNEL_GRAPH_EDGES) {
+      throw new ScenarioKernelValidationError([{
+        code: "KERNEL_GRAPH_LIMIT_EXCEEDED",
+        path: "$.capabilityDescriptors",
+        message: "Capability dependency closure exceeds the 10,000-edge admission bound.",
+      }]);
+    }
+  }
+  return [...resolved.values()].sort(compareKernelIdentity);
+}
+
 export function compileScenarioKernel(input: unknown): CompiledScenarioKernel {
   validateScenarioKernel(input);
   const canonical = canonicalScenarioKernel(input);
-  return deepFreezeKernel({ ...canonical, digest: sha256HexSync(canonical) });
+  const material = {
+    ...canonical,
+    capabilityDescriptors: resolveKernelCapabilityDescriptors(canonical),
+  };
+  const canonicalBytes = canonicalJson(material);
+  return deepFreezeKernel({
+    ...material,
+    canonicalBytes,
+    digest: sha256Utf8HexSync(canonicalBytes),
+  });
 }
 
 export function verifyCompiledScenarioKernel(
   kernel: CompiledScenarioKernel,
 ): CompiledScenarioKernel {
-  const { digest, ...source } = kernel;
+  const { canonicalBytes, digest } = kernel;
+  const source = structuredClone(kernel) as Record<string, unknown>;
+  delete source.capabilityDescriptors;
+  delete source.canonicalBytes;
+  delete source.digest;
   const verified = compileScenarioKernel(source);
-  if (digest !== verified.digest) {
+  if (canonicalBytes !== verified.canonicalBytes || digest !== verified.digest) {
     throw new ScenarioKernelValidationError([{
       code: "KERNEL_DIGEST_MISMATCH",
       path: "$.digest",
-      message: "Scenario kernel digest does not match its canonical content.",
+      message: "Scenario kernel canonical bytes or digest do not match its canonical content.",
     }]);
   }
   return verified;
@@ -845,6 +799,7 @@ function projectionObjectiveVisible(
 export function projectScenarioKernel(
   kernel: CompiledScenarioKernel,
   perspectiveId: string,
+  surface: ScenarioKernelSurface,
 ): ScenarioKernelProjection {
   kernel = verifyCompiledScenarioKernel(kernel);
   const perspective = kernel.perspectives.find((candidate) => candidate.id === perspectiveId);
@@ -855,86 +810,108 @@ export function projectScenarioKernel(
       message: `${perspectiveId} does not identify a perspective.`,
     }]);
   }
+  if (!perspective.surfaces.includes(surface)) {
+    throw new ScenarioKernelValidationError([{
+      code: "KERNEL_PERSPECTIVE_POLICY_INVALID",
+      path: "$.surface",
+      message: `${perspectiveId} does not authorize the ${surface} surface.`,
+    }]);
+  }
   const visibleAffiliations = new Set(perspective.visibleAffiliationIds);
   const affiliations = kernel.affiliations.filter((affiliation) => visibleAffiliations.has(affiliation.id));
   const relationships = kernel.relationships.filter((relationship) =>
     visibleAffiliations.has(relationship.sourceAffiliationId) && visibleAffiliations.has(relationship.targetAffiliationId));
 
-  let organizations = kernel.organizations.filter((organization) => visibleAffiliations.has(organization.affiliationId));
-  let organizationIds = new Set(organizations.map((organization) => organization.id));
-  let changed = true;
-  while (changed) {
-    changed = false;
-    organizations = organizations.filter((organization) => {
-      const keep = !organization.parentOrganizationId || organizationIds.has(organization.parentOrganizationId);
-      if (!keep) changed = true;
-      return keep;
-    });
-    organizationIds = new Set(organizations.map((organization) => organization.id));
+  const organizationCandidates = kernel.organizations.filter((organization) =>
+    visibleAffiliations.has(organization.affiliationId));
+  const organizationIds = new Set(organizationCandidates.map((organization) => organization.id));
+  const childrenByParent = new Map<string, string[]>();
+  const hiddenOrganizationQueue: string[] = [];
+  for (const organization of organizationCandidates) {
+    if (!organization.parentOrganizationId) continue;
+    const children = childrenByParent.get(organization.parentOrganizationId) ?? [];
+    children.push(organization.id);
+    childrenByParent.set(organization.parentOrganizationId, children);
+    if (!organizationIds.has(organization.parentOrganizationId)) hiddenOrganizationQueue.push(organization.id);
   }
-
+  for (let cursor = 0; cursor < hiddenOrganizationQueue.length; cursor += 1) {
+    const hiddenId = hiddenOrganizationQueue[cursor];
+    if (!organizationIds.delete(hiddenId)) continue;
+    hiddenOrganizationQueue.push(...(childrenByParent.get(hiddenId) ?? []));
+  }
+  const organizations = organizationCandidates.filter((organization) => organizationIds.has(organization.id));
+  const exposeCapabilities = perspective.capabilityVisibility === "VISIBLE_REFERENCES";
   const entities = kernel.entities
     .filter((entity) =>
       visibleAffiliations.has(entity.affiliationId) && (!entity.organizationId || organizationIds.has(entity.organizationId)))
-    .map((entity) => perspective.exposeCapabilityDescriptors
-      ? entity
-      : { ...entity, capabilityRefs: [] });
+    .map((entity) => exposeCapabilities ? entity : { ...entity, capabilityRefs: [] });
   const entityIds = new Set(entities.map((entity) => entity.id));
-  let tasks = kernel.tasks.filter((task) =>
+  const taskCandidates = kernel.tasks.filter((task) =>
     organizationIds.has(task.ownerOrganizationId) && task.participantEntityIds.every((id) => entityIds.has(id)));
-  let taskIds = new Set(tasks.map((task) => task.id));
-  changed = true;
-  while (changed) {
-    changed = false;
-    tasks = tasks.filter((task) => {
-      const keep = task.dependencyTaskIds.every((id) => taskIds.has(id))
-        && projectionObjectiveVisible(task.objective, entityIds, organizationIds, taskIds);
-      if (!keep) changed = true;
-      return keep;
-    });
-    taskIds = new Set(tasks.map((task) => task.id));
-  }
-  if (!perspective.exposeCapabilityDescriptors) {
-    tasks = tasks.map((task) => ({ ...task, capabilityRefs: [] }));
-  }
-
-  let capabilityDescriptors: ScenarioKernelInput["capabilityDescriptors"] = [];
-  if (perspective.exposeCapabilityDescriptors) {
-    const referenced = new Set([
-      ...entities.flatMap((entity) => entity.capabilityRefs.map((ref) => `${ref.id}@${ref.version}`)),
-      ...tasks.flatMap((task) => task.capabilityRefs.map((ref) => `${ref.id}@${ref.version}`)),
-    ]);
-    changed = true;
-    while (changed) {
-      changed = false;
-      for (const descriptor of kernel.capabilityDescriptors) {
-        const key = `${descriptor.id}@${descriptor.version}`;
-        if (!referenced.has(key)) continue;
-        for (const dependency of descriptor.dependencies) {
-          const dependencyKey = `${dependency.id}@${dependency.version}`;
-          if (!referenced.has(dependencyKey)) {
-            referenced.add(dependencyKey);
-            changed = true;
-          }
-        }
-      }
+  const taskIds = new Set(taskCandidates.map((task) => task.id));
+  const dependentsByTask = new Map<string, string[]>();
+  const hiddenTaskQueue: string[] = [];
+  for (const task of taskCandidates) {
+    const taskReferences = [
+      ...task.dependencyTaskIds,
+      ...(task.objective.kind === "TASK" ? [task.objective.id] : []),
+    ];
+    for (const referencedTaskId of new Set(taskReferences)) {
+      const dependents = dependentsByTask.get(referencedTaskId) ?? [];
+      dependents.push(task.id);
+      dependentsByTask.set(referencedTaskId, dependents);
+      if (!taskIds.has(referencedTaskId)) hiddenTaskQueue.push(task.id);
     }
-    capabilityDescriptors = kernel.capabilityDescriptors.filter((descriptor) =>
-      referenced.has(`${descriptor.id}@${descriptor.version}`));
+    if (!projectionObjectiveVisible(task.objective, entityIds, organizationIds, taskIds)) {
+      hiddenTaskQueue.push(task.id);
+    }
   }
+  for (let cursor = 0; cursor < hiddenTaskQueue.length; cursor += 1) {
+    const hiddenId = hiddenTaskQueue[cursor];
+    if (!taskIds.delete(hiddenId)) continue;
+    hiddenTaskQueue.push(...(dependentsByTask.get(hiddenId) ?? []));
+  }
+  const tasks = taskCandidates
+    .filter((task) => taskIds.has(task.id))
+    .map((task) => exposeCapabilities ? task : { ...task, capabilityRefs: [] });
+  const visibleCapabilityKeys = new Set(exposeCapabilities ? [
+    ...entities.flatMap((entity) => entity.capabilityRefs.map((ref) => `${ref.id}@${ref.version}`)),
+    ...tasks.flatMap((task) => task.capabilityRefs.map((ref) => `${ref.id}@${ref.version}`)),
+  ] : []);
+  const descriptorsByKey = new Map(kernel.capabilityDescriptors.map((descriptor) =>
+    [`${descriptor.id}@${descriptor.version}`, descriptor]));
+  const capabilityQueue = [...visibleCapabilityKeys];
+  for (let cursor = 0; cursor < capabilityQueue.length; cursor += 1) {
+    const descriptor = descriptorsByKey.get(capabilityQueue[cursor]);
+    if (!descriptor) continue;
+    for (const dependency of descriptor.dependencies) {
+      const key = `${dependency.id}@${dependency.version}`;
+      if (visibleCapabilityKeys.has(key)) continue;
+      visibleCapabilityKeys.add(key);
+      capabilityQueue.push(key);
+    }
+  }
+  const capabilityDescriptors = kernel.capabilityDescriptors.filter((descriptor) =>
+    visibleCapabilityKeys.has(`${descriptor.id}@${descriptor.version}`));
 
   const material = {
     schemaVersion: SCENARIO_KERNEL_PROJECTION_SCHEMA_VERSION,
-    kernelId: kernel.id,
-    kernelVersion: kernel.version,
-    perspective: { id: perspective.id, kind: perspective.kind },
+    scenario: perspective.exposeScenarioIdentity ? { id: kernel.id, version: kernel.version } : null,
+    perspective: {
+      kind: perspective.kind,
+      policyDigest: sha256Utf8HexSync(canonicalJson(perspective)),
+    },
+    surface,
     purpose: perspective.exposeScenarioPurpose ? kernel.purpose : null,
     affiliations,
     relationships,
     organizations,
     entities,
     tasks,
-    capabilityDescriptors,
+    ...(exposeCapabilities ? { capabilityDescriptors } : {}),
   };
-  return deepFreezeKernel({ ...material, digest: sha256HexSync(material) });
+  return deepFreezeKernel({
+    ...material,
+    digest: sha256Utf8HexSync(canonicalJson(material)),
+  });
 }

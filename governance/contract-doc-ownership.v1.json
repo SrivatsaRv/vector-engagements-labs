@@ -3245,12 +3245,105 @@
             "schema",
             "ui"
           ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-capabilities.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "evidence",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-kernel-adapters.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-kernel-history.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-kernel-requests.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-scenario-kernel.ts",
+          "facets": [
+            "verification"
+          ]
         }
       ],
       "testRules": [
         {
           "kind": "EXACT",
           "value": "tests/scenario-kernel.test.mjs",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/scenario-capabilities.test.mjs",
+          "facets": [
+            "admission",
+            "digest",
+            "evidence",
+            "schema",
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/scenario-kernel-adapters.test.mjs",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/scenario-kernel-history.test.mjs",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/scenario-kernel-requests.test.mjs",
           "facets": [
             "admission",
             "digest",
@@ -3269,6 +3362,7 @@
           "facets": [
             "admission",
             "digest",
+            "evidence",
             "schema",
             "ui",
             "verification"
@@ -4565,5 +4659,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "218b698e6d8b3cbb4d31c0d9107ad7d5e37e5f898039fd9eeddeaa833ede030f"
+  "canonicalSha256": "8e5689bb03e4b9b062b495ee62b336bc93aba01abeeb3992f6df8fc7e317d1f0"
 }

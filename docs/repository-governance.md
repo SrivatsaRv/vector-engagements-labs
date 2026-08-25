@@ -115,6 +115,11 @@ under the same family, generated group where applicable, inventory, and facets.
 Prefix rules, families, sections, generated groups, toolchains, commands, and
 workstreams cannot use this mechanism. Tombstones never classify current paths,
 cannot be edited or removed, and are unavailable during the one-time bootstrap.
+
+The `SCENARIO_COMPOSITION_KERNEL` family
+therefore registers each kernel, capability-registry, typed-history,
+request-guard, downstream-adapter, focused-test and benchmark path explicitly;
+adding a nearby `lib/`, `tests/` or `scripts/` file does not inherit ownership.
 Every active implementation, test, input, output, and generator rule must still
 match a tracked head path; a tombstone never excuses an active rule in the same
 or another inventory. Historical multi-family and probe entries may remain
@@ -248,8 +253,9 @@ authoring, spatial transforms, and simulation orchestration instead of treating
 all mission files as one semantic surface. The Air mission schema/compiler and
 its regression suite are exact-path members of that existing family; downstream
 capability work consumes the exported `AirMissionDefinition` and
-`CompiledAirMission` boundary rather than registering a parallel mission
-authority. Generic database mechanics own
+`CompiledAirMission` boundary through the identity-only
+`bindAirMissionToScenarioKernel` adapter rather than registering a parallel
+mission authority. Generic database mechanics own
 migration/backup, provisioning, and database-test documentation, while only
 the exact model-pack and saved-run tables, migrations, seed/verifier paths, and
 Drizzle representations jointly own their model-pack or VSR persistence
