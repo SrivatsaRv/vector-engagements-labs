@@ -314,6 +314,64 @@ test("the focused gate denies network APIs before verifying frozen local bytes",
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /NETWORK_ACCESS_DISABLED/);
   }
+
+  const callbackProbe = String.raw`
+    const dns = require("node:dns");
+    const target = TARGET;
+    const names = NAMES;
+    const unblocked = [];
+    for (const name of names) {
+      const args = name === "lookupService"
+        ? ["127.0.0.1", 80, () => {}]
+        : name === "reverse"
+          ? ["127.0.0.1", () => {}]
+          : ["localhost", () => {}];
+      try {
+        target[name](...args);
+        unblocked.push(name);
+      } catch (error) {
+        if (!String(error?.message).startsWith("NETWORK_ACCESS_DISABLED:")) throw error;
+      }
+    }
+    if (unblocked.length > 0) throw new Error("UNBLOCKED_DNS_METHODS:" + unblocked.join(","));
+  `;
+  const promiseProbe = String.raw`
+    const dns = require("node:dns");
+    const target = TARGET;
+    const names = NAMES;
+    const unblocked = [];
+    for (const name of names) {
+      const args = name === "lookupService" ? ["127.0.0.1", 80] : name === "reverse" ? ["127.0.0.1"] : ["localhost"];
+      try {
+        const pending = target[name](...args);
+        pending?.catch?.(() => {});
+        unblocked.push(name);
+      } catch (error) {
+        if (!String(error?.message).startsWith("NETWORK_ACCESS_DISABLED:")) throw error;
+      }
+    }
+    if (unblocked.length > 0) throw new Error("UNBLOCKED_DNS_PROMISE_METHODS:" + unblocked.join(","));
+  `;
+  const moduleMethods = "Object.getOwnPropertyNames(target).filter((name) => [\"lookup\", \"lookupService\", \"reverse\"].includes(name) || name.startsWith(\"resolve\")).filter((name) => typeof target[name] === \"function\")";
+  const resolverMethods = "Object.getOwnPropertyNames(Object.getPrototypeOf(target)).filter((name) => name === \"reverse\" || name.startsWith(\"resolve\")).filter((name) => typeof target[name] === \"function\")";
+  for (const [label, script] of [
+    ["dns callback module", callbackProbe.replace("TARGET", "dns").replace("NAMES", moduleMethods)],
+    ["dns callback Resolver", callbackProbe.replace("TARGET", "new dns.Resolver()").replace("NAMES", resolverMethods)],
+    ["dns.promises module", promiseProbe.replace("TARGET", "dns.promises").replace("NAMES", moduleMethods)],
+    ["node:dns/promises module", promiseProbe.replace("TARGET", "require('node:dns/promises')").replace("NAMES", moduleMethods)],
+    ["dns.promises Resolver", promiseProbe.replace("TARGET", "new dns.promises.Resolver()").replace("NAMES", resolverMethods)],
+  ]) {
+    const result = spawnSync(process.execPath, ["--require", guard, "--eval", script], { encoding: "utf8", timeout: 3_000 });
+    assert.equal(result.status, 0, `${label} escaped deny-all guard:\n${result.stderr}`);
+  }
+
+  for (const probe of [
+    "import { resolveAny, resolveTxt, reverse } from 'node:dns'; for (const [fn, arg] of [[resolveAny, 'localhost'], [resolveTxt, 'localhost'], [reverse, '127.0.0.1']]) { try { fn(arg, () => {}); throw new Error('UNBLOCKED_ESM_DNS'); } catch (error) { if (!String(error?.message).startsWith('NETWORK_ACCESS_DISABLED:')) throw error; } }",
+    "import { resolveAny, resolveTxt, reverse } from 'node:dns/promises'; for (const [fn, arg] of [[resolveAny, 'localhost'], [resolveTxt, 'localhost'], [reverse, '127.0.0.1']]) { try { fn(arg); throw new Error('UNBLOCKED_ESM_DNS_PROMISES'); } catch (error) { if (!String(error?.message).startsWith('NETWORK_ACCESS_DISABLED:')) throw error; } }",
+  ]) {
+    const result = spawnSync(process.execPath, ["--require", guard, "--input-type=module", "--eval", probe], { encoding: "utf8", timeout: 3_000 });
+    assert.equal(result.status, 0, `ESM DNS export escaped deny-all guard:\n${result.stderr}`);
+  }
 });
 
 test("one-byte mutation, wrong size, wrong report, wrong page, and withdrawn CR-160557 identity fail", () => {

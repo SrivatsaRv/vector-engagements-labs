@@ -201,7 +201,10 @@ reviewer, registry, policy, evidence, and attestation objects use exact keys.
 Non-approval states carry no reviewer, date, jurisdiction, scope, conditions,
 record, evidence, or alternate authority field. Network access is unnecessary
 for verification. The mandatory focused command preloads a deny-all network
-guard and proves TCP, HTTP, and DNS calls fail before inspecting only committed
-bytes. The verifier runs again after the production build so missing output
+guard and proves TCP, HTTP, and every callback, promise, resolver-instance, and
+ESM DNS resolution method fail before inspecting only committed bytes. The DNS
+inventory is discovered from Node's `lookup*`, `resolve*`, and `reverse`
+surfaces so newly exposed resolver variants fail the regression instead of
+silently escaping the guard. The verifier runs again after the production build so missing output
 directories cannot stand in for bundle-exclusion evidence. Dynamic unpinned or
 substituted community/game material is rejected.

@@ -12,7 +12,8 @@ The verifier is offline and cannot fetch replacement evidence. Numeric transcrip
 all derived governance records are current, then verifies the offline bundle.
 Every generator, verifier, and focused adversarial test process preloads the
 tracked deny-all Node network guard; the regression first proves that raw TCP,
-HTTP, and DNS calls fail. The same verifier runs again after `npm run build` in
+HTTP, and every callback, promise, resolver-instance, and ESM DNS lookup,
+`resolve*`, and reverse call fail. The same verifier runs again after `npm run build` in
 `worker-local` and hosted integration so `.next` and every other production
 output are present when source-bundle exclusion is measured.
 The verifier pins the complete canonical manifest digest and rejects
