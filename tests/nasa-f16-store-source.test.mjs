@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import {
   cpSync,
   copyFileSync,
@@ -37,6 +38,21 @@ const metadataFiles = Object.fromEntries(manifest.artifacts.map((artifact) => [
   artifact.metadata.repositoryPath,
   readFileSync(resolve(governedRoot, artifact.metadata.repositoryPath)),
 ]));
+
+test("the required policy command cannot omit committed-source rerender verification", () => {
+  const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
+  assert.match(
+    packageJson.scripts["policy:nasa-f16-store-source:verify"],
+    /scripts\/verify-nasa-f16-store-source\.mjs --source-dir governance\/nasa-historical-f16-store-source\/sources/u,
+  );
+  const omitted = spawnSync(
+    process.execPath,
+    ["--require", "./scripts/lib/generic-sensor-network-deny.cjs", "scripts/verify-nasa-f16-store-source.mjs"],
+    { encoding: "utf8" },
+  );
+  assert.notEqual(omitted.status, 0);
+  assert.match(omitted.stderr, /CLI verification requires exactly --source-dir/u);
+});
 
 const mutate = (apply) => {
   const candidate = structuredClone(manifest);
@@ -183,14 +199,12 @@ test("the manifest rejects identity, decision, role, page, unit, datum, and exec
   }
 });
 
-test("the verifier rejects changed, truncated, swapped, linked, and undeclared local artifacts", async (t) => {
-  const sourceDirectory = process.env.VECTOR_F16_SOURCE_DIR;
-  if (!sourceDirectory) {
-    t.skip("set VECTOR_F16_SOURCE_DIR to the reviewed six-file offline bundle");
-    return;
-  }
+test("the verifier rejects changed, truncated, swapped, linked, and undeclared local artifacts", async () => {
+  const sourceDirectory = process.env.VECTOR_F16_SOURCE_DIR
+    ? resolve(process.env.VECTOR_F16_SOURCE_DIR)
+    : resolve(governedRoot, "sources");
 
-  const result = await verifySourceDirectory(manifest, resolve(sourceDirectory));
+  const result = await verifySourceDirectory(manifest, sourceDirectory);
   assert.equal(result.artifacts, 3);
   assert.equal(result.metadataRecords, 3);
   assert.equal(result.admissionEligible, false);

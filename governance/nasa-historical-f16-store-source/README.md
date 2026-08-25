@@ -23,22 +23,25 @@ value or equation was transcribed.
 
 The manifest keeps adaptation, execution, model admission, numeric/equation
 transcription, and runtime permissions false. The quarantined sources remain
-inadmissible as model-pack or runtime evidence. The local render reproduction
-is fail closed on Poppler 26.05.0 and Sharp 0.35.0; those tool versions are part
-of the frozen render identity.
+inadmissible as model-pack or runtime evidence. Every required policy, local
+CI, clean-clone, and hosted invocation reproduces all 16 declared pages from
+the committed source directory and is fail closed on Poppler 26.05.0 and Sharp
+0.35.0; those tool versions are part of the frozen render identity. The CLI
+cannot succeed without an explicit source directory, and the hostile regression
+cannot skip when an environment override is absent.
 
 Lateral and vertical datums, handedness, a complete body-frame transform, and
 complete station geometry are explicitly `UNAVAILABLE`. The literal Table 2
 inertia labels remain `kN·m²` and `lb·in²`; they are not mass inertia values.
 
-Run the committed contract check with:
+Run the committed contract check, including exact 16-page reproduction, with:
 
 ```sh
 npm run policy:nasa-f16-store-source:verify
 ```
 
-Reproduce all 16 declared renders from the committed exact six-file source set
-without network access with:
+The script binds the committed exact six-file source set. To reproduce an
+independently copied but byte-identical reviewed source directory instead, run:
 
 ```sh
 node --require ./scripts/lib/generic-sensor-network-deny.cjs \

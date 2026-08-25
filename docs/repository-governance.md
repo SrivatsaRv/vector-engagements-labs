@@ -133,9 +133,11 @@ archive check detects drift across the whole model-pack fixture family.
 The historical F-16 external-store source gate runs its evidence generator,
 committed quarantine inventory, source-terms/release-owner verification,
 production-isolation scan, and hostile regressions under the shared deny-all
-network preload. An explicitly requested source-directory run additionally
-reproduces all 16 pages with the pinned Poppler and Sharp versions. The normal
-quality gate does not fetch mutable NTRS or policy URLs. Local Worker and
+network preload. Every required package, local CI, clean-clone, and hosted
+quality/integration invocation supplies the exact committed source directory
+and reproduces all 16 pages with the pinned Poppler and Sharp versions; the CLI
+has no source-omission success path. The normal quality gate does not fetch
+mutable NTRS or policy URLs. Local Worker and
 hosted integration builds rerun the same production-isolation check after the
 built output exists; an absent build directory is not accepted as that final
 evidence.

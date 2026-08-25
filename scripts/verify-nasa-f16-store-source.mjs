@@ -812,10 +812,11 @@ async function run() {
   const manifest = loadManifest();
   const result = verifyManifest(manifest);
   const inventory = verifyCommittedInventory(resolve("."));
-  const sourceArgument = process.argv.indexOf("--source-dir");
-  const sources = sourceArgument >= 0
-    ? await verifySourceDirectory(manifest, resolve(process.argv[sourceArgument + 1] ?? fail("--source-dir requires a path")))
-    : null;
+  const arguments_ = process.argv.slice(2);
+  if (arguments_.length !== 2 || arguments_[0] !== "--source-dir" || !arguments_[1]) {
+    fail("CLI verification requires exactly --source-dir <committed-source-directory>");
+  }
+  const sources = await verifySourceDirectory(manifest, resolve(arguments_[1]));
   const isolation = verifyProductionIsolation(resolve("."));
   process.stdout.write(`${JSON.stringify({ ...result, inventory, isolation, sources })}\n`);
 }
