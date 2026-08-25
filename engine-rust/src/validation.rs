@@ -725,6 +725,8 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         if terrain.columns < 2
             || terrain.rows < 2
             || terrain.surface_elevation_msl_m.len() != terrain.columns * terrain.rows
+            || !terrain.west_deg.is_finite()
+            || !terrain.south_deg.is_finite()
             || !(terrain.longitude_step_deg > 0.0 && terrain.latitude_step_deg > 0.0)
             || terrain
                 .surface_elevation_msl_m
@@ -743,6 +745,10 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         if atmosphere.columns < 2
             || atmosphere.rows < 2
             || atmosphere.sample_count < 2
+            || !atmosphere.west_deg.is_finite()
+            || !atmosphere.south_deg.is_finite()
+            || !(atmosphere.longitude_step_deg > 0.0 && atmosphere.latitude_step_deg > 0.0)
+            || !atmosphere.interval_seconds.is_finite()
             || atmosphere.interval_seconds <= 0.0
             || scenario.duration_seconds
                 > (atmosphere.sample_count - 1) as f64 * atmosphere.interval_seconds

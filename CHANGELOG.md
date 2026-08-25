@@ -64,6 +64,8 @@ schema and reproduces the TypeScript digest on an anonymous fixture. This adds
 no exported simulation ABI, backend-selection rule or v2 runtime admission.
 - Add `vector.environment-runtime-grid.v1` terrain/atmosphere fields with exact
   TypeScript/Rust interpolation and collision parity.
+- Propagate regional terrain/atmosphere coverage, validity and no-data failures
+  as stable Rust engine errors instead of a zero-surface or `NaN` substitute.
 
 No pending family-specific entry.
 
@@ -99,6 +101,9 @@ admission, or tick behavior.
 
 - Consume sourced density/wind per entity/time and use one admitted DEM for
   AGL, below-terrain rejection and guided-vehicle impact.
+- Stop TypeScript and Rust/WASM at the same first unavailable regional sample;
+  legacy zero-plane/educational atmosphere behavior remains distinct and is
+  used only when no regional runtime projection exists.
 
 No pending family-specific entry.
 

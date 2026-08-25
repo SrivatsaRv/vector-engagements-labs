@@ -146,6 +146,18 @@ dynamics. The same terrain grid supplies MSL ground, AGL, initial/route
 below-terrain rejection, guided-vehicle collision and geometric LOS. Missing,
 outside-coverage/time/altitude, corrupt or stale identities fail closed.
 
+The regional TypeScript and Rust/WASM hot paths reject at the first sampling
+boundary that cannot produce terrain, atmosphere or wind. A moving aircraft or
+guided vehicle that crosses a grid edge, a fixed-step frame beyond atmospheric
+validity, a missing grid cell, or a non-finite/physically invalid derived sample
+returns a stable engine error; the run is not emitted with `NaN`, clamped to a
+zero-MSL surface, or allowed to continue until a later subsystem happens to
+fail. Rust terrain and atmosphere helpers therefore return `Result` through
+integration, collision and frame construction. The `0 m` reference plane and
+educational standard atmosphere are retained only when the admitted historical
+synthetic/legacy scenario has no regional runtime projection; they are not an
+error-recovery path for a present regional projection.
+
 `vector.installation-catalogue.v2` retains the bounded 6 IAF / 15 PAF public
 fixture and adds 24 sourced runway records. Twelve contain the minimum
 public-educational geometry/elevation evidence. That count is evidence

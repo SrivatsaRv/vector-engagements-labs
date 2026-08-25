@@ -27,6 +27,13 @@ mission-class or named-scenario physics branch exists.
 Aircraft and guided-vehicle dynamics now sample sourced atmosphere and ENU wind
 at entity position/time. Initial/routes below the same DEM are rejected and
 guided-vehicle terrain impact terminates before invalid atmosphere lookup.
+When a regional runtime projection is present, TypeScript and Rust/WASM stop at
+the first terrain/atmosphere sampling request outside coverage or time validity,
+over missing data, or producing an invalid physical value. Rust propagates that
+condition as `InvalidScenario` through aircraft, weapon, collision and frame
+paths; it never converts terrain failure to `0 m MSL` or atmosphere failure to
+`NaN`. The zero reference plane and educational atmosphere below apply only to
+legacy/synthetic scenarios with no regional runtime projection.
 
 - fixed 50 ms integration step and sampled immutable frames;
 - WGS84/ECEF-derived local east/north/up coordinates with an immutable scenario origin;
