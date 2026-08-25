@@ -1768,6 +1768,13 @@
         },
         {
           "kind": "EXACT",
+          "value": "scripts/lib/generic-aam-performance-evidence.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "scripts/build-generic-aam-verifier.mjs",
           "facets": [
             "datum",
@@ -1885,6 +1892,13 @@
         {
           "kind": "EXACT",
           "value": "tests/generic-aam-verification.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/generic-aam-performance-evidence.test.mjs",
           "facets": [
             "verification"
           ]
@@ -5022,5 +5036,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "3a0a59228f90f6e2673b27b59b55715e5500b8a7334a175a2edfca065e7a3de5"
+  "canonicalSha256": "9882257b2aff14f2f1f83161fd73ff0eac91171d6ee7da3939750da0a194663f"
 }

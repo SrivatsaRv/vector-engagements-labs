@@ -161,15 +161,18 @@ checkpoints, and 1×10⁻⁹ TypeScript/Rust-WASM parity. A deliberately perturb
 trajectory must fail the gate.
 
 Generic-missile arithmetic verification additionally runs
-`reference-aam:verify`. It checks the frozen NASA TM-109057 bytes, exact corpus
+`reference-aam:verify`. It checks the frozen NASA TM-109057 bytes, exact raw corpus
 and successor workload ownership, private-corpus mutation resistance, input/output falsifiers,
 independent arithmetic and convergence oracles, forward/reversed workload
 digests, a cross-platform quantized semantic identity with sampled and aggregate
 trajectory values, full-to-terminal comparison of all 30 numeric frame leaves under the governed default/CPA-specific absolute-plus-relative parity policy,
 half-bin/overflow/policy-tamper falsifiers, printed-radian boundary flips, D09 exceptional semantics, exhaustive
 finite content-addressed run decoding, isolated production-bundle scans, exact numeric-boundary sweeps, and complete TypeScript/actual-WASM frame parity. The separate
-`reference-aam:performance` target reports a 15-case Node-hosted workload under
-explicit p95 limits and makes no Worker or product-capacity claim. See
+`reference-aam:performance` target first verifies the immutable workload bytes,
+then reports both backends under the exact `APPLE_M5_NODE24` environment profile
+and closed p95 limits. Its output binds the exact Git SHA and clean state,
+complete workload identities, every timing sample, distribution, RSS growth,
+frames and output bytes. It makes no Worker or product-capacity claim. See
 [`generic-aam-verification.md`](generic-aam-verification.md).
 
 Scenario-composition verification runs the focused

@@ -2409,6 +2409,11 @@ test("the repository policy maps real simulation identities to their exact owner
   }
   assert.deepEqual(exactRule(genericAam, "lib/validation/generated/generic-aam-verifier-wasm.ts").facets, ["digest", "verification"]);
   assert.deepEqual(prefixRule(genericAam, "verification-rust/generic-aam/").facets, ["datum", "digest", "schema", "unit", "verification"]);
+  assert.deepEqual(exactRule(genericAam, "scripts/lib/generic-aam-performance-evidence.mjs").facets, ["verification"]);
+  assert.deepEqual(
+    genericAam.testRules.find((rule) => rule.value === "tests/generic-aam-performance-evidence.test.mjs").facets,
+    ["verification"],
+  );
 
   const generated = genericAam.generatedGroups.find((group) => group.id === "GENERIC_AAM_VERIFIER_WASM");
   assert.deepEqual(generated.outputRules, [{

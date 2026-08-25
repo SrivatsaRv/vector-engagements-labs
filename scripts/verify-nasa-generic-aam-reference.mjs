@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 
 import { runRustWasmGenericAamVerification } from "../lib/validation/generic-aam-verification-wasm.ts";
 import {
-  genericAamCorpusView,
   assertGenericAamFullFrameParity,
   assertGenericAamVerificationRun,
   genericAamSemanticBatchSha256,
@@ -10,14 +9,15 @@ import {
   genericAamSemanticOutcomeSha256,
   genericAamVerificationInput,
   runGenericAamVerification,
-  verifyGenericAamCorpus,
+  verifyGenericAamCorpusArtifact,
   verifyGenericAamWorkload,
 } from "../lib/validation/generic-aam-verification.ts";
 
 const root = new URL("../", import.meta.url);
-const corpus = genericAamCorpusView();
+const corpusBytes = readFileSync(new URL("../governance/nasa-tm-109057-generic-aam-verification-corpus.v5.json", import.meta.url));
+const corpus = JSON.parse(corpusBytes);
 const source = readFileSync(new URL(corpus.artifact.localPath, root));
-const report = verifyGenericAamCorpus(corpus, source);
+const report = verifyGenericAamCorpusArtifact(corpus, corpusBytes, source);
 const workloadBytes = readFileSync(new URL("../fixtures/public-reference/nasa-tm-109057/workload.v5.json", import.meta.url));
 const workload = JSON.parse(workloadBytes);
 verifyGenericAamWorkload(workload, workloadBytes);

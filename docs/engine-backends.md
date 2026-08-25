@@ -18,9 +18,14 @@ The default backend is a Rust 2021 `cdylib` compiled for `wasm32-unknown-unknown
 - `vector_max_input_len()` publishes the bounded admission limit;
 - `vector_input_reserve(length)` allocates the JSON input buffer;
 - `vector_run_json()` executes the deterministic fixed-step model;
-- `vector_generic_aam_run_json()` executes the isolated NASA TM-109057
-  `ENGINE_VERIFICATION_ONLY` contract and is not a production scenario entry;
 - `vector_output_ptr()` and `vector_output_len()` expose the serialized run.
+
+NASA TM-109057 generic-AAM verification is not exposed by this production
+ABI. It is built from `verification-rust/generic-aam` as a separate generated
+verification artifact and is callable only through the verification adapter,
+focused tests and benchmark. Production Rust exports, production WASM, backend
+selection and the built simulation Worker are scanned for its symbol, subject
+identity and adapter; any match fails the isolation gate.
 
 The build embeds the compiled module in the application with its SHA-256 digest and byte length. Loading fails closed if the required ABI or provenance is missing. VECTOR does not silently fall back to TypeScript after a Rust/WASM run has been selected.
 

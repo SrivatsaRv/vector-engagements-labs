@@ -373,6 +373,8 @@ function deepFreeze<T>(value: T): T {
 }
 
 const COMPILED_SOURCE_SHA256 = "30629ac16b33a519e7aee9e821554fb767b8fcb4daa83574966ee75b4cddc3aa";
+export const GENERIC_AAM_CORPUS_RAW_SHA256 = "bb8599aefa2b698396db6aa2dbdbae2e541532486e189e5a34b993a9f2bd9204";
+export const GENERIC_AAM_CORPUS_RAW_BYTE_LENGTH = 11_521;
 export const GENERIC_AAM_CORPUS_SHA256 = "e799212813fba8b635ee4b8bce114af842ba6a38ef0fb3fbcf21f32b4be55420";
 export const GENERIC_AAM_DECISION_SHA256 = "884bca829ac1b94f959ecff1be6b9cf9847512810c7010f36d8b78cf6cef22f2";
 const TRUSTED_CORPUS = deepFreeze(structuredClone(corpus));
@@ -494,6 +496,27 @@ export function verifyGenericAamCorpus(candidate: unknown, sourceBytes: Uint8Arr
     byteLength: TRUSTED_CORPUS.artifact.byteLength,
     state: "VERIFIED" as const,
   };
+}
+
+export function verifyGenericAamCorpusArtifact(
+  candidate: unknown,
+  corpusBytes: Uint8Array,
+  sourceBytes: Uint8Array,
+) {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(new TextDecoder().decode(corpusBytes));
+  } catch {
+    throw new Error("Generic AAM corpus bytes are not valid JSON.");
+  }
+  if (corpusBytes.byteLength !== GENERIC_AAM_CORPUS_RAW_BYTE_LENGTH
+    || sha256(corpusBytes) !== GENERIC_AAM_CORPUS_RAW_SHA256) {
+    throw new Error("Generic AAM corpus bytes failed the governed raw identity.");
+  }
+  if (canonical(candidate) !== canonical(decoded)) {
+    throw new Error("Generic AAM corpus object does not match the supplied corpus bytes.");
+  }
+  return verifyGenericAamCorpus(candidate, sourceBytes);
 }
 
 export function verifyGenericAamWorkload(candidate: unknown, workloadBytes: Uint8Array) {
