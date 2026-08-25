@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   compareTp1538Transcriptions,
@@ -24,6 +24,7 @@ const contentSha256 = tp1538ComparisonContentSha256(report);
 const output = resolve(outputDirectory, `${contentSha256}.json`);
 const bytes = Buffer.from(`${JSON.stringify(report)}\n`);
 writeFileSync(output, bytes, { flag: "wx", mode: 0o444 });
+chmodSync(output, 0o444);
 const readback = JSON.parse(readFileSync(output, "utf8"));
 if (tp1538ComparisonContentSha256(readback) !== contentSha256) throw new Error("Frozen TP-1538 comparison failed exact readback.");
 process.stdout.write(`${JSON.stringify({

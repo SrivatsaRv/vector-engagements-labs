@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readdirSync } from "node:fs";
+import { basename, join, relative, resolve } from "node:path";
 import sourceManifest from "../../governance/sources/nasa-tp1538/manifest.v1.json" with { type: "json" };
 
 export const TP1538_SOURCE_MANIFEST_SHA256 = "d4736dae888054e502c34912374b8c032dd52f84414bc7e9137b9953acbe4e6b";
 export const MAX_TP1538_TRANSCRIPTION_ARTIFACT_BYTES = 8 * 1024 * 1024;
 export const MAX_TP1538_CORPUS_ARTIFACT_BYTES = 32 * 1024 * 1024;
+export const MAX_TP1538_COMPARISON_ARTIFACT_BYTES = 16 * 1024 * 1024;
+export const MAX_TP1538_ADJUDICATION_ARTIFACT_BYTES = 16 * 1024 * 1024;
 export const MAX_TP1538_COMPARISON_MISMATCHES = 2 * 14_705;
 
 export const TP1538_AXES = deepFreeze({
@@ -88,6 +90,11 @@ export const TP1538_TABLE_INVENTORY = deepFreeze(TABLE_SPECS.map(([id, coefficie
   cellCount: axes.reduce((product, axis) => product * TP1538_AXES[axis].length, 1),
 })));
 
+export const TP1538_COORDINATE_INVENTORY_SHA256 = sha256(canonical({
+  axes: TP1538_AXES,
+  tables: TP1538_TABLE_INVENTORY,
+}));
+
 const ROOT_KEYS = ["contentSha256", "deploymentClass", "entrantId", "isolationSessionId", "method", "schemaVersion", "sourceManifestSha256", "status", "subject", "tables", "transcriptionId"];
 const TABLE_KEYS = ["cells", "tableId"];
 const CELL_KEYS = ["coordinate", "printedValue", "state"];
@@ -97,6 +104,12 @@ const CORPUS_ROOT_KEYS = ["appendixB", "axes", "comparison", "corpusId", "corpus
 const CORPUS_TABLE_KEYS = ["alphaValidityDeg", "axes", "cells", "coefficient", "configurationId", "id", "interpolation", "pdfPages", "units"];
 const CORPUS_CELL_KEYS = ["coordinate", "lineage", "printedValue", "state", "value"];
 const LINEAGE_KEYS = ["cropPath", "cropSha256", "leftTranscriptionId", "pdfPage", "reportPage", "resolution", "rightTranscriptionId"];
+const COMPARISON_ROOT_KEYS = ["leftTranscriptionId", "mismatches", "rightTranscriptionId", "schemaVersion", "sourceManifestSha256", "summary"];
+const COMPARISON_SUMMARY_KEYS = ["agreements", "leftAvailable", "rightAvailable", "stateMismatches", "structuralMismatches", "totalCells", "unenteredBoth", "valueMismatches"];
+const ADJUDICATION_ROOT_KEYS = ["adjudicatorId", "comparison", "contentSha256", "coordinateInventorySha256", "decisions", "deploymentClass", "schemaVersion", "sourceManifestSha256", "status", "subject"];
+const ADJUDICATION_COMPARISON_KEYS = ["contentSha256", "leftTranscriptionId", "mismatchCount", "rawSha256", "rightTranscriptionId"];
+const ADJUDICATION_DECISION_KEYS = ["chosenPrintedValue", "chosenState", "coordinate", "decision", "pdfPage", "rationale", "tableId"];
+const ADJUDICATOR_ID = /^[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$/u;
 
 export const TP1538_REFERENCE_DATA = deepFreeze({
   weight: { si: { value: 91188, unit: "N" }, customary: { value: 20500, unit: "lb" } },
@@ -187,6 +200,30 @@ function parseBoundedJsonArtifact(bytes, maximumBytes, label) {
   }
 }
 
+export function readTp1538BoundedRegularFile(filePath, maximumBytes, label, { requireReadOnly = false } = {}) {
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 2) throw new Error(`${label} maximum byte length is invalid.`);
+  const before = lstatSync(filePath);
+  if (before.isSymbolicLink() || !before.isFile()) throw new Error(`${label} must be a regular non-symbolic-link file.`);
+  if (before.size < 2 || before.size > maximumBytes) throw new Error(`${label} byte length is outside its closed bound.`);
+  if (requireReadOnly && (before.mode & 0o222) !== 0) throw new Error(`${label} must be read-only.`);
+  const descriptor = openSync(filePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const after = fstatSync(descriptor);
+    if (!after.isFile() || after.dev !== before.dev || after.ino !== before.ino || after.size !== before.size) throw new Error(`${label} changed during bounded read.`);
+    const bytes = readFileSync(descriptor);
+    if (bytes.byteLength !== after.size) throw new Error(`${label} exact readback length mismatch.`);
+    return { bytes, mode: after.mode & 0o777 };
+  } finally {
+    closeSync(descriptor);
+  }
+}
+
+export function assertTp1538DigestNamedReadOnlyArtifact(filePath, contentSha256, mode, label) {
+  if (!/^[0-9a-f]{64}$/u.test(contentSha256)) throw new Error(`${label} canonical digest is invalid.`);
+  if (basename(filePath) !== `${contentSha256}.json`) throw new Error(`${label} filename does not match its canonical digest.`);
+  if (mode !== 0o444) throw new Error(`${label} mode must be exactly 0444.`);
+}
+
 export function parseTp1538TranscriptionArtifact(bytes) {
   const transcription = parseBoundedJsonArtifact(bytes, MAX_TP1538_TRANSCRIPTION_ARTIFACT_BYTES, "TP-1538 transcription artifact");
   const report = validateTp1538Transcription(transcription);
@@ -199,6 +236,25 @@ export function parseTp1538CorpusArtifact(bytes, { expectedRawSha256, expectedCo
   if (expectedRawSha256 !== undefined && rawSha256 !== expectedRawSha256) throw new Error("TP-1538 raw corpus bytes do not match the compiled identity.");
   const corpus = parseBoundedJsonArtifact(bytes, MAX_TP1538_CORPUS_ARTIFACT_BYTES, "TP-1538 corpus artifact");
   const report = validateTp1538Corpus(corpus, { expectedCorpusSha256 });
+  return { ...report, rawSha256, byteLength: bytes.byteLength };
+}
+
+export function parseTp1538ComparisonArtifact(bytes, { expectedRawSha256, expectedContentSha256 } = {}) {
+  const rawSha256 = sha256(bytes);
+  if (expectedRawSha256 !== undefined && rawSha256 !== expectedRawSha256) throw new Error("TP-1538 comparison raw-byte identity mismatch.");
+  const comparison = parseBoundedJsonArtifact(bytes, MAX_TP1538_COMPARISON_ARTIFACT_BYTES, "TP-1538 comparison artifact");
+  validateTp1538Comparison(comparison);
+  const contentSha256 = tp1538ComparisonContentSha256(comparison);
+  if (expectedContentSha256 !== undefined && contentSha256 !== expectedContentSha256) throw new Error("TP-1538 comparison canonical identity mismatch.");
+  return { comparison, contentSha256, rawSha256, byteLength: bytes.byteLength };
+}
+
+export function parseTp1538AdjudicationArtifact(bytes, options = {}) {
+  const rawSha256 = sha256(bytes);
+  if (options.expectedRawSha256 !== undefined && rawSha256 !== options.expectedRawSha256) throw new Error("TP-1538 adjudication raw-byte identity mismatch.");
+  const artifact = parseBoundedJsonArtifact(bytes, MAX_TP1538_ADJUDICATION_ARTIFACT_BYTES, "TP-1538 adjudication artifact");
+  const report = validateTp1538AdjudicationArtifact(artifact, options);
+  if (options.expectedContentSha256 !== undefined && artifact.contentSha256 !== options.expectedContentSha256) throw new Error("TP-1538 adjudication canonical identity mismatch.");
   return { ...report, rawSha256, byteLength: bytes.byteLength };
 }
 
@@ -436,6 +492,189 @@ export function tp1538ComparisonContentSha256(comparison) {
   return sha256(canonical(comparison));
 }
 
+function validateMismatchStateValue(table, coordinate, state, printedValue, label) {
+  if (!STATES.has(state) || state === "UNENTERED") throw new Error(`${label} state is invalid.`);
+  const outsidePublishedAlpha = coordinate.alphaDeg !== undefined && coordinate.alphaDeg > table.alphaValidityDeg[1];
+  if (outsidePublishedAlpha !== (state === "OUT_OF_DOMAIN")) throw new Error(`${label} state violates the published coordinate domain.`);
+  if (state === "AVAILABLE") {
+    if (typeof printedValue !== "string" || !DECIMAL.test(printedValue) || !Number.isFinite(Number(printedValue))) throw new Error(`${label} available value must preserve a finite printed decimal.`);
+  } else if (printedValue !== null) throw new Error(`${label} unavailable state cannot contain a value.`);
+}
+
+function coordinateOrdinal(tableId, coordinate) {
+  const tableIndex = TP1538_TABLE_INVENTORY.findIndex(({ id }) => id === tableId);
+  if (tableIndex < 0) throw new Error("TP-1538 comparison mismatch table identity is unknown.");
+  const table = TP1538_TABLE_INVENTORY[tableIndex];
+  const cellIndex = enumerateCoordinates(table).findIndex((candidate) => coordinateKey(candidate) === coordinateKey(coordinate));
+  if (cellIndex < 0) throw new Error("TP-1538 comparison mismatch coordinate is outside the table inventory.");
+  const precedingCells = TP1538_TABLE_INVENTORY.slice(0, tableIndex).reduce((sum, candidate) => sum + candidate.cellCount, 0);
+  return { ordinal: precedingCells + cellIndex, table };
+}
+
+export function validateTp1538Comparison(comparison) {
+  exactKeys(comparison, COMPARISON_ROOT_KEYS, "TP-1538 comparison");
+  if (comparison.schemaVersion !== "vector.tp1538-transcription-comparison.v1" || comparison.sourceManifestSha256 !== TP1538_SOURCE_MANIFEST_SHA256) throw new Error("TP-1538 comparison identity is invalid.");
+  if (![comparison.leftTranscriptionId, comparison.rightTranscriptionId].every((value) => typeof value === "string" && value.length > 0) || comparison.leftTranscriptionId === comparison.rightTranscriptionId) throw new Error("TP-1538 comparison transcription identities are invalid.");
+  exactKeys(comparison.summary, COMPARISON_SUMMARY_KEYS, "TP-1538 comparison summary");
+  for (const [name, count] of Object.entries(comparison.summary)) if (!Number.isSafeInteger(count) || count < 0) throw new Error(`TP-1538 comparison summary ${name} is invalid.`);
+  if (comparison.summary.totalCells !== 14_705 || comparison.summary.structuralMismatches !== 0 || comparison.summary.unenteredBoth !== 0) throw new Error("TP-1538 adjudication requires a complete non-structural comparison.");
+  if (!Array.isArray(comparison.mismatches) || comparison.mismatches.length > MAX_TP1538_COMPARISON_MISMATCHES) throw new Error("TP-1538 comparison mismatch inventory exceeds its closed bound.");
+  let valueMismatches = 0;
+  let stateMismatches = 0;
+  let previousOrdinal = -1;
+  const seen = new Set();
+  for (const mismatch of comparison.mismatches) {
+    if (!mismatch || typeof mismatch !== "object" || Array.isArray(mismatch) || !["STATE", "VALUE"].includes(mismatch.kind)) throw new Error("TP-1538 comparison contains a non-adjudicable mismatch.");
+    exactKeys(mismatch, ["coordinate", "kind", "leftPrintedValue", "leftState", "rightPrintedValue", "rightState", "tableId"], "TP-1538 comparison mismatch");
+    const { ordinal, table } = coordinateOrdinal(mismatch.tableId, mismatch.coordinate);
+    const key = decisionKey(mismatch.tableId, mismatch.coordinate);
+    if (seen.has(key)) throw new Error("TP-1538 comparison mismatch coordinate is duplicated.");
+    if (ordinal <= previousOrdinal) throw new Error("TP-1538 comparison mismatches violate canonical coordinate ordering.");
+    seen.add(key);
+    previousOrdinal = ordinal;
+    validateMismatchStateValue(table, mismatch.coordinate, mismatch.leftState, mismatch.leftPrintedValue, "TP-1538 left mismatch");
+    validateMismatchStateValue(table, mismatch.coordinate, mismatch.rightState, mismatch.rightPrintedValue, "TP-1538 right mismatch");
+    if (mismatch.kind === "VALUE") {
+      if (mismatch.leftState !== "AVAILABLE" || mismatch.rightState !== "AVAILABLE" || mismatch.leftPrintedValue === mismatch.rightPrintedValue) throw new Error("TP-1538 value mismatch is invalid.");
+      valueMismatches += 1;
+    } else {
+      if (mismatch.leftState === mismatch.rightState) throw new Error("TP-1538 state mismatch is invalid.");
+      stateMismatches += 1;
+    }
+  }
+  if (comparison.summary.valueMismatches !== valueMismatches || comparison.summary.stateMismatches !== stateMismatches || comparison.mismatches.length !== valueMismatches + stateMismatches) throw new Error("TP-1538 comparison mismatch summary is invalid.");
+  if (comparison.summary.agreements + comparison.summary.valueMismatches + comparison.summary.stateMismatches !== comparison.summary.totalCells) throw new Error("TP-1538 comparison coverage is incomplete.");
+  for (const name of ["leftAvailable", "rightAvailable"]) if (comparison.summary[name] > comparison.summary.totalCells) throw new Error(`TP-1538 comparison summary ${name} exceeds the coordinate inventory.`);
+  return { comparison, mismatchCount: comparison.mismatches.length };
+}
+
+export function tp1538AdjudicationContentSha256(artifact) {
+  const candidate = structuredClone(artifact);
+  candidate.contentSha256 = null;
+  return sha256(canonical(candidate));
+}
+
+function expectedAdjudicationBinding(comparison, comparisonRawSha256) {
+  return {
+    contentSha256: tp1538ComparisonContentSha256(comparison),
+    rawSha256: comparisonRawSha256,
+    leftTranscriptionId: comparison.leftTranscriptionId,
+    rightTranscriptionId: comparison.rightTranscriptionId,
+    mismatchCount: comparison.mismatches.length,
+  };
+}
+
+export function createTp1538AdjudicationDraft({ comparison, comparisonRawSha256, adjudicatorId }) {
+  validateTp1538Comparison(comparison);
+  if (!/^[0-9a-f]{64}$/u.test(comparisonRawSha256)) throw new Error("TP-1538 comparison raw-byte identity is invalid.");
+  const artifact = {
+    schemaVersion: "vector.tp1538-adjudication-decisions.v1",
+    subject: "NASA_GENERIC_F16",
+    deploymentClass: "ENGINE_VERIFICATION_ONLY",
+    sourceManifestSha256: TP1538_SOURCE_MANIFEST_SHA256,
+    coordinateInventorySha256: TP1538_COORDINATE_INVENTORY_SHA256,
+    comparison: expectedAdjudicationBinding(comparison, comparisonRawSha256),
+    adjudicatorId,
+    status: "DRAFT",
+    decisions: comparison.mismatches.map((mismatch) => ({
+      tableId: mismatch.tableId,
+      coordinate: structuredClone(mismatch.coordinate),
+      pdfPage: tp1538PdfPageForCoordinate(mismatch.tableId, mismatch.coordinate),
+      decision: "UNDECIDED",
+      chosenState: null,
+      chosenPrintedValue: null,
+      rationale: null,
+    })),
+    contentSha256: null,
+  };
+  validateTp1538AdjudicationArtifact(artifact, { comparison, comparisonRawSha256, allowUnresolved: true });
+  return artifact;
+}
+
+function validateAdjudicationIdentity(adjudicatorId, comparison) {
+  if (typeof adjudicatorId !== "string" || !ADJUDICATOR_ID.test(adjudicatorId) || adjudicatorId === comparison.leftTranscriptionId || adjudicatorId === comparison.rightTranscriptionId) throw new Error("TP-1538 adjudicator identity is invalid or conflicts with an entrant artifact identity.");
+}
+
+function projectAdjudicationDecision(slot, adjudicatorId) {
+  return {
+    tableId: slot.tableId,
+    coordinate: structuredClone(slot.coordinate),
+    chosenState: slot.chosenState,
+    chosenPrintedValue: slot.chosenPrintedValue,
+    adjudicatorId,
+    pdfPage: slot.pdfPage,
+    rationale: slot.rationale,
+  };
+}
+
+export function validateTp1538AdjudicationArtifact(artifact, { comparison, comparisonRawSha256, allowUnresolved = false } = {}) {
+  validateTp1538Comparison(comparison);
+  if (!/^[0-9a-f]{64}$/u.test(comparisonRawSha256)) throw new Error("TP-1538 comparison raw-byte identity is invalid.");
+  exactKeys(artifact, ADJUDICATION_ROOT_KEYS, "TP-1538 adjudication artifact");
+  if (artifact.schemaVersion !== "vector.tp1538-adjudication-decisions.v1" || artifact.subject !== "NASA_GENERIC_F16" || artifact.deploymentClass !== "ENGINE_VERIFICATION_ONLY" || artifact.sourceManifestSha256 !== TP1538_SOURCE_MANIFEST_SHA256 || artifact.coordinateInventorySha256 !== TP1538_COORDINATE_INVENTORY_SHA256) throw new Error("TP-1538 adjudication artifact identity is invalid.");
+  validateAdjudicationIdentity(artifact.adjudicatorId, comparison);
+  exactKeys(artifact.comparison, ADJUDICATION_COMPARISON_KEYS, "TP-1538 adjudication comparison binding");
+  if (canonical(artifact.comparison) !== canonical(expectedAdjudicationBinding(comparison, comparisonRawSha256))) throw new Error("TP-1538 adjudication comparison binding is stale or tampered.");
+  if (!Array.isArray(artifact.decisions) || artifact.decisions.length !== comparison.mismatches.length) throw new Error("TP-1538 adjudication decisions have missing or extra mismatch coverage.");
+  const mismatchKeys = new Set(comparison.mismatches.map((mismatch) => decisionKey(mismatch.tableId, mismatch.coordinate)));
+  const seen = new Set();
+  let resolved = 0;
+  let unresolved = 0;
+  for (let index = 0; index < artifact.decisions.length; index += 1) {
+    const slot = artifact.decisions[index];
+    exactKeys(slot, ADJUDICATION_DECISION_KEYS, `TP-1538 adjudication slot ${index}`);
+    const mismatch = comparison.mismatches[index];
+    const key = decisionKey(slot.tableId, slot.coordinate);
+    if (seen.has(key)) throw new Error("TP-1538 adjudication decision is duplicated.");
+    if (!mismatchKeys.has(key)) throw new Error("TP-1538 adjudication contains an extra non-mismatch decision.");
+    if (key !== decisionKey(mismatch.tableId, mismatch.coordinate)) throw new Error("TP-1538 adjudication decisions violate exact mismatch ordering or coverage.");
+    seen.add(key);
+    const expectedPage = tp1538PdfPageForCoordinate(mismatch.tableId, mismatch.coordinate);
+    if (slot.pdfPage !== expectedPage) throw new Error("TP-1538 adjudication decision source page is invalid.");
+    if (slot.decision === "UNDECIDED") {
+      if (slot.chosenState !== null || slot.chosenPrintedValue !== null || slot.rationale !== null) throw new Error("TP-1538 unresolved adjudication slot must not contain decision content.");
+      unresolved += 1;
+      continue;
+    }
+    if (slot.decision !== "SOURCE_READ") throw new Error("TP-1538 adjudication decision type is invalid.");
+    validateDecision(projectAdjudicationDecision(slot, artifact.adjudicatorId), mismatch, expectedPage);
+    resolved += 1;
+  }
+  if (seen.size !== mismatchKeys.size) throw new Error("TP-1538 adjudication decisions do not exactly cover comparator mismatches.");
+  if (!allowUnresolved && unresolved > 0) throw new Error(`TP-1538 adjudication has ${unresolved} unresolved mismatch decision(s).`);
+  if (artifact.status === "DRAFT") {
+    if (artifact.contentSha256 !== null) throw new Error("TP-1538 draft adjudication must have a null canonical digest.");
+  } else if (artifact.status === "FROZEN") {
+    if (unresolved > 0 || !/^[0-9a-f]{64}$/u.test(artifact.contentSha256 ?? "") || artifact.contentSha256 !== tp1538AdjudicationContentSha256(artifact)) throw new Error("TP-1538 frozen adjudication digest or coverage is invalid.");
+  } else throw new Error("TP-1538 adjudication status is invalid.");
+  return { artifact, resolved, unresolved, decisions: artifact.decisions.map((slot) => projectAdjudicationDecision(slot, artifact.adjudicatorId)) };
+}
+
+export function applyTp1538AdjudicationDecision(artifact, decision, { comparison, comparisonRawSha256 }) {
+  const candidate = structuredClone(artifact);
+  validateTp1538AdjudicationArtifact(candidate, { comparison, comparisonRawSha256, allowUnresolved: true });
+  if (candidate.status !== "DRAFT") throw new Error("TP-1538 adjudication updates require a mutable draft.");
+  exactKeys(decision, ADJUDICATION_DECISION_KEYS, "TP-1538 source-read decision");
+  if (decision.decision !== "SOURCE_READ") throw new Error("TP-1538 adjudication decision type is invalid.");
+  const key = decisionKey(decision.tableId, decision.coordinate);
+  const slot = candidate.decisions.find((item) => decisionKey(item.tableId, item.coordinate) === key);
+  if (!slot) throw new Error("TP-1538 adjudication decision does not identify a comparator mismatch.");
+  if (slot.decision !== "UNDECIDED") throw new Error("TP-1538 adjudication decision is append-only and cannot be overwritten.");
+  Object.assign(slot, structuredClone(decision));
+  validateTp1538AdjudicationArtifact(candidate, { comparison, comparisonRawSha256, allowUnresolved: true });
+  return candidate;
+}
+
+export function freezeTp1538AdjudicationArtifact(artifact, { comparison, comparisonRawSha256 }) {
+  const candidate = structuredClone(artifact);
+  validateTp1538AdjudicationArtifact(candidate, { comparison, comparisonRawSha256 });
+  if (candidate.status !== "DRAFT" || candidate.contentSha256 !== null) throw new Error("TP-1538 adjudication freeze requires a complete draft.");
+  candidate.status = "FROZEN";
+  candidate.contentSha256 = tp1538AdjudicationContentSha256(candidate);
+  validateTp1538AdjudicationArtifact(candidate, { comparison, comparisonRawSha256 });
+  return candidate;
+}
+
 function decisionsSha256(decisions) {
   return sha256(canonical(decisions));
 }
@@ -444,15 +683,17 @@ function decisionKey(tableId, coordinate) {
   return `${tableId}:${coordinateKey(coordinate)}`;
 }
 
-function validateDecision(decision, expectedMismatch, expectedPage) {
+function validateDecision(decision, expectedMismatch, expectedPage, { leftEntrantId, rightEntrantId } = {}) {
   const keys = ["adjudicatorId", "chosenPrintedValue", "chosenState", "coordinate", "pdfPage", "rationale", "tableId"];
   exactKeys(decision, keys, "TP-1538 adjudication decision");
   if (decision.tableId !== expectedMismatch.tableId || coordinateKey(decision.coordinate) !== coordinateKey(expectedMismatch.coordinate) || decision.pdfPage !== expectedPage) throw new Error("TP-1538 adjudication decision identity, coordinate, or source page is invalid.");
-  if (typeof decision.adjudicatorId !== "string" || decision.adjudicatorId.length === 0 || typeof decision.rationale !== "string" || decision.rationale.length < 16) throw new Error("TP-1538 adjudication requires an identified adjudicator and material page-grounded rationale.");
+  if (typeof decision.adjudicatorId !== "string" || !ADJUDICATOR_ID.test(decision.adjudicatorId) || decision.adjudicatorId === leftEntrantId || decision.adjudicatorId === rightEntrantId || typeof decision.rationale !== "string" || decision.rationale.length < 16 || decision.rationale.length > 2_000 || /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(decision.rationale)) throw new Error("TP-1538 adjudication requires a distinct identified adjudicator and bounded material page-grounded rationale.");
   if (!STATES.has(decision.chosenState) || decision.chosenState === "UNENTERED") throw new Error("TP-1538 adjudication state is invalid.");
   if (decision.chosenState === "AVAILABLE") {
     if (typeof decision.chosenPrintedValue !== "string" || !DECIMAL.test(decision.chosenPrintedValue)) throw new Error("TP-1538 adjudicated available value must preserve the printed decimal.");
   } else if (decision.chosenPrintedValue !== null) throw new Error("TP-1538 adjudicated unavailable state cannot contain a value.");
+  const table = TP1538_TABLE_INVENTORY.find(({ id }) => id === expectedMismatch.tableId);
+  validateMismatchStateValue(table, decision.coordinate, decision.chosenState, decision.chosenPrintedValue, "TP-1538 adjudication decision");
 }
 
 export function tp1538CorpusContentSha256(corpus) {
@@ -473,7 +714,10 @@ export function createTp1538AdjudicatedCorpus({ left, right, comparison, decisio
     const mismatch = mismatchByKey.get(key);
     if (!mismatch) throw new Error("TP-1538 adjudication decision does not identify a comparator mismatch.");
     const table = TP1538_TABLE_INVENTORY.find(({ id }) => id === decision.tableId);
-    validateDecision(decision, mismatch, pdfPageForCell(table, decision.coordinate));
+    validateDecision(decision, mismatch, pdfPageForCell(table, decision.coordinate), {
+      leftEntrantId: left.entrantId,
+      rightEntrantId: right.entrantId,
+    });
     decisionByKey.set(key, decision);
   }
   if (decisionByKey.size !== mismatchByKey.size) throw new Error(`TP-1538 corpus has ${mismatchByKey.size - decisionByKey.size} missing adjudication decision(s).`);
@@ -570,7 +814,10 @@ export function validateTp1538Corpus(corpus, { expectedCorpusSha256 } = {}) {
     const mismatch = replayedComparison.mismatches.find((candidate) => decisionKey(candidate.tableId, candidate.coordinate) === key);
     const table = TP1538_TABLE_INVENTORY.find(({ id }) => id === decision.tableId);
     if (!mismatch || !table) throw new Error("TP-1538 embedded adjudication decision does not identify a mismatch.");
-    validateDecision(decision, mismatch, pdfPageForCell(table, decision.coordinate));
+    validateDecision(decision, mismatch, pdfPageForCell(table, decision.coordinate), {
+      leftEntrantId: corpus.transcriptions.left.entrantId,
+      rightEntrantId: corpus.transcriptions.right.entrantId,
+    });
     embeddedDecisionByKey.set(key, decision);
   }
   if (embeddedDecisionByKey.size !== replayedComparison.mismatches.length) throw new Error("TP-1538 embedded adjudication decisions are incomplete.");

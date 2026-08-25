@@ -314,10 +314,9 @@ test("comparison and final-corpus CLIs persist digest-named read-only artifacts 
   const right = blankComplete({ transcriptionId: "TP1538_B_CLI", entrantId: "B", isolationSessionId: "cli-b" });
   const leftPath = join(scratch, `${left.contentSha256}.json`);
   const rightPath = join(scratch, `${right.contentSha256}.json`);
-  const decisionsPath = join(scratch, "decisions.json");
+  const decisionsDraftPath = join(scratch, "TEST_ONLY_SYNTHETIC-empty-decisions-draft.json");
   writeFileSync(leftPath, `${JSON.stringify(left)}\n`);
   writeFileSync(rightPath, `${JSON.stringify(right)}\n`);
-  writeFileSync(decisionsPath, "[]\n");
   const comparison = JSON.parse(execFileSync(process.execPath, [
     "scripts/compare-tp1538-transcriptions.mjs",
     "--left", leftPath,
@@ -326,12 +325,24 @@ test("comparison and final-corpus CLIs persist digest-named read-only artifacts 
   ], { encoding: "utf8" }));
   assert.equal(comparison.output, join(scratch, `${comparison.contentSha256}.json`));
   assert.equal(statSync(comparison.output).mode & 0o777, 0o444);
+  execFileSync(process.execPath, [
+    "scripts/manage-tp1538-adjudication.mjs", "create",
+    "--comparison", comparison.output,
+    "--output", decisionsDraftPath,
+    "--adjudicator-id", "TEST_ONLY_SYNTHETIC_ADJUDICATOR",
+  ]);
+  const decisions = JSON.parse(execFileSync(process.execPath, [
+    "scripts/manage-tp1538-adjudication.mjs", "freeze",
+    "--comparison", comparison.output,
+    "--input", decisionsDraftPath,
+    "--output-directory", scratch,
+  ], { encoding: "utf8" }));
   const finalized = JSON.parse(execFileSync(process.execPath, [
     "scripts/finalize-tp1538-aero-corpus.mjs",
     "--left", leftPath,
     "--right", rightPath,
     "--comparison", comparison.output,
-    "--decisions", decisionsPath,
+    "--decisions", decisions.output,
     "--output-directory", scratch,
   ], { encoding: "utf8" }));
   assert.equal(finalized.output, join(scratch, `${finalized.corpusSha256}.json`));
