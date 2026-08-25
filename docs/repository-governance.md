@@ -59,7 +59,38 @@ rejects invalid UTF-8, control-bearing paths, whitespace-only changes, and
 unrelated-section churn. For policy changes it
 audits old endpoints under the base policy and new endpoints under the head
 policy; existing ownership cannot be erased by the policy being reviewed. The
-initial #162 landing is the only explicit bootstrap and is bound to exact base
+head policy may introduce a new family or add an owning or migration section to
+an existing family only when that exact document changes in the same revision.
+The exact heading must be absent from the merge-base document, exist
+exactly once as a regular tracked blob at head, contain material contract
+content visible after Markdown rendering, and appear in the diff-derived
+declaration under `SEMANTIC`. HTML comments, raw empty tags, and empty heading
+hierarchies do not count as contract content. The validator uses the pinned
+Markdown lexer and renderer, rejects the whole candidate section from
+establishing authority when any raw-HTML token appears anywhere, excludes
+headings and definitions, extracts decoded DOM text, ignores Unicode separator,
+control, and formatting code points, and requires a rendered letter or number.
+Reference definitions, empty links, whitespace-only entities, hidden/style/
+title/dialog HTML, cross-block HTML containers or stylesheets, and HTML-wrapped
+placeholder text therefore do not create contract authority, while visible
+Markdown prose, code, lists, and autolinks remain admissible. `marked` is a
+direct locked development dependency. Stage 0.6 installs the exact lockfile
+with lifecycle scripts disabled before executing the parser-backed validator.
+The classifier and the documentation verifier share one dependency-free
+name-status parser; the trusted classifier adapter materializes and hashes that
+parser beside the classifier, so Stage 0, Stage 0.5, and isolated probes require
+no package installation.
+The immutable V1 classifier probe remains executable compatibility authority as
+well as historical ledger evidence; the classifier therefore owns the one
+dependency-free parser implementation without importing the narrow helper. V2
+is the current probe and additionally binds the helper that re-exports that
+same parser authority. Both unchanged self-comparisons must pass. A new
+registration cannot relabel an unchanged pre-existing heading or use
+`DOCS_ALREADY_CURRENT`, `TEST_ONLY`, `GENERATED_ARTIFACT_ONLY`,
+`INTERNAL_REFACTOR`, or `NO_SEMANTIC_CHANGE` in its introducing revision.
+Existing registered sections remain governed solely by the merge-base policy
+and retain the normal material-change and anti-weakening rules. The initial
+#162 landing is the only explicit bootstrap and is bound to exact base
 `661d280699f260e32c53d6a1b0a6f5cf3415dde7`; both the integration tip and the
 merge base must lack the policy. A stale branch whose integration tip already
 has the policy must rebase. Later missing, malformed, weakened, unclassified,

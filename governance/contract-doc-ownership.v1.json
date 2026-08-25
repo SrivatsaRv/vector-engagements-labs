@@ -49,6 +49,13 @@
         },
         {
           "kind": "EXACT",
+          "value": "scripts/lib/git-name-status.mjs",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "scripts/verify-contract-doc-impact.mjs",
           "facets": [
             "delivery"
@@ -4168,6 +4175,32 @@
       ]
     },
     {
+      "id": "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V2",
+      "familyId": "DELIVERY_CONTRACT_GOVERNANCE",
+      "disposition": "INTERNAL_REFACTOR",
+      "changedPathRules": [
+        {
+          "kind": "EXACT",
+          "value": "scripts/classify-ci-changes.mjs",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/lib/git-name-status.mjs",
+          "facets": [
+            "delivery"
+          ]
+        }
+      ],
+      "adapterPath": "scripts/contract-doc-probes/classifier-decision-identity.v2.mjs",
+      "adapterSha256": "3fdd234eb85453f45e5cc1438561eeee42fca883585cfed98f31abd601531abe",
+      "assertionIds": [
+        "CI_CLASSIFIER_DECISION_MATRIX"
+      ]
+    },
+    {
       "id": "DELIVERY_REQUIRED_GATE_INVARIANTS_V1",
       "familyId": "DELIVERY_CONTRACT_GOVERNANCE",
       "disposition": "NO_SEMANTIC_CHANGE",
@@ -4394,5 +4427,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "93af2afcd4c1222b441f5851dcbcf7039f91470d324d7e6231d6932442c37782"
+  "canonicalSha256": "5fec16de17a270edaef016fbc0d39baaa0fccc56165f44d748530fef91bd2a46"
 }

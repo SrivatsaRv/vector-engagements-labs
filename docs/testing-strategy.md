@@ -106,6 +106,30 @@ verification writes the subsequently validated declaration to the visible job
 summary. Regression coverage also proves changelog headings are family-unique,
 the aggregate Drizzle facade has only generic database ownership, and each
 domain schema module selects only its generic plus truthful domain owners.
+Post-bootstrap section-introduction fixtures cover both a wholly new family and
+a new facet on an existing family. They require the exact owning document and a
+semantic declaration in the introducing revision, and reject dormant relabels,
+empty new sections, unchanged or unrelated headings, and every non-semantic or
+docs-current disposition. The same core is exercised through dirty-tree,
+pull-request exact-head, and associated-main-push adapters.
+Placeholder-only section regressions reject non-rendered HTML comments, empty
+raw tags, subordinate headings without material rendered content, invisible
+Unicode/HTML entities, reference definitions, empty links, and non-textual raw
+style content. Hidden, styled, titled, dialog/details, cross-block containers,
+cross-block stylesheets, and every other raw-HTML-bearing section fail closed;
+raw HTML is never permitted to establish new contract authority. Positive
+controls admit ordinary prose, code/list content, and a visible Markdown
+autolink through the pinned renderer and decoded-DOM policy. Hosted Stage 0.6
+installs the exact JavaScript lockfile with lifecycle scripts disabled before
+running this parser-backed gate, while Stage 0/0.5 remain dependency-free.
+Classifier probe regressions exercise the shared dependency-free name-status
+parser from a clean materialized tree, bind its source digest to the classifier,
+and require passing unchanged V1 and V2 self-comparisons before hostile
+mutations. The immutable V1 probe remains executable compatibility authority as
+well as a historical ledger entry; V2 is the current two-file
+classifier/parser-helper identity contract. The helper re-exports the parser
+implemented once by the self-contained classifier, so compatibility does not
+create a second parser.
 Exact-rule retirement regressions reproduce the former delete/rename deadlock
 and then require a bijective, append-only tombstone bound to the merge-base
 commit, canonical base-policy digest, old endpoint, and exact Git operation.
