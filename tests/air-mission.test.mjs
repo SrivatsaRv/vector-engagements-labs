@@ -38,6 +38,11 @@ import { runEngineBackend } from "../lib/engine/backend.ts";
 import { assertSimulationEventStream } from "../lib/engine/simulation-events.ts";
 import { enginePositionToGeographic } from "../lib/scenario-spatial.ts";
 import { VECTOR_ENGINE_WASM_BASE64 } from "../lib/engine/generated/vector-engine-wasm.ts";
+import {
+  GENERIC_TAKEOFF_PERFORMANCE_PROFILE,
+  createGenericTakeoffPerformanceScenario,
+  nearestRankIndex,
+} from "../lib/validation/generic-takeoff-performance.ts";
 
 function runRawRustWasm(scenario) {
   const bytes = Buffer.from(VECTOR_ENGINE_WASM_BASE64, "base64");
@@ -982,21 +987,28 @@ test("governed takeoff failures have stable TS and direct Rust causes", () => {
   }
 });
 
-test("generic takeoff stays inside the focused TS and Rust runtime budget", (t) => {
-  const prepared = prepareSimulation(admittedGroundFixture("RUNWAY")).engineScenario;
-  for (const backend of ["typescript", "rust-wasm"]) {
-    const elapsed = [];
-    for (let runIndex = 0; runIndex < 12; runIndex += 1) {
-      const started = performance.now();
-      const run = runEngineBackend({ ...structuredClone(prepared), durationSeconds: 50 }, backend);
-      elapsed.push(performance.now() - started);
-      assert.ok(run.frames.length < 300);
-    }
-    elapsed.sort((left, right) => left - right);
-    const p95 = elapsed[Math.ceil(elapsed.length * 0.95) - 1];
-    assert.ok(p95 < 100, `${backend} p95 ${p95} ms`);
-    t.diagnostic(`${backend} 50 s takeoff workload: p95=${p95.toFixed(3)} ms, max=${elapsed.at(-1).toFixed(3)} ms, samples=${elapsed.length}`);
-  }
+test("generic takeoff performance profile keeps warmup, sampling, percentile, and isolation semantics", () => {
+  const profile = GENERIC_TAKEOFF_PERFORMANCE_PROFILE;
+  assert.equal(Object.isFrozen(profile), true);
+  assert.equal(Object.isFrozen(profile.backends), true);
+  assert.equal(profile.warmupRunsPerBackend, 3);
+  assert.equal(profile.measuredRunsPerBackend, 20);
+  assert.equal(nearestRankIndex(profile.measuredRunsPerBackend, profile.percentile), 18);
+  assert.equal(profile.maximumP95Ms, 100);
+  assert.equal(profile.maximumFramesPerRun, 300);
+  assert.deepEqual(profile.backends, ["typescript", "rust-wasm"]);
+  assert.equal(profile.durationSeconds, 50);
+  assert.equal(createGenericTakeoffPerformanceScenario().airMission.start.posture, "RUNWAY");
+  const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  assert.equal(
+    packageJson.scripts["performance:generic-takeoff:verify"],
+    "tsx scripts/benchmark-generic-takeoff.ts",
+  );
+  const makefile = readFileSync(new URL("../Makefile", import.meta.url), "utf8");
+  assert.match(
+    makefile,
+    /performance-local:\n\tnpm run reference-aam:performance\n\tnpm run performance:generic-takeoff:verify\n/,
+  );
 });
 
 test("governed runway lifecycle survives the complete VSR write and read boundary", async () => {

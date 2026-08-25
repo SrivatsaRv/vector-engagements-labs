@@ -240,10 +240,16 @@ proof, x86-64 capacity result, or named-sensor performance claim.
 
 ## Required performance test matrix
 
-#182 adds a focused regression workload: 12 already-admitted 50-second runway
-takeoff/climbout runs per TypeScript and Rust/WASM backend, each retaining fewer
-than 300 canonical frames and enforcing a 100 ms p95 ceiling. The gate measures
-engine execution after compilation; it is not named-aircraft, runway-capacity,
+#182 adds a focused regression workload in the standalone
+`performance:generic-takeoff:verify` process. Each TypeScript and Rust/WASM
+backend executes three predeclared warmups followed by 20 measured,
+already-admitted 50-second runway takeoff/climbout runs. The nearest-rank p95 is
+sample 19 rather than the maximum sample; evidence reports every retained
+sample and the maximum separately. Each run retains fewer than 300 canonical
+frames and the fixed ceiling remains 100 ms p95. Running the benchmark outside
+the parallel unit-test process prevents source-verification work, JIT warmup or
+the broad-suite heap from becoming timing authority. The gate measures engine
+execution after compilation; it is not named-aircraft, runway-capacity,
 browser-rendering or server-throughput evidence. Publication also retains the
 existing sub-550,000-byte optimized WASM gate and the complete repository
 performance matrix on the clean candidate SHA.

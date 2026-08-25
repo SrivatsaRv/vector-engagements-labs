@@ -52,6 +52,7 @@ observability-local: compose-up
 
 performance-local:
 	npm run reference-aam:performance
+	npm run performance:generic-takeoff:verify
 	npm run performance:verify
 	npm run performance:model-pack-foundation:verify
 	npm run performance:environment:verify

@@ -1608,6 +1608,13 @@
         },
         {
           "kind": "EXACT",
+          "value": "lib/validation/generic-takeoff-performance.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "lib/validation/track-store-capacity.ts",
           "facets": [
             "verification"
@@ -1623,6 +1630,13 @@
         {
           "kind": "EXACT",
           "value": "scripts/benchmark-engine.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-generic-takeoff.ts",
           "facets": [
             "verification"
           ]
@@ -5321,5 +5335,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "ef2e0cf02ce74eaa790286fb8793590110783beab485b4f8be30ef5af94a69af"
+  "canonicalSha256": "379568e57869fe180cd8651d77250ed80fb6f05a915c418397e2b74e20ead792"
 }

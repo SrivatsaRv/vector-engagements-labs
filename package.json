@@ -39,6 +39,7 @@
     "app:verify": "node scripts/verify-app.mjs",
     "observability:verify": "node scripts/verify-observability.mjs",
     "performance:verify": "tsx scripts/benchmark-engine.ts",
+    "performance:generic-takeoff:verify": "tsx scripts/benchmark-generic-takeoff.ts",
     "performance:model-pack-foundation:verify": "tsx scripts/benchmark-model-pack-foundation.ts",
     "performance:environment:verify": "tsx scripts/benchmark-environment.ts",
     "performance:track-store:verify": "node --import tsx scripts/benchmark-track-store.ts",

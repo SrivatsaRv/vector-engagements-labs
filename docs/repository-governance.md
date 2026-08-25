@@ -41,7 +41,9 @@ named-hardware profile is measured before unrelated capacity workloads can
 consume the host. The gate rejects a dirty or unidentified repository before
 measurement and rejects every backend batch whose governed frame count or
 semantic outcome differs; only an uncontaminated clean-commit run is
-publication evidence.
+publication evidence. It then runs the generic takeoff benchmark in its own
+process with explicit warmups and 20 retained samples per backend; the parallel
+unit-test process validates the profile but is never timing authority.
 
 The value-free TP-1538 tooling child adds its generated Rust-schema freshness,
 Rust formatting/clippy/test/rustdoc and embedded-WASM freshness checks to the
