@@ -3,8 +3,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+  MAX_TP1538_ADJUDICATION_ARTIFACT_BYTES,
+  MAX_TP1538_COMPARISON_ARTIFACT_BYTES,
+  assertTp1538DigestNamedReadOnlyArtifact,
   createTp1538AdjudicatedCorpus,
+  parseTp1538AdjudicationArtifact,
+  parseTp1538ComparisonArtifact,
   parseTp1538TranscriptionArtifact,
+  readTp1538BoundedRegularFile,
   validateTp1538Corpus,
 } from "./lib/tp1538-aero-corpus.mjs";
 
@@ -14,17 +20,6 @@ function argument(name) {
   return process.argv[index + 1];
 }
 
-function readJson(name) {
-  const path = resolve(argument(name));
-  const bytes = readFileSync(path);
-  if (bytes.byteLength < 2 || bytes.byteLength > 8 * 1024 * 1024) throw new Error(`${name} artifact byte length is outside its closed bound.`);
-  try {
-    return { path, value: JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) };
-  } catch {
-    throw new Error(`${name} artifact is not exact UTF-8 JSON.`);
-  }
-}
-
 function readTranscription(name) {
   const path = resolve(argument(name));
   return { path, value: parseTp1538TranscriptionArtifact(readFileSync(path)).transcription };
@@ -32,14 +27,25 @@ function readTranscription(name) {
 
 const left = readTranscription("--left");
 const right = readTranscription("--right");
-const comparison = readJson("--comparison");
-const decisions = readJson("--decisions");
+const comparisonPath = resolve(argument("--comparison"));
+const comparisonFile = readTp1538BoundedRegularFile(comparisonPath, MAX_TP1538_COMPARISON_ARTIFACT_BYTES, "TP-1538 immutable comparison artifact", { requireReadOnly: true });
+const comparison = parseTp1538ComparisonArtifact(comparisonFile.bytes);
+assertTp1538DigestNamedReadOnlyArtifact(comparisonPath, comparison.contentSha256, comparisonFile.mode, "TP-1538 immutable comparison artifact");
+const decisionsPath = resolve(argument("--decisions"));
+const decisionsFile = readTp1538BoundedRegularFile(decisionsPath, MAX_TP1538_ADJUDICATION_ARTIFACT_BYTES, "TP-1538 frozen adjudication artifact", { requireReadOnly: true });
+const decisions = parseTp1538AdjudicationArtifact(decisionsFile.bytes, {
+  comparison: comparison.comparison,
+  comparisonRawSha256: comparison.rawSha256,
+});
+if (decisions.artifact.status !== "FROZEN") throw new Error("TP-1538 finalization requires a frozen adjudication artifact.");
+assertTp1538DigestNamedReadOnlyArtifact(decisionsPath, decisions.artifact.contentSha256, decisionsFile.mode, "TP-1538 frozen adjudication artifact");
 const outputDirectory = resolve(argument("--output-directory"));
 const corpus = createTp1538AdjudicatedCorpus({
   left: left.value,
   right: right.value,
-  comparison: comparison.value,
-  decisions: decisions.value,
+  comparison: comparison.comparison,
+  comparisonRawSha256: comparison.rawSha256,
+  adjudication: decisions.artifact,
 });
 const report = validateTp1538Corpus(corpus, { expectedCorpusSha256: corpus.corpusSha256 });
 const output = resolve(outputDirectory, `${corpus.corpusSha256}.json`);

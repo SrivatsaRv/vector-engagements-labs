@@ -45,6 +45,17 @@ must remain free of its verification-only subject, corpus and evaluator
 markers. Real transcript, comparison, adjudication and corpus artifacts are
 not CI fixtures for this tooling child.
 
+The same family owns the offline adjudication manager and its focused hostile
+test as exact governed paths. `ci-quality` runs
+`tp1538:aero:adjudication:verify`, which uses only bounded
+`TEST_ONLY_SYNTHETIC` mismatches to prove comparison admission, exact decision
+coverage, immutable freeze/readback, finalizer consumption, and corpus replay
+of the frozen adjudication content digest plus comparison raw/canonical
+binding. The family also
+owns its distinct TP-1538 changelog heading; adding those rules is a semantic
+ownership-policy change, not permission to commit a real transcript,
+comparison, decision, corpus value or progress identity.
+
 `ci.yml` is one change-aware pull-request and `main` pipeline. Stage 0 computes
 the rename/copy-aware change set from the exact merge base and head revisions with the tracked
 classifier and always runs repository-policy regression tests. Independent

@@ -99,6 +99,15 @@ No pending family-specific entry.
   authority while #178 establishes a distinct TP-1538 schema, ABI, artifact and
   result identity with no shared values or admission decisions.
 
+#### TP-1538 verification tooling
+
+- Add the offline `vector.tp1538-adjudication-decisions.v1` create, source-read
+  apply, exact-coverage validation and immutable freeze CLI. The finalizer now
+  requires and embeds its digest-named, read-only artifact, content digest, and
+  comparison raw/canonical binding so raw-distinct evidence chains cannot
+  collapse to one corpus identity. Repository evidence uses only bounded
+  `TEST_ONLY_SYNTHETIC` mismatches and admits no source value or corpus.
+
 #### Generic sensor source freeze
 
 Added an immutable, offline-verifiable Stage-0 bundle for the exact Stone Soup

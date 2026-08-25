@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { Worker } from "node:worker_threads";
 import {
   completeTp1538Transcription,
   compareTp1538Transcriptions,
   createTp1538AdjudicatedCorpus,
+  createTp1538AdjudicationDraft,
   createTp1538TranscriptionTemplate,
+  freezeTp1538AdjudicationArtifact,
   TP1538_TABLE_INVENTORY,
 } from "../scripts/lib/tp1538-aero-corpus.mjs";
 import {
@@ -32,6 +35,18 @@ function markUnavailableCells(draft) {
   }
 }
 
+function createSyntheticCorpus(left, right) {
+  const comparison = compareTp1538Transcriptions(left, right);
+  const comparisonRawSha256 = createHash("sha256").update(`${JSON.stringify(comparison)}\n`).digest("hex");
+  const draft = createTp1538AdjudicationDraft({
+    comparison,
+    comparisonRawSha256,
+    adjudicatorId: "TEST_ONLY_SYNTHETIC_ADJUDICATOR",
+  });
+  const adjudication = freezeTp1538AdjudicationArtifact(draft, { comparison, comparisonRawSha256 });
+  return createTp1538AdjudicatedCorpus({ left, right, comparison, comparisonRawSha256, adjudication });
+}
+
 function fixtureCorpus() {
   const identities = [
     { transcriptionId: "TP1538_A_EVALUATOR", entrantId: "A", isolationSessionId: "a" },
@@ -56,8 +71,7 @@ function fixtureCorpus() {
     }
     return completeTp1538Transcription(draft);
   });
-  const comparison = compareTp1538Transcriptions(transcripts[0], transcripts[1]);
-  return createTp1538AdjudicatedCorpus({ left: transcripts[0], right: transcripts[1], comparison, decisions: [] });
+  return createSyntheticCorpus(transcripts[0], transcripts[1]);
 }
 
 function fixtureAssemblyCorpus() {
@@ -80,8 +94,7 @@ function fixtureAssemblyCorpus() {
     }
     return completeTp1538Transcription(draft);
   });
-  const comparison = compareTp1538Transcriptions(transcripts[0], transcripts[1]);
-  return createTp1538AdjudicatedCorpus({ left: transcripts[0], right: transcripts[1], comparison, decisions: [] });
+  return createSyntheticCorpus(transcripts[0], transcripts[1]);
 }
 
 test("exact-knot and independent bilinear interior lookup are closed and deterministic", () => {
@@ -286,8 +299,7 @@ test("zero-weight Appendix B terms do not invent a dependency on unavailable hig
     }
     return completeTp1538Transcription(draft);
   });
-  const comparison = compareTp1538Transcriptions(transcripts[0], transcripts[1]);
-  const corpus = createTp1538AdjudicatedCorpus({ left: transcripts[0], right: transcripts[1], comparison, decisions: [] });
+  const corpus = createSyntheticCorpus(transcripts[0], transcripts[1]);
   const result = assembleTp1538Coefficients(corpus, {
     schemaVersion: "vector.tp1538-aero-assembly-input.v1",
     angleUnit: "DEG",

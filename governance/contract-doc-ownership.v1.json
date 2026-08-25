@@ -1821,6 +1821,11 @@
         },
         {
           "kind": "EXACT",
+          "value": "scripts/manage-tp1538-adjudication.mjs",
+          "facets": ["admission", "digest", "evidence", "schema", "verification"]
+        },
+        {
+          "kind": "EXACT",
           "value": "scripts/finalize-tp1538-aero-corpus.mjs",
           "facets": ["admission", "digest", "evidence", "schema", "verification"]
         },
@@ -1861,6 +1866,11 @@
         }
       ],
       "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/tp1538-adjudication-cli.test.mjs",
+          "facets": ["admission", "digest", "evidence", "schema", "verification"]
+        },
         {
           "kind": "EXACT",
           "value": "tests/tp1538-aero-corpus.test.mjs",
@@ -1975,6 +1985,12 @@
           "path": "docs/tp1538-aero-verification.md",
           "heading": "## Change record",
           "facets": ["admission", "datum", "digest", "evidence", "schema", "unit", "validity", "vsr"]
+        },
+        {
+          "sectionId": "TP1538_AERO_RELEASE_NOTES",
+          "path": "CHANGELOG.md",
+          "heading": "#### TP-1538 verification tooling",
+          "facets": ["admission", "digest", "evidence", "schema", "verification"]
         }
       ]
     },
@@ -5296,5 +5312,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "4d2a8ac91b24c23c633d11c867f2b727b5d8e050ae97a72ea30d2c5090cbebaa"
+  "canonicalSha256": "330b380850dbdd192d7e12564e071db244326e59fd75a2fa5b01637a883c45f9"
 }

@@ -1,4 +1,4 @@
-.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local capacity-baseline-local reference-aircraft-local reference-aam-local generic-sensor-sources-local generic-mission-policy-sources-local air-reference-local worker-local frontend-local browser-local clean-clone-local
+.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local capacity-baseline-local reference-aircraft-local reference-aam-local generic-sensor-sources-local generic-mission-policy-sources-local tp1538-adjudication-local air-reference-local worker-local frontend-local browser-local clean-clone-local
 
 db-up: compose-build
 	docker compose up -d database
@@ -94,6 +94,9 @@ browser-local:
 
 air-reference-local: reference-aircraft-local
 
+tp1538-adjudication-local:
+	npm run tp1538:aero:adjudication:verify
+
 clean-clone-local:
 	@set -eu; \
 		temporary_root="$$(mktemp -d)"; \
@@ -112,6 +115,7 @@ ci-quality:
 	npm run generic-sensor:sources:verify
 	npm run environment:migration:verify
 	npm run tp1538:sources:verify
+	npm run tp1538:aero:adjudication:verify
 	npm run tp1538:aero:schema:verify
 	npm run policy:runtime-stubs:verify
 	npm run policy:aircraft-evidence:verify
