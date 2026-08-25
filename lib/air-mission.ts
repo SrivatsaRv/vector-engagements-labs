@@ -279,8 +279,33 @@ export type AirMissionDefinition = {
   validityLimits: string[];
 };
 
+export type AircraftGroundDynamicsProjection = {
+  schemaVersion: "vector.compiled-aircraft-ground-dynamics.v1";
+  authority: "GENERIC_PUBLIC_EDUCATIONAL";
+  validity: {
+    schemaVersion: "vector.aircraft-ground-dynamics-validity.v1";
+    intendedUse: "PUBLIC_EDUCATIONAL";
+    mechanism: "RUNWAY_ROLL_ROTATION_CLIMBOUT";
+  };
+  maximumTakeoffMassKg: number;
+  minimumTakeoffFuelKg: number;
+  rollingResistanceCoefficient: number;
+  rotationSpeedMps: number;
+  liftoffSpeedMps: number;
+  takeoffLiftCoefficient: number;
+  climboutSpeedMps: number;
+  climboutFlightPathAngleRad: number;
+  enrouteTransitionHeightM: number;
+  maximumTailwindMps: number;
+  maximumCrosswindMps: number;
+  valueState: "MODEL_ASSUMPTION";
+  evidenceRefIds: string[];
+  limitationIds: string[];
+  digest: string;
+};
+
 export type AircraftGroundEnvelope = {
-  schemaVersion: "vector.compiled-aircraft-ground-envelope.v1";
+  schemaVersion: "vector.compiled-aircraft-ground-envelope.v2";
   id: string;
   aircraftId: string;
   aircraftModelId: string;
@@ -291,6 +316,7 @@ export type AircraftGroundEnvelope = {
   valueState: "MODEL_ASSUMPTION";
   evidenceRefIds: string[];
   limitationIds: string[];
+  groundDynamics: AircraftGroundDynamicsProjection;
   digest: string;
 };
 
@@ -470,9 +496,32 @@ function compileGroundEnvelope(
   pack: Readonly<CompiledModelPack>,
   aircraft: CompiledModelPack["aircraft"][number],
 ): AircraftGroundEnvelope {
+  const groundDynamicsWithoutDigest = {
+    schemaVersion: "vector.compiled-aircraft-ground-dynamics.v1" as const,
+    authority: "GENERIC_PUBLIC_EDUCATIONAL" as const,
+    validity: {
+      schemaVersion: "vector.aircraft-ground-dynamics-validity.v1" as const,
+      intendedUse: "PUBLIC_EDUCATIONAL" as const,
+      mechanism: "RUNWAY_ROLL_ROTATION_CLIMBOUT" as const,
+    },
+    maximumTakeoffMassKg: aircraft.emptyMassKg + aircraft.fuelCapacityKg + 4_000,
+    minimumTakeoffFuelKg: 50,
+    rollingResistanceCoefficient: 0.02,
+    rotationSpeedMps: 60,
+    liftoffSpeedMps: 72,
+    takeoffLiftCoefficient: 1.3,
+    climboutSpeedMps: 90,
+    climboutFlightPathAngleRad: 0.1,
+    enrouteTransitionHeightM: 50,
+    maximumTailwindMps: 5,
+    maximumCrosswindMps: 12,
+    valueState: "MODEL_ASSUMPTION" as const,
+    evidenceRefIds: [...aircraft.evidenceRefIds],
+    limitationIds: [...aircraft.limitationIds],
+  };
   const withoutDigest = {
-    schemaVersion: "vector.compiled-aircraft-ground-envelope.v1" as const,
-    id: `${aircraft.id}-ground-envelope-v1`,
+    schemaVersion: "vector.compiled-aircraft-ground-envelope.v2" as const,
+    id: `${aircraft.id}-ground-envelope-v2`,
     aircraftId: aircraft.catalogObjectId,
     aircraftModelId: aircraft.id,
     modelPackDigest: pack.digest,
@@ -482,6 +531,10 @@ function compileGroundEnvelope(
     valueState: "MODEL_ASSUMPTION" as const,
     evidenceRefIds: [...aircraft.evidenceRefIds],
     limitationIds: [...aircraft.limitationIds],
+    groundDynamics: {
+      ...groundDynamicsWithoutDigest,
+      digest: sha256HexSync(groundDynamicsWithoutDigest),
+    },
   };
   return { ...withoutDigest, digest: sha256HexSync(withoutDigest) };
 }
@@ -526,7 +579,7 @@ function resolveAircraftConfiguration(input: {
     && candidate.status === "SUPPORTED"
     && (input.compatibilityRuleId === undefined || candidate.id === input.compatibilityRuleId));
   if (!rule) fail("MISSION_LOADOUT_INVALID", "assignments[0].loadout.stores[0].compatibilityRuleId", "No exact supported compiled compatibility rule admits this store.", "Select a supported rule from the admitted model pack.");
-  return { aircraft, station, rule, groundEnvelope: compileGroundEnvelope(pack, aircraft) };
+  return { aircraft, weapon, station, rule, groundEnvelope: compileGroundEnvelope(pack, aircraft) };
 }
 
 export function createDefaultAirMissionDefinition(input: {
@@ -1006,7 +1059,14 @@ export function compileAirMissionDefinition(
     if (headingDelta > 5) fail("MISSION_RUNWAY_INVALID", "start.runway.headingDeg", "Runway heading disagrees with threshold/end geometry.", "Use the WGS84-derived takeoff direction.");
     const assignment = mission.assignments[0];
     const store = assignment.loadout.stores[0];
-    const groundEnvelope = resolveAircraftConfiguration({ pack: context.modelPack, aircraftId: assignment.aircraftId, weaponId: store.weaponId, quantity: store.quantity, stationId: store.stationId, compatibilityRuleId: store.compatibilityRuleId }).groundEnvelope;
+    const resolvedGroundConfiguration = resolveAircraftConfiguration({ pack: context.modelPack, aircraftId: assignment.aircraftId, weaponId: store.weaponId, quantity: store.quantity, stationId: store.stationId, compatibilityRuleId: store.compatibilityRuleId });
+    const groundEnvelope = resolvedGroundConfiguration.groundEnvelope;
+    const groundDynamics = groundEnvelope.groundDynamics;
+    const initialFuelKg = resolvedGroundConfiguration.aircraft.fuelCapacityKg * assignment.initialFuelPercent / 100;
+    const installedStoreMassKg = resolvedGroundConfiguration.weapon.launchMassKg * store.quantity;
+    const takeoffMassKg = resolvedGroundConfiguration.aircraft.emptyMassKg + initialFuelKg + installedStoreMassKg;
+    if (initialFuelKg < groundDynamics.minimumTakeoffFuelKg) fail("MISSION_FUEL_INVALID", "assignments[0].initialFuelPercent", "Initial fuel is below the admitted generic takeoff requirement.", "Increase initial fuel or use an airborne start.");
+    if (takeoffMassKg > groundDynamics.maximumTakeoffMassKg) fail("MISSION_RUNWAY_INVALID", "assignments[0].loadout", "Takeoff mass exceeds the admitted generic ground-dynamics projection.", "Reduce fuel or installed stores, or use a separately admitted projection.");
     if (runway.lengthM < groundEnvelope.minimumRunwayLengthM) fail("MISSION_RUNWAY_INVALID", "start.runway.lengthM", "Runway is shorter than the assigned aircraft ground envelope.", "Choose a longer runway or a different admitted aircraft configuration.");
     if (!groundEnvelope.compatibleSurfaces.includes(runway.surface)) fail("MISSION_RUNWAY_INVALID", "start.runway.surface", "Runway surface is incompatible with the assigned aircraft ground envelope.", "Choose a compatible surface.");
     if (!Number.isFinite(groundStart.readinessDelaySeconds) || groundStart.readinessDelaySeconds < 0) fail("MISSION_RUNWAY_INVALID", "start.readinessDelaySeconds", "Readiness delay must be finite and non-negative.", "Provide seconds from model start.");
@@ -1029,7 +1089,9 @@ export function compileAirMissionDefinition(
     }
     const headingRad = heading * Math.PI / 180;
     const tailwindMps = effectiveWind!.x * Math.sin(headingRad) + effectiveWind!.y * Math.cos(headingRad);
-    if (tailwindMps > groundEnvelope.maximumTailwindMps) fail("MISSION_RUNWAY_INVALID", "start.runway.headingDeg", "Tailwind exceeds the assigned aircraft ground envelope.", "Reverse takeoff direction, select another runway, or change admitted weather.");
+    const crosswindMps = Math.abs(effectiveWind!.x * Math.cos(headingRad) - effectiveWind!.y * Math.sin(headingRad));
+    if (tailwindMps > groundDynamics.maximumTailwindMps) fail("MISSION_RUNWAY_INVALID", "start.runway.headingDeg", "Tailwind exceeds the admitted generic ground-dynamics projection.", "Reverse takeoff direction, select another runway, or change admitted weather.");
+    if (crosswindMps > groundDynamics.maximumCrosswindMps) fail("MISSION_RUNWAY_INVALID", "start.runway.headingDeg", "Crosswind exceeds the assigned generic ground-dynamics projection.", "Select another runway or change admitted weather.");
     if (!admittedRunways!.some((admittedRunway) =>
       sha256HexSync(runway) === sha256HexSync(admittedRunway)
     )) {

@@ -1608,6 +1608,13 @@
         },
         {
           "kind": "EXACT",
+          "value": "lib/validation/generic-takeoff-performance.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "lib/validation/track-store-capacity.ts",
           "facets": [
             "verification"
@@ -1623,6 +1630,13 @@
         {
           "kind": "EXACT",
           "value": "scripts/benchmark-engine.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-generic-takeoff.ts",
           "facets": [
             "verification"
           ]
@@ -4143,6 +4157,15 @@
         },
         {
           "kind": "EXACT",
+          "value": "scripts/generate-ground-dynamics-scenario-migration.ts",
+          "facets": [
+            "digest",
+            "schema",
+            "storage"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "app/api/catalog/route.ts",
           "facets": [
             "schema"
@@ -5312,5 +5335,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "330b380850dbdd192d7e12564e071db244326e59fd75a2fa5b01637a883c45f9"
+  "canonicalSha256": "379568e57869fe180cd8651d77250ed80fb6f05a915c418397e2b74e20ead792"
 }

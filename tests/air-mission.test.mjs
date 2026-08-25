@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 
@@ -18,7 +19,7 @@ import { sha256HexSync } from "../lib/geospatial/digest.ts";
 import { createDefaultSpatialPlan } from "../lib/scenario-spatial.ts";
 import { DEFAULT_SCENARIO, prepareSimulation, simulate } from "../lib/simulation.ts";
 import { getStudyArea } from "../lib/study-areas.ts";
-import { admitEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
+import { admitEnvironmentPack, createEnvironmentSampler } from "../lib/geospatial/environment-pack.ts";
 import { DEFAULT_SCENARIO_DEFINITION, SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { validateSavedScenario } from "../lib/security/saved-run.ts";
 import {
@@ -34,8 +35,14 @@ import {
 } from "../lib/runtime/model-pack-adapter.ts";
 import { runEngine } from "../lib/engine/core.ts";
 import { runEngineBackend } from "../lib/engine/backend.ts";
+import { assertSimulationEventStream } from "../lib/engine/simulation-events.ts";
 import { enginePositionToGeographic } from "../lib/scenario-spatial.ts";
 import { VECTOR_ENGINE_WASM_BASE64 } from "../lib/engine/generated/vector-engine-wasm.ts";
+import {
+  GENERIC_TAKEOFF_PERFORMANCE_PROFILE,
+  createGenericTakeoffPerformanceScenario,
+  nearestRankIndex,
+} from "../lib/validation/generic-takeoff-performance.ts";
 
 function runRawRustWasm(scenario) {
   const bytes = Buffer.from(VECTOR_ENGINE_WASM_BASE64, "base64");
@@ -51,6 +58,40 @@ function runRawRustWasm(scenario) {
     engine.vector_output_len(),
   ));
   return { accepted, output };
+}
+
+function assertContractParity(actual, expected, path = "root") {
+  if (typeof actual === "number" && typeof expected === "number") {
+    const tolerance = Math.max(1e-9, Math.max(Math.abs(actual), Math.abs(expected)) * 1e-12);
+    assert.ok(
+      Number.isFinite(actual) && Number.isFinite(expected) && Math.abs(actual - expected) <= tolerance,
+      `${path}: ${actual} differs from ${expected} beyond ${tolerance}`,
+    );
+    return;
+  }
+  if (Array.isArray(actual) || Array.isArray(expected)) {
+    assert.ok(Array.isArray(actual) && Array.isArray(expected), `${path}: array shape mismatch`);
+    assert.equal(actual.length, expected.length, `${path}: array length mismatch`);
+    actual.forEach((value, index) => assertContractParity(value, expected[index], `${path}[${index}]`));
+    return;
+  }
+  if (actual && expected && typeof actual === "object" && typeof expected === "object") {
+    assert.deepEqual(Object.keys(actual).sort(), Object.keys(expected).sort(), `${path}: object keys mismatch`);
+    for (const key of Object.keys(actual)) {
+      assertContractParity(actual[key], expected[key], `${path}.${key}`);
+    }
+    return;
+  }
+  assert.deepEqual(actual, expected, path);
+}
+
+function interpolateOracle(table, input) {
+  if (input <= table.axis[0]) return table.values[0];
+  if (input >= table.axis.at(-1)) return table.values.at(-1);
+  const upper = table.axis.findIndex((value) => value >= input);
+  const lower = upper - 1;
+  const fraction = (input - table.axis[lower]) / (table.axis[upper] - table.axis[lower]);
+  return table.values[lower] + (table.values[upper] - table.values[lower]) * fraction;
 }
 
 function fixture(missionClass = "TACTICAL_INTERCEPT") {
@@ -130,6 +171,39 @@ function editRunway(scenario, patch) {
     { ...material, ...patch },
     { state: evidence.state, sourceId: evidence.sourceId },
   );
+}
+
+function resealCompiledGroundDynamics(engineScenario, mutate) {
+  const mission = engineScenario.airMission;
+  const groundEnvelope = mission.assignment.groundEnvelope;
+  const groundDynamics = groundEnvelope.groundDynamics;
+  mutate(groundDynamics);
+  const groundContent = structuredClone(groundDynamics);
+  delete groundContent.digest;
+  groundDynamics.digest = sha256HexSync(groundContent);
+  const envelopeContent = structuredClone(groundEnvelope);
+  delete envelopeContent.digest;
+  groundEnvelope.digest = sha256HexSync(envelopeContent);
+  mission.authored.assignments[0].groundCompatibility.envelopeDigest = groundEnvelope.digest;
+  mission.authoredDigest = sha256HexSync(mission.authored);
+  const missionContent = structuredClone(mission);
+  delete missionContent.compiledDigest;
+  mission.compiledDigest = sha256HexSync(missionContent);
+  for (const binding of [
+    engineScenario.airMissionRuntime,
+    engineScenario.entities.find((entity) => entity.groundOperation).groundOperation,
+  ]) {
+    binding.missionDigest = mission.compiledDigest;
+    binding.groundDynamicsDigest = groundDynamics.digest;
+    for (const key of [
+      "maximumTakeoffMassKg", "minimumTakeoffFuelKg", "rollingResistanceCoefficient",
+      "rotationSpeedMps", "liftoffSpeedMps", "takeoffLiftCoefficient",
+      "climboutSpeedMps", "climboutFlightPathAngleRad",
+      "enrouteTransitionHeightM",
+      "maximumTailwindMps", "maximumCrosswindMps",
+    ]) binding[key] = groundDynamics[key];
+  }
+  return engineScenario;
 }
 
 test("all Air mission classes and engagement overlays compile through one content-addressed schema", () => {
@@ -273,13 +347,28 @@ test("template, new visible draft, and JSON import compile through the identical
 test("forward migrations freeze every canonical v4 template and exact EnvironmentPack content hash", () => {
   const airMigration = readFileSync(new URL("../db/migrations/013_air_mission_contract.sql", import.meta.url), "utf8");
   const environmentMigration = readFileSync(new URL("../db/migrations/014_environment_pack_runways.sql", import.meta.url), "utf8");
+  const groundDynamicsMigration = readFileSync(new URL("../db/migrations/015_generic_ground_dynamics.sql", import.meta.url), "utf8");
+  assert.equal(
+    createHash("sha256").update(environmentMigration).digest("hex"),
+    "c40e91b0fbbf2ee5110ae601dba676d2feec1957ebb440db81703c1696cbd227",
+    "migration 014 remains the frozen historical EnvironmentPack/runway snapshot",
+  );
   for (const definition of SCENARIO_LIBRARY) {
-    const tag = `vector_environment_${definition.id.replaceAll("-", "_")}`;
-    assert.ok(environmentMigration.includes(`package=$${tag}$${canonicalJson(definition)}$${tag}$::jsonb`), definition.id);
-    assert.ok(environmentMigration.includes(`content_hash='${sha256HexSync(definition)}' WHERE id='${definition.id}' AND version='${definition.version}' AND schema_version='vector.scenario.v4'`), definition.id);
+    const tag = `vector_ground_dynamics_${definition.id.replaceAll("-", "_")}`;
+    assert.ok(groundDynamicsMigration.includes(`$${tag}$${canonicalJson(definition)}$${tag}$::jsonb`), definition.id);
+    assert.ok(
+      groundDynamicsMigration.includes(`INSERT INTO scenario_templates (id,version,domain,title,status,package,schema_version,content_hash,engine_version,study_area_id,intended_use_id,intended_use_version,model_pack_id,model_pack_version,model_pack_digest) VALUES ('${definition.id}','${definition.version}'`),
+      `${definition.id} self-sufficient upsert`,
+    );
+    assert.ok(groundDynamicsMigration.includes(`$${tag}$::jsonb,'vector.scenario.v4','${sha256HexSync(definition)}'`), definition.id);
+    assert.ok(
+      groundDynamicsMigration.includes(`('${definition.id}','${definition.version}','vector.scenario.v4','${sha256HexSync(definition)}','${definition.environment.replaceAll("'", "''")}')`),
+      `${definition.id} exact readback identity`,
+    );
   }
   assert.match(airMigration, /WHERE schema_version <> 'vector\.scenario\.v4'/);
   assert.match(environmentMigration, /package->>'environment' NOT LIKE 'Sourced regional terrain and atmosphere%'/);
+  assert.match(groundDynamicsMigration, /Generic ground-dynamics migration exact scenario identity\/hash readback failed/);
 });
 
 test("CAP defaults are visible, editable, and causally change compiled patrol and fuel state", () => {
@@ -438,17 +527,23 @@ test("ground-alert readiness remains causally parked before the admitted release
     frame.entities.find((entity) => entity.id === aircraft.id));
 
   assert.ok(samples.length > 1, "the causal hold must be observed beyond the initial frame");
-  for (const sample of samples) {
+  for (const [sampleIndex, sample] of samples.entries()) {
     assert.equal(sample.aircraftOperationalState, "PARKED");
     assert.equal(sample.aircraftOperationalStateValueState, "VALID");
-    assert.equal(sample.aircraftMovementValueState, "UNAVAILABLE");
-    assert.equal(sample.aircraftMovementUnavailableReason, "GROUND_DYNAMICS_MODEL_UNAVAILABLE");
+    assert.equal(sample.aircraftMovementValueState, "VALID");
+    assert.equal(sample.aircraftMovementUnavailableReason, undefined);
     assert.equal(sample.speedMps, 0);
     assert.deepEqual(sample.velocity, { x: 0, y: 0, z: 0 });
     assert.deepEqual(sample.position, aircraft.initial.position);
     assert.equal(sample.fuelKg, aircraft.initial.fuelKg);
     assert.equal(sample.massKg, aircraft.initial.massKg);
-    assert.equal(sample.aircraftControl, undefined);
+    if (sampleIndex === 0) {
+      assert.equal(sample.aircraftControl, undefined);
+    } else {
+      assert.equal(sample.aircraftControl.limiter, "GROUND_HOLD");
+      assert.deepEqual(sample.aircraftControl.requestedVelocityMps, { x: 0, y: 0, z: 0 });
+      assert.deepEqual(sample.aircraftControl.acceptedSteeringAccelerationMps2, { x: 0, y: 0, z: 0 });
+    }
   }
   const replayed = decodeColumnarFrames(encodeColumnarFrames(run.frames));
   assert.deepEqual(
@@ -456,7 +551,7 @@ test("ground-alert readiness remains causally parked before the admitted release
     samples,
   );
   const rust = runEngineBackend({ ...structuredClone(prepared), durationSeconds: 1 }, "rust-wasm");
-  assert.deepEqual(
+  assertContractParity(
     rust.frames.map((frame) => frame.entities.find((entity) => entity.id === aircraft.id)),
     samples,
   );
@@ -469,6 +564,17 @@ test("ground-operation admission fails closed with TypeScript and Rust parity", 
     ["forged release", (ground) => { ground.releaseTimeSeconds += 1; }],
     ["runway digest", (ground) => { ground.runwayEvidenceDigest = "0".repeat(64); }],
     ["start posture", (ground) => { ground.posture = "RUNWAY"; }],
+    ["ground dynamics digest", (ground) => { ground.groundDynamicsDigest = "f".repeat(64); }],
+    ["nonphysical mass", (ground) => { ground.maximumTakeoffMassKg = 0; }],
+    ["nonphysical fuel", (ground) => { ground.minimumTakeoffFuelKg = -1; }],
+    ["non-finite rolling force", (ground) => { ground.rollingResistanceCoefficient = Number.NaN; }],
+    ["rotation exceeds liftoff", (ground) => { ground.rotationSpeedMps = ground.liftoffSpeedMps + 1; }],
+    ["nonphysical lift", (ground) => { ground.takeoffLiftCoefficient = 0; }],
+    ["nonphysical climb", (ground) => { ground.climboutFlightPathAngleRad = 0; }],
+    ["nonphysical enroute boundary", (ground) => { ground.enrouteTransitionHeightM = 0; }],
+    ["nonphysical tailwind", (ground) => { ground.maximumTailwindMps = 0; }],
+    ["nonphysical crosswind", (ground) => { ground.maximumCrosswindMps = 0; }],
+    ["nonphysical runway", (ground) => { ground.runwayLengthM = 0; }],
     ["unknown authority", (ground) => { ground.hiddenTakeoffSpeedMps = 75; }],
   ];
   for (const [name, mutate] of cases) {
@@ -478,7 +584,7 @@ test("ground-operation admission fails closed with TypeScript and Rust parity", 
     for (const backend of ["typescript", "rust-wasm"]) {
       assert.throws(
         () => runEngineBackend(structuredClone(scenario), backend),
-        /ground-operation|groundOperation|unknown field/i,
+        /ground-operation|groundOperation|unknown field|invalid scenario JSON/i,
         `${name} ${backend}`,
       );
     }
@@ -499,6 +605,13 @@ test("ground-operation admission fails closed with TypeScript and Rust parity", 
     ["runway digest", (binding) => { binding.runwayEvidenceDigest = "b".repeat(64); }],
     ["posture", (binding) => { binding.posture = "RUNWAY"; }],
     ["release", (binding) => { binding.releaseTimeSeconds += 3; }],
+    ["ground dynamics", (binding) => {
+      binding.rotationSpeedMps += 2;
+      binding.groundDynamicsDigest = "c".repeat(64);
+    }],
+    ["runway length", (binding) => { binding.runwayLengthM += 1; }],
+    ["runway heading", (binding) => { binding.runwayHeadingDegTrue += 1; }],
+    ["runway elevation", (binding) => { binding.runwayEndElevationM += 1; }],
   ]) {
     const forgedCompactCopies = structuredClone(base);
     for (const binding of [
@@ -514,6 +627,17 @@ test("ground-operation admission fails closed with TypeScript and Rust parity", 
       forgedCompactCopies,
     ]);
   }
+  const rawCompactGroundForgery = structuredClone(base);
+  for (const binding of [
+    rawCompactGroundForgery.airMissionRuntime,
+    rawCompactGroundForgery.entities.find((entity) => entity.id === "blue-platform-1").groundOperation,
+  ]) {
+    binding.rotationSpeedMps += 2;
+    binding.groundDynamicsDigest = "c".repeat(64);
+  }
+  const rawCompactGroundResult = runRawRustWasm(rawCompactGroundForgery);
+  assert.equal(rawCompactGroundResult.accepted, false);
+  assert.match(rawCompactGroundResult.output, /ground-operation|authoritative/i);
   const forgedMissionAircraft = structuredClone(base);
   forgedMissionAircraft.airMission.assignment.aircraftId = "forged-aircraft";
   hostileScenarios.push([
@@ -563,6 +687,28 @@ test("ground-operation admission fails closed with TypeScript and Rust parity", 
     assert.equal(rawDigestAttack.accepted, false);
     assert.match(rawDigestAttack.output, /digest|ground-operation/i);
   }
+  for (const [name, mutate] of [
+    ["schema", (ground) => { ground.schemaVersion = "vector.compiled-aircraft-ground-dynamics.v0"; }],
+    ["unknown key", (ground) => { ground.callerAssertedAuthority = true; }],
+    ["authority", (ground) => { ground.authority = "CALLER_ASSERTED"; }],
+    ["value state", (ground) => { ground.valueState = "UNAVAILABLE"; }],
+    ["validity", (ground) => { ground.validity.mechanism = "CALLER_ASSERTED"; }],
+    ["evidence", (ground) => { ground.evidenceRefIds = []; }],
+    ["limitations", (ground) => { ground.limitationIds = []; }],
+    ["crosswind", (ground) => { ground.maximumCrosswindMps = 0; }],
+  ]) {
+    const fullAuthorityAttack = resealCompiledGroundDynamics(structuredClone(base), mutate);
+    const rawFullAuthorityResult = runRawRustWasm(fullAuthorityAttack);
+    assert.equal(rawFullAuthorityResult.accepted, false, `raw Rust accepted unsupported ${name}`);
+    assert.match(rawFullAuthorityResult.output, /ground-dynamics|Air mission|invalid scenario/i);
+    for (const backend of ["typescript", "rust-wasm"]) {
+      assert.throws(
+        () => runEngineBackend(structuredClone(fullAuthorityAttack), backend),
+        /ground-operation|ground dynamics|Air mission|invalid scenario/i,
+        `${backend} accepted unsupported ${name}`,
+      );
+    }
+  }
   for (const [name, scenario] of hostileScenarios) {
     for (const backend of ["typescript", "rust-wasm"]) {
       assert.throws(
@@ -574,7 +720,7 @@ test("ground-operation admission fails closed with TypeScript and Rust parity", 
   }
 });
 
-test("released ground alert advances only to hold-short while movement authority is unavailable", () => {
+test("released ground alert enters the admitted runway roll without skipping hold-short", () => {
   const scenario = admittedGroundFixture("GROUND_ALERT_QRA");
   scenario.airMission.start.readinessDelaySeconds = 0;
   const prepared = prepareSimulation(scenario).engineScenario;
@@ -586,19 +732,286 @@ test("released ground alert advances only to hold-short while movement authority
     const samples = run.frames.map((frame) =>
       frame.entities.find((entity) => entity.id === aircraft.id));
     assert.equal(samples[0].aircraftOperationalState, "PARKED");
-    assert.ok(samples.slice(1).every((sample) => sample.aircraftOperationalState === "HOLD_SHORT"));
-    assert.ok(samples.every((sample) => sample.aircraftMovementValueState === "UNAVAILABLE"));
-    assert.ok(samples.every((sample) => sample.speedMps === 0));
-    assert.ok(samples.every((sample) => sample.massKg === aircraft.initial.massKg));
+    assert.ok(samples.slice(1).every((sample) => sample.aircraftOperationalState === "TAKEOFF_ROLL"));
+    assert.ok(samples.every((sample) => sample.aircraftMovementValueState === "VALID"));
+    assert.ok(samples.slice(1).every((sample) => sample.speedMps > 0));
+    assert.ok(samples.slice(1).every((sample) => sample.massKg < aircraft.initial.massKg));
     assert.ok(samples.every((sample) => sample.installedStoreIds.length > 0));
   }
-  assert.deepEqual(
+  assertContractParity(
     runs[1].frames.map((frame) => frame.entities.find((entity) => entity.id === aircraft.id)),
     runs[0].frames.map((frame) => frame.entities.find((entity) => entity.id === aircraft.id)),
   );
 });
 
-test("ground-held runway state survives the complete VSR write and read boundary", async () => {
+test("fixed-step takeoff transition precedence cannot skip roll or rotation", () => {
+  const scenario = structuredClone(
+    prepareSimulation(admittedGroundFixture("RUNWAY")).engineScenario,
+  );
+  resealCompiledGroundDynamics(scenario, (ground) => {
+    ground.rotationSpeedMps = 1;
+    ground.liftoffSpeedMps = 1;
+    ground.climboutSpeedMps = 2;
+  });
+  const operation = scenario.entities.find((entity) => entity.groundOperation).groundOperation;
+  const runwayHeadingRad = (90 - operation.runwayHeadingDegTrue) * Math.PI / 180;
+  scenario.events.push({
+    id: "transition-precedence-headwind",
+    type: "WIND_SHIFT",
+    startSeconds: 0,
+    durationSeconds: 1,
+    vectorMps: {
+      x: -120 * Math.cos(runwayHeadingRad),
+      y: -120 * Math.sin(runwayHeadingRad),
+      z: 0,
+    },
+  });
+  const expected = [
+    ["HOLD_SHORT", "TAKEOFF_ROLL"],
+    ["TAKEOFF_ROLL", "ROTATE"],
+    ["ROTATE", "CLIMBOUT"],
+  ];
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const run = runEngineBackend({ ...structuredClone(scenario), durationSeconds: 1 }, backend);
+    const transitions = run.events.items
+      .filter((event) => event.payload.kind === "AIRCRAFT_OPERATIONAL_STATE_CHANGED")
+      .map((event) => [event.payload.from, event.payload.to]);
+    assert.deepEqual(transitions.slice(0, expected.length), expected, backend);
+  }
+});
+
+test("governed generic runway authority drives causal roll, rotation, and climbout", () => {
+  const scenario = admittedGroundFixture("RUNWAY");
+  const prepared = prepareSimulation(scenario).engineScenario;
+  const aircraft = prepared.entities.find((entity) => entity.id === "blue-platform-1");
+
+  assert.equal(aircraft.groundOperation.schemaVersion, "vector.aircraft-ground-operation.v2");
+  assert.equal(aircraft.groundOperation.executionAuthority, "ADMITTED_GENERIC_EDUCATIONAL");
+  assert.match(aircraft.groundOperation.groundDynamicsDigest, /^[0-9a-f]{64}$/);
+
+  const runs = ["typescript", "rust-wasm"].map((backend) =>
+    runEngineBackend({ ...structuredClone(prepared), durationSeconds: 50 }, backend));
+  const histories = runs.map((run) => run.frames.map((frame) =>
+    frame.entities.find((entity) => entity.id === aircraft.id)));
+  const transitions = runs.map((run) => run.events.items
+    .filter((event) => event.payload.kind === "AIRCRAFT_OPERATIONAL_STATE_CHANGED")
+    .map((event) => ({
+      tick: event.tick,
+      frameIndex: event.frameIndex,
+      from: event.payload.from,
+      to: event.payload.to,
+      movementValueState: event.payload.movementValueState,
+      groundDynamicsDigest: event.payload.groundDynamicsDigest,
+    })));
+  const expectedTransitions = [
+    { tick: 1, frameIndex: 1, from: "HOLD_SHORT", to: "TAKEOFF_ROLL" },
+    { tick: 134, frameIndex: 28, from: "TAKEOFF_ROLL", to: "ROTATE" },
+    { tick: 168, frameIndex: 36, from: "ROTATE", to: "CLIMBOUT" },
+    { tick: 290, frameIndex: 61, from: "CLIMBOUT", to: "ENROUTE" },
+  ].map((transition) => ({
+    ...transition,
+    movementValueState: "VALID",
+    groundDynamicsDigest: aircraft.groundOperation.groundDynamicsDigest,
+  }));
+  assert.deepEqual(transitions[0], expectedTransitions);
+  assert.deepEqual(transitions[1], expectedTransitions);
+  const tamperedEvents = structuredClone(runs[0].events.items);
+  const rotateEvent = tamperedEvents.find((event) =>
+    event.payload.kind === "AIRCRAFT_OPERATIONAL_STATE_CHANGED" && event.payload.to === "ROTATE");
+  rotateEvent.payload.to = "CLIMBOUT";
+  assert.throws(
+    () => assertSimulationEventStream(tamperedEvents, runs[0].frames, runs[0].scenario, runs[0].termination),
+    /aircraft operational transition|frame state|duplicate transition/i,
+  );
+
+  for (const [historyIndex, samples] of histories.entries()) {
+    const states = samples.map((sample) => sample.aircraftOperationalState);
+    assert.equal(states[0], "HOLD_SHORT");
+    assert.ok(states.includes("TAKEOFF_ROLL"));
+    assert.ok(states.includes("ROTATE"));
+    assert.ok(states.includes("CLIMBOUT"));
+    assert.ok(states.includes("ENROUTE"), `backend ${historyIndex} never reached ENROUTE`);
+    assert.ok(samples.slice(1).every((sample) => sample.aircraftMovementValueState === "VALID"));
+    assert.ok(samples.at(-1).position.z > samples[0].position.z);
+    assert.ok(samples.at(-1).fuelKg < samples[0].fuelKg);
+    assert.ok(samples.at(-1).massKg < samples[0].massKg);
+    const takeoffSamples = samples.filter((sample) => sample.aircraftOperationalState !== "ENROUTE");
+    assert.ok(takeoffSamples.every((sample) =>
+      sample.installedStoreIds.length === samples[0].installedStoreIds.length));
+    assert.ok(samples.every((sample) =>
+      Math.abs(sample.massKg - (aircraft.aircraft.emptyMassKg + sample.fuelKg + sample.storeMassKg)) < 1e-6));
+  }
+  assertContractParity(histories[1], histories[0]);
+  assertContractParity(runs[1].events, runs[0].events);
+});
+
+test("generic takeoff has independent force, energy, fuel, climb, convergence, and contrast evidence", () => {
+  const authored = admittedGroundFixture("RUNWAY");
+  const prepared = prepareSimulation(authored).engineScenario;
+  const aircraft = prepared.entities.find((entity) => entity.id === "blue-platform-1");
+  const runs = [0.1, 0.05, 0.025].map((fixedStepSeconds) => {
+    const run = runEngine({ ...structuredClone(prepared), fixedStepSeconds, durationSeconds: 50 });
+    const transitions = run.events.items.filter((event) =>
+      event.payload.kind === "AIRCRAFT_OPERATIONAL_STATE_CHANGED");
+    const samples = run.frames.map((frame) => frame.entities.find((entity) => entity.id === aircraft.id));
+    const climbout = transitions.find((event) => event.payload.to === "CLIMBOUT");
+    const enroute = transitions.find((event) => event.payload.to === "ENROUTE");
+    assert.ok(climbout && enroute);
+    const liftoff = run.frames[climbout.frameIndex].entities.find((entity) => entity.id === aircraft.id);
+    const enrouteState = run.frames[enroute.frameIndex].entities.find((entity) => entity.id === aircraft.id);
+    const horizontalClimb = Math.hypot(
+      enrouteState.position.x - liftoff.position.x,
+      enrouteState.position.y - liftoff.position.y,
+    );
+    const climbGradient = (enrouteState.position.z - liftoff.position.z) / horizontalClimb;
+    assert.ok(liftoff.speedMps >= aircraft.groundOperation.liftoffSpeedMps - 1);
+    const achievedEnergyJ = 0.5 * liftoff.massKg * liftoff.speedMps ** 2;
+    const declaredLiftoffEnergyJ = 0.5 * liftoff.massKg * (aircraft.groundOperation.liftoffSpeedMps - 1) ** 2;
+    assert.ok(achievedEnergyJ >= declaredLiftoffEnergyJ);
+    assert.ok(Math.abs(climbGradient - Math.tan(aircraft.groundOperation.climboutFlightPathAngleRad)) < 0.002);
+    assert.ok(samples.every((sample) =>
+      Math.abs(sample.massKg - (aircraft.aircraft.emptyMassKg + sample.fuelKg + sample.storeMassKg)) < 1e-6));
+    return {
+      fixedStepSeconds,
+      liftoffTimeSeconds: climbout.tick * fixedStepSeconds,
+      liftoffDistanceM: Math.hypot(
+        liftoff.position.x - aircraft.initial.position.x,
+        liftoff.position.y - aircraft.initial.position.y,
+      ),
+    };
+  });
+  assert.ok(Math.max(...runs.map((run) => run.liftoffTimeSeconds)) - Math.min(...runs.map((run) => run.liftoffTimeSeconds)) <= 0.2);
+  assert.ok(Math.max(...runs.map((run) => run.liftoffDistanceM)) - Math.min(...runs.map((run) => run.liftoffDistanceM)) <= 15);
+
+  const baseline = runEngine({ ...structuredClone(prepared), durationSeconds: 20 });
+  const first = baseline.frames[1].entities.find((entity) => entity.id === aircraft.id);
+  const firstDistance = Math.hypot(
+    first.position.x - aircraft.initial.position.x,
+    first.position.y - aircraft.initial.position.y,
+  );
+  const environment = createEnvironmentSampler(admitEnvironmentPack({
+    studyAreaId: authored.studyAreaId,
+    weatherPresetId: authored.weatherPresetId,
+    effectiveWeather: {
+      temperatureOffsetC: authored.temperatureOffset,
+      windEastMps: authored.wind,
+      windNorthMps: authored.windNorth,
+    },
+  }).pack).sample({
+    eastM: aircraft.initial.position.x,
+    northM: aircraft.initial.position.y,
+    upM: aircraft.initial.position.z,
+    modelTimeSeconds: 0,
+  });
+  const dt = prepared.fixedStepSeconds;
+  const thrustN = interpolateOracle(aircraft.aircraft.thrustByThrottle, 1);
+  const fuelCoefficient = interpolateOracle(aircraft.aircraft.fuelFlowByThrottle, 1);
+  const expectedFuelDeltaKg = thrustN * fuelCoefficient * dt;
+  const expectedMassKg = aircraft.initial.massKg - expectedFuelDeltaKg;
+  const initialAirspeedMps = Math.hypot(environment.windEnuMps.x, environment.windEnuMps.y);
+  const liftN = 0.5 * environment.atmosphere.densityKgM3 * initialAirspeedMps ** 2
+    * aircraft.aircraft.referenceAreaM2 * aircraft.groundOperation.takeoffLiftCoefficient;
+  const dragCoefficient = interpolateOracle(
+    aircraft.aircraft.zeroLiftDragByMach,
+    initialAirspeedMps / environment.atmosphere.speedOfSoundMps,
+  ) + interpolateOracle(aircraft.aircraft.inducedDragByAngleOfAttackRad, 0)
+    * aircraft.groundOperation.takeoffLiftCoefficient ** 2;
+  const dragN = 0.5 * environment.atmosphere.densityKgM3 * initialAirspeedMps ** 2
+    * aircraft.aircraft.referenceAreaM2 * dragCoefficient;
+  const rollingResistanceN = aircraft.groundOperation.rollingResistanceCoefficient
+    * Math.max(0, expectedMassKg * prepared.environment.gravityMps2 - liftN);
+  const expectedAccelerationMps2 = (thrustN - dragN - rollingResistanceN) / expectedMassKg;
+  const expectedSpeedMps = expectedAccelerationMps2 * dt;
+  assert.ok(Math.abs((aircraft.initial.fuelKg - first.fuelKg) - expectedFuelDeltaKg) < 1e-12);
+  assert.ok(Math.abs(first.massKg - expectedMassKg) < 1e-9);
+  assert.ok(Math.abs(first.speedMps - expectedSpeedMps) < 1e-9);
+  assert.ok(Math.abs(firstDistance - expectedSpeedMps * dt) < 1e-9);
+
+  const contrastScenarios = [
+    ["lower fuel mass", (scenario) => {
+      scenario.blueFuelPercent = 60;
+      scenario.airMission.assignments[0].initialFuelPercent = 60;
+    }],
+    ["one installed store", (scenario) => {
+      scenario.blueWeaponQuantity = 1;
+      scenario.airMission.assignments[0].loadout.stores[0].quantity = 1;
+      scenario.airMission.fuel.weaponRtbThreshold = 1;
+    }],
+    ["effective wind", (scenario) => {
+      scenario.wind = 2;
+      scenario.windNorth = -1;
+    }],
+  ];
+  const baselineRotateTick = baseline.events.items.find((event) =>
+    event.payload.kind === "AIRCRAFT_OPERATIONAL_STATE_CHANGED" && event.payload.to === "ROTATE").tick;
+  for (const [name, mutate] of contrastScenarios) {
+    const scenario = admittedGroundFixture("RUNWAY");
+    mutate(scenario);
+    const run = runEngine({ ...prepareSimulation(scenario).engineScenario, durationSeconds: 20 });
+    const rotateTick = run.events.items.find((event) =>
+      event.payload.kind === "AIRCRAFT_OPERATIONAL_STATE_CHANGED" && event.payload.to === "ROTATE").tick;
+    assert.notEqual(rotateTick, baselineRotateTick, name);
+  }
+});
+
+test("governed takeoff failures have stable TS and direct Rust causes", () => {
+  const cases = [
+    ["fuel exhaustion", (ground, scenario) => {
+      const aircraft = scenario.entities.find((entity) => entity.id === "blue-platform-1");
+      ground.minimumTakeoffFuelKg = aircraft.initial.fuelKg - 0.1;
+    }, /GROUND_TAKEOFF_FUEL_EXHAUSTED/],
+    ["insufficient force", (ground) => {
+      ground.rollingResistanceCoefficient = 0.99;
+    }, /GROUND_TAKEOFF_FORCE_INSUFFICIENT/],
+    ["runway overrun", (ground) => {
+      ground.takeoffLiftCoefficient = 0.00001;
+    }, /GROUND_RUNWAY_OVERRUN/],
+    ["effective adverse wind", (ground) => {
+      ground.maximumTailwindMps = 0.001;
+      ground.maximumCrosswindMps = 0.001;
+    }, /GROUND_WIND_ENVELOPE_EXCEEDED/],
+  ];
+  for (const [name, mutate, expected] of cases) {
+    const scenario = structuredClone(prepareSimulation(admittedGroundFixture("RUNWAY")).engineScenario);
+    resealCompiledGroundDynamics(scenario, (ground) => mutate(ground, scenario));
+    for (const backend of ["typescript", "rust-wasm"]) {
+      assert.throws(
+        () => runEngineBackend(structuredClone(scenario), backend),
+        expected,
+        `${name} ${backend}`,
+      );
+    }
+    const raw = runRawRustWasm(scenario);
+    assert.equal(raw.accepted, false, `${name} raw Rust acceptance`);
+    assert.match(raw.output, expected, `${name} raw Rust cause`);
+  }
+});
+
+test("generic takeoff performance profile keeps warmup, sampling, percentile, and isolation semantics", () => {
+  const profile = GENERIC_TAKEOFF_PERFORMANCE_PROFILE;
+  assert.equal(Object.isFrozen(profile), true);
+  assert.equal(Object.isFrozen(profile.backends), true);
+  assert.equal(profile.warmupRunsPerBackend, 3);
+  assert.equal(profile.measuredRunsPerBackend, 20);
+  assert.equal(nearestRankIndex(profile.measuredRunsPerBackend, profile.percentile), 18);
+  assert.equal(profile.maximumP95Ms, 100);
+  assert.equal(profile.maximumFramesPerRun, 300);
+  assert.deepEqual(profile.backends, ["typescript", "rust-wasm"]);
+  assert.equal(profile.durationSeconds, 50);
+  assert.equal(createGenericTakeoffPerformanceScenario().airMission.start.posture, "RUNWAY");
+  const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  assert.equal(
+    packageJson.scripts["performance:generic-takeoff:verify"],
+    "tsx scripts/benchmark-generic-takeoff.ts",
+  );
+  const makefile = readFileSync(new URL("../Makefile", import.meta.url), "utf8");
+  assert.match(
+    makefile,
+    /performance-local:\n\tnpm run reference-aam:performance\n\tnpm run performance:generic-takeoff:verify\n/,
+  );
+});
+
+test("governed runway lifecycle survives the complete VSR write and read boundary", async () => {
   const scenario = admittedGroundFixture("RUNWAY");
   const prepared = prepareSimulation(scenario);
   const result = simulate(scenario);
@@ -621,7 +1034,7 @@ test("ground-held runway state survives the complete VSR write and read boundary
   for (const projected of [result, opened.result]) {
     assert.ok(projected.frames.length > 1);
     assert.ok(projected.frames.every((frame) => frame.primaryEntityId === aircraftId));
-    assert.ok(projected.frames.every((frame) => frame.primaryEntityRole === "GROUND_HELD_AIRCRAFT"));
+    assert.ok(projected.frames.every((frame) => frame.primaryEntityRole === "AIRCRAFT"));
     assert.ok(projected.frames.every((frame) =>
       frame.entities.every((entity) => entity.id !== projected.engineRun.primaryWeaponId)));
     assert.ok(projected.frames.every((frame) => {
@@ -632,9 +1045,18 @@ test("ground-held runway state survives the complete VSR write and read boundary
         frame.speed === heldAircraft.speedMps;
     }));
   }
-  assert.ok(samples.every((sample) => sample.aircraftOperationalState === "HOLD_SHORT"));
-  assert.ok(samples.every((sample) => sample.aircraftMovementValueState === "UNAVAILABLE"));
-  assert.ok(samples.every((sample) => sample.aircraftMovementUnavailableReason === "GROUND_DYNAMICS_MODEL_UNAVAILABLE"));
+  assert.ok(["HOLD_SHORT", "TAKEOFF_ROLL", "ROTATE", "CLIMBOUT", "ENROUTE"].every((state) =>
+    samples.some((sample) => sample.aircraftOperationalState === state)));
+  assert.ok(samples.every((sample) => sample.aircraftMovementValueState === "VALID"));
+  assert.ok(samples.every((sample) => sample.aircraftMovementUnavailableReason === undefined));
+  assertContractParity(opened.result.engineRun.frames, result.engineRun.frames);
+  assert.deepEqual(opened.result.engineRun.events, result.engineRun.events);
+  assert.deepEqual(
+    opened.result.engineRun.events.items
+      .filter((event) => event.payload.kind === "AIRCRAFT_OPERATIONAL_STATE_CHANGED")
+      .map((event) => [event.tick, event.frameIndex, event.payload.from, event.payload.to]),
+    [[1, 1, "HOLD_SHORT", "TAKEOFF_ROLL"], [134, 28, "TAKEOFF_ROLL", "ROTATE"], [168, 36, "ROTATE", "CLIMBOUT"], [290, 61, "CLIMBOUT", "ENROUTE"]],
+  );
 });
 
 test("unknown schema, dangling references, AGL without terrain, impossible time and reserve fail closed", () => {
@@ -704,7 +1126,16 @@ test("runway identity, evidence, state, dimensions, surface, heading, and wind f
     [(scenario) => { scenario.airMission.assignments[0].groundCompatibility.envelopeDigest = "0".repeat(64); }, "MISSION_RUNWAY_INVALID", "assignments[0].groundCompatibility"],
     [(scenario) => { editRunway(scenario, { surface: "UNPAVED" }); }, "MISSION_RUNWAY_INVALID", "start.runway.surface"],
     [(scenario) => { editRunway(scenario, { headingDeg: 180 }); }, "MISSION_RUNWAY_INVALID", "start.runway.headingDeg"],
-    [(scenario) => { scenario.wind = 8; }, "MISSION_RUNWAY_INVALID", "start.runway.headingDeg"],
+    [(scenario) => {
+      const heading = scenario.airMission.start.runway.headingDeg * Math.PI / 180;
+      scenario.wind = 50 * Math.sin(heading);
+      scenario.windNorth = 50 * Math.cos(heading);
+    }, "MISSION_RUNWAY_INVALID", "start.runway.headingDeg"],
+    [(scenario) => {
+      const heading = scenario.airMission.start.runway.headingDeg * Math.PI / 180;
+      scenario.wind = 50 * Math.cos(heading);
+      scenario.windNorth = -50 * Math.sin(heading);
+    }, "MISSION_RUNWAY_INVALID", "start.runway.headingDeg"],
   ];
   for (const [mutate, code, fieldPath] of cases) {
     const scenario = admittedGroundFixture();

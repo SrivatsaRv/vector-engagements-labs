@@ -49,6 +49,7 @@ import {
 } from "./track-store.ts";
 import type { SimulationEventReceipt } from "./simulation-events.ts";
 import type { TrackTransitionCommit } from "./contracts.ts";
+import { sha256HexSync } from "../geospatial/digest.ts";
 
 type RuntimeState = {
   definition: EngineEntityDefinition;
@@ -427,17 +428,25 @@ function updateKinematicEntity(
   const { kind } = state.definition;
   if (kind !== "AIRCRAFT") return;
   const groundOperation = state.definition.groundOperation;
-  if (groundOperation) {
-    state.aircraftOperationalState =
-      groundOperation.posture === "PARKING" || time < groundOperation.releaseTimeSeconds
-        ? "PARKED"
-        : "HOLD_SHORT";
-    state.velocity = { x: 0, y: 0, z: 0 };
-    state.commandedG = 0;
-    state.dragNewtons = 0;
-    state.thrustNewtons = 0;
-    state.aircraftControl = undefined;
-    state.phase = groundOperation.unavailabilityReason;
+  if (groundOperation && state.aircraftOperationalState !== "ENROUTE") {
+    if (time < groundOperation.releaseTimeSeconds) {
+      state.aircraftOperationalState = groundOperation.posture === "RUNWAY" ? "HOLD_SHORT" : "PARKED";
+      state.velocity = { x: 0, y: 0, z: 0 };
+      state.commandedG = 0;
+      state.dragNewtons = 0;
+      state.thrustNewtons = 0;
+      state.aircraftControl = {
+        routePointIndex: state.routePointIndex,
+        requestedVelocityMps: { x: 0, y: 0, z: 0 },
+        requestedSteeringAccelerationMps2: { x: 0, y: 0, z: 0 },
+        acceptedSteeringAccelerationMps2: { x: 0, y: 0, z: 0 },
+        achievedVelocityMps: { x: 0, y: 0, z: 0 },
+        limiter: "GROUND_HOLD",
+      };
+      state.phase = "GROUND_READINESS_HOLD";
+      return;
+    }
+    updateGroundAircraft(state, scenario, time, dt, environmentSampler);
     return;
   }
   const model = state.definition.aircraft!;
@@ -568,6 +577,139 @@ function updateKinematicEntity(
         ? "LOAD_FACTOR"
         : "NONE"
       : "ROUTE_COMPLETE",
+  };
+}
+
+function updateGroundAircraft(
+  state: RuntimeState,
+  scenario: EngineScenario,
+  time: number,
+  dt: number,
+  environmentSampler?: RuntimeEnvironmentSampler,
+) {
+  const operation = state.definition.groundOperation!;
+  const model = state.definition.aircraft!;
+  const priorVelocity = { ...state.velocity };
+  const runwayDirection = {
+    x: Math.cos((90 - operation.runwayHeadingDegTrue) * Math.PI / 180),
+    y: Math.sin((90 - operation.runwayHeadingDegTrue) * Math.PI / 180),
+    z: 0,
+  };
+  const environment = sampledEnvironment(scenario, environmentSampler, state.position, time);
+  const wind = activeWind(scenario, time, environment.windEnuMps);
+  const tailwindMps = dot(wind, runwayDirection);
+  const crosswindMps = Math.abs(wind.x * -runwayDirection.y + wind.y * runwayDirection.x);
+  if (tailwindMps > operation.maximumTailwindMps || crosswindMps > operation.maximumCrosswindMps) {
+    throw new Error("[GROUND_WIND_ENVELOPE_EXCEEDED] Effective runway wind exceeds the admitted projection.");
+  }
+  const airRelative = subtract(state.velocity, wind);
+  const airspeed = magnitude(airRelative);
+  const speedOfSound = environment.atmosphere.speedOfSoundMps;
+  const dynamicPressure = 0.5 * environment.atmosphere.densityKgM3 * airspeed * airspeed;
+  const lift = dynamicPressure * model.referenceAreaM2 * operation.takeoffLiftCoefficient;
+  const dragCoefficient = interpolateTable(model.zeroLiftDragByMach, airspeed / speedOfSound)
+    + interpolateTable(model.inducedDragByAngleOfAttackRad, 0)
+      * operation.takeoffLiftCoefficient * operation.takeoffLiftCoefficient;
+  const drag = dynamicPressure * model.referenceAreaM2 * dragCoefficient;
+  const thrust = interpolateTable(model.thrustByThrottle, 1);
+  const fuelCoefficient = interpolateTable(model.fuelFlowByThrottle, 1);
+  if (!(thrust > 0) || state.fuelKg <= 0) {
+    throw new Error("[GROUND_TAKEOFF_FUEL_EXHAUSTED] Admitted takeoff thrust is unavailable.");
+  }
+  const fuelConsumed = Math.min(state.fuelKg, thrust * fuelCoefficient * dt);
+  state.fuelKg -= fuelConsumed;
+  state.massKg = model.emptyMassKg + state.fuelKg + state.storeMassKg;
+  if (state.fuelKg < operation.minimumTakeoffFuelKg) {
+    throw new Error("[GROUND_TAKEOFF_FUEL_EXHAUSTED] Fuel fell below the admitted takeoff minimum.");
+  }
+  state.dragNewtons = drag;
+  state.thrustNewtons = thrust;
+  state.availableG = model.maximumCommandG;
+
+  const currentGroundSpeed = Math.max(0, dot(state.velocity, runwayDirection));
+  const normalForce = Math.max(0, state.massKg * G0 - lift);
+  const rollingResistance = operation.rollingResistanceCoefficient * normalForce;
+  const groundAcceleration = (thrust - drag - rollingResistance) / state.massKg;
+  if (!(groundAcceleration > 0)) {
+    throw new Error("[GROUND_TAKEOFF_FORCE_INSUFFICIENT] Net runway force is not positive.");
+  }
+  const nextGroundSpeed = currentGroundSpeed + groundAcceleration * dt;
+  const distanceFromThreshold = dot(
+    subtract(state.position, state.definition.initial.position),
+    runwayDirection,
+  );
+  const nextDistance = distanceFromThreshold + nextGroundSpeed * dt;
+  const priorOperationalState = state.aircraftOperationalState;
+  const requestedSpeed = state.aircraftOperationalState === "CLIMBOUT"
+    ? operation.climboutSpeedMps
+    : operation.liftoffSpeedMps;
+
+  if (priorOperationalState !== "CLIMBOUT") {
+    if (nextDistance > operation.runwayLengthM + 1e-9) {
+      state.aircraftOperationalState = "ABORTED";
+      throw new Error("[GROUND_RUNWAY_OVERRUN] Liftoff was not achieved inside the admitted runway.");
+    }
+    const runwayFraction = Math.min(1, nextDistance / operation.runwayLengthM);
+    state.velocity = scale(runwayDirection, nextGroundSpeed);
+    state.position = add(
+      state.definition.initial.position,
+      {
+        x: runwayDirection.x * nextDistance,
+        y: runwayDirection.y * nextDistance,
+        z: (operation.runwayEndElevationM - state.definition.initial.position.z) * runwayFraction,
+      },
+    );
+    if (priorOperationalState === "ROTATE"
+      && airspeed >= operation.liftoffSpeedMps
+      && lift >= state.massKg * G0) {
+      state.aircraftOperationalState = "CLIMBOUT";
+    } else if (priorOperationalState === "TAKEOFF_ROLL"
+      && airspeed >= operation.rotationSpeedMps) {
+      state.aircraftOperationalState = "ROTATE";
+    } else if (priorOperationalState === "PARKED" || priorOperationalState === "HOLD_SHORT") {
+      state.aircraftOperationalState = "TAKEOFF_ROLL";
+    } else if (priorOperationalState !== "TAKEOFF_ROLL" && priorOperationalState !== "ROTATE") {
+      throw new Error("[GROUND_OPERATIONAL_TRANSITION_INVALID] Ground state cannot enter the takeoff sequence.");
+    }
+  } else {
+    const climbSpeed = Math.min(
+      operation.climboutSpeedMps,
+      Math.max(currentGroundSpeed, magnitude(state.velocity)) + groundAcceleration * dt,
+    );
+    const horizontalSpeed = climbSpeed * Math.cos(operation.climboutFlightPathAngleRad);
+    state.velocity = {
+      x: runwayDirection.x * horizontalSpeed,
+      y: runwayDirection.y * horizontalSpeed,
+      z: climbSpeed * Math.sin(operation.climboutFlightPathAngleRad),
+    };
+    state.position = add(state.position, scale(state.velocity, dt));
+    if (state.position.z - state.definition.initial.position.z >= operation.enrouteTransitionHeightM) {
+      state.aircraftOperationalState = "ENROUTE";
+    }
+  }
+
+  const requestedVelocity = state.aircraftOperationalState === "CLIMBOUT"
+    ? {
+        x: runwayDirection.x * requestedSpeed * Math.cos(operation.climboutFlightPathAngleRad),
+        y: runwayDirection.y * requestedSpeed * Math.cos(operation.climboutFlightPathAngleRad),
+        z: requestedSpeed * Math.sin(operation.climboutFlightPathAngleRad),
+      }
+    : scale(runwayDirection, requestedSpeed);
+  const requestedAcceleration = scale(subtract(requestedVelocity, priorVelocity), 1 / dt);
+  const acceptedAcceleration = scale(subtract(state.velocity, priorVelocity), 1 / dt);
+  if (!state.aircraftOperationalState) {
+    throw new Error("[GROUND_OPERATIONAL_TRANSITION_INVALID] Ground state is missing.");
+  }
+  state.headingRad = (90 - operation.runwayHeadingDegTrue) * Math.PI / 180;
+  state.commandedG = magnitude(acceptedAcceleration) / G0;
+  state.phase = state.aircraftOperationalState;
+  state.aircraftControl = {
+    routePointIndex: state.routePointIndex,
+    requestedVelocityMps: requestedVelocity,
+    requestedSteeringAccelerationMps2: requestedAcceleration,
+    acceptedSteeringAccelerationMps2: acceptedAcceleration,
+    achievedVelocityMps: { ...state.velocity },
+    limiter: state.aircraftOperationalState === "CLIMBOUT" ? "CLIMBOUT" : "GROUND_FORCE",
   };
 }
 
@@ -822,12 +964,7 @@ function toFrame(
           aircraftMovementValueState:
             state.lifecycle === "TERMINATED"
               ? "TERMINATED" as const
-              : state.definition.groundOperation
-                ? "UNAVAILABLE" as const
-                : "VALID" as const,
-          ...(state.definition.groundOperation
-            ? { aircraftMovementUnavailableReason: state.definition.groundOperation.unavailabilityReason }
-            : {}),
+              : "VALID" as const,
         }
       : {}),
     ...(state.aircraftControl
@@ -1144,37 +1281,120 @@ export class EngineSession {
         const binding = scenario.airMissionRuntime;
         const validDigest = (value: string) => /^[0-9a-f]{64}$/.test(value);
         const exactGroundFields = [
+          "climboutFlightPathAngleRad",
+          "climboutSpeedMps",
+          "enrouteTransitionHeightM",
           "executionAuthority",
+          "groundDynamicsDigest",
+          "liftoffSpeedMps",
+          "maximumCrosswindMps",
+          "maximumTailwindMps",
+          "maximumTakeoffMassKg",
+          "minimumTakeoffFuelKg",
           "missionDigest",
           "posture",
           "releaseTimeSeconds",
+          "rollingResistanceCoefficient",
+          "rotationSpeedMps",
+          "runwayEndElevationM",
           "runwayEvidenceDigest",
+          "runwayHeadingDegTrue",
+          "runwayLengthM",
           "schemaVersion",
-          "unavailabilityReason",
+          "takeoffLiftCoefficient",
         ];
+        const authoritativeGround = scenario.airMission?.assignment.groundEnvelope.groundDynamics;
+        const authoritativeGroundFields = [
+          "authority",
+          "climboutFlightPathAngleRad",
+          "climboutSpeedMps",
+          "digest",
+          "enrouteTransitionHeightM",
+          "evidenceRefIds",
+          "liftoffSpeedMps",
+          "limitationIds",
+          "maximumCrosswindMps",
+          "maximumTailwindMps",
+          "maximumTakeoffMassKg",
+          "minimumTakeoffFuelKg",
+          "rollingResistanceCoefficient",
+          "rotationSpeedMps",
+          "schemaVersion",
+          "takeoffLiftCoefficient",
+          "validity",
+          "valueState",
+        ];
+        const authoritativeGroundDigestValid = authoritativeGround !== undefined
+          && (() => {
+            const material = structuredClone(authoritativeGround) as Record<string, unknown>;
+            delete material.digest;
+            return sha256HexSync(material) === authoritativeGround.digest;
+          })();
+        const authoredRunway = scenario.airMission?.authored.start.posture === "AIRBORNE"
+          ? undefined
+          : scenario.airMission?.authored.start.runway;
         if (
           JSON.stringify(Object.keys(ground).sort()) !== JSON.stringify(exactGroundFields) ||
-          ground.schemaVersion !== "vector.aircraft-ground-operation.v1" ||
+          ground.schemaVersion !== "vector.aircraft-ground-operation.v2" ||
           !["PARKING", "RUNWAY", "GROUND_ALERT_QRA"].includes(ground.posture) ||
           !Number.isFinite(ground.releaseTimeSeconds) ||
           ground.releaseTimeSeconds < 0 ||
           !validDigest(ground.missionDigest) ||
           !validDigest(ground.runwayEvidenceDigest) ||
-          ground.executionAuthority !== "UNAVAILABLE" ||
-          ground.unavailabilityReason !== "GROUND_DYNAMICS_MODEL_UNAVAILABLE" ||
-          binding?.schemaVersion !== ground.schemaVersion ||
-          binding.missionDigest !== ground.missionDigest ||
-          binding.runwayEvidenceDigest !== ground.runwayEvidenceDigest ||
-          binding.posture !== ground.posture ||
-          binding.releaseTimeSeconds !== ground.releaseTimeSeconds ||
-          binding.executionAuthority !== ground.executionAuthority ||
-          binding.unavailabilityReason !== ground.unavailabilityReason ||
+          !validDigest(ground.groundDynamicsDigest) ||
+          ground.executionAuthority !== "ADMITTED_GENERIC_EDUCATIONAL" ||
+          !Number.isFinite(ground.maximumTakeoffMassKg) || ground.maximumTakeoffMassKg <= 0 ||
+          !Number.isFinite(ground.minimumTakeoffFuelKg) || ground.minimumTakeoffFuelKg <= 0 ||
+          !Number.isFinite(ground.rollingResistanceCoefficient) || ground.rollingResistanceCoefficient < 0 || ground.rollingResistanceCoefficient >= 1 ||
+          !Number.isFinite(ground.rotationSpeedMps) || ground.rotationSpeedMps <= 0 ||
+          !Number.isFinite(ground.liftoffSpeedMps) || ground.liftoffSpeedMps < ground.rotationSpeedMps ||
+          !Number.isFinite(ground.takeoffLiftCoefficient) || ground.takeoffLiftCoefficient <= 0 ||
+          !Number.isFinite(ground.climboutSpeedMps) || ground.climboutSpeedMps < ground.liftoffSpeedMps ||
+          !Number.isFinite(ground.climboutFlightPathAngleRad) || ground.climboutFlightPathAngleRad <= 0 || ground.climboutFlightPathAngleRad >= Math.PI / 2 ||
+          !Number.isFinite(ground.enrouteTransitionHeightM) || ground.enrouteTransitionHeightM <= 0 ||
+          !Number.isFinite(ground.maximumTailwindMps) || ground.maximumTailwindMps <= 0 ||
+          !Number.isFinite(ground.maximumCrosswindMps) || ground.maximumCrosswindMps <= 0 ||
+          !binding || sha256HexSync(binding) !== sha256HexSync(ground) ||
           scenario.airMission?.start.entryState !== "GROUND" ||
           scenario.airMission.compiledDigest !== ground.missionDigest ||
           scenario.airMission.authored.start.posture === "AIRBORNE" ||
           scenario.airMission.authored.start.posture !== ground.posture ||
           scenario.airMission.authored.start.readinessDelaySeconds !== ground.releaseTimeSeconds ||
           scenario.airMission.authored.start.runway.evidence.digest !== ground.runwayEvidenceDigest ||
+          !authoritativeGround ||
+          JSON.stringify(Object.keys(authoritativeGround).sort()) !== JSON.stringify(authoritativeGroundFields) ||
+          authoritativeGround.schemaVersion !== "vector.compiled-aircraft-ground-dynamics.v1" ||
+          authoritativeGround.authority !== "GENERIC_PUBLIC_EDUCATIONAL" ||
+          authoritativeGround.valueState !== "MODEL_ASSUMPTION" ||
+          JSON.stringify(authoritativeGround.validity) !== JSON.stringify({
+            schemaVersion: "vector.aircraft-ground-dynamics-validity.v1",
+            intendedUse: "PUBLIC_EDUCATIONAL",
+            mechanism: "RUNWAY_ROLL_ROTATION_CLIMBOUT",
+          }) ||
+          !Array.isArray(authoritativeGround.evidenceRefIds) || !authoritativeGround.evidenceRefIds.length ||
+          authoritativeGround.evidenceRefIds.some((value) => typeof value !== "string" || !value) ||
+          !Array.isArray(authoritativeGround.limitationIds) || !authoritativeGround.limitationIds.length ||
+          authoritativeGround.limitationIds.some((value) => typeof value !== "string" || !value) ||
+          !Number.isFinite(authoritativeGround.maximumCrosswindMps) || authoritativeGround.maximumCrosswindMps <= 0 ||
+          !authoritativeGroundDigestValid ||
+          authoritativeGround.digest !== ground.groundDynamicsDigest ||
+          authoritativeGround.maximumTakeoffMassKg !== ground.maximumTakeoffMassKg ||
+          authoritativeGround.minimumTakeoffFuelKg !== ground.minimumTakeoffFuelKg ||
+          authoritativeGround.rollingResistanceCoefficient !== ground.rollingResistanceCoefficient ||
+          authoritativeGround.rotationSpeedMps !== ground.rotationSpeedMps ||
+          authoritativeGround.liftoffSpeedMps !== ground.liftoffSpeedMps ||
+          authoritativeGround.takeoffLiftCoefficient !== ground.takeoffLiftCoefficient ||
+          authoritativeGround.climboutSpeedMps !== ground.climboutSpeedMps ||
+          authoritativeGround.climboutFlightPathAngleRad !== ground.climboutFlightPathAngleRad ||
+          authoritativeGround.enrouteTransitionHeightM !== ground.enrouteTransitionHeightM ||
+          authoritativeGround.maximumTailwindMps !== ground.maximumTailwindMps ||
+          authoritativeGround.maximumCrosswindMps !== ground.maximumCrosswindMps ||
+          !authoredRunway ||
+          authoredRunway.lengthM !== ground.runwayLengthM ||
+          authoredRunway.end.elevation.valueM !== ground.runwayEndElevationM ||
+          Math.abs(aircraft.initial.headingRad - (90 - ground.runwayHeadingDegTrue) * Math.PI / 180) > 1e-12 ||
+          aircraft.initial.massKg > ground.maximumTakeoffMassKg ||
+          aircraft.initial.fuelKg < ground.minimumTakeoffFuelKg ||
           magnitude(aircraft.initial.velocity) !== 0
         ) {
           throw new Error(`Aircraft ${aircraft.id} has no valid ground-operation admission.`);
@@ -1445,12 +1665,12 @@ export class EngineSession {
         const speed = magnitude(primaryWeapon.velocity);
         const weapon = primaryWeapon.definition.weapon!;
         const sinceLaunch = time - (weapon.launchTimeSeconds ?? 0);
-        if (
+        if (primaryWeapon.lifecycle !== "STOWED" && (
           (sinceLaunch > weapon.burnSeconds + 2 &&
             speed < 80 &&
             separationM > 1000) ||
           (primaryWeapon.position.z <= terrainElevation(this.environmentSampler, primaryWeapon.position) && time > 1)
-        ) {
+        )) {
           this.termination = "energy_depleted";
           this.completed = true;
         }
@@ -1488,6 +1708,9 @@ export class EngineSession {
       const beforeUpdates = new Map(
         [...this.states.values()].map((state) => [state.definition.id, state.lifecycle]),
       );
+      const beforeOperationalUpdates = new Map(
+        [...this.states.values()].map((state) => [state.definition.id, state.aircraftOperationalState]),
+      );
       for (const state of this.states.values())
         updateKinematicEntity(state, scenario, time, scenario.fixedStepSeconds, this.environmentSampler);
       for (const state of this.states.values())
@@ -1516,6 +1739,29 @@ export class EngineSession {
           },
         });
       }
+      for (const state of this.states.values()) {
+        const prior = beforeOperationalUpdates.get(state.definition.id);
+        const next = state.aircraftOperationalState;
+        if (!prior || !next || prior === next || !state.definition.groundOperation) continue;
+        this.eventJournal.emit({
+          localKey: `aircraft-operational:${state.definition.id}:${prior}:${next}`,
+          tick: this.integratedSteps,
+          modelTimeSeconds: nextEventTime,
+          phase: "MISSION",
+          producer: { subsystem: "AIRCRAFT_DYNAMICS", entityId: state.definition.id },
+          knowledgeScope: "WORLD",
+          participants: [{ entityId: state.definition.id, role: "SUBJECT" }],
+          causes: [],
+          payload: {
+            kind: "AIRCRAFT_OPERATIONAL_STATE_CHANGED",
+            schemaVersion: SIMULATION_EVENT_PAYLOAD_SCHEMAS.AIRCRAFT_OPERATIONAL_STATE_CHANGED,
+            from: prior,
+            to: next,
+            movementValueState: state.lifecycle === "TERMINATED" ? "TERMINATED" : "VALID",
+            groundDynamicsDigest: state.definition.groundOperation.groundDynamicsDigest,
+          },
+        });
+      }
       const postRelativePosition = subtract(primaryTarget.position, primaryWeapon.position);
       const postSeparationM = magnitude(postRelativePosition);
       this.closestApproachM = Math.min(this.closestApproachM, postSeparationM);
@@ -1529,10 +1775,10 @@ export class EngineSession {
         const speed = magnitude(primaryWeapon.velocity);
         const weapon = primaryWeapon.definition.weapon!;
         const sinceLaunch = nextTime - (weapon.launchTimeSeconds ?? 0);
-        if (
+        if (primaryWeapon.lifecycle !== "STOWED" && (
           (sinceLaunch > weapon.burnSeconds + 2 && speed < 80 && postSeparationM > 1000) ||
           (primaryWeapon.position.z <= terrainElevation(this.environmentSampler, primaryWeapon.position) && nextTime > 1)
-        ) {
+        )) {
           this.termination = "energy_depleted";
           this.completed = true;
         } else if (nextTick >= this.terminalTick) {

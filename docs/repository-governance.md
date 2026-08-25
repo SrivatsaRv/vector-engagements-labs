@@ -28,6 +28,11 @@ Repository administrators retain emergency recovery authority but should not use
 
 ## Continuous integration
 
+#182 adds the generic ground-dynamics migration generator to the existing
+mission-scenario owner. The declaration gate therefore covers its schema,
+digest and storage facets alongside the generated forward migration; it does
+not classify the generator as tooling-only or create a second contract family.
+
 Regional environment changes run the offline source/digest verifier in
 `ci-local`; release evidence additionally includes the built Worker
 cancel/retry gate and the bounded environment throughput/memory benchmark.
@@ -36,7 +41,9 @@ named-hardware profile is measured before unrelated capacity workloads can
 consume the host. The gate rejects a dirty or unidentified repository before
 measurement and rejects every backend batch whose governed frame count or
 semantic outcome differs; only an uncontaminated clean-commit run is
-publication evidence.
+publication evidence. It then runs the generic takeoff benchmark in its own
+process with explicit warmups and 20 retained samples per backend; the parallel
+unit-test process validates the profile but is never timing authority.
 
 The value-free TP-1538 tooling child adds its generated Rust-schema freshness,
 Rust formatting/clippy/test/rustdoc and embedded-WASM freshness checks to the
@@ -467,18 +474,19 @@ fails the local and PR gate.
 Air mission ground-start authoring consumes the exact sourced runway geometry
 from the immutable EnvironmentPack. `STUB-24` remains a release-blocking
 explicit assumption owned by #60/#64 only for the content-addressed
-`vector.compiled-aircraft-ground-envelope.v1` resolved from the model pack.
+`vector.compiled-aircraft-ground-envelope.v2` and nested
+`vector.compiled-aircraft-ground-dynamics.v1` resolved from the model pack.
 Scenario-authored minima, surface/tailwind values, or self-labelled evidence
 states are rejected; no installation or production claim may treat the ground
 performance envelope as validated platform data.
 
-Until that evidence exists, `vector.aircraft-ground-operation.v1` makes the
-runtime limitation executable. Ground starts are held at `PARKED` or
-`HOLD_SHORT`, movement is `UNAVAILABLE` with
-`GROUND_DYNAMICS_MODEL_UNAVAILABLE`, and installed stores cannot launch. This
-does not retire STUB-24 or satisfy #64's takeoff/recovery acceptance criteria;
-it prevents the prior zero-speed-to-airborne fallback from masquerading as
-causal runway motion.
+`vector.aircraft-ground-operation.v2` now makes one generic educational
+mechanism executable: valid readiness hold, force-driven runway roll, achieved
+rotation/liftoff and bounded climbout with fuel/mass/store continuity. The
+content-addressed inputs remain `MODEL_ASSUMPTION`, and direct TS/Rust authority
+checks reject hidden fallback or compact-copy promotion. This does not retire
+STUB-24 or satisfy #64's named takeoff/recovery evidence; taxi, braking,
+landing, recovery and store release remain outside authority.
 
 `STUB-25` separately owns #61's visible runway/DEM elevation reconciliation.
 The regional pack uses the higher surface plus 0.01 m only inside its declared

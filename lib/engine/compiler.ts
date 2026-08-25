@@ -530,7 +530,7 @@ export function compileScenario(
       ...(compiledAirMission?.start.entryState === "GROUND"
         ? {
             groundOperation: {
-              schemaVersion: "vector.aircraft-ground-operation.v1" as const,
+              schemaVersion: "vector.aircraft-ground-operation.v2" as const,
               posture: compiledAirMission.start.posture as "PARKING" | "RUNWAY" | "GROUND_ALERT_QRA",
               releaseTimeSeconds:
                 compiledAirMission.authored.start.posture === "AIRBORNE"
@@ -541,8 +541,26 @@ export function compileScenario(
                 compiledAirMission.authored.start.posture === "AIRBORNE"
                   ? ""
                   : compiledAirMission.authored.start.runway.evidence.digest,
-              executionAuthority: "UNAVAILABLE" as const,
-              unavailabilityReason: "GROUND_DYNAMICS_MODEL_UNAVAILABLE" as const,
+              executionAuthority: "ADMITTED_GENERIC_EDUCATIONAL" as const,
+              groundDynamicsDigest: compiledAirMission.assignment.groundEnvelope.groundDynamics.digest,
+              maximumTakeoffMassKg: compiledAirMission.assignment.groundEnvelope.groundDynamics.maximumTakeoffMassKg,
+              minimumTakeoffFuelKg: compiledAirMission.assignment.groundEnvelope.groundDynamics.minimumTakeoffFuelKg,
+              rollingResistanceCoefficient: compiledAirMission.assignment.groundEnvelope.groundDynamics.rollingResistanceCoefficient,
+              rotationSpeedMps: compiledAirMission.assignment.groundEnvelope.groundDynamics.rotationSpeedMps,
+              liftoffSpeedMps: compiledAirMission.assignment.groundEnvelope.groundDynamics.liftoffSpeedMps,
+              takeoffLiftCoefficient: compiledAirMission.assignment.groundEnvelope.groundDynamics.takeoffLiftCoefficient,
+              climboutSpeedMps: compiledAirMission.assignment.groundEnvelope.groundDynamics.climboutSpeedMps,
+              climboutFlightPathAngleRad: compiledAirMission.assignment.groundEnvelope.groundDynamics.climboutFlightPathAngleRad,
+              enrouteTransitionHeightM: compiledAirMission.assignment.groundEnvelope.groundDynamics.enrouteTransitionHeightM,
+              maximumTailwindMps: compiledAirMission.assignment.groundEnvelope.groundDynamics.maximumTailwindMps,
+              maximumCrosswindMps: compiledAirMission.assignment.groundEnvelope.groundDynamics.maximumCrosswindMps,
+              runwayLengthM: compiledAirMission.authored.start.posture === "AIRBORNE"
+                ? 0
+                : compiledAirMission.authored.start.runway.lengthM,
+              runwayHeadingDegTrue: compiledAirMission.start.runwayHeadingDegTrue!,
+              runwayEndElevationM: compiledAirMission.authored.start.posture === "AIRBORNE"
+                ? blueStart.z
+                : compiledAirMission.authored.start.runway.end.elevation.valueM,
             },
           }
         : {}),

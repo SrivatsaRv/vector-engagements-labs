@@ -553,6 +553,27 @@ test("a current deployment manifest drives the real Worker run after route recov
     await expect(page.getByRole("button", { name: "Play playback", exact: true })).toBeVisible();
   }
   const timeline = page.getByRole("slider", { name: "Run timeline" });
+  for (const [modelTimeSeconds, operationalState] of [
+    [0, "HOLD SHORT"],
+    [0.05, "TAKEOFF ROLL"],
+    [6.7, "ROTATE"],
+    [8.4, "CLIMBOUT"],
+    [14.5, "ENROUTE"],
+  ] as const) {
+    await timeline.evaluate((element, value) => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setter.call(element, String(value));
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+    }, modelTimeSeconds);
+    await expect(page.locator(".current-geometry")).toContainText(operationalState);
+    await expect(page.locator(".current-geometry")).toContainText("VALID");
+    const phaseDisplayTime = await page.locator(".current-geometry").getAttribute("data-display-time");
+    expect(phaseDisplayTime).not.toBeNull();
+    await expect(page.locator(".engagement-map-shell")).toHaveAttribute("data-display-time", phaseDisplayTime!);
+    await expect(page.locator(".playback [data-display-time]")).toHaveAttribute("data-display-time", phaseDisplayTime!);
+    await expect(page.locator(".telemetry-title [data-display-time]")).toHaveAttribute("data-display-time", phaseDisplayTime!);
+  }
   await timeline.focus();
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowLeft");
@@ -566,9 +587,10 @@ test("a current deployment manifest drives the real Worker run after route recov
   await expect(routeTransition).toHaveAttribute("data-frame-index", await page.locator(".engagement-map-shell").getAttribute("data-display-frame-index") ?? "");
   await expect(routeTransition).toContainText(/Fly-over|Fly-by|Route complete|unavailable/i);
   await expect(page.locator(".current-geometry")).not.toContainText("Relative-position diagram");
-  await expect(page.locator(".current-geometry")).toContainText("HOLD SHORT");
+  await expect(page.locator(".current-geometry")).toContainText("ENROUTE");
   await expect(page.locator(".current-geometry")).toContainText("Movement");
-  await expect(page.locator(".current-geometry")).toContainText("Aircraft movement is unavailable. GROUND DYNAMICS MODEL UNAVAILABLE.");
+  await expect(page.locator(".current-geometry")).toContainText("VALID");
+  await expect(page.locator(".current-geometry")).not.toContainText("Aircraft movement is unavailable");
   await expect(page.locator(".telemetry.is-collapsed")).toBeVisible();
   const telemetryToggle = page.getByRole("button", { name: /expand telemetry/i });
   await expect(telemetryToggle).toHaveAttribute("aria-expanded", "false");

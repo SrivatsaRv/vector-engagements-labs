@@ -4,6 +4,7 @@ import {
   RUST_WASM_ENGINE_ARTIFACT,
   runEngineBackend,
 } from "../lib/engine/backend.ts";
+import { VECTOR_ENGINE_WASM_OPTIMIZER } from "../lib/engine/generated/vector-engine-wasm.ts";
 import { compileScenario } from "../lib/engine/compiler.ts";
 import {
   getProfile,
@@ -93,6 +94,10 @@ test("committed Rust/WASM artifact has a stable integrity identity", () => {
   assert.match(RUST_WASM_ENGINE_ARTIFACT.sha256, /^[a-f0-9]{64}$/);
   assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes > 100_000);
   assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 550_000);
+  assert.equal(
+    VECTOR_ENGINE_WASM_OPTIMIZER,
+    "binaryen@131.0.0 -O3 -S2 rust-wasm-features-v1",
+  );
 });
 
 for (const definition of SCENARIO_LIBRARY) {

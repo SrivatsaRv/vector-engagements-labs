@@ -53,6 +53,11 @@ The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-eas
 
 ## Scenario artifact
 
+Runway-start artifacts now bind the exact generic ground-dynamics projection
+and its validity/evidence/limitation digest beside the already sourced runway,
+environment, fuel, mass and installed-store identities. The compiler rejects
+missing or mismatched authority before constructing runtime tick state.
+
 The artifact binds one exact regional environment-pack ID/version/digest and an
 optional exact `vector.installation-origin.v2` runway identity. Compilation
 fails before producing a runnable artifact when either binding is stale.
@@ -67,6 +72,11 @@ Air packages use canonical `vector.scenario.v4`; non-Air packages share that
 package envelope without acquiring an Air mission object.
 
 ## Air mission contract
+
+The compiled ground envelope advances to v2 only for the bounded
+`PUBLIC_EDUCATIONAL` roll/rotation/climbout mechanism. It declares closed SI
+inputs and wind/mass/fuel/runway limits; no Air-mission label can promote a
+named aircraft, TP-1538 value, landing, recovery or store-release capability.
 
 Construct produces a `vector.scenario.v4` package with an intended-use identity,
 immutable compiled model-pack identity/digest, and, for Air-domain work, exactly
@@ -97,9 +107,10 @@ aircraft ground-performance envelope remains a declared model assumption.
 Scenario cards and Air-mission validity limits name the sourced pack's
 coverage, time, resolution and uncertainty instead of claiming a standard
 atmosphere or absent terrain.
-Until #64 admits governed ground forces, the compiled ground-operation artifact
-declares movement unavailable. The runtime can show `PARKED`/`HOLD_SHORT`, but
-cannot infer taxi, rotation, takeoff, climbout, approach, or landing behavior.
+When the exact generic ground-dynamics projection is admitted, the compiled
+operation executes readiness hold, runway roll, rotation, liftoff and climbout.
+It remains a visible `MODEL_ASSUMPTION`: taxi steering, rejected-takeoff
+braking, landing, recovery and named-aircraft performance stay unavailable.
 
 Version 1 currently admits the BLUE launcher-side mission only; `RED` fails
 with `MISSION_SIDE_UNSUPPORTED` until an explicit opposing-side runtime mapping
@@ -140,6 +151,10 @@ responsible for any future versioned executable policy, in-tick side-picture
 interface, achieved-state/inventory guards and bounded-command consumer.
 
 ## Cross-domain scenario composition kernel
+
+The kernel remains an identity/admission adapter: it verifies the expanded
+ground-dynamics projection and digest but neither calculates takeoff physics nor
+copies that authority into a kernel-owned schema.
 
 The `SCENARIO_COMPOSITION_KERNEL` family owns one coordinated TypeScript
 contract set: `vector.scenario-kernel.v1`, the governed capability
@@ -275,6 +290,10 @@ layers remain with #155, #87, #60 and the runtime owners.
 
 ## Builder expansion boundary
 
+Ground-start authoring exposes the governed inputs and recorded result states;
+the UI does not derive rotation, liftoff, climb path, speed or controller
+acceptance. Those values arrive only from the Worker/VSR canonical frame.
+
 The configured-template builder edits every input used by the eight validated templates. Its **Place & flight** surface now performs direct geographic start placement, heading, altitude and speed editing, and Blue/Red route and waypoint authoring inside a selected preset study area. Map gestures and numeric fields update one spatial plan; compilation converts it to local east-north-up engine state. The admitted point-mass aircraft controller executes compiled three-dimensional route points and records requested, accepted, and achieved movement. The authored route remains visible beside the computed track so the two cannot be confused.
 
 Each configured route now compiles a `vector.route-plan.v2` constraint with one
@@ -347,6 +366,11 @@ The internal `vector.scenario-draft.v1` state contract now provides the safe aut
 
 ## Full builder UX specification
 
+For an admitted runway start, the run journey preserves the exact start/runway
+authority through the Worker and presents recorded hold, roll, rotate, climbout
+and enroute states. Cancellation or recovery restarts admission; it cannot reuse
+an unsealed partial ground-operation result.
+
 The configured Air workflow now exposes one mission object across Define and
 Place & flight: class/regime and CAP policy/geometry controls, exact start and
 runway evidence, flight-plan constraints, loadout/fuel, validation digest, and
@@ -354,10 +378,10 @@ the existing Run gate all edit or consume the same authored artifact.
 Construct shows the admitted pack version/digest and only offers runway-backed
 bases available inside that pack; unsupported installations remain visibly
 airborne-placement-only.
-After a run, Current Geometry is a read-only Observe projection. A ground-held
-aircraft presents the operational and movement value states recorded in the
-selected frame; the component cannot synthesize movement or promote its
-installed store into a launched world entity.
+After a run, Current Geometry is a read-only Observe projection. The runway
+aircraft presents recorded `HOLD_SHORT`/`TAKEOFF_ROLL`/`ROTATE`/`CLIMBOUT`/
+`ENROUTE` and movement state from the selected frame; the component cannot
+synthesize movement or promote its installed store into a launched entity.
 
 The builder is one persistent desktop workspace, not a page-per-field wizard. The left rail owns the five Construct sections, the center owns the geographic placement surface and form for the selected object, and the right rail owns the selected entity, validation state, and compiled-summary preview. From 1280×720 upward all three remain visible; QHD and 4K expand the task surface, controls, map and typography rather than adding empty margins. On phones the same five-step state is presented as a single column with persistent actions; desktop rails are removed and no scenario state is discarded. Drawers may extend a rail but may not replace the map.
 
@@ -392,6 +416,10 @@ fails and Simulate remains unavailable; the UI never reconstructs credibility
 from static labels.
 
 ### Artifact and state boundaries
+
+Operational phase, movement value state, mass, fuel, stores and controller
+request/accept/achievement are computed result fields. Authoring may configure
+their governed inputs but never writes or repairs these recorded values.
 
 `Scenario.airMission` is durable authored state; `CompiledAirMission` is the
 immutable run boundary; Worker/VSR/report views are read-only projections.

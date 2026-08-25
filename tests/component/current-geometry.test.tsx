@@ -63,5 +63,31 @@ describe("CurrentGeometry", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Aircraft movement is unavailable. GROUND DYNAMICS MODEL UNAVAILABLE.",
     );
+
+    for (const operationalState of ["TAKEOFF_ROLL", "ROTATE", "CLIMBOUT", "ENROUTE"] as const) {
+      const valid = {
+        ...prelaunch,
+        frames: prelaunch.frames.map((frame, index) => index !== selected.frameIndex
+          ? frame
+          : {
+              ...frame,
+              entities: frame.entities.map((entity) => entity.id !== "blue-platform-1"
+                ? entity
+                : {
+                    ...entity,
+                    aircraftOperationalState: operationalState,
+                    aircraftMovementValueState: "VALID" as const,
+                    aircraftMovementUnavailableReason: undefined,
+                  }),
+            }),
+      };
+      rerender(<CurrentGeometry geometry={selectCurrentGeometry(
+        valid,
+        selectDisplayFrame(valid, selected.displayTimeSeconds),
+      )} />);
+      expect(screen.getByText(operationalState.replaceAll("_", " "))).toBeVisible();
+      expect(screen.getByText("VALID")).toBeVisible();
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    }
   });
 });

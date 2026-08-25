@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { canonicalJson } from "../lib/canonical-json.ts";
@@ -9,6 +10,8 @@ import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { STUDY_AREAS } from "../lib/study-areas.ts";
 
 const migrationPath = resolve("db/migrations/014_environment_pack_runways.sql");
+const successorMigrationPath = resolve("db/migrations/015_generic_ground_dynamics.sql");
+const frozenMigrationSha256 = "c40e91b0fbbf2ee5110ae601dba676d2feec1957ebb440db81703c1696cbd227";
 const startMarker = "-- BEGIN GENERATED ENVIRONMENT-PACK SCENARIO PACKAGES";
 const endMarker = "-- END GENERATED ENVIRONMENT-PACK SCENARIO PACKAGES";
 const checkOnly = process.argv.includes("--check");
@@ -18,6 +21,19 @@ for (const argument of process.argv.slice(2)) {
 }
 if (!checkOnly && !process.argv.includes("--write")) {
   throw new Error("Pass --write to regenerate the migration or --check to verify it.");
+}
+
+const existing = readFileSync(migrationPath, "utf8");
+if (existsSync(successorMigrationPath)) {
+  const actualSha256 = createHash("sha256").update(existing).digest("hex");
+  if (actualSha256 !== frozenMigrationSha256) {
+    throw new Error(`Historical environment migration 014 changed: expected ${frozenMigrationSha256}, received ${actualSha256}.`);
+  }
+  if (!checkOnly) {
+    throw new Error("Environment migration 014 is frozen; add a forward migration instead of regenerating it.");
+  }
+  process.stdout.write(`verified frozen environment migration 014 ${actualSha256}\n`);
+  process.exit(0);
 }
 
 const escapeSqlLiteral = (value: string) => value.replaceAll("'", "''");
@@ -84,7 +100,6 @@ BEGIN
   END IF;
 END $$;
 ${endMarker}`;
-const existing = readFileSync(migrationPath, "utf8");
 const start = existing.indexOf(startMarker);
 const end = existing.indexOf(endMarker);
 if (start < 0 || end < start) throw new Error("Environment scenario migration markers are missing or out of order.");

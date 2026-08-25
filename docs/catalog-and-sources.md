@@ -192,6 +192,11 @@ stored.
 
 ## Environment-pack installation coverage
 
+Migration 014 remains the immutable installation/runway/EnvironmentPack source
+snapshot after #182. Migration 015 neither copies nor rewrites those governed
+rows; it consumes their existing identities while upserting and verifying only
+the eight current canonical scenario packages.
+
 Installation and study-area table definitions are owned by
 `db/schema/geospatial.ts`; this module split does not change their PostGIS
 columns, constraints, or catalog identities.

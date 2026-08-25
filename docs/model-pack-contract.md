@@ -39,32 +39,44 @@ compiled artifacts. Neither may be replaced by presentation or import labels.
 
 ## Versioned schemas
 
+`vector.compiled-aircraft-ground-envelope.v2` nests the exact-key
+`vector.compiled-aircraft-ground-dynamics.v1` projection. The projection seals
+SI mass, fuel, rolling resistance, rotation/liftoff, lift, climb, wind and
+enroute-transition values with validity, value state, evidence, limitations and
+a content digest.
+
 Air mission authoring adds `vector.air-mission.v1`, `vector.flight-plan.v1`,
 `vector.loadout-plan.v1`, and `vector.compiled-air-mission.v1` as mission-owned
 adapters. They reference this model pack by exact digest; they do not redefine
 aircraft, weapon, station, or coefficient schemas.
 
 The mission adapter also emits
-`vector.compiled-aircraft-ground-envelope.v1` from one content-addressed
+`vector.compiled-aircraft-ground-envelope.v2` from one content-addressed
 resolver bound to the pack digest, aircraft model ID, assumption evidence, and
 limitations. The authored mission retains only
 `vector.aircraft-ground-envelope-binding.v1` identity/digest fields. Imported
 runway minima, surface lists, tailwind limits, or self-labelled
 `SOURCED`/`CALIBRATED` values are not executable authority. This remains the
-explicit `MODEL_ASSUMPTION` allowed by STUB-24 until #64 replaces it with
-governed aircraft ground-performance evidence. Issue #61 separately replaces
+explicit `MODEL_ASSUMPTION` allowed by STUB-24. Its nested
+`vector.compiled-aircraft-ground-dynamics.v1` closes SI inputs for generic
+rolling resistance, rotation/liftoff speed, lift, climb speed/gradient, mass,
+fuel and crosswind and is content-addressed independently. It authorizes only
+the versioned `PUBLIC_EDUCATIONAL` runway-roll/rotation/climbout validity and
+declares the 50 m relative-height `ENROUTE` boundary as an SI input rather than
+a hidden phase timer. It authorizes only the issue #182 educational mechanism until #64 replaces it with governed
+aircraft ground-performance evidence. Issue #61 separately replaces
 the runway geometry/provenance boundary with a sourced immutable catalogue.
 Engine scenarios now additionally carry `vector.environment-runtime-grid.v1`;
 this does not change model-pack schemas or authorize environmental values as
 named-platform evidence.
 
-Ground-start scenarios also carry `vector.aircraft-ground-operation.v1`. The
-contract binds the compiled mission digest, runway-evidence digest, posture,
-and release time, but declares `executionAuthority: UNAVAILABLE` and
-`GROUND_DYNAMICS_MODEL_UNAVAILABLE`. This is a fail-closed runtime boundary,
-not a takeoff-performance model: no rotation speed, rolling force, lift,
-braking, runway distance, or recovery authority is inferred from STUB-24.
-TypeScript and Rust validate the exact contract and report the same held state.
+Ground-start scenarios carry `vector.aircraft-ground-operation.v2`. The flat
+tick projection binds the compiled mission, runway evidence, exact ground
+dynamics digest, mass/fuel limits, force/rotation/liftoff/climb inputs and
+sourced runway geometry. TypeScript and direct Rust/WASM independently bind it
+to the full compiled Air mission before execution. Missing/unknown fields,
+stale or caller-recomputed compact digests, physical invalidity and authority
+mismatch reject; no hidden fallback to the scalar envelope exists.
 
 The schema-module split changes ownership granularity only. Existing table,
 column, constraint, and JSON payload contracts are unchanged.
@@ -421,7 +433,7 @@ compiler. Production admission cannot consume or relabel this adapter.
 
 ## Scenario binding and patches
 
-Ground Air scenarios add one exact `vector.aircraft-ground-operation.v1`
+Ground Air scenarios add one exact `vector.aircraft-ground-operation.v2`
 binding beside the existing model-pack identity. Its mission, runway evidence,
 posture, and release fields are compiler-owned and exact-key validated; it does
 not add or override aerodynamic, propulsion, or control values.
@@ -466,8 +478,8 @@ Draft patch addition creates a new revision.
 
 ## Loadout compatibility
 
-An installed store remains inventory while its launch platform carries an
-unavailable ground-operation binding. Neither scheduled launch time nor an
+An installed store remains inventory while its launch platform carries a
+ground-operation binding and has not reached `ENROUTE`. Neither scheduled launch time nor an
 otherwise valid station/rule admission can release it; mass and store identity
 remain on the aircraft until a future governed ground/air transition exists.
 
@@ -616,9 +628,16 @@ an immutable historical artifact; v0.8 publishes this new admission boundary.
 
 ## Consumption rules for dependent workstreams
 
-Consumers must treat `GROUND_DYNAMICS_MODEL_UNAVAILABLE` as a closed movement
-boundary. It is not permission to substitute scalar ground-envelope assumptions,
-an airborne minimum-speed controller, or named-platform performance.
+Consumers must preserve the independently sealed full mission as authority over
+both compact runtime bindings. They may not substitute the older scalar STUB-24
+envelope, infer missing ground inputs, or accept caller-resealed compact copies.
+
+Consumers may execute the generic ground projection only when the compiler has
+sealed `ADMITTED_GENERIC_EDUCATIONAL`. A missing or unsupported projection
+rejects new-run admission; historical v1 records retain their explicit
+`GROUND_DYNAMICS_MODEL_UNAVAILABLE` state. Neither boundary permits
+named-platform performance, landing/recovery, store release, or a fallback to
+scalar envelope assumptions or the airborne controller.
 
 Mission/capability consumers import the exported `AirMissionDefinition` and
 `CompiledAirMission` types from `lib/air-mission.ts`. They may attach downstream

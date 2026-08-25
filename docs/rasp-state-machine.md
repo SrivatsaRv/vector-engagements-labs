@@ -8,6 +8,11 @@ is not admitted by the production deployment and makes no named-sensor claim.
 
 ## Canonical boundary
 
+The ground-operation state sequence is fixed and one-way for the admitted
+mechanism: `PARKED`/`HOLD_SHORT` → `TAKEOFF_ROLL` → `ROTATE` → `CLIMBOUT` →
+`ENROUTE`. At most one transition commits per integer tick; skipped or forbidden
+edges reject instead of being inferred from elapsed time.
+
 `vector.compiled-air-mission.v1` is immutable run provenance beside the engine
 scenario, not a second track/picture state machine. Start, route, fuel and store
 consequences enter through ordinary canonical entities and frames.
@@ -112,6 +117,11 @@ hides entities while this state is selected.
 
 ## Record and replay
 
+Ground-operation frames and `AIRCRAFT_OPERATIONAL_STATE_CHANGED` events replay
+as recorded, including tick/frame identity, movement value state, controller
+request/accept/achievement, fuel, mass and installed-store inventory. Replay
+never recalculates phase or motion from mission inputs.
+
 The Rust compiled-model-pack v2 identity validator is confined to offline
 publication/readback. It adds no RASP event, picture, observer state, VSR field,
 or replay authority.
@@ -127,6 +137,11 @@ Frame schema v6 replays ground operational/movement availability exactly; RASP
 consumers may not convert unavailable movement into an observation or track.
 
 ## Air mission record storage
+
+Runway lifecycle storage retains the full compiled mission lineage plus the
+exact ground-dynamics, runway and environment bindings used during execution.
+Older held-only records remain readable as historical unavailable evidence and
+are not upgraded into executable takeoff records.
 
 For `vector.scenario.v4` Air runs, the VSR manifest also binds
 `vector.compiled-air-mission.v1` by mission ID/version, authored digest, and
@@ -171,6 +186,11 @@ This slice does not make tactical decisions, launch-authority, weapon-support,
 or Su-30MKI/F-16 radar claims. Parent issue #26 remains open.
 
 ## Regression evidence
+
+#182 adds direct TypeScript/Rust hostile admission, one-transition-per-tick,
+force/energy/fuel/climb/convergence oracles, Worker completion, VSR tamper and
+five-viewport canonical-frame regressions. The evidence is generic educational
+mechanism verification, not named-aircraft validation.
 
 Issue #61 adds cross-backend environment parity plus archived-pack
 supersession regression without changing the governed RASP transition table.

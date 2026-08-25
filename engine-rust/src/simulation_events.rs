@@ -2,7 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
 
-use crate::{Affiliation, EngineError, EntityKind, EntityLifecycle, Termination};
+use crate::{
+    Affiliation, AircraftOperationalState, EngineError, EntityKind, EntityLifecycle, Termination,
+};
 
 pub const SIMULATION_EVENT_SCHEMA: &str = "vector.simulation-event.v2";
 pub const RUN_STARTED_PAYLOAD_SCHEMA: &str = "vector.simulation-event-payload.run-started.v1";
@@ -10,6 +12,8 @@ pub const ENTITY_ENTERED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.entity-entered-world.v1";
 pub const LIFECYCLE_CHANGED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.entity-lifecycle-changed.v1";
+pub const AIRCRAFT_OPERATIONAL_CHANGED_PAYLOAD_SCHEMA: &str =
+    "vector.simulation-event-payload.aircraft-operational-state-changed.v1";
 pub const RUN_COMPLETED_PAYLOAD_SCHEMA: &str = "vector.simulation-event-payload.run-completed.v1";
 pub const TRACK_CHANGED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.track-state-changed.v3";
@@ -39,6 +43,8 @@ pub enum SimulationEventSubsystem {
     EntityLifecycle,
     #[serde(rename = "SENSOR_TRACK")]
     SensorTrack,
+    #[serde(rename = "AIRCRAFT_DYNAMICS")]
+    AircraftDynamics,
 }
 
 impl SimulationEventSubsystem {
@@ -47,6 +53,7 @@ impl SimulationEventSubsystem {
             Self::RunCoordinator => "RUN_COORDINATOR",
             Self::EntityLifecycle => "ENTITY_LIFECYCLE",
             Self::SensorTrack => "SENSOR_TRACK",
+            Self::AircraftDynamics => "AIRCRAFT_DYNAMICS",
         }
     }
 }
@@ -138,6 +145,17 @@ pub enum SimulationEventPayload {
         from: EntityLifecycle,
         to: EntityLifecycle,
     },
+    #[serde(rename = "AIRCRAFT_OPERATIONAL_STATE_CHANGED")]
+    AircraftOperationalStateChanged {
+        #[serde(rename = "schemaVersion")]
+        schema_version: &'static str,
+        from: AircraftOperationalState,
+        to: AircraftOperationalState,
+        #[serde(rename = "movementValueState")]
+        movement_value_state: &'static str,
+        #[serde(rename = "groundDynamicsDigest")]
+        ground_dynamics_digest: String,
+    },
     #[serde(rename = "RUN_COMPLETED")]
     RunCompleted {
         #[serde(rename = "schemaVersion")]
@@ -197,6 +215,10 @@ fn lifecycle_key(value: EntityLifecycle) -> &'static str {
     }
 }
 
+fn aircraft_operational_state_key(value: AircraftOperationalState) -> &'static str {
+    value.key()
+}
+
 fn termination_key(value: Termination) -> &'static str {
     match value {
         Termination::ThresholdReached => "threshold_reached",
@@ -213,8 +235,9 @@ impl SimulationEventPayload {
             Self::RunStarted { .. } => 0,
             Self::EntityEnteredWorld { .. } => 1,
             Self::EntityLifecycleChanged { .. } => 2,
-            Self::RunCompleted { .. } => 3,
-            Self::TrackStateChanged { .. } => 4,
+            Self::AircraftOperationalStateChanged { .. } => 3,
+            Self::RunCompleted { .. } => 4,
+            Self::TrackStateChanged { .. } => 5,
         }
     }
 
@@ -247,10 +270,24 @@ impl SimulationEventPayload {
                 lifecycle_key(*from),
                 lifecycle_key(*to),
             ],
+            Self::AircraftOperationalStateChanged {
+                schema_version,
+                from,
+                to,
+                movement_value_state,
+                ground_dynamics_digest,
+            } => vec![
+                "3",
+                schema_version,
+                aircraft_operational_state_key(*from),
+                aircraft_operational_state_key(*to),
+                movement_value_state,
+                ground_dynamics_digest,
+            ],
             Self::RunCompleted {
                 schema_version,
                 termination,
-            } => vec!["3", schema_version, termination_key(*termination)],
+            } => vec!["4", schema_version, termination_key(*termination)],
             Self::TrackStateChanged {
                 schema_version,
                 perspective,
@@ -269,7 +306,7 @@ impl SimulationEventPayload {
                 uncertainty_value_state,
             } => {
                 return serde_json::to_string(&serde_json::json!([
-                    "4",
+                    "5",
                     schema_version,
                     perspective,
                     track_id,
@@ -486,6 +523,45 @@ impl SimulationEventDraft {
             payload: SimulationEventPayload::RunCompleted {
                 schema_version: RUN_COMPLETED_PAYLOAD_SCHEMA,
                 termination,
+            },
+        }
+    }
+
+    pub fn aircraft_operational_changed(
+        tick: u64,
+        time: f64,
+        entity_id: &str,
+        from: AircraftOperationalState,
+        to: AircraftOperationalState,
+        ground_dynamics_digest: &str,
+    ) -> Self {
+        Self {
+            local_key: format!(
+                "aircraft-operational:{entity_id}:{}:{}",
+                aircraft_operational_state_key(from),
+                aircraft_operational_state_key(to)
+            ),
+            tick,
+            model_time_seconds: time,
+            phase: SimulationEventPhase::Mission,
+            producer: SimulationEventProducer {
+                subsystem: SimulationEventSubsystem::AircraftDynamics,
+                entity_id: Some(entity_id.to_string()),
+            },
+            owner_affiliation: None,
+            knowledge_scope: SimulationEventKnowledgeScope::World,
+            participants: vec![SimulationEventParticipant {
+                entity_id: entity_id.to_string(),
+                role: SimulationEventParticipantRole::Subject,
+            }],
+            causes: Vec::new(),
+            correlation_id: None,
+            payload: SimulationEventPayload::AircraftOperationalStateChanged {
+                schema_version: AIRCRAFT_OPERATIONAL_CHANGED_PAYLOAD_SCHEMA,
+                from,
+                to,
+                movement_value_state: "VALID",
+                ground_dynamics_digest: ground_dynamics_digest.to_string(),
             },
         }
     }
