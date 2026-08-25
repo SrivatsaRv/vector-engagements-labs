@@ -12,7 +12,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub use error::EngineError;
-pub use model_pack::{validate_model_pack_json, CompiledModelPack};
+pub use model_pack::{
+    validate_compiled_model_pack_v2_json, validate_model_pack_json, CompiledModelPack,
+    CompiledModelPackV2Identity,
+};
 pub use public_aircraft_reference::{
     run_public_aircraft_reference, run_public_aircraft_reference_json,
     PublicAircraftReferenceInput, PublicAircraftReferenceRun,

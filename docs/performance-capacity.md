@@ -245,6 +245,19 @@ no per-tick catalogue or database work. Mission compilation and Worker
 re-admission occur once before execution; the applicable local performance gate
 must pass on the frozen completion candidate beside TypeScript/Rust parity.
 
+The Stage-B #170 workload is separately frozen at
+`fixtures/performance/model-pack-foundation-workload.v1.json`, digest
+`3477e7d3ba75b7daa62be382194a87484817f2c1bbb946e5f819aa67ab4aee78`.
+Measured on 2026-08-25 using Node.js v24.3.0 on an Apple M5 arm64 with 10
+logical cores and 16 GiB memory, its compile/publish/exact-lookup/research-
+export/research-import p99 values were 67.116/56.000/10.980/15.727/50.554 ms.
+Compiled-pack reuse at 1/10/100/500 instances measured
+0.013/0.007/0.068/0.120 ms p99. All measurements passed the workload's declared
+p50, p95, p99 and maximum budgets. These results cover only the non-runtime Stage-B
+compiler, immutable reference repository, backup/readback and already-compiled
+reuse paths; they are not browser, Worker, physics-tick, named-aircraft or
+production-capacity evidence.
+
 | Test | Purpose |
 | --- | --- |
 | Engine microbenchmark | Fixed-step cost, allocations, and TypeScript/Rust parity |

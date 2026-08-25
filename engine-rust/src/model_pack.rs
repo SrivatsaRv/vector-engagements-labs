@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use crate::{valid_verification_track_model, EngineError, ObserverTrackModel};
 
 const COMPILED_SCHEMA: &str = "vector.compiled-model-pack.v1";
+const COMPILED_V2_SCHEMA: &str = "vector.compiled-model-pack.v2";
 const AIRCRAFT_EVIDENCE_REGISTRY: &str =
     include_str!("../../governance/aircraft-evidence-registry.v2.json");
 
@@ -236,6 +237,16 @@ pub struct CompiledModelPack {
     pub weapons: Vec<WeaponModel>,
     pub loadouts: Vec<LoadoutModel>,
     pub compatibility: Vec<CompatibilityRule>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompiledModelPackV2Identity {
+    pub id: String,
+    pub version: String,
+    pub digest: String,
+    pub legacy_projection_digest: String,
+    pub source_digest: String,
+    pub lineage_digest: String,
 }
 
 fn invalid(message: impl Into<String>) -> EngineError {
@@ -798,6 +809,664 @@ fn digest_payload(value: &Value) -> Result<String, EngineError> {
     let encoded = serde_json::to_vec(&canonicalize_digest_value(payload))
         .map_err(|error| EngineError::Serialization(error.to_string()))?;
     Ok(format!("{:x}", Sha256::digest(encoded)))
+}
+
+fn exact_keys_at(
+    value: &Value,
+    path: &str,
+    required: &[&str],
+    optional: &[&str],
+) -> Result<(), EngineError> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| invalid(format!("{path} must be an object")))?;
+    for key in object.keys() {
+        if !required.contains(&key.as_str()) && !optional.contains(&key.as_str()) {
+            return Err(invalid(format!("{path} has unsupported field {key}")));
+        }
+    }
+    for key in required {
+        if !object.contains_key(*key) {
+            return Err(invalid(format!("{path} is missing field {key}")));
+        }
+    }
+    Ok(())
+}
+
+fn array_at<'a>(value: &'a Value, path: &str) -> Result<&'a Vec<Value>, EngineError> {
+    value
+        .as_array()
+        .ok_or_else(|| invalid(format!("{path} must be an array")))
+}
+
+fn validate_compiled_validity_exact(value: &Value, path: &str) -> Result<(), EngineError> {
+    exact_keys_at(
+        value,
+        path,
+        &[
+            "altitudeM",
+            "mach",
+            "angleOfAttackRad",
+            "loadFactorG",
+            "configurations",
+            "environments",
+        ],
+        &[],
+    )?;
+    for field in ["altitudeM", "mach", "angleOfAttackRad", "loadFactorG"] {
+        exact_keys_at(
+            &value[field],
+            &format!("{path}.{field}"),
+            &["minimum", "maximum"],
+            &[],
+        )?;
+    }
+    array_at(&value["configurations"], &format!("{path}.configurations"))?;
+    array_at(&value["environments"], &format!("{path}.environments"))?;
+    Ok(())
+}
+
+fn validate_source_validity_exact(value: &Value, path: &str) -> Result<(), EngineError> {
+    exact_keys_at(
+        value,
+        path,
+        &[
+            "altitude",
+            "mach",
+            "angleOfAttack",
+            "loadFactor",
+            "configurations",
+            "environments",
+        ],
+        &[],
+    )?;
+    for field in ["altitude", "mach", "angleOfAttack", "loadFactor"] {
+        exact_keys_at(
+            &value[field],
+            &format!("{path}.{field}"),
+            &["minimum", "maximum", "unit"],
+            &[],
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_compiled_table_exact(value: &Value, path: &str) -> Result<(), EngineError> {
+    exact_keys_at(
+        value,
+        path,
+        &[
+            "id",
+            "outputUnit",
+            "axes",
+            "values",
+            "evidenceRefIds",
+            "validityDomain",
+        ],
+        &[],
+    )?;
+    for (index, axis) in array_at(&value["axes"], &format!("{path}.axes"))?
+        .iter()
+        .enumerate()
+    {
+        exact_keys_at(
+            axis,
+            &format!("{path}.axes[{index}]"),
+            &["semantic", "unit", "values"],
+            &[],
+        )?;
+    }
+    validate_compiled_validity_exact(&value["validityDomain"], &format!("{path}.validityDomain"))
+}
+
+fn validate_compiled_base_exact(
+    value: &Value,
+    path: &str,
+    specific: &[&str],
+    optional: &[&str],
+) -> Result<(), EngineError> {
+    let mut required = vec![
+        "id",
+        "version",
+        "evidenceRefIds",
+        "validityDomain",
+        "limitationIds",
+    ];
+    required.extend_from_slice(specific);
+    exact_keys_at(value, path, &required, optional)?;
+    validate_compiled_validity_exact(&value["validityDomain"], &format!("{path}.validityDomain"))
+}
+
+fn validate_observer_track_model_exact(value: &Value, path: &str) -> Result<(), EngineError> {
+    exact_keys_at(
+        value,
+        path,
+        &[
+            "schemaVersion",
+            "valueState",
+            "intendedUse",
+            "positionBiasM",
+            "velocityBiasMps",
+            "positionStandardDeviationM",
+            "velocityStandardDeviationMps",
+            "confirmationObservations",
+            "maximumObservationAgeSeconds",
+            "coastAfterSeconds",
+            "lostAfterSeconds",
+            "observationWindowsSeconds",
+        ],
+        &[],
+    )?;
+    for field in [
+        "positionBiasM",
+        "velocityBiasMps",
+        "positionStandardDeviationM",
+        "velocityStandardDeviationMps",
+    ] {
+        exact_keys_at(
+            &value[field],
+            &format!("{path}.{field}"),
+            &["x", "y", "z"],
+            &[],
+        )?;
+    }
+    for (index, window) in array_at(
+        &value["observationWindowsSeconds"],
+        &format!("{path}.observationWindowsSeconds"),
+    )?
+    .iter()
+    .enumerate()
+    {
+        exact_keys_at(
+            window,
+            &format!("{path}.observationWindowsSeconds[{index}]"),
+            &["start", "end"],
+            &[],
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_compiled_v2_exact_shape(value: &Value) -> Result<(), EngineError> {
+    exact_keys_at(
+        value,
+        "pack",
+        &[
+            "schemaVersion",
+            "id",
+            "version",
+            "digest",
+            "unitSystem",
+            "coordinateConventions",
+            "intendedUses",
+            "credibilityManifestRef",
+            "evidence",
+            "catalogIdentities",
+            "aerodynamics",
+            "propulsion",
+            "sensors",
+            "aircraft",
+            "weapons",
+            "loadouts",
+            "compatibility",
+            "legacyProjectionDigest",
+            "sourceDigest",
+            "lineageDigest",
+            "admissionState",
+            "requirementCompleteness",
+            "evidenceLineage",
+        ],
+        &[],
+    )?;
+    exact_keys_at(
+        &value["coordinateConventions"],
+        "pack.coordinateConventions",
+        &[
+            "geodeticDatum",
+            "localFrame",
+            "bodyAxes",
+            "aerodynamicAxes",
+            "angularUnit",
+            "positionUnit",
+            "velocityUnit",
+            "verticalReference",
+        ],
+        &[],
+    )?;
+    for (index, item) in array_at(&value["intendedUses"], "pack.intendedUses")?
+        .iter()
+        .enumerate()
+    {
+        exact_keys_at(
+            item,
+            &format!("pack.intendedUses[{index}]"),
+            &["id", "version"],
+            &[],
+        )?;
+    }
+    exact_keys_at(
+        &value["credibilityManifestRef"],
+        "pack.credibilityManifestRef",
+        &["id", "version"],
+        &[],
+    )?;
+    for (index, item) in array_at(&value["evidence"], "pack.evidence")?
+        .iter()
+        .enumerate()
+    {
+        exact_keys_at(
+            item,
+            &format!("pack.evidence[{index}]"),
+            &["id", "kind", "title", "uri", "accessedAt"],
+            &["locator", "contentSha256"],
+        )?;
+    }
+    for (index, item) in array_at(&value["catalogIdentities"], "pack.catalogIdentities")?
+        .iter()
+        .enumerate()
+    {
+        exact_keys_at(
+            item,
+            &format!("pack.catalogIdentities[{index}]"),
+            &["catalogObjectId", "kind", "definitionModelIds"],
+            &[],
+        )?;
+    }
+    for (index, item) in array_at(&value["aerodynamics"], "pack.aerodynamics")?
+        .iter()
+        .enumerate()
+    {
+        let path = format!("pack.aerodynamics[{index}]");
+        validate_compiled_base_exact(
+            item,
+            &path,
+            &[
+                "referenceAreaM2",
+                "referenceChordM",
+                "referenceSpanM",
+                "coefficientTables",
+            ],
+            &[],
+        )?;
+        for (table_index, table) in array_at(
+            &item["coefficientTables"],
+            &format!("{path}.coefficientTables"),
+        )?
+        .iter()
+        .enumerate()
+        {
+            validate_compiled_table_exact(
+                table,
+                &format!("{path}.coefficientTables[{table_index}]"),
+            )?;
+        }
+    }
+    for (index, item) in array_at(&value["propulsion"], "pack.propulsion")?
+        .iter()
+        .enumerate()
+    {
+        let path = format!("pack.propulsion[{index}]");
+        validate_compiled_base_exact(
+            item,
+            &path,
+            &["engineCount", "thrustTable", "fuelFlowTable", "spoolTimeS"],
+            &[],
+        )?;
+        validate_compiled_table_exact(&item["thrustTable"], &format!("{path}.thrustTable"))?;
+        validate_compiled_table_exact(&item["fuelFlowTable"], &format!("{path}.fuelFlowTable"))?;
+    }
+    for (index, item) in array_at(&value["sensors"], "pack.sensors")?
+        .iter()
+        .enumerate()
+    {
+        let path = format!("pack.sensors[{index}]");
+        validate_compiled_base_exact(
+            item,
+            &path,
+            &[
+                "sensorKind",
+                "detectionRangeM",
+                "minimumRangeM",
+                "scanPeriodS",
+                "azimuthFieldOfViewRad",
+                "elevationFieldOfViewRad",
+            ],
+            &["evidenceAdmission", "verificationTrackModel"],
+        )?;
+        if let Some(admission) = item.get("evidenceAdmission") {
+            exact_keys_at(
+                admission,
+                &format!("{path}.evidenceAdmission"),
+                &[
+                    "schemaVersion",
+                    "sourceEvidenceRefIds",
+                    "validationEvidenceRefIds",
+                    "coverage",
+                ],
+                &[],
+            )?;
+            exact_keys_at(
+                &admission["coverage"],
+                &format!("{path}.evidenceAdmission.coverage"),
+                &[
+                    "detectionRange",
+                    "minimumRange",
+                    "scanPeriod",
+                    "azimuthFieldOfView",
+                    "elevationFieldOfView",
+                    "measurementUncertainty",
+                    "targetApplicability",
+                ],
+                &[],
+            )?;
+        }
+        if let Some(track_model) = item.get("verificationTrackModel") {
+            validate_observer_track_model_exact(
+                track_model,
+                &format!("{path}.verificationTrackModel"),
+            )?;
+        }
+    }
+    for (index, item) in array_at(&value["aircraft"], "pack.aircraft")?
+        .iter()
+        .enumerate()
+    {
+        let path = format!("pack.aircraft[{index}]");
+        validate_compiled_base_exact(
+            item,
+            &path,
+            &[
+                "catalogObjectId",
+                "emptyMassKg",
+                "fuelCapacityKg",
+                "aerodynamicModelIndex",
+                "propulsionModelIndexes",
+                "sensorModelIndexes",
+                "loadoutModelIndex",
+                "maximumCommandLoadFactorG",
+                "performanceAdmission",
+            ],
+            &[],
+        )?;
+        let admission = &item["performanceAdmission"];
+        if admission["state"] == Value::String("UNSUPPORTED".to_string()) {
+            exact_keys_at(
+                admission,
+                &format!("{path}.performanceAdmission"),
+                &["state", "limitationId", "reason"],
+                &[],
+            )?;
+        } else {
+            exact_keys_at(
+                admission,
+                &format!("{path}.performanceAdmission"),
+                &["state", "capabilities"],
+                &[],
+            )?;
+            for (capability_index, capability) in array_at(
+                &admission["capabilities"],
+                &format!("{path}.performanceAdmission.capabilities"),
+            )?
+            .iter()
+            .enumerate()
+            {
+                exact_keys_at(
+                    capability,
+                    &format!("{path}.performanceAdmission.capabilities[{capability_index}]"),
+                    &[
+                        "capability",
+                        "sourceEvidenceRefIds",
+                        "validationEvidenceRefIds",
+                    ],
+                    &[],
+                )?;
+            }
+        }
+    }
+    for (index, item) in array_at(&value["weapons"], "pack.weapons")?
+        .iter()
+        .enumerate()
+    {
+        validate_compiled_base_exact(
+            item,
+            &format!("pack.weapons[{index}]"),
+            &[
+                "catalogObjectId",
+                "launchMassKg",
+                "dryMassKg",
+                "aerodynamicModelIndex",
+                "propulsionModelIndex",
+                "sensorModelIndex",
+                "seekerMode",
+                "supportRequirement",
+                "launchAuthorization",
+                "maximumCommandLoadFactorG",
+                "seekerActivationRangeM",
+                "datalinkUpdatePeriodS",
+                "thrustTaperSpeedMps",
+                "navigationConstant",
+            ],
+            &[],
+        )?;
+    }
+    for (index, item) in array_at(&value["loadouts"], "pack.loadouts")?
+        .iter()
+        .enumerate()
+    {
+        let path = format!("pack.loadouts[{index}]");
+        validate_compiled_base_exact(item, &path, &["platformCatalogObjectId", "stations"], &[])?;
+        for (station_index, station) in array_at(&item["stations"], &format!("{path}.stations"))?
+            .iter()
+            .enumerate()
+        {
+            let station_path = format!("{path}.stations[{station_index}]");
+            exact_keys_at(
+                station,
+                &station_path,
+                &[
+                    "id",
+                    "stationGroup",
+                    "positionBodyM",
+                    "maximumQuantity",
+                    "compatibleStoreModelIndexes",
+                ],
+                &[],
+            )?;
+            exact_keys_at(
+                &station["positionBodyM"],
+                &format!("{station_path}.positionBodyM"),
+                &["x", "y", "z"],
+                &[],
+            )?;
+        }
+    }
+    for (index, item) in array_at(&value["compatibility"], "pack.compatibility")?
+        .iter()
+        .enumerate()
+    {
+        exact_keys_at(
+            item,
+            &format!("pack.compatibility[{index}]"),
+            &[
+                "id",
+                "platformCatalogObjectId",
+                "loadoutModelIndex",
+                "storeModelIndex",
+                "stationGroup",
+                "status",
+                "maximumQuantity",
+                "rationale",
+                "evidenceRefIds",
+            ],
+            &[],
+        )?;
+    }
+    let completeness = &value["requirementCompleteness"];
+    exact_keys_at(
+        completeness,
+        "pack.requirementCompleteness",
+        &["profile", "results", "complete", "digest"],
+        &[],
+    )?;
+    exact_keys_at(
+        &completeness["profile"],
+        "pack.requirementCompleteness.profile",
+        &["id", "version", "digest"],
+        &[],
+    )?;
+    for (index, item) in array_at(
+        &completeness["results"],
+        "pack.requirementCompleteness.results",
+    )?
+    .iter()
+    .enumerate()
+    {
+        exact_keys_at(
+            item,
+            &format!("pack.requirementCompleteness.results[{index}]"),
+            &["requirementId", "state", "gapReasons"],
+            &[],
+        )?;
+    }
+    for (index, item) in array_at(&value["evidenceLineage"], "pack.evidenceLineage")?
+        .iter()
+        .enumerate()
+    {
+        let path = format!("pack.evidenceLineage[{index}]");
+        exact_keys_at(
+            item,
+            &path,
+            &[
+                "id",
+                "selector",
+                "dataFamily",
+                "componentId",
+                "configurationId",
+                "valueState",
+                "evidenceRole",
+                "unit",
+                "frame",
+                "datum",
+                "uncertainty",
+                "validityDomain",
+            ],
+            &[
+                "valueDigest",
+                "rawArtifactDigest",
+                "derivativeDigest",
+                "sourceLocator",
+                "sourceRecord",
+                "gapReason",
+            ],
+        )?;
+        if item["uncertainty"]["state"] == Value::String("KNOWN".to_string()) {
+            exact_keys_at(
+                &item["uncertainty"],
+                &format!("{path}.uncertainty"),
+                &["state", "magnitude", "unit"],
+                &[],
+            )?;
+        } else {
+            exact_keys_at(
+                &item["uncertainty"],
+                &format!("{path}.uncertainty"),
+                &["state"],
+                &[],
+            )?;
+        }
+        validate_source_validity_exact(&item["validityDomain"], &format!("{path}.validityDomain"))?;
+    }
+    Ok(())
+}
+
+/// Strictly validates a Stage-B compiled identity without admitting it to runtime execution.
+pub fn validate_compiled_model_pack_v2_json(
+    input: &str,
+) -> Result<CompiledModelPackV2Identity, EngineError> {
+    let value: Value =
+        serde_json::from_str(input).map_err(|error| EngineError::InvalidJson(error.to_string()))?;
+    validate_compiled_v2_exact_shape(&value)?;
+    if value["schemaVersion"] != Value::String(COMPILED_V2_SCHEMA.to_string())
+        || value["unitSystem"] != Value::String("SI".to_string())
+    {
+        return Err(invalid(
+            "unsupported compiled model-pack v2 schema or unit system",
+        ));
+    }
+    for field in [
+        "digest",
+        "legacyProjectionDigest",
+        "sourceDigest",
+        "lineageDigest",
+    ] {
+        if !value[field].as_str().is_some_and(sha256_digest) {
+            return Err(invalid(format!("pack.{field} must be lowercase SHA-256")));
+        }
+    }
+    let computed_digest = digest_payload(&value)?;
+    if value["digest"] != Value::String(computed_digest) {
+        return Err(invalid("compiled model-pack v2 digest mismatch"));
+    }
+    let completeness = &value["requirementCompleteness"];
+    let computed_completeness_digest = digest_payload(completeness)?;
+    if completeness["digest"] != Value::String(computed_completeness_digest) {
+        return Err(invalid(
+            "compiled model-pack v2 completeness digest mismatch",
+        ));
+    }
+    let complete = completeness["complete"]
+        .as_bool()
+        .ok_or_else(|| invalid("pack.requirementCompleteness.complete must be boolean"))?;
+    let expected_admission = if complete {
+        "COMPLETE_FOUNDATION_NON_PROMOTABLE"
+    } else {
+        "INCOMPLETE"
+    };
+    if value["admissionState"] != Value::String(expected_admission.to_string()) {
+        return Err(invalid("compiled model-pack v2 admission state mismatch"));
+    }
+    let mut legacy_value = value.clone();
+    let legacy = legacy_value
+        .as_object_mut()
+        .ok_or_else(|| invalid("compiled model pack must be an object"))?;
+    for field in [
+        "legacyProjectionDigest",
+        "sourceDigest",
+        "lineageDigest",
+        "admissionState",
+        "requirementCompleteness",
+        "evidenceLineage",
+    ] {
+        legacy.remove(field);
+    }
+    legacy.insert(
+        "schemaVersion".to_string(),
+        Value::String(COMPILED_SCHEMA.to_string()),
+    );
+    legacy.insert(
+        "digest".to_string(),
+        value["legacyProjectionDigest"].clone(),
+    );
+    let legacy_pack: CompiledModelPack = serde_json::from_value(legacy_value.clone())
+        .map_err(|error| EngineError::InvalidJson(error.to_string()))?;
+    validate_pack(&legacy_pack, &legacy_value)?;
+    Ok(CompiledModelPackV2Identity {
+        id: value["id"].as_str().unwrap_or_default().to_string(),
+        version: value["version"].as_str().unwrap_or_default().to_string(),
+        digest: value["digest"].as_str().unwrap_or_default().to_string(),
+        legacy_projection_digest: value["legacyProjectionDigest"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string(),
+        source_digest: value["sourceDigest"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string(),
+        lineage_digest: value["lineageDigest"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string(),
+    })
 }
 
 fn validate_pack(pack: &CompiledModelPack, value: &Value) -> Result<(), EngineError> {
@@ -1426,6 +2095,42 @@ mod tests {
         assert!(error
             .to_string()
             .contains("unknown or unvalidated positive-sensor evidence coverage"));
+        Ok(())
+    }
+
+    #[test]
+    fn compiled_v2_identity_matches_typescript_and_rejects_unknown_or_tampered_fields(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let archive: Value = serde_json::from_str(include_str!(
+            "../../fixtures/model-packs/anonymous-pack-alpha.governed.v2.json"
+        ))?;
+        let pack = archive["publications"][0]["bundle"]["pack"].clone();
+        let identity = validate_compiled_model_pack_v2_json(&serde_json::to_string(&pack)?)?;
+        assert_eq!(
+            identity.digest,
+            "8c012597c59d082c1cd92f0be075eeab90ddef4d07e94dd0a613dc5a13e66376"
+        );
+        assert_eq!(identity.id, "anonymous-pack-alpha");
+
+        let mut unknown = pack.clone();
+        unknown["inventedAuthority"] = Value::Bool(true);
+        let unknown_error =
+            match validate_compiled_model_pack_v2_json(&serde_json::to_string(&unknown)?) {
+                Ok(_) => return Err("unknown compiled authority must reject".into()),
+                Err(error) => error,
+            };
+        assert!(unknown_error
+            .to_string()
+            .contains("pack has unsupported field inventedAuthority"));
+
+        let mut tampered = pack;
+        tampered["evidenceLineage"][0]["valueDigest"] = Value::String("0".repeat(64));
+        let tamper_error =
+            match validate_compiled_model_pack_v2_json(&serde_json::to_string(&tampered)?) {
+                Ok(_) => return Err("last-field tampering must reject".into()),
+                Err(error) => error,
+            };
+        assert!(tamper_error.to_string().contains("digest mismatch"));
         Ok(())
     }
 }

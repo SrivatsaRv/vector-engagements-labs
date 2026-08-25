@@ -34,6 +34,13 @@ scenario binding and every entity provenance record. Pack validation and
 runtime construction occur before integration; the numerical loop has no
 database access or unit parsing.
 
+The same WASM-capable Rust core now also contains the strict Stage-B
+`vector.compiled-model-pack.v2` identity validator. It consumes the
+TypeScript-generated anonymous fixture, rejects unknown keys, recomputes the v1
+SI projection, completeness and final digests, and returns only the exact pack
+identity. V2 remains non-promotable: the function is not part of the simulation
+ABI above and cannot construct runtime state or select a backend.
+
 ## TypeScript reference
 
 The TypeScript engine is retained as an independently executable reference implementation. It uses the same coordinate frames, atmosphere, entity lifecycle, identity-bearing aircraft table interpolation with fail-closed coverage, aircraft state update, proportional-navigation guidance, coverage-envelope generation, termination rules, and sampling cadence.
@@ -53,6 +60,8 @@ admitted in the server runtime. The selected backend is recorded in
 `EngineRun.diagnostics`, the compiled VSR member and the VSR manifest. Rust/WASM
 remains independently executable through explicit verification manifests for
 parity checks. See [`deployment-capabilities.md`](deployment-capabilities.md).
+Validating a Stage-B v2 pack in Rust does not alter that selection or provenance
+authority; no deployment manifest currently admits v2 execution.
 
 ## Build and verification
 
@@ -78,7 +87,9 @@ committed, integrity-checked artifact and does not install a compiler at runtime
 The swap boundary consumes mission-authoritative start speed, fuel mass, and
 store count only after the compiler has reconciled them with the generic engine
 entity contract. No mission class, scenario ID, or named aircraft selects a
-backend or physics branch.
+backend or physics branch. Likewise, a successfully validated Stage-B v2
+identity cannot cross this swap boundary until #154 and the later
+Worker/runtime/VSR owner add a separate admission contract.
 
 UI components do not import either numerical core. They call `simulate`, which compiles the scenario and dispatches through `runEngineBackend`. Observe, Explain, Compare, Save, and Report consume only the returned `EngineRun`. A later native service, worker pool, or higher-fidelity engine must implement this same boundary instead of branching presentation state.
 

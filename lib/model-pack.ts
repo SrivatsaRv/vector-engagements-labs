@@ -5,6 +5,17 @@ import type { Vec3 } from "./engine/primitives.ts";
 
 export const MODEL_PACK_SOURCE_SCHEMA_VERSION = "vector.model-pack-source.v1";
 export const COMPILED_MODEL_PACK_SCHEMA_VERSION = "vector.compiled-model-pack.v1";
+export const MODEL_PACK_SOURCE_V2_SCHEMA_VERSION = "vector.model-pack-source.v2";
+export const COMPILED_MODEL_PACK_V2_SCHEMA_VERSION = "vector.compiled-model-pack.v2";
+export const MODEL_PACK_REQUIREMENT_PROFILE_SCHEMA_VERSION = "vector.model-pack-requirement-profile.v1";
+export const AIRCRAFT_RAW_SOURCE_SCHEMA_VERSION = "vector.aircraft-raw-source-artifact.v1";
+export const AIRCRAFT_DERIVATIVE_SCHEMA_VERSION = "vector.aircraft-derivative.v1";
+export const GOVERNED_MODEL_PACK_EXPORT_SCHEMA_VERSION = "vector.governed-model-pack-export.v1";
+export const COMPILED_MODEL_PACK_EXPORT_SCHEMA_VERSION = "vector.compiled-model-pack-export.v1";
+export const AIRCRAFT_DERIVATIVE_RECIPE_ID = "vector.aircraft-derivative.canonical-envelope";
+export const AIRCRAFT_DERIVATIVE_RECIPE_VERSION = "1.0.0";
+export const AIRCRAFT_DERIVATIVE_TOOL_ID = "vector-model-pack-offline-rebuilder";
+export const AIRCRAFT_DERIVATIVE_TOOL_VERSION = "1.0.0";
 export const CREDIBILITY_MANIFEST_SCHEMA_VERSION = "vector.credibility-manifest.v1";
 export const INTENDED_USE_SCHEMA_VERSION = "vector.intended-use.v1";
 export const MODEL_PATCH_SCHEMA_VERSION = "vector.model-patch.v1";
@@ -367,6 +378,123 @@ export type ModelPackSource = {
   credibility: CredibilityManifestSource;
 };
 
+export type AircraftDataFamily =
+  | "AERODYNAMICS"
+  | "PROPULSION"
+  | "FLIGHT_CONTROLS"
+  | "MASS_PROPERTIES"
+  | "STATIONS_STORES"
+  | "SENSORS";
+
+export type AircraftEvidenceRole = "SOURCE" | "VALIDATION";
+
+export type AircraftLineageValueState =
+  | "AVAILABLE"
+  | "UNKNOWN"
+  | "UNAVAILABLE"
+  | "ASSUMPTION"
+  | "REFERENCE_ONLY"
+  | "UNSUPPORTED"
+  | "NOT_APPLICABLE";
+
+export type ModelPackRequirementProfile = {
+  schemaVersion: typeof MODEL_PACK_REQUIREMENT_PROFILE_SCHEMA_VERSION;
+  id: string;
+  version: string;
+  intendedUse: { id: IntendedUseId; version: string };
+  requirements: Array<{
+    id: string;
+    dataFamily: AircraftDataFamily;
+    applicability: { componentIds: string[]; configurations: string[] };
+    fieldSelectors: string[];
+    requiredEvidenceRoles: AircraftEvidenceRole[];
+    required: boolean;
+  }>;
+};
+
+export type AircraftRawSourceArtifact = {
+  schemaVersion: typeof AIRCRAFT_RAW_SOURCE_SCHEMA_VERSION;
+  id: string;
+  version: string;
+  subject: { id: string; configurationId: string };
+  locator: { uri: string; retrievedAt: string; record: string };
+  mediaType: string;
+  byteLength: number;
+  contentDigest: string;
+  rights: {
+    licenseId: string;
+    redistribution: "PERMITTED" | "RESTRICTED" | "PROHIBITED";
+    exportDisposition: "PUBLIC" | "CONTROLLED" | "UNKNOWN";
+  };
+  eligibility: {
+    state: "ELIGIBLE" | "ENGINE_VERIFICATION_ONLY" | "REFERENCE_ONLY" | "INELIGIBLE";
+    nonclaims: string[];
+  };
+};
+
+export type AircraftDerivativeRecord = {
+  schemaVersion: typeof AIRCRAFT_DERIVATIVE_SCHEMA_VERSION;
+  id: string;
+  version: string;
+  subject: { id: string; configurationId: string };
+  orderedInputDigests: string[];
+  recipe: {
+    id: string;
+    version: string;
+    tool: { id: string; version: string };
+    arguments: string[];
+    environmentDigest: string;
+  };
+  transformations: Array<{
+    selector: string;
+    fromUnit: SourceUnit;
+    toUnit: SourceUnit;
+    frame: string;
+    datum: string;
+    uncertaintyPropagation: "PRESERVED" | "PROPAGATED" | "UNKNOWN";
+  }>;
+  output: { mediaType: string; byteLength: number; contentDigest: string };
+};
+
+export type AircraftFieldLineage = {
+  id: string;
+  selector: string;
+  dataFamily: AircraftDataFamily;
+  componentId: string;
+  configurationId: string;
+  valueState: AircraftLineageValueState;
+  evidenceRole: AircraftEvidenceRole;
+  valueDigest?: string;
+  rawArtifactDigest?: string;
+  derivativeDigest?: string;
+  sourceLocator?: string;
+  sourceRecord?: string;
+  unit: SourceUnit;
+  frame: string;
+  datum: string;
+  uncertainty:
+    | { state: "KNOWN"; magnitude: number; unit: SourceUnit }
+    | { state: "UNKNOWN" };
+  validityDomain: ValidityDomain;
+  gapReason?: string;
+};
+
+export type ModelPackSourceV2 = Omit<ModelPackSource, "schemaVersion"> & {
+  schemaVersion: typeof MODEL_PACK_SOURCE_V2_SCHEMA_VERSION;
+  governance: {
+    requirementProfile: ModelPackRequirementProfile;
+    rawSourceArtifacts: AircraftRawSourceArtifact[];
+    derivatives: AircraftDerivativeRecord[];
+    fieldLineage: AircraftFieldLineage[];
+  };
+};
+
+export type GovernedModelPackCompileInput = {
+  source: ModelPackSourceV2;
+  rawArtifactBytes: Array<{ digest: string; bytes: Uint8Array }>;
+  derivativeBytes: Array<{ digest: string; bytes: Uint8Array }>;
+};
+
 export type CompiledTable = {
   id: string;
   outputUnit: SiUnit;
@@ -480,6 +608,54 @@ export type CompiledModelPack = {
 export type CompiledModelPackBundle = {
   pack: CompiledModelPack;
   credibilityManifest: CredibilityManifest;
+};
+
+export type ModelPackRequirementCompleteness = {
+  profile: { id: string; version: string; digest: string };
+  results: Array<{
+    requirementId: string;
+    state: "SATISFIED" | "INCOMPLETE" | "NOT_APPLICABLE";
+    gapReasons: string[];
+  }>;
+  complete: boolean;
+  digest: string;
+};
+
+export type CompiledModelPackV2 = Omit<CompiledModelPack, "schemaVersion" | "digest"> & {
+  schemaVersion: typeof COMPILED_MODEL_PACK_V2_SCHEMA_VERSION;
+  digest: string;
+  legacyProjectionDigest: string;
+  sourceDigest: string;
+  lineageDigest: string;
+  admissionState: "INCOMPLETE" | "COMPLETE_FOUNDATION_NON_PROMOTABLE";
+  requirementCompleteness: ModelPackRequirementCompleteness;
+  evidenceLineage: AircraftFieldLineage[];
+};
+
+export type CompiledModelPackV2Bundle = {
+  pack: CompiledModelPackV2;
+  credibilityManifest: CredibilityManifest;
+};
+
+export type ExactModelPackReference = { id: string; version: string; digest: string };
+
+export type GovernedModelPackPublication = GovernedModelPackCompileInput & {
+  bundle: CompiledModelPackV2Bundle;
+};
+
+export type GovernedModelPackResearchExport = {
+  schemaVersion: typeof GOVERNED_MODEL_PACK_EXPORT_SCHEMA_VERSION;
+  publications: Array<{
+    source: ModelPackSourceV2;
+    rawArtifactBytes: Array<{ digest: string; bytes: number[] }>;
+    derivativeBytes: Array<{ digest: string; bytes: number[] }>;
+    bundle: CompiledModelPackV2Bundle;
+  }>;
+};
+
+export type CompiledModelPackExport = {
+  schemaVersion: typeof COMPILED_MODEL_PACK_EXPORT_SCHEMA_VERSION;
+  packs: CompiledModelPackV2Bundle[];
 };
 
 export type ScenarioModelPatch = {
@@ -928,6 +1104,7 @@ function ensureNoDependencyCycles(
 }
 
 function deepFreeze<T>(value: T): T {
+  if (ArrayBuffer.isView(value)) return value;
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
     for (const item of Object.values(value as Record<string, unknown>)) deepFreeze(item);
@@ -955,8 +1132,8 @@ function normalizeDigestNumbers(value: unknown): unknown {
   return value;
 }
 
-function modelPayloadDigest(pack: Omit<CompiledModelPack, "digest">) {
-  const normalized = normalizeDigestNumbers(digestPayload(pack));
+function governedContentDigest(value: unknown) {
+  const normalized = normalizeDigestNumbers(value);
   const canonicalize = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(canonicalize);
     if (value && typeof value === "object") {
@@ -974,6 +1151,20 @@ function modelPayloadDigest(pack: Omit<CompiledModelPack, "digest">) {
       .map((byte) => byte.toString(16).padStart(2, "0"))
       .join(""),
   );
+}
+
+export function aircraftLineageValueDigest(input: {
+  selector: string;
+  value: string | number | boolean;
+  unit: SourceUnit;
+  frame: string;
+  datum: string;
+}) {
+  return governedContentDigest(input);
+}
+
+function modelPayloadDigest(pack: Omit<CompiledModelPack, "digest">) {
+  return governedContentDigest(digestPayload(pack));
 }
 
 export async function compileModelPack(source: ModelPackSource): Promise<CompiledModelPackBundle> {
@@ -1443,6 +1634,1395 @@ export async function verifyCompiledModelPackDigest(pack: CompiledModelPack) {
     Object.entries(pack).filter(([key]) => key !== "digest"),
   ) as Omit<CompiledModelPack, "digest">;
   return (await modelPayloadDigest(payload)) === pack.digest;
+}
+
+const AIRCRAFT_DATA_FAMILIES: AircraftDataFamily[] = [
+  "AERODYNAMICS",
+  "PROPULSION",
+  "FLIGHT_CONTROLS",
+  "MASS_PROPERTIES",
+  "STATIONS_STORES",
+  "SENSORS",
+];
+const AIRCRAFT_LINEAGE_VALUE_STATES: AircraftLineageValueState[] = [
+  "AVAILABLE",
+  "UNKNOWN",
+  "UNAVAILABLE",
+  "ASSUMPTION",
+  "REFERENCE_ONLY",
+  "UNSUPPORTED",
+  "NOT_APPLICABLE",
+];
+const MAX_GOVERNED_ARTIFACT_BYTES = 32 * 1024 * 1024;
+const MAX_GOVERNED_SOURCE_BYTES = 8 * 1024 * 1024;
+const MAX_GOVERNED_CORPUS_BYTES = 64 * 1024 * 1024;
+const MAX_GOVERNED_RECORDS = 2_048;
+const MAX_GOVERNED_CONFIGURATIONS = 128;
+const MAX_GOVERNED_TABLE_CELLS = 2_000_000;
+
+const compareCanonicalText = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0;
+const pointerToken = (value: string) => value.replaceAll("~", "~0").replaceAll("/", "~1");
+
+export type GovernedAircraftScalarField = {
+  componentId: string;
+  dataFamily: AircraftDataFamily;
+  selector: string;
+  unit: SourceUnit;
+  value: string | number | boolean;
+  configurations: string[];
+};
+
+export function listGovernedAircraftScalarFields(source: ModelPackSourceV2): GovernedAircraftScalarField[] {
+  const fields: GovernedAircraftScalarField[] = [];
+  const add = (
+    component: ModelSourceBase,
+    dataFamily: AircraftDataFamily,
+    selector: string,
+    unit: SourceUnit,
+  ) => fields.push({
+    componentId: component.id,
+    dataFamily,
+    selector,
+    unit,
+    value: resolveGovernedScalarSelector(component, selector) as string | number | boolean,
+    configurations: [...component.validityDomain.configurations].sort(compareCanonicalText),
+  });
+  const addTable = (
+    component: ModelSourceBase,
+    dataFamily: AircraftDataFamily,
+    root: string,
+    table: CoefficientTableSource,
+  ) => {
+    for (const axis of table.axes) {
+      axis.values.forEach((_value, index) => add(
+        component,
+        dataFamily,
+        `${root}/axes/${pointerToken(axis.semantic)}/values/${index}`,
+        axis.unit,
+      ));
+    }
+    table.values.forEach((_value, index) => add(component, dataFamily, `${root}/values/${index}`, table.outputUnit));
+  };
+  for (const model of source.aerodynamics) {
+    add(model, "AERODYNAMICS", "/referenceArea/value", model.referenceArea.unit);
+    add(model, "AERODYNAMICS", "/referenceChord/value", model.referenceChord.unit);
+    add(model, "AERODYNAMICS", "/referenceSpan/value", model.referenceSpan.unit);
+    for (const table of model.coefficientTables) {
+      addTable(model, "AERODYNAMICS", `/coefficientTables/${pointerToken(table.id)}`, table);
+    }
+  }
+  for (const model of source.propulsion) {
+    add(model, "PROPULSION", "/engineCount", "1");
+    add(model, "PROPULSION", "/spoolTime/value", model.spoolTime.unit);
+    addTable(model, "PROPULSION", "/thrustTable", model.thrustTable);
+    addTable(model, "PROPULSION", "/fuelFlowTable", model.fuelFlowTable);
+  }
+  for (const model of source.sensors) {
+    for (const field of [
+      "detectionRange", "minimumRange", "scanPeriod", "azimuthFieldOfView", "elevationFieldOfView",
+    ] as const) add(model, "SENSORS", `/${field}/value`, model[field].unit);
+  }
+  for (const model of source.aircraft) {
+    add(model, "FLIGHT_CONTROLS", "/maximumCommandLoadFactor/value", model.maximumCommandLoadFactor.unit);
+    add(model, "MASS_PROPERTIES", "/emptyMass/value", model.emptyMass.unit);
+    add(model, "MASS_PROPERTIES", "/fuelCapacity/value", model.fuelCapacity.unit);
+  }
+  for (const model of source.weapons) {
+    for (const field of [
+      "launchMass", "dryMass", "maximumCommandLoadFactor", "seekerActivationRange",
+      "datalinkUpdatePeriod", "thrustTaperSpeed", "navigationConstant",
+    ] as const) add(model, "STATIONS_STORES", `/${field}/value`, model[field].unit);
+  }
+  for (const model of source.loadouts) {
+    for (const station of model.stations) {
+      const root = `/stations/${pointerToken(station.id)}`;
+      add(model, "STATIONS_STORES", `${root}/positionBody/x/value`, station.positionBody.x.unit);
+      add(model, "STATIONS_STORES", `${root}/positionBody/y/value`, station.positionBody.y.unit);
+      add(model, "STATIONS_STORES", `${root}/positionBody/z/value`, station.positionBody.z.unit);
+      add(model, "STATIONS_STORES", `${root}/maximumQuantity`, "1");
+    }
+  }
+  return fields.sort((left, right) => compareCanonicalText(
+    `${left.dataFamily}\u0000${left.componentId}\u0000${left.selector}`,
+    `${right.dataFamily}\u0000${right.componentId}\u0000${right.selector}`,
+  ));
+}
+
+function validateUniqueStrings(issues: string[], path: string, values: string[]) {
+  nonEmpty(issues, path, values);
+  if (new Set(values).size !== values.length) issues.push(`${path} must not contain duplicates`);
+}
+
+function validateSourceUnit(issues: string[], path: string, unit: SourceUnit) {
+  if (!Object.hasOwn(UNIT_CONVERSIONS, unit)) issues.push(`${path} unit is unsupported`);
+}
+
+function resolveGovernedScalarSelector(component: unknown, selector: string) {
+  if (!selector.startsWith("/") || /~(?:[^01]|$)/u.test(selector)) return undefined;
+  let value: unknown = component;
+  for (const encodedToken of selector.slice(1).split("/")) {
+    const token = encodedToken.replaceAll("~1", "/").replaceAll("~0", "~");
+    if (Array.isArray(value)) {
+      const keyed = value.filter((item): item is Record<string, unknown> =>
+        Boolean(item) && typeof item === "object" && !Array.isArray(item)
+      );
+      if (keyed.length === value.length && keyed.length > 0) {
+        const matches = keyed.filter((item) => item.id === token || item.semantic === token);
+        if (matches.length !== 1) return undefined;
+        [value] = matches;
+      } else {
+        if (!/^(?:0|[1-9][0-9]*)$/u.test(token)) return undefined;
+        value = value[Number(token)];
+      }
+    } else if (value && typeof value === "object" && Object.hasOwn(value, token)) {
+      value = (value as Record<string, unknown>)[token];
+    } else {
+      return undefined;
+    }
+  }
+  return ["string", "number", "boolean"].includes(typeof value) ? value : undefined;
+}
+
+function exactKeys(
+  issues: string[],
+  path: string,
+  value: unknown,
+  required: readonly string[],
+  optional: readonly string[] = [],
+) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    issues.push(`${path} must be an object`);
+    return;
+  }
+  const allowed = new Set([...required, ...optional]);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) issues.push(`${path} has unsupported field ${key}`);
+  }
+  for (const key of required) {
+    if (!Object.hasOwn(value, key)) issues.push(`${path} is missing field ${key}`);
+  }
+}
+
+function validateGovernedExactKeys(source: ModelPackSourceV2, issues: string[]) {
+  exactKeys(issues, "source", source, [
+    "schemaVersion", "id", "version", "coordinateConventions", "intendedUses", "evidence",
+    "catalogIdentities", "aerodynamics", "propulsion", "sensors", "aircraft", "weapons",
+    "loadouts", "compatibility", "credibility", "governance",
+  ]);
+  exactKeys(issues, "source.coordinateConventions", source.coordinateConventions, [
+    "geodeticDatum", "localFrame", "bodyAxes", "aerodynamicAxes", "angularUnit",
+    "positionUnit", "velocityUnit", "verticalReference",
+  ]);
+  source.intendedUses?.forEach((item, index) => exactKeys(
+    issues,
+    `source.intendedUses[${index}]`,
+    item,
+    [
+      "schemaVersion", "id", "version", "question", "requiredCapabilities",
+      "supportedInterpretations", "unsupportedInterpretations",
+    ],
+  ));
+  source.evidence?.forEach((item, index) => exactKeys(
+    issues,
+    `source.evidence[${index}]`,
+    item,
+    ["id", "kind", "title", "uri", "accessedAt"],
+    ["locator", "contentSha256"],
+  ));
+  source.catalogIdentities?.forEach((item, index) => exactKeys(
+    issues,
+    `source.catalogIdentities[${index}]`,
+    item,
+    ["catalogObjectId", "kind", "definitionModelIds"],
+  ));
+  const validity = (path: string, value: ValidityDomain) => {
+    exactKeys(issues, path, value, [
+      "altitude", "mach", "angleOfAttack", "loadFactor", "configurations", "environments",
+    ]);
+    for (const field of ["altitude", "mach", "angleOfAttack", "loadFactor"] as const) {
+      exactKeys(issues, `${path}.${field}`, value?.[field], ["minimum", "maximum", "unit"]);
+    }
+  };
+  const quantity = (path: string, value: Quantity) => exactKeys(
+    issues,
+    path,
+    value,
+    ["value", "unit", "evidenceRefIds"],
+  );
+  const table = (path: string, value: CoefficientTableSource) => {
+    exactKeys(issues, path, value, [
+      "id", "outputUnit", "axes", "values", "evidenceRefIds", "validityDomain",
+    ]);
+    value?.axes?.forEach((axis, index) => exactKeys(
+      issues,
+      `${path}.axes[${index}]`,
+      axis,
+      ["semantic", "unit", "values"],
+    ));
+    validity(`${path}.validityDomain`, value?.validityDomain);
+  };
+  const base = (path: string, value: ModelSourceBase, specific: string[], optional: string[] = []) => {
+    exactKeys(issues, path, value, [
+      "kind", "id", "version", "evidenceRefIds", "validityDomain", "limitationIds", ...specific,
+    ], ["dependsOn", ...optional]);
+    validity(`${path}.validityDomain`, value?.validityDomain);
+  };
+  source.aerodynamics?.forEach((item, index) => {
+    const path = `source.aerodynamics[${index}]`;
+    base(path, item, ["referenceArea", "referenceChord", "referenceSpan", "coefficientTables"]);
+    quantity(`${path}.referenceArea`, item.referenceArea);
+    quantity(`${path}.referenceChord`, item.referenceChord);
+    quantity(`${path}.referenceSpan`, item.referenceSpan);
+    item.coefficientTables?.forEach((value, tableIndex) => table(`${path}.coefficientTables[${tableIndex}]`, value));
+  });
+  source.propulsion?.forEach((item, index) => {
+    const path = `source.propulsion[${index}]`;
+    base(path, item, ["engineCount", "thrustTable", "fuelFlowTable", "spoolTime"]);
+    table(`${path}.thrustTable`, item.thrustTable);
+    table(`${path}.fuelFlowTable`, item.fuelFlowTable);
+    quantity(`${path}.spoolTime`, item.spoolTime);
+  });
+  source.sensors?.forEach((item, index) => {
+    const path = `source.sensors[${index}]`;
+    base(path, item, [
+      "sensorKind", "detectionRange", "minimumRange", "scanPeriod",
+      "azimuthFieldOfView", "elevationFieldOfView",
+    ], ["evidenceAdmission", "verificationTrackModel"]);
+    for (const field of [
+      "detectionRange", "minimumRange", "scanPeriod", "azimuthFieldOfView", "elevationFieldOfView",
+    ] as const) quantity(`${path}.${field}`, item[field]);
+    if (item.evidenceAdmission) {
+      exactKeys(issues, `${path}.evidenceAdmission`, item.evidenceAdmission, [
+        "schemaVersion", "sourceEvidenceRefIds", "validationEvidenceRefIds", "coverage",
+      ]);
+      exactKeys(issues, `${path}.evidenceAdmission.coverage`, item.evidenceAdmission.coverage, [
+        ...SENSOR_EVIDENCE_COVERAGE_FIELDS,
+      ]);
+    }
+  });
+  source.aircraft?.forEach((item, index) => {
+    const path = `source.aircraft[${index}]`;
+    base(path, item, [
+      "catalogObjectId", "emptyMass", "fuelCapacity", "aerodynamicModelId",
+      "propulsionModelIds", "sensorModelIds", "loadoutModelId",
+      "maximumCommandLoadFactor", "performanceAdmission",
+    ]);
+    quantity(`${path}.emptyMass`, item.emptyMass);
+    quantity(`${path}.fuelCapacity`, item.fuelCapacity);
+    quantity(`${path}.maximumCommandLoadFactor`, item.maximumCommandLoadFactor);
+    if (item.performanceAdmission?.state === "UNSUPPORTED") {
+      exactKeys(issues, `${path}.performanceAdmission`, item.performanceAdmission, ["state", "limitationId", "reason"]);
+    } else {
+      exactKeys(issues, `${path}.performanceAdmission`, item.performanceAdmission, ["state", "capabilities"]);
+      item.performanceAdmission?.capabilities?.forEach((capability, capabilityIndex) => exactKeys(
+        issues,
+        `${path}.performanceAdmission.capabilities[${capabilityIndex}]`,
+        capability,
+        ["capability", "sourceEvidenceRefIds", "validationEvidenceRefIds"],
+      ));
+    }
+  });
+  source.weapons?.forEach((item, index) => {
+    const path = `source.weapons[${index}]`;
+    base(path, item, [
+      "catalogObjectId", "launchMass", "dryMass", "aerodynamicModelId", "propulsionModelId",
+      "seekerMode", "supportRequirement", "launchAuthorization", "maximumCommandLoadFactor",
+      "seekerActivationRange", "datalinkUpdatePeriod", "thrustTaperSpeed", "navigationConstant",
+    ], ["sensorModelId"]);
+    for (const field of [
+      "launchMass", "dryMass", "maximumCommandLoadFactor", "seekerActivationRange",
+      "datalinkUpdatePeriod", "thrustTaperSpeed", "navigationConstant",
+    ] as const) quantity(`${path}.${field}`, item[field]);
+  });
+  source.loadouts?.forEach((item, index) => {
+    const path = `source.loadouts[${index}]`;
+    base(path, item, ["platformCatalogObjectId", "stations"]);
+    item.stations?.forEach((station, stationIndex) => {
+      const stationPath = `${path}.stations[${stationIndex}]`;
+      exactKeys(issues, stationPath, station, [
+        "id", "stationGroup", "positionBody", "maximumQuantity", "compatibleStoreModelIds",
+      ]);
+      exactKeys(issues, `${stationPath}.positionBody`, station.positionBody, ["x", "y", "z"]);
+      quantity(`${stationPath}.positionBody.x`, station.positionBody?.x);
+      quantity(`${stationPath}.positionBody.y`, station.positionBody?.y);
+      quantity(`${stationPath}.positionBody.z`, station.positionBody?.z);
+    });
+  });
+  source.compatibility?.forEach((item, index) => exactKeys(
+    issues,
+    `source.compatibility[${index}]`,
+    item,
+    [
+      "id", "platformCatalogObjectId", "loadoutModelId", "storeModelId", "stationGroup",
+      "status", "maximumQuantity", "rationale", "evidenceRefIds",
+    ],
+  ));
+  exactKeys(issues, "source.credibility", source.credibility, [
+    "id", "version", "engineDigest", "intendedUseRefs", "validityDomain", "requirements",
+    "cases", "numericalTolerances", "uncertaintyCharacterization", "limitations", "approvalState",
+  ]);
+  validity("source.credibility.validityDomain", source.credibility?.validityDomain);
+  source.credibility?.intendedUseRefs?.forEach((item, index) => exactKeys(
+    issues,
+    `source.credibility.intendedUseRefs[${index}]`,
+    item,
+    ["id", "version"],
+  ));
+  source.credibility?.requirements?.forEach((item, index) => exactKeys(
+    issues,
+    `source.credibility.requirements[${index}]`,
+    item,
+    ["id", "statement"],
+  ));
+  source.credibility?.cases?.forEach((item, index) => exactKeys(
+    issues,
+    `source.credibility.cases[${index}]`,
+    item,
+    ["id", "requirementId", "kind", "result", "tolerance", "evidenceRefId"],
+    ["executedAt", "reviewedModelDigest"],
+  ));
+  source.credibility?.numericalTolerances?.forEach((item, index) => exactKeys(
+    issues,
+    `source.credibility.numericalTolerances[${index}]`,
+    item,
+    ["metric", "tolerance", "unit"],
+  ));
+  source.credibility?.limitations?.forEach((item, index) => exactKeys(
+    issues,
+    `source.credibility.limitations[${index}]`,
+    item,
+    ["id", "severity", "statement", "affectedCapabilities"],
+  ));
+  exactKeys(issues, "source.governance", source.governance, [
+    "requirementProfile", "rawSourceArtifacts", "derivatives", "fieldLineage",
+  ]);
+  const profile = source.governance?.requirementProfile;
+  exactKeys(issues, "source.governance.requirementProfile", profile, [
+    "schemaVersion", "id", "version", "intendedUse", "requirements",
+  ]);
+  exactKeys(issues, "source.governance.requirementProfile.intendedUse", profile?.intendedUse, ["id", "version"]);
+  profile?.requirements?.forEach((item, index) => {
+    const path = `source.governance.requirementProfile.requirements[${index}]`;
+    exactKeys(issues, path, item, [
+      "id", "dataFamily", "applicability", "fieldSelectors", "requiredEvidenceRoles", "required",
+    ]);
+    exactKeys(issues, `${path}.applicability`, item.applicability, ["componentIds", "configurations"]);
+  });
+  source.governance?.rawSourceArtifacts?.forEach((item, index) => {
+    const path = `source.governance.rawSourceArtifacts[${index}]`;
+    exactKeys(issues, path, item, [
+      "schemaVersion", "id", "version", "subject", "locator", "mediaType", "byteLength",
+      "contentDigest", "rights", "eligibility",
+    ]);
+    exactKeys(issues, `${path}.subject`, item.subject, ["id", "configurationId"]);
+    exactKeys(issues, `${path}.locator`, item.locator, ["uri", "retrievedAt", "record"]);
+    exactKeys(issues, `${path}.rights`, item.rights, ["licenseId", "redistribution", "exportDisposition"]);
+    exactKeys(issues, `${path}.eligibility`, item.eligibility, ["state", "nonclaims"]);
+  });
+  source.governance?.derivatives?.forEach((item, index) => {
+    const path = `source.governance.derivatives[${index}]`;
+    exactKeys(issues, path, item, [
+      "schemaVersion", "id", "version", "subject", "orderedInputDigests", "recipe",
+      "transformations", "output",
+    ]);
+    exactKeys(issues, `${path}.subject`, item.subject, ["id", "configurationId"]);
+    exactKeys(issues, `${path}.recipe`, item.recipe, ["id", "version", "tool", "arguments", "environmentDigest"]);
+    exactKeys(issues, `${path}.recipe.tool`, item.recipe?.tool, ["id", "version"]);
+    item.transformations?.forEach((transformation, transformationIndex) => exactKeys(
+      issues,
+      `${path}.transformations[${transformationIndex}]`,
+      transformation,
+      ["selector", "fromUnit", "toUnit", "frame", "datum", "uncertaintyPropagation"],
+    ));
+    exactKeys(issues, `${path}.output`, item.output, ["mediaType", "byteLength", "contentDigest"]);
+  });
+  source.governance?.fieldLineage?.forEach((item, index) => {
+    const path = `source.governance.fieldLineage[${index}]`;
+    exactKeys(issues, path, item, [
+      "id", "selector", "dataFamily", "componentId", "configurationId", "valueState",
+      "evidenceRole", "unit", "frame", "datum", "uncertainty", "validityDomain",
+    ], ["valueDigest", "rawArtifactDigest", "derivativeDigest", "sourceLocator", "sourceRecord", "gapReason"]);
+    exactKeys(
+      issues,
+      `${path}.uncertainty`,
+      item.uncertainty,
+      item.uncertainty?.state === "KNOWN" ? ["state", "magnitude", "unit"] : ["state"],
+    );
+  });
+}
+
+function orderedGovernance(source: ModelPackSourceV2) {
+  const clone = structuredClone(source);
+  const byId = <T extends { id: string }>(values: T[]) => values.sort((left, right) => compareCanonicalText(left.id, right.id));
+  const sortStrings = (values: string[]) => values.sort(compareCanonicalText);
+  const sortValidity = (value: ValidityDomain) => {
+    sortStrings(value.configurations);
+    sortStrings(value.environments);
+  };
+  clone.intendedUses.sort((left, right) => compareCanonicalText(`${left.id}@${left.version}`, `${right.id}@${right.version}`));
+  for (const intendedUse of clone.intendedUses) {
+    sortStrings(intendedUse.requiredCapabilities);
+    sortStrings(intendedUse.supportedInterpretations);
+    sortStrings(intendedUse.unsupportedInterpretations);
+  }
+  byId(clone.evidence);
+  byId(clone.aerodynamics);
+  byId(clone.propulsion);
+  byId(clone.sensors);
+  byId(clone.aircraft);
+  byId(clone.weapons);
+  byId(clone.loadouts);
+  byId(clone.compatibility);
+  clone.catalogIdentities.sort((left, right) => compareCanonicalText(left.catalogObjectId, right.catalogObjectId));
+  for (const identity of clone.catalogIdentities) sortStrings(identity.definitionModelIds);
+  for (const model of [...clone.aerodynamics, ...clone.propulsion, ...clone.sensors, ...clone.aircraft, ...clone.weapons, ...clone.loadouts]) {
+    sortStrings(model.evidenceRefIds);
+    sortStrings(model.limitationIds);
+    if (model.dependsOn) sortStrings(model.dependsOn);
+    sortValidity(model.validityDomain);
+  }
+  for (const model of clone.aerodynamics) byId(model.coefficientTables);
+  for (const model of clone.aircraft) {
+    sortStrings(model.propulsionModelIds);
+    sortStrings(model.sensorModelIds);
+  }
+  for (const model of clone.loadouts) {
+    byId(model.stations);
+    for (const station of model.stations) sortStrings(station.compatibleStoreModelIds);
+  }
+  clone.credibility.intendedUseRefs.sort((left, right) => compareCanonicalText(`${left.id}@${left.version}`, `${right.id}@${right.version}`));
+  byId(clone.credibility.requirements);
+  byId(clone.credibility.cases);
+  byId(clone.credibility.limitations);
+  clone.credibility.numericalTolerances.sort((left, right) => compareCanonicalText(left.metric, right.metric));
+  sortValidity(clone.credibility.validityDomain);
+  clone.governance.requirementProfile.requirements.sort((left, right) => compareCanonicalText(left.id, right.id));
+  for (const requirement of clone.governance.requirementProfile.requirements) {
+    requirement.applicability.componentIds.sort(compareCanonicalText);
+    requirement.applicability.configurations.sort(compareCanonicalText);
+    requirement.fieldSelectors.sort(compareCanonicalText);
+    requirement.requiredEvidenceRoles.sort(compareCanonicalText);
+  }
+  clone.governance.rawSourceArtifacts.sort((left, right) => compareCanonicalText(left.id, right.id));
+  for (const artifact of clone.governance.rawSourceArtifacts) artifact.eligibility.nonclaims.sort(compareCanonicalText);
+  clone.governance.derivatives.sort((left, right) => compareCanonicalText(left.id, right.id));
+  for (const derivative of clone.governance.derivatives) {
+    derivative.transformations.sort((left, right) => compareCanonicalText(left.selector, right.selector));
+  }
+  clone.governance.fieldLineage.sort((left, right) => compareCanonicalText(left.id, right.id));
+  return clone;
+}
+
+export async function sha256ArtifactBytes(bytes: Uint8Array) {
+  const ownedBytes = Uint8Array.from(bytes);
+  const digest = await crypto.subtle.digest("SHA-256", ownedBytes.buffer);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function byteMap(
+  issues: string[],
+  path: string,
+  entries: Array<{ digest: string; bytes: Uint8Array }>,
+) {
+  const result = new Map<string, Uint8Array>();
+  let totalBytes = 0;
+  if (entries.length > MAX_GOVERNED_RECORDS) issues.push(`${path} exceeds ${MAX_GOVERNED_RECORDS} records`);
+  for (const [index, entry] of entries.entries()) {
+    exactKeys(issues, `${path}[${index}]`, entry, ["digest", "bytes"]);
+    if (!DIGEST_PATTERN.test(entry.digest)) issues.push(`${path}[${index}].digest must be a SHA-256 digest`);
+    if (!(entry.bytes instanceof Uint8Array)) issues.push(`${path}[${index}].bytes must be Uint8Array`);
+    if (entry.bytes?.byteLength > MAX_GOVERNED_ARTIFACT_BYTES) {
+      issues.push(`${path}[${index}].bytes exceeds ${MAX_GOVERNED_ARTIFACT_BYTES} bytes`);
+    }
+    totalBytes += entry.bytes?.byteLength ?? 0;
+    if (result.has(entry.digest)) issues.push(`${path} contains duplicate digest ${entry.digest}`);
+    result.set(entry.digest, entry.bytes);
+  }
+  if (totalBytes > MAX_GOVERNED_CORPUS_BYTES) issues.push(`${path} exceeds ${MAX_GOVERNED_CORPUS_BYTES} total bytes`);
+  return result;
+}
+
+export async function rebuildAircraftDerivative(
+  derivative: AircraftDerivativeRecord,
+  orderedInputs: Array<{ digest: string; bytes: Uint8Array }>,
+) {
+  if (
+    derivative.recipe.id !== AIRCRAFT_DERIVATIVE_RECIPE_ID
+    || derivative.recipe.version !== AIRCRAFT_DERIVATIVE_RECIPE_VERSION
+    || derivative.recipe.tool.id !== AIRCRAFT_DERIVATIVE_TOOL_ID
+    || derivative.recipe.tool.version !== AIRCRAFT_DERIVATIVE_TOOL_VERSION
+  ) {
+    throw new ModelPackValidationError([
+      `[MODEL_PACK_DERIVATIVE_RECIPE] derivative ${derivative.id} uses an unsupported recipe/tool identity`,
+    ]);
+  }
+  if (
+    orderedInputs.length !== derivative.orderedInputDigests.length
+    || orderedInputs.some((input, index) => input.digest !== derivative.orderedInputDigests[index])
+  ) {
+    throw new ModelPackValidationError([
+      `[MODEL_PACK_DERIVATIVE_INPUT] derivative ${derivative.id} inputs do not match orderedInputDigests`,
+    ]);
+  }
+  const encoded = JSON.stringify({
+    schemaVersion: derivative.schemaVersion,
+    id: derivative.id,
+    version: derivative.version,
+    subject: derivative.subject,
+    orderedInputs: orderedInputs.map((input) => ({ digest: input.digest, bytes: [...input.bytes] })),
+    recipe: derivative.recipe,
+    transformations: [...derivative.transformations].sort((left, right) =>
+      compareCanonicalText(left.selector, right.selector)
+    ),
+    outputMediaType: derivative.output.mediaType,
+  });
+  return new TextEncoder().encode(encoded);
+}
+
+async function validateGovernedLineage(input: GovernedModelPackCompileInput) {
+  const { source } = input;
+  const issues: string[] = [];
+  exactKeys(issues, "compileInput", input, ["source", "rawArtifactBytes", "derivativeBytes"]);
+  if (source.schemaVersion !== MODEL_PACK_SOURCE_V2_SCHEMA_VERSION) {
+    issues.push(`schemaVersion must be ${MODEL_PACK_SOURCE_V2_SCHEMA_VERSION}`);
+  }
+  validateGovernedExactKeys(source, issues);
+  if (issues.length > 0) throw new ModelPackValidationError(issues);
+  const encodedSource = new TextEncoder().encode(JSON.stringify(source));
+  if (encodedSource.byteLength > MAX_GOVERNED_SOURCE_BYTES) {
+    issues.push(`source exceeds ${MAX_GOVERNED_SOURCE_BYTES} bytes`);
+  }
+  const { requirementProfile, rawSourceArtifacts, derivatives, fieldLineage } = source.governance;
+  if (requirementProfile.schemaVersion !== MODEL_PACK_REQUIREMENT_PROFILE_SCHEMA_VERSION) {
+    issues.push(`requirementProfile.schemaVersion must be ${MODEL_PACK_REQUIREMENT_PROFILE_SCHEMA_VERSION}`);
+  }
+  stableId(issues, "requirementProfile.id", requirementProfile.id);
+  version(issues, "requirementProfile.version", requirementProfile.version);
+  uniqueIds(issues, "requirementProfile.requirements", requirementProfile.requirements);
+  uniqueIds(issues, "rawSourceArtifacts", rawSourceArtifacts);
+  uniqueIds(issues, "derivatives", derivatives);
+  uniqueIds(issues, "fieldLineage", fieldLineage);
+  if (rawSourceArtifacts.length + derivatives.length + fieldLineage.length > MAX_GOVERNED_RECORDS) {
+    issues.push(`governed record count exceeds ${MAX_GOVERNED_RECORDS}`);
+  }
+  if (!source.intendedUses.some((item) =>
+    item.id === requirementProfile.intendedUse.id && item.version === requirementProfile.intendedUse.version
+  )) issues.push("requirementProfile.intendedUse is not declared by the source pack");
+
+  const rawBytes = byteMap(issues, "rawArtifactBytes", input.rawArtifactBytes);
+  const normalizedBytes = byteMap(issues, "derivativeBytes", input.derivativeBytes);
+  const rawByDigest = new Map(rawSourceArtifacts.map((item) => [item.contentDigest, item]));
+  const derivativeByDigest = new Map(derivatives.map((item) => [item.output.contentDigest, item]));
+  if (rawByDigest.size !== rawSourceArtifacts.length) issues.push("rawSourceArtifacts contains duplicate contentDigest");
+  if (derivativeByDigest.size !== derivatives.length) issues.push("derivatives contains duplicate output contentDigest");
+  const redistributionStates = new Set(["PERMITTED", "RESTRICTED", "PROHIBITED"]);
+  const exportDispositions = new Set(["PUBLIC", "CONTROLLED", "UNKNOWN"]);
+  const eligibilityStates = new Set(["ELIGIBLE", "ENGINE_VERIFICATION_ONLY", "REFERENCE_ONLY", "INELIGIBLE"]);
+  for (const [index, artifact] of rawSourceArtifacts.entries()) {
+    const path = `rawSourceArtifacts[${index}]`;
+    if (artifact.schemaVersion !== AIRCRAFT_RAW_SOURCE_SCHEMA_VERSION) issues.push(`${path}.schemaVersion is unsupported`);
+    stableId(issues, `${path}.id`, artifact.id);
+    version(issues, `${path}.version`, artifact.version);
+    if (!DIGEST_PATTERN.test(artifact.contentDigest)) issues.push(`${path}.contentDigest must be a SHA-256 digest`);
+    if (!Number.isSafeInteger(artifact.byteLength) || artifact.byteLength < 0 || artifact.byteLength > MAX_GOVERNED_ARTIFACT_BYTES) {
+      issues.push(`${path}.byteLength is outside the governed bound`);
+    }
+    if (!artifact.subject.id.trim() || !artifact.subject.configurationId.trim()) issues.push(`${path}.subject must be exact`);
+    if (
+      !artifact.locator.uri.trim()
+      || artifact.locator.uri !== artifact.locator.uri.trim()
+      || !artifact.locator.record.trim()
+      || artifact.locator.record !== artifact.locator.record.trim()
+      || !Number.isFinite(Date.parse(artifact.locator.retrievedAt))
+      || new Date(artifact.locator.retrievedAt).toISOString() !== artifact.locator.retrievedAt
+    ) {
+      issues.push(`${path}.locator must be canonical and retrieval-bound`);
+    }
+    if (!artifact.mediaType.trim()) issues.push(`${path}.mediaType must not be blank`);
+    if (
+      !artifact.rights.licenseId.trim()
+      || !redistributionStates.has(artifact.rights.redistribution)
+      || !exportDispositions.has(artifact.rights.exportDisposition)
+    ) {
+      issues.push(`${path}.rights must carry an explicit licence and export disposition`);
+    }
+    if (!eligibilityStates.has(artifact.eligibility.state)) issues.push(`${path}.eligibility.state is unsupported`);
+    nonEmpty(issues, `${path}.eligibility.nonclaims`, artifact.eligibility.nonclaims);
+    const bytes = rawBytes.get(artifact.contentDigest);
+    if (!bytes) issues.push(`${path} is missing raw artifact bytes`);
+    else {
+      if (bytes.byteLength !== artifact.byteLength) issues.push(`${path} raw artifact byte length does not match`);
+      if (await sha256ArtifactBytes(bytes) !== artifact.contentDigest) issues.push(`${path} raw artifact bytes do not match contentDigest`);
+    }
+  }
+  for (const entry of input.rawArtifactBytes) {
+    if (!rawByDigest.has(entry.digest)) issues.push(`rawArtifactBytes contains unreferenced digest ${entry.digest}`);
+  }
+
+  for (const [index, derivative] of derivatives.entries()) {
+    const path = `derivatives[${index}]`;
+    if (derivative.schemaVersion !== AIRCRAFT_DERIVATIVE_SCHEMA_VERSION) issues.push(`${path}.schemaVersion is unsupported`);
+    stableId(issues, `${path}.id`, derivative.id);
+    version(issues, `${path}.version`, derivative.version);
+    stableId(issues, `${path}.recipe.id`, derivative.recipe.id);
+    version(issues, `${path}.recipe.version`, derivative.recipe.version);
+    stableId(issues, `${path}.recipe.tool.id`, derivative.recipe.tool.id);
+    version(issues, `${path}.recipe.tool.version`, derivative.recipe.tool.version);
+    if (!derivative.subject.id.trim() || !derivative.subject.configurationId.trim()) issues.push(`${path}.subject must be exact`);
+    if (!DIGEST_PATTERN.test(derivative.recipe.environmentDigest)) issues.push(`${path}.recipe.environmentDigest must be a SHA-256 digest`);
+    nonEmpty(issues, `${path}.orderedInputDigests`, derivative.orderedInputDigests);
+    validateUniqueStrings(
+      issues,
+      `${path}.transformations`,
+      derivative.transformations.map((transformation) => transformation.selector),
+    );
+    for (const digest of derivative.orderedInputDigests) {
+      const rawInput = rawByDigest.get(digest);
+      const derivativeInput = derivativeByDigest.get(digest);
+      if (!rawInput && !derivativeInput) issues.push(`${path} references unavailable input digest ${digest}`);
+      const inputSubject = rawInput?.subject ?? derivativeInput?.subject;
+      if (
+        inputSubject
+        && (inputSubject.id !== derivative.subject.id || inputSubject.configurationId !== derivative.subject.configurationId)
+      ) issues.push(`${path} launders input subject or configuration identity`);
+      if (digest === derivative.output.contentDigest) issues.push(`${path} cannot consume its own output digest`);
+    }
+    if (!DIGEST_PATTERN.test(derivative.output.contentDigest)) issues.push(`${path}.output.contentDigest must be a SHA-256 digest`);
+    if (
+      !Number.isSafeInteger(derivative.output.byteLength)
+      || derivative.output.byteLength < 0
+      || derivative.output.byteLength > MAX_GOVERNED_ARTIFACT_BYTES
+    ) issues.push(`${path}.output.byteLength is outside the governed bound`);
+    if (!derivative.output.mediaType.trim()) issues.push(`${path}.output.mediaType must not be blank`);
+    for (const [transformationIndex, transformation] of derivative.transformations.entries()) {
+      const transformationPath = `${path}.transformations[${transformationIndex}]`;
+      if (!transformation.selector.startsWith("/")) issues.push(`${transformationPath}.selector must be canonical`);
+      validateSourceUnit(issues, `${transformationPath}.fromUnit`, transformation.fromUnit);
+      validateSourceUnit(issues, `${transformationPath}.toUnit`, transformation.toUnit);
+      if (!transformation.frame.trim()) issues.push(`${transformationPath}.frame must be explicit`);
+      if (!transformation.datum.trim()) issues.push(`${transformationPath}.datum must be explicit`);
+      if (!["PRESERVED", "PROPAGATED", "UNKNOWN"].includes(transformation.uncertaintyPropagation)) {
+        issues.push(`${transformationPath}.uncertaintyPropagation is unsupported`);
+      }
+    }
+    const bytes = normalizedBytes.get(derivative.output.contentDigest);
+    if (!bytes) issues.push(`${path} is missing derivative bytes`);
+    else {
+      if (bytes.byteLength !== derivative.output.byteLength) issues.push(`${path} derivative byte length does not match`);
+      if (await sha256ArtifactBytes(bytes) !== derivative.output.contentDigest) issues.push(`${path} derivative bytes do not match contentDigest`);
+    }
+  }
+  for (const entry of input.derivativeBytes) {
+    if (!derivativeByDigest.has(entry.digest)) issues.push(`derivativeBytes contains unreferenced digest ${entry.digest}`);
+  }
+
+  const visitState = new Map<string, "VISITING" | "VISITED">();
+  const visit = (digest: string) => {
+    if (visitState.get(digest) === "VISITING") {
+      issues.push(`derivative dependency cycle contains ${digest}`);
+      return;
+    }
+    if (visitState.get(digest) === "VISITED") return;
+    visitState.set(digest, "VISITING");
+    for (const dependency of derivativeByDigest.get(digest)?.orderedInputDigests ?? []) {
+      if (derivativeByDigest.has(dependency)) visit(dependency);
+    }
+    visitState.set(digest, "VISITED");
+  };
+  derivativeByDigest.forEach((_value, digest) => visit(digest));
+  const derivativeDescendsFromRaw = (derivativeDigest: string, rawDigest: string, seen = new Set<string>()): boolean => {
+    if (seen.has(derivativeDigest)) return false;
+    seen.add(derivativeDigest);
+    return (derivativeByDigest.get(derivativeDigest)?.orderedInputDigests ?? []).some((inputDigest) =>
+      inputDigest === rawDigest
+      || (derivativeByDigest.has(inputDigest) && derivativeDescendsFromRaw(inputDigest, rawDigest, seen))
+    );
+  };
+
+  const componentAuthorities = new Map<string, {
+    component: ModelSourceBase;
+    families: Set<AircraftDataFamily>;
+  }>();
+  const registerComponentAuthorities = (
+    values: ModelSourceBase[],
+    families: AircraftDataFamily[],
+  ) => values.forEach((item) => componentAuthorities.set(item.id, {
+    component: item,
+    families: new Set(families),
+  }));
+  registerComponentAuthorities(source.aerodynamics, ["AERODYNAMICS"]);
+  registerComponentAuthorities(source.propulsion, ["PROPULSION"]);
+  registerComponentAuthorities(source.sensors, ["SENSORS"]);
+  registerComponentAuthorities(source.aircraft, ["FLIGHT_CONTROLS", "MASS_PROPERTIES"]);
+  registerComponentAuthorities(source.weapons, ["STATIONS_STORES"]);
+  registerComponentAuthorities(source.loadouts, ["STATIONS_STORES"]);
+  const validComponentIds = new Set(componentAuthorities.keys());
+  const governedFields = listGovernedAircraftScalarFields(source);
+  const governedFieldByKey = new Map(governedFields.map((field) => [
+    `${field.dataFamily}\u0000${field.componentId}\u0000${field.selector}`,
+    field,
+  ]));
+  for (const [index, lineage] of fieldLineage.entries()) {
+    const path = `fieldLineage[${index}]`;
+    if (!AIRCRAFT_DATA_FAMILIES.includes(lineage.dataFamily)) issues.push(`${path}.dataFamily is unsupported`);
+    if (!AIRCRAFT_LINEAGE_VALUE_STATES.includes(lineage.valueState)) issues.push(`${path}.valueState is unsupported`);
+    if (lineage.evidenceRole !== "SOURCE" && lineage.evidenceRole !== "VALIDATION") issues.push(`${path}.evidenceRole is unsupported`);
+    if (!validComponentIds.has(lineage.componentId)) issues.push(`${path}.componentId is unresolved`);
+    if (!lineage.selector.startsWith("/")) issues.push(`${path}.selector must be canonical`);
+    const componentAuthority = componentAuthorities.get(lineage.componentId);
+    if (componentAuthority && !componentAuthority.families.has(lineage.dataFamily)) {
+      issues.push(`${path}.componentId cannot establish ${lineage.dataFamily} authority`);
+    }
+    const authoredValue = componentAuthority
+      ? resolveGovernedScalarSelector(componentAuthority.component, lineage.selector)
+      : undefined;
+    if (componentAuthority && authoredValue === undefined) {
+      issues.push(`${path}.selector does not resolve to an authored scalar field`);
+    }
+    const governedField = governedFieldByKey.get(`${lineage.dataFamily}\u0000${lineage.componentId}\u0000${lineage.selector}`);
+    if (!governedField) issues.push(`${path}.selector is not an owned physical scalar for ${lineage.dataFamily}`);
+    if (governedField && lineage.unit !== governedField.unit) {
+      issues.push(`${path}.unit does not match the authored scalar unit ${governedField.unit}`);
+    }
+    if (governedField && !governedField.configurations.includes(lineage.configurationId)) {
+      issues.push(`${path}.configurationId is outside component validity`);
+    }
+    validateSourceUnit(issues, `${path}.unit`, lineage.unit);
+    if (!lineage.frame.trim()) issues.push(`${path}.frame must be explicit`);
+    if (!lineage.datum.trim()) issues.push(`${path}.datum must be explicit`);
+    normalizeValidityDomain(issues, `${path}.validityDomain`, lineage.validityDomain);
+    if (componentAuthority && !validityDomainCovers(
+      normalizeValidityDomain([], `${path}.validityDomain`, lineage.validityDomain),
+      normalizeValidityDomain([], `${path}.componentValidityDomain`, componentAuthority.component.validityDomain),
+    )) issues.push(`${path}.validityDomain does not cover the owning component validity domain`);
+    if (lineage.uncertainty.state === "KNOWN") {
+      finite(issues, `${path}.uncertainty.magnitude`, lineage.uncertainty.magnitude);
+      if (lineage.uncertainty.magnitude < 0) issues.push(`${path}.uncertainty.magnitude must not be negative`);
+      validateSourceUnit(issues, `${path}.uncertainty`, lineage.uncertainty.unit);
+    } else if (lineage.uncertainty.state !== "UNKNOWN") {
+      issues.push(`${path}.uncertainty.state is unsupported`);
+    }
+    if (lineage.valueState === "AVAILABLE") {
+      if (!lineage.valueDigest || !DIGEST_PATTERN.test(lineage.valueDigest)) {
+        issues.push(`${path}.valueDigest must be a SHA-256 digest for AVAILABLE`);
+      } else if (
+        authoredValue !== undefined
+        && await aircraftLineageValueDigest({
+          selector: lineage.selector,
+          value: authoredValue as string | number | boolean,
+          unit: lineage.unit,
+          frame: lineage.frame,
+          datum: lineage.datum,
+        }) !== lineage.valueDigest
+      ) issues.push(`${path}.valueDigest does not match the authored scalar value`);
+      const raw = lineage.rawArtifactDigest ? rawByDigest.get(lineage.rawArtifactDigest) : undefined;
+      const derivative = lineage.derivativeDigest ? derivativeByDigest.get(lineage.derivativeDigest) : undefined;
+      if (!raw) issues.push(`${path}.rawArtifactDigest is unresolved`);
+      if (!derivative) issues.push(`${path}.derivativeDigest is unresolved`);
+      if (raw && lineage.sourceLocator !== raw.locator.uri) issues.push(`${path}.sourceLocator does not match its raw artifact`);
+      if (raw && lineage.sourceRecord !== raw.locator.record) issues.push(`${path}.sourceRecord does not match its raw artifact`);
+      if (raw && !["ELIGIBLE", "ENGINE_VERIFICATION_ONLY"].includes(raw.eligibility.state)) {
+        issues.push(`${path}.rawArtifactDigest is not eligible for executable lineage`);
+      }
+      if (raw?.rights.exportDisposition === "UNKNOWN") {
+        issues.push(`${path}.rawArtifactDigest has unknown export disposition and is not eligible for executable lineage`);
+      }
+      if (raw && (raw.subject.id !== lineage.componentId || raw.subject.configurationId !== lineage.configurationId)) {
+        issues.push(`${path} launders subject or configuration identity`);
+      }
+      if (derivative && (derivative.subject.id !== lineage.componentId || derivative.subject.configurationId !== lineage.configurationId)) {
+        issues.push(`${path} launders derivative subject or configuration identity`);
+      }
+      if (derivative && lineage.rawArtifactDigest && !derivativeDescendsFromRaw(derivative.output.contentDigest, lineage.rawArtifactDigest)) {
+        issues.push(`${path}.derivativeDigest does not descend from its raw artifact`);
+      }
+      const transformation = derivative?.transformations.find((item) => item.selector === lineage.selector);
+      if (derivative && !transformation) issues.push(`${path}.derivativeDigest does not transform its governed selector`);
+      if (
+        transformation
+        && (
+          transformation.toUnit !== lineage.unit
+          || transformation.frame !== lineage.frame
+          || transformation.datum !== lineage.datum
+        )
+      ) issues.push(`${path}.derivative transformation does not preserve unit, frame, and datum authority`);
+      if (lineage.gapReason !== undefined) issues.push(`${path}.gapReason is not permitted for AVAILABLE`);
+    } else {
+      if (!lineage.gapReason?.trim()) issues.push(`${path}.gapReason is required for ${lineage.valueState}`);
+      if (lineage.valueDigest || lineage.rawArtifactDigest || lineage.derivativeDigest || lineage.sourceLocator || lineage.sourceRecord) {
+        issues.push(`${path} cannot attach executable lineage to ${lineage.valueState}`);
+      }
+    }
+  }
+
+  const allConfigurations = new Set<string>();
+  for (const requirement of requirementProfile.requirements) {
+    if (!AIRCRAFT_DATA_FAMILIES.includes(requirement.dataFamily)) issues.push(`requirement ${requirement.id}.dataFamily is unsupported`);
+    if (typeof requirement.required !== "boolean") issues.push(`requirement ${requirement.id}.required must be boolean`);
+    validateUniqueStrings(issues, `requirement ${requirement.id}.applicability.componentIds`, requirement.applicability.componentIds);
+    validateUniqueStrings(issues, `requirement ${requirement.id}.applicability.configurations`, requirement.applicability.configurations);
+    validateUniqueStrings(issues, `requirement ${requirement.id}.fieldSelectors`, requirement.fieldSelectors);
+    validateUniqueStrings(issues, `requirement ${requirement.id}.requiredEvidenceRoles`, requirement.requiredEvidenceRoles);
+    requirement.applicability.componentIds.forEach((id) => {
+      const authority = componentAuthorities.get(id);
+      if (!authority) {
+        issues.push(`requirement ${requirement.id} references unresolved component ${id}`);
+        return;
+      }
+      if (!authority.families.has(requirement.dataFamily)) {
+        issues.push(`requirement ${requirement.id} component ${id} cannot establish ${requirement.dataFamily} authority`);
+      }
+      for (const selector of requirement.fieldSelectors) {
+        if (resolveGovernedScalarSelector(authority.component, selector) === undefined) {
+          issues.push(`requirement ${requirement.id} selector ${selector} does not resolve for component ${id}`);
+        }
+      }
+      for (const configuration of requirement.applicability.configurations) {
+        if (!authority.component.validityDomain.configurations.includes(configuration)) {
+          issues.push(`requirement ${requirement.id} configuration ${configuration} is outside component validity ${id}`);
+        }
+      }
+    });
+    requirement.applicability.configurations.forEach((configuration) => allConfigurations.add(configuration));
+    requirement.fieldSelectors.forEach((selector) => {
+      if (!selector.startsWith("/")) issues.push(`requirement ${requirement.id} has non-canonical field selector ${selector}`);
+    });
+    for (const role of requirement.requiredEvidenceRoles) {
+      if (role !== "SOURCE" && role !== "VALIDATION") issues.push(`requirement ${requirement.id} has unsupported evidence role ${role}`);
+    }
+  }
+  for (const field of governedFields) {
+    const requirements = requirementProfile.requirements.filter((requirement) =>
+      requirement.dataFamily === field.dataFamily
+      && requirement.applicability.componentIds.includes(field.componentId)
+      && requirement.fieldSelectors.includes(field.selector)
+    );
+    if (requirements.length === 0) {
+      issues.push(
+        `authored scalar ${field.selector} is absent from the closed requirement profile for ${field.componentId}`,
+      );
+      continue;
+    }
+    for (const configuration of field.configurations) {
+      if (!requirements.some((requirement) => requirement.applicability.configurations.includes(configuration))) {
+        issues.push(
+          `authored scalar ${field.selector} configuration ${configuration} is absent from the closed requirement profile for ${field.componentId}`,
+        );
+      }
+    }
+  }
+  if (allConfigurations.size > MAX_GOVERNED_CONFIGURATIONS) issues.push(`configuration count exceeds ${MAX_GOVERNED_CONFIGURATIONS}`);
+  const tableCellCount = [
+    ...source.aerodynamics.flatMap((model) => model.coefficientTables),
+    ...source.propulsion.flatMap((model) => [model.thrustTable, model.fuelFlowTable]),
+  ].reduce((total, table) => total + table.values.length, 0);
+  if (tableCellCount > MAX_GOVERNED_TABLE_CELLS) issues.push(`table cell count exceeds ${MAX_GOVERNED_TABLE_CELLS}`);
+
+  if (issues.length > 0) throw new ModelPackValidationError(issues);
+  const rebuiltDerivatives = new Map<string, Uint8Array>();
+  const rebuildDerivative = async (digest: string): Promise<Uint8Array> => {
+    const prior = rebuiltDerivatives.get(digest);
+    if (prior) return prior;
+    const derivative = derivativeByDigest.get(digest);
+    if (!derivative) throw new ModelPackValidationError([`[MODEL_PACK_DERIVATIVE_INPUT] unresolved derivative ${digest}`]);
+    const orderedInputs = [];
+    for (const inputDigest of derivative.orderedInputDigests) {
+      const raw = rawBytes.get(inputDigest);
+      const bytes = raw ?? await rebuildDerivative(inputDigest);
+      orderedInputs.push({ digest: inputDigest, bytes });
+    }
+    const rebuilt = await rebuildAircraftDerivative(derivative, orderedInputs);
+    const stored = normalizedBytes.get(digest);
+    if (!stored || stored.byteLength !== rebuilt.byteLength || stored.some((byte, index) => byte !== rebuilt[index])) {
+      throw new ModelPackValidationError([
+        `[MODEL_PACK_DERIVATIVE_REBUILD] derivative ${derivative.id} does not reproduce its exact stored bytes`,
+      ]);
+    }
+    rebuiltDerivatives.set(digest, rebuilt);
+    return rebuilt;
+  };
+  for (const digest of derivativeByDigest.keys()) await rebuildDerivative(digest);
+  return { rawBytes, normalizedBytes };
+}
+
+async function requirementCompleteness(source: ModelPackSourceV2): Promise<ModelPackRequirementCompleteness> {
+  const profile = source.governance.requirementProfile;
+  const results = [...profile.requirements]
+    .sort((left, right) => compareCanonicalText(left.id, right.id))
+    .map((requirement) => {
+      const gapReasons: string[] = [];
+      for (const componentId of requirement.applicability.componentIds) {
+        for (const configurationId of requirement.applicability.configurations) {
+          for (const selector of requirement.fieldSelectors) {
+            const availableForSelector = source.governance.fieldLineage.filter((lineage) =>
+              lineage.selector === selector
+              && lineage.dataFamily === requirement.dataFamily
+              && lineage.componentId === componentId
+              && lineage.configurationId === configurationId
+              && lineage.valueState === "AVAILABLE"
+            );
+            const sourceEvidence = availableForSelector.filter((lineage) => lineage.evidenceRole === "SOURCE");
+            for (const evidenceRole of requirement.requiredEvidenceRoles) {
+              const roleEvidence = availableForSelector.filter((lineage) => lineage.evidenceRole === evidenceRole);
+              const independent = evidenceRole !== "VALIDATION"
+                || !requirement.requiredEvidenceRoles.includes("SOURCE")
+                || roleEvidence.some((validation) => sourceEvidence.every((sourceLineage) =>
+                  validation.rawArtifactDigest !== sourceLineage.rawArtifactDigest
+                  && validation.derivativeDigest !== sourceLineage.derivativeDigest
+                ));
+              if (roleEvidence.length === 0) {
+                gapReasons.push(`${componentId}/${configurationId}/${selector}/${evidenceRole}`);
+              } else if (!independent) {
+                gapReasons.push(`${componentId}/${configurationId}/${selector}/${evidenceRole}/INDEPENDENT`);
+              }
+            }
+          }
+        }
+      }
+      const state = gapReasons.length === 0
+        ? "SATISFIED"
+        : requirement.required ? "INCOMPLETE" : "NOT_APPLICABLE";
+      return { requirementId: requirement.id, state, gapReasons } as const;
+    });
+  const profileDigest = await governedContentDigest(profile);
+  const withoutDigest = {
+    profile: { id: profile.id, version: profile.version, digest: profileDigest },
+    results,
+    complete: results.every((item) => item.state !== "INCOMPLETE"),
+  };
+  return { ...withoutDigest, digest: await governedContentDigest(withoutDigest) };
+}
+
+export async function compileGovernedModelPack(
+  input: GovernedModelPackCompileInput,
+): Promise<CompiledModelPackV2Bundle> {
+  await validateGovernedLineage(input);
+  if (input.source.credibility.approvalState !== "DRAFT") {
+    throw new ModelPackValidationError(["v2 Stage-B packs are foundation-only; authors cannot self-declare admission"]);
+  }
+  const orderedSource = orderedGovernance(input.source);
+  const legacySource = structuredClone(orderedSource) as unknown as ModelPackSource & {
+    governance?: ModelPackSourceV2["governance"];
+  };
+  legacySource.schemaVersion = MODEL_PACK_SOURCE_SCHEMA_VERSION;
+  Reflect.deleteProperty(legacySource, "governance");
+  const legacyBundle = await compileModelPack(legacySource);
+  const completeness = await requirementCompleteness(orderedSource);
+  const sourceDigest = await governedContentDigest(orderedSource);
+  const evidenceLineage = structuredClone(orderedSource.governance.fieldLineage);
+  const lineageDigest = await governedContentDigest({
+    requirementProfile: orderedSource.governance.requirementProfile,
+    rawSourceArtifacts: orderedSource.governance.rawSourceArtifacts,
+    derivatives: orderedSource.governance.derivatives,
+    fieldLineage: evidenceLineage,
+  });
+  const legacyProjectionDigest = legacyBundle.pack.digest;
+  const legacyPayload = structuredClone(legacyBundle.pack) as Partial<CompiledModelPack>;
+  Reflect.deleteProperty(legacyPayload, "digest");
+  Reflect.deleteProperty(legacyPayload, "schemaVersion");
+  const payload: Omit<CompiledModelPackV2, "digest"> = {
+    ...legacyPayload as Omit<CompiledModelPack, "digest" | "schemaVersion">,
+    schemaVersion: COMPILED_MODEL_PACK_V2_SCHEMA_VERSION,
+    legacyProjectionDigest,
+    sourceDigest,
+    lineageDigest,
+    admissionState: completeness.complete ? "COMPLETE_FOUNDATION_NON_PROMOTABLE" : "INCOMPLETE",
+    requirementCompleteness: completeness,
+    evidenceLineage,
+  };
+  const digest = await governedContentDigest(payload);
+  const manifestWithoutContentDigest: Omit<CredibilityManifest, "contentDigest"> = {
+    ...legacyBundle.credibilityManifest,
+    subject: { kind: "MODEL_PACK", id: payload.id, digest },
+    modelPackDigest: digest,
+  };
+  const credibilityManifest = {
+    ...manifestWithoutContentDigest,
+    contentDigest: await sha256Hex(manifestWithoutContentDigest),
+  };
+  return deepFreeze({ pack: { ...payload, digest }, credibilityManifest });
+}
+
+function validateCompiledModelPackV2ExactKeys(pack: CompiledModelPackV2, issues: string[]) {
+  exactKeys(issues, "pack", pack, [
+    "schemaVersion", "id", "version", "digest", "unitSystem", "coordinateConventions",
+    "intendedUses", "credibilityManifestRef", "evidence", "catalogIdentities",
+    "aerodynamics", "propulsion", "sensors", "aircraft", "weapons", "loadouts",
+    "compatibility", "legacyProjectionDigest", "sourceDigest", "lineageDigest",
+    "admissionState", "requirementCompleteness", "evidenceLineage",
+  ]);
+  exactKeys(issues, "pack.coordinateConventions", pack.coordinateConventions, [
+    "geodeticDatum", "localFrame", "bodyAxes", "aerodynamicAxes", "angularUnit",
+    "positionUnit", "velocityUnit", "verticalReference",
+  ]);
+  pack.intendedUses?.forEach((item, index) => exactKeys(
+    issues, `pack.intendedUses[${index}]`, item, ["id", "version"],
+  ));
+  exactKeys(issues, "pack.credibilityManifestRef", pack.credibilityManifestRef, ["id", "version"]);
+  pack.evidence?.forEach((item, index) => exactKeys(
+    issues,
+    `pack.evidence[${index}]`,
+    item,
+    ["id", "kind", "title", "uri", "accessedAt"],
+    ["locator", "contentSha256"],
+  ));
+  pack.catalogIdentities?.forEach((item, index) => exactKeys(
+    issues, `pack.catalogIdentities[${index}]`, item, ["catalogObjectId", "kind", "definitionModelIds"],
+  ));
+  const validity = (path: string, value: SiValidityDomain) => {
+    exactKeys(issues, path, value, [
+      "altitudeM", "mach", "angleOfAttackRad", "loadFactorG", "configurations", "environments",
+    ]);
+    for (const field of ["altitudeM", "mach", "angleOfAttackRad", "loadFactorG"] as const) {
+      exactKeys(issues, `${path}.${field}`, value?.[field], ["minimum", "maximum"]);
+    }
+  };
+  const table = (path: string, value: CompiledTable) => {
+    exactKeys(issues, path, value, [
+      "id", "outputUnit", "axes", "values", "evidenceRefIds", "validityDomain",
+    ]);
+    value?.axes?.forEach((axis, index) => exactKeys(
+      issues, `${path}.axes[${index}]`, axis, ["semantic", "unit", "values"],
+    ));
+    validity(`${path}.validityDomain`, value?.validityDomain);
+  };
+  const base = (path: string, value: CompiledModelBase, specific: string[], optional: string[] = []) => {
+    exactKeys(issues, path, value, [
+      "id", "version", "evidenceRefIds", "validityDomain", "limitationIds", ...specific,
+    ], optional);
+    validity(`${path}.validityDomain`, value?.validityDomain);
+  };
+  pack.aerodynamics?.forEach((item, index) => {
+    const path = `pack.aerodynamics[${index}]`;
+    base(path, item, ["referenceAreaM2", "referenceChordM", "referenceSpanM", "coefficientTables"]);
+    item.coefficientTables?.forEach((value, tableIndex) => table(`${path}.coefficientTables[${tableIndex}]`, value));
+  });
+  pack.propulsion?.forEach((item, index) => {
+    const path = `pack.propulsion[${index}]`;
+    base(path, item, ["engineCount", "thrustTable", "fuelFlowTable", "spoolTimeS"]);
+    table(`${path}.thrustTable`, item.thrustTable);
+    table(`${path}.fuelFlowTable`, item.fuelFlowTable);
+  });
+  pack.sensors?.forEach((item, index) => {
+    const path = `pack.sensors[${index}]`;
+    base(path, item, [
+      "sensorKind", "detectionRangeM", "minimumRangeM", "scanPeriodS",
+      "azimuthFieldOfViewRad", "elevationFieldOfViewRad",
+    ], ["evidenceAdmission", "verificationTrackModel"]);
+    if (item.evidenceAdmission) {
+      exactKeys(issues, `${path}.evidenceAdmission`, item.evidenceAdmission, [
+        "schemaVersion", "sourceEvidenceRefIds", "validationEvidenceRefIds", "coverage",
+      ]);
+      exactKeys(issues, `${path}.evidenceAdmission.coverage`, item.evidenceAdmission.coverage, [
+        ...SENSOR_EVIDENCE_COVERAGE_FIELDS,
+      ]);
+    }
+  });
+  pack.aircraft?.forEach((item, index) => {
+    const path = `pack.aircraft[${index}]`;
+    base(path, item, [
+      "catalogObjectId", "emptyMassKg", "fuelCapacityKg", "aerodynamicModelIndex",
+      "propulsionModelIndexes", "sensorModelIndexes", "loadoutModelIndex",
+      "maximumCommandLoadFactorG", "performanceAdmission",
+    ]);
+    if (item.performanceAdmission.state === "UNSUPPORTED") {
+      exactKeys(issues, `${path}.performanceAdmission`, item.performanceAdmission, ["state", "limitationId", "reason"]);
+    } else {
+      exactKeys(issues, `${path}.performanceAdmission`, item.performanceAdmission, ["state", "capabilities"]);
+      item.performanceAdmission.capabilities.forEach((capability, capabilityIndex) => exactKeys(
+        issues,
+        `${path}.performanceAdmission.capabilities[${capabilityIndex}]`,
+        capability,
+        ["capability", "sourceEvidenceRefIds", "validationEvidenceRefIds"],
+      ));
+    }
+  });
+  pack.weapons?.forEach((item, index) => base(`pack.weapons[${index}]`, item, [
+    "catalogObjectId", "launchMassKg", "dryMassKg", "aerodynamicModelIndex",
+    "propulsionModelIndex", "sensorModelIndex", "seekerMode", "supportRequirement",
+    "launchAuthorization", "maximumCommandLoadFactorG", "seekerActivationRangeM",
+    "datalinkUpdatePeriodS", "thrustTaperSpeedMps", "navigationConstant",
+  ]));
+  pack.loadouts?.forEach((item, index) => {
+    const path = `pack.loadouts[${index}]`;
+    base(path, item, ["platformCatalogObjectId", "stations"]);
+    item.stations?.forEach((station, stationIndex) => {
+      const stationPath = `${path}.stations[${stationIndex}]`;
+      exactKeys(issues, stationPath, station, [
+        "id", "stationGroup", "positionBodyM", "maximumQuantity", "compatibleStoreModelIndexes",
+      ]);
+      exactKeys(issues, `${stationPath}.positionBodyM`, station.positionBodyM, ["x", "y", "z"]);
+    });
+  });
+  pack.compatibility?.forEach((item, index) => exactKeys(
+    issues,
+    `pack.compatibility[${index}]`,
+    item,
+    [
+      "id", "platformCatalogObjectId", "loadoutModelIndex", "storeModelIndex",
+      "stationGroup", "status", "maximumQuantity", "rationale", "evidenceRefIds",
+    ],
+  ));
+  exactKeys(issues, "pack.requirementCompleteness", pack.requirementCompleteness, [
+    "profile", "results", "complete", "digest",
+  ]);
+  exactKeys(issues, "pack.requirementCompleteness.profile", pack.requirementCompleteness?.profile, [
+    "id", "version", "digest",
+  ]);
+  pack.requirementCompleteness?.results?.forEach((item, index) => exactKeys(
+    issues,
+    `pack.requirementCompleteness.results[${index}]`,
+    item,
+    ["requirementId", "state", "gapReasons"],
+  ));
+  pack.evidenceLineage?.forEach((item, index) => {
+    const path = `pack.evidenceLineage[${index}]`;
+    exactKeys(issues, path, item, [
+      "id", "selector", "dataFamily", "componentId", "configurationId", "valueState",
+      "evidenceRole", "unit", "frame", "datum", "uncertainty", "validityDomain",
+    ], ["valueDigest", "rawArtifactDigest", "derivativeDigest", "sourceLocator", "sourceRecord", "gapReason"]);
+    exactKeys(
+      issues,
+      `${path}.uncertainty`,
+      item.uncertainty,
+      item.uncertainty?.state === "KNOWN" ? ["state", "magnitude", "unit"] : ["state"],
+    );
+    const domain = item.validityDomain;
+    exactKeys(issues, `${path}.validityDomain`, domain, [
+      "altitude", "mach", "angleOfAttack", "loadFactor", "configurations", "environments",
+    ]);
+    for (const field of ["altitude", "mach", "angleOfAttack", "loadFactor"] as const) {
+      exactKeys(issues, `${path}.validityDomain.${field}`, domain?.[field], ["minimum", "maximum", "unit"]);
+    }
+  });
+}
+
+export async function validateCompiledModelPackV2(pack: unknown): Promise<CompiledModelPackV2> {
+  const issues: string[] = [];
+  validateCompiledModelPackV2ExactKeys(pack as CompiledModelPackV2, issues);
+  if (issues.length > 0) {
+    throw new ModelPackValidationError(issues.map((issue) => `[MODEL_PACK_V2_SCHEMA] ${issue}`));
+  }
+  const candidate = pack as CompiledModelPackV2;
+  if (candidate.schemaVersion !== COMPILED_MODEL_PACK_V2_SCHEMA_VERSION) {
+    issues.push(`[MODEL_PACK_V2_SCHEMA] pack.schemaVersion must be ${COMPILED_MODEL_PACK_V2_SCHEMA_VERSION}`);
+  }
+  for (const [path, digest] of [
+    ["pack.digest", candidate.digest],
+    ["pack.legacyProjectionDigest", candidate.legacyProjectionDigest],
+    ["pack.sourceDigest", candidate.sourceDigest],
+    ["pack.lineageDigest", candidate.lineageDigest],
+    ["pack.requirementCompleteness.profile.digest", candidate.requirementCompleteness.profile.digest],
+    ["pack.requirementCompleteness.digest", candidate.requirementCompleteness.digest],
+  ] as const) {
+    if (!DIGEST_PATTERN.test(digest)) issues.push(`[MODEL_PACK_V2_IDENTITY] ${path} must be a SHA-256 digest`);
+  }
+  const completenessPayload = structuredClone(candidate.requirementCompleteness) as Partial<ModelPackRequirementCompleteness>;
+  Reflect.deleteProperty(completenessPayload, "digest");
+  if (await governedContentDigest(completenessPayload) !== candidate.requirementCompleteness.digest) {
+    issues.push("[MODEL_PACK_V2_IDENTITY] pack.requirementCompleteness.digest does not match its payload");
+  }
+  const expectedAdmission = candidate.requirementCompleteness.complete
+    ? "COMPLETE_FOUNDATION_NON_PROMOTABLE"
+    : "INCOMPLETE";
+  if (candidate.admissionState !== expectedAdmission) {
+    issues.push("[MODEL_PACK_V2_ADMISSION] pack.admissionState does not match computed completeness");
+  }
+  const legacyProjection = structuredClone(candidate) as unknown as Record<string, unknown>;
+  for (const key of [
+    "legacyProjectionDigest", "sourceDigest", "lineageDigest", "admissionState",
+    "requirementCompleteness", "evidenceLineage",
+  ] as const) Reflect.deleteProperty(legacyProjection, key);
+  legacyProjection.schemaVersion = COMPILED_MODEL_PACK_SCHEMA_VERSION;
+  legacyProjection.digest = candidate.legacyProjectionDigest;
+  if (!await verifyCompiledModelPackDigest(legacyProjection as CompiledModelPack)) {
+    issues.push("[MODEL_PACK_V2_IDENTITY] pack.legacyProjectionDigest does not match its SI projection");
+  }
+  const payload = structuredClone(candidate) as Partial<CompiledModelPackV2>;
+  Reflect.deleteProperty(payload, "digest");
+  if (await governedContentDigest(payload) !== candidate.digest) {
+    issues.push("[MODEL_PACK_V2_IDENTITY] pack.digest does not match its canonical payload");
+  }
+  if (issues.length > 0) throw new ModelPackValidationError(issues);
+  return deepFreeze(structuredClone(candidate));
+}
+
+export async function verifyCompiledModelPackV2Digest(pack: CompiledModelPackV2) {
+  try {
+    await validateCompiledModelPackV2(pack);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function readLegacyCompiledModelPack(pack: CompiledModelPack) {
+  if (pack.schemaVersion !== COMPILED_MODEL_PACK_SCHEMA_VERSION || !await verifyCompiledModelPackDigest(pack)) {
+    throw new ModelPackValidationError(["legacy v1 compiled pack is unreadable or corrupt"]);
+  }
+  return deepFreeze({ pack: structuredClone(pack), promotable: false as const });
+}
+
+function exactReferenceKey(reference: ExactModelPackReference) {
+  return `${reference.id}\u0000${reference.version}\u0000${reference.digest}`;
+}
+
+function versionKey(reference: Pick<ExactModelPackReference, "id" | "version">) {
+  return `${reference.id}\u0000${reference.version}`;
+}
+
+function referenceFor(bundle: CompiledModelPackV2Bundle): ExactModelPackReference {
+  return { id: bundle.pack.id, version: bundle.pack.version, digest: bundle.pack.digest };
+}
+
+function archiveBytes(entries: Array<{ digest: string; bytes: number[] }>, path: string) {
+  return entries.map((entry, index) => {
+    const issues: string[] = [];
+    exactKeys(issues, `${path}[${index}]`, entry, ["digest", "bytes"]);
+    if (issues.length > 0) throw new ModelPackValidationError(issues);
+    if (!Array.isArray(entry.bytes) || entry.bytes.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)) {
+      throw new ModelPackValidationError([`${path}[${index}].bytes is not an exact byte array`]);
+    }
+    return { digest: entry.digest, bytes: Uint8Array.from(entry.bytes) };
+  });
+}
+
+function orderedUniqueReferences(references: ExactModelPackReference[]) {
+  if (references.length === 0) throw new ModelPackValidationError(["reference list must not be empty"]);
+  const ordered = [...references].sort((left, right) =>
+    compareCanonicalText(exactReferenceKey(left), exactReferenceKey(right))
+  );
+  for (let index = 1; index < ordered.length; index += 1) {
+    if (exactReferenceKey(ordered[index - 1]) === exactReferenceKey(ordered[index])) {
+      throw new ModelPackValidationError(["reference list contains a duplicate exact reference"]);
+    }
+  }
+  return ordered;
+}
+
+export class InMemoryModelPackRepository {
+  readonly #publications = new Map<string, GovernedModelPackPublication>();
+  readonly #versionIdentities = new Map<string, string>();
+
+  get size() {
+    return this.#publications.size;
+  }
+
+  async #readExactPublication(reference: ExactModelPackReference) {
+    const referenceIssues: string[] = [];
+    exactKeys(referenceIssues, "reference", reference, ["id", "version", "digest"]);
+    if (referenceIssues.length > 0) throw new ModelPackValidationError(referenceIssues);
+    if (!ID_PATTERN.test(reference.id) || !SEMVER_PATTERN.test(reference.version) || !DIGEST_PATTERN.test(reference.digest)) {
+      throw new ModelPackValidationError(["exact model-pack reference is malformed"]);
+    }
+    const publication = this.#publications.get(exactReferenceKey(reference));
+    if (!publication) throw new ModelPackValidationError(["exact compiled model pack was not found"]);
+    try {
+      await validateCompiledModelPackV2(publication.bundle.pack);
+    } catch {
+      throw new ModelPackValidationError(["[MODEL_PACK_STORAGE_CORRUPT] stored compiled model pack is corrupt"]);
+    }
+    return publication;
+  }
+
+  async publishBatch(publications: GovernedModelPackPublication[]) {
+    if (publications.length === 0) throw new ModelPackValidationError(["publication batch must not be empty"]);
+    if (publications.length > MAX_GOVERNED_RECORDS) throw new ModelPackValidationError(["publication batch is oversized"]);
+    const staged = new Map<string, GovernedModelPackPublication>();
+    const stagedVersions = new Map<string, string>();
+    for (const [publicationIndex, publication] of publications.entries()) {
+      const publicationIssues: string[] = [];
+      exactKeys(publicationIssues, `publication[${publicationIndex}]`, publication, [
+        "source", "rawArtifactBytes", "derivativeBytes", "bundle",
+      ]);
+      if (publicationIssues.length > 0) throw new ModelPackValidationError(publicationIssues);
+      const rebuilt = await compileGovernedModelPack({
+        source: publication.source,
+        rawArtifactBytes: publication.rawArtifactBytes,
+        derivativeBytes: publication.derivativeBytes,
+      });
+      if (await governedContentDigest(rebuilt) !== await governedContentDigest(publication.bundle)) {
+        throw new ModelPackValidationError(["published bundle does not match reproducible compilation"]);
+      }
+      const reference = referenceFor(rebuilt);
+      const key = exactReferenceKey(reference);
+      const identity = versionKey(reference);
+      const existingDigest = stagedVersions.get(identity) ?? this.#versionIdentities.get(identity);
+      if (existingDigest && existingDigest !== reference.digest) {
+        throw new ModelPackValidationError([`append-only identity ${reference.id}@${reference.version} already has digest ${existingDigest}`]);
+      }
+      if (staged.has(key) || this.#publications.has(key)) {
+        throw new ModelPackValidationError([`published identity ${reference.id}@${reference.version}/${reference.digest} already exists`]);
+      }
+      stagedVersions.set(identity, reference.digest);
+      staged.set(key, deepFreeze({
+        source: structuredClone(publication.source),
+        rawArtifactBytes: publication.rawArtifactBytes.map((item) => ({ digest: item.digest, bytes: item.bytes.slice() })),
+        derivativeBytes: publication.derivativeBytes.map((item) => ({ digest: item.digest, bytes: item.bytes.slice() })),
+        bundle: rebuilt,
+      }));
+    }
+    for (const [key, publication] of staged) this.#publications.set(key, publication);
+    for (const [key, digest] of stagedVersions) this.#versionIdentities.set(key, digest);
+  }
+
+  async resolveExact(reference: ExactModelPackReference) {
+    const publication = await this.#readExactPublication(reference);
+    if (publication.bundle.pack.admissionState !== "COMPLETE_FOUNDATION_NON_PROMOTABLE") {
+      throw new ModelPackValidationError(["compiled model pack is incomplete"]);
+    }
+    return publication.bundle;
+  }
+
+  async resolveForDeployment(reference: ExactModelPackReference): Promise<never> {
+    await this.resolveExact(reference);
+    throw new ModelPackValidationError(["Stage-B compiled packs are non-promotable until runtime admission lands"]);
+  }
+
+  async exportResearch(references: ExactModelPackReference[]): Promise<GovernedModelPackResearchExport> {
+    const publications = [];
+    for (const reference of orderedUniqueReferences(references)) {
+      const publication = await this.#readExactPublication(reference);
+      publications.push({
+        source: structuredClone(publication.source),
+        rawArtifactBytes: publication.rawArtifactBytes.map((item) => ({ digest: item.digest, bytes: [...item.bytes] })),
+        derivativeBytes: publication.derivativeBytes.map((item) => ({ digest: item.digest, bytes: [...item.bytes] })),
+        bundle: structuredClone(publication.bundle),
+      });
+    }
+    return { schemaVersion: GOVERNED_MODEL_PACK_EXPORT_SCHEMA_VERSION, publications };
+  }
+
+  async importResearch(archive: GovernedModelPackResearchExport) {
+    const archiveIssues: string[] = [];
+    exactKeys(archiveIssues, "archive", archive, ["schemaVersion", "publications"]);
+    if (archiveIssues.length > 0) throw new ModelPackValidationError(archiveIssues);
+    if (archive.schemaVersion !== GOVERNED_MODEL_PACK_EXPORT_SCHEMA_VERSION || !Array.isArray(archive.publications)) {
+      throw new ModelPackValidationError(["research export schema is unsupported"]);
+    }
+    const publications = archive.publications.map((publication, index) => {
+      const issues: string[] = [];
+      exactKeys(issues, `archive.publications[${index}]`, publication, [
+        "source", "rawArtifactBytes", "derivativeBytes", "bundle",
+      ]);
+      if (issues.length > 0) throw new ModelPackValidationError(issues);
+      return {
+        source: structuredClone(publication.source),
+        rawArtifactBytes: archiveBytes(publication.rawArtifactBytes, `archive.publications[${index}].rawArtifactBytes`),
+        derivativeBytes: archiveBytes(publication.derivativeBytes, `archive.publications[${index}].derivativeBytes`),
+        bundle: structuredClone(publication.bundle),
+      };
+    });
+    await this.publishBatch(publications);
+  }
+
+  async exportCompiled(references: ExactModelPackReference[]): Promise<CompiledModelPackExport> {
+    const packs = [];
+    for (const reference of orderedUniqueReferences(references)) {
+      packs.push(structuredClone(await this.resolveExact(reference)));
+    }
+    return { schemaVersion: COMPILED_MODEL_PACK_EXPORT_SCHEMA_VERSION, packs };
+  }
 }
 
 /**

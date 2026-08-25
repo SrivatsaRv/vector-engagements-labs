@@ -14,6 +14,10 @@ Primary references:
 
 ## Archive contents
 
+The Rust crate's compiled-model-pack v2 identity validator is an offline
+publication/readback check only. Its result is not a VSR member and it does not
+change the archive envelope, manifest, required member set, or record schema.
+
 For an Air-domain v4 scenario, `scenario.json` contains the exact authored
 mission, `compiled.json` contains `vector.compiled-air-mission.v1`, and both
 `manifest.json` and `report.json` bind its ID/version plus authored and compiled
@@ -89,6 +93,9 @@ it is not displayed as if it were a separate model sample.
 
 ## Frame contract
 
+Compiled-model-pack v2 publication validation adds no frame columns, entity
+state, event state, or replay-derived values.
+
 Mission lineage adds no parallel frame state. Ground starts are represented by
 the canonical aircraft entity at the runway threshold with zero speed in the
 first recorded frame; later motion remains the ordinary engine-frame contract.
@@ -124,6 +131,10 @@ environment dataset.
 Weapons remain loadout inventory before launch. Aircraft frames preserve the installed inventory identities and total store mass while the weapon is stowed. A launch event removes that store and its declared launch mass from the aircraft once, then creates the weapon's first world sample with the launch platform position and inherited velocity. Static objects may omit unchanged samples. The viewer interpolates only properties explicitly declared interpolable.
 
 ## Integrity and replay
+
+VSR integrity continues to validate only the model-pack identity already bound
+by the compiled scenario and manifest. The new offline v2 validator neither
+weakens that check nor lets replay resolve or substitute a model pack.
 
 Readback recompiles the archived authored mission against the archived model
 and environment pack and requires exact equality across scenario, compiled,
@@ -219,6 +230,10 @@ authoritative v2 stream.
 
 ## Browser and interoperability boundary
 
+The compiled-model-pack v2 identity validator is not a browser/Worker or VSR
+viewer API. No replay consumer, transfer payload, or interoperability adapter
+changes in this stage.
+
 Browsers receive the verified optional compiled mission envelope through the
 existing VSR reader. Unknown mission schemas or missing viewer-feature identity
 fail closed; presentation code cannot synthesize mission authority.
@@ -229,6 +244,9 @@ same aggregate persistence/API contract.
 VSR is designed for browser production and playback. Frames use a transferable columnar buffer so a Web Worker, TypeScript engine or Rust/WASM engine can produce the same record contract. An ACMI 2.2 exporter can be added as an interoperability adapter; ACMI is not used as VECTOR's internal source of model truth because it does not carry VECTOR's full coefficient, provenance and scenario contracts.
 
 ## Implemented replay boundary
+
+No VSR version, persisted field, record writer/reader behavior, or replay
+authority changes with the offline compiled-model-pack v2 validator.
 
 Current replay preserves mission class/regime, start posture, flight-plan,
 compiled aircraft ground envelope, exact station/rule loadout, fuel, and exact
