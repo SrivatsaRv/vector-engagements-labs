@@ -1360,6 +1360,73 @@
       ]
     },
     {
+      "id": "EVIDENCE_GENERIC_MISSION_POLICY_SOURCE_FREEZE",
+      "workstream": "verification-release",
+      "implementationRules": [
+        {
+          "kind": "PREFIX",
+          "value": "governance/generic-mission-policy-verification-source/",
+          "facets": ["admission", "digest", "evidence", "validity", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/lib/generic-mission-policy-source-verifier.mjs",
+          "facets": ["admission", "digest", "evidence", "validity", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-generic-mission-policy-governance.mjs",
+          "facets": ["admission", "digest", "evidence", "validity", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-generic-mission-policy-source.mjs",
+          "facets": ["admission", "digest", "evidence", "validity", "verification"]
+        }
+      ],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/generic-mission-policy-source.test.mjs",
+          "facets": ["verification"]
+        }
+      ],
+      "generatedGroups": [],
+      "owningSections": [
+        {
+          "sectionId": "GENERIC_MISSION_POLICY_SOURCE_CATALOG_BOUNDARY",
+          "path": "docs/catalog-and-sources.md",
+          "heading": "## Generic mission-policy verification source-only quarantine",
+          "facets": ["admission", "digest", "evidence", "validity", "verification"]
+        },
+        {
+          "sectionId": "GENERIC_MISSION_POLICY_SOURCE_MODEL_PACK_BOUNDARY",
+          "path": "docs/model-pack-contract.md",
+          "heading": "### Generic mission-policy source-only boundary",
+          "facets": ["admission", "evidence", "validity"]
+        },
+        {
+          "sectionId": "GENERIC_MISSION_POLICY_SOURCE_PHYSICS_BOUNDARY",
+          "path": "docs/physics-model.md",
+          "heading": "### Generic mission-policy Stage-0 evidence boundary",
+          "facets": ["evidence", "validity"]
+        },
+        {
+          "sectionId": "GENERIC_MISSION_POLICY_SOURCE_MISSION_AUTHORITY_BOUNDARY",
+          "path": "docs/scenario-builder.md",
+          "heading": "### Generic mission-policy Stage-0 dependency",
+          "facets": ["admission", "validity"]
+        },
+        {
+          "sectionId": "GENERIC_MISSION_POLICY_SOURCE_TESTING_BOUNDARY",
+          "path": "docs/testing-strategy.md",
+          "heading": "## Generic mission-policy Stage-0 source freeze",
+          "facets": ["verification"]
+        }
+      ],
+      "migrationSections": []
+    },
+    {
       "id": "PERSISTENCE_DATABASE_SCHEMA",
       "workstream": "platform-data",
       "implementationRules": [
@@ -5229,5 +5296,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "4479179affada1e990ac3daec80e7acc7646aa20194ce66f0921e73aa0566339"
+  "canonicalSha256": "4d2a8ac91b24c23c633d11c867f2b727b5d8e050ae97a72ea30d2c5090cbebaa"
 }

@@ -1,0 +1,562 @@
+{
+  "schemaVersion": "vector.generic-mission-policy-verification-source-manifest.v1",
+  "id": "generic-mission-policy-verification-source-freeze-20260826",
+  "version": "1.0.0",
+  "canonicalDigest": "72c6a77c66e70b7c20059a0c1dd0b64ef6a22e43121de8247aac2a4cb1f89b57",
+  "sourceSetDigest": "561f3f0760515aeb059fcc5e8929e63502ab8207f861505a217bbb132a0187f2",
+  "stage": "STAGE_0_SOURCE_ONLY",
+  "intendedUse": "ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE",
+  "availabilityStates": [
+    "SOURCE_FACT",
+    "REFERENCE_ONLY",
+    "MODEL_ASSUMPTION",
+    "UNSUPPORTED",
+    "UNVERIFIED_DISCOVERY_ONLY",
+    "PERMANENTLY_INELIGIBLE"
+  ],
+  "permissions": {
+    "referenceOnlyExternalVerification": true,
+    "redistribution": false,
+    "adaptation": false,
+    "execution": false,
+    "runtime": false,
+    "modelPack": false,
+    "production": false
+  },
+  "renderProfile": {
+    "id": "darwin-arm64-poppler-26.05.0-150dpi-rgb8-png",
+    "platform": "darwin-arm64",
+    "renderer": "pdftoppm",
+    "rendererVersion": "26.05.0",
+    "dpi": 150,
+    "format": "PNG",
+    "arguments": [
+      "-f",
+      "<pdfPage>",
+      "-l",
+      "<pdfPage>",
+      "-r",
+      "150",
+      "-png",
+      "-singlefile"
+    ],
+    "crossPlatformByteIdentityClaimed": false,
+    "renderSetDigest": "6abfb14eac2355a3be6a7836a45a6a1a5740fbfd6c72455f42be4f2cfa31ee04"
+  },
+  "artifacts": [
+    {
+      "id": "nasa-ntrs-20190029195",
+      "subject": "NASA_CIVIL_SUAS_DECISION_ARCHITECTURE_RESEARCH",
+      "civilSourceFamily": "NASA_NTRS_CIVIL_AVIATION_RESEARCH",
+      "title": "Onboard Decision-Making for Nominal and Contingency sUAS Flight",
+      "role": "CIVIL_SUAS_FSM_ARCHITECTURE_CONTEXT",
+      "pdf": {
+        "fileName": "20190029195.pdf",
+        "url": "https://ntrs.nasa.gov/api/citations/20190029195/downloads/20190029195.pdf",
+        "byteLength": 3939526,
+        "sha256": "08d6b1f2b3354449572105571cfd51108a9624fa47e925b9e36f4e9f1912f801",
+        "md5": "091986c8883a6a4daf505712747a58be",
+        "pageCount": 16,
+        "repositoryPath": null
+      },
+      "metadata": {
+        "fileName": "nasa-2019-metadata.json",
+        "url": "https://ntrs.nasa.gov/api/citations/20190029195",
+        "byteLength": 4114,
+        "sha256": "cc0f3b75b87951656f0ea623bcebc0acde2dc78b9d85318875609654a8e35ea1",
+        "repositoryPath": null,
+        "accessEvidence": {
+          "accessedOn": "2026-08-26",
+          "httpStatus": 200,
+          "contentType": "application/json; charset=utf-8",
+          "contentLength": 4114,
+          "etag": "W/\"1012-9PoiBCtyRv82YYYvMyLKDQMnvY0\"",
+          "lastModified": null
+        }
+      },
+      "accessEvidence": {
+        "accessedOn": "2026-08-26",
+        "httpStatus": 200,
+        "contentType": "application/pdf",
+        "contentLength": 3939526,
+        "etag": "091986c8883a6a4daf505712747a58be",
+        "lastModified": "2020-08-06T21:52:18Z"
+      },
+      "rightsFacts": {
+        "distribution": "PUBLIC",
+        "determinationType": "PUBLIC_USE_PERMITTED",
+        "isExportControl": "NO",
+        "ear": "NO",
+        "itar": "NO",
+        "visibleRightsNotice": "AIAA_COPYRIGHT_ALL_RIGHTS_RESERVED",
+        "repositoryLicenceInference": "NONE"
+      },
+      "decisions": {
+        "referenceUseDecision": {
+          "value": "CLOSED_EXTERNAL_REFERENCE_ONLY_NO_COPY",
+          "authorityKind": "RELEASE_OWNER_GOVERNANCE_DECISION_NON_LEGAL",
+          "reviewerRole": "RELEASE_OWNER_REVIEW",
+          "decisionDate": "2026-08-26",
+          "scope": "EXACT_USER_SUPPLIED_BYTES_INTERNAL_OFFLINE_VERIFICATION_ONLY",
+          "permissionGranted": true,
+          "evidenceDigest": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1"
+        },
+        "adaptationDecision": {
+          "value": "CLOSED_DENIED_NOT_AUTHORIZED",
+          "authorityKind": "SOURCE_TERMS_EVIDENCE_NON_LEGAL",
+          "reviewerRole": "RELEASE_OWNER_REVIEW",
+          "decisionDate": "2026-08-26",
+          "scope": "ALL_DERIVATION_AND_CODE_ADAPTATION",
+          "permissionGranted": false,
+          "evidenceDigest": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1"
+        },
+        "redistributionDecision": {
+          "value": "CLOSED_DENIED_NOT_AUTHORIZED",
+          "authorityKind": "SOURCE_TERMS_EVIDENCE_NON_LEGAL",
+          "reviewerRole": "RELEASE_OWNER_REVIEW",
+          "decisionDate": "2026-08-26",
+          "scope": "PDF_METADATA_RENDER_CROP_AND_EXTENSIVE_QUOTATION_BYTES",
+          "permissionGranted": false,
+          "evidenceDigest": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1"
+        },
+        "exportReviewDecision": {
+          "value": "SOURCE_METADATA_NO_EAR_ITAR_RESTRICTION_RECORDED",
+          "authorityKind": "SOURCE_TERMS_EVIDENCE_NON_LEGAL",
+          "reviewerRole": "RELEASE_OWNER_REVIEW",
+          "decisionDate": "2026-08-26",
+          "scope": "EXACT_NTRS_METADATA_FACTS_ONLY",
+          "permissionGranted": false,
+          "evidenceDigest": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1"
+        }
+      },
+      "pageMaps": [
+        {
+          "pdfPage": 1,
+          "printedPage": "1",
+          "anchor": "TITLE_AND_VISIBLE_AIAA_RIGHTS_NOTICE",
+          "eligibleClaim": "PRELIMINARY_CIVIL_SUAS_ARCHITECTURE_CONTEXT",
+          "ineligibleInference": "NO_VECTOR_TYPE_COMMAND_OR_EXECUTABLE_POLICY",
+          "renderSha256": "57ba72904294d5d8d325ac24b6eff81f8a5e32f20b7b4ed1bc2479d09a974e57"
+        },
+        {
+          "pdfPage": 2,
+          "printedPage": "2",
+          "anchor": "REPORTED_STATE_CATEGORIES_AND_SINGLE_CONTINGENCY_LIMIT",
+          "eligibleClaim": "PRELIMINARY_FSM_REPLAN_CONCEPT_WITH_SINGLE_CONTINGENCY_LIMIT",
+          "ineligibleInference": "NO_VALIDATED_SIMULTANEOUS_CONTINGENCY_POLICY",
+          "renderSha256": "d5ec864acbb7596253e45605b11fc621c38754e95a098e68efe5202bbe48e92b"
+        },
+        {
+          "pdfPage": 5,
+          "printedPage": "5",
+          "anchor": "REPORTED_MODULE_ARCHITECTURE",
+          "eligibleClaim": "CIVIL_MODULE_INPUT_OUTPUT_CONTEXT_ONLY",
+          "ineligibleInference": "NO_VECTOR_INTERFACE_OR_SIDE_OWNERSHIP",
+          "renderSha256": "100e9aa00b1ea87d86938134d5cee917ebec05e40bb86d4b312fa8713f692bad"
+        },
+        {
+          "pdfPage": 6,
+          "printedPage": "6",
+          "anchor": "PLAN_EXECUTE_SEPARATION",
+          "eligibleClaim": "REPORTED_PLAN_EXECUTE_ARCHITECTURE_SEPARATION",
+          "ineligibleInference": "NO_COMMAND_AUTHORITY_OR_RUNTIME_STATE_MACHINE",
+          "renderSha256": "755758040762b6d5f7c05e659c7c4aa170ac8348c2eac1a7f246c7bc8297fe3b"
+        },
+        {
+          "pdfPage": 7,
+          "printedPage": "7",
+          "anchor": "ASSUMED_INPUTS_AND_INCOMPLETE_MODULES",
+          "eligibleClaim": "REPORTED_ASSUMED_AND_INCOMPLETE_INTERFACE_QUALIFICATIONS",
+          "ineligibleInference": "NO_IMPLEMENTED_METRIC_OR_INTEGRATION_CLAIM",
+          "renderSha256": "ec241b751854a6fc09fcfdffd8b4b82912c38e7befc0db140604f83a9b23eaa4"
+        },
+        {
+          "pdfPage": 15,
+          "printedPage": "15",
+          "anchor": "HARD_CODED_BUTTON_TRIGGERED_MISSING_INTEGRATION_AND_FUTURE_WORK",
+          "eligibleClaim": "MANDATORY_NEGATIVE_SCOPE_LIMITATIONS",
+          "ineligibleInference": "NO_VALIDATION_FIXTURE_RUNTIME_AUTHORITY_OR_SIMULTANEOUS_CONTINGENCY_LOGIC",
+          "renderSha256": "c37ac84036a2456ca0516fd5d212989731b4748d39b954bcbfa4eb8db5a52e88"
+        }
+      ]
+    },
+    {
+      "id": "nasa-ntrs-20205011183",
+      "subject": "NASA_CIVIL_UAM_CONTINGENCY_RESEARCH",
+      "civilSourceFamily": "NASA_NTRS_CIVIL_AVIATION_RESEARCH",
+      "title": "Dynamic Vehicle Assessment for Intelligent Contingency Management for Urban Air Mobility Vehicles",
+      "role": "CIVIL_UAM_CONTINGENCY_CHALLENGE_AND_TOOL_ROADMAP_CONTEXT",
+      "pdf": {
+        "fileName": "2021_scitech_dva_Approv.pdf",
+        "url": "https://ntrs.nasa.gov/api/citations/20205011183/downloads/2021_scitech_dva_Approv.pdf",
+        "byteLength": 980859,
+        "sha256": "a8994e0b3a152cfc587aedac8c8d24be4577b8d3f377df478090db9eac2161bf",
+        "md5": "61a3fafe499aa3be2d601aad9609d052",
+        "pageCount": 15,
+        "repositoryPath": null
+      },
+      "metadata": {
+        "fileName": "nasa-2020-metadata.json",
+        "url": "https://ntrs.nasa.gov/api/citations/20205011183",
+        "byteLength": 4401,
+        "sha256": "1004549fd5f797daef6af98987043e34e78a7eafb918fab835dc3ccb76d18a57",
+        "repositoryPath": null,
+        "accessEvidence": {
+          "accessedOn": "2026-08-26",
+          "httpStatus": 200,
+          "contentType": "application/json; charset=utf-8",
+          "contentLength": 4401,
+          "etag": "W/\"1131-ALEsJ9pnbcFc1e3MFBppTgV5wEM\"",
+          "lastModified": null
+        }
+      },
+      "accessEvidence": {
+        "accessedOn": "2026-08-26",
+        "httpStatus": 200,
+        "contentType": "application/pdf",
+        "contentLength": 980859,
+        "etag": "61a3fafe499aa3be2d601aad9609d052",
+        "lastModified": "2020-12-08T14:53:16Z"
+      },
+      "rightsFacts": {
+        "distribution": "PUBLIC",
+        "determinationType": "PUBLIC_USE_PERMITTED",
+        "isExportControl": "NO",
+        "ear": "NO",
+        "itar": "NO",
+        "visibleRightsNotice": "AIAA_PUBLICATION_CONTEXT",
+        "repositoryLicenceInference": "NONE"
+      },
+      "decisions": {
+        "referenceUseDecision": {
+          "value": "CLOSED_EXTERNAL_REFERENCE_ONLY_NO_COPY",
+          "authorityKind": "RELEASE_OWNER_GOVERNANCE_DECISION_NON_LEGAL",
+          "reviewerRole": "RELEASE_OWNER_REVIEW",
+          "decisionDate": "2026-08-26",
+          "scope": "EXACT_USER_SUPPLIED_BYTES_INTERNAL_OFFLINE_VERIFICATION_ONLY",
+          "permissionGranted": true,
+          "evidenceDigest": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1"
+        },
+        "adaptationDecision": {
+          "value": "CLOSED_DENIED_NOT_AUTHORIZED",
+          "authorityKind": "SOURCE_TERMS_EVIDENCE_NON_LEGAL",
+          "reviewerRole": "RELEASE_OWNER_REVIEW",
+          "decisionDate": "2026-08-26",
+          "scope": "ALL_DERIVATION_AND_CODE_ADAPTATION",
+          "permissionGranted": false,
+          "evidenceDigest": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1"
+        },
+        "redistributionDecision": {
+          "value": "CLOSED_DENIED_NOT_AUTHORIZED",
+          "authorityKind": "SOURCE_TERMS_EVIDENCE_NON_LEGAL",
+          "reviewerRole": "RELEASE_OWNER_REVIEW",
+          "decisionDate": "2026-08-26",
+          "scope": "PDF_METADATA_RENDER_CROP_AND_EXTENSIVE_QUOTATION_BYTES",
+          "permissionGranted": false,
+          "evidenceDigest": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1"
+        },
+        "exportReviewDecision": {
+          "value": "SOURCE_METADATA_NO_EAR_ITAR_RESTRICTION_RECORDED",
+          "authorityKind": "SOURCE_TERMS_EVIDENCE_NON_LEGAL",
+          "reviewerRole": "RELEASE_OWNER_REVIEW",
+          "decisionDate": "2026-08-26",
+          "scope": "EXACT_NTRS_METADATA_FACTS_ONLY",
+          "permissionGranted": false,
+          "evidenceDigest": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1"
+        }
+      },
+      "pageMaps": [
+        {
+          "pdfPage": 2,
+          "printedPage": "2",
+          "anchor": "CONTINGENCY_CHALLENGE_AND_CAPABILITY_GAP",
+          "eligibleClaim": "CIVIL_CHALLENGE_SEQUENCE_AND_ISOLATED_TOOL_RESEARCH_CONTEXT",
+          "ineligibleInference": "NO_FULL_AUTONOMOUS_CAPABILITY_ALGORITHM_OR_POLICY",
+          "renderSha256": "e9f9165c258ec3daa5f3a113c2b76d054715eff71fa4bbe51220924fc031ecc5"
+        },
+        {
+          "pdfPage": 12,
+          "printedPage": "12",
+          "anchor": "PRELIMINARY_RESULTS_AND_FUTURE_RESEARCH",
+          "eligibleClaim": "TOOL_ROADMAP_AND_FUTURE_RESEARCH_CONTEXT",
+          "ineligibleInference": "NO_VALIDATED_DECISION_ALGORITHM_OR_AUTONOMOUS_POLICY",
+          "renderSha256": "83a4bade5af434c2d343a8587dacf03a102e6fd7d745751224104400f38f527c"
+        }
+      ]
+    },
+    {
+      "id": "faa-h-8083-2a",
+      "subject": "FAA_HUMAN_GENERAL_AVIATION_RISK_MANAGEMENT_TRAINING",
+      "civilSourceFamily": "FAA_GENERAL_AVIATION_TRAINING_HANDBOOK",
+      "title": "Risk Management Handbook (FAA-H-8083-2A)",
+      "role": "HUMAN_GENERAL_AVIATION_RISK_MANAGEMENT_TRAINING_CONTEXT",
+      "pdf": {
+        "fileName": "risk_management_handbook_2A.pdf",
+        "url": "https://www.faa.gov/sites/faa.gov/files/2022-06/risk_management_handbook_2A.pdf",
+        "byteLength": 15344860,
+        "sha256": "519443a598eedd34c1824ad2ea482f393af0b80e52649e33c0e24a351e4c78bf",
+        "md5": "596f70fcbe1e093ef27e5721e6a5e705",
+        "pageCount": 80,
+        "repositoryPath": null
+      },
+      "metadata": null,
+      "accessEvidence": {
+        "accessedOn": "2026-08-26",
+        "httpStatus": 200,
+        "contentType": "application/pdf",
+        "contentLength": 15344860,
+        "etag": null,
+        "lastModified": "2022-06-02T20:16:25Z"
+      },
+      "rightsFacts": {
+        "distribution": "PUBLICLY_ACCESSIBLE",
+        "determinationType": "NOT_ESTABLISHED_BY_SOURCE_TERMS",
+        "isExportControl": "NOT_ESTABLISHED_BY_SOURCE_TERMS",
+        "ear": "NOT_ESTABLISHED_BY_SOURCE_TERMS",
+        "itar": "NOT_ESTABLISHED_BY_SOURCE_TERMS",
+        "visibleRightsNotice": "NO_REDISTRIBUTION_LICENCE_ESTABLISHED",
+        "repositoryLicenceInference": "NONE"
+      },
+      "decisions": {
+        "referenceUseDecision": {
+          "value": "CLOSED_EXTERNAL_REFERENCE_ONLY_NO_COPY",
+          "authorityKind": "RELEASE_OWNER_GOVERNANCE_DECISION_NON_LEGAL",
+          "reviewerRole": "RELEASE_OWNER_REVIEW",
+          "decisionDate": "2026-08-26",
+          "scope": "EXACT_USER_SUPPLIED_BYTES_INTERNAL_OFFLINE_VERIFICATION_ONLY",
+          "permissionGranted": true,
+          "evidenceDigest": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1"
+        },
+        "adaptationDecision": {
+          "value": "CLOSED_DENIED_NOT_AUTHORIZED",
+          "authorityKind": "SOURCE_TERMS_EVIDENCE_NON_LEGAL",
+          "reviewerRole": "RELEASE_OWNER_REVIEW",
+          "decisionDate": "2026-08-26",
+          "scope": "ALL_DERIVATION_AND_CODE_ADAPTATION",
+          "permissionGranted": false,
+          "evidenceDigest": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1"
+        },
+        "redistributionDecision": {
+          "value": "CLOSED_DENIED_NOT_AUTHORIZED",
+          "authorityKind": "SOURCE_TERMS_EVIDENCE_NON_LEGAL",
+          "reviewerRole": "RELEASE_OWNER_REVIEW",
+          "decisionDate": "2026-08-26",
+          "scope": "PDF_RENDER_CROP_AND_EXTENSIVE_QUOTATION_BYTES",
+          "permissionGranted": false,
+          "evidenceDigest": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1"
+        },
+        "exportReviewDecision": {
+          "value": "NOT_ESTABLISHED_BY_SOURCE_TERMS",
+          "authorityKind": "SOURCE_TERMS_EVIDENCE_NON_LEGAL",
+          "reviewerRole": "RELEASE_OWNER_REVIEW",
+          "decisionDate": "2026-08-26",
+          "scope": "EXACT_USER_SUPPLIED_PDF_ONLY",
+          "permissionGranted": false,
+          "evidenceDigest": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1"
+        }
+      },
+      "pageMaps": [
+        {
+          "pdfPage": 51,
+          "printedPage": "7-2",
+          "anchor": "HUMAN_AUTOMATION_INTERACTION_AND_REVERSION_TRAINING",
+          "eligibleClaim": "HUMAN_PILOT_AUTOMATION_TRAINING_CONTEXT",
+          "ineligibleInference": "NO_REGULATION_AUTONOMOUS_POLICY_OR_DETERMINISTIC_TRANSITION",
+          "renderSha256": "ace8ffaeffe00462fa9a359f3033992aa52e097bb932547b502f1bb51b182d92"
+        },
+        {
+          "pdfPage": 52,
+          "printedPage": "7-3",
+          "anchor": "ANTICIPATE_ACT_VERIFY_HUMAN_TRAINING",
+          "eligibleClaim": "HUMAN_PILOT_AUTOMATION_AWARENESS_CONTEXT",
+          "ineligibleInference": "NO_AUTONOMOUS_CONTROL_SPECIFICATION",
+          "renderSha256": "1387360c62a7c3132faf7819bbc9d2ef02958ed56a904ad4e5ca821375585005"
+        },
+        {
+          "pdfPage": 53,
+          "printedPage": "7-4",
+          "anchor": "AUTOMATION_CHAPTER_SUMMARY",
+          "eligibleClaim": "HUMAN_TRAINING_LIMITATIONS_CONTEXT",
+          "ineligibleInference": "NO_CERTIFICATION_OR_ALGORITHM_CLAIM",
+          "renderSha256": "854b56c62486d947d5aefdd1341e9f0f2b5f6894c6e44f87f6e8c1ece2fd46cb"
+        },
+        {
+          "pdfPage": 54,
+          "printedPage": "8-1",
+          "anchor": "HUMAN_AERONAUTICAL_DECISION_MAKING_INTRODUCTION",
+          "eligibleClaim": "HUMAN_GENERAL_AVIATION_DECISION_TRAINING_CONTEXT",
+          "ineligibleInference": "NO_AUTONOMOUS_OR_COMBAT_DOCTRINE",
+          "renderSha256": "404700f41788c13d9c660df8dad04c32bbceefe154471ee2fa2168219a8ad632"
+        },
+        {
+          "pdfPage": 55,
+          "printedPage": "8-2",
+          "anchor": "HUMAN_THREE_P_MODEL_AND_CONTINUOUS_REASSESSMENT",
+          "eligibleClaim": "HUMAN_PILOT_REASSESSMENT_TRAINING_CONTEXT",
+          "ineligibleInference": "NO_EXECUTABLE_LOOP_OR_TRANSITION",
+          "renderSha256": "d09fa79c10b90ba31eb9cb01e9c3a20b380a5436543d2043dd03da5121157636"
+        },
+        {
+          "pdfPage": 56,
+          "printedPage": "8-3",
+          "anchor": "HUMAN_FEASIBILITY_AND_RESOURCE_AWARENESS",
+          "eligibleClaim": "HUMAN_CAPABILITY_EQUIPMENT_AND_RESOURCE_FEASIBILITY_CONTEXT",
+          "ineligibleInference": "NO_NUMERIC_FUEL_RESERVE_ROUTE_OR_ACTION_MAPPING",
+          "renderSha256": "1c2eb34c005a475805480b0a19128e5d4d3e2f493fb6038a137d3b555d587dc9"
+        },
+        {
+          "pdfPage": 57,
+          "printedPage": "8-4",
+          "anchor": "HUMAN_DECISION_TRAINING_SUMMARY",
+          "eligibleClaim": "HUMAN_GENERAL_AVIATION_RISK_TRAINING_CONTEXT",
+          "ineligibleInference": "NO_DETERMINISTIC_POLICY_COMBAT_DOCTRINE_OR_ROE",
+          "renderSha256": "e70fb47950922682fc7804f4f0bab5e3236d5f49bbaf0b408c6e91795489872f"
+        }
+      ]
+    }
+  ],
+  "rejectedAlternates": [
+    {
+      "id": "nasa-20190029195-wp-content-alternate",
+      "url": "https://www.nasa.gov/wp-content/uploads/2024/04/2019-baculi-scitech-2019-1457-508-0.pdf",
+      "fileName": "2019-baculi-alternate.pdf",
+      "byteLength": 4205732,
+      "sha256": "91648a0c709cae3c1072d1dd80a3ced748687350635146d9e18f00ec1f40e558",
+      "status": "REJECTED_NOT_BYTE_IDENTICAL_NOT_SEPARATELY_GOVERNED",
+      "repositoryPath": null,
+      "accessEvidence": {
+        "accessedOn": "2026-08-26",
+        "httpStatus": 200,
+        "contentType": "application/pdf",
+        "contentLength": 4205732,
+        "etag": "6cd47f177de6ace9",
+        "lastModified": "2024-04-24T18:39:46Z"
+      }
+    }
+  ],
+  "excludedSources": [
+    {
+      "id": "AFDP_1",
+      "availability": "UNVERIFIED_DISCOVERY_ONLY",
+      "contentAcquired": false,
+      "eligibleClaims": []
+    },
+    {
+      "id": "AFDP_3_01",
+      "availability": "UNVERIFIED_DISCOVERY_ONLY",
+      "contentAcquired": false,
+      "eligibleClaims": []
+    },
+    {
+      "id": "CJCSI_3121_01_S",
+      "availability": "PERMANENTLY_INELIGIBLE",
+      "contentAcquired": false,
+      "eligibleClaims": []
+    },
+    {
+      "id": "GAME_AND_COMMUNITY_DUMPS",
+      "availability": "PERMANENTLY_INELIGIBLE",
+      "contentAcquired": false,
+      "eligibleClaims": []
+    }
+  ],
+  "unresolvedAssumptionClasses": [
+    {
+      "class": "CADENCE",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    },
+    {
+      "class": "THRESHOLD",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    },
+    {
+      "class": "PRIORITY",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    },
+    {
+      "class": "TIE_BREAK",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    },
+    {
+      "class": "HYSTERESIS",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    },
+    {
+      "class": "TIMEOUT",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    },
+    {
+      "class": "FUEL_VALUE",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    },
+    {
+      "class": "RESERVE_VALUE",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    },
+    {
+      "class": "ROUTE_GEOMETRY",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    },
+    {
+      "class": "ACTION_MAPPING",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    },
+    {
+      "class": "COMMAND_BOUND",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    },
+    {
+      "class": "DOCTRINE",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    },
+    {
+      "class": "RULES_OF_ENGAGEMENT",
+      "availability": "MODEL_ASSUMPTION",
+      "valuePresent": false
+    }
+  ],
+  "prohibitedExecutableFields": [
+    "stateMachine",
+    "action",
+    "threshold",
+    "cadence",
+    "timeout",
+    "priority",
+    "fuelValue",
+    "geometry",
+    "command",
+    "policyExport",
+    "runtimeBinding",
+    "modelPackCapability"
+  ],
+  "nonclaims": [
+    "NO_EXECUTABLE_POLICY_OR_FSM",
+    "NO_AUTONOMY_VALIDATION_OR_SIMULTANEOUS_CONTINGENCY_LOGIC",
+    "NO_COMBAT_MISSION_BEHAVIOR_DOCTRINE_TACTICS_OR_ROE",
+    "NO_NAMED_AIRCRAFT_WEAPON_OR_SENSOR",
+    "NO_TRACK_SUPPORT_RELEASE_OR_COMMAND_AUTHORITY",
+    "NO_NUMERIC_CADENCE_THRESHOLD_TIMEOUT_FUEL_GEOMETRY_OR_COMMAND",
+    "NO_RUNTIME_UI_VSR_EVENT_DATABASE_OR_PARENT_CLOSURE"
+  ],
+  "governanceBindings": {
+    "sourceTermsEvidencePath": "source-terms-evidence.v1.json",
+    "sourceTermsEvidenceSha256": "9bb1dfeeace5ea1b64450bd7cfcd219ae5bc8e71380cfc54c5389ae9b9253cd1",
+    "releaseOwnerReviewPath": "release-owner-visual-review.v1.json",
+    "productionIsolationEvidencePath": "production-isolation-evidence.v1.json",
+    "issue": "https://github.com/SrivatsaRv/vector-engagements-labs/issues/151",
+    "issueContractCorrection": "https://github.com/SrivatsaRv/vector-engagements-labs/issues/151#issuecomment-5415174561",
+    "pageMappingCorrection": "https://github.com/SrivatsaRv/vector-engagements-labs/issues/151#issuecomment-5415221719"
+  }
+}

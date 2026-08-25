@@ -12,6 +12,30 @@ The #142 gate separately admits two complete, isolated manual transcripts, repor
 
 The admitted corpus must then replay identical full-state results through TypeScript and the generated-schema Rust/WASM verifier, survive bounded UTF-8 record readback, and recover a separate verification-only Worker from the same corpus after termination. Corpus admission replays each resolved state/value and `AGREED_DOUBLE_ENTRY` or `SOURCE_ADJUDICATED` label from the exact embedded transcripts and decisions, so a recomputed top-level digest cannot detach a value from its evidence lineage. The immutable performance workload binds its corpus, requests, expected results and runtime identity; its executable policy rejects dirty or unidentified measurement state and validates every complete measured output against the frozen result digest. Pre-optimization admission, 4,096-operation batch, Worker, memory and WASM-size limits are maintained in [`tp1538-aero-verification.md`](tp1538-aero-verification.md). `make ci-local`, exact-SHA clean-clone execution, and built-bundle isolation remain completion gates rather than substitutes for the independent numeric workflow.
 
+## Generic mission-policy Stage-0 source freeze
+
+`npm run policy:generic-mission-policy-source:verify` is the source-independent
+CI contract gate. It validates the canonical manifest, non-legal source-terms
+evidence, exact release-owner review binding, closed denied decisions,
+value-less assumption classes, corrected FAA PDF/printed-page mapping, rejected
+alternate identity, hostile manifest cases and production/runtime-fixture
+isolation. It runs under the deny-all network guard before and after the Worker
+build. A missing external-source directory cannot become a skipped success.
+
+`VECTOR_GENERIC_MISSION_POLICY_SOURCE_DIR=/absolute/path make
+generic-mission-policy-sources-local` is the separate mandatory completion
+gate. It checks the three user-supplied PDFs, both NASA metadata files and the
+rejected NASA alternate by exact size/hash; verifies NASA rights/export facts,
+FAA MD5 and all PDF page counts; rerenders all 15 selected pages with the
+content-addressed Darwin arm64 Poppler 26.05.0 profile; and requires exact
+source-set and ordered render-set digests. The source, metadata, render and
+contact-sheet bytes remain outside Git.
+
+Runtime/parity, browser, performance, database and migration layers are omitted
+because this change adds no executable, UI, persistence or schema behavior.
+Normal `make ci-local`, built Worker verification and exact clean-clone evidence
+remain mandatory to prove nonpromotion and regression safety.
+
 ## Generic sensor Stage-0 source freeze
 
 `npm run generic-sensor:sources:verify` first proves the generated manifest and

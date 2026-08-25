@@ -124,6 +124,9 @@ authority; no old heading is relabelled and no unrelated schema is introduced.
 Retiring #61's six completed runtime-stub rows is explicit governance data:
 regional source verification, immutable pack admission and browser/runtime
 tests replace those blockers; remaining assumptions stay separately disclosed.
+Source-freeze validators may recognize the `MODEL_ASSUMPTION` vocabulary only
+through issue-owned ledger exemptions that prove the records remain value-less
+governance assertions and cannot provide runtime or mission-policy authority.
 
 The hosted integration build reruns the issue #148 deny-network source verifier
 after creating the production output. A build that embeds a Stage-0 source

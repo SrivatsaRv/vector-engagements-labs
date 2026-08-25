@@ -1,4 +1,4 @@
-.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local capacity-baseline-local reference-aircraft-local reference-aam-local generic-sensor-sources-local air-reference-local worker-local frontend-local browser-local clean-clone-local
+.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local capacity-baseline-local reference-aircraft-local reference-aam-local generic-sensor-sources-local generic-mission-policy-sources-local air-reference-local worker-local frontend-local browser-local clean-clone-local
 
 db-up: compose-build
 	docker compose up -d database
@@ -70,10 +70,15 @@ reference-aam-local:
 generic-sensor-sources-local:
 	npm run generic-sensor:sources:verify
 
+generic-mission-policy-sources-local:
+	@test -n "$${VECTOR_GENERIC_MISSION_POLICY_SOURCE_DIR:-}" || (echo "VECTOR_GENERIC_MISSION_POLICY_SOURCE_DIR must identify exact user-supplied source bytes" >&2; exit 1)
+	npm run generic-mission-policy:sources:verify
+
 worker-local:
 	npm run build
 	npm run generic-sensor:sources:verify
 	npm run policy:nasa-f16-store-source:verify
+	npm run policy:generic-mission-policy-source:verify
 	npm run runtime:verify
 	npm run worker:verify
 
@@ -112,6 +117,7 @@ ci-quality:
 	npm run policy:aircraft-evidence:verify
 	npm run policy:nasa-generic-f16:verify
 	npm run policy:nasa-f16-store-source:verify
+	npm run policy:generic-mission-policy-source:verify
 	npm run symbols:verify
 	npm run models:verify
 	npm run reference-aircraft:verify

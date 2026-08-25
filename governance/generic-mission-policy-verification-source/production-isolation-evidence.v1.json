@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "vector.generic-mission-policy-production-isolation-evidence.v1",
+  "status": "PASS",
+  "executedOn": "2026-08-26",
+  "command": "npm run policy:generic-mission-policy-source:verify",
+  "exactCommitBinding": "PR_AND_ISSUE_COMPLETION_EVIDENCE_REQUIRED_AFTER_COMMIT",
+  "manifestCanonicalDigest": "72c6a77c66e70b7c20059a0c1dd0b64ef6a22e43121de8247aac2a4cb1f89b57",
+  "scannedRoots": [
+    "app",
+    "components",
+    "lib",
+    "server",
+    "worker",
+    "engine-rust/src",
+    "public",
+    "dist",
+    ".next",
+    ".open-next",
+    "fixtures/model-packs",
+    "fixtures/vector-record",
+    "fixtures/public-reference",
+    "fixtures/performance"
+  ],
+  "forbiddenMarkers": [
+    "vector.generic-mission-policy-verification-source-manifest.v1",
+    "generic-mission-policy-verification-source-freeze-20260826",
+    "NASA_CIVIL_SUAS_DECISION_ARCHITECTURE_RESEARCH",
+    "NASA_CIVIL_UAM_CONTINGENCY_RESEARCH",
+    "FAA_HUMAN_GENERAL_AVIATION_RISK_MANAGEMENT_TRAINING",
+    "CIVIL_SUAS_FSM_ARCHITECTURE_CONTEXT",
+    "CIVIL_UAM_CONTINGENCY_CHALLENGE_AND_TOOL_ROADMAP_CONTEXT",
+    "HUMAN_GENERAL_AVIATION_RISK_MANAGEMENT_TRAINING_CONTEXT"
+  ],
+  "runtimeGates": {
+    "typescriptRustParity": "OMITTED_SOURCE_ONLY_NO_EXECUTABLE_CHANGE",
+    "browser": "OMITTED_SOURCE_ONLY_NO_UI_CHANGE",
+    "performance": "OMITTED_SOURCE_ONLY_NO_RUNTIME_CHANGE",
+    "database": "OMITTED_SOURCE_ONLY_NO_DATABASE_CHANGE",
+    "migration": "OMITTED_SOURCE_ONLY_NO_SCHEMA_CHANGE"
+  }
+}

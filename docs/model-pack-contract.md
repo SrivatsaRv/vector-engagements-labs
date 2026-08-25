@@ -369,6 +369,26 @@ numbers, span stations, semi-span fractions, fuselage stations, and
 forward-hook-relative distances remain distinct. A complete 3D station datum
 and body-frame transform are unavailable.
 
+### Generic mission-policy source-only boundary
+
+`vector.generic-mission-policy-verification-source-manifest.v1` is not a model
+pack, model-pack source, derivative, executable intended-use profile or runtime
+policy. It addresses three exact, external civil research/training artifacts
+and their bounded page roles only. Its local redistribution and adaptation
+decisions are closed denied; its execution, runtime, model-pack, production and
+catalog permissions are false. A later pack cannot convert public availability,
+NASA metadata, a release-owner technical review, page text, a claim category or
+the manifest digest into executable evidence.
+
+No cadence, threshold, priority, tie-break, hysteresis, timeout, fuel/reserve
+number, route geometry, action mapping or command bound exists in this source
+freeze. Each class is explicitly `MODEL_ASSUMPTION` with `valuePresent: false`.
+Compilation must reject any reference from an executable policy or model-pack
+capability to this source-only manifest. The NASA civil state/module concepts
+and FAA human-pilot training loop do not validate an autonomous policy, combat
+mission behavior, doctrine, tactics, rules of engagement, track/support state,
+release authority, sensor use or named-platform behavior.
+
 ### Catalog admission enforcement
 
 Catalog admission checks that every aircraft carries this boundary before the

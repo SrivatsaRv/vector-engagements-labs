@@ -125,6 +125,20 @@ preflight accepts only a wholly v3 or wholly v4 catalogue, the migration rejects
 any residual non-v4 row, and postflight validates every v4 Air mission envelope.
 Deployment does not depend on a seed mutation.
 
+### Generic mission-policy Stage-0 dependency
+
+Issue #151 does not change #38 mission authority. Its generic mission-policy
+source manifest is an external-byte, civil-context Stage-0 verification freeze
+only. NASA research architecture/challenge categories and FAA human-pilot
+training categories cannot become a mission default, autonomous state machine,
+action mapping, transition, cadence, threshold, timeout, priority, fuel/reserve
+value, route geometry, command, doctrine, tactics, rules of engagement,
+track/support state or release authority. The manifest's execution, runtime,
+model-pack, production and catalog permissions are false; compilation and
+saved-run admission must reject any attempted promotion. #38 remains
+responsible for any future versioned executable policy, in-tick side-picture
+interface, achieved-state/inventory guards and bounded-command consumer.
+
 ## Cross-domain scenario composition kernel
 
 The `SCENARIO_COMPOSITION_KERNEL` family owns one coordinated TypeScript
