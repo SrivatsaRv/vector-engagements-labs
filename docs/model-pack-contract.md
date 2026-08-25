@@ -25,8 +25,26 @@ The following artifacts have different owners and must not be collapsed:
 
 Presentation labels, icons, meshes, map state, and camera state do not belong in
 physical model definitions. A runtime state never becomes catalog authority.
+The Air mission's authored station/rule IDs and ground-envelope digest are
+scenario bindings; the resolved capacity and `MODEL_ASSUMPTION` envelope are
+compiled artifacts. Neither may be replaced by presentation or import labels.
 
 ## Versioned schemas
+
+Air mission authoring adds `vector.air-mission.v1`, `vector.flight-plan.v1`,
+`vector.loadout-plan.v1`, and `vector.compiled-air-mission.v1` as mission-owned
+adapters. They reference this model pack by exact digest; they do not redefine
+aircraft, weapon, station, or coefficient schemas.
+
+The mission adapter also emits
+`vector.compiled-aircraft-ground-envelope.v1` from one content-addressed
+resolver bound to the pack digest, aircraft model ID, assumption evidence, and
+limitations. The authored mission retains only
+`vector.aircraft-ground-envelope-binding.v1` identity/digest fields. Imported
+runway minima, surface lists, tailwind limits, or self-labelled
+`SOURCED`/`CALIBRATED` values are not executable authority. This remains the
+explicit `MODEL_ASSUMPTION` allowed by STUB-30 until #61/#64 replace it with
+governed aircraft/runway performance evidence.
 
 The schema-module split changes ownership granularity only. Existing table,
 column, constraint, and JSON payload contracts are unchanged.
@@ -38,7 +56,7 @@ column, constraint, and JSON payload contracts are unchanged.
 | intended use | `vector.intended-use.v1` | `IntendedUseContract` |
 | credibility | `vector.credibility-manifest.v1` | `CredibilityManifest` |
 | scenario patch | `vector.model-patch.v1` | `ScenarioModelPatch` |
-| scenario package | `vector.scenario.v3` | `ScenarioDefinition` / `StoredScenarioPackage` |
+| scenario package | `vector.scenario.v4` | `ScenarioDefinition` / `StoredScenarioPackage` |
 | scenario draft | `vector.scenario-draft.v1` | `ScenarioDraft` |
 
 The source of truth is [`lib/model-pack.ts`](../lib/model-pack.ts). Rust consumes
@@ -61,6 +79,11 @@ One `ModelPackSource` contains:
 - aerodynamic, propulsion, sensor, aircraft, weapon, and loadout definitions;
 - explicit platform/store/station compatibility rules;
 - one credibility-manifest source.
+
+The current source declares a maximum quantity of two on each teaching station
+and its matching supported compatibility rule because every canonical template
+already authors two stores. Any future quantity change is a source-model change
+that regenerates the compiled digest; it is not inferred from scenario demand.
 
 Every physical quantity is `{ value, unit, evidenceRefIds }`. Supported source
 units are deliberately closed: dimensionless, kg/g, m/km/ft, m²/cm², s/ms,
@@ -137,6 +160,13 @@ TrackStore mechanics only; no named aircraft sensor is thereby available.
 8. binds the credibility manifest to that exact digest; and
 9. recursively freezes the returned bundle.
 
+Air mission compilation then invokes the same
+`validateScenarioModelInstance` authority for its exact aircraft model,
+station, store model, quantity, and pack digest. The separately exported ground
+envelope resolver hashes only governed `MODEL_ASSUMPTION` values plus the
+compiled aircraft evidence/limitation identity; it does not parse authored
+performance values.
+
 The digest excludes only the outer `digest` member. Object keys use Unicode
 code-point order. Arrays retain authored order. To avoid JavaScript/Rust
 floating-point formatting differences, numbers are hashed as normalized
@@ -153,6 +183,10 @@ numbers and indexes; it does not parse units, traverse source JSON, or query a
 database.
 
 ## Intended use and credibility
+
+Every Air mission declares `PUBLIC_EDUCATIONAL`, explicit assumptions and
+validity limits. A mission/task label cannot promote context evidence or a
+named-aircraft association into executable performance authority.
 
 The current intended-use identity is
 `vector.intended-use.geometry-teaching@1.0.0`. It supports geometry teaching and
@@ -248,11 +282,12 @@ catalog identity.
 
 ## Scenario binding and patches
 
-Every `vector.scenario.v3` package contains:
+Every `vector.scenario.v4` package contains:
 
 ```text
 intendedUse: { id, version }
 modelPack: { id, version, digest }
+airMission: vector.air-mission.v1 (required for Air-domain packages)
 ```
 
 Every compiled engine scenario contains the same binding under `modelPack`.
@@ -278,6 +313,13 @@ Draft patch addition creates a new revision.
 
 ## Loadout compatibility
 
+An Air `FlightAssignment` binds the exact aircraft, compiled model-pack digest,
+one admitted station/store/compatibility-rule identity and positive quantity.
+The shared `validateScenarioModelInstance` validator is the station membership,
+store compatibility, station capacity, and rule-capacity authority. Compilation rejects
+missing or mismatched compatibility before store count can affect entity count,
+aircraft mass, or endurance.
+
 Compatibility is explicit and four-part: platform catalog identity, compiled
 loadout, compiled store, and station group. A `SUPPORTED` rule and station
 membership are both required. Station capacity and rule capacity are enforced.
@@ -301,6 +343,11 @@ incompatible data rejects the scenario; it never falls back to the legacy model
 authoring list or a weapon-name heuristic.
 
 ## Persistence
+
+Air scenario packages persist the authored mission and exact model-pack digest
+inside canonical v4 JSON. Saved runs and VSRs additionally retain the compiled
+mission digests; readback revalidates them against the archived pack rather than
+the current catalogue.
 
 Model-pack storage consumers import the unchanged aggregate schema facade,
 while contract-document ownership follows `db/schema/model-pack.ts` directly.
@@ -350,19 +397,27 @@ deployments continue to apply the forward-only numbered migrations in
 ```text
 id:      vector-scalar-study-models
 version: 0.8.0
-digest:  4081605000d0e06e24b2a0bed1c2585de6d953f6f3688b5849052452d32e321a
+digest:  199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73
 state:   DRAFT
 ```
 
 It contains the existing four aircraft scalar assumption records, eight weapon
 scalar assumption records, explicit aerodynamic/propulsion/sensor/loadout
-components, and the eight configured compatibility relationships. This is a
+components, and the eight configured compatibility relationships. The declared
+study station and matching compatibility rule each admit at most two stores,
+matching the existing two-store teaching templates; this is bounded regression
+continuity, not a named-aircraft carriage claim. This is a
 contract migration and regression-continuity fixture, not a fidelity upgrade.
 Every aircraft in this pack has `performanceAdmission: UNSUPPORTED`; requests
 for named aircraft performance fail closed. The preserved v0.7 fixture remains
 an immutable historical artifact; v0.8 publishes this new admission boundary.
 
 ## Consumption rules for dependent workstreams
+
+Mission/capability consumers import the exported `AirMissionDefinition` and
+`CompiledAirMission` types from `lib/air-mission.ts`. They may attach downstream
+behavior to those stable IDs and references but must not create a parallel
+mission, flight-plan, fuel, loadout, or start schema.
 
 1. Import schema constants and types from `lib/model-pack.ts`; do not duplicate
    them in a feature directory.
@@ -386,6 +441,13 @@ environment envelope rejects the pack during compilation and Rust/WASM
 validation. The runtime must not fill the gap with a scalar fallback.
 
 ## Verification
+
+`tests/air-mission.test.mjs` covers all class/overlay/start combinations,
+canonical digest repeatability, units/datums, closed route/task references,
+exact station/rule/capacity admission, immutable ground-envelope binding,
+runway and fuel/loadout rejection, Worker/server parity, runtime
+mass/endurance effects, and VSR readback against the current compiled model-pack
+digest.
 
 - `npm run models:verify` rejects a stale generated fixture.
 - `tests/model-pack.test.mjs` covers units, validity domains, canonical digests,

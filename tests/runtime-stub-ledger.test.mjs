@@ -11,8 +11,8 @@ import ledger from "../governance/runtime-stub-ledger.v1.json" with { type: "jso
 
 test("the runtime stub ledger is complete, ordered, source-backed, and executable", () => {
   const result = verifyRuntimeStubLedger();
-  assert.equal(result.entries, 29);
-  assert.equal(result.releaseBlocking, 29);
+  assert.equal(result.entries, 30);
+  assert.equal(result.releaseBlocking, 30);
   assert.ok(result.indicatorLines > 0);
   assert.equal(result.sourceLessPublicReferences, 9);
   assert.match(result.sha256, /^[a-f0-9]{64}$/u);

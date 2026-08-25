@@ -63,6 +63,10 @@ callback links in diagram code.
 
 ## Notes
 
+Migration `013_air_mission_contract.sql` updates only existing scenario-template
+packages and hashes. It does not read, rewrite, default, or otherwise change
+anonymous blog-comment rows or their admission/lifecycle contract.
+
 The persisted comment table is declared in `db/schema/blog-comments.ts` and
 re-exported by the single aggregate `db/schema.ts` Drizzle facade.
 

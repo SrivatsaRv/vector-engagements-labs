@@ -351,10 +351,10 @@ test("every configured library baseline remains valid and numerically finite", (
     assert.ok(result.frames.length > 1);
     assert.equal(result.engineRun.diagnostics.nonFiniteStateCount, 0);
     assert.ok(result.engineRun.diagnostics.minimumMassMarginKg >= -1e-8);
-    assert.equal(
-      result.entityManifest.length,
-      definition.domain === "A2A" ? 4 : 3,
-    );
+    const expectedEntityCount = 2
+      + definition.scenario.blueWeaponQuantity
+      + (definition.domain === "A2A" ? definition.scenario.redWeaponQuantity : 0);
+    assert.equal(result.entityManifest.length, expectedEntityCount);
     for (let index = 1; index < result.frames.length; index += 1) {
       assert.ok(result.frames[index].t > result.frames[index - 1].t);
     }

@@ -18,6 +18,7 @@ import type {
 import type { SyntheticEnvironmentManifest } from "../geospatial/synthetic-environment.ts";
 import type { EnvironmentPack, EnvironmentPackBinding } from "../geospatial/environment-pack.ts";
 import type { InstallationOriginReference } from "../mission-admission.ts";
+import type { CompiledAirMission } from "../air-mission.ts";
 
 export type EntityKind =
   | "AIRCRAFT"
@@ -463,6 +464,8 @@ export type EngineScenario = {
   seed: number;
   durationSeconds: number;
   fixedStepSeconds: number;
+  /** Present for scenarios authored through vector.air-mission.v1. */
+  airMission?: CompiledAirMission;
   modelPack: {
     schemaVersion: "vector.compiled-model-pack.v1";
     id: string;

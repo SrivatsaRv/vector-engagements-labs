@@ -5,6 +5,11 @@ callers are treated as attacker controlled before database or upstream work.
 
 ## Saved runs
 
+Air-domain saved-run admission requires the authored v1 mission unchanged,
+recompiles it against exact environment/model identities, and returns stable
+mission code/field-path errors. It never fills missing class, start, route,
+loadout, fuel, recovery, policy, engine, or support values.
+
 Saved-run snapshots and saved-run admission counters now have separate
 domain-owned declaration modules behind the unchanged aggregate Drizzle schema.
 
@@ -73,6 +78,11 @@ all development ports on `127.0.0.1`.
 
 ## Catalog and basemap relay
 
+`PublicApiError` retains explicit status, code, headers and deterministic field
+path as ordinary immutable instance fields. This representation is executable
+under both the built application loader and Node's strip-only TypeScript loader;
+it does not change catalog, tile, request-size, origin or storage admission.
+
 The shared public-API rate-window table is declared in
 `db/schema/public-api-admission.ts`; its limiter and relay behavior are
 unchanged.
@@ -95,6 +105,11 @@ a separate binding. These are safety controls, not billing guarantees; account
 spending limits and abuse monitoring remain deployment duties.
 
 ## Delivery trust
+
+The contract ownership registry now maps the one Air mission implementation and
+regression suite to new material mission-contract and record-storage sections.
+The registry canonical digest and exact semantic declaration bind that new
+authority; no old heading is relabelled and no unrelated schema is introduced.
 
 Release workflows run from the trusted `main` definition and accept only an
 existing semantic tag in reviewed `main` history. They run the full gate,

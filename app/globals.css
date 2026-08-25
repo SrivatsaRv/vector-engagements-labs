@@ -1372,6 +1372,54 @@ a {
   gap: 10px;
   margin-top: 13px;
 }
+.air-mission-editor,
+.air-mission-start-editor {
+  max-width: 880px;
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--blue);
+  background: #f8fafb;
+}
+.air-mission-editor > header span,
+.air-mission-start-editor > header span,
+.flight-plan-contract > span {
+  display: block;
+  color: var(--blue);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: .1em;
+}
+.air-mission-editor > header strong,
+.air-mission-start-editor > header strong { display: block; margin-top: 6px; font-size: 12px; }
+.air-mission-editor > header p,
+.air-mission-start-editor > header p,
+.flight-plan-contract > small { color: var(--muted); font-size: 9px; line-height: 1.5; }
+.air-mission-editor .field,
+.air-mission-start-editor .field { min-width: 0; margin: 6px 0; }
+.air-mission-editor select,
+.air-mission-start-editor select { min-height: 34px; border: 1px solid var(--line); background: #fff; padding: 0 8px; font-size: 10px; }
+.cap-contract { display: grid; gap: 12px; }
+.mission-area-editor,
+.flight-plan-contract fieldset { min-width: 0; margin: 0; padding: 10px; border: 1px solid var(--line); background: #fff; }
+.mission-area-editor legend,
+.flight-plan-contract legend { padding: 0 5px; color: var(--muted); font-size: 9px; font-weight: 700; }
+.mission-area-vertices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.mission-area-vertices > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ground-start-contract,
+.flight-plan-contract { display: grid; gap: 10px; margin-top: 12px; }
+.mission-start-readback { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--line); }
+.mission-start-readback div { min-width: 0; padding: 8px; background: #fff; }
+.mission-start-readback dt { color: var(--muted); font-size: 8px; text-transform: uppercase; }
+.mission-start-readback dd { margin: 3px 0 0; overflow-wrap: anywhere; font: 9px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.checkbox-field input { width: 18px; height: 18px; padding: 0; }
+@media (max-width: 720px) {
+  .air-mission-editor .advanced-grid,
+  .air-mission-start-editor .advanced-grid,
+  .mission-area-vertices,
+  .mission-area-vertices > div,
+  .mission-start-readback { grid-template-columns: 1fr; }
+}
 .compact-controls > label:last-child {
   display: flex;
   flex-direction: column;

@@ -26,6 +26,11 @@ import {
   assertPhaseAEnvironmentPack,
   environmentPackBinding,
 } from "../geospatial/environment-pack.ts";
+import {
+  COMPILED_AIR_MISSION_SCHEMA_VERSION,
+  compileAirMissionDefinition,
+} from "../air-mission.ts";
+import { CURRENT_COMPILED_MODEL_PACK } from "../engine/weapon-admission.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v5" as const;
@@ -70,6 +75,13 @@ export type VectorRecordManifest = {
     schemaVersion: "vector.deployment-capabilities.v1";
     digest: string;
   };
+  airMission?: {
+    schemaVersion: typeof COMPILED_AIR_MISSION_SCHEMA_VERSION;
+    id: string;
+    version: string;
+    authoredDigest: string;
+    compiledDigest: string;
+  };
   requiredViewerFeatures: string[];
   members: VectorRecordMember[];
 };
@@ -89,6 +101,7 @@ type RecordReport = {
     reason: string;
   };
   engine: Omit<EngineRun, "scenario" | "frames" | "events">;
+  airMission?: VectorRecordManifest["airMission"];
   limitations: string[];
 };
 
@@ -478,6 +491,17 @@ export async function createVectorSimulationRecord(
       peakCommandG: result.engineRun.peakCommandG,
       diagnostics: result.engineRun.diagnostics,
     },
+    ...(prepared.engineScenario.airMission
+      ? {
+          airMission: {
+            schemaVersion: prepared.engineScenario.airMission.schemaVersion,
+            id: prepared.engineScenario.airMission.id,
+            version: prepared.engineScenario.airMission.version,
+            authoredDigest: prepared.engineScenario.airMission.authoredDigest,
+            compiledDigest: prepared.engineScenario.airMission.compiledDigest,
+          },
+        }
+      : {}),
     limitations: [
       "Educational deterministic point-mass model; named-aircraft performance remains unsupported and no catalog association supplies runtime authority.",
       "Observer state is recorded from the canonical fail-closed tick boundary.",
@@ -509,7 +533,7 @@ export async function createVectorSimulationRecord(
       .sort((left, right) => compareCanonicalText(left.entityId, right.entityId)),
   }));
   const nonManifest = await Promise.all([
-    member("scenario.json", "vector.scenario.v2", "application/json", true, jsonBytes(prepared.scenario)),
+    member("scenario.json", prepared.scenario.airMission ? "vector.scenario.v4" : "vector.scenario.v2", "application/json", true, jsonBytes(prepared.scenario)),
     member(
       "compiled.json",
       "vector.compiled-adapter.v1",
@@ -585,11 +609,23 @@ export async function createVectorSimulationRecord(
       schemaVersion: prepared.capabilityManifest.schemaVersion,
       digest: prepared.capabilityManifest.digest,
     },
+    ...(prepared.engineScenario.airMission
+      ? {
+          airMission: {
+            schemaVersion: prepared.engineScenario.airMission.schemaVersion,
+            id: prepared.engineScenario.airMission.id,
+            version: prepared.engineScenario.airMission.version,
+            authoredDigest: prepared.engineScenario.airMission.authoredDigest,
+            compiledDigest: prepared.engineScenario.airMission.compiledDigest,
+          },
+        }
+      : {}),
     requiredViewerFeatures: [
       VECTOR_FRAME_SCHEMA,
       VECTOR_EVENT_SCHEMA,
       VECTOR_PICTURE_SCHEMA,
       "vector.report.v1",
+      ...(prepared.engineScenario.airMission ? [COMPILED_AIR_MISSION_SCHEMA_VERSION] : []),
     ],
     members: nonManifest.map(({ bytes, ...item }) => ({
       ...item,
@@ -771,6 +807,9 @@ export async function openVectorSimulationRecord(
   }
   const report = JSON.parse(decoder.decode(required("report.json"))) as RecordReport;
   if (report.schemaVersion !== "vector.report.v1") throw new Error("VECTOR report schema is unsupported.");
+  if (canonicalJson(report.airMission ?? null) !== canonicalJson(manifest.airMission ?? null)) {
+    throw new Error("VECTOR report Air mission lineage is inconsistent.");
+  }
   const decodedFrames = decodeColumnarFrames(required("frames.arrow"));
   const pictures = jsonLines<RaspTrack>(required("pictures.jsonl"));
   if (
@@ -796,6 +835,38 @@ export async function openVectorSimulationRecord(
       compiled.engineScenario,
       report.engine.termination,
     );
+  }
+  if (scenario.airMission) {
+    const recordedMission = compiled.engineScenario.airMission;
+    if (!recordedMission || !manifest.airMission || !manifest.requiredViewerFeatures.includes(COMPILED_AIR_MISSION_SCHEMA_VERSION)) {
+      throw new Error("VECTOR record has no admitted Air mission identity.");
+    }
+    let verifiedMission;
+    try {
+      verifiedMission = compileAirMissionDefinition(scenario.airMission, {
+        scenario,
+        modelPack: CURRENT_COMPILED_MODEL_PACK,
+        environmentPackDigest: environmentPack.identity.digest,
+        environmentPack,
+      });
+    } catch (error) {
+      throw new Error(
+        `VECTOR record compiled scenario Air mission is not admitted model truth: ${error instanceof Error ? error.message : "unknown mission error"}`,
+      );
+    }
+    if (
+      recordedMission.authoredDigest !== verifiedMission.authoredDigest ||
+      recordedMission.compiledDigest !== verifiedMission.compiledDigest ||
+      manifest.airMission.schemaVersion !== recordedMission.schemaVersion ||
+      manifest.airMission.id !== recordedMission.id ||
+      manifest.airMission.version !== recordedMission.version ||
+      manifest.airMission.authoredDigest !== recordedMission.authoredDigest ||
+      manifest.airMission.compiledDigest !== recordedMission.compiledDigest
+    ) {
+      throw new Error("VECTOR record Air mission identity is inconsistent.");
+    }
+  } else if (compiled.engineScenario.airMission || manifest.airMission) {
+    throw new Error("VECTOR record cannot add compiled Air mission authority to a legacy scenario.");
   }
   const engineRun: EngineRun = {
     scenario: compiled.engineScenario,

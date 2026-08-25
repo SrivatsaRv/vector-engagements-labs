@@ -36,6 +36,7 @@ function withGeospatialRecord(
     ...run,
     scenario: {
       ...run.scenario,
+      ...(scenario.airMission ? { airMission: scenario.airMission } : {}),
       geospatial: scenario.geospatial,
       environment: {
         ...run.scenario.environment,

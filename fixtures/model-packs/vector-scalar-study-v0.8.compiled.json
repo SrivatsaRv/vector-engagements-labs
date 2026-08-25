@@ -3548,7 +3548,7 @@
               "y": 0,
               "z": 0
             },
-            "maximumQuantity": 1,
+            "maximumQuantity": 2,
             "compatibleStoreModelIndexes": [
               0,
               3
@@ -3599,7 +3599,7 @@
               "y": 0,
               "z": 0
             },
-            "maximumQuantity": 1,
+            "maximumQuantity": 2,
             "compatibleStoreModelIndexes": [
               2,
               4
@@ -3650,7 +3650,7 @@
               "y": 0,
               "z": 0
             },
-            "maximumQuantity": 1,
+            "maximumQuantity": 2,
             "compatibleStoreModelIndexes": [
               1
             ]
@@ -3700,7 +3700,7 @@
               "y": 0,
               "z": 0
             },
-            "maximumQuantity": 1,
+            "maximumQuantity": 2,
             "compatibleStoreModelIndexes": [
               5
             ]
@@ -3750,7 +3750,7 @@
               "y": 0,
               "z": 0
             },
-            "maximumQuantity": 1,
+            "maximumQuantity": 2,
             "compatibleStoreModelIndexes": [
               6
             ]
@@ -3800,7 +3800,7 @@
               "y": 0,
               "z": 0
             },
-            "maximumQuantity": 1,
+            "maximumQuantity": 2,
             "compatibleStoreModelIndexes": [
               7
             ]
@@ -3852,7 +3852,7 @@
         "storeModelIndex": 0,
         "stationGroup": "DECLARED_STUDY_STATION",
         "status": "SUPPORTED",
-        "maximumQuantity": 1,
+        "maximumQuantity": 2,
         "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
         "evidenceRefIds": [
           "current-scalar-model-assumptions"
@@ -3865,7 +3865,7 @@
         "storeModelIndex": 3,
         "stationGroup": "DECLARED_STUDY_STATION",
         "status": "SUPPORTED",
-        "maximumQuantity": 1,
+        "maximumQuantity": 2,
         "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
         "evidenceRefIds": [
           "current-scalar-model-assumptions"
@@ -3878,7 +3878,7 @@
         "storeModelIndex": 2,
         "stationGroup": "DECLARED_STUDY_STATION",
         "status": "SUPPORTED",
-        "maximumQuantity": 1,
+        "maximumQuantity": 2,
         "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
         "evidenceRefIds": [
           "current-scalar-model-assumptions"
@@ -3891,7 +3891,7 @@
         "storeModelIndex": 4,
         "stationGroup": "DECLARED_STUDY_STATION",
         "status": "SUPPORTED",
-        "maximumQuantity": 1,
+        "maximumQuantity": 2,
         "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
         "evidenceRefIds": [
           "current-scalar-model-assumptions"
@@ -3904,7 +3904,7 @@
         "storeModelIndex": 1,
         "stationGroup": "DECLARED_STUDY_STATION",
         "status": "SUPPORTED",
-        "maximumQuantity": 1,
+        "maximumQuantity": 2,
         "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
         "evidenceRefIds": [
           "current-scalar-model-assumptions"
@@ -3917,7 +3917,7 @@
         "storeModelIndex": 5,
         "stationGroup": "DECLARED_STUDY_STATION",
         "status": "SUPPORTED",
-        "maximumQuantity": 1,
+        "maximumQuantity": 2,
         "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
         "evidenceRefIds": [
           "current-scalar-model-assumptions"
@@ -3930,7 +3930,7 @@
         "storeModelIndex": 6,
         "stationGroup": "DECLARED_STUDY_STATION",
         "status": "SUPPORTED",
-        "maximumQuantity": 1,
+        "maximumQuantity": 2,
         "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
         "evidenceRefIds": [
           "current-scalar-model-assumptions"
@@ -3943,25 +3943,25 @@
         "storeModelIndex": 7,
         "stationGroup": "DECLARED_STUDY_STATION",
         "status": "SUPPORTED",
-        "maximumQuantity": 1,
+        "maximumQuantity": 2,
         "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
         "evidenceRefIds": [
           "current-scalar-model-assumptions"
         ]
       }
     ],
-    "digest": "4081605000d0e06e24b2a0bed1c2585de6d953f6f3688b5849052452d32e321a"
+    "digest": "199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73"
   },
   "credibilityManifest": {
     "schemaVersion": "vector.credibility-manifest.v1",
     "subject": {
       "kind": "MODEL_PACK",
       "id": "vector-scalar-study-models",
-      "digest": "4081605000d0e06e24b2a0bed1c2585de6d953f6f3688b5849052452d32e321a"
+      "digest": "199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73"
     },
     "id": "vector-scalar-study-credibility",
     "version": "1.2.0",
-    "modelPackDigest": "4081605000d0e06e24b2a0bed1c2585de6d953f6f3688b5849052452d32e321a",
+    "modelPackDigest": "199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73",
     "engineDigest": "c59104464d75fa910f8ba79114d50a9ffae31c92875ab9ac6e65f62679ddc4aa",
     "intendedUseRefs": [
       {
@@ -4043,6 +4043,6 @@
       }
     ],
     "approvalState": "DRAFT",
-    "contentDigest": "b408a9256ffd6a79061e2d35ef7a4031a2900aa5b05b7856f98413fc717e2138"
+    "contentDigest": "9337bea52bea7c9d96ec3978e179f0af3f309892f6e779533dc6fce80325a22d"
   }
 }

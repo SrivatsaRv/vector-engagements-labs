@@ -46,6 +46,17 @@ and neither backend changes scenario or frame schemas.
 
 ## Dedicated simulation Worker
 
+Air-domain adapters now carry the exact authored and compiled
+`vector.air-mission.v1` lineage. Before caching a structured-cloned adapter, the
+Worker independently recompiles mission, flight-plan, start, loadout, fuel,
+model-pack, and environment-pack inputs and requires the same compiled digest;
+main-thread validation is not trusted as Worker admission.
+For Air scenarios, the compiler materializes BLUE start/heading, route-plan v2
+geometry/transitions/radii, initial fuel, and admitted station/rule/quantity
+from `CompiledAirMission`. The mission editor's spatial route is retained only
+as an anti-staleness compatibility projection and does not become a second
+runtime input.
+
 Interactive workbench execution uses the module Worker in
 `lib/runtime/simulation.worker.ts`. This is a browser Web Worker and is unrelated
 to the Cloudflare application Worker in `worker/index.ts`. Its message contract is
@@ -79,6 +90,11 @@ no larger than 64 MiB, and uses a power-of-two capacity so subsequent records ca
 reuse storage. No `SharedArrayBuffer` or cross-origin isolation is required.
 
 ## Built Worker verification
+
+The built-Worker journey includes CAP/BVR with an exact Pathankot runway start
+and proves that the admitted artifact, rather than a UI label, reaches a
+completed Worker run. Focused adapter tests tamper fuel after main-thread
+compilation and require the same stable code and field path as server admission.
 
 `npm run worker:verify` loads the two production Worker artifacts from the
 declared Vinext client output directory, `dist/client/_next/static`. It requires

@@ -240,7 +240,11 @@ select only their exact contract sections; browser-consumed geospatial and
 object-catalog authorities additionally select the built-browser gate. Mission
 ownership separately maps information-state/replay, scenario admission,
 authoring, spatial transforms, and simulation orchestration instead of treating
-all mission files as one semantic surface. Generic database mechanics own
+all mission files as one semantic surface. The Air mission schema/compiler and
+its regression suite are exact-path members of that existing family; downstream
+capability work consumes the exported `AirMissionDefinition` and
+`CompiledAirMission` boundary rather than registering a parallel mission
+authority. Generic database mechanics own
 migration/backup, provisioning, and database-test documentation, while only
 the exact model-pack and saved-run tables, migrations, seed/verifier paths, and
 Drizzle representations jointly own their model-pack or VSR persistence
@@ -372,6 +376,15 @@ their ledger entries. Exemptions are permitted only for non-causal code paths
 and must state their rationale and the owning issue; #66 owns those policy
 exceptions. A new fallback or model-assumption indicator without that evidence
 fails the local and PR gate.
+
+Air mission ground-start authoring registers its visible, content-addressed
+educational runway geometry as `STUB-30`. It remains a release-blocking explicit
+supported assumption owned by #60/#61: the compiler may admit only its exact
+declared evidence and the single content-addressed
+`vector.compiled-aircraft-ground-envelope.v1` `MODEL_ASSUMPTION` resolved from
+the immutable model pack. Scenario-authored minima, surface/tailwind values, or
+`SOURCED`/`CALIBRATED` labels are rejected; no installation or production claim
+may treat the assumption as sourced runway truth.
 
 Browser/responsive checks and performance benchmarks are deliberately not run
 on GitHub-hosted pull-request runners. They remain explicit maintainer checks

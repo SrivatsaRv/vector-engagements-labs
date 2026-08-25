@@ -103,6 +103,11 @@ Worker version is created.
 
 ## Deployment gates
 
+The PostGIS gate now exercises both sides of the Air mission transition: current
+v3 production rows are valid pre-migration input, while post-migration and fresh
+databases must expose canonical `vector.scenario.v4` Air envelopes through the
+catalog and application verifier. A mixed catalogue fails closed.
+
 - The exact release commit has a successful Required PR Gate; release and
   deployment workflows re-run the gates appropriate to their authority.
 - `make ci-local`, integration, responsive, observability, and performance checks pass against the release commit.

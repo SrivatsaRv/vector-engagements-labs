@@ -357,7 +357,7 @@ test("instances enforce catalog identity, station capacity and compatibility", a
   assert.throws(
     () => validateScenarioModelInstance(pack, {
       ...valid,
-      loadout: [{ ...valid.loadout[0], quantity: 2 }],
+      loadout: [{ ...valid.loadout[0], quantity: station.maximumQuantity + 1 }],
     }),
     /exceeds station capacity/,
   );

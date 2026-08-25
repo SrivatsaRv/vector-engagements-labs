@@ -71,7 +71,7 @@ try {
 
   const invalidPackages = await sql`SELECT id, version
     FROM scenario_templates
-    WHERE schema_version <> 'vector.scenario.v3'
+    WHERE schema_version NOT IN ('vector.scenario.v3', 'vector.scenario.v4')
       OR engine_version <> 'browser-point-mass-v0.5'
       OR content_hash !~ '^[0-9a-f]{64}$'
       OR intended_use_id <> ${CURRENT_INTENDED_USE_ID}
@@ -79,8 +79,22 @@ try {
       OR model_pack_id <> ${CURRENT_MODEL_PACK_ID}
       OR model_pack_version <> ${CURRENT_MODEL_PACK_VERSION}
       OR model_pack_digest <> ${CURRENT_MODEL_PACK_DIGEST}
-      OR package IS NULL`;
+      OR package IS NULL
+      OR (schema_version = 'vector.scenario.v4' AND package->'scenario'->'airMission'->>'schemaVersion' <> 'vector.air-mission.v1')`;
   assert.equal(invalidPackages.length, 0);
+
+  // Production verifies the currently deployed v3 rows before applying the
+  // forward-only migration. Migration 013 then fails closed unless every row
+  // is v4, and this verifier checks the v4 mission envelope on the second pass.
+  const [scenarioVersions] = await sql`SELECT
+    count(*) FILTER (WHERE schema_version='vector.scenario.v3')::int AS v3,
+    count(*) FILTER (WHERE schema_version='vector.scenario.v4')::int AS v4
+    FROM scenario_templates`;
+  assert.ok(
+    (scenarioVersions.v3 === counts.scenarios && scenarioVersions.v4 === 0)
+      || (scenarioVersions.v3 === 0 && scenarioVersions.v4 === counts.scenarios),
+    "scenario templates must be wholly pre-migration v3 or post-migration v4",
+  );
 
   const peaceDrive = await sql`SELECT id, variant, crew, data_status, engine_ids, radar_id, ew_id, datalink_id
     FROM platform_variants

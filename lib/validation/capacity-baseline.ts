@@ -133,14 +133,27 @@ export function createCapacityBaselineScenario(): EngineScenario {
   if (!blue?.aircraft || !red?.aircraft) {
     throw new Error("Capacity baseline requires the admitted A2A aircraft blueprints.");
   }
+  const guidedVehicles = base.entities.filter((entity) => entity.kind === "GUIDED_WEAPON");
+  const launched = guidedVehicles.find((entity) => entity.weapon?.launchTimeSeconds === 0);
+  const stowed = guidedVehicles.find((entity) => entity.weapon?.launchTimeSeconds === null);
+  if (!launched?.weapon || !stowed?.weapon) {
+    throw new Error("Capacity baseline requires one launched and one stowed guided-vehicle blueprint.");
+  }
   const added = [
     ...Array.from({ length: 48 }, (_, index) => movingAircraft(blue, "BLUE", index)),
     ...Array.from({ length: 48 }, (_, index) => movingAircraft(red, "RED", index)),
   ];
-  const entities = [...base.entities, ...added];
+  // This verification-only workload owns an exact 98-aircraft/two-vehicle mix;
+  // it must not inherit the template's mission loadout quantity or mission
+  // authority merely because the admitted blueprints came from an Air template.
+  const redWithoutStores = structuredClone(red);
+  redWithoutStores.initial.massKg = redWithoutStores.aircraft!.emptyMassKg
+    + redWithoutStores.initial.fuelKg;
+  const entities = [blue, launched, stowed, redWithoutStores, ...added];
   if (entities.length !== CAPACITY_BASELINE_ENTITY_COUNT) {
     throw new Error(`Capacity baseline must contain ${CAPACITY_BASELINE_ENTITY_COUNT} entities.`);
   }
+  delete base.airMission;
   return {
     ...base,
     id: CAPACITY_BASELINE_WORKLOAD_ID,

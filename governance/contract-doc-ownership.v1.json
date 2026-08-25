@@ -3268,6 +3268,20 @@
         },
         {
           "kind": "EXACT",
+          "value": "lib/air-mission.ts",
+          "facets": [
+            "admission",
+            "datum",
+            "digest",
+            "runtime",
+            "schema",
+            "ui",
+            "unit",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "lib/object-catalog.ts",
           "facets": [
             "schema",
@@ -3336,6 +3350,22 @@
       "testRules": [
         {
           "kind": "EXACT",
+          "value": "tests/air-mission.test.mjs",
+          "facets": [
+            "admission",
+            "datum",
+            "digest",
+            "runtime",
+            "schema",
+            "storage",
+            "ui",
+            "unit",
+            "verification",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "tests/mission-admission.test.mjs",
           "facets": [
             "admission",
@@ -3385,6 +3415,16 @@
           ]
         },
         {
+          "sectionId": "MISSION_AIR_MISSION_CONTRACT",
+          "path": "docs/scenario-builder.md",
+          "heading": "## Air mission contract",
+          "facets": [
+            "datum",
+            "digest",
+            "unit"
+          ]
+        },
+        {
           "sectionId": "MISSION_BUILDER_EXPANSION",
           "path": "docs/scenario-builder.md",
           "heading": "## Builder expansion boundary",
@@ -3406,6 +3446,14 @@
           "heading": "## Record and replay",
           "facets": [
             "vsr"
+          ]
+        },
+        {
+          "sectionId": "MISSION_AIR_MISSION_RECORD_STORAGE",
+          "path": "docs/rasp-state-machine.md",
+          "heading": "## Air mission record storage",
+          "facets": [
+            "storage"
           ]
         },
         {
@@ -4460,5 +4508,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "9fabcc12b14ec1d4cfa08ecd9a7cad30c96e117d1fb55fc5ec441e13027619d2"
+  "canonicalSha256": "6fd0f266c006bbd03b49be37632b0e1540fa964ac9362d5b91caf921506bef8f"
 }

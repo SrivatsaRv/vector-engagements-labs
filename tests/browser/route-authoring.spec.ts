@@ -336,6 +336,15 @@ test("a current deployment manifest drives the real Worker run after route recov
 
   await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided");
   await expect(page.locator(".catalog-state.POSTGIS")).toHaveText("PostGIS catalog connected");
+  await expect(page.getByRole("region", { name: "Air mission contract" })).toContainText("vector.air-mission.v1");
+  await page.getByRole("combobox", { name: "Mission class" }).selectOption("COMBAT_AIR_PATROL");
+  await expect(page.getByRole("group", { name: "CAP defaults" })).toBeVisible();
+  await page.getByRole("combobox", { name: "Engagement regime" }).selectOption("BVR");
+  const stationTime = page.getByRole("slider", { name: /CAP on-station time/i });
+  await stationTime.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(stationTime).toHaveValue("35");
+  await expect(page.getByRole("textbox", { name: "Recovery policy" })).toBeVisible();
   const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
   if (compact) {
     await page.getByRole("button", { name: /Next: Forces & loadouts/i }).click();
@@ -384,6 +393,31 @@ test("a current deployment manifest drives the real Worker run after route recov
   await expect(page.getByText(/manual airborne start/i)).toBeVisible();
   await expect(page.getByText(/no installation identity will be compiled/i)).toBeVisible();
 
+  // Rebind the exact installation, then author a real ground/runway start.
+  // The same mission artifact drives validation, Worker spawn, and VSR output.
+  if ((await blueOriginPicker.getAttribute("aria-expanded")) !== "true") {
+    await blueOriginPicker.click();
+  }
+  await page.getByRole("option", { name: "Pathankot AFS", exact: true }).click();
+  const missionStart = page.getByRole("region", { name: "Mission start and recovery" });
+  await missionStart.getByRole("combobox", { name: "Start posture" }).selectOption("RUNWAY");
+  await expect(missionStart.getByRole("textbox", { name: "Runway artifact ID" })).toHaveValue("educational-runway-assumption-v1");
+  await expect(missionStart).toContainText("iaf-pathankot · source iaf-stations-wikipedia");
+  await expect(missionStart).toContainText(/model assumption · [0-9a-f]{16}/i);
+  await expect(missionStart).toContainText("first frame remains on the threshold with zero speed");
+  await expect(missionStart.getByRole("region", { name: "Mission flight plan constraints" })).toContainText("vector.flight-plan.v1");
+
+  // The mission editor is the authority. Its single route adapter updates the
+  // legacy spatial projection atomically; the Worker later consumes the
+  // compiled mission route, never an independently edited copy.
+  const missionRouteLongitude = missionStart.getByRole("spinbutton", { name: "blue-route-2 longitude" });
+  const editedMissionLongitude = Number(await missionRouteLongitude.inputValue()) + 0.005;
+  await missionRouteLongitude.fill(String(editedMissionLongitude));
+  await missionRouteLongitude.press("Enter");
+  const routeEditor = page.getByRole("region", { name: /route coordinates/i }).first();
+  const projectedRouteLongitude = routeEditor.locator("fieldset").first().getByLabel("Longitude", { exact: true });
+  await expect.poll(async () => Number(await projectedRouteLongitude.inputValue())).toBeCloseTo(editedMissionLongitude, 6);
+
   const speed = page.getByRole("textbox", { name: /true airspeed/i });
   await speed.fill("-1");
   await expect(speed).toHaveValue("-1");
@@ -395,7 +429,6 @@ test("a current deployment manifest drives the real Worker run after route recov
 
   await speed.fill("275");
   await speed.press("Enter");
-  const routeEditor = page.getByRole("region", { name: /route coordinates/i }).first();
   await expect(routeEditor.getByTestId("compiled-route-plan-preview")).toContainText("vector.route-plan.v2");
   const acceptanceRadius = routeEditor.getByRole("textbox", { name: /acceptance radius/i });
   await acceptanceRadius.fill("0");
@@ -431,6 +464,8 @@ test("a current deployment manifest drives the real Worker run after route recov
     await page.getByRole("button", { name: "5 Validate" }).click();
   }
   await expect(page.getByText(/Authored positions and routes are inside/i)).toBeVisible();
+  await expect(page.getByText(/Air mission, flight plan, start, loadout, and fuel are admitted/i)).toBeVisible();
+  await expect(page.getByText(/combat air patrol · bvr · runway/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /run baseline/i })).toBeEnabled();
   await page.getByRole("button", { name: /run baseline/i }).click();
 

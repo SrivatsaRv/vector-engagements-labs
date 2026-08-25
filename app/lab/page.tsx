@@ -105,6 +105,14 @@ import {
   selectRecordedTrackState,
   selectRouteTransitionStates,
 } from "@/lib/frontend/selectors";
+import {
+  bindRunwayEvidence,
+  createDefaultAirMissionDefinition,
+  synchronizeScenarioAirMission,
+  updateScenarioAirMissionRoutePoint,
+  type RunwayGeometry,
+} from "@/lib/air-mission";
+import { CURRENT_COMPILED_MODEL_PACK } from "@/lib/engine/weapon-admission";
 
 type Workspace = "configure" | "run" | "results";
 type PlaybackSurface = "MAP" | "THREE_D";
@@ -415,9 +423,12 @@ function LabWorkbench({
   const setConfiguredScenario = useCallback<
     React.Dispatch<React.SetStateAction<Scenario>>
   >((action) => {
-    setScenario((current) =>
-      typeof action === "function" ? action(current) : action,
-    );
+    setScenario((current) => {
+      const next = typeof action === "function" ? action(current) : action;
+      return next.airMission !== current.airMission
+        ? next
+        : synchronizeScenarioAirMission(next, CURRENT_COMPILED_MODEL_PACK);
+    });
     setDraftRevision((value) => value + 1);
     if (hasRun) {
       setHasRun(false);
@@ -1066,6 +1077,136 @@ function ConfigureWorkspace({
       targetSpeed: plan.red.speedMps,
     }));
   };
+  const setMissionStartPosture = (posture: NonNullable<Scenario["airMission"]>["start"]["posture"]) => {
+    setScenario((current) => {
+      if (!current.airMission || !current.spatialPlan || current.domain !== "A2A") return current;
+      if (posture === "AIRBORNE") {
+        return {
+          ...current,
+          airMission: {
+            ...current.airMission,
+            start: {
+              posture: "AIRBORNE",
+              flightPlanId: current.airMission.flightPlans[0].id,
+              routePointId: current.airMission.flightPlans[0].routePoints[0].id,
+            },
+          },
+        };
+      }
+      const origin = current.spatialPlan.blue.originReference;
+      const installation = installations.find((item) => item.id === origin?.installationId);
+      const elevationM = installation?.elevation_ft !== undefined && installation.elevation_ft !== null
+        ? Number(installation.elevation_ft) * 0.3048
+        : selectedStudyArea?.surfaceElevationM ?? 0;
+      const longitude = installation ? Number(installation.longitude) : current.spatialPlan.blue.position.longitude;
+      const latitude = installation ? Number(installation.latitude) : current.spatialPlan.blue.position.latitude;
+      const threshold = { longitude, latitude, elevation: { valueM: elevationM, datum: "MSL" as const } };
+      const runwayMaterial = {
+        id: "educational-runway-assumption-v1",
+        threshold,
+        end: { longitude: longitude + 0.01, latitude, elevation: { valueM: elevationM, datum: "MSL" as const } },
+        headingDeg: 90,
+        lengthM: 1_000,
+        widthM: 30,
+        surface: "PAVED" as const,
+        operationalState: "OPEN" as const,
+      };
+      const nextPlan: ScenarioSpatialPlan = {
+        ...current.spatialPlan,
+        blue: {
+          ...current.spatialPlan.blue,
+          position: { longitude, latitude, altitudeM: elevationM, verticalDatum: "MSL" },
+          route: current.spatialPlan.blue.route.map((point, index) => index === 0
+            ? { longitude, latitude, altitudeM: elevationM, verticalDatum: "MSL" }
+            : point),
+        },
+      };
+      const synchronized = synchronizeScenarioAirMission({
+        ...current,
+        spatialPlan: nextPlan,
+        altitude: elevationM,
+      }, CURRENT_COMPILED_MODEL_PACK);
+      return {
+        ...synchronized,
+        airMission: {
+          ...synchronized.airMission!,
+          start: {
+            posture,
+            installationId: origin?.installationId ?? "",
+            installationSourceId: origin?.sourceId ?? "",
+            runway: bindRunwayEvidence(runwayMaterial, {
+              state: "MODEL_ASSUMPTION",
+              sourceId: "visible-authoring:educational-runway-assumption-v1",
+            }),
+            readinessDelaySeconds: posture === "GROUND_ALERT_QRA" ? 300 : 0,
+            taxiFidelity: "ABSTRACTED",
+            takeoffCondition: "Runway open, compatibility admitted, and readiness delay elapsed.",
+            rejectedTakeoffCondition: "Runway closes or the admitted ground envelope is violated before release.",
+          },
+        },
+      };
+    });
+  };
+  const updateGroundRunway = (patch: Partial<Omit<RunwayGeometry, "evidence">>) => {
+    setScenario((current) => {
+      if (!current.airMission || current.airMission.start.posture === "AIRBORNE") return current;
+      const { evidence, ...material } = current.airMission.start.runway;
+      const runway = bindRunwayEvidence(
+        { ...material, ...patch },
+        { state: evidence.state, sourceId: evidence.sourceId },
+      );
+      return {
+        ...current,
+        airMission: {
+          ...current.airMission,
+          start: { ...current.airMission.start, runway },
+        },
+      };
+    });
+  };
+  const updateMissionRoutePoint = (
+    index: number,
+    patch: Partial<NonNullable<Scenario["airMission"]>["flightPlans"][number]["routePoints"][number]>,
+  ) => {
+    setScenario((current) => updateScenarioAirMissionRoutePoint(current, index, patch));
+  };
+  const updateMissionLegRole = (
+    index: number,
+    role: NonNullable<Scenario["airMission"]>["flightPlans"][number]["legs"][number]["role"],
+  ) => {
+    if (!scenario.airMission) return;
+    const flightPlans = structuredClone(scenario.airMission.flightPlans);
+    flightPlans[0].legs[index].role = role;
+    update("airMission", { ...scenario.airMission, flightPlans });
+  };
+  type CapTasks = Extract<NonNullable<Scenario["airMission"]>["tasks"], { kind: "COMBAT_AIR_PATROL" }>;
+  const updateCapTasks = (patch: Partial<CapTasks>) => {
+    setScenario((current) => {
+      if (!current.airMission || current.airMission.tasks.kind !== "COMBAT_AIR_PATROL") return current;
+      return {
+        ...current,
+        airMission: {
+          ...current.airMission,
+          tasks: { ...current.airMission.tasks, ...patch },
+        },
+      };
+    });
+  };
+  const updateCapAreaVertex = (
+    areaKey: "patrolArea" | "prosecutionArea",
+    vertexIndex: number,
+    coordinate: "longitude" | "latitude",
+    value: number,
+  ) => {
+    setScenario((current) => {
+      if (!current.airMission || current.airMission.tasks.kind !== "COMBAT_AIR_PATROL") return current;
+      const tasks = structuredClone(current.airMission.tasks);
+      const area = tasks[areaKey];
+      if (!area) return current;
+      area.vertices[vertexIndex][coordinate] = value;
+      return { ...current, airMission: { ...current.airMission, tasks } };
+    });
+  };
   const updateSpatialAltitude = (team: "blue" | "red", altitudeM: number) => {
     const plan = scenario.spatialPlan;
     if (!plan) return;
@@ -1233,6 +1374,171 @@ function ConfigureWorkspace({
                 onChange={(event) => update("objective", event.target.value)}
               />
             </label>
+            {scenario.airMission && (
+              <section className="air-mission-editor" aria-label="Air mission contract">
+                <header>
+                  <span>AIR MISSION · {scenario.airMission.schemaVersion}</span>
+                  <strong>Mission intent compiled with the flight, fuel, loadout, and start artifact.</strong>
+                  <p>These are causal authored fields, not report labels. Run admission binds their exact digest.</p>
+                </header>
+                <div className="advanced-grid">
+                  <label className="field">
+                    <span>Mission class</span>
+                    <select
+                      aria-label="Mission class"
+                      data-vector-overlay-exempt="ua-native-select"
+                      value={scenario.airMission.missionClass}
+                      onChange={(event) => update("airMission", createDefaultAirMissionDefinition({
+                        scenario,
+                        missionClass: event.target.value as NonNullable<Scenario["airMission"]>["missionClass"],
+                        modelPack: CURRENT_COMPILED_MODEL_PACK,
+                      }))}
+                    >
+                      <option value="TACTICAL_INTERCEPT">Tactical Intercept</option>
+                      <option value="COMBAT_AIR_PATROL">Combat Air Patrol</option>
+                      <option value="FIGHTER_SWEEP">Fighter Sweep</option>
+                      <option value="ESCORT">Escort</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Engagement regime</span>
+                    <select
+                      aria-label="Engagement regime"
+                      data-vector-overlay-exempt="ua-native-select"
+                      value={scenario.airMission.regime}
+                      onChange={(event) => update("airMission", {
+                        ...scenario.airMission!,
+                        regime: event.target.value as NonNullable<Scenario["airMission"]>["regime"],
+                      })}
+                    >
+                      <option value="BVR">BVR</option>
+                      <option value="WVR_BFM">WVR / BFM</option>
+                      <option value="UNRESTRICTED_TRANSITION">Unrestricted / transition</option>
+                    </select>
+                  </label>
+                </div>
+                {scenario.airMission.tasks.kind === "COMBAT_AIR_PATROL" && (
+                  <div className="cap-contract" role="group" aria-label="CAP defaults">
+                    <div className="advanced-grid">
+                      <Range
+                        label="CAP on-station time"
+                        value={scenario.airMission.tasks.onStationMinutes}
+                        min={5}
+                        max={180}
+                        step={5}
+                        unit="min"
+                        onChange={(value) => updateCapTasks({ onStationMinutes: value })}
+                      />
+                      <label className="field">
+                        <span>On-station count</span>
+                        <input type="number" min={1} aria-label="CAP on-station count" value={scenario.airMission.tasks.onStationCount} onChange={(event) => updateCapTasks({ onStationCount: Number(event.target.value) })} />
+                      </label>
+                      <label className="field">
+                        <span>Flight size</span>
+                        <input type="number" min={1} aria-label="CAP flight size" value={scenario.airMission.tasks.flightSize} onChange={(event) => updateCapTasks({ flightSize: Number(event.target.value) })} />
+                      </label>
+                      <label className="field">
+                        <span>Patrol pattern</span>
+                        <select aria-label="CAP patrol pattern" data-vector-overlay-exempt="ua-native-select" value={scenario.airMission.tasks.patrolPattern} onChange={() => updateCapTasks({ patrolPattern: "RACETRACK" })}>
+                          <option value="RACETRACK">Racetrack</option>
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>Investigation limit (m)</span>
+                        <input type="number" min={1} aria-label="CAP investigation limit" value={scenario.airMission.tasks.investigationLimitM} onChange={(event) => updateCapTasks({ investigationLimitM: Number(event.target.value) })} />
+                      </label>
+                      <label className="field">
+                        <span>Prosecution limit (m)</span>
+                        <input type="number" min={1} aria-label="CAP prosecution limit" value={scenario.airMission.tasks.prosecutionLimitM} onChange={(event) => updateCapTasks({ prosecutionLimitM: Number(event.target.value) })} />
+                      </label>
+                      <Range
+                        label="Fuel reserve"
+                        value={scenario.airMission.fuel.reservePercent}
+                        min={5}
+                        max={50}
+                        step={5}
+                        unit="%"
+                        onChange={(value) => update("airMission", {
+                          ...scenario.airMission!,
+                          fuel: { ...scenario.airMission!.fuel, reservePercent: value },
+                        })}
+                      />
+                      <label className="field">
+                        <span>Weapon RTB threshold</span>
+                        <input type="number" min={0} aria-label="CAP weapon RTB threshold" value={scenario.airMission.fuel.weaponRtbThreshold} onChange={(event) => update("airMission", { ...scenario.airMission!, fuel: { ...scenario.airMission!.fuel, weaponRtbThreshold: Number(event.target.value) } })} />
+                      </label>
+                      <label className="field">
+                        <span>Emission policy</span>
+                        <select
+                          aria-label="Emission policy"
+                          data-vector-overlay-exempt="ua-native-select"
+                          value={scenario.airMission.policies.emission}
+                          onChange={(event) => update("airMission", {
+                            ...scenario.airMission!,
+                            policies: { ...scenario.airMission!.policies, emission: event.target.value as "ACTIVE" | "SILENT" },
+                          })}
+                        >
+                          <option value="ACTIVE">Active</option>
+                          <option value="SILENT">Silent</option>
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>Weapon policy</span>
+                        <select aria-label="Weapon policy" data-vector-overlay-exempt="ua-native-select" value={scenario.airMission.policies.weapon} onChange={(event) => update("airMission", { ...scenario.airMission!, policies: { ...scenario.airMission!.policies, weapon: event.target.value as NonNullable<Scenario["airMission"]>["policies"]["weapon"] } })}>
+                          <option value="HOLD">Hold</option>
+                          <option value="TIGHT">Tight</option>
+                          <option value="FREE_WITHIN_BOUNDARY">Free within boundary</option>
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>Recovery</span>
+                        <input aria-label="Recovery policy" value={scenario.airMission.recoveryCondition} onChange={(event) => update("airMission", { ...scenario.airMission!, recoveryCondition: event.target.value })} />
+                      </label>
+                      <label className="field">
+                        <span>Recovery installation</span>
+                        <select aria-label="Recovery installation" data-vector-overlay-exempt="ua-native-select" value={scenario.airMission.fuel.recoveryInstallationId ?? ""} onChange={(event) => update("airMission", { ...scenario.airMission!, fuel: { ...scenario.airMission!.fuel, recoveryInstallationId: event.target.value || null } })}>
+                          <option value="">Not assigned</option>
+                          {installations.map((installation) => <option key={installation.id} value={installation.id}>{installation.name}</option>)}
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>Divert installation</span>
+                        <select aria-label="Divert installation" data-vector-overlay-exempt="ua-native-select" value={scenario.airMission.fuel.divertInstallationId ?? ""} onChange={(event) => update("airMission", { ...scenario.airMission!, fuel: { ...scenario.airMission!.fuel, divertInstallationId: event.target.value || null } })}>
+                          <option value="">Not assigned</option>
+                          {installations.map((installation) => <option key={installation.id} value={installation.id}>{installation.name}</option>)}
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>Completion</span>
+                        <input aria-label="CAP completion condition" value={scenario.airMission.tasks.completionCondition} onChange={(event) => updateCapTasks({ completionCondition: event.target.value })} />
+                      </label>
+                    </div>
+                    {(["patrolArea", "prosecutionArea"] as const).map((areaKey) => {
+                      const area = scenario.airMission!.tasks.kind === "COMBAT_AIR_PATROL" ? scenario.airMission!.tasks[areaKey] : null;
+                      return area ? (
+                        <fieldset className="mission-area-editor" key={areaKey}>
+                          <legend>{areaKey === "patrolArea" ? "Patrol area" : "Prosecution area"} · WGS84 polygon</legend>
+                          <div className="mission-area-vertices">
+                            {area.vertices.map((vertex, index) => (
+                              <div key={`${area.id}-${index}`}>
+                                <label className="field">
+                                  <span>Vertex {index + 1} longitude</span>
+                                  <input type="number" step="0.000001" aria-label={`${areaKey} vertex ${index + 1} longitude`} value={vertex.longitude} onChange={(event) => updateCapAreaVertex(areaKey, index, "longitude", Number(event.target.value))} />
+                                </label>
+                                <label className="field">
+                                  <span>Vertex {index + 1} latitude</span>
+                                  <input type="number" step="0.000001" aria-label={`${areaKey} vertex ${index + 1} latitude`} value={vertex.latitude} onChange={(event) => updateCapAreaVertex(areaKey, index, "latitude", Number(event.target.value))} />
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </fieldset>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+              </section>
+            )}
             <div className="guided-options">
               <span>Optional comparison focus · replaces the run purpose</span>
               {definition.focusOptions.map((option) => (
@@ -1491,6 +1797,251 @@ function ConfigureWorkspace({
                 onChange={applySpatialPlan}
                 onValidityChange={onSpatialValidityChange}
               />
+            )}
+            {scenario.airMission && (
+              <section className="air-mission-start-editor" aria-label="Mission start and recovery">
+                <header>
+                  <span>START & RECOVERY</span>
+                  <strong>One compiled start posture; no coordinate-only base or runway substitution.</strong>
+                  <p>Ground geometry is an explicit educational model assumption until sourced runway evidence is admitted. Its exact classification and digest are frozen with the run.</p>
+                </header>
+                <label className="field">
+                  <span>Start posture</span>
+                  <select
+                    aria-label="Start posture"
+                    data-vector-overlay-exempt="ua-native-select"
+                    value={scenario.airMission.start.posture}
+                    onChange={(event) => setMissionStartPosture(event.target.value as NonNullable<Scenario["airMission"]>["start"]["posture"])}
+                  >
+                    <option value="AIRBORNE">Airborne</option>
+                    <option value="PARKING">Parking / ground start</option>
+                    <option value="RUNWAY">Runway start</option>
+                    <option value="GROUND_ALERT_QRA">Ground alert / QRA</option>
+                  </select>
+                </label>
+                {scenario.airMission.start.posture === "AIRBORNE" ? (
+                  <div className="fixed-condition">
+                    <strong>Airborne route entry</strong>
+                    <p>{scenario.airMission.start.flightPlanId} · {scenario.airMission.start.routePointId} · exact WGS84/MSL route-point identity</p>
+                  </div>
+                ) : (
+                  <div className="ground-start-contract">
+                    {!scenario.airMission.start.installationId && (
+                      <div className="study-context-unavailable" role="alert">
+                        <strong>Select a Blue origin installation before admitting a ground start.</strong>
+                        <span>The compiler will not choose a base, runway, or source identity from coordinates.</span>
+                      </div>
+                    )}
+                    <div className="advanced-grid">
+                      <label className="field">
+                        <span>Runway artifact ID</span>
+                        <input
+                          aria-label="Runway artifact ID"
+                          value={scenario.airMission.start.runway.id}
+                          onChange={(event) => updateGroundRunway({ id: event.target.value })}
+                        />
+                      </label>
+                      <label className="field">
+                        <span>Heading</span>
+                        <input
+                          type="number"
+                          aria-label="Runway heading"
+                          value={scenario.airMission.start.runway.headingDeg}
+                          onChange={(event) => updateGroundRunway({ headingDeg: Number(event.target.value) })}
+                        />
+                      </label>
+                      <label className="field">
+                        <span>Length (m)</span>
+                        <input
+                          type="number"
+                          aria-label="Runway length"
+                          value={scenario.airMission.start.runway.lengthM}
+                          onChange={(event) => updateGroundRunway({ lengthM: Number(event.target.value) })}
+                        />
+                      </label>
+                      <label className="field">
+                        <span>Width (m)</span>
+                        <input
+                          type="number"
+                          aria-label="Runway width"
+                          value={scenario.airMission.start.runway.widthM}
+                          onChange={(event) => updateGroundRunway({ widthM: Number(event.target.value) })}
+                        />
+                      </label>
+                      <label className="field">
+                        <span>Surface</span>
+                        <select
+                          aria-label="Runway surface"
+                          data-vector-overlay-exempt="ua-native-select"
+                          value={scenario.airMission.start.runway.surface}
+                          onChange={(event) => updateGroundRunway({ surface: event.target.value as RunwayGeometry["surface"] })}
+                        >
+                          <option value="PAVED">Paved</option>
+                          <option value="UNPAVED">Unpaved</option>
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>Readiness delay (s)</span>
+                        <input
+                          type="number"
+                          aria-label="Readiness delay"
+                          value={scenario.airMission.start.readinessDelaySeconds}
+                          onChange={(event) => update("airMission", {
+                            ...scenario.airMission!,
+                            start: { ...scenario.airMission!.start, readinessDelaySeconds: Number(event.target.value) } as NonNullable<Scenario["airMission"]>["start"],
+                          })}
+                        />
+                      </label>
+                    </div>
+                    <dl className="mission-start-readback">
+                      <div><dt>Installation</dt><dd>{scenario.airMission.start.installationId || "UNKNOWN"} · source {scenario.airMission.start.installationSourceId || "UNKNOWN"}</dd></div>
+                      <div><dt>Threshold</dt><dd>{scenario.airMission.start.runway.threshold.longitude.toFixed(6)}, {scenario.airMission.start.runway.threshold.latitude.toFixed(6)} · {scenario.airMission.start.runway.threshold.elevation.valueM.toFixed(1)} m MSL</dd></div>
+                      <div><dt>Runway end</dt><dd>{scenario.airMission.start.runway.end.longitude.toFixed(6)}, {scenario.airMission.start.runway.end.latitude.toFixed(6)} · {scenario.airMission.start.runway.end.elevation.valueM.toFixed(1)} m MSL</dd></div>
+                      <div><dt>Evidence</dt><dd>{scenario.airMission.start.runway.evidence.state.replaceAll("_", " ").toLowerCase()} · {scenario.airMission.start.runway.evidence.digest.slice(0, 16)}</dd></div>
+                      <div><dt>Taxi fidelity</dt><dd>Abstracted · first frame remains on the threshold with zero speed</dd></div>
+                      <div><dt>Takeoff</dt><dd>{scenario.airMission.start.takeoffCondition}</dd></div>
+                      <div><dt>Rejected takeoff</dt><dd>{scenario.airMission.start.rejectedTakeoffCondition}</dd></div>
+                    </dl>
+                  </div>
+                )}
+                <div className="flight-plan-contract" role="region" aria-label="Mission flight plan constraints">
+                  <span>FLIGHT PLAN · vector.flight-plan.v1</span>
+                  {scenario.airMission.flightPlans[0].routePoints.map((point, index) => (
+                    <fieldset key={point.id}>
+                      <legend>{point.id} · {point.turnMethod.replaceAll("_", " ").toLowerCase()}</legend>
+                      <div className="advanced-grid">
+                        <label className="field">
+                          <span>Task reference</span>
+                          <select
+                            aria-label={`${point.id} task reference`}
+                            data-vector-overlay-exempt="ua-native-select"
+                            value={point.taskRef ?? ""}
+                            onChange={(event) => updateMissionRoutePoint(index, { taskRef: (event.target.value || null) as typeof point.taskRef })}
+                          >
+                            <option value="">No task reference</option>
+                            <option value={index === 0 ? "MISSION_START" : scenario.airMission!.missionClass}>
+                              {index === 0 ? "Mission start" : scenario.airMission!.missionClass.replaceAll("_", " ").toLowerCase()}
+                            </option>
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span>Longitude (WGS84 deg)</span>
+                          <input
+                            type="number"
+                            step="0.000001"
+                            aria-label={`${point.id} longitude`}
+                            value={point.position.longitude}
+                            onChange={(event) => updateMissionRoutePoint(index, { position: { ...point.position, longitude: Number(event.target.value) } })}
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Latitude (WGS84 deg)</span>
+                          <input
+                            type="number"
+                            step="0.000001"
+                            aria-label={`${point.id} latitude`}
+                            value={point.position.latitude}
+                            onChange={(event) => updateMissionRoutePoint(index, { position: { ...point.position, latitude: Number(event.target.value) } })}
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Altitude (m MSL)</span>
+                          <input
+                            type="number"
+                            step="1"
+                            aria-label={`${point.id} altitude metres MSL`}
+                            value={point.position.altitude.valueM}
+                            onChange={(event) => updateMissionRoutePoint(index, { position: { ...point.position, altitude: { ...point.position.altitude, valueM: Number(event.target.value) } } })}
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Turn method</span>
+                          <select
+                            aria-label={`${point.id} turn method`}
+                            data-vector-overlay-exempt="ua-native-select"
+                            value={point.turnMethod}
+                            disabled={index === 0}
+                            onChange={(event) => updateMissionRoutePoint(index, { turnMethod: event.target.value as typeof point.turnMethod })}
+                          >
+                            {(index === 0 ? ["START"] : ["FLY_BY", "FLY_OVER"] as const).map((method) => <option key={method} value={method}>{method.replaceAll("_", " ").toLowerCase()}</option>)}
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span>Acceptance radius (m)</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="25000"
+                            aria-label={`${point.id} acceptance radius metres`}
+                            value={point.acceptanceRadiusM}
+                            disabled={index === 0 || point.turnMethod === "FLY_OVER"}
+                            onChange={(event) => updateMissionRoutePoint(index, { acceptanceRadiusM: Number(event.target.value) })}
+                          />
+                        </label>
+                        <label className="field">
+                          <span>ETA (model s, optional)</span>
+                          <input
+                            type="number"
+                            aria-label={`${point.id} ETA`}
+                            value={point.constraint.etaSeconds ?? ""}
+                            onChange={(event) => updateMissionRoutePoint(index, {
+                              constraint: {
+                                ...point.constraint,
+                                etaSeconds: event.target.value === "" ? undefined : Number(event.target.value),
+                              },
+                            })}
+                          />
+                        </label>
+                        <label className="field">
+                          <span>TOT (model s, optional)</span>
+                          <input
+                            type="number"
+                            aria-label={`${point.id} total time on target`}
+                            value={point.constraint.totalTimeOnTargetSeconds ?? ""}
+                            onChange={(event) => updateMissionRoutePoint(index, {
+                              constraint: {
+                                ...point.constraint,
+                                totalTimeOnTargetSeconds: event.target.value === "" ? undefined : Number(event.target.value),
+                              },
+                            })}
+                          />
+                        </label>
+                        <label className="field checkbox-field">
+                          <span>Constraint lock</span>
+                          <input
+                            type="checkbox"
+                            aria-label={`${point.id} constraint lock`}
+                            checked={point.constraint.locked}
+                            onChange={(event) => updateMissionRoutePoint(index, {
+                              constraint: { ...point.constraint, locked: event.target.checked },
+                            })}
+                          />
+                        </label>
+                      </div>
+                    </fieldset>
+                  ))}
+                  {scenario.airMission.flightPlans[0].legs.map((leg, index) => (
+                    <label className="field" key={leg.id}>
+                      <span>{leg.id} · {leg.fromPointId} → {leg.toPointId}</span>
+                      <select
+                        aria-label={`${leg.id} role`}
+                        data-vector-overlay-exempt="ua-native-select"
+                        value={leg.role}
+                        onChange={(event) => updateMissionLegRole(index, event.target.value as typeof leg.role)}
+                      >
+                        {(["DEPARTURE", "TRANSIT", "INGRESS", "INTERCEPT_ATTACK", "ON_STATION_PATROL", "REFUEL", "EGRESS", "RECOVERY", "DIVERT"] as const).map((role) => (
+                          <option value={role} key={role}>{role.replaceAll("_", " ").toLowerCase()}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                  <small>
+                    TAS {scenario.airMission.flightPlans[0].routePoints[0].constraint.speed.kind === "TAS"
+                      ? `${scenario.airMission.flightPlans[0].routePoints[0].constraint.speed.valueMps} m/s`
+                      : `Mach ${scenario.airMission.flightPlans[0].routePoints[0].constraint.speed.value}`} · WGS84 / metres MSL
+                  </small>
+                </div>
+              </section>
             )}
             <div className="compact-controls">
               <Range
@@ -2098,6 +2649,7 @@ function Range({
       </output>
       <input
         type="range"
+        aria-label={label}
         value={value}
         min={min}
         max={max}

@@ -1,15 +1,24 @@
 const JSON_CONTENT_TYPE = "application/json";
 
 export class PublicApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly headers?: HeadersInit;
+  /** Internal field address for deterministic admission/replay handling. */
+  readonly fieldPath?: string;
+
   constructor(
-    readonly status: number,
-    readonly code: string,
+    status: number,
+    code: string,
     message = code,
-    readonly headers?: HeadersInit,
-    /** Internal field address for deterministic admission/replay handling. */
-    readonly fieldPath?: string,
+    headers?: HeadersInit,
+    fieldPath?: string,
   ) {
     super(message);
+    this.status = status;
+    this.code = code;
+    this.headers = headers;
+    this.fieldPath = fieldPath;
   }
 }
 

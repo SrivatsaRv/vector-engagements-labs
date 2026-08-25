@@ -38,7 +38,11 @@ criteria remain open.
 
 ## Current admitted surface
 
-- A2A and the `TACTICAL_INTERCEPT` / `AIRBORNE` foundation are enabled.
+- A2A plus Tactical Intercept, Combat Air Patrol, Fighter Sweep, Escort and the
+  `AIRBORNE`, `PARKING`, `RUNWAY`, and `GROUND_ALERT_QRA` start postures are
+  admitted through `vector.air-mission.v1`. A ground start still requires an
+  exact installation/source identity and content-addressed runway evidence;
+  the capability list is not permission to invent either.
 - A2G, G2A and G2G are disabled by deployment. Their library entries remain
   visible as future study material, but they have no Run link.
 - A disabled or unknown direct link shows an unavailable state. It never opens
@@ -54,9 +58,12 @@ criteria remain open.
   capability manifest and model-pack digest. No radar-jamming measurement
   effect is admitted. Data link, AEW, EW, and terrain interaction remain
   disabled and cannot inject a track or support state.
-- Tactical policy is not admitted. The product does not expose defensive-turn,
-  g-demand, or team-decision controls; authored route following remains the
-  admitted aircraft-motion authority.
+- Mission emission/weapon/completion/abort/recovery policy is authored,
+  compiled, and recorded. Autonomous virtual-pilot policy execution remains
+  outside this deployment; the product still exposes no decorative
+  defensive-turn, g-demand, or team-decision controls. Authored route following,
+  ground/airborne entry, fuel, and installed stores remain the current motion
+  and mass authorities.
 - The compiler ignores legacy tactical-decision fields and uses only the
   versioned weapon model's guidance parameters. This prevents a label from
   changing a run while the virtual-pilot contract is unavailable.

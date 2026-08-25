@@ -1,6 +1,7 @@
 import { CURRENT_MODEL_PACK_DIGEST } from "../reference-model-pack.ts";
 import type { EngineBackendId } from "../engine/contracts.ts";
 import type { EngagementDomain } from "../engine/primitives.ts";
+import type { AirMissionClass, AirStartPosture } from "../air-mission.ts";
 import { sha256HexSync } from "../geospatial/digest.ts";
 import deploymentConfiguration from "../../config/deployment-capabilities.json" with {
   type: "json",
@@ -54,8 +55,8 @@ export type DeploymentCapabilityManifest = {
   configurationSource: "repository/deployment-capabilities";
   buildIdentity: string;
   domains: Record<EngagementDomain, CapabilityDecision>;
-  missionClasses: readonly ["TACTICAL_INTERCEPT"];
-  startPostures: readonly ["AIRBORNE"];
+  missionClasses: readonly AirMissionClass[];
+  startPostures: readonly AirStartPosture[];
   optionalCapabilities: Record<OptionalCapability, CapabilityDecision>;
   admittedModelPackDigests: readonly string[];
   engine: {
@@ -91,6 +92,8 @@ const STATES = new Set<CapabilityState>([
   "STALE",
 ]);
 const BACKENDS = new Set<EngineBackendId>(["rust-wasm", "typescript"]);
+const MISSION_CLASSES = new Set<AirMissionClass>(["TACTICAL_INTERCEPT", "COMBAT_AIR_PATROL", "FIGHTER_SWEEP", "ESCORT"]);
+const START_POSTURES = new Set<AirStartPosture>(["AIRBORNE", "PARKING", "RUNWAY", "GROUND_ALERT_QRA"]);
 
 export class CapabilityAdmissionError extends Error {
   readonly code:
@@ -177,6 +180,12 @@ export function createDeploymentCapabilityManifest(
       "CAPABILITY_CONFIG_INVALID",
       "At least one model-pack digest must be admitted.",
     );
+  }
+  if (!input.missionClasses.length || input.missionClasses.some((item) => !MISSION_CLASSES.has(item))) {
+    throw new CapabilityAdmissionError("CAPABILITY_CONFIG_INVALID", "Deployment missionClasses contain an unknown or empty value.");
+  }
+  if (!input.startPostures.length || input.startPostures.some((item) => !START_POSTURES.has(item))) {
+    throw new CapabilityAdmissionError("CAPABILITY_CONFIG_INVALID", "Deployment startPostures contain an unknown or empty value.");
   }
   if (!input.admittedModelPackDigests.includes(CURRENT_MODEL_PACK_DIGEST)) {
     throw new CapabilityAdmissionError(
@@ -327,6 +336,15 @@ export function admitScenarioCapabilities(
       "DOMAIN_DISABLED",
       decision?.reason ?? "The scenario domain is not known to this deployment.",
     );
+  }
+  const mission = scenario.airMission as { missionClass?: AirMissionClass; start?: { posture?: AirStartPosture } } | undefined;
+  if (scenario.domain === "A2A" && mission) {
+    if (!mission.missionClass || !manifest.missionClasses.includes(mission.missionClass)) {
+      throw new CapabilityAdmissionError("CAPABILITY_CONFIG_INVALID", "The authored Air mission class is not admitted by this deployment.");
+    }
+    if (!mission.start?.posture || !manifest.startPostures.includes(mission.start.posture)) {
+      throw new CapabilityAdmissionError("CAPABILITY_CONFIG_INVALID", "The authored Air mission start posture is not admitted by this deployment.");
+    }
   }
   return manifest;
 }

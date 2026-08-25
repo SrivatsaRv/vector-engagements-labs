@@ -1,25 +1,32 @@
-import type { ReportData } from "@/lib/report-export";
-import type { ScenarioDefinition } from "@/lib/scenarios";
+import type { ReportData } from "../report-export.ts";
+import type { ScenarioDefinition } from "../scenarios.ts";
+import {
+  AirMissionAdmissionError,
+  compileAirMissionDefinition,
+  isAirMissionDefinition,
+} from "../air-mission.ts";
+import { CURRENT_COMPILED_MODEL_PACK } from "../engine/weapon-admission.ts";
+import { admitPhaseAEnvironmentPack } from "../geospatial/environment-pack.ts";
 import {
   type Scenario,
   simulate,
-} from "@/lib/simulation";
-import { findWeaponSimulationModel } from "@/lib/simulation-models";
-import { ENGINE_VERSION } from "@/lib/engine/version";
-import { OBJECT_CATALOG } from "@/lib/object-catalog";
-import { compileModelPack } from "@/lib/model-pack";
-import { createCurrentModelPackSource } from "@/lib/reference-model-pack";
+} from "../simulation.ts";
+import { findWeaponSimulationModel } from "../simulation-models.ts";
+import { ENGINE_VERSION } from "../engine/version.ts";
+import { OBJECT_CATALOG } from "../object-catalog.ts";
+import { compileModelPack } from "../model-pack.ts";
+import { createCurrentModelPackSource } from "../reference-model-pack.ts";
 import {
   EnvironmentAdmissionError,
   resolveEnvironmentSelection,
-} from "@/lib/study-areas";
+} from "../study-areas.ts";
 import {
   MissionAdmissionError,
   resolveInstallationOriginReference,
   type InstallationOriginReference,
-} from "@/lib/mission-admission";
-import { finiteNumber, PublicApiError, shortString } from "./public-api";
-import { SAVED_RUN_LIFECYCLE_POLICY } from "./admission-policy";
+} from "../mission-admission.ts";
+import { finiteNumber, PublicApiError, shortString } from "./public-api.ts";
+import { SAVED_RUN_LIFECYCLE_POLICY } from "./admission-policy.ts";
 
 const domains = new Set(["A2A", "A2G", "G2A", "G2G"]);
 const profiles = new Set(["short", "medium", "sustained"]);
@@ -241,11 +248,23 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
     humidityPercent: finiteNumber(input.humidityPercent, 0, 100, "humidity"),
     temperatureOffset: finiteNumber(input.temperatureOffset, -80, 80, "temperature_offset"),
     spatialPlan: spatialPlan(input.spatialPlan),
+    airMission: isAirMissionDefinition(input.airMission)
+      ? structuredClone(input.airMission)
+      : undefined,
     lossIncreaseAt: optionalTime(input.lossIncreaseAt, "wind_shift_at"),
     lossIncreaseAmount: finiteNumber(input.lossIncreaseAmount, -150, 150, "wind_shift"),
     seed: finiteNumber(input.seed, 0, 2_147_483_647, "seed"),
   };
   if (scenario.domain !== template.domain) throw new PublicApiError(409, "scenario_domain_mismatch");
+  if (scenario.domain === "A2A" && !scenario.airMission) {
+    throw new PublicApiError(
+      400,
+      "MISSION_SCHEMA_INVALID",
+      "An Air saved run requires vector.air-mission.v1; missing mission intent is not defaulted.",
+      undefined,
+      "airMission",
+    );
+  }
   try {
     resolveEnvironmentSelection(scenario);
     for (const [team, placement] of Object.entries(scenario.spatialPlan ?? {})) {
@@ -256,11 +275,31 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
         fieldPath: `spatialPlan.${team}.originReference`,
       });
     }
+    if (scenario.airMission) {
+      const environment = admitPhaseAEnvironmentPack({
+        studyAreaId: scenario.studyAreaId,
+        weatherPresetId: scenario.weatherPresetId,
+        effectiveWeather: {
+          windEastMps: scenario.wind,
+          windNorthMps: scenario.windNorth,
+          temperatureOffsetC: scenario.temperatureOffset,
+        },
+      });
+      compileAirMissionDefinition(scenario.airMission, {
+        scenario,
+        modelPack: CURRENT_COMPILED_MODEL_PACK,
+        environmentPackDigest: environment.pack.identity.digest,
+        environmentPack: environment.pack,
+      });
+    }
   } catch (error) {
     if (error instanceof EnvironmentAdmissionError) {
       throw new PublicApiError(400, error.code, error.message, undefined, error.fieldPath);
     }
     if (error instanceof MissionAdmissionError) {
+      throw new PublicApiError(400, error.code, error.message, undefined, error.fieldPath);
+    }
+    if (error instanceof AirMissionAdmissionError) {
       throw new PublicApiError(400, error.code, error.message, undefined, error.fieldPath);
     }
     throw error;
@@ -311,6 +350,17 @@ export async function buildVerifiedSavedRun(
       ...provenance,
       intendedUse: template.intendedUse,
       modelPack: template.modelPack,
+      ...(result.engineRun.scenario.airMission
+        ? {
+            airMission: {
+              schemaVersion: result.engineRun.scenario.airMission.schemaVersion,
+              id: result.engineRun.scenario.airMission.id,
+              version: result.engineRun.scenario.airMission.version,
+              authoredDigest: result.engineRun.scenario.airMission.authoredDigest,
+              compiledDigest: result.engineRun.scenario.airMission.compiledDigest,
+            },
+          }
+        : {}),
       credibilityManifest: {
         id: modelPackBundle.credibilityManifest.id,
         version: modelPackBundle.credibilityManifest.version,

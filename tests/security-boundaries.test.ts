@@ -156,7 +156,7 @@ test("saved reports are recomputed from admitted scenario inputs", async () => {
   const verified = await buildVerifiedSavedRun(
     DEFAULT_SCENARIO_DEFINITION.scenario,
     DEFAULT_SCENARIO_DEFINITION,
-    { schemaVersion: "vector.scenario.v3", contentHash: "a".repeat(64), draftRevision: 0 },
+    { schemaVersion: "vector.scenario.v4", contentHash: "a".repeat(64), draftRevision: 0 },
   );
   assert.ok(verified.result.frames.length > 1);
   assert.equal(verified.report.result, verified.result);

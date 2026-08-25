@@ -13,15 +13,21 @@ one family must not imply changes to unrelated contracts.
 
 Model-pack persistence table declarations now live in the domain-owned
 `db/schema/model-pack.ts` module behind the unchanged aggregate Drizzle facade.
+Air flight assignments bind exact model-pack, aircraft and compatible
+station/store identities; mission authoring does not duplicate model schemas.
 
 #### Database schema
 
 The aggregate `db/schema.ts` facade now re-exports domain-owned schema modules;
-table names, columns, constraints, and migrations are unchanged.
+table names, columns, constraints, and prior migrations are unchanged.
+Forward-only migration `013_air_mission_contract.sql` replaces exact v3 scenario
+packages/hashes with canonical v4 packages and rejects mixed or residual rows.
 
 #### Engine ABI
 
-No pending family-specific entry.
+Engine scenarios carry an optional compiled Air mission lineage envelope. The
+generic physics ABI is unchanged; Rust/WASM results reattach the verified
+envelope for backend-independent VSR provenance.
 
 #### Generic AAM verification
 
@@ -29,16 +35,21 @@ No pending family-specific entry.
 
 #### Simulation physics
 
-No pending family-specific entry.
+Compiled Air start, route speed, fuel and installed-store quantity now drive
+generic initial state, mass and endurance without mission-class or named-case
+physics branches.
 
 #### Browser Worker protocol
 
-No pending family-specific entry.
+The Worker independently recompiles and verifies Air mission/model/environment
+identity before caching or executing a runtime adapter.
 
 #### Vector simulation records
 
 Saved-run record and admission tables now have separate domain-owned schema
 modules without changing their persisted representation.
+Air VSRs bind authored and compiled mission identities across scenario,
+compiled, manifest and report members and revalidate them before replay.
 
 #### Capability descriptors
 
@@ -46,11 +57,18 @@ modules without changing their persisted representation.
   Select while preserving stale authored identities as unavailable. This is a
   presentation-only migration; deployment admission and catalog authority are
   unchanged.
+- The deployment admits all four Air mission classes, three engagement overlays
+  and four start postures while retaining explicit nonclaims for autonomous
+  virtual-pilot policy behavior.
 
 #### Mission scenarios
 
-Scenario-template table declarations now live in `db/schema/scenarios.ts`
-behind the unchanged aggregate schema export.
+Air templates advance to `vector.scenario.v4` with one authored
+`vector.air-mission.v1` and content-addressed `vector.compiled-air-mission.v1`.
+All Air mission classes, overlays, flight plans, start postures, loadout/fuel,
+recovery, Worker/server admission, and VSR/report lineage share that contract.
+Migration `013_air_mission_contract.sql` freezes exact upgraded template JSON
+and hashes; no production seed or fallback default performs the migration.
 
 ### Added
 
@@ -80,7 +98,7 @@ behind the unchanged aggregate schema export.
 - Docker Compose now runs self-contained production, migration, and local-seed
   bundles from one `VECTOR_IMAGE`; database and telemetry values are supplied
   only at runtime and Docker Hub is not implied or configured.
-- Scenario packages advance to `vector.scenario.v3` and saved runs now bind the
+- Scenario packages advance to `vector.scenario.v4` and saved runs now bind the
   intended-use identity and exact compiled model-pack digest. Unknown objects,
   missing coefficients, incompatible stores, and unsupported combinations fail
   closed instead of receiving generic fallback coefficients.

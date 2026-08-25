@@ -14,6 +14,11 @@ Primary references:
 
 ## Archive contents
 
+For an Air-domain v4 scenario, `scenario.json` contains the exact authored
+mission, `compiled.json` contains `vector.compiled-air-mission.v1`, and both
+`manifest.json` and `report.json` bind its ID/version plus authored and compiled
+SHA-256 digests.
+
 Saved-run snapshot table declarations are isolated in
 `db/schema/vector-record.ts`; admission quota tables are separately declared in
 `db/schema/saved-run-admission.ts`. Both remain part of one aggregate schema.
@@ -84,6 +89,10 @@ it is not displayed as if it were a separate model sample.
 
 ## Frame contract
 
+Mission lineage adds no parallel frame state. Ground starts are represented by
+the canonical aircraft entity at the runway threshold with zero speed in the
+first recorded frame; later motion remains the ordinary engine-frame contract.
+
 The schema-module split does not change frame, picture, event, or snapshot JSON
 fields.
 
@@ -115,6 +124,10 @@ environment dataset.
 Weapons remain loadout inventory before launch. Aircraft frames preserve the installed inventory identities and total store mass while the weapon is stowed. A launch event removes that store and its declared launch mass from the aircraft once, then creates the weapon's first world sample with the launch platform position and inherited velocity. Static objects may omit unchanged samples. The viewer interpolates only properties explicitly declared interpolable.
 
 ## Integrity and replay
+
+Readback recompiles the archived authored mission against the archived model
+and environment pack and requires exact equality across scenario, compiled,
+manifest, and report members before returning replay data.
 
 Record digests and replay verification are unchanged by the persistence-module
 ownership split.
@@ -206,12 +219,21 @@ authoritative v2 stream.
 
 ## Browser and interoperability boundary
 
+Browsers receive the verified optional compiled mission envelope through the
+existing VSR reader. Unknown mission schemas or missing viewer-feature identity
+fail closed; presentation code cannot synthesize mission authority.
+
 Browser and Worker consumers continue to receive saved records through the
 same aggregate persistence/API contract.
 
 VSR is designed for browser production and playback. Frames use a transferable columnar buffer so a Web Worker, TypeScript engine or Rust/WASM engine can produce the same record contract. An ACMI 2.2 exporter can be added as an interoperability adapter; ACMI is not used as VECTOR's internal source of model truth because it does not carry VECTOR's full coefficient, provenance and scenario contracts.
 
 ## Implemented replay boundary
+
+Current replay preserves mission class/regime, start posture, flight-plan,
+compiled aircraft ground envelope, exact station/rule loadout, fuel, and exact
+authored/compiled/model-pack digests as immutable provenance. It does not execute a
+virtual pilot or derive policy decisions during replay.
 
 No replay behavior or supported record version changes with the table-module
 refactor.

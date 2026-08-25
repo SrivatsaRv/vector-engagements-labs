@@ -11,6 +11,12 @@ import {
   hasValidRouteWaypointTransitions,
   isPointInsideStudyArea,
 } from "./scenario-spatial.ts";
+import {
+  AirMissionAdmissionError,
+  compileAirMissionDefinition,
+} from "./air-mission.ts";
+import { CURRENT_COMPILED_MODEL_PACK } from "./engine/weapon-admission.ts";
+import { admitPhaseAEnvironmentPack } from "./geospatial/environment-pack.ts";
 
 export type ValidationState = "pass" | "warning" | "error";
 export type ValidationItem = {
@@ -88,6 +94,56 @@ export function validateScenario(
           Math.abs(entity.route[0].altitudeM - entity.position.altitudeM) < 1e-6,
       ),
   );
+  let missionValidation: ValidationItem;
+  try {
+    if (scenario.domain === "A2A" && !scenario.airMission) {
+      throw new AirMissionAdmissionError(
+        "MISSION_SCHEMA_INVALID",
+        "airMission",
+        "An Air scenario requires vector.air-mission.v1.",
+        "Load or author the Air mission contract.",
+      );
+    }
+    if (scenario.airMission) {
+      const environment = admitPhaseAEnvironmentPack({
+        studyAreaId: scenario.studyAreaId,
+        weatherPresetId: scenario.weatherPresetId,
+        effectiveWeather: {
+          windEastMps: scenario.wind,
+          windNorthMps: scenario.windNorth,
+          temperatureOffsetC: scenario.temperatureOffset,
+        },
+      });
+      const compiled = compileAirMissionDefinition(scenario.airMission, {
+        scenario,
+        modelPack: CURRENT_COMPILED_MODEL_PACK,
+        environmentPackDigest: environment.pack.identity.digest,
+        environmentPack: environment.pack,
+      });
+      missionValidation = {
+        id: "air-mission",
+        label: "Air mission, flight plan, start, loadout, and fuel are admitted",
+        detail: `${compiled.authored.missionClass.replaceAll("_", " ").toLowerCase()} · ${compiled.authored.regime.replaceAll("_", " ").toLowerCase()} · ${compiled.start.posture.toLowerCase()} · digest ${compiled.compiledDigest.slice(0, 16)}`,
+        state: "pass",
+      };
+    } else {
+      missionValidation = {
+        id: "air-mission",
+        label: "Air mission contract is not applicable",
+        detail: "This non-Air template retains its owned domain contract.",
+        state: "pass",
+      };
+    }
+  } catch (error) {
+    missionValidation = {
+      id: "air-mission",
+      label: "Air mission admission failed",
+      detail: error instanceof AirMissionAdmissionError
+        ? `${error.code} at ${error.fieldPath}. ${error.correctiveGuidance}`
+        : error instanceof Error ? error.message : "Unknown mission admission failure.",
+      state: "error",
+    };
+  }
 
   return [
     {
@@ -148,6 +204,7 @@ export function validateScenario(
         : `Choose a weapon with a cataloged compatibility record for ${platform?.designation ?? launchObject.designation}.`,
       state: loadoutLinked ? "pass" : "error",
     },
+    missionValidation,
     {
       id: "target-state",
       label: targetStateFits
