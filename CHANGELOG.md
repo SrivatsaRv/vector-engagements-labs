@@ -70,6 +70,21 @@ recovery, Worker/server admission, and VSR/report lineage share that contract.
 Migration `013_air_mission_contract.sql` freezes exact upgraded template JSON
 and hashes; no production seed or fallback default performs the migration.
 
+#### Scenario composition kernel
+
+`vector.scenario-kernel.v1` now owns arbitrary affiliations, organization
+structure, multi-domain entity identities, authored task graphs and six-surface
+perspective projections. Owner-controlled content-addressed capability
+descriptors replace scenario-authored descriptor authority. Canonical bytes,
+iterative bounded graph admission, typed atomic mutation history, undo/redo,
+request/draft/perspective stale-response guards, exact blank/template/import
+intake, identity-only V1 migration and projection-only workspace discovery are
+versioned and tested. An identity-only adapter closes exact task/entity and
+capability references around #60's published authored/compiled Air mission
+digests without copying mission fields or execution authority. #60 retains Air
+compile/runtime authority; no database migration or new domain physics is
+introduced.
+
 ### Added
 
 - Governed North Punjab, Ladakh, Rajasthan, North East, Arabian Sea, and coastal

@@ -32,7 +32,10 @@ merge-base-to-worktree change set contains a registered family. The verifier
 constructs an isolated temporary Git snapshot for dirty and untracked files,
 so pre-commit validation neither ignores edits nor mutates the real index. The
 post-commit clean-clone run validates the exact immutable candidate and carries
-the declaration path forward. It then verifies the machine-readable runtime stub
+the declaration path forward. Registry regression also resolves each newly
+introduced family to its exact implementation and maintained section, and
+checks changelog-heading uniqueness against the live inventory rather than a
+fixed family count. It then verifies the machine-readable runtime stub
 ledger. A new or removed production fallback, temporary adapter, model
 assumption, named-duel identifier, scripted guidance hold, or source-less public
 reference must update its owning ledger entry; an
@@ -101,6 +104,21 @@ finite content-addressed run decoding, isolated production-bundle scans, exact n
 `reference-aam:performance` target reports a 15-case Node-hosted workload under
 explicit p95 limits and makes no Worker or product-capacity claim. See
 [`generic-aam-verification.md`](generic-aam-verification.md).
+
+Scenario-composition verification runs the focused
+`tests/scenario-kernel*.test.mjs` and `tests/scenario-capabilities.test.mjs`
+suites for exact schema admission, content-addressed descriptors, graph bounds,
+canonical bytes, atomic typed history, six-surface redaction, stale async
+response rejection and exact #154 intake, #155 workspace and #60 published-Air
+adapter boundaries. The #60 proof rejects forged compiled lineage, dangling
+assignment/target identities and missing governed capability admission while
+emitting no duplicated mission fields. The reproducible
+`npx tsx scripts/benchmark-scenario-kernel.ts` workload measures 12, 75, 100
+and 250 entities over compilation, all-entity bulk edit, exact-byte undo/redo
+and all six workspace projections after warm-up, rejects digest drift, and
+enforces p95 at or below 100 ms for every tier. It is contract/projection
+evidence only; it does not substitute for the
+browser, Worker, renderer, memory or runtime capacity gates owned downstream.
 
 GitHub CI uses `scripts/classify-ci-changes.mjs` to select the smallest complete
 automated gate from merge-base-relative `--name-status -z` records. Rename and

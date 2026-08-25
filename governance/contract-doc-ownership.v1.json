@@ -3233,6 +3233,157 @@
       "migrationSections": []
     },
     {
+      "id": "SCENARIO_COMPOSITION_KERNEL",
+      "workstream": "staff-architecture",
+      "implementationRules": [
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-kernel.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-capabilities.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "evidence",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-kernel-adapters.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-kernel-history.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-kernel-requests.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-scenario-kernel.ts",
+          "facets": [
+            "verification"
+          ]
+        }
+      ],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/scenario-kernel.test.mjs",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/scenario-capabilities.test.mjs",
+          "facets": [
+            "admission",
+            "digest",
+            "evidence",
+            "schema",
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/scenario-kernel-adapters.test.mjs",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/scenario-kernel-history.test.mjs",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/scenario-kernel-requests.test.mjs",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui",
+            "verification"
+          ]
+        }
+      ],
+      "generatedGroups": [],
+      "owningSections": [
+        {
+          "sectionId": "SCENARIO_COMPOSITION_KERNEL_CONTRACT",
+          "path": "docs/scenario-builder.md",
+          "heading": "## Cross-domain scenario composition kernel",
+          "facets": [
+            "admission",
+            "digest",
+            "evidence",
+            "schema",
+            "ui",
+            "verification"
+          ]
+        }
+      ],
+      "migrationSections": [
+        {
+          "sectionId": "SCENARIO_COMPOSITION_KERNEL_CHANGELOG",
+          "path": "CHANGELOG.md",
+          "heading": "#### Scenario composition kernel",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui"
+          ]
+        }
+      ]
+    },
+    {
       "id": "MISSION_SCENARIO_RUNTIME",
       "workstream": "simulation-systems",
       "implementationRules": [
@@ -4508,5 +4659,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "6fd0f266c006bbd03b49be37632b0e1540fa964ac9362d5b91caf921506bef8f"
+  "canonicalSha256": "8e5689bb03e4b9b062b495ee62b336bc93aba01abeeb3992f6df8fc7e317d1f0"
 }

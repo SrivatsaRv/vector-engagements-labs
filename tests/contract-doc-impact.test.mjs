@@ -2270,6 +2270,7 @@ test("the repository policy maps real simulation identities to their exact owner
   const physics = family("SIMULATION_PHYSICS_RUNTIME");
   const vsr = family("RECORD_VSR_PERSISTENCE");
   const geospatial = family("GEOSPATIAL_ENVIRONMENT");
+  const scenarioKernel = family("SCENARIO_COMPOSITION_KERNEL");
   const mission = family("MISSION_SCENARIO_RUNTIME");
   const persistence = family("PERSISTENCE_DATABASE_SCHEMA");
   const capabilities = family("CAPABILITY_DESCRIPTORS_SELECTORS");
@@ -2308,9 +2309,13 @@ test("the repository policy maps real simulation identities to their exact owner
   assert.deepEqual(ownersOf("db/schema/saved-run-admission.ts").map((owner) => owner.id), ["PERSISTENCE_DATABASE_SCHEMA", "RECORD_VSR_PERSISTENCE", "SECURITY_SAVED_RUNS"]);
   assert.deepEqual(ownersOf("db/schema/public-api-admission.ts").map((owner) => owner.id), ["PERSISTENCE_DATABASE_SCHEMA", "SECURITY_CATALOG_BASEMAP"]);
   assert.deepEqual(ownersOf("db/schema/blog-comments.ts").map((owner) => owner.id), ["PERSISTENCE_DATABASE_SCHEMA", "CONTENT_COMMENTS"]);
-  assert.equal(new Set(repositoryPolicy.families.flatMap((owner) => owner.migrationSections)
+  const changelogHeadings = repositoryPolicy.families.flatMap((owner) => owner.migrationSections)
     .filter((section) => section.path === "CHANGELOG.md")
-    .map((section) => section.heading)).size, 9, "each changelog-owning family must have a distinct section");
+    .map((section) => section.heading);
+  assert.equal(new Set(changelogHeadings).size, changelogHeadings.length, "each changelog-owning family must have a distinct section");
+  assert.deepEqual(exactRule(scenarioKernel, "lib/scenario-kernel.ts").facets, ["admission", "digest", "schema", "ui"]);
+  assert.deepEqual(requiredSections(scenarioKernel, "lib/scenario-kernel.ts"), ["SCENARIO_COMPOSITION_KERNEL_CONTRACT"]);
+  assert.deepEqual(ownersOf("lib/scenario-kernel.ts").map((owner) => owner.id), ["SCENARIO_COMPOSITION_KERNEL"]);
   assert.equal(exactRule(securitySavedRuns, "app/api/blog-comments/route.ts"), undefined);
   assert.deepEqual(exactRule(contentComments, "app/api/blog-comments/route.ts").facets, ["admission", "storage", "validity"]);
   assert.deepEqual(requiredSections(contentComments, "app/api/blog-comments/route.ts"), ["CONTENT_COMMENTS"]);
