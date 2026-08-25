@@ -13,6 +13,11 @@ VECTOR keeps the compact A2A/A2G/G2A/G2G identifiers for scanning, but gives eac
 
 These labels are intentionally narrower than operational doctrine. VECTOR is a public-data educational model and does not claim to simulate the full counterair, counterland, strategic-attack, or targeting processes. UI copy names the configured platform, weapon, target, and information state whenever the catalog contains them; “abstract profile” is not used as a substitute for incomplete data.
 
+Transient Select, Menu, and Popover labels name the field and current choice;
+persistent evidence/help is labelled as a Disclosure. These interaction terms
+describe presentation state only and never imply a new mission, admission, or
+simulation capability.
+
 ## Color meaning
 
 Affiliation and state colors must not be interchangeable:

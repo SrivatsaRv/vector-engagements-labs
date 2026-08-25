@@ -2861,6 +2861,14 @@
         },
         {
           "kind": "EXACT",
+          "value": "components/ui/OverlayPrimitives.tsx",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "scripts/run-browser-contracts.mjs",
           "facets": [
             "ui",
@@ -2900,6 +2908,22 @@
             "ui",
             "verification"
           ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/object-picker.test.tsx",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/overlay-primitives.test.tsx",
+          "facets": [
+            "ui",
+            "verification"
+          ]
         }
       ],
       "generatedGroups": [],
@@ -2910,6 +2934,15 @@
           "heading": "## Behavioral rules",
           "facets": [
             "ui"
+          ]
+        },
+        {
+          "sectionId": "UI_SHARED_OVERLAYS",
+          "path": "docs/responsive-ui.md",
+          "heading": "## Shared control and overlay contract",
+          "facets": [
+            "ui",
+            "verification"
           ]
         },
         {
@@ -4427,5 +4460,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "5fec16de17a270edaef016fbc0d39baaa0fccc56165f44d748530fef91bd2a46"
+  "canonicalSha256": "9fabcc12b14ec1d4cfa08ecd9a7cad30c96e117d1fb55fc5ec441e13027619d2"
 }

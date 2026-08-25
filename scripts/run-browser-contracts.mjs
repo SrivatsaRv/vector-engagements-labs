@@ -12,10 +12,11 @@ export const BROWSER_PROJECTS = Object.freeze([
   "desktop-1440",
   "full-hd",
 ]);
-export const BROWSER_CASES_PER_PROJECT = 3;
+export const BROWSER_CASES_PER_PROJECT = 4;
 export const BROWSER_CASE_TITLES = Object.freeze([
   "a disabled domain link cannot fall through to the A2A workbench",
   "Peace Drive I evidence is visibly context-only and fitted EW remains unknown",
+  "shared transient controls hand off once and remain accessible, contained, and stable",
   "a current deployment manifest drives the real Worker run after route recovery",
 ]);
 

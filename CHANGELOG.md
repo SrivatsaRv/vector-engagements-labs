@@ -42,7 +42,10 @@ modules without changing their persisted representation.
 
 #### Capability descriptors
 
-No pending family-specific entry.
+- Aircraft and weapon capability choices now consume the shared root-owned
+  Select while preserving stale authored identities as unavailable. This is a
+  presentation-only migration; deployment admission and catalog authority are
+  unchanged.
 
 #### Mission scenarios
 

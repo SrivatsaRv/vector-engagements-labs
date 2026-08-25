@@ -81,6 +81,11 @@ The internal `vector.scenario-draft.v1` state contract now provides the safe aut
 
 The builder is one persistent desktop workspace, not a page-per-field wizard. The left rail owns the five Construct sections, the center owns the geographic placement surface and form for the selected object, and the right rail owns the selected entity, validation state, and compiled-summary preview. From 1280×720 upward all three remain visible; QHD and 4K expand the task surface, controls, map and typography rather than adding empty margins. On phones the same five-step state is presented as a single column with persistent actions; desktop rails are removed and no scenario state is discarded. Drawers may extend a rail but may not replace the map.
 
+All custom choice surfaces in this workspace use the root-owned Select, Menu,
+or Popover family and obey one transient-open invariant. Explanatory evidence
+uses the persistent Disclosure primitive, so help can remain expanded while an
+aircraft, weapon, origin, or basemap choice is completed.
+
 ### Enter
 
 The user starts from exactly one of four states:
@@ -117,6 +122,9 @@ from static labels.
 - The engine owns lifecycle changes and produces ordered frames and events.
 - Observe reads frames; it never writes entity positions.
 - Save records the authored package identity, compiled scenario, frame hash and report together.
+- Overlay open state, focus ownership, placement, and Disclosure expansion are
+  presentation-only and are absent from the draft, compiled scenario, Worker
+  request, VSR, saved run, and report.
 
 A field change after a run increments the draft revision, invalidates Save and Report, preserves the prior saved run, and requires a new simulation. A failed compile never leaves a partially runnable result in the workspace.
 
@@ -160,8 +168,14 @@ reference, or map anchor.
 - The selected study area and weather are explicitly labelled preconfigured.
 - Place & flight exposes the six governed regional presets immediately and may collapse them only after they have been shown. A missing/incomplete PostGIS catalog produces an actionable blocked state rather than a runnable static fallback.
 - Blue and Red each have an affiliation-scoped origin picker populated from bases available in the selected public-reference environment pack. It explicitly says this bounded fixture is not a complete IAF/PAF catalogue. Choosing an origin moves that team's aircraft to the installation; manual drag remains available when no catalog origin is appropriate.
+- Aircraft, weapon, origin, and basemap choices consume the shared Select and
+  application overlay coordinator defined by [`responsive-ui.md`](responsive-ui.md).
+  Only one transient choice surface may be open, while evidence/help
+  Disclosures retain independent state. Missing or permission-filtered catalog
+  identities remain visibly unavailable for correction; a picker never displays
+  its first option in place of the authored identity.
 - Selecting an origin retains `vector.installation-origin.v1` with its installation ID, source ID, selected study-area ID and weather-preset ID. The compiler re-resolves all four values before producing an engine scenario. A missing/deleted installation, stale source, cross-environment reference, or runway ID blocks compilation with a stable field-path error; it never becomes a coordinate-only origin. Manual drag explicitly clears that optional airborne-origin reference. Ground/runway starts remain unavailable because the current catalog has only point locations and text runway notes, not admitted runway geometry or start evidence.
-- The five-viewport browser journey opens the affiliation-scoped native origin disclosure, selects Pathankot AFS, verifies the rendered installation identity and governed coordinates, then completes a real Worker run after an explicit manual-airborne edit. The mission-admission regression independently proves that this selected identity is present in the compiled engine scenario and changes the frozen environment digest.
+- The five-viewport browser journey opens the affiliation-scoped shared origin Select, selects Pathankot AFS, verifies the rendered installation identity and governed coordinates, then completes a real Worker run after an explicit manual-airborne edit. The mission-admission regression independently proves that this selected identity is present in the compiled engine scenario and changes the frozen environment digest.
 - Blue and Red start markers and waypoints are draggable. A numeric longitude or
   latitude edit has the same meaning as dragging a start: it explicitly changes
   the aircraft to a manual airborne placement and clears any installation-origin
@@ -169,6 +183,10 @@ reference, or map anchor.
   installation identity because they do not move its geographic origin.
 - Waypoint creation is scoped to the currently selected team and lives in that team's route inspector. The map never offers an unowned generic waypoint action.
 - The selected entity inspector edits WGS84 start coordinates, explicit MSL altitude, true heading, true airspeed, and each waypoint's WGS84 coordinates, MSL altitude, acceptance radius, and `FLY_BY`/`FLY_OVER` transition. This provides a keyboard-accessible alternative to map placement.
+- Waypoint transition remains a browser-native `select` and is explicitly
+  marked as UA-owned. Its option window is not a VECTOR portal and is exempt
+  from custom overlay exclusivity; the browser owns its keyboard, focus, touch,
+  placement, and close behavior.
 - Numeric editors retain intermediate text. Empty, non-finite, out-of-area, negative, over-limit, and uncommitted values keep the operator in Place & flight and block validation instead of being discarded, normalized, or clamped into a different scenario.
 - Drag and numeric edits synchronize starting distance, altitude difference, aspect, and platform speeds before compilation.
 - Validation blocks non-finite state, negative speed or altitude, invalid headings, mismatched route origins, zero-length route legs, missing or invalid `vector.route-plan.v2` radii or transitions, and any start or waypoint outside the preset boundary.

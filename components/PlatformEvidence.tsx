@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Disclosure } from "@/components/ui/OverlayPrimitives";
 
 import {
   findPlatform,
@@ -57,10 +58,14 @@ export function PlatformEvidence({ platformId }: { platformId: string }) {
     designation: findWeapon(item.weaponId)?.designation ?? item.weaponId,
   }));
   return (
-    <details className="platform-systems">
-      <summary>
+    <Disclosure
+      className="platform-systems"
+      summary={
+        <>
         Aircraft evidence <span>{platform.status}</span>
-      </summary>
+        </>
+      }
+    >
       <dl>
         {systemRows.map((item) => (
           <div key={item.id} data-testid={`platform-system-${item.id}`}>
@@ -105,6 +110,6 @@ export function PlatformEvidence({ platformId }: { platformId: string }) {
           ))}
         </footer>
       )}
-    </details>
+    </Disclosure>
   );
 }

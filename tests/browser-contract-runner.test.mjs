@@ -42,7 +42,7 @@ const passingReport = (project, artifactPath) => ({
     },
   ],
   errors: [],
-  stats: { expected: 3, skipped: 0, unexpected: 0, flaky: 0 },
+  stats: { expected: BROWSER_CASE_TITLES.length, skipped: 0, unexpected: 0, flaky: 0 },
 });
 
 const failedReport = (project, artifactPath, attachments) => ({
@@ -77,7 +77,12 @@ const failedReport = (project, artifactPath, attachments) => ({
     },
   ],
   errors: [],
-  stats: { expected: 2, skipped: 0, unexpected: 1, flaky: 0 },
+  stats: {
+    expected: BROWSER_CASE_TITLES.length - 1,
+    skipped: 0,
+    unexpected: 1,
+    flaky: 0,
+  },
 });
 
 async function unusedLocalPort() {

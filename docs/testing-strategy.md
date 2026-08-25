@@ -49,7 +49,10 @@ verifies governed migration data before fixture admission, covers the live
 PostGIS/API path, and runs automated responsive interaction checks. The
 responsive verifier reads the configuration-owned engine identity from
 `config/deployment-capabilities.json` and requires the observed run to use that
-backend; it must not hardcode a TypeScript or Rust/WASM selection. The image
+backend; it must not hardcode a TypeScript or Rust/WASM selection. Its default
+run covers the entire governed responsive matrix. `VECTOR_RESPONSIVE_WIDTH`
+can select one admitted matrix width for local red/green diagnosis, but it
+fails closed for unknown widths and is not complete release evidence. The image
 inspection rejects missing OCI identity, development `node_modules`, an
 unexpected command, or a root user. These targets remain separate because they
 have different environment and runtime costs.
@@ -100,6 +103,10 @@ content, data, or delivery family rather than a generic test-only owner.
 Regression coverage changes a test and two independent owning sections in one
 fixture, proving the test-selected facet cannot hide the second changed contract
 section; migration headings remain a distinct requirement inventory.
+The ownership baseline also binds the shared overlay implementation and its
+focused ObjectPicker/overlay regressions to `UI_RESPONSIVE_INTERACTION`,
+including its dedicated shared-overlay section, so future primitive changes
+cannot bypass responsive interaction evidence.
 The template command runs the same analysis without accepting a declaration and
 emits the exact required family/section inventory for the current diff. Hosted
 verification writes the subsequently validated declaration to the visible job
@@ -249,15 +256,15 @@ checks that the log remains readable, and binds the same port again to prove
 cleanup. This process evidence is separate from the Browser Contract runner. CI
 builds the application once, then `scripts/run-browser-contracts.mjs` executes
 the five Playwright projects serially with a fresh managed Wrangler/Workerd
-process group for each viewport. The policy is `RUN_ALL_PROJECTS_ONCE`: all 15
+process group for each viewport. The policy is `RUN_ALL_PROJECTS_ONCE`: all 20
 cases execute without retries even after one project fails, so later-viewport
 evidence is not suppressed. An external `SIGINT` or `SIGTERM` is different: it
 terminates the active server and test process groups, records the interruption,
 does not start later projects, and exits nonzero. Any project, server,
 interruption, cleanup, or evidence-retention failure makes the aggregate command
 fail. A pass requires a nonempty managed-server log and parseable Playwright JSON
-bound to the expected project, exactly three executed cases, and their successful
-statuses. The three governed case identities are exact and distinct; global or
+bound to the expected project, exactly four executed cases, and their successful
+statuses. The four governed case identities are exact and distinct; global or
 per-result errors cannot coexist with a passing status. Every governed project
 entry must bind to the selected project's isolated output directory.
 Browser-test failures require retained trace, screenshot, and video

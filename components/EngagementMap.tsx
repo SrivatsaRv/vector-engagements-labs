@@ -4,6 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
 import { CircleHelp, Layers3 } from "lucide-react";
 import { VectorMapControls, type MapCameraTelemetry } from "@/components/VectorMapControls";
+import { Disclosure } from "@/components/ui/OverlayPrimitives";
 import type { RaspTrack, SimulationResult } from "@/lib/simulation";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
 import {
@@ -57,7 +58,6 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
   );
   const [mapError, setMapError] = useState("");
   const [basemap, setBasemap] = useState<VectorBasemap>("MINIMAL");
-  const [paletteOpen, setPaletteOpen] = useState(false);
   // This is deliberately view-local. Selecting a marker changes label detail
   // only; it cannot change the selected replay frame or a saved run.
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
@@ -581,9 +581,7 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
       <VectorMapControls
         basemap={basemap}
         camera={camera}
-        paletteOpen={paletteOpen}
-        onPaletteToggle={() => setPaletteOpen((current) => !current)}
-        onBasemap={(value) => { setBasemap(value); setPaletteOpen(false); }}
+        onBasemap={setBasemap}
         onZoomIn={() => mapRef.current?.zoomIn({ duration: 120 })}
         onZoomOut={() => mapRef.current?.zoomOut({ duration: 120 })}
         onTilt={() => mapRef.current?.easeTo({ pitch: camera.pitch > 5 ? 0 : 52, duration: 220 })}
@@ -597,8 +595,10 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           <span>{mapStatus === "error" ? mapError : "Preparing geographic context and overlays."}</span>
         </div>
       )}
-      <details className="map-layer-legend">
-        <summary><Layers3 size={14} aria-hidden="true" /> Layers <span>5 available</span></summary>
+      <Disclosure
+        className="map-layer-legend"
+        summary={<><Layers3 size={14} aria-hidden="true" /> Layers <span>5 available</span></>}
+      >
         <div aria-label="Map layer legend">
           <span><i className="route" />Declared route</span>
           <span><i className="track" />Recorded trajectory</span>
@@ -606,15 +606,17 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           <span><i className="engagement" />Engagement envelope</span>
           <span><i className="launch" />Launch</span>
         </div>
-      </details>
-      <details className="map-context-disclosure">
-        <summary><CircleHelp size={14} aria-hidden="true" /> Study area</summary>
+      </Disclosure>
+      <Disclosure
+        className="map-context-disclosure"
+        summary={<><CircleHelp size={14} aria-hidden="true" /> Study area</>}
+      >
         <div>
           <strong>{spatial.name}</strong>
           <p>Public educational area. This map gives geographic context only.</p>
           <p>Drag to pan. Use the controls for extent, layers and tilt preview.</p>
         </div>
-      </details>
+      </Disclosure>
     </div>
   );
 }

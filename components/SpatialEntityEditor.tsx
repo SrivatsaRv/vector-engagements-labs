@@ -374,6 +374,7 @@ export function SpatialEntityEditor({
             <label>
               Transition
               <select
+                data-vector-overlay-exempt="ua-native-select"
                 value={draft.transition}
                 onChange={(event) =>
                   setWaypoints((current) => current.map((point, pointIndex) =>

@@ -60,6 +60,10 @@ criteria remain open.
 - The compiler ignores legacy tactical-decision fields and uses only the
   versioned weapon model's guidance parameters. This prevents a label from
   changing a run while the virtual-pilot contract is unavailable.
+- Capability-filtered aircraft and weapon identities are presented through the
+  shared application Select. That presentation preserves an unavailable
+  authored identity for correction and never substitutes the first admitted
+  option; it does not broaden or recompute deployment admission.
 
 ## Change and rollback
 

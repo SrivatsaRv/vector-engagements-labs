@@ -17,7 +17,7 @@ assert.ok(
   expectedEngineBackend === "typescript" || expectedEngineBackend === "rust-wasm",
   "deployment capability manifest must declare a supported engine backend",
 );
-const breakpoints = [
+const viewportMatrix = [
   { label: "compact-phone", width: 320, height: 568, family: "phone" },
   { label: "phone", width: 390, height: 844, family: "phone" },
   { label: "large-phone", width: 430, height: 932, family: "phone" },
@@ -31,6 +31,11 @@ const breakpoints = [
   { label: "qhd-27-inch", width: 2560, height: 1440, family: "large" },
   { label: "4k-tv", width: 3840, height: 2160, family: "large" },
 ];
+const requestedWidth = Number.parseInt(process.env.VECTOR_RESPONSIVE_WIDTH ?? "", 10);
+const breakpoints = Number.isFinite(requestedWidth)
+  ? viewportMatrix.filter(({ width }) => width === requestedWidth)
+  : viewportMatrix;
+assert.ok(breakpoints.length > 0, "requested responsive viewport must be in the governed matrix");
 
 async function openConstructStep(page, step, viewport) {
   if (viewport.family !== "phone") {
@@ -38,7 +43,7 @@ async function openConstructStep(page, step, viewport) {
       "1 Define",
       "2 Forces & loadouts",
       "3 Place & flight",
-      "4 Sensors & decisions",
+      "4 Admitted conditions",
       "5 Validate",
     ];
     await page.getByRole("button", { name: labels[step], exact: true }).click();
@@ -47,6 +52,19 @@ async function openConstructStep(page, step, viewport) {
   for (let current = 0; current < step; current += 1) {
     await page.locator(".builder-actions > div button").last().click();
   }
+}
+
+async function waitForStableText(locator) {
+  let previous = null;
+  let unchangedSamples = 0;
+  for (let sample = 0; sample < 20; sample += 1) {
+    const current = await locator.textContent();
+    unchangedSamples = current === previous ? unchangedSamples + 1 : 0;
+    if (unchangedSamples >= 4) return;
+    previous = current;
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+  }
+  throw new Error("Map camera telemetry did not settle before disclosure verification");
 }
 
 mkdirSync(outputDirectory, { recursive: true });
@@ -150,7 +168,7 @@ try {
             ?.getBoundingClientRect().height ?? 0,
         markers: document.querySelectorAll(".authoring-entity-marker").length,
         installationMarkers: document.querySelectorAll(".authoring-installation-marker").length,
-        originPickers: document.querySelectorAll(".origin-pickers details").length,
+        originPickers: document.querySelectorAll(".origin-pickers .origin-picker").length,
         mapControlCount: document.querySelectorAll(".scenario-authoring-map-shell .vector-map-toolbar button").length,
         cameraTelemetry: document.querySelectorAll(".scenario-authoring-map-shell .vector-map-telemetry span").length,
         studyAreaChoices: document.querySelectorAll(".study-area-grid button").length,
@@ -174,11 +192,11 @@ try {
     assert.equal(construct.studyAreaEditorVisible, true, `${viewport.width}: study-area choices are hidden`);
     assert.ok(successfulTiles > 0, `${viewport.width}: basemap returned no successful tiles`);
     if (viewport.label === "phone") {
-      await page.getByRole("button", { name: "Basemap", exact: true }).click();
-      await page.getByRole("button", { name: /^Tactical/ }).click();
+      await page.getByRole("combobox", { name: /^Basemap:/ }).click();
+      await page.getByRole("option", { name: /^Tactical/ }).click();
       await page.waitForFunction(() => localStorage.getItem("vector.map.basemap.v1") === "TACTICAL");
-      await page.getByRole("button", { name: "Basemap", exact: true }).click();
-      await page.getByRole("button", { name: /^Minimal/ }).click();
+      await page.getByRole("combobox", { name: /^Basemap:/ }).click();
+      await page.getByRole("option", { name: /^Minimal/ }).click();
     }
     assert.ok(construct.primaryActionHeight >= 38, `${viewport.width}: primary action is undersized`);
     if (viewport.family === "phone") {
@@ -210,15 +228,17 @@ try {
       fullPage: false,
     });
 
-    const blueOriginPicker = page.locator(".origin-pickers details.blue");
-    const blueOriginOptions = blueOriginPicker.locator("button");
+    const blueOriginPicker = page.getByRole("combobox", { name: /^Blue origin:/ });
+    await blueOriginPicker.click();
+    const blueOriginOptions = page.getByRole("listbox", { name: "Blue origin" }).getByRole("option");
     if ((await blueOriginOptions.count()) > 0) {
-      await blueOriginPicker.locator("summary").click();
       const selectedOrigin = (await blueOriginOptions.first().textContent())?.trim();
       await blueOriginOptions.first().click();
       await page
         .getByText(`${selectedOrigin} selected as the Blue origin.`, { exact: true })
         .waitFor();
+    } else {
+      await page.keyboard.press("Escape");
     }
 
     // Restore the calibrated package before validating and running it. Origin
@@ -228,20 +248,18 @@ try {
 
     await openConstructStep(page, 3, viewport);
     const conditions = await page.evaluate(() => {
-      const cards = [...document.querySelectorAll(".event-choice button")];
-      const blue = document.querySelector(".rasp-effect-grid article.blue");
-      const red = document.querySelector(".rasp-effect-grid article.red");
+      const wind = document.querySelector('.range-field input[type="range"]');
       return {
-        cardHeights: cards.map((card) => card.getBoundingClientRect().height),
-        blueBorder: blue ? getComputedStyle(blue).borderTopColor : "",
-        redBorder: red ? getComputedStyle(red).borderTopColor : "",
+        admission: document.querySelector('.configured-note[role="status"] strong')?.textContent,
+        windMinimum: wind?.getAttribute("min"),
+        windMaximum: wind?.getAttribute("max"),
         bodyWidth: document.body.scrollWidth,
       };
     });
-    assert.equal(conditions.cardHeights.length, 3);
-    assert.ok(conditions.cardHeights.every((height) => height >= 100));
-    assert.notEqual(conditions.blueBorder, conditions.redBorder, "RASP ownership colors must differ");
-    assert.ok(conditions.bodyWidth <= viewport.width, `${viewport.width}: Conditions overflows horizontally`);
+    assert.match(conditions.admission ?? "", /Information-state availability is deployment governed/);
+    assert.equal(conditions.windMinimum, "-40");
+    assert.equal(conditions.windMaximum, "40");
+    assert.ok(conditions.bodyWidth <= viewport.width, `${viewport.width}: admitted conditions overflow horizontally`);
 
     if (viewport.family === "phone") {
       await page.locator(".builder-actions > div button").last().click();
@@ -253,7 +271,7 @@ try {
     const credibilityText = await page.locator(".credibility-admission").innerText();
     assert.match(credibilityText, /DRAFT/);
     assert.match(credibilityText, /BLOCKING:/);
-    assert.match(credibilityText, /vector-scalar-study-models@0\.6\.0/);
+    assert.match(credibilityText, /vector-scalar-study-models@0\.8\.0/);
     assert.equal(await runButton.isEnabled(), true, `${viewport.width}: calibrated template is not runnable`);
     await runButton.click();
     await page.locator(".session-layout").waitFor();
@@ -296,6 +314,15 @@ try {
       `${viewport.width}: deployed browser backend does not match the capability manifest`,
     );
     await page.getByRole("button", { name: "Pause playback", exact: true }).click();
+    // MapLibre fits the recorded geometry with a 220 ms animation after the
+    // markers become available. Compare the disclosure resize only after that
+    // camera transition has settled.
+    const mapCameraTelemetry = page.locator(".engagement-map-shell .vector-map-telemetry");
+    await page.waitForFunction(() => {
+      const value = document.querySelector(".engagement-map-shell .vector-map-telemetry")?.textContent ?? "";
+      return !value.includes("Z 5.3");
+    });
+    await waitForStableText(mapCameraTelemetry);
     const collapsedFrame = await page.evaluate(() => ({
       sceneHeight: document.querySelector(".scene-wrap")?.getBoundingClientRect().height ?? 0,
       canvasHeight: document.querySelector(".engagement-map canvas")?.getBoundingClientRect().height ?? 0,
@@ -325,7 +352,10 @@ try {
       telemetryPanels: document.querySelectorAll(".telemetry-panel").length,
     }));
     assert.equal(expandedFrame.telemetryPanels, 6, `${viewport.width}: expanded telemetry lost a chart`);
-    assert.ok(collapsedFrame.sceneHeight > expandedFrame.sceneHeight, `${viewport.width}: collapsed telemetry did not release map height`);
+    assert.ok(
+      collapsedFrame.sceneHeight > expandedFrame.sceneHeight,
+      `${viewport.width}: collapsed telemetry did not release map height (${collapsedFrame.sceneHeight} <= ${expandedFrame.sceneHeight})`,
+    );
     assert.ok(Math.abs(collapsedFrame.canvasHeight - collapsedFrame.sceneHeight) <= 2, `${viewport.width}: collapsed MapLibre canvas did not resize`);
     assert.ok(Math.abs(expandedFrame.canvasHeight - expandedFrame.sceneHeight) <= 2, `${viewport.width}: expanded MapLibre canvas did not resize`);
     assert.equal(collapsedFrame.camera, expandedFrame.camera, `${viewport.width}: telemetry changed the map camera`);

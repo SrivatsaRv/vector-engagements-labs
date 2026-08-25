@@ -70,6 +70,11 @@ remains independently testable in the entity legend and component contract;
 tests must not require a MapLibre marker from a fixture that deliberately
 aborts the tile transport.
 
+Basemap choice uses the application transient Select, while layer, study-area,
+aircraft-evidence, and weapon-evidence content uses persistent Disclosures.
+Their open or closed state is presentation-only: it cannot select a canonical
+frame, create an observation, change lifecycle, or mutate the VSR.
+
 ## Lifecycle
 
 - **Stowed** is inventory and is not placed in the world.

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { BrowserTelemetry } from "@/components/BrowserTelemetry";
+import { OverlayProvider } from "@/components/ui/OverlayPrimitives";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL || "https://labs.reachdefence.com"),
@@ -43,7 +44,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body><BrowserTelemetry />{children}</body>
+      <body>
+        <OverlayProvider>
+          <BrowserTelemetry />
+          {children}
+        </OverlayProvider>
+      </body>
     </html>
   );
 }

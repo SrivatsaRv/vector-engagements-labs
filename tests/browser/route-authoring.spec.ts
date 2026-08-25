@@ -113,6 +113,215 @@ async function catalogFixture() {
   };
 }
 
+test("shared transient controls hand off once and remain accessible, contained, and stable", async ({ page }, testInfo) => {
+  const runtimeErrors: string[] = [];
+  page.on("pageerror", (error) => runtimeErrors.push(error.message));
+  const catalog = await catalogFixture();
+  const longLabel = "Pathankot Air Force Station — public-reference catalogue identity with an intentionally long responsive label";
+  const longLabelInstallation = catalog.installations.find((item) => item.id === "iaf-pathankot");
+  if (longLabelInstallation) longLabelInstallation.name = longLabel;
+  await page.route("**/api/catalog", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
+  );
+  await page.route("**/api/map-tile?**", (route) => route.abort());
+  await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided");
+  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText("PostGIS catalog connected");
+  const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
+
+  if (compact) await page.getByRole("button", { name: /Next: Forces & loadouts/i }).click();
+  else await page.getByRole("button", { name: /^2 Forces & loadouts$/i }).click();
+  const blueTeam = page.locator("article.blue-team");
+  const aircraft = blueTeam.getByRole("combobox", { name: /Aircraft variant:/i });
+  const weapon = blueTeam.getByRole("combobox", { name: /Selected weapon:/i });
+  await expect(aircraft).toHaveAttribute("aria-controls");
+  await aircraft.click();
+  await expect(page.getByRole("listbox", { name: "Aircraft variant" })).toBeVisible();
+  await weapon.click();
+  await expect(aircraft).toHaveAttribute("aria-expanded", "false");
+  await expect(weapon).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("listbox")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(weapon).toBeFocused();
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+
+  if (compact) await page.getByRole("button", { name: /Next: Place & flight/i }).click();
+  else await page.getByRole("button", { name: /^3 Place & flight$/i }).click();
+  const blueOrigin = page.getByRole("combobox", { name: /Blue origin:/i });
+  const redOrigin = page.getByRole("combobox", { name: /Red origin:/i });
+  const touchClient = ["phone-390", "tablet-768"].includes(testInfo.project.name)
+    ? await page.context().newCDPSession(page)
+    : null;
+  if (touchClient) {
+    await touchClient.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+  }
+  const activateOrigin = async (trigger: typeof blueOrigin) => {
+    if (!touchClient) {
+      await trigger.click();
+      return;
+    }
+    await trigger.evaluate((element) => {
+      element.dispatchEvent(new PointerEvent("pointerdown", {
+        bubbles: true,
+        composed: true,
+        isPrimary: true,
+        pointerId: 1,
+        pointerType: "touch",
+      }));
+      element.dispatchEvent(new PointerEvent("pointerup", {
+        bubbles: true,
+        composed: true,
+        isPrimary: true,
+        pointerId: 1,
+        pointerType: "touch",
+      }));
+      (element as HTMLElement).click();
+    });
+  };
+  await activateOrigin(blueOrigin);
+  const longOption = page.getByRole("option", { name: new RegExp(longLabel, "i") });
+  await expect(longOption).toBeVisible();
+  const longLabelContainment = await longOption.evaluate((option) => {
+    const optionBox = option.getBoundingClientRect();
+    const listbox = option.closest("[role=listbox]")!.getBoundingClientRect();
+    return {
+      optionLeft: optionBox.left,
+      optionRight: optionBox.right,
+      surfaceLeft: listbox.left,
+      surfaceRight: listbox.right,
+    };
+  });
+  expect(longLabelContainment.optionLeft).toBeGreaterThanOrEqual(longLabelContainment.surfaceLeft);
+  expect(longLabelContainment.optionRight).toBeLessThanOrEqual(longLabelContainment.surfaceRight);
+  await activateOrigin(redOrigin);
+  await expect(blueOrigin).toHaveAttribute("aria-expanded", "false");
+  await expect(redOrigin).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("listbox")).toHaveCount(1);
+
+  const basemap = page.getByRole("combobox", { name: /Basemap:/i });
+  await activateOrigin(basemap);
+  await expect(redOrigin).toHaveAttribute("aria-expanded", "false");
+  await expect(basemap).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("listbox", { name: "Basemap" })).toBeVisible();
+  const containment = await page.getByRole("listbox", { name: "Basemap" }).evaluate((surface) => {
+    const box = surface.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    return {
+      bottom: box.bottom,
+      height: box.height,
+      left: box.left,
+      right: box.right,
+      viewportHeight: viewport?.height ?? window.innerHeight,
+      viewportWidth: viewport?.width ?? window.innerWidth,
+    };
+  });
+  expect(containment.height).toBeGreaterThan(0);
+  expect(containment.left).toBeGreaterThanOrEqual(7);
+  expect(containment.right).toBeLessThanOrEqual(containment.viewportWidth - 7);
+  expect(containment.bottom).toBeLessThanOrEqual(containment.viewportHeight - 7);
+  const stickyRailPlacement = await page.getByRole("listbox", { name: "Basemap" }).evaluate((surface) => {
+    const overlay = surface.getBoundingClientRect();
+    const rail = document.querySelector<HTMLElement>("[data-vector-overlay-obstacle=persistent-action-rail]")
+      ?.getBoundingClientRect();
+    if (!rail) return { avoids: false, overlay: null, rail: null };
+    return {
+      avoids: overlay.right <= rail.left
+      || overlay.left >= rail.right
+      || overlay.bottom <= rail.top
+      || overlay.top >= rail.bottom,
+      overlay: { bottom: overlay.bottom, left: overlay.left, right: overlay.right, top: overlay.top },
+      rail: { bottom: rail.bottom, left: rail.left, right: rail.right, top: rail.top },
+    };
+  });
+  expect(stickyRailPlacement.avoids, JSON.stringify(stickyRailPlacement)).toBe(true);
+  const coarsePointer = await page.evaluate(() => matchMedia("(pointer: coarse)").matches);
+  if (touchClient) expect(coarsePointer).toBe(true);
+  if (coarsePointer) {
+    const triggerBox = await basemap.boundingBox();
+    expect(triggerBox?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(triggerBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+    const optionBoxes = await page.getByRole("listbox", { name: "Basemap" }).getByRole("option").evaluateAll((items) =>
+      items.map((item) => ({
+        height: item.getBoundingClientRect().height,
+        width: item.getBoundingClientRect().width,
+      })),
+    );
+    expect(optionBoxes.every((box) => box.height >= 44 && box.width >= 44)).toBe(true);
+  }
+  await page.getByRole("option", { name: "Standard" }).click();
+  await expect(basemap).toBeFocused();
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+
+  if (testInfo.project.name === "laptop-1366") {
+    const client = await page.context().newCDPSession(page);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await basemap.click();
+    expect(await page.getByRole("listbox", { name: "Basemap" }).evaluate((surface) =>
+      getComputedStyle(surface).scrollBehavior,
+    )).toBe("auto");
+    await page.keyboard.press("Escape");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await client.send("Emulation.setPageScaleFactor", { pageScaleFactor: 2 });
+    await basemap.evaluate((trigger) => (trigger as HTMLElement).click());
+    const zoomContainment = await page.getByRole("listbox", { name: "Basemap" }).evaluate((surface) => {
+      const box = surface.getBoundingClientRect();
+      return {
+        bottom: box.bottom,
+        left: box.left,
+        right: box.right,
+        viewportHeight: window.visualViewport?.height ?? window.innerHeight,
+        viewportWidth: window.visualViewport?.width ?? window.innerWidth,
+      };
+    });
+    expect(zoomContainment.left).toBeGreaterThanOrEqual(7);
+    expect(zoomContainment.right).toBeLessThanOrEqual(zoomContainment.viewportWidth - 7);
+    expect(zoomContainment.bottom).toBeLessThanOrEqual(zoomContainment.viewportHeight - 7);
+    await page.keyboard.press("Escape");
+    await client.send("Emulation.setPageScaleFactor", { pageScaleFactor: 1 });
+
+    await client.send("HeapProfiler.collectGarbage");
+    const before = await client.send("Runtime.getHeapUsage");
+    const timings = await page.evaluate(async () => {
+      const triggers = Array.from(document.querySelectorAll<HTMLButtonElement>(".origin-picker-trigger"));
+      const shifts: number[] = [];
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries() as PerformanceEntryList & Array<{ value: number; hadRecentInput: boolean }>) {
+          if (!entry.hadRecentInput) shifts.push(entry.value);
+        }
+      });
+      observer.observe({ type: "layout-shift", buffered: true });
+      const samples: number[] = [];
+      for (let cycle = 0; cycle < 105; cycle += 1) {
+        const started = performance.now();
+        triggers[cycle % 2]!.click();
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        if (cycle >= 5) samples.push(performance.now() - started);
+      }
+      observer.disconnect();
+      samples.sort((a, b) => a - b);
+      return {
+        cls: shifts.reduce((sum, value) => sum + value, 0),
+        p95Ms: samples[Math.floor(samples.length * 0.95)] ?? Infinity,
+        surfaces: document.querySelectorAll("[data-vector-overlay=transient]").length,
+      };
+    });
+    await client.send("HeapProfiler.collectGarbage");
+    const after = await client.send("Runtime.getHeapUsage");
+    const heapDeltaBytes = after.usedSize - before.usedSize;
+    await testInfo.attach("overlay-performance.json", {
+      body: JSON.stringify({ ...timings, heapDeltaBytes }),
+      contentType: "application/json",
+    });
+    expect(timings.p95Ms).toBeLessThanOrEqual(100);
+    expect(timings.cls).toBeLessThanOrEqual(0.05);
+    expect(timings.surfaces).toBe(1);
+    expect(heapDeltaBytes).toBeLessThanOrEqual(2_000_000);
+  }
+
+  await page.goto("/scenarios");
+  await expect(page.locator("[data-vector-overlay=transient]")).toHaveCount(0);
+  expect(runtimeErrors).toEqual([]);
+});
+
 test("a current deployment manifest drives the real Worker run after route recovery", async ({ page }) => {
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
@@ -136,15 +345,14 @@ test("a current deployment manifest drives the real Worker run after route recov
   }
 
   // A selected installation is a compiled identity, not a decorative marker.
-  // The native disclosure is the accessible interaction that exposes the
-  // affiliation-scoped choices; the option is intentionally absent while it
-  // remains closed.
-  const blueOriginPicker = page.locator(".origin-pickers details.blue");
+  // The governed shared select exposes the affiliation-scoped choices; the
+  // option is intentionally absent while its transient listbox remains closed.
+  const blueOriginPicker = page.getByRole("combobox", { name: /Blue origin/i });
   await expect(page.getByText(/base available in this public-reference environment pack/i)).toBeVisible();
   await expect(page.getByText(/not a complete IAF or PAF catalogue/i)).toBeVisible();
-  await blueOriginPicker.getByText("Blue origin", { exact: true }).click();
-  await expect(blueOriginPicker).toHaveAttribute("open", "");
-  await blueOriginPicker.getByRole("button", { name: "Pathankot AFS", exact: true }).click();
+  await blueOriginPicker.click();
+  await expect(blueOriginPicker).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("option", { name: "Pathankot AFS", exact: true }).click();
   const originState = page.locator(".origin-reference-state");
   await expect(originState).toContainText("Installation origin selected");
   await expect(originState).toContainText("iaf-pathankot · source iaf-stations-wikipedia");

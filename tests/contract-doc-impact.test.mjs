@@ -2435,7 +2435,12 @@ test("the repository policy maps real simulation identities to their exact owner
   for (const path of ["components/EngagementMap.tsx", "components/SimulationScene.tsx"]) {
     assert.deepEqual(ownersOf(path).map((owner) => owner.id), ["UI_OBSERVE", "UI_PRESENTATION_SEMANTICS", "UI_RESPONSIVE_INTERACTION"]);
     assert.deepEqual(requiredSections(uiPresentation, path), ["UI_PRODUCT_LANGUAGE", "UI_TACVIEW_SUBSET"]);
-    assert.deepEqual(requiredSections(uiResponsive, path), ["UI_RESPONSIVE_BEHAVIOR", "UI_RESPONSIVE_PROOF"]);
+    assert.deepEqual(requiredSections(uiResponsive, path), ["UI_RESPONSIVE_BEHAVIOR", "UI_RESPONSIVE_PROOF", "UI_SHARED_OVERLAYS"]);
+  }
+  assert.deepEqual(ownersOf("components/ui/OverlayPrimitives.tsx").map((owner) => owner.id), ["UI_RESPONSIVE_INTERACTION"]);
+  assert.deepEqual(requiredSections(uiResponsive, "components/ui/OverlayPrimitives.tsx"), ["UI_RESPONSIVE_BEHAVIOR", "UI_RESPONSIVE_PROOF", "UI_SHARED_OVERLAYS"]);
+  for (const path of ["tests/component/object-picker.test.tsx", "tests/component/overlay-primitives.test.tsx"]) {
+    assert.deepEqual(ownersOf(path).map((owner) => owner.id), ["UI_RESPONSIVE_INTERACTION"]);
   }
   assert.deepEqual(requiredSections(uiObserve, "app/lab/page.tsx"), ["UI_OBSERVE_PROOF", "UI_OBSERVE_SHELL"]);
   assert.deepEqual(requiredSections(observability, "components/BrowserTelemetry.tsx"), ["OBSERVABILITY_CONTRACT"]);
