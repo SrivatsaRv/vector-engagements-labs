@@ -4,7 +4,9 @@ import { cpus, totalmem } from "node:os";
 import { performance } from "node:perf_hooks";
 
 import {
+  admitGenericAamPerformanceRepository,
   admitGenericAamPerformanceWorkload,
+  admitGenericAamMeasuredBatch,
   evaluateGenericAamPerformanceResults,
   measureGenericAamPerformanceBackends,
   resolveGenericAamPerformanceProfile,
@@ -13,18 +15,28 @@ import { runRustWasmGenericAamVerification } from "../lib/validation/generic-aam
 import {
   GENERIC_AAM_CORPUS_SHA256,
   GENERIC_AAM_DECISION_SHA256,
+  assertGenericAamVerificationRun,
   genericAamVerificationInput,
+  genericAamSemanticBatchSha256,
+  genericAamSemanticOutcome,
+  genericAamSemanticOutcomeSha256,
   runGenericAamVerification,
   verifyGenericAamWorkload,
 } from "../lib/validation/generic-aam-verification.ts";
 
 type WorkloadCase = {
+  id: string;
   tickRateHz: 32 | 64 | 128;
   maxTicks: number;
   seekerHalfAngleDeg: 15 | 20 | 30;
+  seekerHalfAngleRad: 0.261798 | 0.349064 | 0.523596;
   caseRole?: "TABLE_THRUST_CONFLICT_SENSITIVITY";
   targetPositionM: { x: number; y: number; z: number };
+  expectedTerminal: string;
+  expectedTick: number;
+  expectedCause: string;
   expectedFrameCount: number;
+  semanticOutcomeSha256: string;
 };
 
 type Workload = {
@@ -69,6 +81,12 @@ const inputs = workload.cases.map((entry) => {
   return input;
 });
 
+const repository = admitGenericAamPerformanceRepository(
+  execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+  execFileSync("git", ["status", "--porcelain", "--untracked-files=normal"], { encoding: "utf8" }).trim(),
+);
+const expectedFrames = workload.cases.reduce((sum, entry) => sum + entry.expectedFrameCount, 0);
+
 const results = measureGenericAamPerformanceBackends({
   runners: {
     typescript: runGenericAamVerification,
@@ -79,11 +97,22 @@ const results = measureGenericAamPerformanceBackends({
   now: () => performance.now(),
   memoryUsage: () => process.memoryUsage(),
   serialize: (result: ReturnType<typeof runGenericAamVerification>) => JSON.stringify(result),
+  validateBatch: ({ backend, runs }: {
+    backend: "typescript" | "rust-wasm";
+    runs: ReturnType<typeof runGenericAamVerification>[];
+  }) => admitGenericAamMeasuredBatch({
+    backend,
+    runs,
+    inputs,
+    cases: workload.cases,
+    expectedFrames,
+    expectedBatchSha256: workload.expectedBatchSha256,
+    assertRun: assertGenericAamVerificationRun,
+    projectOutcome: genericAamSemanticOutcome,
+    outcomeSha256: genericAamSemanticOutcomeSha256,
+    batchSha256: genericAamSemanticBatchSha256,
+  }),
 });
-const repository = {
-  commitSha: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
-  worktreeClean: execFileSync("git", ["status", "--porcelain", "--untracked-files=normal"], { encoding: "utf8" }).trim() === "",
-};
 const report = {
   schemaVersion: "vector.generic-aam-verification-performance.v2",
   repository,
@@ -97,7 +126,7 @@ const report = {
     decisionSha256: GENERIC_AAM_DECISION_SHA256,
     expectedBatchSha256: workload.expectedBatchSha256,
     cases: workload.caseCount,
-    expectedFrames: workload.cases.reduce((sum, entry) => sum + entry.expectedFrameCount, 0),
+    expectedFrames,
     tickRatesHz: [...new Set(workload.cases.map(({ tickRateHz }) => tickRateHz))].sort((a, b) => a - b),
     seekerHalfAnglesDeg: [...new Set(workload.cases.map(({ seekerHalfAngleDeg }) => seekerHalfAngleDeg))].sort((a, b) => a - b),
   },

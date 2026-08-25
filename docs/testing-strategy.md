@@ -170,7 +170,10 @@ half-bin/overflow/policy-tamper falsifiers, printed-radian boundary flips, D09 e
 finite content-addressed run decoding, isolated production-bundle scans, exact numeric-boundary sweeps, and complete TypeScript/actual-WASM frame parity. The separate
 `reference-aam:performance` target first verifies the immutable workload bytes,
 then reports both backends under the exact `APPLE_M5_NODE24` environment profile
-and closed p95 limits. Its output binds the exact Git SHA and clean state,
+and closed p95 limits. It rejects dirty or unidentified Git state before
+measurement and independently admits every measured backend batch against the
+exact per-case terminal/tick/cause/frame-count/semantic digests, 12,145-frame
+total and governed sorted batch digest. Its output binds the exact Git SHA,
 complete workload identities, every timing sample, distribution, RSS growth,
 frames and output bytes. It makes no Worker or product-capacity claim. See
 [`generic-aam-verification.md`](generic-aam-verification.md).

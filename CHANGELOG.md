@@ -82,6 +82,10 @@ No pending family-specific entry.
   Rust/WASM boundary, and close the named Apple M5 performance evidence
   contract over immutable workload identity, exact Git state, both backend
   distributions, memory and output size without mutable threshold overrides.
+- Reject dirty or unidentified benchmark state before measurement, and require
+  every measured TypeScript and Rust-WASM batch to reproduce the exact governed
+  per-case semantic outcomes, 12,145-frame total and sorted batch digest before
+  its timings can be admitted.
 
 #### Generic sensor source freeze
 
