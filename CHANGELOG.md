@@ -103,8 +103,10 @@ No pending family-specific entry.
 
 - Add the offline `vector.tp1538-adjudication-decisions.v1` create, source-read
   apply, exact-coverage validation and immutable freeze CLI. The finalizer now
-  requires its digest-named, read-only artifact. Repository evidence uses only
-  bounded `TEST_ONLY_SYNTHETIC` mismatches and admits no source value or corpus.
+  requires and embeds its digest-named, read-only artifact, content digest, and
+  comparison raw/canonical binding so raw-distinct evidence chains cannot
+  collapse to one corpus identity. Repository evidence uses only bounded
+  `TEST_ONLY_SYNTHETIC` mismatches and admits no source value or corpus.
 
 #### Generic sensor source freeze
 

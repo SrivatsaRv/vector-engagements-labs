@@ -14,10 +14,13 @@ import {
   MAX_TP1538_COMPARISON_MISMATCHES,
   MAX_TP1538_CORPUS_ARTIFACT_BYTES,
   MAX_TP1538_TRANSCRIPTION_ARTIFACT_BYTES,
+  applyTp1538AdjudicationDecision,
   completeTp1538Transcription,
   compareTp1538Transcriptions,
   createTp1538AdjudicatedCorpus,
+  createTp1538AdjudicationDraft,
   createTp1538TranscriptionTemplate,
+  freezeTp1538AdjudicationArtifact,
   parseTp1538CorpusArtifact,
   parseTp1538TranscriptionArtifact,
   tp1538CorpusContentSha256,
@@ -250,6 +253,28 @@ function blankComplete(identity) {
   return completeTp1538Transcription(draft);
 }
 
+function frozenSyntheticAdjudication(comparison, projectedDecisions = []) {
+  const comparisonRawSha256 = createHash("sha256").update(`${JSON.stringify(comparison)}\n`).digest("hex");
+  let adjudication = createTp1538AdjudicationDraft({
+    comparison,
+    comparisonRawSha256,
+    adjudicatorId: "TEST_ONLY_SYNTHETIC_ADJUDICATOR",
+  });
+  for (const decision of projectedDecisions) {
+    adjudication = applyTp1538AdjudicationDecision(adjudication, {
+      tableId: decision.tableId,
+      coordinate: decision.coordinate,
+      pdfPage: decision.pdfPage,
+      decision: "SOURCE_READ",
+      chosenState: decision.chosenState,
+      chosenPrintedValue: decision.chosenPrintedValue,
+      rationale: decision.rationale,
+    }, { comparison, comparisonRawSha256 });
+  }
+  adjudication = freezeTp1538AdjudicationArtifact(adjudication, { comparison, comparisonRawSha256 });
+  return { comparisonRawSha256, adjudication };
+}
+
 test("adjudication binds every cell to exact page/crop and transcript identities", () => {
   const a = blankComplete({ transcriptionId: "TP1538_A_TEST", entrantId: "A", isolationSessionId: "a" });
   const b = blankComplete({ transcriptionId: "TP1538_B_TEST", entrantId: "B", isolationSessionId: "b" });
@@ -258,7 +283,8 @@ test("adjudication binds every cell to exact page/crop and transcript identities
   const frozenA = completeTp1538Transcription({ ...a, status: "DRAFT", contentSha256: null });
   const frozenB = completeTp1538Transcription({ ...b, status: "DRAFT", contentSha256: null });
   const comparison = compareTp1538Transcriptions(frozenA, frozenB);
-  const corpus = createTp1538AdjudicatedCorpus({ left: frozenA, right: frozenB, comparison, decisions: [] });
+  const binding = frozenSyntheticAdjudication(comparison);
+  const corpus = createTp1538AdjudicatedCorpus({ left: frozenA, right: frozenB, comparison, ...binding });
   const admitted = validateTp1538Corpus(corpus, { expectedCorpusSha256: corpus.corpusSha256 });
   assert.equal(admitted.totalCells, 14_705);
   assert.equal(corpus.tables[0].cells[0].lineage.pdfPage, 51);
@@ -364,20 +390,22 @@ test("every mismatch requires one exact page-grounded adjudication decision", ()
   const frozenA = completeTp1538Transcription({ ...a, status: "DRAFT", contentSha256: null });
   const frozenB = completeTp1538Transcription({ ...b, status: "DRAFT", contentSha256: null });
   const comparison = compareTp1538Transcriptions(frozenA, frozenB);
-  assert.throws(() => createTp1538AdjudicatedCorpus({ left: frozenA, right: frozenB, comparison, decisions: [] }), /missing adjudication/);
+  const comparisonRawSha256 = createHash("sha256").update(`${JSON.stringify(comparison)}\n`).digest("hex");
+  assert.throws(() => createTp1538AdjudicatedCorpus({ left: frozenA, right: frozenB, comparison, comparisonRawSha256 }), /frozen adjudication/);
+  const binding = frozenSyntheticAdjudication(comparison, [{
+    tableId: "CX_BASE",
+    coordinate: { alphaDeg: -20, betaDeg: -30, stabilatorDeg: -25 },
+    chosenState: "AVAILABLE",
+    chosenPrintedValue: "31415.92650",
+    adjudicatorId: "TEST_ONLY_SYNTHETIC_ADJUDICATOR",
+    pdfPage: 51,
+    rationale: "Re-read the printed TEST_ONLY_SYNTHETIC cell in the frozen lossless crop.",
+  }]);
   const corpus = createTp1538AdjudicatedCorpus({
     left: frozenA,
     right: frozenB,
     comparison,
-    decisions: [{
-      tableId: "CX_BASE",
-      coordinate: { alphaDeg: -20, betaDeg: -30, stabilatorDeg: -25 },
-      chosenState: "AVAILABLE",
-      chosenPrintedValue: "31415.92650",
-      adjudicatorId: "C",
-      pdfPage: 51,
-      rationale: "Re-read the printed cell in the frozen lossless crop.",
-    }],
+    ...binding,
   });
   assert.equal(corpus.tables[0].cells[0].lineage.resolution, "SOURCE_ADJUDICATED");
   assert.equal(corpus.tables[0].cells[0].value, 31_415.9265);

@@ -675,10 +675,6 @@ export function freezeTp1538AdjudicationArtifact(artifact, { comparison, compari
   return candidate;
 }
 
-function decisionsSha256(decisions) {
-  return sha256(canonical(decisions));
-}
-
 function decisionKey(tableId, coordinate) {
   return `${tableId}:${coordinateKey(coordinate)}`;
 }
@@ -702,10 +698,13 @@ export function tp1538CorpusContentSha256(corpus) {
   return sha256(canonical(candidate));
 }
 
-export function createTp1538AdjudicatedCorpus({ left, right, comparison, decisions }) {
+export function createTp1538AdjudicatedCorpus({ left, right, comparison, comparisonRawSha256, adjudication }) {
   const expectedComparison = compareTp1538Transcriptions(left, right);
   if (canonical(comparison) !== canonical(expectedComparison)) throw new Error("TP-1538 comparison is stale, partial, reordered, or forged.");
-  if (!Array.isArray(decisions)) throw new Error("TP-1538 adjudication decisions must be an array.");
+  if (!adjudication || typeof adjudication !== "object" || Array.isArray(adjudication)) throw new Error("TP-1538 corpus requires a frozen adjudication artifact.");
+  const adjudicationReport = validateTp1538AdjudicationArtifact(adjudication, { comparison, comparisonRawSha256 });
+  if (adjudication.status !== "FROZEN") throw new Error("TP-1538 corpus requires a frozen adjudication artifact.");
+  const decisions = adjudicationReport.decisions;
   const mismatchByKey = new Map(comparison.mismatches.map((mismatch) => [decisionKey(mismatch.tableId, mismatch.coordinate), mismatch]));
   const decisionByKey = new Map();
   for (const decision of decisions) {
@@ -770,9 +769,9 @@ export function createTp1538AdjudicatedCorpus({ left, right, comparison, decisio
     comparison: {
       report: structuredClone(comparison),
       sha256: tp1538ComparisonContentSha256(comparison),
+      rawSha256: comparisonRawSha256,
       mismatchCount: comparison.mismatches.length,
-      decisions: structuredClone(decisions),
-      decisionSha256: decisionsSha256(decisions),
+      adjudication: structuredClone(adjudication),
     },
     axes: TP1538_AXES,
     signs: TP1538_SIGNS,
@@ -797,18 +796,23 @@ export function validateTp1538Corpus(corpus, { expectedCorpusSha256 } = {}) {
   if (canonical(corpus.source) !== canonical({ manifestSha256: TP1538_SOURCE_MANIFEST_SHA256, ...sourceManifest.source })) throw new Error("TP-1538 corpus source or rights identity is invalid.");
   if (canonical(corpus.cropRecipe) !== canonical(sourceManifest.recipe) || canonical(corpus.sourcePages) !== canonical(sourceManifest.pages)) throw new Error("TP-1538 corpus crop recipe or page manifest is invalid.");
   exactKeys(corpus.transcriptions, ["left", "right"], "TP-1538 corpus transcriptions");
-  exactKeys(corpus.comparison, ["decisionSha256", "decisions", "mismatchCount", "report", "sha256"], "TP-1538 corpus comparison");
+  exactKeys(corpus.comparison, ["adjudication", "mismatchCount", "rawSha256", "report", "sha256"], "TP-1538 corpus comparison");
   const leftReport = validateTp1538Transcription(corpus.transcriptions.left);
   const rightReport = validateTp1538Transcription(corpus.transcriptions.right);
   if (corpus.transcriptions.left.transcriptionId === corpus.transcriptions.right.transcriptionId
     || corpus.transcriptions.left.entrantId === corpus.transcriptions.right.entrantId
     || corpus.transcriptions.left.isolationSessionId === corpus.transcriptions.right.isolationSessionId
-    || ![corpus.transcriptions.left.contentSha256, corpus.transcriptions.right.contentSha256, corpus.comparison.sha256, corpus.comparison.decisionSha256].every((digest) => /^[0-9a-f]{64}$/u.test(digest))) throw new Error("TP-1538 transcript, comparison, or decision identity is invalid.");
+    || ![corpus.transcriptions.left.contentSha256, corpus.transcriptions.right.contentSha256, corpus.comparison.sha256, corpus.comparison.rawSha256, corpus.comparison.adjudication?.contentSha256].every((digest) => /^[0-9a-f]{64}$/u.test(digest))) throw new Error("TP-1538 transcript, comparison, or adjudication identity is invalid.");
   if (!Number.isSafeInteger(corpus.comparison.mismatchCount) || corpus.comparison.mismatchCount < 0) throw new Error("TP-1538 mismatch count is invalid.");
   const replayedComparison = compareValidatedTranscriptions(corpus.transcriptions.left, corpus.transcriptions.right, leftReport, rightReport);
-  if (canonical(corpus.comparison.report) !== canonical(replayedComparison) || corpus.comparison.sha256 !== tp1538ComparisonContentSha256(replayedComparison) || corpus.comparison.mismatchCount !== replayedComparison.mismatches.length || !Array.isArray(corpus.comparison.decisions) || corpus.comparison.decisionSha256 !== decisionsSha256(corpus.comparison.decisions)) throw new Error("TP-1538 embedded comparison or decision identity is invalid.");
+  if (canonical(corpus.comparison.report) !== canonical(replayedComparison) || corpus.comparison.sha256 !== tp1538ComparisonContentSha256(replayedComparison) || corpus.comparison.mismatchCount !== replayedComparison.mismatches.length) throw new Error("TP-1538 embedded comparison identity is invalid.");
+  const embeddedAdjudication = validateTp1538AdjudicationArtifact(corpus.comparison.adjudication, {
+    comparison: replayedComparison,
+    comparisonRawSha256: corpus.comparison.rawSha256,
+  });
+  if (corpus.comparison.adjudication.status !== "FROZEN") throw new Error("TP-1538 embedded adjudication artifact is not frozen.");
   const embeddedDecisionByKey = new Map();
-  for (const decision of corpus.comparison.decisions) {
+  for (const decision of embeddedAdjudication.decisions) {
     const key = decisionKey(decision.tableId, decision.coordinate);
     if (embeddedDecisionByKey.has(key)) throw new Error("TP-1538 embedded adjudication decision is duplicated.");
     const mismatch = replayedComparison.mismatches.find((candidate) => decisionKey(candidate.tableId, candidate.coordinate) === key);

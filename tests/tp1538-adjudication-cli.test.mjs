@@ -11,13 +11,16 @@ import {
   TP1538_TABLE_INVENTORY,
   applyTp1538AdjudicationDecision,
   completeTp1538Transcription,
+  createTp1538AdjudicatedCorpus,
   createTp1538AdjudicationDraft,
   createTp1538TranscriptionTemplate,
   freezeTp1538AdjudicationArtifact,
   parseTp1538AdjudicationArtifact,
   parseTp1538ComparisonArtifact,
   tp1538ComparisonContentSha256,
+  tp1538CorpusContentSha256,
   validateTp1538AdjudicationArtifact,
+  validateTp1538Corpus,
 } from "../scripts/lib/tp1538-aero-corpus.mjs";
 
 const CLI = "scripts/manage-tp1538-adjudication.mjs";
@@ -164,6 +167,58 @@ test("the finalizer accepts the frozen synthetic decision artifact and rejects a
     "--decisions", entrantPath,
     "--output-directory", setup.scratch,
   ]), /distinct identified adjudicator/i);
+});
+
+test("the corpus identity binds raw-distinct comparison and frozen adjudication artifacts", () => {
+  const setup = setupSyntheticComparison();
+  const compact = parseTp1538ComparisonArtifact(Buffer.from(`${JSON.stringify(setup.comparison.comparison)}\n`));
+  const indented = parseTp1538ComparisonArtifact(Buffer.from(`${JSON.stringify(setup.comparison.comparison, null, 2)}\n`));
+  assert.notEqual(compact.rawSha256, indented.rawSha256);
+
+  const adjudicate = (parsed) => {
+    let artifact = createTp1538AdjudicationDraft({
+      comparison: parsed.comparison,
+      comparisonRawSha256: parsed.rawSha256,
+      adjudicatorId: SYNTHETIC_ADJUDICATOR,
+    });
+    artifact = applyTp1538AdjudicationDecision(artifact, VALUE_DECISION, { comparison: parsed.comparison, comparisonRawSha256: parsed.rawSha256 });
+    artifact = applyTp1538AdjudicationDecision(artifact, STATE_DECISION, { comparison: parsed.comparison, comparisonRawSha256: parsed.rawSha256 });
+    return freezeTp1538AdjudicationArtifact(artifact, { comparison: parsed.comparison, comparisonRawSha256: parsed.rawSha256 });
+  };
+  const compactAdjudication = adjudicate(compact);
+  const indentedAdjudication = adjudicate(indented);
+  assert.notEqual(compactAdjudication.contentSha256, indentedAdjudication.contentSha256);
+
+  const compactCorpus = createTp1538AdjudicatedCorpus({
+    left: setup.left,
+    right: setup.right,
+    comparison: compact.comparison,
+    comparisonRawSha256: compact.rawSha256,
+    adjudication: compactAdjudication,
+  });
+  const indentedCorpus = createTp1538AdjudicatedCorpus({
+    left: setup.left,
+    right: setup.right,
+    comparison: indented.comparison,
+    comparisonRawSha256: indented.rawSha256,
+    adjudication: indentedAdjudication,
+  });
+  assert.notEqual(compactCorpus.corpusSha256, indentedCorpus.corpusSha256);
+  assert.equal(compactCorpus.comparison.rawSha256, compact.rawSha256);
+  assert.equal(compactCorpus.comparison.adjudication.contentSha256, compactAdjudication.contentSha256);
+  assert.equal(indentedCorpus.comparison.rawSha256, indented.rawSha256);
+  assert.equal(indentedCorpus.comparison.adjudication.contentSha256, indentedAdjudication.contentSha256);
+  assert.equal(validateTp1538Corpus(compactCorpus, { expectedCorpusSha256: compactCorpus.corpusSha256 }).totalCells, 14_705);
+
+  const rawBindingTamper = structuredClone(compactCorpus);
+  rawBindingTamper.comparison.rawSha256 = indented.rawSha256;
+  rawBindingTamper.corpusSha256 = tp1538CorpusContentSha256(rawBindingTamper);
+  assert.throws(() => validateTp1538Corpus(rawBindingTamper, { expectedCorpusSha256: rawBindingTamper.corpusSha256 }), /stale|tampered/i);
+
+  const artifactDigestTamper = structuredClone(compactCorpus);
+  artifactDigestTamper.comparison.adjudication.contentSha256 = indentedAdjudication.contentSha256;
+  artifactDigestTamper.corpusSha256 = tp1538CorpusContentSha256(artifactDigestTamper);
+  assert.throws(() => validateTp1538Corpus(artifactDigestTamper, { expectedCorpusSha256: artifactDigestTamper.corpusSha256 }), /digest/i);
 });
 
 test("hostile coordinates, pages, decision fields and coverage fail closed", () => {

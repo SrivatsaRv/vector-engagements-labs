@@ -49,7 +49,9 @@ The same family owns the offline adjudication manager and its focused hostile
 test as exact governed paths. `ci-quality` runs
 `tp1538:aero:adjudication:verify`, which uses only bounded
 `TEST_ONLY_SYNTHETIC` mismatches to prove comparison admission, exact decision
-coverage, immutable freeze/readback and finalizer consumption. The family also
+coverage, immutable freeze/readback, finalizer consumption, and corpus replay
+of the frozen adjudication content digest plus comparison raw/canonical
+binding. The family also
 owns its distinct TP-1538 changelog heading; adding those rules is a semantic
 ownership-policy change, not permission to commit a real transcript,
 comparison, decision, corpus value or progress identity.

@@ -44,7 +44,8 @@ const corpus = createTp1538AdjudicatedCorpus({
   left: left.value,
   right: right.value,
   comparison: comparison.comparison,
-  decisions: decisions.decisions,
+  comparisonRawSha256: comparison.rawSha256,
+  adjudication: decisions.artifact,
 });
 const report = validateTp1538Corpus(corpus, { expectedCorpusSha256: corpus.corpusSha256 });
 const output = resolve(outputDirectory, `${corpus.corpusSha256}.json`);
