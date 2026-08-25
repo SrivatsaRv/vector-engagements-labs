@@ -32,7 +32,10 @@ merge-base-to-worktree change set contains a registered family. The verifier
 constructs an isolated temporary Git snapshot for dirty and untracked files,
 so pre-commit validation neither ignores edits nor mutates the real index. The
 post-commit clean-clone run validates the exact immutable candidate and carries
-the declaration path forward. It then verifies the machine-readable runtime stub
+the declaration path forward. Registry regression also resolves each newly
+introduced family to its exact implementation and maintained section, and
+checks changelog-heading uniqueness against the live inventory rather than a
+fixed family count. It then verifies the machine-readable runtime stub
 ledger. A new or removed production fallback, temporary adapter, model
 assumption, named-duel identifier, scripted guidance hold, or source-less public
 reference must update its owning ledger entry; an

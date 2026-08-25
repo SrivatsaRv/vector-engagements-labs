@@ -3233,6 +3233,63 @@
       "migrationSections": []
     },
     {
+      "id": "SCENARIO_COMPOSITION_KERNEL",
+      "workstream": "staff-architecture",
+      "implementationRules": [
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-kernel.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui"
+          ]
+        }
+      ],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/scenario-kernel.test.mjs",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui",
+            "verification"
+          ]
+        }
+      ],
+      "generatedGroups": [],
+      "owningSections": [
+        {
+          "sectionId": "SCENARIO_COMPOSITION_KERNEL_CONTRACT",
+          "path": "docs/scenario-builder.md",
+          "heading": "## Cross-domain scenario composition kernel",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui",
+            "verification"
+          ]
+        }
+      ],
+      "migrationSections": [
+        {
+          "sectionId": "SCENARIO_COMPOSITION_KERNEL_CHANGELOG",
+          "path": "CHANGELOG.md",
+          "heading": "#### Scenario composition kernel",
+          "facets": [
+            "admission",
+            "digest",
+            "schema",
+            "ui"
+          ]
+        }
+      ]
+    },
+    {
       "id": "MISSION_SCENARIO_RUNTIME",
       "workstream": "simulation-systems",
       "implementationRules": [
@@ -4508,5 +4565,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "6fd0f266c006bbd03b49be37632b0e1540fa964ac9362d5b91caf921506bef8f"
+  "canonicalSha256": "218b698e6d8b3cbb4d31c0d9107ad7d5e37e5f898039fd9eeddeaa833ede030f"
 }

@@ -70,6 +70,14 @@ recovery, Worker/server admission, and VSR/report lineage share that contract.
 Migration `013_air_mission_contract.sql` freezes exact upgraded template JSON
 and hashes; no production seed or fallback default performs the migration.
 
+#### Scenario composition kernel
+
+The new in-memory `vector.scenario-kernel.v1` contract canonicalizes arbitrary
+affiliations, organization structure, multi-domain entity identities, authored
+task graphs, non-authoritative capability descriptors and perspective-safe
+composition projections. The current Air authoring/compiler path and persisted
+scenario/VSR formats are unchanged; no database migration is required.
+
 ### Added
 
 - Governed North Punjab, Ladakh, Rajasthan, North East, Arabian Sea, and coastal

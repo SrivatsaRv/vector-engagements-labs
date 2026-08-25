@@ -94,6 +94,90 @@ preflight accepts only a wholly v3 or wholly v4 catalogue, the migration rejects
 any residual non-v4 row, and postflight validates every v4 Air mission envelope.
 Deployment does not depend on a seed mutation.
 
+## Cross-domain scenario composition kernel
+
+`lib/scenario-kernel.ts` owns the first bounded
+`vector.scenario-kernel.v1` composition contract. It is the upstream authored
+identity and reference authority for arbitrary affiliations, explicit directed
+affiliation relationships, coalition/force/organization/group structure,
+multi-domain entity identities, authored scenario-level tasks, declarative
+capability descriptors and perspective policies. `BLUE`, `RED`, array order,
+display colour, a scenario name and a platform name have no semantic role in
+this contract. Hostility exists only as an explicit relationship record.
+
+Kernel import is exact-key and fail closed. Stable IDs, semantic versions,
+closed enums, typed references, unique collection membership, task and
+organization acyclicity, finite task timing and capability dependency
+acyclicity are validated with stable code/path issues. Stable identifiers are
+bounded to 128 characters, other strings are bounded according to role, and
+every collection has a 10,000-item admission ceiling; oversized input rejects
+before member traversal. Capability descriptors must match the scenario's
+intended-use identity. Compilation sorts every
+unordered identity collection and reference set before deriving SHA-256 over
+canonical JSON with locale-independent code-unit comparison. Reversing
+affiliation, organization, entity, task, capability
+or perspective insertion order therefore produces the same immutable bytes and
+digest. Perspective projection revalidates that content address before applying
+policy, so a mutated or stale compiled kernel cannot reach a selector. The
+current v1 has no persistence migration: it is an in-memory
+contract slice and is not yet stored in `vector.scenario.v3` or a VSR.
+
+Capability descriptors are discovery metadata, not model or runtime authority.
+They declare contract owner, intended-use identity, admission reason, unit and
+datum-bearing authoring fields, unavailable output identities, dependency/reset
+semantics and inspectors drawn from a closed canonical selector list. Every v1
+descriptor has `runtimeAuthority: NONE`, and every derived/model/runtime output
+has `availability: UNAVAILABLE`. Exact-key admission rejects component/module
+names, renderer formulas, arbitrary selector paths and other executable or
+feature-local fields. Inspector localization keys are stable data identifiers;
+future presentation consumers must continue to treat resolved display strings
+as untrusted text.
+
+Perspective projection occurs before any presentation selector receives the
+composition. A projection contains only explicitly visible affiliations and
+relationships, organizations whose complete parent chain remains visible,
+entities whose organization remains visible, and tasks whose owner,
+participants, objective and dependency closure all remain visible. Capability
+descriptors are omitted unless the active policy permits them and are then
+limited to the visible entities/tasks plus dependency closure. Hidden purpose,
+identities, task counts and dangling references are absent rather than masked
+after selection. Each projection has a perspective-bound digest, so changing
+perspective changes cache identity. This projects authored composition only; it
+does not admit or redact runtime truth, side-owned tracks, events, explanations,
+compare results or exports.
+
+The adapter ownership is explicit:
+
+- #60 remains the sole owner of the Air mission/entity projection into the
+  current compiled engine contract. `vector.scenario-draft.v1` and the live
+  configured Air path are unchanged and do not silently consume the kernel.
+- #154 must migrate template, blank and import intake onto this kernel and then
+  bind validation to the exact draft digest; it cannot create a second force,
+  task or capability schema.
+- #155 may consume perspective projections and declarative selectors for its
+  navigator/inspectors. React, MapLibre and Three.js may not read the unfiltered
+  kernel to decide visibility or infer executable capability.
+
+This first slice admits composition, canonical identity, descriptor discovery
+and authored-policy projection only. It does not add typed mutation history,
+deletion/reassignment commands, accepted-controller or achieved task state,
+domain physics, sensor/track/weapon/support authority, runtime land/maritime
+execution, UI completion, database storage, VSR projection or TypeScript/Rust
+runtime parity. Those remain follow-on acceptance work under #156 and the named
+adapter issues.
+
+### Verification
+
+`tests/scenario-kernel.test.mjs` is the contract and regression fixture. It
+proves third-force, neutral and civil composition; Air/Land/Maritime identities;
+insertion-order invariance; descriptor poisoning rejection; duplicate, cyclic,
+self and dangling reference rejection with stable code/path issues; stale digest
+rejection before perspective selection; hidden-objective redaction; selective
+capability-projection invalidation; and deterministic 12-, 75-, 100- and
+250-entity tiers. Runtime parity, browser, visual, database/migration and engine
+performance layers are omitted for this bounded slice because no such consumer
+or persisted format changes.
+
 ## Builder expansion boundary
 
 The configured-template builder edits every input used by the eight validated templates. Its **Place & flight** surface now performs direct geographic start placement, heading, altitude and speed editing, and Blue/Red route and waypoint authoring inside a selected preset study area. Map gestures and numeric fields update one spatial plan; compilation converts it to local east-north-up engine state. The admitted point-mass aircraft controller executes compiled three-dimensional route points and records requested, accepted, and achieved movement. The authored route remains visible beside the computed track so the two cannot be confused.

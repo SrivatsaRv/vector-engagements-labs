@@ -44,6 +44,11 @@ a contract family or belongs to one closed, exact non-contract class; there is
 no blanket documentation or product-runtime escape hatch. Each governed
 change supplies exactly one bounded `vector.contract-doc-impact-declaration.v1`
 block naming every affected family and its exact stable Markdown section IDs.
+New issue-owned contract families are registered in the introducing semantic
+revision with exact executable, test, maintained-document and changelog paths;
+the policy regression suite proves their paths have one owner and that every
+changelog-owning family retains a distinct heading without a fixed family-count
+ceiling.
 Rules carry a closed semantic-facet inventory (`schema`, `unit`, `datum`,
 `evidence`, `admission`, `validity`, `digest`, `runtime`, `vsr`, `ui`,
 `storage`, `delivery`, and `verification`), so only the sections and
