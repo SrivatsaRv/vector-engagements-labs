@@ -137,6 +137,10 @@ admission, or tick behavior.
   unavailable until governed ground dynamics exist. Ground-held aircraft retain
   position, fuel, mass and stores and cannot launch a weapon; no taxi, runway,
   takeoff, climbout or recovery physics is claimed.
+- Require both runtimes to bind both compact ground-operation copies to the
+  authoritative compiled Air mission, and make Worker/VSR presentation select
+  the actual held aircraft instead of dereferencing or materializing its stowed
+  primary store.
 
 No pending family-specific entry.
 

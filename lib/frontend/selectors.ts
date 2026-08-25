@@ -244,6 +244,11 @@ export type SelectedGeometry =
       rangeMeters: number;
       closureRateMps: number;
       lineOfSightRateRadS: number;
+      aircraft?: {
+        operationalState: NonNullable<EngineEntityFrame["aircraftOperationalState"]>;
+        movementValueState: NonNullable<EngineEntityFrame["aircraftMovementValueState"]>;
+        movementUnavailableReason?: NonNullable<EngineEntityFrame["aircraftMovementUnavailableReason"]>;
+      };
       weapon:
         | {
             state: "AVAILABLE";
@@ -381,6 +386,17 @@ export function selectCurrentGeometry(
     rangeMeters,
     closureRateMps,
     lineOfSightRateRadS,
+    ...(launcher.aircraftOperationalState && launcher.aircraftMovementValueState
+      ? {
+          aircraft: {
+            operationalState: launcher.aircraftOperationalState,
+            movementValueState: launcher.aircraftMovementValueState,
+            ...(launcher.aircraftMovementUnavailableReason
+              ? { movementUnavailableReason: launcher.aircraftMovementUnavailableReason }
+              : {}),
+          },
+        }
+      : {}),
     weapon: { state: "UNAVAILABLE" as const, reason: "NOT_LAUNCHED" as const },
   };
 }

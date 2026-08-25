@@ -1121,6 +1121,21 @@ export class EngineSession {
         throw new Error(`Observer sensor ${entity.id} cannot attach a track model to admission v1.`);
       }
     }
+    const groundMission = scenario.airMission?.start.entryState === "GROUND"
+      ? scenario.airMission
+      : undefined;
+    const groundAircraft = scenario.entities.filter(
+      (entity) => entity.kind === "AIRCRAFT" && entity.groundOperation !== undefined,
+    );
+    if (
+      groundMission
+        ? scenario.airMissionRuntime === undefined ||
+          groundAircraft.length !== 1 ||
+          groundAircraft[0]?.provenance.sourceObjectId !== groundMission.assignment.aircraftId
+        : scenario.airMissionRuntime !== undefined || groundAircraft.length !== 0
+    ) {
+      throw new Error("Scenario has no authoritative ground-operation admission.");
+    }
     for (const aircraft of scenario.entities.filter(
       (entity) => entity.kind === "AIRCRAFT",
     )) {

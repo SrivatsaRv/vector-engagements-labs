@@ -710,6 +710,10 @@ pub struct EngineScenario {
     pub seed: u64,
     pub duration_seconds: f64,
     pub fixed_step_seconds: f64,
+    #[serde(default, skip_serializing)]
+    pub air_mission_authority: Option<AircraftGroundOperation>,
+    #[serde(default, skip_serializing)]
+    pub air_mission_aircraft_source_object_id: Option<String>,
     #[serde(default)]
     pub air_mission_runtime: Option<AircraftGroundOperation>,
     pub model_pack: ModelPackBinding,
@@ -2824,8 +2828,14 @@ pub fn run_json(input: &str) -> Result<String, EngineError> {
             maximum: MAX_INPUT_BYTES,
         });
     }
-    let scenario: EngineScenario =
+    let payload: serde_json::Value =
         serde_json::from_str(input).map_err(|error| EngineError::InvalidJson(error.to_string()))?;
+    let authority = validation::validate_air_mission_authority(payload.get("airMission"))?;
+    let mut scenario: EngineScenario =
+        serde_json::from_str(input).map_err(|error| EngineError::InvalidJson(error.to_string()))?;
+    scenario.air_mission_authority = authority.as_ref().map(|item| item.binding.clone());
+    scenario.air_mission_aircraft_source_object_id =
+        authority.map(|item| item.aircraft_source_object_id);
     let run = try_run_engine(scenario)?;
     serde_json::to_string(&run).map_err(|error| EngineError::Serialization(error.to_string()))
 }
@@ -3002,6 +3012,8 @@ mod tests {
             seed: 42,
             duration_seconds: 3.0,
             fixed_step_seconds: 0.05,
+            air_mission_authority: None,
+            air_mission_aircraft_source_object_id: None,
             air_mission_runtime: None,
             model_pack: ModelPackBinding {
                 schema_version: "vector.compiled-model-pack.v1".to_string(),

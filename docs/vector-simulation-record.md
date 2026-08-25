@@ -110,6 +110,13 @@ the canonical aircraft entity at the runway threshold with zero speed in the
 first recorded frame. Frame v6 additionally records achieved operational state,
 movement value state, and the stable unavailable cause; it does not fabricate
 requested/accepted/achieved movement vectors while ground dynamics are absent.
+The compatibility `SimulationResult` projection identifies its primary entity
+as either `GUIDED_VEHICLE` or `GROUND_HELD_AIRCRAFT`. While a store remains
+stowed, live and replay projections use the actual recorded aircraft position,
+velocity, mass, fuel, and phase and never create a weapon frame. Movement
+authority remains the aircraft frame's explicit `UNAVAILABLE` value and stable
+cause; a recorded zero held velocity is not promoted into a valid movement
+capability.
 Recorded geographic/engine frames retain the exact environment-pack binding;
 sampled atmosphere and DEM effects are replay evidence, not recalculated fields.
 
@@ -291,6 +298,10 @@ pictures for A2A runs, provenance, limitations, and report outcome. The
 from recorded frames and metadata without calling either physics backend. That
 read model is sufficient for the existing map, Three.js, telemetry, RASP,
 explanation, and report consumers.
+For a ground-held run, this reconstruction again selects the actual recorded
+aircraft as `GROUND_HELD_AIRCRAFT`; it does not require or synthesize the
+unlaunched primary store. This is the same path used by the browser Worker after
+it has produced and reopened the transferable record.
 
 `frames.arrow` currently contains the versioned VECTOR columnar codec
 `vector.frames.columnar.v6`: string/lifecycle, installed-store identity, and

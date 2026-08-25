@@ -1,3 +1,4 @@
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
@@ -23,6 +24,73 @@ pub const MAX_RECORDED_ENTITY_STATES: u64 = 1_000_000;
 const MAX_IDENTIFIER_BYTES: usize = 128;
 const MAX_LABEL_BYTES: usize = 512;
 const MAX_DURATION_SECONDS: f64 = 3_600.0;
+
+pub(crate) struct GroundMissionAuthority {
+    pub(crate) binding: crate::AircraftGroundOperation,
+    pub(crate) aircraft_source_object_id: String,
+}
+
+fn mission_string<'a>(mission: &'a Value, pointer: &str) -> Result<&'a str, EngineError> {
+    mission
+        .pointer(pointer)
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid("Air mission authority is invalid"))
+}
+
+fn mission_number(mission: &Value, pointer: &str) -> Result<f64, EngineError> {
+    mission
+        .pointer(pointer)
+        .and_then(Value::as_f64)
+        .filter(|value| value.is_finite())
+        .ok_or_else(|| invalid("Air mission authority is invalid"))
+}
+
+pub(crate) fn validate_air_mission_authority(
+    mission: Option<&Value>,
+) -> Result<Option<GroundMissionAuthority>, EngineError> {
+    let Some(mission) = mission else {
+        return Ok(None);
+    };
+    let compiled_digest = mission_string(mission, "/compiledDigest")?;
+    let authored_digest = mission_string(mission, "/authoredDigest")?;
+    sha256_digest("airMission.compiledDigest", compiled_digest)?;
+    sha256_digest("airMission.authoredDigest", authored_digest)?;
+    let entry_state = mission_string(mission, "/start/entryState")?;
+    if entry_state == "AIRBORNE" {
+        return Ok(None);
+    }
+    if entry_state != "GROUND" {
+        return Err(invalid("Air mission authority is invalid"));
+    }
+    let posture = mission_string(mission, "/authored/start/posture")?;
+    if posture == "AIRBORNE" || mission_string(mission, "/start/posture")? != posture {
+        return Err(invalid("Air mission authority is invalid"));
+    }
+    let assignment_id = mission_string(mission, "/assignment/id")?;
+    let aircraft_source_object_id = mission_string(mission, "/assignment/aircraftId")?;
+    if mission_string(mission, "/authored/assignments/0/id")? != assignment_id
+        || mission_string(mission, "/authored/assignments/0/aircraftId")?
+            != aircraft_source_object_id
+    {
+        return Err(invalid("Air mission authority is invalid"));
+    }
+    Ok(Some(GroundMissionAuthority {
+        binding: crate::AircraftGroundOperation {
+            schema_version: "vector.aircraft-ground-operation.v1".to_string(),
+            posture: posture.to_string(),
+            release_time_seconds: mission_number(mission, "/authored/start/readinessDelaySeconds")?,
+            mission_digest: compiled_digest.to_string(),
+            runway_evidence_digest: mission_string(
+                mission,
+                "/authored/start/runway/evidence/digest",
+            )?
+            .to_string(),
+            execution_authority: "UNAVAILABLE".to_string(),
+            unavailability_reason: "GROUND_DYNAMICS_MODEL_UNAVAILABLE".to_string(),
+        },
+        aircraft_source_object_id: aircraft_source_object_id.to_string(),
+    }))
+}
 const MIN_FIXED_STEP_SECONDS: f64 = 0.001;
 const MAX_FIXED_STEP_SECONDS: f64 = 1.0;
 
@@ -919,6 +987,30 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
             }
         }
     }
+    let ground_aircraft: Vec<_> = scenario
+        .entities
+        .iter()
+        .filter(|entity| {
+            entity.kind == crate::EntityKind::Aircraft && entity.ground_operation.is_some()
+        })
+        .collect();
+    let has_authoritative_ground_admission = match (
+        scenario.air_mission_authority.as_ref(),
+        scenario.air_mission_aircraft_source_object_id.as_ref(),
+    ) {
+        (Some(_), Some(aircraft_source_object_id)) => {
+            scenario.air_mission_runtime.is_some()
+                && ground_aircraft.len() == 1
+                && ground_aircraft[0].provenance.source_object_id == *aircraft_source_object_id
+        }
+        (None, None) => scenario.air_mission_runtime.is_none() && ground_aircraft.is_empty(),
+        _ => false,
+    };
+    if !has_authoritative_ground_admission {
+        return Err(invalid(
+            "scenario has no authoritative ground-operation admission",
+        ));
+    }
     for aircraft in scenario
         .entities
         .iter()
@@ -937,6 +1029,18 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
                         && binding.execution_authority == ground.execution_authority
                         && binding.unavailability_reason == ground.unavailability_reason
                 });
+            let authoritative_mission_matches = scenario
+                .air_mission_authority
+                .as_ref()
+                .is_some_and(|authority| {
+                    authority.schema_version == ground.schema_version
+                        && authority.mission_digest == ground.mission_digest
+                        && authority.runway_evidence_digest == ground.runway_evidence_digest
+                        && authority.posture == ground.posture
+                        && authority.release_time_seconds == ground.release_time_seconds
+                        && authority.execution_authority == ground.execution_authority
+                        && authority.unavailability_reason == ground.unavailability_reason
+                });
             if ground.schema_version != "vector.aircraft-ground-operation.v1"
                 || !matches!(
                     ground.posture.as_str(),
@@ -953,6 +1057,7 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
                 || ground.execution_authority != "UNAVAILABLE"
                 || ground.unavailability_reason != "GROUND_DYNAMICS_MODEL_UNAVAILABLE"
                 || !mission_matches
+                || !authoritative_mission_matches
                 || aircraft.initial.velocity.magnitude() != 0.0
             {
                 return Err(invalid(format!(

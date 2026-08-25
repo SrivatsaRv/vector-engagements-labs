@@ -11,6 +11,7 @@ import {
 } from "./generated/vector-engine-wasm.ts";
 import { enginePositionToGeographic } from "../scenario-spatial.ts";
 import { assertSimulationEventStream } from "./simulation-events.ts";
+import { sha256HexSync } from "../geospatial/digest.ts";
 import type {
   PublicAircraftReferenceInput,
   PublicAircraftReferenceRun,
@@ -130,6 +131,16 @@ export function runRustWasmPublicAircraftReference(
 
 export function runRustWasmEngine(scenario: EngineScenario): EngineRun {
   const engine = getRustEngine();
+  if (scenario.airMission) {
+    const compiledContent = structuredClone(scenario.airMission) as Record<string, unknown>;
+    delete compiledContent.compiledDigest;
+    if (
+      sha256HexSync(compiledContent) !== scenario.airMission.compiledDigest ||
+      sha256HexSync(scenario.airMission.authored) !== scenario.airMission.authoredDigest
+    ) {
+      throw new Error("Rust/WASM Air mission lineage digest is invalid.");
+    }
+  }
   const input = new TextEncoder().encode(JSON.stringify(scenario));
   const maximumInputLength = engine.vector_max_input_len();
   if (input.byteLength > maximumInputLength) {

@@ -134,6 +134,10 @@ export type Scenario = {
 
 export type Frame = {
   t: number;
+  /** The canonical entity projected into the legacy interceptor presentation fields. */
+  primaryEntityId: string;
+  /** Distinguishes an active vehicle from an actual held aircraft; never implies store spawn. */
+  primaryEntityRole: "GUIDED_VEHICLE" | "GROUND_HELD_AIRCRAFT";
   interceptor: Vec3;
   target: Vec3;
   speed: number;
@@ -574,40 +578,91 @@ export function buildSimulationResult(
   const frames: Frame[] = engineRun.frames.map((engineFrame) => {
     const weapon = engineFrame.entities.find(
       (entity) => entity.id === engineRun.primaryWeaponId,
-    )!;
+    );
+    const heldAircraft = weapon
+      ? undefined
+      : engineFrame.entities.find(
+          (entity) =>
+            entity.kind === "AIRCRAFT" &&
+            entity.installedStoreIds.includes(engineRun.primaryWeaponId) &&
+            entity.aircraftMovementValueState === "UNAVAILABLE" &&
+            entity.aircraftMovementUnavailableReason ===
+              "GROUND_DYNAMICS_MODEL_UNAVAILABLE",
+        );
+    const primaryEntity = weapon ?? heldAircraft;
     const target = engineFrame.entities.find(
       (entity) => entity.id === engineRun.primaryTargetId,
-    )!;
+    );
+    if (!primaryEntity || !target) {
+      throw new Error(
+        "Simulation result has no active guided vehicle or admitted ground-held aircraft and target.",
+      );
+    }
+    const primaryEntityRole = weapon
+      ? "GUIDED_VEHICLE" as const
+      : "GROUND_HELD_AIRCRAFT" as const;
     const atmosphere = environmentSampler.sample({
-      eastM: weapon.position.x,
-      northM: weapon.position.y,
-      upM: weapon.position.z,
+      eastM: primaryEntity.position.x,
+      northM: primaryEntity.position.y,
+      upM: primaryEntity.position.z,
       modelTimeSeconds: engineFrame.t,
     }).atmosphere;
+    const relativePosition = {
+      x: target.position.x - primaryEntity.position.x,
+      y: target.position.y - primaryEntity.position.y,
+      z: target.position.z - primaryEntity.position.z,
+    };
+    const relativeVelocity = {
+      x: target.velocity.x - primaryEntity.velocity.x,
+      y: target.velocity.y - primaryEntity.velocity.y,
+      z: target.velocity.z - primaryEntity.velocity.z,
+    };
+    const actualRange = Math.hypot(
+      relativePosition.x,
+      relativePosition.y,
+      relativePosition.z,
+    );
+    const actualClosureRate = actualRange > 1e-9
+      ? -(
+          relativePosition.x * relativeVelocity.x +
+          relativePosition.y * relativeVelocity.y +
+          relativePosition.z * relativeVelocity.z
+        ) / actualRange
+      : 0;
+    const cross = {
+      x: relativePosition.y * relativeVelocity.z - relativePosition.z * relativeVelocity.y,
+      y: relativePosition.z * relativeVelocity.x - relativePosition.x * relativeVelocity.z,
+      z: relativePosition.x * relativeVelocity.y - relativePosition.y * relativeVelocity.x,
+    };
+    const actualLineOfSightRate = actualRange > 1e-9
+      ? Math.hypot(cross.x, cross.y, cross.z) / (actualRange * actualRange)
+      : 0;
     return {
       t: engineFrame.t,
-      interceptor: weapon.position,
+      primaryEntityId: primaryEntity.id,
+      primaryEntityRole,
+      interceptor: primaryEntity.position,
       target: target.position,
-      speed: weapon.speedMps,
-      range: engineFrame.separationM,
+      speed: primaryEntity.speedMps,
+      range: weapon ? engineFrame.separationM : actualRange,
       energy: Math.max(
         0,
-        Math.min(100, (weapon.speedMps / Math.max(1, profile.maxSpeed)) * 100),
+        Math.min(100, (primaryEntity.speedMps / Math.max(1, profile.maxSpeed)) * 100),
       ),
-      phase: weapon.phase,
-      losRate: engineFrame.lineOfSightRateRadS,
+      phase: primaryEntity.phase,
+      losRate: weapon ? engineFrame.lineOfSightRateRadS : actualLineOfSightRate,
       airDensity: atmosphere.densityKgM3,
-      mach: weapon.mach,
+      mach: primaryEntity.mach,
       entities: engineFrame.entities,
       geographicPositions: engineFrame.geographicPositions,
-      closureRate: engineFrame.closureRateMps,
-      specificEnergy: weapon.specificEnergyJkg,
-      massKg: weapon.massKg,
-      fuelKg: weapon.fuelKg,
-      commandedG: weapon.commandedG,
-      availableG: weapon.availableG,
-      thrustNewtons: weapon.thrustNewtons,
-      dragNewtons: weapon.dragNewtons,
+      closureRate: weapon ? engineFrame.closureRateMps : actualClosureRate,
+      specificEnergy: primaryEntity.specificEnergyJkg,
+      massKg: primaryEntity.massKg,
+      fuelKg: primaryEntity.fuelKg,
+      commandedG: primaryEntity.commandedG,
+      availableG: primaryEntity.availableG,
+      thrustNewtons: primaryEntity.thrustNewtons,
+      dragNewtons: primaryEntity.dragNewtons,
       observerStates: engineFrame.observerStates,
     };
   });

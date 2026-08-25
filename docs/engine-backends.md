@@ -6,12 +6,21 @@ VECTOR has one engine contract and two browser implementations. The authored sce
 
 `EngineScenario.airMission` is an optional compiled lineage envelope. A ground
 run also carries a compact compiler-owned copy of the exact
-`vector.aircraft-ground-operation.v1` artifact. Rust/WASM compares that copy to
-the entity artifact before ticks; TypeScript additionally checks it against the
-full mission lineage. A forged mission/runway/release binding therefore fails
-in both backends without making Rust parse unrelated authoring fields. The
-backend adapter reattaches the already verified Air mission so results retain
-identical VSR authority.
+`vector.aircraft-ground-operation.v1` artifact. Before ticks, both backends
+require exactly one ground-operation entity owned by the compiled Air mission,
+compare the compact runtime and entity copies, and bind their posture, release,
+mission digest, runway evidence digest, and aircraft source identity to the
+authoritative compiled Air mission. Rust deserializes only that closed lineage
+projection and ignores unrelated authoring fields. The production Rust adapter
+revalidates the exact full compiled and authored content digests before the ABI
+call. Independently, the raw Rust/WASM admission deserializes the full mission
+as a non-output authority value, rejects malformed digest identities, and
+derives aircraft, posture, release, runway evidence, and compiled-mission
+identity from its authored/compiled lineage. Caller-supplied compact authority
+fields are overwritten. Rust rejects either a missing compact copy or compact
+copies that diverge from the full mission.
+The backend adapter reattaches the already verified Air mission so results
+retain identical VSR authority.
 The Rust ABI admits `vector.environment-runtime-grid.v1` with the exact parent
 pack binding and implements the same grid/time interpolation, atmosphere
 derivation, wind consumption and DEM collision rules as TypeScript.

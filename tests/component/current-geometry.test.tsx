@@ -37,5 +37,31 @@ describe("CurrentGeometry", () => {
     expect(screen.queryByText("Weapon speed")).not.toBeInTheDocument();
     expect(screen.queryByText("Weapon Mach")).not.toBeInTheDocument();
     expect(screen.queryByText("Relative-position diagram")).not.toBeInTheDocument();
+
+    const held = {
+      ...prelaunch,
+      frames: prelaunch.frames.map((frame, index) => index !== selected.frameIndex
+        ? frame
+        : {
+            ...frame,
+            entities: frame.entities.map((entity) => entity.id !== "blue-platform-1"
+              ? entity
+              : {
+                  ...entity,
+                  aircraftOperationalState: "HOLD_SHORT" as const,
+                  aircraftMovementValueState: "UNAVAILABLE" as const,
+                  aircraftMovementUnavailableReason: "GROUND_DYNAMICS_MODEL_UNAVAILABLE" as const,
+                }),
+          }),
+    };
+    rerender(<CurrentGeometry geometry={selectCurrentGeometry(
+      held,
+      selectDisplayFrame(held, selected.displayTimeSeconds),
+    )} />);
+    expect(screen.getByText("HOLD SHORT")).toBeVisible();
+    expect(screen.getByText("UNAVAILABLE")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Aircraft movement is unavailable. GROUND DYNAMICS MODEL UNAVAILABLE.",
+    );
   });
 });

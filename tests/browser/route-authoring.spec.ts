@@ -566,6 +566,9 @@ test("a current deployment manifest drives the real Worker run after route recov
   await expect(routeTransition).toHaveAttribute("data-frame-index", await page.locator(".engagement-map-shell").getAttribute("data-display-frame-index") ?? "");
   await expect(routeTransition).toContainText(/Fly-over|Fly-by|Route complete|unavailable/i);
   await expect(page.locator(".current-geometry")).not.toContainText("Relative-position diagram");
+  await expect(page.locator(".current-geometry")).toContainText("HOLD SHORT");
+  await expect(page.locator(".current-geometry")).toContainText("Movement");
+  await expect(page.locator(".current-geometry")).toContainText("Aircraft movement is unavailable. GROUND DYNAMICS MODEL UNAVAILABLE.");
   await expect(page.locator(".telemetry.is-collapsed")).toBeVisible();
   const telemetryToggle = page.getByRole("button", { name: /expand telemetry/i });
   await expect(telemetryToggle).toHaveAttribute("aria-expanded", "false");

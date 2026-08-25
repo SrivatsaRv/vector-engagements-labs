@@ -38,6 +38,12 @@ export function CurrentGeometry({ geometry }: Props) {
               label="Weapon state"
               value={geometry.weapon.state === "AVAILABLE" ? geometry.weapon.flightState.replaceAll("_", " ") : "Not launched"}
             />
+            {geometry.aircraft && (
+              <>
+                <GeometryMetric label="Aircraft state" value={geometry.aircraft.operationalState.replaceAll("_", " ")} />
+                <GeometryMetric label="Movement" value={geometry.aircraft.movementValueState.replaceAll("_", " ")} />
+              </>
+            )}
             {geometry.weapon.state === "AVAILABLE" && (
               <>
                 <GeometryMetric label="Weapon speed" value={`${Math.round(geometry.weapon.speedMps)} m/s`} />
@@ -50,6 +56,12 @@ export function CurrentGeometry({ geometry }: Props) {
               ? "Weapon-to-target geometry is recorded by the selected engine frame."
               : "Aircraft-to-target geometry is derived from recorded aircraft state. Weapon values are unavailable before launch."}
           </p>
+          {geometry.aircraft?.movementUnavailableReason && (
+            <p className="track-state-unavailable" role="status">
+              <CircleAlert size={14} aria-hidden="true" />
+              Aircraft movement is unavailable. {geometry.aircraft.movementUnavailableReason.replaceAll("_", " ")}.
+            </p>
+          )}
         </>
       ) : (
         <p className="track-state-unavailable" role="status">
