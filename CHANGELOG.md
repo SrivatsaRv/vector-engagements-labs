@@ -27,7 +27,13 @@ sensor/weapon admission categories, station/store membership, and compatibility
 status/capacity; canonical structural IDs remain singly bound as identity rather
 than duplicated scalar lineage. A length-only safe-integer table preflight now
 rejects pathological shapes and more than 2,000,000 cumulative cells before
-source serialization or lineage materialization. The slice reproduces derivative
+source serialization or lineage materialization. Repository publication now
+binds canonical content digests for every independently versioned intended-use
+contract, requirement profile, raw-source record, derivative, and credibility
+manifest across staged and prior batches, so a
+reused `(schema, id, version)` can share only identical content. Research import
+preflights exact entry counts and length-only per-entry and cumulative corpus
+bounds before scanning or copying archive bytes. The slice reproduces derivative
 bytes through one pinned offline recipe, validates the compiled v2 identity in
 both TypeScript and Rust/WASM, publishes two generated anonymous research
 archives, and gates compile/publish/lookup/export/import plus 1/10/100/500 reuse

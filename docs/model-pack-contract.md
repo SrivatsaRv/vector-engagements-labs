@@ -442,8 +442,14 @@ while contract-document ownership follows `db/schema/model-pack.ts` directly.
 Stage B also provides `InMemoryModelPackRepository` as the exact resolver and
 storage-port reference, not as durable production persistence. Metadata and
 immutable bytes remain separate. `publishBatch` recompiles every member before
-atomically publishing any; published `(id, version)` identities cannot change
-digest. `resolveExact` accepts only exact `(id, version, digest)` and rejects
+atomically publishing any; published pack `(id, version)` identities cannot
+change digest. The same transaction stages canonical content-digest identities
+for every independently versioned intended-use contract, requirement profile,
+raw-source artifact, derivative, and credibility manifest. A same-batch or
+later publication may share an exact
+`(schema, id, version)` only when canonical content is identical; conflict
+rejects atomically before any staged member becomes visible. `resolveExact`
+accepts only exact `(id, version, digest)` and rejects
 malformed, missing, stale, corrupt, or incomplete packs. Research export/import
 preserves exact bytes for offline backup/restore/readback, including incomplete
 gap-bearing publications through a separate integrity-only read path;
@@ -454,7 +460,11 @@ Admission bounds are 32 MiB per artifact, 64 MiB per raw or derivative corpus,
 8 MiB per v2 source, 2,048 governed records, 128 configurations, six axes per
 table, and 2,000,000 cumulative table cells. Shape/cardinality and table-cell
 bounds reject before source serialization or lineage materialization. The port accepts no
-compression. Durable database/blob adapters, cache lifecycle, Worker recovery,
+compression. Research import applies the same 32/64 MiB byte limits across the
+entire archive corpus and a 2,048-entry cap before it scans any byte or calls
+the bounded owned-byte allocator; malformed or unsafe lengths fail with stable
+archive codes.
+Durable database/blob adapters, cache lifecycle, Worker recovery,
 and runtime cache/load remain later-stage dependencies. The immutable Stage-B
 performance workload covers compile, publish, exact lookup, research
 export/import, and 1/10/100/500-instance compiled reuse.

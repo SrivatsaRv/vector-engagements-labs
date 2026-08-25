@@ -228,7 +228,23 @@ immutable byte maps and proves atomic publication, append-only identities,
 export/import, corruption rejection, and readback. A production database/blob
 adapter, backup medium, cache eviction, cancellation, and Worker recovery remain
 later-stage work. Exact research export is the portable backup format; importing
-it replays validation and compilation before one atomic batch becomes visible.
+it first preflights the whole archive before any byte scan or copy: raw and
+derivative entry counts are each capped at 2,048, every declared byte-array
+length must be a safe nonnegative integer, each entry is capped at 32 MiB, and
+each corpus is capped at 64 MiB across all publications. Stable
+`MODEL_PACK_ARCHIVE_ENTRY_COUNT`, `MODEL_PACK_ARCHIVE_BYTE_LENGTH`,
+`MODEL_PACK_ARCHIVE_ARTIFACT_BOUNDS`, and `MODEL_PACK_ARCHIVE_CORPUS_BOUNDS`
+failures expose the rejecting boundary. Only then does import validate each byte
+and replay compilation before one atomic batch becomes visible.
+
+Append-only identity applies below the pack envelope as well as to it. The
+repository stages canonical content digests for every independently versioned
+intended-use contract, requirement profile, raw-source record, derivative, and
+credibility manifest. It compares those staged
+identities with both earlier members of the same batch and all prior
+publications. Reusing an exact `(schema, id, version)` with identical content is
+valid sharing; changing its canonical content fails the whole batch with
+`MODEL_PACK_STORAGE_IDENTITY_CONFLICT` and leaves prior publications untouched.
 
 Incomplete publications remain exportable through the integrity-only research
 backup/readback path so governed gaps are recoverable; they remain unavailable
@@ -242,8 +258,8 @@ The immutable workload
 `8a438546acdfc3d3bf49d8052e26865c275f2d3fa9b935763e1271438f706e5c`
 and measures compile, atomic publish, exact lookup, research export/import and
 1/10/100/500-instance compiled reuse. On 2026-08-25, Node v24.3.0 on an Apple M5
-arm64 with 10 logical cores and 16 GiB memory measured p99 values of 68.618,
-66.911, 16.251, 18.935, 64.383 and 0.012/0.007/0.079/0.122 ms respectively.
+arm64 with 10 logical cores and 16 GiB memory measured p99 values of 95.936,
+89.550, 13.506, 22.244, 113.104 and 0.015/0.007/0.078/0.118 ms respectively.
 All p50, p95, p99, and maximum measurements were below their committed
 regression budgets. These are local
 foundation measurements, not browser/runtime throughput, x86-64 capacity, or a
@@ -254,6 +270,8 @@ named-aircraft performance claim.
 | Failure | Meaning | Required action |
 | --- | --- | --- |
 | raw or derivative bytes do not match | byte length or SHA-256 differs | recover the exact artifact or publish a new version and rebuild all descendants |
+| archive entry/byte/corpus bound | research import would scan or allocate unbounded work | split the lawful archive into separately admitted bounded imports; never weaken the limit |
+| storage identity conflict | an existing intended-use/requirement/raw/derivative/credibility `(schema, id, version)` has different canonical content | publish a new semantic version and rebuild dependent identities |
 | unsupported field | exact-key schema rejected silent data loss | remove the field or version the owning schema |
 | source locator does not match | field lineage points at different evidence | bind the exact governed raw record; never edit the locator in place |
 | launders subject or configuration | record ancestry crosses governed identity | create a distinct subject/configuration record and derivative |

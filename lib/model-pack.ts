@@ -2982,19 +2982,99 @@ function versionKey(reference: Pick<ExactModelPackReference, "id" | "version">) 
   return `${reference.id}\u0000${reference.version}`;
 }
 
+function governedSubrecordVersionKey(
+  kind: "intended-use contract" | "requirement profile" | "raw source artifact" | "derivative" | "credibility manifest",
+  record: { schemaVersion: string; id: string; version: string },
+) {
+  return `${kind}\u0000${record.schemaVersion}\u0000${record.id}\u0000${record.version}`;
+}
+
 function referenceFor(bundle: CompiledModelPackV2Bundle): ExactModelPackReference {
   return { id: bundle.pack.id, version: bundle.pack.version, digest: bundle.pack.digest };
 }
 
-function archiveBytes(entries: Array<{ digest: string; bytes: number[] }>, path: string) {
-  return entries.map((entry, index) => {
+type ArchiveBytePreflightState = { entryCount: number; totalBytes: number };
+type PreflightedArchiveByte = { digest: string; bytes: number[]; byteLength: number };
+
+function exactArchiveByteLength(bytes: unknown, path: string) {
+  if (!Array.isArray(bytes)) {
+    throw new ModelPackValidationError([`[MODEL_PACK_ARCHIVE_BYTE_LENGTH] ${path} is not an exact byte array`]);
+  }
+  let length: number;
+  try {
+    length = bytes.length;
+  } catch {
+    throw new ModelPackValidationError([`[MODEL_PACK_ARCHIVE_BYTE_LENGTH] ${path}.length must be a safe nonnegative integer`]);
+  }
+  if (!Number.isSafeInteger(length) || length < 0) {
+    throw new ModelPackValidationError([`[MODEL_PACK_ARCHIVE_BYTE_LENGTH] ${path}.length must be a safe nonnegative integer`]);
+  }
+  return length;
+}
+
+function preflightArchiveBytes(
+  entries: unknown,
+  path: string,
+  state: ArchiveBytePreflightState,
+) {
+  if (!Array.isArray(entries)) {
+    throw new ModelPackValidationError([`[MODEL_PACK_ARCHIVE_ENTRY_COUNT] ${path} must be an exact entry array`]);
+  }
+  let entryCount: number;
+  try {
+    entryCount = entries.length;
+  } catch {
+    throw new ModelPackValidationError([`[MODEL_PACK_ARCHIVE_ENTRY_COUNT] ${path}.length must be a safe nonnegative integer`]);
+  }
+  if (!Number.isSafeInteger(entryCount) || entryCount < 0) {
+    throw new ModelPackValidationError([`[MODEL_PACK_ARCHIVE_ENTRY_COUNT] ${path}.length must be a safe nonnegative integer`]);
+  }
+  if (entryCount > MAX_GOVERNED_RECORDS - state.entryCount) {
+    throw new ModelPackValidationError([
+      `[MODEL_PACK_ARCHIVE_ENTRY_COUNT] ${path} exceeds ${MAX_GOVERNED_RECORDS} cumulative entries`,
+    ]);
+  }
+  state.entryCount += entryCount;
+  const preflighted: PreflightedArchiveByte[] = [];
+  for (let index = 0; index < entryCount; index += 1) {
+    const entry = entries[index] as unknown;
     const issues: string[] = [];
     exactKeys(issues, `${path}[${index}]`, entry, ["digest", "bytes"]);
     if (issues.length > 0) throw new ModelPackValidationError(issues);
-    if (!Array.isArray(entry.bytes) || entry.bytes.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)) {
-      throw new ModelPackValidationError([`${path}[${index}].bytes is not an exact byte array`]);
+    const { digest, bytes } = entry as { digest: string; bytes: unknown };
+    const byteLength = exactArchiveByteLength(bytes, `${path}[${index}].bytes`);
+    if (byteLength > MAX_GOVERNED_ARTIFACT_BYTES) {
+      throw new ModelPackValidationError([
+        `[MODEL_PACK_ARCHIVE_ARTIFACT_BOUNDS] ${path}[${index}].bytes exceeds ${MAX_GOVERNED_ARTIFACT_BYTES} bytes`,
+      ]);
     }
-    return { digest: entry.digest, bytes: Uint8Array.from(entry.bytes) };
+    if (byteLength > MAX_GOVERNED_CORPUS_BYTES - state.totalBytes) {
+      throw new ModelPackValidationError([
+        `[MODEL_PACK_ARCHIVE_CORPUS_BOUNDS] ${path} exceeds ${MAX_GOVERNED_CORPUS_BYTES} cumulative bytes`,
+      ]);
+    }
+    state.totalBytes += byteLength;
+    preflighted.push({ digest, bytes: bytes as number[], byteLength });
+  }
+  return preflighted;
+}
+
+function archiveBytes(entries: PreflightedArchiveByte[], path: string) {
+  return entries.map((entry, index) => {
+    if (entry.bytes.length !== entry.byteLength) {
+      throw new ModelPackValidationError([
+        `[MODEL_PACK_ARCHIVE_BYTE_LENGTH] ${path}[${index}].bytes.length changed after preflight`,
+      ]);
+    }
+    const ownedBytes = new Uint8Array(entry.byteLength);
+    for (let byteIndex = 0; byteIndex < entry.byteLength; byteIndex += 1) {
+      const byte = entry.bytes[byteIndex];
+      if (!Number.isInteger(byte) || byte < 0 || byte > 255) {
+        throw new ModelPackValidationError([`${path}[${index}].bytes is not an exact byte array`]);
+      }
+      ownedBytes[byteIndex] = byte;
+    }
+    return { digest: entry.digest, bytes: ownedBytes };
   });
 }
 
@@ -3014,6 +3094,7 @@ function orderedUniqueReferences(references: ExactModelPackReference[]) {
 export class InMemoryModelPackRepository {
   readonly #publications = new Map<string, GovernedModelPackPublication>();
   readonly #versionIdentities = new Map<string, string>();
+  readonly #governedSubrecordIdentities = new Map<string, string>();
 
   get size() {
     return this.#publications.size;
@@ -3041,6 +3122,7 @@ export class InMemoryModelPackRepository {
     if (publications.length > MAX_GOVERNED_RECORDS) throw new ModelPackValidationError(["publication batch is oversized"]);
     const staged = new Map<string, GovernedModelPackPublication>();
     const stagedVersions = new Map<string, string>();
+    const stagedGovernedSubrecords = new Map<string, string>();
     for (const [publicationIndex, publication] of publications.entries()) {
       const publicationIssues: string[] = [];
       exactKeys(publicationIssues, `publication[${publicationIndex}]`, publication, [
@@ -3065,6 +3147,30 @@ export class InMemoryModelPackRepository {
       if (staged.has(key) || this.#publications.has(key)) {
         throw new ModelPackValidationError([`published identity ${reference.id}@${reference.version}/${reference.digest} already exists`]);
       }
+      const orderedSource = orderedGovernance(publication.source);
+      const governance = orderedSource.governance;
+      const governedSubrecords = [
+        ...orderedSource.intendedUses.map((record) => ({
+          kind: "intended-use contract" as const,
+          record,
+        })),
+        { kind: "requirement profile" as const, record: governance.requirementProfile },
+        ...governance.rawSourceArtifacts.map((record) => ({ kind: "raw source artifact" as const, record })),
+        ...governance.derivatives.map((record) => ({ kind: "derivative" as const, record })),
+        { kind: "credibility manifest" as const, record: rebuilt.credibilityManifest },
+      ];
+      for (const { kind, record } of governedSubrecords) {
+        const recordKey = governedSubrecordVersionKey(kind, record);
+        const contentDigest = await governedContentDigest(record);
+        const existingContentDigest = stagedGovernedSubrecords.get(recordKey)
+          ?? this.#governedSubrecordIdentities.get(recordKey);
+        if (existingContentDigest && existingContentDigest !== contentDigest) {
+          throw new ModelPackValidationError([
+            `[MODEL_PACK_STORAGE_IDENTITY_CONFLICT] ${kind} ${record.id}@${record.version} already has canonical content digest ${existingContentDigest}`,
+          ]);
+        }
+        stagedGovernedSubrecords.set(recordKey, contentDigest);
+      }
       stagedVersions.set(identity, reference.digest);
       staged.set(key, deepFreeze({
         source: structuredClone(publication.source),
@@ -3075,6 +3181,7 @@ export class InMemoryModelPackRepository {
     }
     for (const [key, publication] of staged) this.#publications.set(key, publication);
     for (const [key, digest] of stagedVersions) this.#versionIdentities.set(key, digest);
+    for (const [key, digest] of stagedGovernedSubrecords) this.#governedSubrecordIdentities.set(key, digest);
   }
 
   async resolveExact(reference: ExactModelPackReference) {
@@ -3111,16 +3218,37 @@ export class InMemoryModelPackRepository {
     if (archive.schemaVersion !== GOVERNED_MODEL_PACK_EXPORT_SCHEMA_VERSION || !Array.isArray(archive.publications)) {
       throw new ModelPackValidationError(["research export schema is unsupported"]);
     }
-    const publications = archive.publications.map((publication, index) => {
+    if (archive.publications.length > MAX_GOVERNED_RECORDS) {
+      throw new ModelPackValidationError([
+        `[MODEL_PACK_ARCHIVE_ENTRY_COUNT] archive.publications exceeds ${MAX_GOVERNED_RECORDS} entries`,
+      ]);
+    }
+    const rawPreflight = { entryCount: 0, totalBytes: 0 };
+    const derivativePreflight = { entryCount: 0, totalBytes: 0 };
+    const preflightedPublications = [];
+    for (const [index, publication] of archive.publications.entries()) {
       const issues: string[] = [];
       exactKeys(issues, `archive.publications[${index}]`, publication, [
         "source", "rawArtifactBytes", "derivativeBytes", "bundle",
       ]);
       if (issues.length > 0) throw new ModelPackValidationError(issues);
+      const rawArtifactBytes = preflightArchiveBytes(
+        publication.rawArtifactBytes,
+        `archive.publications[${index}].rawArtifactBytes`,
+        rawPreflight,
+      );
+      const derivativeBytes = preflightArchiveBytes(
+        publication.derivativeBytes,
+        `archive.publications[${index}].derivativeBytes`,
+        derivativePreflight,
+      );
+      preflightedPublications.push({ publication, rawArtifactBytes, derivativeBytes });
+    }
+    const publications = preflightedPublications.map(({ publication, rawArtifactBytes, derivativeBytes }, index) => {
       return {
         source: structuredClone(publication.source),
-        rawArtifactBytes: archiveBytes(publication.rawArtifactBytes, `archive.publications[${index}].rawArtifactBytes`),
-        derivativeBytes: archiveBytes(publication.derivativeBytes, `archive.publications[${index}].derivativeBytes`),
+        rawArtifactBytes: archiveBytes(rawArtifactBytes, `archive.publications[${index}].rawArtifactBytes`),
+        derivativeBytes: archiveBytes(derivativeBytes, `archive.publications[${index}].derivativeBytes`),
         bundle: structuredClone(publication.bundle),
       };
     });

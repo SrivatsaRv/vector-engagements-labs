@@ -628,6 +628,125 @@ test("governed raw, derivative, source, and compiled identities fail closed and 
   );
 });
 
+test("append-only storage binds every independently versioned governed subrecord", async () => {
+  const baselineInput = await createAnonymousGovernedPublication("anonymous-pack-storage-baseline");
+  const baseline = { ...baselineInput, bundle: await compileGovernedModelPack(baselineInput) };
+
+  const sharedInput = await createAnonymousGovernedPublication("anonymous-pack-storage-shared");
+  sharedInput.source.governance = structuredClone(baselineInput.source.governance);
+  sharedInput.rawArtifactBytes = baselineInput.rawArtifactBytes.map((entry) => ({
+    digest: entry.digest,
+    bytes: entry.bytes.slice(),
+  }));
+  sharedInput.derivativeBytes = baselineInput.derivativeBytes.map((entry) => ({
+    digest: entry.digest,
+    bytes: entry.bytes.slice(),
+  }));
+  const shared = { ...sharedInput, bundle: await compileGovernedModelPack(sharedInput) };
+  const sharingRepository = new InMemoryModelPackRepository();
+  await sharingRepository.publishBatch([baseline, shared]);
+  assert.equal(sharingRepository.size, 2, "unchanged governed subrecords may be shared by distinct packs");
+
+  const profileConflictInput = await createAnonymousGovernedPublication("anonymous-pack-storage-profile-conflict");
+  profileConflictInput.source.governance.requirementProfile.id =
+    baselineInput.source.governance.requirementProfile.id;
+  profileConflictInput.source.governance.requirementProfile.version =
+    baselineInput.source.governance.requirementProfile.version;
+  profileConflictInput.source.governance.requirementProfile.requirements[0].id += "-changed";
+  const profileConflict = {
+    ...profileConflictInput,
+    bundle: await compileGovernedModelPack(profileConflictInput),
+  };
+  const sameBatchRepository = new InMemoryModelPackRepository();
+  await assert.rejects(
+    sameBatchRepository.publishBatch([baseline, profileConflict]),
+    /\[MODEL_PACK_STORAGE_IDENTITY_CONFLICT\].*requirement profile/,
+  );
+  assert.equal(sameBatchRepository.size, 0, "same-batch identity conflict must publish nothing");
+
+  const intendedUseConflictInput = await createAnonymousGovernedPublication("anonymous-pack-storage-intended-use-conflict");
+  intendedUseConflictInput.source.intendedUses.find((item) =>
+    item.id === "vector.intended-use.engine-verification"
+  ).question = "Changed question under the same intended-use identity";
+  const intendedUseConflict = {
+    ...intendedUseConflictInput,
+    bundle: await compileGovernedModelPack(intendedUseConflictInput),
+  };
+  const intendedUseRepository = new InMemoryModelPackRepository();
+  await intendedUseRepository.publishBatch([baseline]);
+  await assert.rejects(
+    intendedUseRepository.publishBatch([intendedUseConflict]),
+    /\[MODEL_PACK_STORAGE_IDENTITY_CONFLICT\].*intended-use contract/,
+  );
+  assert.equal(intendedUseRepository.size, 1);
+
+  const rawConflictInput = await createAnonymousGovernedPublication("anonymous-pack-storage-raw-conflict");
+  rawConflictInput.source.governance.rawSourceArtifacts[0].id =
+    baselineInput.source.governance.rawSourceArtifacts[0].id;
+  rawConflictInput.source.governance.rawSourceArtifacts[0].version =
+    baselineInput.source.governance.rawSourceArtifacts[0].version;
+  const rawConflict = { ...rawConflictInput, bundle: await compileGovernedModelPack(rawConflictInput) };
+  const rawRepository = new InMemoryModelPackRepository();
+  await rawRepository.publishBatch([baseline]);
+  await assert.rejects(
+    rawRepository.publishBatch([rawConflict]),
+    /\[MODEL_PACK_STORAGE_IDENTITY_CONFLICT\].*raw source artifact/,
+  );
+  assert.equal(rawRepository.size, 1, "later raw-record conflict must preserve the prior publication");
+
+  const derivativeConflictInput = await createAnonymousGovernedPublication("anonymous-pack-storage-derivative-conflict");
+  derivativeConflictInput.source.governance.derivatives[0].id =
+    baselineInput.source.governance.derivatives[0].id;
+  derivativeConflictInput.source.governance.derivatives[0].version =
+    baselineInput.source.governance.derivatives[0].version;
+  const changedDerivative = derivativeConflictInput.source.governance.derivatives[0];
+  const previousDerivativeDigest = changedDerivative.output.contentDigest;
+  const rebuiltDerivativeBytes = await rebuildAircraftDerivative(
+    changedDerivative,
+    changedDerivative.orderedInputDigests.map((digest) => ({
+      digest,
+      bytes: derivativeConflictInput.rawArtifactBytes.find((entry) => entry.digest === digest).bytes,
+    })),
+  );
+  const changedDerivativeDigest = await sha256ArtifactBytes(rebuiltDerivativeBytes);
+  changedDerivative.output.byteLength = rebuiltDerivativeBytes.byteLength;
+  changedDerivative.output.contentDigest = changedDerivativeDigest;
+  const changedDerivativeByteRecord = derivativeConflictInput.derivativeBytes.find((entry) =>
+    entry.digest === previousDerivativeDigest
+  );
+  changedDerivativeByteRecord.digest = changedDerivativeDigest;
+  changedDerivativeByteRecord.bytes = rebuiltDerivativeBytes;
+  for (const lineage of derivativeConflictInput.source.governance.fieldLineage) {
+    if (lineage.derivativeDigest === previousDerivativeDigest) lineage.derivativeDigest = changedDerivativeDigest;
+  }
+  const derivativeConflict = {
+    ...derivativeConflictInput,
+    bundle: await compileGovernedModelPack(derivativeConflictInput),
+  };
+  const derivativeRepository = new InMemoryModelPackRepository();
+  await derivativeRepository.publishBatch([baseline]);
+  await assert.rejects(
+    derivativeRepository.publishBatch([derivativeConflict]),
+    /\[MODEL_PACK_STORAGE_IDENTITY_CONFLICT\].*derivative/,
+  );
+  assert.equal(derivativeRepository.size, 1, "later derivative conflict must preserve the prior publication");
+
+  const credibilityConflictInput = await createAnonymousGovernedPublication("anonymous-pack-storage-credibility-conflict");
+  credibilityConflictInput.source.credibility.id = baselineInput.source.credibility.id;
+  credibilityConflictInput.source.credibility.version = baselineInput.source.credibility.version;
+  const credibilityConflict = {
+    ...credibilityConflictInput,
+    bundle: await compileGovernedModelPack(credibilityConflictInput),
+  };
+  const credibilityRepository = new InMemoryModelPackRepository();
+  await credibilityRepository.publishBatch([baseline]);
+  await assert.rejects(
+    credibilityRepository.publishBatch([credibilityConflict]),
+    /\[MODEL_PACK_STORAGE_IDENTITY_CONFLICT\].*credibility manifest/,
+  );
+  assert.equal(credibilityRepository.size, 1);
+});
+
 test("multi-stage derivatives preserve exact transitive raw ancestry", async () => {
   const input = await createAnonymousGovernedPublication("anonymous-pack-multi-stage-derivative");
   const finalDerivative = input.source.governance.derivatives[0];
@@ -693,6 +812,59 @@ test("governed export/import/readback preserves exact bytes and production expor
     new InMemoryModelPackRepository().importResearch(unknownArchiveByteField),
     /unsupported field inventedAuthority/,
   );
+
+  const indexedReads = [];
+  const lengthOnlyBytes = (length) => {
+    const target = [];
+    target.length = length;
+    return new Proxy(target, {
+      get(array, property, receiver) {
+        if (typeof property === "string" && /^\d+$/.test(property)) indexedReads.push(property);
+        return Reflect.get(array, property, receiver);
+      },
+    });
+  };
+  const oversizedArchive = structuredClone(researchExport);
+  oversizedArchive.publications[0].rawArtifactBytes[0].bytes = lengthOnlyBytes(32 * 1024 * 1024 + 1);
+  await assert.rejects(
+    new InMemoryModelPackRepository().importResearch(oversizedArchive),
+    /\[MODEL_PACK_ARCHIVE_ARTIFACT_BOUNDS\].*rawArtifactBytes\[0\]\.bytes/,
+  );
+  assert.equal(indexedReads.length, 0, "oversized archive bytes must reject before scanning or copying");
+
+  const cumulativeArchive = structuredClone(researchExport);
+  cumulativeArchive.publications[0].derivativeBytes = [
+    { digest: "1".repeat(64), bytes: lengthOnlyBytes(32 * 1024 * 1024) },
+    { digest: "2".repeat(64), bytes: lengthOnlyBytes(32 * 1024 * 1024) },
+    { digest: "3".repeat(64), bytes: lengthOnlyBytes(1) },
+  ];
+  await assert.rejects(
+    new InMemoryModelPackRepository().importResearch(cumulativeArchive),
+    /\[MODEL_PACK_ARCHIVE_CORPUS_BOUNDS\].*derivativeBytes/,
+  );
+  assert.equal(indexedReads.length, 0, "cumulative archive bounds must reject before indexed reads");
+
+  const excessiveEntriesArchive = structuredClone(researchExport);
+  excessiveEntriesArchive.publications[0].rawArtifactBytes = new Array(2_049);
+  await assert.rejects(
+    new InMemoryModelPackRepository().importResearch(excessiveEntriesArchive),
+    /\[MODEL_PACK_ARCHIVE_ENTRY_COUNT\].*rawArtifactBytes/,
+  );
+
+  const malformedLengthArchive = structuredClone(researchExport);
+  const malformedLength = new Proxy([], {
+    get(array, property, receiver) {
+      if (property === "length") return 1.5;
+      if (typeof property === "string" && /^\d+$/.test(property)) indexedReads.push(property);
+      return Reflect.get(array, property, receiver);
+    },
+  });
+  malformedLengthArchive.publications[0].rawArtifactBytes[0].bytes = malformedLength;
+  await assert.rejects(
+    new InMemoryModelPackRepository().importResearch(malformedLengthArchive),
+    /\[MODEL_PACK_ARCHIVE_BYTE_LENGTH\].*rawArtifactBytes\[0\]\.bytes/,
+  );
+  assert.equal(indexedReads.length, 0, "malformed archive lengths must reject without indexed reads");
 
   const productionExport = await sourceRepository.exportCompiled([reference]);
   const productionBytes = JSON.stringify(productionExport);
