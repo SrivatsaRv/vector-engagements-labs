@@ -89,9 +89,11 @@ machine inspection independently reproduces every declared page render. A
 non-legal release-owner semantic review is bound to separately
 content-addressed Darwin-arm64 and Linux-amd64 44-page render sets and eight
 profile/contact-sheet identities without admitting numeric values or equations.
-Hosted quality and post-build integration restore a digest-keyed renderer image
-built once from the SHA-pinned official Poppler 26.05.0 source on a pinned
-Ubuntu base. Production quarantine now covers the entire `fixtures/` tree,
+Hosted quality, web-contract, and post-build integration restore a digest-keyed
+renderer image built once from the SHA-pinned official Poppler 26.05.0 source
+on a pinned Ubuntu base. Both `pdftoppm` and `pdfinfo` come from that image, so
+the mandatory source suite cannot consume an ambient runner tool. Production
+quarantine now covers the entire `fixtures/` tree,
 including public-reference and performance subtrees.
 
 #### Simulation physics

@@ -224,6 +224,10 @@ surfaces so newly exposed resolver variants fail the regression instead of
 silently escaping the guard. The verifier runs again after the production build so missing output
 directories cannot stand in for bundle-exclusion evidence. Dynamic unpinned or
 substituted community/game material is rejected.
+Hosted source checks resolve both `pdftoppm` and `pdfinfo` through the same
+network-denied, digest-keyed Poppler 26.05.0 image. Quality, web-contract, and
+integration jobs depend on that setup and cannot fall back to an ambient
+runner binary with an ungoverned version.
 
 Visual release review is a separate technical boundary. `RELEASE_OWNER_REVIEW`
 is manifest-bound to separately content-addressed Darwin-arm64 and Linux-amd64

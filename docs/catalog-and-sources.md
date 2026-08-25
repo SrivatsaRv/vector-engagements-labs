@@ -196,6 +196,9 @@ ineligible claims, extracted-text policy, and the source-only policy—as one
 reviewed authority table. Replacing a PDF or render and updating every local
 hash or total still fails. Generator freshness plus full bundle verification is
 mandatory in `make ci-quality` through `generic-sensor:sources:verify`.
+The hosted verifier toolchain exposes both `pdftoppm` and `pdfinfo` from the
+same pinned Poppler 26.05.0 image before any quality, web-contract, or
+integration source check; the runner's ambient utilities are not evidence.
 
 The corresponding legal artifact keeps redistribution, reference execution,
 and adaptation as independent decisions. Redistribution is

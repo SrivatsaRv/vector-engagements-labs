@@ -134,7 +134,7 @@ The historical F-16 external-store source gate runs its evidence generator,
 committed quarantine inventory, source-terms/release-owner verification,
 production-isolation scan, and hostile regressions under the shared deny-all
 network preload. Every required package, local CI, clean-clone, and hosted
-quality/integration invocation supplies the exact committed source directory
+quality/web-contract/integration invocation supplies the exact committed source directory
 and reproduces all 16 pages with the pinned Poppler and Sharp versions; the CLI
 has no source-omission success path. The normal quality gate does not fetch
 mutable NTRS or policy URLs. Local Worker and

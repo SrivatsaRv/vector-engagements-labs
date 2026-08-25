@@ -43,10 +43,13 @@ else
   (cd "${cache_root}" && sha256sum "$(basename "${image_archive}")" > "$(basename "${image_archive_digest}")")
 fi
 
-sed \
-  -e "s|@@IMAGE_TAG@@|${image_tag}|" \
-  -e "s|@@GITHUB_WORKSPACE@@|${GITHUB_WORKSPACE}|g" \
-  "${GITHUB_WORKSPACE}/scripts/pinned-pdftoppm-wrapper.sh.in" > "${bin_dir}/pdftoppm"
-chmod 0755 "${bin_dir}/pdftoppm"
-"${bin_dir}/pdftoppm" -v 2>&1 | grep -F "pdftoppm version ${poppler_version}"
+for tool in pdftoppm pdfinfo; do
+  sed \
+    -e "s|@@IMAGE_TAG@@|${image_tag}|" \
+    -e "s|@@GITHUB_WORKSPACE@@|${GITHUB_WORKSPACE}|g" \
+    -e "s|@@TOOL@@|${tool}|g" \
+    "${GITHUB_WORKSPACE}/scripts/pinned-pdftoppm-wrapper.sh.in" > "${bin_dir}/${tool}"
+  chmod 0755 "${bin_dir}/${tool}"
+  "${bin_dir}/${tool}" -v 2>&1 | grep -F "${tool} version ${poppler_version}"
+done
 printf '%s\n' "${bin_dir}" >> "${GITHUB_PATH}"

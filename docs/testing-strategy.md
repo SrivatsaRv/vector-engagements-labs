@@ -43,12 +43,15 @@ Ubuntu 24.04 image pinned at
 The bootstrap rejects any source digest except
 `6fef27ff04f37db43054c86bcdff6128c9fb1f6af4ef3c8b369a7e9abd68d0bb`.
 Its Docker image is cached under a key derived from the installer, Dockerfile,
-and network-denied wrapper, then restored by quality and post-build integration
-instead of compiling twice. The cold x86-emulated reproduction completed in
+and network-denied wrapper, then restored by quality, web-contract, and
+post-build integration instead of compiling independently in each job. Both
+`pdftoppm` and `pdfinfo` are built from that source and invoked through the
+same no-network container; Stage 2A depends on the setup job because `npm test`
+executes the mandatory source rerender regression. The cold x86-emulated reproduction completed in
 6m31s; the setup job has a 15-minute budget while the existing 20-minute
 quality/integration budgets remain unchanged. The verifier container has no
 network and every Linux render must match its committed profile byte-for-byte.
-The built executable and its Poppler shared library live under `/opt/poppler`;
+The built executables and their Poppler shared library live under `/opt/poppler`;
 they cannot be placed below `/tmp`, because the network-denied wrapper mounts
 the host temporary tree there for exact input and output paths. Bootstrap also
 expands every workspace placeholder before the wrapper's version probe, so no
