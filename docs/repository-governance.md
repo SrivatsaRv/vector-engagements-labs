@@ -96,6 +96,11 @@ merge base must lack the policy. A stale branch whose integration tip already
 has the policy must rebase. Later missing, malformed, weakened, unclassified,
 or unmapped policy state fails closed.
 
+The `UI_RESPONSIVE_INTERACTION` family owns the shared overlay implementation,
+its focused component regressions, and the dedicated responsive overlay
+contract section. Adding those exact paths and section is a semantic policy
+change; later edits must update the same owned documentation and evidence.
+
 Governed `EXACT` implementation, test, or generated rules may leave the active
 inventory only through an append-only `ruleRetirements` tombstone. The
 tombstone binds the exact merge-base commit, canonical base-policy digest,

@@ -46,7 +46,7 @@ test("Peace Drive I evidence is visibly context-only and fitted EW remains unkno
   await expect(redEvidence).not.toContainText("ALQ-211");
 
   const redTeam = page.locator("article.red-team");
-  await redTeam.getByRole("button", { name: /F-16C Block 52/i }).click();
+  await redTeam.getByRole("combobox", { name: /Aircraft variant.*F-16C Block 52/i }).click();
   const aircraftOptions = page.getByRole("listbox", { name: "Aircraft variant" });
   await expect(aircraftOptions.getByRole("option", { name: /F-16C Block 52/i })).toHaveCount(1);
   await expect(aircraftOptions.getByRole("option", { name: /F-16D Block 52/i })).toHaveCount(0);

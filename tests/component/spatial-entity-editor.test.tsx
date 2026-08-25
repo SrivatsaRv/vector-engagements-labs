@@ -121,7 +121,9 @@ describe("SpatialEntityEditor", () => {
     render(<Harness onValidityChange={onValidityChange} onEntityChange={onEntityChange} />);
 
     const route = screen.getByRole("region", { name: /test aircraft route coordinates/i });
-    await user.selectOptions(within(route).getByRole("combobox", { name: /transition/i }), "FLY_OVER");
+    const transition = within(route).getByRole("combobox", { name: /transition/i });
+    expect(transition).toHaveAttribute("data-vector-overlay-exempt", "ua-native-select");
+    await user.selectOptions(transition, "FLY_OVER");
     await user.tab();
 
     await waitFor(() => expect(onEntityChange).toHaveBeenCalled());

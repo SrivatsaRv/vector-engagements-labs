@@ -16,6 +16,7 @@ import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
 import { presentTacticalSymbol } from "@/lib/tactical-symbol-contract";
 import { VectorMapControls, type MapCameraTelemetry } from "@/components/VectorMapControls";
 import { SpatialEntityEditor } from "@/components/SpatialEntityEditor";
+import { VectorSelect } from "@/components/ui/OverlayPrimitives";
 import {
   buildVectorMapStyle,
   readVectorBasemap,
@@ -70,7 +71,6 @@ export function ScenarioAuthoringMap({
   const [message, setMessage] = useState("");
   const [mapError, setMapError] = useState("");
   const [basemap, setBasemap] = useState<VectorBasemap>("MINIMAL");
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [teamValidity, setTeamValidity] = useState({ blue: true, red: true });
   const [camera, setCamera] = useState<MapCameraTelemetry>({
     longitude: studyArea.anchor.longitude,
@@ -599,16 +599,27 @@ export function ScenarioAuthoringMap({
             const service = team === "blue" ? "IAF" : "PAF";
             const options = availableOrigins.filter((item) => item.service === service);
             return (
-              <details className={team} key={team}>
-                <summary>{team === "blue" ? "Blue" : "Red"} origin</summary>
-                <div>
-                  {options.length ? options.map((installation) => (
-                    <button key={installation.id} onClick={() => selectOrigin(team, installation)} type="button">
-                      {installation.name}{installation.icao_code ? ` · ${installation.icao_code}` : ""}
-                    </button>
-                  )) : <span>No {service} base in this study area. Drag the start marker instead.</span>}
-                </div>
-              </details>
+              <VectorSelect
+                className={`origin-picker ${team}`}
+                emptyContent={<span>No {service} base in this study area. Drag the start marker instead.</span>}
+                key={team}
+                label={`${team === "blue" ? "Blue" : "Red"} origin`}
+                matchTriggerWidth={false}
+                maxWidth={320}
+                onChange={(installationId) => {
+                  const installation = options.find((item) => item.id === installationId);
+                  if (installation) selectOrigin(team, installation);
+                }}
+                options={options.map((installation) => ({
+                  value: installation.id,
+                  label: `${installation.name}${installation.icao_code ? ` · ${installation.icao_code}` : ""}`,
+                }))}
+                renderTrigger={() => <>{team === "blue" ? "Blue" : "Red"} origin</>}
+                showLabel={false}
+                surfaceClassName="origin-picker-menu"
+                triggerClassName="origin-picker-trigger"
+                value={plan[team].originReference?.installationId ?? ""}
+              />
             );
           })}
         </div>
@@ -618,9 +629,7 @@ export function ScenarioAuthoringMap({
         <VectorMapControls
           basemap={basemap}
           camera={camera}
-          paletteOpen={paletteOpen}
-          onPaletteToggle={() => setPaletteOpen((current) => !current)}
-          onBasemap={(value) => { setBasemap(value); setPaletteOpen(false); }}
+          onBasemap={setBasemap}
           onZoomIn={() => mapRef.current?.zoomIn({ duration: 120 })}
           onZoomOut={() => mapRef.current?.zoomOut({ duration: 120 })}
           onTilt={() => {

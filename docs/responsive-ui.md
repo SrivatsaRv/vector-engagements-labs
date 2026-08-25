@@ -30,10 +30,62 @@ rendering sharpness; viewport width and height govern task geometry.
 - The live 3D renderer observes its container, so orientation changes and panel reflow update the WebGL viewport without stretching or clipping.
 - Landing copy, calls to action and live preview remain within the first natural reading sequence on small screens; no fixed hero height creates blank space.
 - Report reading width remains bounded even when operational maps expand.
+- Portalled transient controls remain inside the visual viewport and safe-area
+  insets, avoid the sticky Construct action rail, and scroll internally without
+  shifting the workspace.
 - Blog editorial diagrams remain bounded at reading width on desktop. On phone,
   their full-resolution canvas scrolls inside the figure rather than shrinking
   technical labels below a readable size; the linked source image remains
   available for full-resolution inspection.
+
+## Shared control and overlay contract
+
+VECTOR has one presentation-only overlay coordinator at the application root.
+Every custom Select, Menu, or Popover registers one trigger and one portalled
+surface with that coordinator. At most one transient surface is open in the
+workspace. A direct pointer, touch, or keyboard activation of a second trigger
+closes the prior surface and opens the requested surface in the same action.
+Outside press, Escape, selection, route removal, and trigger unmount close the
+surface; Escape and selection return focus to its trigger. The coordinator owns
+one stable document pointer, keyboard, and focus-boundary listener set rather
+than installing listeners per feature or per open cycle.
+
+The shared select uses the select-only ARIA combobox pattern: focus remains on
+the labelled trigger, `aria-controls` binds it to a listbox, and
+`aria-activedescendant` identifies the active option. The trigger's accessible
+name includes both the field label and current value. Arrow, Home, End,
+Enter/Space, Escape, Tab, and bounded typeahead behavior are covered by the
+component contract. A stale authored identity is displayed as unavailable and
+associated with an error; the first current option is never substituted.
+
+The shared Menu follows the menu-button pattern: opening moves focus to the
+first enabled menu item, Arrow/Home/End moves real item focus, and action or
+Escape closes and returns focus. The shared non-modal Popover exposes a labelled
+dialog, moves focus into its first interactive child (or the dialog itself), and
+closes when focus leaves its trigger/surface boundary. These primitives use the
+same coordinator and placement surface as Select; they cannot create a second
+portal or focus-manager family.
+
+Transient surfaces use one portal/placement policy. They remain at least eight
+CSS pixels inside the visual viewport, flip above a trigger when necessary,
+scroll internally, and do not move document layout. Coarse-pointer triggers and
+options are at least 44×44 CSS pixels. Reduced motion removes nonessential
+movement without altering state. These non-modal surfaces do not lock document
+scroll or capture the pointer; their portal owns internal overscroll containment
+and the coordinator owns outside-press behavior.
+
+Persistent evidence and help use the shared Disclosure primitive. Multiple
+Disclosures may remain open and do not participate in transient exclusivity.
+Browser-owned native `select` is an explicit exception: it retains UA focus,
+keyboard, touch, and popup behavior and carries
+`data-vector-overlay-exempt="ua-native-select"`; VECTOR does not partially wrap
+or attempt to coordinate the UA-owned option window.
+
+The affected interaction budget is open/direct-handoff p95 no greater than
+100 ms with cumulative layout shift no greater than 0.05. A 100-cycle warm
+stability check must retain one surface, show no coordinator-listener growth,
+leave no detached portal after unmount, and keep post-GC heap growth within the
+declared two-megabyte browser-test guard.
 
 ## Observe viewport shell
 
@@ -63,14 +115,28 @@ transition therefore reallocates the canvas row while preserving camera/extent
 unless the operator explicitly chooses Fit. Reduced-motion preference removes
 nonessential marker transitions.
 
+Basemap is a shared transient Select. Layers, study-area context, and evidence
+are persistent Disclosures; expanding any combination of them cannot alter the
+recorded frame, selected playback time, map camera truth, or another
+Disclosure's state.
+
 ## Automated proof
 
 `npm run ui:responsive:verify` launches system Chrome at every viewport above.
 It validates the landing hero and live 3D preview, map tiles and canvas size, start/base markers, base-origin mutation,
-action size and placement, rail behavior, typography scaling, RASP ownership,
+action size and placement, rail behavior, typography scaling, deployment-governed condition availability,
 3D container resize behavior, playback and legend containment, telemetry layout, Rust/WASM provenance, entity rendering, page errors, and
 horizontal overflow. Screenshots are written to the ignored
-`outputs/responsive/` directory for visual inspection.
+`outputs/responsive/` directory for visual inspection. The default command is
+the release matrix. `VECTOR_RESPONSIVE_WIDTH` may select one width already in
+that matrix for focused diagnosis; an unknown width fails closed, and a focused
+run does not replace the default matrix at handoff.
+
+The built-browser shared-overlay journey additionally exercises the required
+390×844, 768×1024, 1366×768, 1440×900, and 1920×1080 fast matrix. It proves
+one-click aircraft-to-weapon, Blue-to-Red-origin, and origin-to-basemap handoff;
+ARIA/focus ownership; coarse-pointer target size; visual-viewport containment;
+200% page-scale containment; route cleanup; p95/CLS; and post-GC stability.
 
 `npm run blog:visual:verify` separately validates the two high-resolution blog
 editorial diagrams at 1440×900 and 390×844. It proves asset dimensions,

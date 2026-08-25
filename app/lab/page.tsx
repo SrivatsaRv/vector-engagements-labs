@@ -36,6 +36,7 @@ import { TrackStateInspector } from "@/components/TrackStateInspector";
 import { CurrentGeometry } from "@/components/CurrentGeometry";
 import { RouteTransitionInspector } from "@/components/RouteTransitionInspector";
 import { PlatformEvidence } from "@/components/PlatformEvidence";
+import { Disclosure } from "@/components/ui/OverlayPrimitives";
 import { applyTacticalLabelPolicy, presentTacticalSymbol } from "@/lib/tactical-symbol-contract";
 import {
   canConduct,
@@ -1743,7 +1744,7 @@ function ConfigureWorkspace({
           </section>
         )}
         </div>
-        <footer className="builder-actions">
+        <footer className="builder-actions" data-vector-overlay-obstacle="persistent-action-rail">
           <span>
             {step === 4
               ? canConduct(validations)
@@ -1985,10 +1986,14 @@ function WeaponDetails({ weaponId }: { weaponId: string }) {
   if (!weapon) return null;
   const sources = weapon.sourceIds.map(getSource).filter(Boolean);
   return (
-    <details className="weapon-details">
-      <summary>
+    <Disclosure
+      className="weapon-details"
+      summary={
+        <>
         Weapon guidance and sources <span>{weapon.status}</span>
-      </summary>
+        </>
+      }
+    >
       <dl>
         <div>
           <dt>Seeker</dt>
@@ -2026,7 +2031,7 @@ function WeaponDetails({ weaponId }: { weaponId: string }) {
           ))}
         </footer>
       )}
-    </details>
+    </Disclosure>
   );
 }
 
