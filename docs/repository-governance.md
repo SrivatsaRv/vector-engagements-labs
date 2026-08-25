@@ -38,6 +38,13 @@ measurement and rejects every backend batch whose governed frame count or
 semantic outcome differs; only an uncontaminated clean-commit run is
 publication evidence.
 
+The value-free TP-1538 tooling child adds its generated Rust-schema freshness,
+Rust formatting/clippy/test/rustdoc and embedded-WASM freshness checks to the
+same `ci-local` sequence. The production audit and ordinary application build
+must remain free of its verification-only subject, corpus and evaluator
+markers. Real transcript, comparison, adjudication and corpus artifacts are
+not CI fixtures for this tooling child.
+
 `ci.yml` is one change-aware pull-request and `main` pipeline. Stage 0 computes
 the rename/copy-aware change set from the exact merge base and head revisions with the tracked
 classifier and always runs repository-policy regression tests. Independent

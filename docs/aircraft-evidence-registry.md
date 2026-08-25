@@ -161,9 +161,12 @@ The immutable evidence identities for the first #135 slice are:
 | common-model reference | NASA NESC F-16 package | `20c60f615ae8e87d81c9d98b54fff45a2832840201499cbcfe3f45a60ef3e5b2` | new derivative requires explicit licence and ancestry review |
 | common-model comparison | NESC Atmospheric Case 13.2 archive | `b26a2f9eb4c537ea96bf73493004ae77d37b38d496b32e6d50e00b4ec9482fb1` | new derivative requires explicit licence and ancestry review |
 
-TP-1538 publishes numeric aerodynamic tables in Table III (PDF pages 51–85,
-report pages 45–79) and mass/dimensional data in Table I (PDF/report pages
-49/43). TM-2003-212145 publishes the simulated mass properties in Table 1
+TP-1538 publishes numeric aerodynamic tables in Table III (PDF pages 51–97,
+report pages 45–91) and mass/dimensional data in Table I (PDF/report pages
+49/43). The issue #142 corpus is a separately owned `NASA_GENERIC_F16`,
+`ENGINE_VERIFICATION_ONLY` derivative with no registry or production-runtime
+authority; it cannot upgrade this registry subject or satisfy a named aircraft
+capability. TM-2003-212145 publishes the simulated mass properties in Table 1
 (PDF/report pages 48/33), but directs the actual aerodynamic and propulsion
 table values to external MATLAB package files. The NESC package fills those
 gaps only through a lineage that includes a Morelli copyright notice and

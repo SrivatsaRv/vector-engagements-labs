@@ -1,0 +1,22 @@
+[package]
+name = "vector-tp1538-aero-verifier"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+description = "Standalone NASA TP-1538 verification-only table evaluator"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.149", features = ["float_roundtrip"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "z"
+overflow-checks = true
+panic = "abort"
+strip = true

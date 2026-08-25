@@ -1719,6 +1719,199 @@
       ]
     },
     {
+      "id": "TP1538_AERO_VERIFICATION",
+      "workstream": "simulation-systems",
+      "implementationRules": [
+        {
+          "kind": "PREFIX",
+          "value": "verification-rust/tp1538-aero/",
+          "facets": ["datum", "digest", "schema", "unit", "validity", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/lib/tp1538-aero-corpus.mjs",
+          "facets": ["admission", "datum", "digest", "evidence", "schema", "unit", "validity", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/create-tp1538-transcription.mjs",
+          "facets": ["evidence", "schema", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/apply-tp1538-manual-entries.mjs",
+          "facets": ["admission", "evidence", "schema", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/freeze-tp1538-transcription.mjs",
+          "facets": ["admission", "digest", "evidence", "schema", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/compare-tp1538-transcriptions.mjs",
+          "facets": ["evidence", "schema", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/finalize-tp1538-aero-corpus.mjs",
+          "facets": ["admission", "digest", "evidence", "schema", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/generate-tp1538-rust-schema.mjs",
+          "facets": ["datum", "digest", "schema", "unit", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/build-tp1538-aero-verifier.mjs",
+          "facets": ["digest", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/lib/tp1538-aero-performance-evidence.mjs",
+          "facets": ["digest", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/workers/tp1538-aero-verification.worker.ts",
+          "facets": ["admission", "schema", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/validation/tp1538-aero-verification.ts",
+          "facets": ["admission", "datum", "digest", "schema", "unit", "validity", "verification", "vsr"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/validation/tp1538-aero-verification-wasm.ts",
+          "facets": ["datum", "digest", "schema", "unit", "validity", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/validation/generated/tp1538-aero-verifier-wasm.ts",
+          "facets": ["digest", "verification"]
+        }
+      ],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/tp1538-aero-corpus.test.mjs",
+          "facets": ["admission", "digest", "evidence", "schema", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/tp1538-aero-evaluator.test.mjs",
+          "facets": ["datum", "digest", "schema", "unit", "validity", "verification", "vsr"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/tp1538-aero-performance-evidence.test.mjs",
+          "facets": ["digest", "verification"]
+        }
+      ],
+      "generatedGroups": [
+        {
+          "id": "TP1538_RUST_SCHEMA",
+          "toolchainId": "NODE",
+          "outputRules": [
+            {
+              "kind": "EXACT",
+              "value": "verification-rust/tp1538-aero/src/generated_schema.rs",
+              "facets": ["datum", "schema", "unit", "validity", "verification"]
+            }
+          ],
+          "inputRules": [
+            {
+              "kind": "EXACT",
+              "value": "scripts/lib/tp1538-aero-corpus.mjs",
+              "facets": ["datum", "schema", "unit", "validity", "verification"]
+            }
+          ],
+          "generatorRules": [
+            {
+              "kind": "EXACT",
+              "value": "scripts/generate-tp1538-rust-schema.mjs",
+              "facets": ["datum", "schema", "unit", "validity", "verification"]
+            }
+          ],
+          "freshnessArgv": ["node", "scripts/generate-tp1538-rust-schema.mjs", "--check"]
+        },
+        {
+          "id": "TP1538_AERO_VERIFIER_WASM",
+          "toolchainId": "NODE_RUST_WASM32",
+          "outputRules": [
+            {
+              "kind": "EXACT",
+              "value": "lib/validation/generated/tp1538-aero-verifier-wasm.ts",
+              "facets": ["digest", "verification"]
+            }
+          ],
+          "inputRules": [
+            {
+              "kind": "PREFIX",
+              "value": "verification-rust/tp1538-aero/",
+              "facets": ["datum", "digest", "schema", "unit", "validity", "verification"]
+            }
+          ],
+          "generatorRules": [
+            {
+              "kind": "EXACT",
+              "value": "scripts/build-tp1538-aero-verifier.mjs",
+              "facets": ["digest", "verification"]
+            }
+          ],
+          "freshnessArgv": ["node", "scripts/build-tp1538-aero-verifier.mjs", "--check"]
+        }
+      ],
+      "owningSections": [
+        {
+          "sectionId": "TP1538_AERO_TESTING",
+          "path": "docs/testing-strategy.md",
+          "heading": "## Value-free TP-1538 aerodynamic tooling",
+          "facets": ["verification"]
+        },
+        {
+          "sectionId": "TP1538_AERO_AUTHORITY",
+          "path": "docs/tp1538-aero-verification.md",
+          "heading": "## Authority, scope, and nonclaims",
+          "facets": ["evidence", "validity"]
+        },
+        {
+          "sectionId": "TP1538_AERO_INVENTORY",
+          "path": "docs/tp1538-aero-verification.md",
+          "heading": "## Complete source and table inventory",
+          "facets": ["datum", "evidence", "schema", "unit"]
+        },
+        {
+          "sectionId": "TP1538_AERO_TRANSCRIPTION",
+          "path": "docs/tp1538-aero-verification.md",
+          "heading": "## Independent transcription and adjudication protocol",
+          "facets": ["admission", "digest", "evidence", "verification"]
+        },
+        {
+          "sectionId": "TP1538_AERO_EVALUATOR",
+          "path": "docs/tp1538-aero-verification.md",
+          "heading": "## Evaluator and immutable identity",
+          "facets": ["admission", "datum", "digest", "schema", "unit", "validity", "vsr"]
+        },
+        {
+          "sectionId": "TP1538_AERO_VERIFICATION",
+          "path": "docs/tp1538-aero-verification.md",
+          "heading": "## Verification and performance",
+          "facets": ["verification"]
+        }
+      ],
+      "migrationSections": [
+        {
+          "sectionId": "TP1538_AERO_CHANGE_RECORD",
+          "path": "docs/tp1538-aero-verification.md",
+          "heading": "## Change record",
+          "facets": ["admission", "datum", "digest", "evidence", "schema", "unit", "validity", "vsr"]
+        }
+      ]
+    },
+    {
       "id": "GENERIC_AAM_VERIFICATION",
       "workstream": "simulation-systems",
       "implementationRules": [
@@ -5036,5 +5229,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "9882257b2aff14f2f1f83161fd73ff0eac91171d6ee7da3939750da0a194663f"
+  "canonicalSha256": "4479179affada1e990ac3daec80e7acc7646aa20194ce66f0921e73aa0566339"
 }

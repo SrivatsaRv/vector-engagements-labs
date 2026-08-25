@@ -72,6 +72,9 @@ no exported simulation ABI, backend-selection rule or v2 runtime admission.
   as stable Rust engine errors instead of a zero-surface or `NaN` substitute.
 - Correct the documented production ABI inventory: the NASA generic-AAM symbol
   belongs only to the separately built verification Rust/WASM artifact.
+- Register the value-free TP-1538 evaluator as another separately built
+  verification artifact whose ABI and digest cannot enter production backend
+  selection, `EngineScenario`, `EngineRun`, Worker, or VSR authority.
 
 No pending family-specific entry.
 
@@ -86,6 +89,9 @@ No pending family-specific entry.
   every measured TypeScript and Rust-WASM batch to reproduce the exact governed
   per-case semantic outcomes, 12,145-frame total and sorted batch digest before
   its timings can be admitted.
+- Preserve all generic-AAM corpus, discrepancy, evaluator and performance
+  authority while #178 establishes a distinct TP-1538 schema, ABI, artifact and
+  result identity with no shared values or admission decisions.
 
 #### Generic sensor source freeze
 
