@@ -380,8 +380,11 @@ fails the local and PR gate.
 Air mission ground-start authoring registers its visible, content-addressed
 educational runway geometry as `STUB-30`. It remains a release-blocking explicit
 supported assumption owned by #60/#61: the compiler may admit only its exact
-declared evidence and compatibility envelope, and no installation or production
-claim may treat it as sourced runway truth.
+declared evidence and the single content-addressed
+`vector.compiled-aircraft-ground-envelope.v1` `MODEL_ASSUMPTION` resolved from
+the immutable model pack. Scenario-authored minima, surface/tailwind values, or
+`SOURCED`/`CALIBRATED` labels are rejected; no installation or production claim
+may treat the assumption as sourced runway truth.
 
 Browser/responsive checks and performance benchmarks are deliberately not run
 on GitHub-hosted pull-request runners. They remain explicit maintainer checks

@@ -4,6 +4,11 @@ import { isPointInsideStudyArea } from "./scenario-spatial.ts";
 import { getStudyArea } from "./study-areas.ts";
 import type { Scenario } from "./simulation.ts";
 import type { EnvironmentPack } from "./geospatial/environment-pack.ts";
+import {
+  ModelPackValidationError,
+  validateScenarioModelInstance,
+  type CompiledModelPack,
+} from "./model-pack.ts";
 
 export const AIR_MISSION_SCHEMA_VERSION = "vector.air-mission.v1" as const;
 export const COMPILED_AIR_MISSION_SCHEMA_VERSION = "vector.compiled-air-mission.v1" as const;
@@ -36,13 +41,14 @@ export type FlightPlanRoutePoint = {
   id: string;
   position: MissionPosition;
   turnMethod: "START" | "FLY_BY" | "FLY_OVER";
+  acceptanceRadiusM: number;
   constraint: {
     speed: { kind: "TAS"; valueMps: number } | { kind: "MACH"; value: number };
     etaSeconds?: number;
     totalTimeOnTargetSeconds?: number;
     locked: boolean;
   };
-  taskRef: string | null;
+  taskRef: "MISSION_START" | AirMissionClass | null;
 };
 
 export type FlightPlan = {
@@ -160,7 +166,7 @@ export type AirMissionDefinition = {
   id: string;
   version: string;
   objective: string;
-  side: "BLUE" | "RED";
+  side: "BLUE";
   missionClass: AirMissionClass;
   regime: EngagementRegime;
   studyAreaId: string;
@@ -176,14 +182,13 @@ export type AirMissionDefinition = {
     initialFuelPercent: number;
     loadout: {
       schemaVersion: "vector.loadout-plan.v1";
-      stores: Array<{ stationId: string; weaponId: string; quantity: number }>;
+      stores: Array<{ stationId: string; weaponId: string; quantity: number; compatibilityRuleId: string }>;
       compatibility: "COMPILED_MODEL_PACK";
     };
     groundCompatibility: {
-      minimumRunwayLengthM: number;
-      compatibleSurfaces: Array<"PAVED" | "UNPAVED">;
-      maximumTailwindMps: number;
-      valueState: "MODEL_ASSUMPTION" | "SOURCED" | "CALIBRATED";
+      schemaVersion: "vector.aircraft-ground-envelope-binding.v1";
+      envelopeId: string;
+      envelopeDigest: string;
     };
   }>;
   tasks: AirMissionTasks;
@@ -211,10 +216,26 @@ export type AirMissionDefinition = {
   validityLimits: string[];
 };
 
+export type AircraftGroundEnvelope = {
+  schemaVersion: "vector.compiled-aircraft-ground-envelope.v1";
+  id: string;
+  aircraftId: string;
+  aircraftModelId: string;
+  modelPackDigest: string;
+  minimumRunwayLengthM: number;
+  compatibleSurfaces: Array<"PAVED" | "UNPAVED">;
+  maximumTailwindMps: number;
+  valueState: "MODEL_ASSUMPTION";
+  evidenceRefIds: string[];
+  limitationIds: string[];
+  digest: string;
+};
+
 export type AirMissionAdmissionCode =
   | "MISSION_SCHEMA_UNSUPPORTED"
   | "MISSION_SCHEMA_INVALID"
   | "MISSION_CLASS_FIELDS_MISMATCH"
+  | "MISSION_SIDE_UNSUPPORTED"
   | "MISSION_ENVIRONMENT_MISMATCH"
   | "MISSION_MODEL_PACK_MISMATCH"
   | "MISSION_REFERENCE_UNKNOWN"
@@ -258,11 +279,23 @@ export type CompiledAirMission = {
   modelPackDigest: string;
   environmentPackDigest: string;
   authored: AirMissionDefinition;
+  flightPlan: FlightPlan;
+  assignment: {
+    id: string;
+    flightPlanId: string;
+    aircraftId: string;
+    initialFuelPercent: number;
+    loadout: Array<{ stationId: string; weaponId: string; quantity: number; compatibilityRuleId: string }>;
+    groundEnvelope: AircraftGroundEnvelope;
+  };
+  policies: AirMissionDefinition["policies"];
   start: {
     posture: AirStartPosture;
     entryState: "AIRBORNE" | "GROUND";
     position: MissionPosition;
     initialSpeedMps: number;
+    headingSource: "FLIGHT_PLAN_FIRST_LEG" | "RUNWAY_TRUE_HEADING";
+    runwayHeadingDegTrue: number | null;
   };
 };
 
@@ -370,15 +403,85 @@ function taskDefaults(missionClass: AirMissionClass, firstPoint: FlightPlanRoute
   }
 }
 
+function compileGroundEnvelope(
+  pack: Readonly<CompiledModelPack>,
+  aircraft: CompiledModelPack["aircraft"][number],
+): AircraftGroundEnvelope {
+  const withoutDigest = {
+    schemaVersion: "vector.compiled-aircraft-ground-envelope.v1" as const,
+    id: `${aircraft.id}-ground-envelope-v1`,
+    aircraftId: aircraft.catalogObjectId,
+    aircraftModelId: aircraft.id,
+    modelPackDigest: pack.digest,
+    minimumRunwayLengthM: 800,
+    compatibleSurfaces: ["PAVED"] as Array<"PAVED" | "UNPAVED">,
+    maximumTailwindMps: 5,
+    valueState: "MODEL_ASSUMPTION" as const,
+    evidenceRefIds: [...aircraft.evidenceRefIds],
+    limitationIds: [...aircraft.limitationIds],
+  };
+  return { ...withoutDigest, digest: sha256HexSync(withoutDigest) };
+}
+
+function resolveAircraftConfiguration(input: {
+  pack: Readonly<CompiledModelPack>;
+  aircraftId: string;
+  weaponId: string;
+  quantity: number;
+  stationId?: string;
+  compatibilityRuleId?: string;
+}) {
+  const { pack } = input;
+  const aircraft = pack.aircraft.find((candidate) => candidate.catalogObjectId === input.aircraftId);
+  if (!aircraft) fail("MISSION_MODEL_PACK_MISMATCH", "assignments[0].aircraftId", "The assigned aircraft is absent from the admitted compiled model pack.", "Select an aircraft identity admitted by the exact model-pack digest.");
+  const loadout = pack.loadouts[aircraft.loadoutModelIndex];
+  const weaponIndex = pack.weapons.findIndex((candidate) => candidate.catalogObjectId === input.weaponId);
+  const weapon = pack.weapons[weaponIndex];
+  if (!loadout || loadout.platformCatalogObjectId !== input.aircraftId || weaponIndex < 0) fail("MISSION_LOADOUT_INVALID", "assignments[0].loadout", "The compiled aircraft/loadout/weapon identity cannot be resolved.", "Select a store admitted for the exact compiled aircraft configuration.");
+  const station = input.stationId === undefined
+    ? loadout.stations.find((candidate) => candidate.compatibleStoreModelIndexes.includes(weaponIndex))
+    : loadout.stations.find((candidate) => candidate.id === input.stationId);
+  if (!station) fail("MISSION_LOADOUT_INVALID", "assignments[0].loadout.stores[0].stationId", "The station is missing or incompatible with the selected store.", "Select the exact compatible compiled station identity.");
+  try {
+    validateScenarioModelInstance(pack as CompiledModelPack, {
+      id: "air-mission-loadout-admission",
+      catalogObjectId: input.aircraftId,
+      modelId: aircraft.id,
+      modelPackDigest: pack.digest,
+      loadout: [{ stationId: station.id, storeModelId: weapon.id, quantity: input.quantity }],
+      patches: [],
+    });
+  } catch (error) {
+    const detail = error instanceof ModelPackValidationError ? error.issues.join("; ") : "compiled loadout admission failed";
+    fail("MISSION_LOADOUT_INVALID", "assignments[0].loadout.stores[0]", `The admitted compiled model pack rejected this station/store/quantity: ${detail}.`, "Select an exact supported station and quantity within compiled capacity.");
+  }
+  const rule = pack.compatibility.find((candidate) =>
+    candidate.platformCatalogObjectId === input.aircraftId
+    && candidate.loadoutModelIndex === aircraft.loadoutModelIndex
+    && candidate.storeModelIndex === weaponIndex
+    && candidate.stationGroup === station.stationGroup
+    && candidate.status === "SUPPORTED"
+    && (input.compatibilityRuleId === undefined || candidate.id === input.compatibilityRuleId));
+  if (!rule) fail("MISSION_LOADOUT_INVALID", "assignments[0].loadout.stores[0].compatibilityRuleId", "No exact supported compiled compatibility rule admits this store.", "Select a supported rule from the admitted model pack.");
+  return { aircraft, station, rule, groundEnvelope: compileGroundEnvelope(pack, aircraft) };
+}
+
 export function createDefaultAirMissionDefinition(input: {
   scenario: MissionScenario;
   missionClass?: AirMissionClass;
-  modelPackDigest: string;
+  modelPack: Readonly<CompiledModelPack>;
 }): AirMissionDefinition {
   const scenario = input.scenario;
   if (!scenario.spatialPlan) {
     fail("MISSION_ROUTE_INVALID", "spatialPlan", "Air mission defaults require an explicit spatial plan.", "Author the start positions and routes first.");
   }
+  const missionClass = input.missionClass ?? "TACTICAL_INTERCEPT";
+  const configuration = resolveAircraftConfiguration({
+    pack: input.modelPack,
+    aircraftId: scenario.bluePlatformId,
+    weaponId: scenario.blueSystemId,
+    quantity: scenario.blueWeaponQuantity,
+  });
   const transitions = scenario.spatialPlan.blue.routeWaypointTransitions ?? scenario.spatialPlan.blue.route.map((_, index) => index === 0 ? "START" : "FLY_BY");
   const routePoints: FlightPlanRoutePoint[] = scenario.spatialPlan.blue.route.map((point, index) => ({
     id: `blue-route-${index + 1}`,
@@ -388,11 +491,12 @@ export function createDefaultAirMissionDefinition(input: {
       altitude: { valueM: point.altitudeM, datum: point.verticalDatum },
     },
     turnMethod: transitions[index] ?? (index === 0 ? "START" : "FLY_BY"),
+    acceptanceRadiusM: scenario.spatialPlan!.blue.routeAcceptanceRadiiM[index],
     constraint: {
       speed: { kind: "TAS", valueMps: scenario.spatialPlan!.blue.speedMps },
       locked: false,
     },
-    taskRef: index === 0 ? "MISSION_START" : "MISSION_TASK",
+    taskRef: index === 0 ? "MISSION_START" : missionClass,
   }));
   const flightPlan: FlightPlan = {
     schemaVersion: "vector.flight-plan.v1",
@@ -405,7 +509,6 @@ export function createDefaultAirMissionDefinition(input: {
       role: (index === 0 ? "TRANSIT" : "INTERCEPT_ATTACK") as FlightLegRole,
     })),
   };
-  const missionClass = input.missionClass ?? "TACTICAL_INTERCEPT";
   return {
     schemaVersion: AIR_MISSION_SCHEMA_VERSION,
     id: "blue-air-mission-1",
@@ -423,18 +526,17 @@ export function createDefaultAirMissionDefinition(input: {
       id: "blue-flight-1",
       flightPlanId: flightPlan.id,
       aircraftId: scenario.bluePlatformId,
-      aircraftModelPackDigest: input.modelPackDigest,
+      aircraftModelPackDigest: input.modelPack.digest,
       initialFuelPercent: scenario.blueFuelPercent,
       loadout: {
         schemaVersion: "vector.loadout-plan.v1",
-        stores: [{ stationId: "compiled-compatible-station", weaponId: scenario.blueSystemId, quantity: scenario.blueWeaponQuantity }],
+        stores: [{ stationId: configuration.station.id, weaponId: scenario.blueSystemId, quantity: scenario.blueWeaponQuantity, compatibilityRuleId: configuration.rule.id }],
         compatibility: "COMPILED_MODEL_PACK",
       },
       groundCompatibility: {
-        minimumRunwayLengthM: 800,
-        compatibleSurfaces: ["PAVED"],
-        maximumTailwindMps: 5,
-        valueState: "MODEL_ASSUMPTION",
+        schemaVersion: "vector.aircraft-ground-envelope-binding.v1",
+        envelopeId: configuration.groundEnvelope.id,
+        envelopeDigest: configuration.groundEnvelope.digest,
       },
     }],
     tasks: taskDefaults(missionClass, routePoints[0], scenario.blueTrackSource),
@@ -467,26 +569,48 @@ export function createDefaultAirMissionDefinition(input: {
  */
 export function synchronizeScenarioAirMission(
   scenario: Scenario,
-  modelPackDigest: string,
+  modelPack: Readonly<CompiledModelPack>,
 ): Scenario {
   const current = scenario.airMission;
   if (!current || !scenario.spatialPlan || scenario.domain !== "A2A") return scenario;
   const next = createDefaultAirMissionDefinition({
     scenario,
     missionClass: current.missionClass,
-    modelPackDigest,
+    modelPack,
   });
+  const environmentChanged = current.studyAreaId !== scenario.studyAreaId
+    || current.weatherPresetId !== scenario.weatherPresetId;
+  const synchronizedTasks: AirMissionTasks = (() => {
+    if (current.tasks.kind !== current.missionClass) return next.tasks;
+    if (!environmentChanged) return structuredClone(current.tasks);
+    switch (current.tasks.kind) {
+      case "TACTICAL_INTERCEPT":
+        return { ...structuredClone(current.tasks), defendedArea: structuredClone((next.tasks as Extract<AirMissionTasks, { kind: "TACTICAL_INTERCEPT" }>).defendedArea) };
+      case "COMBAT_AIR_PATROL": {
+        const replacement = next.tasks as Extract<AirMissionTasks, { kind: "COMBAT_AIR_PATROL" }>;
+        return { ...structuredClone(current.tasks), patrolArea: structuredClone(replacement.patrolArea), prosecutionArea: structuredClone(replacement.prosecutionArea) };
+      }
+      case "FIGHTER_SWEEP": {
+        const replacement = next.tasks as Extract<AirMissionTasks, { kind: "FIGHTER_SWEEP" }>;
+        return { ...structuredClone(current.tasks), sweepArea: structuredClone(replacement.sweepArea), engagementBoundary: structuredClone(replacement.engagementBoundary) };
+      }
+      case "ESCORT":
+        return { ...structuredClone(current.tasks), joinUpPointId: (next.tasks as Extract<AirMissionTasks, { kind: "ESCORT" }>).joinUpPointId };
+    }
+  })();
   return {
     ...scenario,
     airMission: {
       ...next,
       id: current.id,
       version: current.version,
-      start: structuredClone(current.start),
+      start: structuredClone(environmentChanged ? next.start : current.start),
       regime: current.regime,
-      tasks: current.tasks.kind === current.missionClass ? structuredClone(current.tasks) : next.tasks,
+      tasks: synchronizedTasks,
       policies: structuredClone(current.policies),
-      fuel: { ...next.fuel, ...structuredClone(current.fuel) },
+      fuel: environmentChanged
+        ? { ...structuredClone(current.fuel), recoveryInstallationId: null, divertInstallationId: null }
+        : { ...next.fuel, ...structuredClone(current.fuel) },
       completionCondition: current.completionCondition,
       abortCondition: current.abortCondition,
       disengagementCondition: current.disengagementCondition,
@@ -496,6 +620,56 @@ export function synchronizeScenarioAirMission(
       validityLimits: [...current.validityLimits],
     },
   };
+}
+
+/**
+ * The sole visible flight-plan edit boundary. AirMissionDefinition is
+ * authoritative; spatialPlan.blue is updated atomically as a compatibility
+ * projection for legacy consumers and compile-time anti-staleness checks.
+ */
+export function updateScenarioAirMissionRoutePoint(
+  scenario: Scenario,
+  index: number,
+  patch: Partial<FlightPlanRoutePoint>,
+): Scenario {
+  if (scenario.domain !== "A2A" || !scenario.airMission || !scenario.spatialPlan) return scenario;
+  const plan = scenario.airMission.flightPlans[0];
+  const currentPoint = plan?.routePoints[index];
+  if (!currentPoint) fail("MISSION_REFERENCE_UNKNOWN", `flightPlans[0].routePoints[${index}]`, "The route edit references a missing point.", "Edit an existing visible flight-plan point.");
+  const nextPoint: FlightPlanRoutePoint = {
+    ...structuredClone(currentPoint),
+    ...structuredClone(patch),
+  };
+  if (patch.turnMethod === "FLY_OVER" && patch.acceptanceRadiusM === undefined) nextPoint.acceptanceRadiusM = 1;
+  if (index === 0) {
+    nextPoint.turnMethod = "START";
+    nextPoint.acceptanceRadiusM = 1;
+    nextPoint.taskRef = "MISSION_START";
+  }
+  if (nextPoint.position.altitude.datum !== "MSL") fail("MISSION_TERRAIN_REQUIRED", `flightPlans[0].routePoints[${index}].position.altitude.datum`, "The compatibility projection cannot represent AGL without admitted terrain.", "Use metres MSL for visible route edits.");
+  const flightPlans = structuredClone(scenario.airMission.flightPlans);
+  flightPlans[0].routePoints[index] = nextPoint;
+  const spatialPlan = structuredClone(scenario.spatialPlan);
+  spatialPlan.blue.route[index] = {
+    longitude: nextPoint.position.longitude,
+    latitude: nextPoint.position.latitude,
+    altitudeM: nextPoint.position.altitude.valueM,
+    verticalDatum: "MSL",
+  };
+  if (index === 0) spatialPlan.blue.position = structuredClone(spatialPlan.blue.route[index]);
+  const transitions = spatialPlan.blue.routeWaypointTransitions
+    ?? spatialPlan.blue.route.map((_, pointIndex) => pointIndex === 0 ? "START" : "FLY_BY");
+  transitions[index] = nextPoint.turnMethod;
+  spatialPlan.blue.routeWaypointTransitions = transitions;
+  spatialPlan.blue.routeAcceptanceRadiiM[index] = nextPoint.acceptanceRadiusM;
+  if (patch.constraint?.speed) {
+    spatialPlan.blue.speedMps = constrainedSpeedMps(nextPoint);
+    flightPlans[0].routePoints = flightPlans[0].routePoints.map((point) => ({
+      ...point,
+      constraint: { ...point.constraint, speed: structuredClone(nextPoint.constraint.speed) },
+    }));
+  }
+  return { ...scenario, spatialPlan, airMission: { ...scenario.airMission, flightPlans } };
 }
 
 function validateArea(area: MissionArea, path: string, studyAreaId: string) {
@@ -538,6 +712,7 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
   if (mission.schemaVersion !== AIR_MISSION_SCHEMA_VERSION || !nonEmptyText(mission.id) || !nonEmptyText(mission.version) || !nonEmptyText(mission.objective) || !["BLUE", "RED"].includes(mission.side) || !["TACTICAL_INTERCEPT", "COMBAT_AIR_PATROL", "FIGHTER_SWEEP", "ESCORT"].includes(mission.missionClass) || !["BVR", "WVR_BFM", "UNRESTRICTED_TRANSITION"].includes(mission.regime) || !nonEmptyText(mission.studyAreaId) || !nonEmptyText(mission.weatherPresetId)) {
     fail("MISSION_SCHEMA_INVALID", "airMission", "The Air mission identity, taxonomy, or objective is invalid.", "Select a supported class/regime and provide stable identity and objective.");
   }
+  if (mission.side !== "BLUE") fail("MISSION_SIDE_UNSUPPORTED", "side", "The current Air mission runtime admits the BLUE launcher-side mission only.", "Author the BLUE launcher-side mission; RED-side mission mapping is not available in vector.air-mission.v1.");
   if (!Array.isArray(mission.assignedTargetIds) || mission.assignedTargetIds.length === 0 || mission.assignedTargetIds.some((id) => !nonEmptyText(id))) fail("MISSION_SCHEMA_INVALID", "assignedTargetIds", "Assigned targets require stable non-empty IDs.", "Select an existing target/contact identity.");
   if (!Array.isArray(mission.flightPlans) || !Array.isArray(mission.assignments) || !Array.isArray(mission.assumptions) || !Array.isArray(mission.validityLimits) || mission.assumptions.some((item) => !nonEmptyText(item)) || mission.validityLimits.some((item) => !nonEmptyText(item))) fail("MISSION_SCHEMA_INVALID", "airMission", "Mission collections must be explicit arrays with textual assumptions and validity limits.", "Author all required mission collections.");
   if (![mission.completionCondition, mission.abortCondition, mission.disengagementCondition, mission.recoveryCondition].every(nonEmptyText) || mission.intendedUse !== "PUBLIC_EDUCATIONAL") fail("MISSION_SCHEMA_INVALID", "airMission", "Mission conditions and intended use must be explicit.", "Provide completion, abort, disengagement, recovery, and intended-use fields.");
@@ -548,7 +723,7 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
     if (plan.schemaVersion !== "vector.flight-plan.v1" || !nonEmptyText(plan.id) || !Array.isArray(plan.routePoints) || !Array.isArray(plan.legs)) fail("MISSION_SCHEMA_INVALID", planPath, "Flight-plan identity, points, or legs are malformed.", "Use vector.flight-plan.v1 with explicit point and leg arrays.");
     plan.routePoints.forEach((point, pointIndex) => {
       const pointPath = `${planPath}.routePoints[${pointIndex}]`;
-      exactRecord(point, ["id", "position", "turnMethod", "constraint", "taskRef"], pointPath);
+      exactRecord(point, ["id", "position", "turnMethod", "acceptanceRadiusM", "constraint", "taskRef"], pointPath);
       exactRecord(point.position, ["longitude", "latitude", "altitude"], `${pointPath}.position`);
       exactRecord(point.position.altitude, ["valueM", "datum"], `${pointPath}.position.altitude`);
       if (!isRecord(point.constraint) || !("speed" in point.constraint) || !("locked" in point.constraint) || Object.keys(point.constraint).some((key) => !["speed", "etaSeconds", "totalTimeOnTargetSeconds", "locked"].includes(key))) {
@@ -557,7 +732,9 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
       if (!isRecord(point.constraint.speed)) fail("MISSION_SCHEMA_INVALID", `${pointPath}.constraint.speed`, "Speed constraint is malformed.", "Choose TAS metres per second or Mach.");
       const speedKeys = point.constraint.speed.kind === "TAS" ? ["kind", "valueMps"] : ["kind", "value"];
       exactRecord(point.constraint.speed, speedKeys, `${pointPath}.constraint.speed`);
-      if (!nonEmptyText(point.id) || !["START", "FLY_BY", "FLY_OVER"].includes(point.turnMethod) || (point.taskRef !== null && !nonEmptyText(point.taskRef)) || typeof point.constraint.locked !== "boolean" || !["MSL", "AGL"].includes(point.position.altitude.datum) || !["TAS", "MACH"].includes(point.constraint.speed.kind)) fail("MISSION_SCHEMA_INVALID", pointPath, "Route-point identity, turn, datum, speed, lock, or task reference is invalid.", "Author an exact typed route point.");
+      if (!nonEmptyText(point.id) || !["START", "FLY_BY", "FLY_OVER"].includes(point.turnMethod) || !Number.isFinite(point.acceptanceRadiusM) || point.acceptanceRadiusM < 1 || point.acceptanceRadiusM > 25_000 || (pointIndex === 0 && point.acceptanceRadiusM !== 1) || (point.turnMethod === "FLY_OVER" && point.acceptanceRadiusM !== 1) || (point.taskRef !== null && !nonEmptyText(point.taskRef)) || typeof point.constraint.locked !== "boolean" || !["MSL", "AGL"].includes(point.position.altitude.datum) || !["TAS", "MACH"].includes(point.constraint.speed.kind)) fail("MISSION_SCHEMA_INVALID", pointPath, "Route-point identity, turn, acceptance radius, datum, speed, lock, or task reference is invalid.", "Author an exact typed route point with a bounded radius; START and FLY_OVER use 1 metre.");
+      const expectedTaskRef = pointIndex === 0 ? "MISSION_START" : mission.missionClass;
+      if (point.taskRef !== null && point.taskRef !== expectedTaskRef) fail("MISSION_REFERENCE_UNKNOWN", `${pointPath}.taskRef`, "Route point references a missing or unrelated mission task.", `Reference ${expectedTaskRef} or leave the optional task reference empty.`);
     });
     plan.legs.forEach((leg, legIndex) => {
       const legPath = `${planPath}.legs[${legIndex}]`;
@@ -585,10 +762,10 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
     const path = `assignments[${index}]`;
     exactRecord(assignment, ["id", "flightPlanId", "aircraftId", "aircraftModelPackDigest", "initialFuelPercent", "loadout", "groundCompatibility"], path);
     exactRecord(assignment.loadout, ["schemaVersion", "stores", "compatibility"], `${path}.loadout`);
-    exactRecord(assignment.groundCompatibility, ["minimumRunwayLengthM", "compatibleSurfaces", "maximumTailwindMps", "valueState"], `${path}.groundCompatibility`);
-    if (!Array.isArray(assignment.loadout.stores) || !Array.isArray(assignment.groundCompatibility.compatibleSurfaces)) fail("MISSION_SCHEMA_INVALID", path, "Assignment stores and ground-compatible surfaces must be arrays.", "Author explicit loadout and ground compatibility.");
-    assignment.loadout.stores.forEach((store, storeIndex) => exactRecord(store, ["stationId", "weaponId", "quantity"], `${path}.loadout.stores[${storeIndex}]`));
-    if (!nonEmptyText(assignment.id) || !nonEmptyText(assignment.flightPlanId) || !nonEmptyText(assignment.aircraftId) || !/^[0-9a-f]{64}$/.test(assignment.aircraftModelPackDigest) || assignment.loadout.schemaVersion !== "vector.loadout-plan.v1" || assignment.loadout.compatibility !== "COMPILED_MODEL_PACK" || !["MODEL_ASSUMPTION", "SOURCED", "CALIBRATED"].includes(assignment.groundCompatibility.valueState) || assignment.groundCompatibility.compatibleSurfaces.some((surface) => !["PAVED", "UNPAVED"].includes(surface))) fail("MISSION_SCHEMA_INVALID", path, "Assignment identity, model binding, loadout, or ground compatibility is invalid.", "Bind one exact flight, aircraft model pack, loadout, and ground envelope.");
+    exactRecord(assignment.groundCompatibility, ["schemaVersion", "envelopeId", "envelopeDigest"], `${path}.groundCompatibility`);
+    if (!Array.isArray(assignment.loadout.stores)) fail("MISSION_SCHEMA_INVALID", path, "Assignment stores must be an explicit array.", "Author an exact compiled-model-pack loadout binding.");
+    assignment.loadout.stores.forEach((store, storeIndex) => exactRecord(store, ["stationId", "weaponId", "quantity", "compatibilityRuleId"], `${path}.loadout.stores[${storeIndex}]`));
+    if (!nonEmptyText(assignment.id) || !nonEmptyText(assignment.flightPlanId) || !nonEmptyText(assignment.aircraftId) || !/^[0-9a-f]{64}$/.test(assignment.aircraftModelPackDigest) || assignment.loadout.schemaVersion !== "vector.loadout-plan.v1" || assignment.loadout.compatibility !== "COMPILED_MODEL_PACK" || assignment.groundCompatibility.schemaVersion !== "vector.aircraft-ground-envelope-binding.v1" || !nonEmptyText(assignment.groundCompatibility.envelopeId) || !/^[0-9a-f]{64}$/.test(assignment.groundCompatibility.envelopeDigest)) fail("MISSION_SCHEMA_INVALID", path, "Assignment identity, model binding, loadout, or ground-envelope binding is invalid.", "Bind one exact flight, aircraft model pack, loadout, and content-addressed assumption envelope.");
   });
 
   exactRecord(mission.policies, ["emission", "weapon", "deterministicPolicyVersion"], "policies");
@@ -609,11 +786,12 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
 
 export function compileAirMissionDefinition(
   input: AirMissionDefinition,
-  context: { scenario: MissionScenario; modelPackDigest: string; environmentPackDigest: string; environmentPack?: Readonly<EnvironmentPack> },
+  context: { scenario: MissionScenario; modelPack: Readonly<CompiledModelPack>; environmentPackDigest: string; environmentPack?: Readonly<EnvironmentPack> },
 ): CompiledAirMission {
   if (input?.schemaVersion !== AIR_MISSION_SCHEMA_VERSION) fail("MISSION_SCHEMA_UNSUPPORTED", "schemaVersion", "The Air mission schema version is unsupported.", `Use ${AIR_MISSION_SCHEMA_VERSION}.`);
   const mission: unknown = structuredClone(input);
   validateMissionShape(mission);
+  const modelPackDigest = context.modelPack.digest;
   if (mission.studyAreaId !== context.scenario.studyAreaId) fail("MISSION_ENVIRONMENT_MISMATCH", "studyAreaId", "Mission study area does not match the admitted scenario environment.", "Select the exact authored environment identity.");
   if (mission.weatherPresetId !== context.scenario.weatherPresetId) fail("MISSION_ENVIRONMENT_MISMATCH", "weatherPresetId", "Mission weather preset does not match the admitted scenario environment.", "Select the exact authored weather identity.");
   if (!context.scenario.spatialPlan) fail("MISSION_ROUTE_INVALID", "spatialPlan", "An Air mission requires an explicit geographic spatial plan.", "Author both aircraft start positions and routes.");
@@ -622,6 +800,7 @@ export function compileAirMissionDefinition(
   const flightIds = new Set<string>();
   mission.flightPlans.forEach((plan, planIndex) => {
     if (plan.schemaVersion !== "vector.flight-plan.v1" || !plan.id || flightIds.has(plan.id) || plan.routePoints.length < 2) fail("MISSION_ROUTE_INVALID", `flightPlans[${planIndex}]`, "Flight plans require a unique ID and at least two route points.", "Author an ordered, non-zero route.");
+    if (planIndex === 0 && plan.routePoints.length !== context.scenario.spatialPlan!.blue.route.length) fail("MISSION_ROUTE_START_MISMATCH", `flightPlans[${planIndex}].routePoints`, "The Air mission and compatibility spatial projection have different route cardinality.", "Edit the flight plan through the single Air mission route adapter.");
     flightIds.add(plan.id);
     const pointIds = new Set<string>();
     plan.routePoints.forEach((point, pointIndex) => {
@@ -649,9 +828,11 @@ export function compileAirMissionDefinition(
         const authoredPoint = context.scenario.spatialPlan!.blue.route[pointIndex];
         const authoredTransition = context.scenario.spatialPlan!.blue.routeWaypointTransitions?.[pointIndex]
           ?? (pointIndex === 0 ? "START" : "FLY_BY");
+        const authoredRadiusM = context.scenario.spatialPlan!.blue.routeAcceptanceRadiiM[pointIndex];
         if (!authoredPoint || Math.abs(point.position.longitude - authoredPoint.longitude) > 1e-9 || Math.abs(point.position.latitude - authoredPoint.latitude) > 1e-9 || Math.abs(point.position.altitude.valueM - authoredPoint.altitudeM) > 1e-6 || point.turnMethod !== authoredTransition) {
           fail("MISSION_ROUTE_START_MISMATCH", `${path}.position`, "Mission flight-plan geometry or turn method disagrees with the authored spatial route.", "Edit route geometry and transitions through the Air mission adapter.");
         }
+        if (point.acceptanceRadiusM !== authoredRadiusM) fail("MISSION_ROUTE_START_MISMATCH", `${path}.acceptanceRadiusM`, "Mission flight-plan acceptance radius disagrees with the compatibility spatial projection.", "Edit the radius through the single Air mission route adapter.");
         if (Math.abs(constrainedSpeedMps(point) - context.scenario.spatialPlan!.blue.speedMps) > 1e-6) {
           fail("MISSION_ROUTE_INVALID", `${path}.constraint.speed`, "Resolved flight-plan speed must equal the assigned spatial-route speed.", "Edit TAS or Mach through the Air mission flight plan.");
         }
@@ -669,15 +850,25 @@ export function compileAirMissionDefinition(
     const path = `assignments[${index}]`;
     if (!assignment.id || assignmentIds.has(assignment.id) || !flightIds.has(assignment.flightPlanId)) fail("MISSION_REFERENCE_UNKNOWN", path, "Flight assignment identity or flight-plan reference is invalid.", "Use unique assignment and existing flight-plan IDs.");
     assignmentIds.add(assignment.id);
-    if (assignment.aircraftModelPackDigest !== context.modelPackDigest) fail("MISSION_MODEL_PACK_MISMATCH", `${path}.aircraftModelPackDigest`, "Flight assignment model-pack digest is not the admitted digest.", "Recompile the mission against the selected immutable model pack.");
+    if (assignment.aircraftModelPackDigest !== modelPackDigest) fail("MISSION_MODEL_PACK_MISMATCH", `${path}.aircraftModelPackDigest`, "Flight assignment model-pack digest is not the admitted digest.", "Recompile the mission against the selected immutable model pack.");
     if (assignment.aircraftId !== context.scenario.bluePlatformId) fail("MISSION_MODEL_PACK_MISMATCH", `${path}.aircraftId`, "Flight assignment aircraft identity does not match the scenario selection.", "Select the assigned compiled aircraft.");
     if (!Number.isFinite(assignment.initialFuelPercent) || assignment.initialFuelPercent <= 0 || assignment.initialFuelPercent > 100) fail("MISSION_FUEL_INVALID", `${path}.initialFuelPercent`, "Initial fuel must be finite and in (0, 100] percent.", "Choose a physically bounded initial fuel state.");
     if (assignment.initialFuelPercent !== context.scenario.blueFuelPercent) fail("MISSION_FUEL_INVALID", `${path}.initialFuelPercent`, "Mission fuel disagrees with the scenario fuel input.", "Edit fuel through the mission assignment.");
     if (assignment.loadout.schemaVersion !== "vector.loadout-plan.v1" || assignment.loadout.compatibility !== "COMPILED_MODEL_PACK" || assignment.loadout.stores.length !== 1) fail("MISSION_LOADOUT_INVALID", `${path}.loadout`, "The current assignment requires one compiled-model-pack loadout entry.", "Choose the one admitted compatible weapon/station entry.");
+    let resolvedConfiguration: ReturnType<typeof resolveAircraftConfiguration> | undefined;
     assignment.loadout.stores.forEach((store, storeIndex) => {
-      if (!store.stationId || store.weaponId !== context.scenario.blueSystemId || !Number.isInteger(store.quantity) || store.quantity <= 0 || store.quantity !== context.scenario.blueWeaponQuantity) fail("MISSION_LOADOUT_INVALID", `${path}.loadout.stores[${storeIndex}].quantity`, "Loadout store identity or quantity disagrees with the compiled scenario.", "Select the exact compatible weapon and positive integer quantity.");
+      if (store.weaponId !== context.scenario.blueSystemId) fail("MISSION_LOADOUT_INVALID", `${path}.loadout.stores[${storeIndex}].weaponId`, "Loadout store identity disagrees with the compiled scenario.", "Select the exact compiled weapon identity.");
+      if (store.quantity !== context.scenario.blueWeaponQuantity) fail("MISSION_LOADOUT_INVALID", `${path}.loadout.stores[${storeIndex}].quantity`, "Loadout quantity disagrees with the compiled scenario.", "Select the exact positive compiled quantity.");
+      resolvedConfiguration = resolveAircraftConfiguration({
+        pack: context.modelPack,
+        aircraftId: assignment.aircraftId,
+        weaponId: store.weaponId,
+        quantity: store.quantity,
+        stationId: store.stationId,
+        compatibilityRuleId: store.compatibilityRuleId,
+      });
     });
-    if (!Number.isFinite(assignment.groundCompatibility.minimumRunwayLengthM) || assignment.groundCompatibility.minimumRunwayLengthM <= 0 || !assignment.groundCompatibility.compatibleSurfaces.length || !Number.isFinite(assignment.groundCompatibility.maximumTailwindMps) || assignment.groundCompatibility.maximumTailwindMps < 0) fail("MISSION_RUNWAY_INVALID", `${path}.groundCompatibility`, "Ground compatibility requires positive runway length, surfaces, and a bounded tailwind.", "Provide a sourced, calibrated, or explicit model-assumption ground envelope.");
+    if (!resolvedConfiguration || assignment.groundCompatibility.envelopeId !== resolvedConfiguration.groundEnvelope.id || assignment.groundCompatibility.envelopeDigest !== resolvedConfiguration.groundEnvelope.digest) fail("MISSION_RUNWAY_INVALID", `${path}.groundCompatibility`, "The authored ground-envelope binding does not match the immutable compiled MODEL_ASSUMPTION resolver.", "Rebind the mission to the exact admitted model-pack digest and aircraft identity; authored performance values are not accepted.");
   });
   if (!Number.isFinite(mission.fuel.reservePercent) || mission.fuel.reservePercent < 0 || mission.fuel.reservePercent > 100) fail("MISSION_FUEL_INVALID", "fuel.reservePercent", "Fuel reserve must be from 0 to 100 percent.", "Provide an explicit bounded reserve.");
   if (!Number.isInteger(mission.fuel.weaponRtbThreshold) || mission.fuel.weaponRtbThreshold < 0 || mission.fuel.weaponRtbThreshold > context.scenario.blueWeaponQuantity) fail("MISSION_FUEL_INVALID", "fuel.weaponRtbThreshold", "Weapon RTB threshold must be a bounded store count.", "Choose an integer from zero through the admitted loadout quantity.");
@@ -701,7 +892,7 @@ export function compileAirMissionDefinition(
     if (mission.start.flightPlanId !== firstPlan.id || mission.start.routePointId !== firstPoint.id) fail("MISSION_REFERENCE_UNKNOWN", "start", "Airborne start must reference the first point of its assigned flight plan.", "Reference the exact flight plan and start point.");
     const studyArea = getStudyArea(mission.studyAreaId);
     if (firstPoint.position.altitude.valueM <= studyArea.surfaceElevationM) fail("MISSION_TERRAIN_REQUIRED", "start.routePointId", "Airborne start must be above the admitted MSL reference surface.", "Increase start altitude or author an admitted ground start.");
-    start = { posture: "AIRBORNE", entryState: "AIRBORNE", position: firstPoint.position, initialSpeedMps: constrainedSpeedMps(firstPoint) };
+    start = { posture: "AIRBORNE", entryState: "AIRBORNE", position: firstPoint.position, initialSpeedMps: constrainedSpeedMps(firstPoint), headingSource: "FLIGHT_PLAN_FIRST_LEG", runwayHeadingDegTrue: null };
   } else {
     const groundStart = mission.start;
     const installation = PUBLIC_INSTALLATIONS.find((item) => item.id === groundStart.installationId);
@@ -740,17 +931,21 @@ export function compileAirMissionDefinition(
     const headingDelta = Math.abs(((heading - geometricHeading + 540) % 360) - 180);
     if (headingDelta > 5) fail("MISSION_RUNWAY_INVALID", "start.runway.headingDeg", "Runway heading disagrees with threshold/end geometry.", "Use the WGS84-derived takeoff direction.");
     const assignment = mission.assignments[0];
-    if (runway.lengthM < assignment.groundCompatibility.minimumRunwayLengthM) fail("MISSION_RUNWAY_INVALID", "start.runway.lengthM", "Runway is shorter than the assigned aircraft ground envelope.", "Choose a longer runway or a different admitted aircraft configuration.");
-    if (!assignment.groundCompatibility.compatibleSurfaces.includes(runway.surface)) fail("MISSION_RUNWAY_INVALID", "start.runway.surface", "Runway surface is incompatible with the assigned aircraft ground envelope.", "Choose a compatible surface.");
+    const store = assignment.loadout.stores[0];
+    const groundEnvelope = resolveAircraftConfiguration({ pack: context.modelPack, aircraftId: assignment.aircraftId, weaponId: store.weaponId, quantity: store.quantity, stationId: store.stationId, compatibilityRuleId: store.compatibilityRuleId }).groundEnvelope;
+    if (runway.lengthM < groundEnvelope.minimumRunwayLengthM) fail("MISSION_RUNWAY_INVALID", "start.runway.lengthM", "Runway is shorter than the assigned aircraft ground envelope.", "Choose a longer runway or a different admitted aircraft configuration.");
+    if (!groundEnvelope.compatibleSurfaces.includes(runway.surface)) fail("MISSION_RUNWAY_INVALID", "start.runway.surface", "Runway surface is incompatible with the assigned aircraft ground envelope.", "Choose a compatible surface.");
     const headingRad = heading * Math.PI / 180;
     const tailwindMps = context.scenario.wind * Math.sin(headingRad) + context.scenario.windNorth * Math.cos(headingRad);
-    if (tailwindMps > assignment.groundCompatibility.maximumTailwindMps) fail("MISSION_RUNWAY_INVALID", "start.runway.headingDeg", "Tailwind exceeds the assigned aircraft ground envelope.", "Reverse takeoff direction, select another runway, or change admitted weather.");
+    if (tailwindMps > groundEnvelope.maximumTailwindMps) fail("MISSION_RUNWAY_INVALID", "start.runway.headingDeg", "Tailwind exceeds the assigned aircraft ground envelope.", "Reverse takeoff direction, select another runway, or change admitted weather.");
     if (!Number.isFinite(groundStart.readinessDelaySeconds) || groundStart.readinessDelaySeconds < 0) fail("MISSION_RUNWAY_INVALID", "start.readinessDelaySeconds", "Readiness delay must be finite and non-negative.", "Provide seconds from model start.");
     start = {
       posture: groundStart.posture,
       entryState: "GROUND",
       position: { longitude: runway.threshold.longitude, latitude: runway.threshold.latitude, altitude: runway.threshold.elevation },
       initialSpeedMps: 0,
+      headingSource: "RUNWAY_TRUE_HEADING",
+      runwayHeadingDegTrue: runway.headingDeg,
     };
   }
 
@@ -782,9 +977,26 @@ export function compileAirMissionDefinition(
     id: mission.id,
     version: mission.version,
     authoredDigest,
-    modelPackDigest: context.modelPackDigest,
+    modelPackDigest,
     environmentPackDigest: context.environmentPackDigest,
     authored: mission,
+    flightPlan: structuredClone(mission.flightPlans[0]),
+    assignment: {
+      id: mission.assignments[0].id,
+      flightPlanId: mission.assignments[0].flightPlanId,
+      aircraftId: mission.assignments[0].aircraftId,
+      initialFuelPercent: mission.assignments[0].initialFuelPercent,
+      loadout: structuredClone(mission.assignments[0].loadout.stores),
+      groundEnvelope: resolveAircraftConfiguration({
+        pack: context.modelPack,
+        aircraftId: mission.assignments[0].aircraftId,
+        weaponId: mission.assignments[0].loadout.stores[0].weaponId,
+        quantity: mission.assignments[0].loadout.stores[0].quantity,
+        stationId: mission.assignments[0].loadout.stores[0].stationId,
+        compatibilityRuleId: mission.assignments[0].loadout.stores[0].compatibilityRuleId,
+      }).groundEnvelope,
+    },
+    policies: structuredClone(mission.policies),
     start,
   };
   return Object.freeze({ ...withoutDigest, compiledDigest: sha256HexSync(withoutDigest) });

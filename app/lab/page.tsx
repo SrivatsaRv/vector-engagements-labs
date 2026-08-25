@@ -109,9 +109,10 @@ import {
   bindRunwayEvidence,
   createDefaultAirMissionDefinition,
   synchronizeScenarioAirMission,
+  updateScenarioAirMissionRoutePoint,
   type RunwayGeometry,
 } from "@/lib/air-mission";
-import { CURRENT_MODEL_PACK_DIGEST } from "@/lib/reference-model-pack";
+import { CURRENT_COMPILED_MODEL_PACK } from "@/lib/engine/weapon-admission";
 
 type Workspace = "configure" | "run" | "results";
 type PlaybackSurface = "MAP" | "THREE_D";
@@ -426,7 +427,7 @@ function LabWorkbench({
       const next = typeof action === "function" ? action(current) : action;
       return next.airMission !== current.airMission
         ? next
-        : synchronizeScenarioAirMission(next, CURRENT_MODEL_PACK_DIGEST);
+        : synchronizeScenarioAirMission(next, CURRENT_COMPILED_MODEL_PACK);
     });
     setDraftRevision((value) => value + 1);
     if (hasRun) {
@@ -1124,7 +1125,7 @@ function ConfigureWorkspace({
         ...current,
         spatialPlan: nextPlan,
         altitude: elevationM,
-      }, CURRENT_MODEL_PACK_DIGEST);
+      }, CURRENT_COMPILED_MODEL_PACK);
       return {
         ...synchronized,
         airMission: {
@@ -1167,10 +1168,7 @@ function ConfigureWorkspace({
     index: number,
     patch: Partial<NonNullable<Scenario["airMission"]>["flightPlans"][number]["routePoints"][number]>,
   ) => {
-    if (!scenario.airMission) return;
-    const flightPlans = structuredClone(scenario.airMission.flightPlans);
-    flightPlans[0].routePoints[index] = { ...flightPlans[0].routePoints[index], ...patch };
-    update("airMission", { ...scenario.airMission, flightPlans });
+    setScenario((current) => updateScenarioAirMissionRoutePoint(current, index, patch));
   };
   const updateMissionLegRole = (
     index: number,
@@ -1393,7 +1391,7 @@ function ConfigureWorkspace({
                       onChange={(event) => update("airMission", createDefaultAirMissionDefinition({
                         scenario,
                         missionClass: event.target.value as NonNullable<Scenario["airMission"]>["missionClass"],
-                        modelPackDigest: CURRENT_MODEL_PACK_DIGEST,
+                        modelPack: CURRENT_COMPILED_MODEL_PACK,
                       }))}
                     >
                       <option value="TACTICAL_INTERCEPT">Tactical Intercept</option>
@@ -1914,10 +1912,70 @@ function ConfigureWorkspace({
                       <div className="advanced-grid">
                         <label className="field">
                           <span>Task reference</span>
-                          <input
+                          <select
                             aria-label={`${point.id} task reference`}
+                            data-vector-overlay-exempt="ua-native-select"
                             value={point.taskRef ?? ""}
-                            onChange={(event) => updateMissionRoutePoint(index, { taskRef: event.target.value || null })}
+                            onChange={(event) => updateMissionRoutePoint(index, { taskRef: (event.target.value || null) as typeof point.taskRef })}
+                          >
+                            <option value="">No task reference</option>
+                            <option value={index === 0 ? "MISSION_START" : scenario.airMission!.missionClass}>
+                              {index === 0 ? "Mission start" : scenario.airMission!.missionClass.replaceAll("_", " ").toLowerCase()}
+                            </option>
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span>Longitude (WGS84 deg)</span>
+                          <input
+                            type="number"
+                            step="0.000001"
+                            aria-label={`${point.id} longitude`}
+                            value={point.position.longitude}
+                            onChange={(event) => updateMissionRoutePoint(index, { position: { ...point.position, longitude: Number(event.target.value) } })}
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Latitude (WGS84 deg)</span>
+                          <input
+                            type="number"
+                            step="0.000001"
+                            aria-label={`${point.id} latitude`}
+                            value={point.position.latitude}
+                            onChange={(event) => updateMissionRoutePoint(index, { position: { ...point.position, latitude: Number(event.target.value) } })}
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Altitude (m MSL)</span>
+                          <input
+                            type="number"
+                            step="1"
+                            aria-label={`${point.id} altitude metres MSL`}
+                            value={point.position.altitude.valueM}
+                            onChange={(event) => updateMissionRoutePoint(index, { position: { ...point.position, altitude: { ...point.position.altitude, valueM: Number(event.target.value) } } })}
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Turn method</span>
+                          <select
+                            aria-label={`${point.id} turn method`}
+                            data-vector-overlay-exempt="ua-native-select"
+                            value={point.turnMethod}
+                            disabled={index === 0}
+                            onChange={(event) => updateMissionRoutePoint(index, { turnMethod: event.target.value as typeof point.turnMethod })}
+                          >
+                            {(index === 0 ? ["START"] : ["FLY_BY", "FLY_OVER"] as const).map((method) => <option key={method} value={method}>{method.replaceAll("_", " ").toLowerCase()}</option>)}
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span>Acceptance radius (m)</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="25000"
+                            aria-label={`${point.id} acceptance radius metres`}
+                            value={point.acceptanceRadiusM}
+                            disabled={index === 0 || point.turnMethod === "FLY_OVER"}
+                            onChange={(event) => updateMissionRoutePoint(index, { acceptanceRadiusM: Number(event.target.value) })}
                           />
                         </label>
                         <label className="field">

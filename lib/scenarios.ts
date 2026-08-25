@@ -12,6 +12,7 @@ import {
   CURRENT_MODEL_PACK_VERSION,
 } from "./reference-model-pack.ts";
 import { createDefaultAirMissionDefinition } from "./air-mission.ts";
+import { CURRENT_COMPILED_MODEL_PACK } from "./engine/weapon-admission.ts";
 import { createDefaultSpatialPlan } from "./scenario-spatial.ts";
 
 export type { EngagementDomain } from "./simulation.ts";
@@ -112,7 +113,7 @@ const scenario = (patch: Partial<Scenario>): Scenario => {
     ...withSpatialPlan,
     airMission: withSpatialPlan.airMission ?? createDefaultAirMissionDefinition({
       scenario: withSpatialPlan,
-      modelPackDigest: CURRENT_MODEL_PACK_DIGEST,
+      modelPack: CURRENT_COMPILED_MODEL_PACK,
     }),
   };
 };

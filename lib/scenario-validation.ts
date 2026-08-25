@@ -15,7 +15,7 @@ import {
   AirMissionAdmissionError,
   compileAirMissionDefinition,
 } from "./air-mission.ts";
-import { CURRENT_MODEL_PACK_DIGEST } from "./reference-model-pack.ts";
+import { CURRENT_COMPILED_MODEL_PACK } from "./engine/weapon-admission.ts";
 import { admitPhaseAEnvironmentPack } from "./geospatial/environment-pack.ts";
 
 export type ValidationState = "pass" | "warning" | "error";
@@ -116,7 +116,7 @@ export function validateScenario(
       });
       const compiled = compileAirMissionDefinition(scenario.airMission, {
         scenario,
-        modelPackDigest: CURRENT_MODEL_PACK_DIGEST,
+        modelPack: CURRENT_COMPILED_MODEL_PACK,
         environmentPackDigest: environment.pack.identity.digest,
         environmentPack: environment.pack,
       });

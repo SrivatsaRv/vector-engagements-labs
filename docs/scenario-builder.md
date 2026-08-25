@@ -70,6 +70,15 @@ a stable code, field path, and corrective guidance. It does not choose a study
 area, weather preset, installation, runway, aircraft, store, fuel state, or
 mission default to repair an import.
 
+Version 1 currently admits the BLUE launcher-side mission only; `RED` fails
+with `MISSION_SIDE_UNSUPPORTED` until an explicit opposing-side runtime mapping
+exists. Route-point task references are closed to `MISSION_START`, the selected
+mission-class task identity, or explicit `null`; free text and deleted task IDs
+never acquire authority. An environment identity change regenerates
+study-area-owned task polygons, join-up/start geometry, and installation
+bindings while preserving non-geographic policy such as CAP timing and emission
+state.
+
 The compiled engine scenario carries the complete immutable mission artifact
 beside all spawned entities, initial states, events, environment, study-area
 context, completion rules, and model IDs. The existing simulation Worker runs
@@ -104,12 +113,17 @@ all-fly-by semantics: an omitted transition array is compiled as `START` then
 `FLY_BY` for every remaining route point. New authoring always emits v2; a
 present but malformed v2 transition array is rejected rather than downgraded.
 
-Air mission authoring uses that spatial editor through one draft adapter. Every
+Air mission authoring uses one route-edit adapter. `AirMissionDefinition` is the
+authority; the existing `spatialPlan.blue` route is an atomic compatibility
+projection for legacy validators and non-Air/red-route consumers. The compiler
+first rejects any stale disagreement, then derives the BLUE runtime start,
+heading, route, route-plan v2 transitions/radii, initial fuel, store quantity,
+and station/rule identity from `CompiledAirMission`, not from the projection.
+Every
 route point also has a stable flight-plan ID, WGS84 longitude/latitude, explicit
 MSL altitude in metres, typed `START`/`FLY_BY`/`FLY_OVER` method, TAS in metres
-per second, optional ETA/TOT, lock state, task reference, and an ordered typed
-leg. The compiler requires exact equality between the mission flight plan and
-the spatial route; neither copy may override the other. AGL is rejected until
+per second, a bounded acceptance radius in metres, optional ETA/TOT, lock state,
+closed task reference, and an ordered typed leg. AGL is rejected until
 an exact terrain dataset and conversion are admitted. Impossible ETA, zero
 legs, invalid turn state, and out-of-coverage points produce no runnable
 artifact.
@@ -253,7 +267,7 @@ reference, or map anchor.
   identities remain visibly unavailable for correction; a picker never displays
   its first option in place of the authored identity.
 - Selecting an airborne origin retains `vector.installation-origin.v1` with its installation ID, source ID, selected study-area ID and weather-preset ID. The compiler re-resolves all four values before producing an engine scenario. A missing/deleted installation, stale source, cross-environment reference, or legacy runway ID blocks compilation with a stable field-path error; it never becomes a coordinate-only origin. Manual drag explicitly clears that optional airborne-origin reference. Selecting a ground posture instead creates the separate `GroundStartAndRecovery` union member described above; it never upgrades the catalog's text-only runway note into evidence.
-- The five-viewport browser journey selects CAP/BVR, edits station time, selects Pathankot AFS, proves keyboard route constraints and ground-start admission/readback, and completes a real production Worker run. Focused mission regressions independently prove all classes/overlays, all start postures, exact first-frame ground state, fuel/loadout mass consequence, stable negative codes, server admission, and VSR/report lineage.
+- The five-viewport browser journey selects CAP/BVR, edits station time and the authoritative mission route, proves the compatibility projection readback, selects Pathankot AFS, proves keyboard route constraints and ground-start admission/readback, and completes a real production Worker run. Focused mission regressions independently prove all classes/overlays, all start postures, exact first-frame ground state, model-pack station/rule/capacity rejection, immutable ground-envelope binding, environment geometry regeneration, fuel/loadout mass consequence, stable negative codes, server admission, and VSR/report lineage.
 - Blue and Red start markers and waypoints are draggable. A numeric longitude or
   latitude edit has the same meaning as dragging a start: it explicitly changes
   the aircraft to a manual airborne placement and clears any installation-origin

@@ -30,6 +30,7 @@ import {
   COMPILED_AIR_MISSION_SCHEMA_VERSION,
   compileAirMissionDefinition,
 } from "../air-mission.ts";
+import { CURRENT_COMPILED_MODEL_PACK } from "../engine/weapon-admission.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v5" as const;
@@ -844,7 +845,7 @@ export async function openVectorSimulationRecord(
     try {
       verifiedMission = compileAirMissionDefinition(scenario.airMission, {
         scenario,
-        modelPackDigest: compiled.engineScenario.modelPack.digest,
+        modelPack: CURRENT_COMPILED_MODEL_PACK,
         environmentPackDigest: environmentPack.identity.digest,
         environmentPack,
       });

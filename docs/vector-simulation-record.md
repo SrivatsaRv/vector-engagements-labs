@@ -231,7 +231,8 @@ VSR is designed for browser production and playback. Frames use a transferable c
 ## Implemented replay boundary
 
 Current replay preserves mission class/regime, start posture, flight-plan,
-loadout/fuel, and exact digests as immutable provenance. It does not execute a
+compiled aircraft ground envelope, exact station/rule loadout, fuel, and exact
+authored/compiled/model-pack digests as immutable provenance. It does not execute a
 virtual pilot or derive policy decisions during replay.
 
 No replay behavior or supported record version changes with the table-module

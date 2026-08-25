@@ -8,11 +8,14 @@ import {
   bindRunwayEvidence,
   compileAirMissionDefinition,
   createDefaultAirMissionDefinition,
+  synchronizeScenarioAirMission,
+  updateScenarioAirMissionRoutePoint,
 } from "../lib/air-mission.ts";
-import { CURRENT_MODEL_PACK_DIGEST } from "../lib/reference-model-pack.ts";
+import { CURRENT_COMPILED_MODEL_PACK } from "../lib/engine/weapon-admission.ts";
 import { canonicalJson } from "../lib/canonical-json.ts";
 import { sha256HexSync } from "../lib/geospatial/digest.ts";
 import { createDefaultSpatialPlan } from "../lib/scenario-spatial.ts";
+import { localFrameToGeographic } from "../lib/geospatial/geodesy.ts";
 import { DEFAULT_SCENARIO, prepareSimulation, simulate } from "../lib/simulation.ts";
 import { getStudyArea } from "../lib/study-areas.ts";
 import { DEFAULT_SCENARIO_DEFINITION, SCENARIO_LIBRARY } from "../lib/scenarios.ts";
@@ -42,7 +45,7 @@ function fixture(missionClass = "TACTICAL_INTERCEPT") {
   scenario.airMission = createDefaultAirMissionDefinition({
     scenario,
     missionClass,
-    modelPackDigest: CURRENT_MODEL_PACK_DIGEST,
+    modelPack: CURRENT_COMPILED_MODEL_PACK,
   });
   return scenario;
 }
@@ -127,6 +130,95 @@ test("every Air mission class rejects a missing or impossible class-owned field"
   }
 });
 
+test("current Air mission v1 rejects unsupported side and unresolved task references", () => {
+  const cases = [
+    [(mission) => { mission.side = "RED"; }, "MISSION_SIDE_UNSUPPORTED", "side"],
+    [(mission) => { mission.flightPlans[0].routePoints[0].taskRef = "deleted-start"; }, "MISSION_REFERENCE_UNKNOWN", "flightPlans[0].routePoints[0].taskRef"],
+    [(mission) => { mission.flightPlans[0].routePoints[1].taskRef = "deleted-task"; }, "MISSION_REFERENCE_UNKNOWN", "flightPlans[0].routePoints[1].taskRef"],
+  ];
+  for (const [mutate, code, fieldPath] of cases) {
+    const scenario = fixture("COMBAT_AIR_PATROL");
+    mutate(scenario.airMission);
+    assert.throws(
+      () => prepareSimulation(scenario),
+      (error) => error instanceof AirMissionAdmissionError
+        && error.code === code
+        && error.fieldPath === fieldPath,
+      `${code} ${fieldPath}`,
+    );
+  }
+});
+
+test("one flight-plan adapter controls compiled and runtime geometry, transitions, and radii", () => {
+  let scenario = fixture("COMBAT_AIR_PATROL");
+  const routePoint = scenario.airMission.flightPlans[0].routePoints[1];
+  assert.equal(routePoint.taskRef, "COMBAT_AIR_PATROL");
+  assert.equal(routePoint.acceptanceRadiusM, scenario.spatialPlan.blue.routeAcceptanceRadiiM[1]);
+
+  const editedLongitude = routePoint.position.longitude + 0.02;
+  scenario = updateScenarioAirMissionRoutePoint(scenario, 1, {
+    position: { ...routePoint.position, longitude: editedLongitude },
+    turnMethod: "FLY_OVER",
+  });
+
+  const prepared = prepareSimulation(scenario);
+  const runtimeAircraft = prepared.engineScenario.entities.find((entity) => entity.id === "blue-platform-1");
+  const recordedRoutePoint = localFrameToGeographic(
+    runtimeAircraft.route[1],
+    prepared.engineScenario.geospatial.origin,
+  );
+  assert.equal(prepared.engineScenario.airMission.flightPlan.routePoints[1].position.longitude, editedLongitude);
+  assert.equal(scenario.spatialPlan.blue.route[1].longitude, editedLongitude);
+  assert.equal(runtimeAircraft.routePlan.schemaVersion, "vector.route-plan.v2");
+  assert.equal(runtimeAircraft.routePlan.waypointTransitions[1], "FLY_OVER");
+  assert.equal(runtimeAircraft.routePlan.waypointAcceptanceRadiiM[1], 1);
+  assert.ok(Math.abs(recordedRoutePoint.longitudeDeg - editedLongitude) < 1e-9);
+});
+
+test("compiled model-pack admission rejects unknown stations, rules, and quantities above immutable capacity", () => {
+  const cases = [
+    [(store) => { store.stationId = "deleted-station"; }, "assignments[0].loadout.stores[0].stationId"],
+    [(store) => { store.compatibilityRuleId = "deleted-rule"; }, "assignments[0].loadout.stores[0].compatibilityRuleId"],
+    [(store) => { store.quantity = 3; }, "assignments[0].loadout.stores[0]"],
+  ];
+  for (const [mutate, fieldPath] of cases) {
+    const scenario = fixture();
+    mutate(scenario.airMission.assignments[0].loadout.stores[0]);
+    if (scenario.airMission.assignments[0].loadout.stores[0].quantity === 3) scenario.blueWeaponQuantity = 3;
+    assert.throws(
+      () => prepareSimulation(scenario),
+      (error) => error instanceof AirMissionAdmissionError && error.code === "MISSION_LOADOUT_INVALID" && error.fieldPath === fieldPath,
+      fieldPath,
+    );
+  }
+});
+
+test("environment resynchronization regenerates location-owned task geometry and preserves policy", () => {
+  let scenario = fixture("COMBAT_AIR_PATROL");
+  scenario.airMission.tasks.onStationMinutes = 47;
+  scenario.airMission.policies.emission = "SILENT";
+  const nextArea = getStudyArea("rajasthan-desert");
+  scenario = {
+    ...scenario,
+    studyAreaId: nextArea.id,
+    weatherPresetId: nextArea.defaultWeatherPresetId,
+    spatialPlan: createDefaultSpatialPlan({
+      studyArea: nextArea,
+      rangeM: scenario.range,
+      blueAltitudeM: scenario.altitude,
+      redAltitudeM: scenario.altitude + scenario.targetDelta,
+      blueSpeedMps: scenario.launcherSpeed,
+      redSpeedMps: scenario.targetSpeed,
+      crossingAngleDeg: scenario.aspect,
+    }),
+  };
+  const synchronized = synchronizeScenarioAirMission(scenario, CURRENT_COMPILED_MODEL_PACK);
+  assert.equal(synchronized.airMission.tasks.onStationMinutes, 47);
+  assert.equal(synchronized.airMission.policies.emission, "SILENT");
+  assert.notDeepEqual(synchronized.airMission.tasks.patrolArea, scenario.airMission.tasks.patrolArea);
+  assert.doesNotThrow(() => prepareSimulation(synchronized));
+});
+
 test("template, new visible draft, and JSON import compile through the identical adapter", () => {
   const template = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
   const draft = fixture();
@@ -202,12 +294,12 @@ test("admitted fuel and loadout edits change compiled fuel, mass, store state, a
   assert.ok(lastFuel < firstFuel);
 
   const loadoutChanged = structuredClone(baseline);
-  loadoutChanged.blueWeaponQuantity = 3;
-  loadoutChanged.airMission.assignments[0].loadout.stores[0].quantity = 3;
+  loadoutChanged.blueWeaponQuantity = 1;
+  loadoutChanged.airMission.assignments[0].loadout.stores[0].quantity = 1;
   const loadoutPrepared = prepareSimulation(loadoutChanged);
   const loadoutAircraft = loadoutPrepared.engineScenario.entities.find((entity) => entity.id === "blue-platform-1");
-  assert.equal(loadoutPrepared.engineScenario.entities.filter((entity) => entity.weapon?.launchPlatformId === "blue-platform-1").length, 3);
-  assert.ok(loadoutAircraft.initial.massKg > baselineAircraft.initial.massKg);
+  assert.equal(loadoutPrepared.engineScenario.entities.filter((entity) => entity.weapon?.launchPlatformId === "blue-platform-1").length, 1);
+  assert.ok(loadoutAircraft.initial.massKg < baselineAircraft.initial.massKg);
 });
 
 test("airborne and ground/runway starts are first-class and unsupported evidence fails closed", () => {
@@ -341,14 +433,15 @@ test("Mach constraints compile deterministically into a causal airborne entry sp
   }
   const compiled = prepareSimulation(scenario).engineScenario;
   assert.ok(Math.abs(compiled.airMission.start.initialSpeedMps - tasMps) < 1e-9);
-  assert.ok(Math.abs(compiled.entities.find((entity) => entity.id === "blue-platform-1").initial.velocity.x - tasMps) < 1e-9);
+  const velocity = compiled.entities.find((entity) => entity.id === "blue-platform-1").initial.velocity;
+  assert.ok(Math.abs(Math.hypot(velocity.x, velocity.y, velocity.z) - tasMps) < 1e-9);
 });
 
 test("runway identity, evidence, state, dimensions, surface, heading, and wind fail closed", () => {
   const cases = [
     [(scenario) => { scenario.airMission.start.runway.evidence.digest = "0".repeat(64); }, "MISSION_RUNWAY_EVIDENCE_MISSING", "start.runway.evidence.digest"],
     [(scenario) => { editRunway(scenario, { operationalState: "CLOSED" }); }, "MISSION_RUNWAY_INVALID", "start.runway.operationalState"],
-    [(scenario) => { scenario.airMission.assignments[0].groundCompatibility.minimumRunwayLengthM = 2_500; }, "MISSION_RUNWAY_INVALID", "start.runway.lengthM"],
+    [(scenario) => { scenario.airMission.assignments[0].groundCompatibility.envelopeDigest = "0".repeat(64); }, "MISSION_RUNWAY_INVALID", "assignments[0].groundCompatibility"],
     [(scenario) => { editRunway(scenario, { surface: "UNPAVED" }); }, "MISSION_RUNWAY_INVALID", "start.runway.surface"],
     [(scenario) => { editRunway(scenario, { headingDeg: 180 }); }, "MISSION_RUNWAY_INVALID", "start.runway.headingDeg"],
     [(scenario) => { scenario.wind = 8; }, "MISSION_RUNWAY_INVALID", "start.runway.headingDeg"],
@@ -382,7 +475,7 @@ test("compilation is pure and does not accept a decorative UI-only mission objec
   const mission = structuredClone(scenario.airMission);
   const context = {
     scenario,
-    modelPackDigest: CURRENT_MODEL_PACK_DIGEST,
+    modelPack: CURRENT_COMPILED_MODEL_PACK,
     environmentPackDigest: prepareSimulation({ ...scenario, airMission: undefined }).engineScenario.geospatial.environmentPack.digest,
   };
   const compiled = compileAirMissionDefinition(mission, context);

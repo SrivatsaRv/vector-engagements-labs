@@ -16,7 +16,7 @@ import {
 
 export const CURRENT_MODEL_PACK_ID = "vector-scalar-study-models";
 export const CURRENT_MODEL_PACK_VERSION = "0.8.0";
-export const CURRENT_MODEL_PACK_DIGEST = "4081605000d0e06e24b2a0bed1c2585de6d953f6f3688b5849052452d32e321a";
+export const CURRENT_MODEL_PACK_DIGEST = "199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73";
 export const CURRENT_INTENDED_USE_ID = "vector.intended-use.geometry-teaching";
 export const CURRENT_INTENDED_USE_VERSION = "1.0.0";
 export const CURRENT_CREDIBILITY_MANIFEST_ID = "vector-scalar-study-credibility";
@@ -223,7 +223,7 @@ export function createCurrentModelPackSource(): ModelPackSource {
             y: quantity(0, "m"),
             z: quantity(0, "m"),
           },
-          maximumQuantity: 1,
+          maximumQuantity: 2,
           compatibleStoreModelIds,
         },
       ],
@@ -352,7 +352,7 @@ export function createCurrentModelPackSource(): ModelPackSource {
       storeModelId: weaponModelId(item.weaponId)!,
       stationGroup: "DECLARED_STUDY_STATION",
       status: "SUPPORTED" as const,
-      maximumQuantity: 1,
+      maximumQuantity: 2,
       rationale: "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
       evidenceRefIds: [ASSUMPTION_EVIDENCE_ID],
     })),

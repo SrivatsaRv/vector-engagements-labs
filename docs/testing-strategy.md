@@ -73,7 +73,10 @@ template creation, JSON import, compiler admission, the production Worker
 boundary, saved-run readback and VSR replay. Its focused regressions cover every
 mission class, engagement overlay and start posture; hostile nested authority,
 non-finite or out-of-area geometry, stale environment/runway evidence, invalid
-time and fuel constraints, cross-model loadouts, digest tampering and missing
+time and fuel constraints, BLUE-only side admission, arbitrary/deleted task
+references, unknown station/rule identities, store quantities above immutable
+capacity, ground-envelope digest tampering, environment-owned geometry
+regeneration, cross-model loadouts, digest tampering and missing
 persisted intent; and causal first-frame, fuel, mass and store consequences.
 The database gate must prove both an all-v3 pre-migration state and the exact
 all-v4 result of migration `013_air_mission_contract.sql`; mixed versions fail.

@@ -8,6 +8,7 @@ import type { RuntimeModelPackAdapter } from "./protocol.ts";
 import { assertRuntimeModelPackDigest } from "../engine/runtime-model-pack.ts";
 import { compileAirMissionDefinition } from "../air-mission.ts";
 import { admitPhaseAEnvironmentPack } from "../geospatial/environment-pack.ts";
+import { CURRENT_COMPILED_MODEL_PACK } from "../engine/weapon-admission.ts";
 
 export async function adaptPreparedSimulation(
   prepared: PreparedSimulation,
@@ -60,7 +61,7 @@ export async function admitRuntimeModelPack(
     });
     const verifiedMission = compileAirMissionDefinition(scenario.airMission, {
       scenario,
-      modelPackDigest: engineScenario.modelPack.digest,
+      modelPack: CURRENT_COMPILED_MODEL_PACK,
       environmentPackDigest: admittedEnvironment.pack.identity.digest,
       environmentPack: admittedEnvironment.pack,
     });

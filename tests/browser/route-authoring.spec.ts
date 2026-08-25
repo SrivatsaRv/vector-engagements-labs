@@ -407,6 +407,17 @@ test("a current deployment manifest drives the real Worker run after route recov
   await expect(missionStart).toContainText("first frame remains on the threshold with zero speed");
   await expect(missionStart.getByRole("region", { name: "Mission flight plan constraints" })).toContainText("vector.flight-plan.v1");
 
+  // The mission editor is the authority. Its single route adapter updates the
+  // legacy spatial projection atomically; the Worker later consumes the
+  // compiled mission route, never an independently edited copy.
+  const missionRouteLongitude = missionStart.getByRole("spinbutton", { name: "blue-route-2 longitude" });
+  const editedMissionLongitude = Number(await missionRouteLongitude.inputValue()) + 0.005;
+  await missionRouteLongitude.fill(String(editedMissionLongitude));
+  await missionRouteLongitude.press("Enter");
+  const routeEditor = page.getByRole("region", { name: /route coordinates/i }).first();
+  const projectedRouteLongitude = routeEditor.locator("fieldset").first().getByLabel("Longitude", { exact: true });
+  await expect.poll(async () => Number(await projectedRouteLongitude.inputValue())).toBeCloseTo(editedMissionLongitude, 6);
+
   const speed = page.getByRole("textbox", { name: /true airspeed/i });
   await speed.fill("-1");
   await expect(speed).toHaveValue("-1");
@@ -418,7 +429,6 @@ test("a current deployment manifest drives the real Worker run after route recov
 
   await speed.fill("275");
   await speed.press("Enter");
-  const routeEditor = page.getByRole("region", { name: /route coordinates/i }).first();
   await expect(routeEditor.getByTestId("compiled-route-plan-preview")).toContainText("vector.route-plan.v2");
   const acceptanceRadius = routeEditor.getByRole("textbox", { name: /acceptance radius/i });
   await acceptanceRadius.fill("0");

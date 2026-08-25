@@ -5,7 +5,7 @@ import {
   compileAirMissionDefinition,
   isAirMissionDefinition,
 } from "../air-mission.ts";
-import { CURRENT_MODEL_PACK_DIGEST } from "../reference-model-pack.ts";
+import { CURRENT_COMPILED_MODEL_PACK } from "../engine/weapon-admission.ts";
 import { admitPhaseAEnvironmentPack } from "../geospatial/environment-pack.ts";
 import {
   type Scenario,
@@ -287,7 +287,7 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
       });
       compileAirMissionDefinition(scenario.airMission, {
         scenario,
-        modelPackDigest: CURRENT_MODEL_PACK_DIGEST,
+        modelPack: CURRENT_COMPILED_MODEL_PACK,
         environmentPackDigest: environment.pack.identity.digest,
         environmentPack: environment.pack,
       });

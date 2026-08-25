@@ -22,6 +22,7 @@ import { localFrameToGeographic } from "../geospatial/geodesy.ts";
 import {
   DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M,
   ROUTE_PLAN_SCHEMA_VERSION,
+  geographicToLocal,
   scenarioOrigin,
 } from "../scenario-spatial.ts";
 import { buildSyntheticEnvironmentManifest } from "../geospatial/synthetic-environment.ts";
@@ -273,7 +274,7 @@ export function compileScenario(
     ? input.authoredScenario
       ? compileAirMissionDefinition(input.airMission, {
           scenario: input.authoredScenario,
-          modelPackDigest: CURRENT_MODEL_PACK_DIGEST,
+          modelPack: CURRENT_COMPILED_MODEL_PACK,
           environmentPackDigest: environmentPack.identity.digest,
           environmentPack,
         })
@@ -282,14 +283,24 @@ export function compileScenario(
         })()
     : undefined;
   // A2A runtime values cross this single adapter only after the authored
-  // Scenario and Air mission have been proven identical above. The placement
-  // vectors are the admitted WGS84-to-local conversion of the exact mission
-  // flight plan; fuel, loadout, policy and start are read from the compiled
-  // artifact itself. Legacy non-Air domains retain their existing inputs.
-  const compiledAssignment = compiledAirMission?.authored.assignments[0];
+  // Scenario and Air mission have been proven identical above. The immutable
+  // compiled flight plan owns route, start, transitions and acceptance radii;
+  // legacy spatialPlan is only the compatibility projection retained for
+  // non-Air/red-route consumers until its owning migration. Legacy non-Air
+  // domains retain their existing inputs.
+  const compiledAssignment = compiledAirMission?.assignment;
+  const compiledBluePlan = compiledAirMission?.flightPlan;
+  const compiledBlueRoute = compiledBluePlan?.routePoints.map((point) => geographicToLocal({
+    longitude: point.position.longitude,
+    latitude: point.position.latitude,
+    altitudeM: point.position.altitude.valueM,
+    verticalDatum: "MSL",
+  }, studyArea));
+  const compiledBlueTransitions = compiledBluePlan?.routePoints.map((point) => point.turnMethod);
+  const compiledBlueAcceptanceRadiiM = compiledBluePlan?.routePoints.map((point) => point.acceptanceRadiusM);
   const runtimeBlueFuelPercent = compiledAssignment?.initialFuelPercent ?? input.blueFuelPercent;
-  const runtimeBlueWeaponQuantity = compiledAssignment?.loadout.stores.reduce((total, store) => total + store.quantity, 0) ?? input.blueWeaponQuantity;
-  const runtimeBlueRadarMode = compiledAirMission?.authored.policies.emission ?? input.blueRadarMode;
+  const runtimeBlueWeaponQuantity = compiledAssignment?.loadout.reduce((total, store) => total + store.quantity, 0) ?? input.blueWeaponQuantity;
+  const runtimeBlueRadarMode = compiledAirMission?.policies.emission ?? input.blueRadarMode;
   const admittedOriginReferences = [
     [input.placement?.blueOriginReference, "placement.blue.originReference"],
     [input.placement?.redOriginReference, "placement.red.originReference"],
@@ -303,7 +314,14 @@ export function compileScenario(
     });
   });
   const targetHeadingRad = ((180 - input.aspect) * Math.PI) / 180;
-  const blueStart = input.placement?.blueStart ?? {
+  const blueStart = compiledAirMission?.start
+    ? geographicToLocal({
+        longitude: compiledAirMission.start.position.longitude,
+        latitude: compiledAirMission.start.position.latitude,
+        altitudeM: compiledAirMission.start.position.altitude.valueM,
+        verticalDatum: "MSL",
+      }, studyArea)
+    : input.placement?.blueStart ?? {
     x: 0,
     y: 0,
     z: input.altitude,
@@ -313,7 +331,14 @@ export function compileScenario(
     y: 0,
     z: Math.max(0, input.altitude + input.targetDelta),
   };
-  const blueHeadingRad = input.placement?.blueHeadingRad ?? 0;
+  const blueHeadingRad = compiledAirMission
+    ? compiledAirMission.start.headingSource === "FLIGHT_PLAN_FIRST_LEG"
+      ? Math.atan2(
+          compiledBlueRoute![1].y - compiledBlueRoute![0].y,
+          compiledBlueRoute![1].x - compiledBlueRoute![0].x,
+        )
+      : ((90 - compiledAirMission.start.runwayHeadingDegTrue!) * Math.PI) / 180
+    : input.placement?.blueHeadingRad ?? 0;
   const redHeadingRad = input.placement?.redHeadingRad ?? targetHeadingRad;
   const movingTarget = input.domain === "A2A" || input.domain === "G2A";
   const blueIsAircraft = blueObject.kind === "AIRCRAFT";
@@ -355,11 +380,22 @@ export function compileScenario(
   const redFuelKg = redAircraft
     ? redAircraft.fuelCapacityKg * (input.redFuelPercent / 100)
     : 0;
-  const blueCompiledWeapon = resolveCompiledWeaponAdmission(
+  const resolvedBlueCompiledWeapon = resolveCompiledWeaponAdmission(
     CURRENT_COMPILED_MODEL_PACK,
     blueObject.id,
     blueSystem.id,
   );
+  const blueMissionStore = compiledAssignment?.loadout[0];
+  const blueCompiledWeapon = blueMissionStore
+    ? {
+        ...resolvedBlueCompiledWeapon,
+        admission: {
+          ...resolvedBlueCompiledWeapon.admission,
+          stationId: blueMissionStore.stationId,
+          compatibilityRuleId: blueMissionStore.compatibilityRuleId,
+        },
+      }
+    : resolvedBlueCompiledWeapon;
   const redCompiledWeapon = redSystem
     ? resolveCompiledWeaponAdmission(CURRENT_COMPILED_MODEL_PACK, redObject.id, redSystem.id)
     : undefined;
@@ -374,8 +410,10 @@ export function compileScenario(
       kind: kindMap[blueObject.kind],
       symbolRole: blueObject.symbolRole,
       lifecycle: "ACTIVE",
-      route: input.placement?.blueRoute.length
-        ? input.placement.blueRoute.map((point) => ({ ...point }))
+      route: compiledBlueRoute?.length
+        ? compiledBlueRoute.map((point) => ({ ...point }))
+        : input.placement?.blueRoute.length
+          ? input.placement.blueRoute.map((point) => ({ ...point }))
         : [
             blueStart,
             {
@@ -393,17 +431,23 @@ export function compileScenario(
             },
         ],
       routePlan: {
-        schemaVersion: input.placement?.blueRoute.length &&
+        schemaVersion: compiledBlueRoute?.length
+          ? ROUTE_PLAN_SCHEMA_VERSION
+          : input.placement?.blueRoute.length &&
             input.placement.blueRouteWaypointTransitions === undefined
           ? "vector.route-plan.v1"
           : ROUTE_PLAN_SCHEMA_VERSION,
-        waypointAcceptanceRadiiM: input.placement?.blueRoute.length
-          ? [...input.placement.blueRouteAcceptanceRadiiM]
+        waypointAcceptanceRadiiM: compiledBlueAcceptanceRadiiM?.length
+          ? [...compiledBlueAcceptanceRadiiM]
+          : input.placement?.blueRoute.length
+            ? [...input.placement.blueRouteAcceptanceRadiiM]
           : [1, DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M],
-        waypointTransitions: input.placement?.blueRoute.length
-          ? input.placement.blueRouteWaypointTransitions === undefined
-            ? undefined
-            : [...input.placement.blueRouteWaypointTransitions]
+        waypointTransitions: compiledBlueTransitions?.length
+          ? [...compiledBlueTransitions]
+          : input.placement?.blueRoute.length
+            ? input.placement.blueRouteWaypointTransitions === undefined
+              ? undefined
+              : [...input.placement.blueRouteWaypointTransitions]
           : ["START", "FLY_BY"],
       },
       initial: {
