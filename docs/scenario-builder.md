@@ -56,6 +56,10 @@ The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-eas
 The artifact binds one exact regional environment-pack ID/version/digest and an
 optional exact `vector.installation-origin.v2` runway identity. Compilation
 fails before producing a runnable artifact when either binding is stale.
+For a ground start the compiled engine artifact additionally binds the exact
+mission digest, runway-evidence digest, posture, and readiness release time in
+`vector.aircraft-ground-operation.v1`; unknown or conflicting fields fail
+admission.
 
 The persisted scenario-template table is declared by
 `db/schema/scenarios.ts` and re-exported from the one aggregate Drizzle schema.
@@ -93,6 +97,9 @@ aircraft ground-performance envelope remains a declared model assumption.
 Scenario cards and Air-mission validity limits name the sourced pack's
 coverage, time, resolution and uncertainty instead of claiming a standard
 atmosphere or absent terrain.
+Until #64 admits governed ground forces, the compiled ground-operation artifact
+declares movement unavailable. The runtime can show `PARKED`/`HOLD_SHORT`, but
+cannot infer taxi, rotation, takeoff, climbout, approach, or landing behavior.
 
 Version 1 currently admits the BLUE launcher-side mission only; `RED` fails
 with `MISSION_SIDE_UNSUPPORTED` until an explicit opposing-side runtime mapping
@@ -270,6 +277,11 @@ transition arrays block validation and compiled-engine admission. Existing
 all-fly-by semantics: an omitted transition array is compiled as `START` then
 `FLY_BY` for every remaining route point. New authoring always emits v2; a
 present but malformed v2 transition array is rejected rather than downgraded.
+
+Ground-authored routes do not activate the airborne controller while ground
+dynamics are unavailable. The canonical record exposes the held operational
+state and cause; the builder must not render the authored route as achieved
+movement or synthesize a takeoff path.
 
 Air mission authoring uses one route-edit adapter. `AirMissionDefinition` is the
 authority; the existing `spatialPlan.blue` route is an atomic compatibility

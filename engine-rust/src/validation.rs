@@ -924,6 +924,43 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         .iter()
         .filter(|entity| entity.kind == crate::EntityKind::Aircraft)
     {
+        if let Some(ground) = aircraft.ground_operation.as_ref() {
+            let mission_matches = scenario
+                .air_mission_runtime
+                .as_ref()
+                .is_some_and(|binding| {
+                    binding.schema_version == ground.schema_version
+                        && binding.mission_digest == ground.mission_digest
+                        && binding.runway_evidence_digest == ground.runway_evidence_digest
+                        && binding.posture == ground.posture
+                        && binding.release_time_seconds == ground.release_time_seconds
+                        && binding.execution_authority == ground.execution_authority
+                        && binding.unavailability_reason == ground.unavailability_reason
+                });
+            if ground.schema_version != "vector.aircraft-ground-operation.v1"
+                || !matches!(
+                    ground.posture.as_str(),
+                    "PARKING" | "RUNWAY" | "GROUND_ALERT_QRA"
+                )
+                || !ground.release_time_seconds.is_finite()
+                || ground.release_time_seconds < 0.0
+                || sha256_digest("groundOperation.missionDigest", &ground.mission_digest).is_err()
+                || sha256_digest(
+                    "groundOperation.runwayEvidenceDigest",
+                    &ground.runway_evidence_digest,
+                )
+                .is_err()
+                || ground.execution_authority != "UNAVAILABLE"
+                || ground.unavailability_reason != "GROUND_DYNAMICS_MODEL_UNAVAILABLE"
+                || !mission_matches
+                || aircraft.initial.velocity.magnitude() != 0.0
+            {
+                return Err(invalid(format!(
+                    "aircraft {} has no valid ground-operation admission",
+                    aircraft.id
+                )));
+            }
+        }
         let aircraft_model = aircraft
             .aircraft
             .as_ref()

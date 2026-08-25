@@ -4,10 +4,14 @@ VECTOR has one engine contract and two browser implementations. The authored sce
 
 ## Rust / WebAssembly
 
-`EngineScenario.airMission` is an optional compiled lineage envelope. Rust/WASM
-continues to execute the existing generic entity/route ABI and ignores that
-non-physics envelope; the backend adapter reattaches the already verified exact
-artifact so TypeScript and Rust results retain identical VSR authority.
+`EngineScenario.airMission` is an optional compiled lineage envelope. A ground
+run also carries a compact compiler-owned copy of the exact
+`vector.aircraft-ground-operation.v1` artifact. Rust/WASM compares that copy to
+the entity artifact before ticks; TypeScript additionally checks it against the
+full mission lineage. A forged mission/runway/release binding therefore fails
+in both backends without making Rust parse unrelated authoring fields. The
+backend adapter reattaches the already verified Air mission so results retain
+identical VSR authority.
 The Rust ABI admits `vector.environment-runtime-grid.v1` with the exact parent
 pack binding and implements the same grid/time interpolation, atmosphere
 derivation, wind consumption and DEM collision rules as TypeScript.
@@ -78,6 +82,9 @@ Validating a Stage-B v2 pack in Rust does not alter that selection or provenance
 authority; no deployment manifest currently admits v2 execution.
 Likewise, a TP-1538 verification digest records only an offline evaluator run;
 it cannot select a deployment backend or become `EngineRun` provenance.
+Ground-operation provenance is likewise backend-neutral: both implementations
+require the same mission, start posture, release time, and runway evidence
+digest and emit the same fail-closed operational/movement state.
 
 ## Build and verification
 
@@ -109,6 +116,10 @@ Worker/runtime/VSR owner add a separate admission contract.
 The TP-1538 verification adapter is also outside this boundary: neither a
 complete synthetic batch nor a later admitted corpus can enter an
 `EngineScenario` without a separately owned production model-pack contract.
+Ground starts cross the swap boundary only through
+`vector.aircraft-ground-operation.v1`. Its current execution authority is
+`UNAVAILABLE`; both backends hold position and inventory rather than invoking
+the airborne controller. This does not admit taxi, takeoff, or recovery.
 The backend-neutral scenario owns the complete preprocessed environment
 projection. Implementations may optimize sampling but may not re-resolve area
 names, query remote terrain/database state, or substitute atmosphere defaults.

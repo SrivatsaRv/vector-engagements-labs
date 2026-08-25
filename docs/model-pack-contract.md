@@ -58,6 +58,14 @@ Engine scenarios now additionally carry `vector.environment-runtime-grid.v1`;
 this does not change model-pack schemas or authorize environmental values as
 named-platform evidence.
 
+Ground-start scenarios also carry `vector.aircraft-ground-operation.v1`. The
+contract binds the compiled mission digest, runway-evidence digest, posture,
+and release time, but declares `executionAuthority: UNAVAILABLE` and
+`GROUND_DYNAMICS_MODEL_UNAVAILABLE`. This is a fail-closed runtime boundary,
+not a takeoff-performance model: no rotation speed, rolling force, lift,
+braking, runway distance, or recovery authority is inferred from STUB-24.
+TypeScript and Rust validate the exact contract and report the same held state.
+
 The schema-module split changes ownership granularity only. Existing table,
 column, constraint, and JSON payload contracts are unchanged.
 
@@ -393,6 +401,11 @@ compiler. Production admission cannot consume or relabel this adapter.
 
 ## Scenario binding and patches
 
+Ground Air scenarios add one exact `vector.aircraft-ground-operation.v1`
+binding beside the existing model-pack identity. Its mission, runway evidence,
+posture, and release fields are compiler-owned and exact-key validated; it does
+not add or override aerodynamic, propulsion, or control values.
+
 User-authored wind/temperature changes create a distinct environment-pack
 digest. They are not model-pack patches and cannot rewrite sourced grid fields.
 
@@ -432,6 +445,11 @@ Unknown fields, stale digests, missing evidence, or non-finite values fail.
 Draft patch addition creates a new revision.
 
 ## Loadout compatibility
+
+An installed store remains inventory while its launch platform carries an
+unavailable ground-operation binding. Neither scheduled launch time nor an
+otherwise valid station/rule admission can release it; mass and store identity
+remain on the aircraft until a future governed ground/air transition exists.
 
 An Air `FlightAssignment` binds the exact aircraft, compiled model-pack digest,
 one admitted station/store/compatibility-rule identity and positive quantity.
@@ -578,6 +596,10 @@ an immutable historical artifact; v0.8 publishes this new admission boundary.
 
 ## Consumption rules for dependent workstreams
 
+Consumers must treat `GROUND_DYNAMICS_MODEL_UNAVAILABLE` as a closed movement
+boundary. It is not permission to substitute scalar ground-envelope assumptions,
+an airborne minimum-speed controller, or named-platform performance.
+
 Mission/capability consumers import the exported `AirMissionDefinition` and
 `CompiledAirMission` types from `lib/air-mission.ts`. They may attach downstream
 behavior to those stable IDs and references but must not create a parallel
@@ -617,6 +639,11 @@ exact station/rule/capacity admission, immutable ground-envelope binding,
 runway and fuel/loadout rejection, Worker/server parity, runtime
 mass/endurance effects, and VSR readback against the current compiled model-pack
 digest.
+It also proves that a QRA aircraft remains exactly parked before its admitted
+release boundary, cannot launch an installed store from the ground, preserves
+mass and fuel, rejects forged/extended ground-operation admission in both
+backends, and round-trips the explicit operational/movement value state through
+the v6 frame codec.
 The release gate now pairs existing model-pack checks with exact environment
 source verification, TS/Rust runtime parity and corrupt-binding rejection.
 

@@ -313,3 +313,7 @@ and exact-subject evidence owners retain their admission authority.
 In particular, Stage B makes no claim over regional source licensing, WGS84 or
 vertical-datum conversion, sampled wind, terrain/LOS, runway admission, or
 EnvironmentPack production migration/readback.
+The separate ground-held safety boundary does not change these nonclaims. Its
+`UNAVAILABLE` authority prevents motion and store launch; it supplies no
+runway-force, propulsion, control, takeoff, climbout, or recovery evidence and
+cannot promote a Stage-B or named-aircraft pack.

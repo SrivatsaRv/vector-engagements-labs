@@ -23,6 +23,8 @@ import { DEFAULT_SCENARIO_DEFINITION, SCENARIO_LIBRARY } from "../lib/scenarios.
 import { validateSavedScenario } from "../lib/security/saved-run.ts";
 import {
   createVectorSimulationRecord,
+  decodeColumnarFrames,
+  encodeColumnarFrames,
   openVectorSimulationRecord,
   serializeVectorRecord,
 } from "../lib/record/vector-record.ts";
@@ -31,6 +33,7 @@ import {
   admitRuntimeModelPack,
 } from "../lib/runtime/model-pack-adapter.ts";
 import { runEngine } from "../lib/engine/core.ts";
+import { runEngineBackend } from "../lib/engine/backend.ts";
 import { enginePositionToGeographic } from "../lib/scenario-spatial.ts";
 
 function fixture(missionClass = "TACTICAL_INTERCEPT") {
@@ -406,6 +409,86 @@ test("airborne and ground/runway starts are first-class and unsupported evidence
   assert.throws(
     () => prepareSimulation(reciprocalScenario),
     /Runway threshold and admitted DEM elevations conflict outside the declared reconciliation envelope/,
+  );
+});
+
+test("ground-alert readiness remains causally parked before the admitted release boundary", () => {
+  const scenario = admittedGroundFixture("GROUND_ALERT_QRA");
+  const prepared = prepareSimulation(scenario).engineScenario;
+  const aircraft = prepared.entities.find((entity) => entity.id === "blue-platform-1");
+  const run = runEngine({ ...prepared, durationSeconds: 1 });
+  const samples = run.frames.map((frame) =>
+    frame.entities.find((entity) => entity.id === aircraft.id));
+
+  assert.ok(samples.length > 1, "the causal hold must be observed beyond the initial frame");
+  for (const sample of samples) {
+    assert.equal(sample.aircraftOperationalState, "PARKED");
+    assert.equal(sample.aircraftOperationalStateValueState, "VALID");
+    assert.equal(sample.aircraftMovementValueState, "UNAVAILABLE");
+    assert.equal(sample.aircraftMovementUnavailableReason, "GROUND_DYNAMICS_MODEL_UNAVAILABLE");
+    assert.equal(sample.speedMps, 0);
+    assert.deepEqual(sample.velocity, { x: 0, y: 0, z: 0 });
+    assert.deepEqual(sample.position, aircraft.initial.position);
+    assert.equal(sample.fuelKg, aircraft.initial.fuelKg);
+    assert.equal(sample.massKg, aircraft.initial.massKg);
+    assert.equal(sample.aircraftControl, undefined);
+  }
+  const replayed = decodeColumnarFrames(encodeColumnarFrames(run.frames));
+  assert.deepEqual(
+    replayed.map((frame) => frame.entities.find((entity) => entity.id === aircraft.id)),
+    samples,
+  );
+  const rust = runEngineBackend({ ...structuredClone(prepared), durationSeconds: 1 }, "rust-wasm");
+  assert.deepEqual(
+    rust.frames.map((frame) => frame.entities.find((entity) => entity.id === aircraft.id)),
+    samples,
+  );
+});
+
+test("ground-operation admission fails closed with TypeScript and Rust parity", () => {
+  const base = prepareSimulation(admittedGroundFixture("GROUND_ALERT_QRA")).engineScenario;
+  const cases = [
+    ["mission digest", (ground) => { ground.missionDigest = "0".repeat(64); }],
+    ["forged release", (ground) => { ground.releaseTimeSeconds += 1; }],
+    ["runway digest", (ground) => { ground.runwayEvidenceDigest = "0".repeat(64); }],
+    ["start posture", (ground) => { ground.posture = "RUNWAY"; }],
+    ["unknown authority", (ground) => { ground.hiddenTakeoffSpeedMps = 75; }],
+  ];
+  for (const [name, mutate] of cases) {
+    const scenario = structuredClone(base);
+    const aircraft = scenario.entities.find((entity) => entity.id === "blue-platform-1");
+    mutate(aircraft.groundOperation);
+    for (const backend of ["typescript", "rust-wasm"]) {
+      assert.throws(
+        () => runEngineBackend(structuredClone(scenario), backend),
+        /ground-operation|groundOperation|unknown field/i,
+        `${name} ${backend}`,
+      );
+    }
+  }
+});
+
+test("released ground alert advances only to hold-short while movement authority is unavailable", () => {
+  const scenario = admittedGroundFixture("GROUND_ALERT_QRA");
+  scenario.airMission.start.readinessDelaySeconds = 0;
+  const prepared = prepareSimulation(scenario).engineScenario;
+  const aircraft = prepared.entities.find((entity) => entity.id === "blue-platform-1");
+  const runs = ["typescript", "rust-wasm"].map((backend) =>
+    runEngineBackend({ ...structuredClone(prepared), durationSeconds: 1 }, backend));
+
+  for (const run of runs) {
+    const samples = run.frames.map((frame) =>
+      frame.entities.find((entity) => entity.id === aircraft.id));
+    assert.equal(samples[0].aircraftOperationalState, "PARKED");
+    assert.ok(samples.slice(1).every((sample) => sample.aircraftOperationalState === "HOLD_SHORT"));
+    assert.ok(samples.every((sample) => sample.aircraftMovementValueState === "UNAVAILABLE"));
+    assert.ok(samples.every((sample) => sample.speedMps === 0));
+    assert.ok(samples.every((sample) => sample.massKg === aircraft.initial.massKg));
+    assert.ok(samples.every((sample) => sample.installedStoreIds.length > 0));
+  }
+  assert.deepEqual(
+    runs[1].frames.map((frame) => frame.entities.find((entity) => entity.id === aircraft.id)),
+    runs[0].frames.map((frame) => frame.entities.find((entity) => entity.id === aircraft.id)),
   );
 });
 

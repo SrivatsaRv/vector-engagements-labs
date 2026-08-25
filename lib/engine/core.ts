@@ -7,6 +7,7 @@ import type {
   ObserverPerspective,
   EngineRun,
   EngineScenario,
+  AircraftOperationalState,
   WeaponFlightState,
 } from "./contracts.ts";
 import { SIMULATION_EVENT_PAYLOAD_SCHEMAS } from "./contracts.ts";
@@ -67,6 +68,7 @@ type RuntimeState = {
   weaponFlightState?: WeaponFlightState;
   routePointIndex: number;
   aircraftControl?: NonNullable<EngineEntityFrame["aircraftControl"]>;
+  aircraftOperationalState?: AircraftOperationalState;
   lastGuidanceAcceleration: Vec3;
   lastGuidanceUpdateSeconds: number;
 };
@@ -354,6 +356,14 @@ function initialState(definition: EngineEntityDefinition): RuntimeState {
     weaponFlightState:
       definition.kind === "GUIDED_WEAPON" ? "STOWED" : undefined,
     routePointIndex: startsAtFirstRoutePoint ? 1 : 0,
+    aircraftOperationalState:
+      definition.kind !== "AIRCRAFT"
+        ? undefined
+        : definition.groundOperation?.posture === "RUNWAY"
+          ? "HOLD_SHORT"
+          : definition.groundOperation
+            ? "PARKED"
+            : "ENROUTE",
     lastGuidanceAcceleration: { x: 0, y: 0, z: 0 },
     lastGuidanceUpdateSeconds: Number.NEGATIVE_INFINITY,
   };
@@ -416,6 +426,20 @@ function updateKinematicEntity(
   if (state.lifecycle !== "ACTIVE" && state.lifecycle !== "TRACKING") return;
   const { kind } = state.definition;
   if (kind !== "AIRCRAFT") return;
+  const groundOperation = state.definition.groundOperation;
+  if (groundOperation) {
+    state.aircraftOperationalState =
+      groundOperation.posture === "PARKING" || time < groundOperation.releaseTimeSeconds
+        ? "PARKED"
+        : "HOLD_SHORT";
+    state.velocity = { x: 0, y: 0, z: 0 };
+    state.commandedG = 0;
+    state.dragNewtons = 0;
+    state.thrustNewtons = 0;
+    state.aircraftControl = undefined;
+    state.phase = groundOperation.unavailabilityReason;
+    return;
+  }
   const model = state.definition.aircraft!;
   const speed = Math.max(1, magnitude(state.velocity));
   const route = state.definition.route ?? [];
@@ -532,6 +556,7 @@ function updateKinematicEntity(
   state.position = add(state.position, scale(state.velocity, dt));
   state.commandedG = magnitude(acceptedSteeringAcceleration) / G0;
   state.phase = routePoint ? "Following route" : "Route complete";
+  state.aircraftOperationalState = "ENROUTE";
   state.aircraftControl = {
     routePointIndex: routePoint ? state.routePointIndex : null,
     requestedVelocityMps: requestedVelocity,
@@ -577,6 +602,7 @@ function activateWeapon(
   const launcher = states.get(weapon.launchPlatformId);
   if (launcher) {
     if (launcher.definition.kind === "AIRCRAFT") {
+      if (launcher.definition.groundOperation) return;
       if (!launcher.installedStoreIds.delete(state.definition.id)) {
         throw new Error(
           `Aircraft ${launcher.definition.id} does not carry store ${state.definition.id}.`,
@@ -788,6 +814,22 @@ function toFrame(
       ? { weaponFlightState: state.weaponFlightState }
       : {}),
     valueState: state.definition.provenance.valueState,
+    ...(state.aircraftOperationalState
+      ? {
+          aircraftOperationalState: state.aircraftOperationalState,
+          aircraftOperationalStateValueState:
+            state.lifecycle === "TERMINATED" ? "TERMINATED" as const : "VALID" as const,
+          aircraftMovementValueState:
+            state.lifecycle === "TERMINATED"
+              ? "TERMINATED" as const
+              : state.definition.groundOperation
+                ? "UNAVAILABLE" as const
+                : "VALID" as const,
+          ...(state.definition.groundOperation
+            ? { aircraftMovementUnavailableReason: state.definition.groundOperation.unavailabilityReason }
+            : {}),
+        }
+      : {}),
     ...(state.aircraftControl
       ? { aircraftControl: structuredClone(state.aircraftControl) }
       : {}),
@@ -1082,6 +1124,47 @@ export class EngineSession {
     for (const aircraft of scenario.entities.filter(
       (entity) => entity.kind === "AIRCRAFT",
     )) {
+      const ground = aircraft.groundOperation;
+      if (ground) {
+        const binding = scenario.airMissionRuntime;
+        const validDigest = (value: string) => /^[0-9a-f]{64}$/.test(value);
+        const exactGroundFields = [
+          "executionAuthority",
+          "missionDigest",
+          "posture",
+          "releaseTimeSeconds",
+          "runwayEvidenceDigest",
+          "schemaVersion",
+          "unavailabilityReason",
+        ];
+        if (
+          JSON.stringify(Object.keys(ground).sort()) !== JSON.stringify(exactGroundFields) ||
+          ground.schemaVersion !== "vector.aircraft-ground-operation.v1" ||
+          !["PARKING", "RUNWAY", "GROUND_ALERT_QRA"].includes(ground.posture) ||
+          !Number.isFinite(ground.releaseTimeSeconds) ||
+          ground.releaseTimeSeconds < 0 ||
+          !validDigest(ground.missionDigest) ||
+          !validDigest(ground.runwayEvidenceDigest) ||
+          ground.executionAuthority !== "UNAVAILABLE" ||
+          ground.unavailabilityReason !== "GROUND_DYNAMICS_MODEL_UNAVAILABLE" ||
+          binding?.schemaVersion !== ground.schemaVersion ||
+          binding.missionDigest !== ground.missionDigest ||
+          binding.runwayEvidenceDigest !== ground.runwayEvidenceDigest ||
+          binding.posture !== ground.posture ||
+          binding.releaseTimeSeconds !== ground.releaseTimeSeconds ||
+          binding.executionAuthority !== ground.executionAuthority ||
+          binding.unavailabilityReason !== ground.unavailabilityReason ||
+          scenario.airMission?.start.entryState !== "GROUND" ||
+          scenario.airMission.compiledDigest !== ground.missionDigest ||
+          scenario.airMission.authored.start.posture === "AIRBORNE" ||
+          scenario.airMission.authored.start.posture !== ground.posture ||
+          scenario.airMission.authored.start.readinessDelaySeconds !== ground.releaseTimeSeconds ||
+          scenario.airMission.authored.start.runway.evidence.digest !== ground.runwayEvidenceDigest ||
+          magnitude(aircraft.initial.velocity) !== 0
+        ) {
+          throw new Error(`Aircraft ${aircraft.id} has no valid ground-operation admission.`);
+        }
+      }
       const installedStores = scenario.entities.filter(
         (entity) =>
           entity.lifecycle === "STOWED" &&

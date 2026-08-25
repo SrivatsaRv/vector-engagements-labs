@@ -6,6 +6,7 @@ import {
   encodeColumnarFrames,
   LEGACY_VECTOR_EVENT_SCHEMA,
   LEGACY_VECTOR_FRAME_SCHEMA,
+  OLDER_VECTOR_FRAME_SCHEMA,
   LEGACY_VECTOR_PICTURE_SCHEMA,
   openVectorSimulationRecord,
   serializeVectorRecord,
@@ -238,23 +239,39 @@ test("VSR retains read-only compatibility with the last observer frame and pictu
     currentSchema.every((value, inner) => legacyFrameBytes[index + inner] === value),
   );
   assert.ok(offset > 0);
-  legacyFrameBytes[offset + currentSchema.length - 1] = "4".charCodeAt(0);
+  legacyFrameBytes[offset + currentSchema.length - 1] = "5".charCodeAt(0);
   let legacy = await replaceRecordMember(
     record,
     "frames.arrow",
     LEGACY_VECTOR_FRAME_SCHEMA,
     legacyFrameBytes,
   );
-  legacy = await replaceRecordMember(
-    legacy,
-    "pictures.jsonl",
-    LEGACY_VECTOR_PICTURE_SCHEMA,
-    pictureMember.bytes,
-  );
   const serialized = serializeVectorRecord(legacy);
   const opened = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
   assert.deepEqual(opened.result.frames, result.frames);
   assert.ok(opened.pictures.every((picture) => picture.schemaVersion === "vector.observer-state.v2"));
+
+  const olderFrameBytes = frameMember.bytes.slice();
+  olderFrameBytes[offset + currentSchema.length - 1] = "4".charCodeAt(0);
+  let older = await replaceRecordMember(
+    record,
+    "frames.arrow",
+    OLDER_VECTOR_FRAME_SCHEMA,
+    olderFrameBytes,
+  );
+  older = await replaceRecordMember(
+    older,
+    "pictures.jsonl",
+    LEGACY_VECTOR_PICTURE_SCHEMA,
+    pictureMember.bytes,
+  );
+  const olderSerialized = serializeVectorRecord(older);
+  const olderOpened = await openVectorSimulationRecord(
+    olderSerialized.buffer,
+    olderSerialized.byteLength,
+  );
+  assert.deepEqual(olderOpened.result.frames, result.frames);
+  assert.ok(olderOpened.pictures.every((picture) => picture.schemaVersion === "vector.observer-state.v2"));
 });
 
 test("VSR rejects tampered side-owned track state and track-event history", async () => {
@@ -425,7 +442,8 @@ test("VSR admits only the governed frame/picture schema pairs", async () => {
   const record = await createVectorSimulationRecord(prepareSimulation(scenario), simulate(scenario), createdAt);
   for (const [frameSchema, pictureSchema] of [
     [VECTOR_FRAME_SCHEMA, LEGACY_VECTOR_PICTURE_SCHEMA],
-    [LEGACY_VECTOR_FRAME_SCHEMA, VECTOR_PICTURE_SCHEMA],
+    [LEGACY_VECTOR_FRAME_SCHEMA, LEGACY_VECTOR_PICTURE_SCHEMA],
+    [OLDER_VECTOR_FRAME_SCHEMA, VECTOR_PICTURE_SCHEMA],
   ]) {
     let corrupt = await replaceRecordMember(record, "frames.arrow", frameSchema, record.members.find((member) => member.path === "frames.arrow").bytes);
     corrupt = await replaceRecordMember(corrupt, "pictures.jsonl", pictureSchema, record.members.find((member) => member.path === "pictures.jsonl").bytes);

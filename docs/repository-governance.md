@@ -445,6 +445,14 @@ Scenario-authored minima, surface/tailwind values, or self-labelled evidence
 states are rejected; no installation or production claim may treat the ground
 performance envelope as validated platform data.
 
+Until that evidence exists, `vector.aircraft-ground-operation.v1` makes the
+runtime limitation executable. Ground starts are held at `PARKED` or
+`HOLD_SHORT`, movement is `UNAVAILABLE` with
+`GROUND_DYNAMICS_MODEL_UNAVAILABLE`, and installed stores cannot launch. This
+does not retire STUB-24 or satisfy #64's takeoff/recovery acceptance criteria;
+it prevents the prior zero-speed-to-airborne fallback from masquerading as
+causal runway motion.
+
 `STUB-25` separately owns #61's visible runway/DEM elevation reconciliation.
 The regional pack uses the higher surface plus 0.01 m only inside its declared
 30 m disagreement envelope and rejects larger conflicts. It remains

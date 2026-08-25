@@ -33,8 +33,9 @@ import {
 import { CURRENT_COMPILED_MODEL_PACK } from "../engine/weapon-admission.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
-export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v5" as const;
-export const LEGACY_VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v4" as const;
+export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v6" as const;
+export const LEGACY_VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v5" as const;
+export const OLDER_VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v4" as const;
 export const VECTOR_EVENT_SCHEMA = SIMULATION_EVENT_SCHEMA;
 export const LEGACY_VECTOR_EVENT_SCHEMA = "vector.events.v1" as const;
 export const VECTOR_PICTURE_SCHEMA = "vector.pictures.v4" as const;
@@ -206,6 +207,10 @@ type EntityMetadata = Pick<
   | "phase"
   | "weaponFlightState"
   | "valueState"
+  | "aircraftOperationalState"
+  | "aircraftOperationalStateValueState"
+  | "aircraftMovementValueState"
+  | "aircraftMovementUnavailableReason"
 >;
 
 type StoredEntityMetadata = EntityMetadata & {
@@ -309,6 +314,18 @@ export function encodeColumnarFrames(frames: EngineFrame[]): Uint8Array {
         ? { weaponFlightState: entity.weaponFlightState }
         : {}),
       valueState: entity.valueState,
+      ...(entity.aircraftOperationalState
+        ? { aircraftOperationalState: entity.aircraftOperationalState }
+        : {}),
+      ...(entity.aircraftOperationalStateValueState
+        ? { aircraftOperationalStateValueState: entity.aircraftOperationalStateValueState }
+        : {}),
+      ...(entity.aircraftMovementValueState
+        ? { aircraftMovementValueState: entity.aircraftMovementValueState }
+        : {}),
+      ...(entity.aircraftMovementUnavailableReason
+        ? { aircraftMovementUnavailableReason: entity.aircraftMovementUnavailableReason }
+        : {}),
       installedStoreIds: entity.installedStoreIds,
       ...(entity.aircraftControl
         ? { aircraftControlLimiter: entity.aircraftControl.limiter }
@@ -354,13 +371,13 @@ export function decodeColumnarFrames(bytes: Uint8Array): EngineFrame[] {
     );
   }
   if (
-    ![VECTOR_FRAME_SCHEMA, LEGACY_VECTOR_FRAME_SCHEMA].includes(header.schemaVersion as typeof VECTOR_FRAME_SCHEMA) ||
+    ![VECTOR_FRAME_SCHEMA, LEGACY_VECTOR_FRAME_SCHEMA, OLDER_VECTOR_FRAME_SCHEMA].includes(header.schemaVersion as typeof VECTOR_FRAME_SCHEMA) ||
     canonicalJson(header.columns) !== canonicalJson(FRAME_COLUMNS)
   ) {
     throw new Error("VECTOR frame schema is unsupported.");
   }
   if (
-    header.schemaVersion === LEGACY_VECTOR_FRAME_SCHEMA &&
+    header.schemaVersion === OLDER_VECTOR_FRAME_SCHEMA &&
     header.frames.some((frame) => frame.observerStates.some((state) => state.schemaVersion !== "vector.observer-state.v2"))
   ) throw new Error("Legacy VECTOR frame schema cannot contain observer state v3.");
   const valueCount = header.entities.length * FRAME_COLUMNS.length;
@@ -753,7 +770,7 @@ export async function openVectorSimulationRecord(
   const frameMember = header.members.find((candidate) => candidate.path === "frames.arrow");
   if (
     !frameMember ||
-    ![VECTOR_FRAME_SCHEMA, LEGACY_VECTOR_FRAME_SCHEMA].includes(frameMember.schemaVersion as typeof VECTOR_FRAME_SCHEMA) ||
+    ![VECTOR_FRAME_SCHEMA, LEGACY_VECTOR_FRAME_SCHEMA, OLDER_VECTOR_FRAME_SCHEMA].includes(frameMember.schemaVersion as typeof VECTOR_FRAME_SCHEMA) ||
     !manifest.requiredViewerFeatures.includes(frameMember.schemaVersion)
   ) throw new Error("VECTOR record does not admit a supported frame schema.");
   const pictureMember = header.members.find((candidate) => candidate.path === "pictures.jsonl");
@@ -768,7 +785,8 @@ export async function openVectorSimulationRecord(
   }
   const supportedObserverPair =
     (frameMember.schemaVersion === VECTOR_FRAME_SCHEMA && pictureMember.schemaVersion === VECTOR_PICTURE_SCHEMA) ||
-    (frameMember.schemaVersion === LEGACY_VECTOR_FRAME_SCHEMA && pictureMember.schemaVersion === LEGACY_VECTOR_PICTURE_SCHEMA);
+    (frameMember.schemaVersion === LEGACY_VECTOR_FRAME_SCHEMA && pictureMember.schemaVersion === VECTOR_PICTURE_SCHEMA) ||
+    (frameMember.schemaVersion === OLDER_VECTOR_FRAME_SCHEMA && pictureMember.schemaVersion === LEGACY_VECTOR_PICTURE_SCHEMA);
   if (!supportedObserverPair) {
     throw new Error("VECTOR record frame and picture schema pair is unsupported.");
   }

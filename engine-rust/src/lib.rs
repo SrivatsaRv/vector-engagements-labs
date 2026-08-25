@@ -326,6 +326,18 @@ pub struct AircraftModel {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AircraftGroundOperation {
+    pub schema_version: String,
+    pub posture: String,
+    pub release_time_seconds: f64,
+    pub mission_digest: String,
+    pub runway_evidence_digest: String,
+    pub execution_authority: String,
+    pub unavailability_reason: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Table1d {
     pub id: String,
@@ -470,6 +482,8 @@ pub struct EntityDefinition {
     #[serde(default)]
     pub observer_sensor: Option<ObserverSensorAdmission>,
     pub aircraft: Option<AircraftModel>,
+    #[serde(default)]
+    pub ground_operation: Option<AircraftGroundOperation>,
     pub provenance: Provenance,
 }
 
@@ -696,6 +710,8 @@ pub struct EngineScenario {
     pub seed: u64,
     pub duration_seconds: f64,
     pub fixed_step_seconds: f64,
+    #[serde(default)]
+    pub air_mission_runtime: Option<AircraftGroundOperation>,
     pub model_pack: ModelPackBinding,
     pub entities: Vec<EntityDefinition>,
     pub environment: Environment,
@@ -720,6 +736,14 @@ pub enum AircraftControlLimiter {
     LoadFactor,
     None,
     RouteComplete,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AircraftOperationalState {
+    Parked,
+    HoldShort,
+    Enroute,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -751,6 +775,14 @@ pub struct EntityFrame {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub weapon_flight_state: Option<WeaponFlightState>,
     pub value_state: ModelValueState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aircraft_operational_state: Option<AircraftOperationalState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aircraft_operational_state_value_state: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aircraft_movement_value_state: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aircraft_movement_unavailable_reason: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aircraft_control: Option<AircraftControlFrame>,
 }
@@ -1503,6 +1535,7 @@ struct RuntimeState {
     weapon_flight_state: Option<WeaponFlightState>,
     route_point_index: usize,
     aircraft_control: Option<AircraftControlFrame>,
+    aircraft_operational_state: Option<AircraftOperationalState>,
     last_guidance_acceleration: Vec3,
     last_guidance_update_seconds: f64,
 }
@@ -1545,6 +1578,17 @@ impl RuntimeState {
             },
             route_point_index: usize::from(starts_at_first_route_point),
             aircraft_control: None,
+            aircraft_operational_state: if definition.kind != EntityKind::Aircraft {
+                None
+            } else if let Some(ground) = definition.ground_operation.as_ref() {
+                Some(if ground.posture == "RUNWAY" {
+                    AircraftOperationalState::HoldShort
+                } else {
+                    AircraftOperationalState::Parked
+                })
+            } else {
+                Some(AircraftOperationalState::Enroute)
+            },
             last_guidance_acceleration: Vec3::default(),
             last_guidance_update_seconds: f64::NEG_INFINITY,
         }
@@ -1802,6 +1846,22 @@ fn update_aircraft(
     let Some(model) = state.definition.aircraft.as_ref() else {
         return Ok(());
     };
+    if let Some(ground) = state.definition.ground_operation.as_ref() {
+        state.aircraft_operational_state = Some(
+            if ground.posture == "PARKING" || time < ground.release_time_seconds {
+                AircraftOperationalState::Parked
+            } else {
+                AircraftOperationalState::HoldShort
+            },
+        );
+        state.velocity = Vec3::default();
+        state.commanded_g = 0.0;
+        state.drag_newtons = 0.0;
+        state.thrust_newtons = 0.0;
+        state.aircraft_control = None;
+        state.phase = ground.unavailability_reason.clone();
+        return Ok(());
+    }
     let speed = state.velocity.magnitude().max(1.0);
     while state.route_point_index < state.definition.route.len().saturating_sub(1) {
         let Some(point) = state.definition.route.get(state.route_point_index) else {
@@ -1925,6 +1985,7 @@ fn update_aircraft(
         "Route complete"
     }
     .to_string();
+    state.aircraft_operational_state = Some(AircraftOperationalState::Enroute);
     state.aircraft_control = Some(AircraftControlFrame {
         route_point_index: route_point.map(|_| state.route_point_index),
         requested_velocity_mps: requested_velocity,
@@ -1994,6 +2055,9 @@ fn activate_weapons(
             let velocity = states[launcher_index].velocity;
             let heading = states[launcher_index].heading_rad;
             if states[launcher_index].definition.kind == EntityKind::Aircraft {
+                if states[launcher_index].definition.ground_operation.is_some() {
+                    continue;
+                }
                 let Some(store_index) = states[launcher_index]
                     .installed_store_ids
                     .iter()
@@ -2201,6 +2265,28 @@ fn entity_frame(
         phase: state.phase.clone(),
         weapon_flight_state: state.weapon_flight_state,
         value_state: state.definition.provenance.value_state,
+        aircraft_operational_state: state.aircraft_operational_state,
+        aircraft_operational_state_value_state: state.aircraft_operational_state.map(|_| {
+            if state.lifecycle == EntityLifecycle::Terminated {
+                "TERMINATED"
+            } else {
+                "VALID"
+            }
+        }),
+        aircraft_movement_value_state: state.aircraft_operational_state.map(|_| {
+            if state.lifecycle == EntityLifecycle::Terminated {
+                "TERMINATED"
+            } else if state.definition.ground_operation.is_some() {
+                "UNAVAILABLE"
+            } else {
+                "VALID"
+            }
+        }),
+        aircraft_movement_unavailable_reason: state
+            .definition
+            .ground_operation
+            .as_ref()
+            .map(|_| "GROUND_DYNAMICS_MODEL_UNAVAILABLE"),
         aircraft_control: state.aircraft_control.clone(),
     })
 }
@@ -2812,6 +2898,7 @@ mod tests {
                 },
                 maximum_command_g: 9.0,
             }),
+            ground_operation: None,
             provenance: provenance(),
         }
     }
@@ -2904,6 +2991,7 @@ mod tests {
             sensor: None,
             observer_sensor: None,
             aircraft: None,
+            ground_operation: None,
             provenance: provenance(),
         };
         EngineScenario {
@@ -2914,6 +3002,7 @@ mod tests {
             seed: 42,
             duration_seconds: 3.0,
             fixed_step_seconds: 0.05,
+            air_mission_runtime: None,
             model_pack: ModelPackBinding {
                 schema_version: "vector.compiled-model-pack.v1".to_string(),
                 id: "native-test-pack".to_string(),

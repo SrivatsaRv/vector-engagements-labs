@@ -23,9 +23,15 @@ behavior.
 
 Air mission compilation changes only admitted initial/route inputs to this
 generic model: airborne/Mach speed, zero-speed runway entry, fuel mass and
-installed store count. Existing point-mass equations, fixed-step integration,
-guidance, atmosphere and TypeScript/Rust numerical behavior are unchanged; no
-mission-class or named-scenario physics branch exists.
+installed store count. A ground entry now also compiles
+`vector.aircraft-ground-operation.v1`, binding the exact mission and runway
+evidence digests, posture, and readiness release time. Because no complete
+ground-dynamics model is admitted yet, its execution authority is explicitly
+`UNAVAILABLE`: TypeScript and Rust hold the aircraft at `PARKED` or
+`HOLD_SHORT`, preserve fuel/mass/stores, and prevent store launch. They do not
+reuse the airborne 60 m/s floor as a takeoff model. Existing point-mass
+equations, fixed-step airborne integration, guidance, and atmosphere remain
+unchanged; no mission-class or named-scenario physics branch exists.
 Aircraft and guided-vehicle dynamics now sample sourced atmosphere and ENU wind
 at entity position/time. Initial/routes below the same DEM are rejected and
 guided-vehicle terrain impact terminates before invalid atmosphere lookup.
@@ -47,6 +53,8 @@ legacy/synthetic scenarios with no regional runtime projection.
 - direct and commanded-loft guidance;
 - proportional-navigation acceleration demand with command limits;
 - deterministic execution of authored airborne route points;
+- causal ground readiness hold with achieved operational state and an explicit
+  unavailable-movement reason until governed runway dynamics are admitted;
 - G2G commanded cruise altitude, with a terminal blend to objective elevation for direct paths and a higher commanded apex for lofted paths;
 - governed wind-shift events;
 - closest approach, completion, energy, target-unavailable, and time termination; non-finite-state checks; and dry-mass margin diagnostics.

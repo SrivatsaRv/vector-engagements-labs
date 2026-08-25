@@ -12,6 +12,11 @@ loadout, fuel, recovery, policy, engine, or support values.
 Saved-run admission validates the complete regional EnvironmentPack, compact
 runtime binding and exact runway origin schema. Corrupt, stale, unknown or
 cross-environment identities fail closed without catalogue fallback.
+Ground-start replay also requires the exact compiled ground-operation mission,
+posture, release, and runway-evidence binding. A digest-valid hostile mutation,
+unknown field, or mismatched archived identity is rejected; replay never repairs
+it by substituting a current mission or by presenting unavailable movement as a
+valid zero-valued dynamics result.
 
 Saved-run snapshots and saved-run admission counters now have separate
 domain-owned declaration modules behind the unchanged aggregate Drizzle schema.

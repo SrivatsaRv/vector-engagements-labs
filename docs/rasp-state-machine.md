@@ -14,6 +14,9 @@ consequences enter through ordinary canonical entities and frames.
 Environment sampling is causal state input: sourced density/wind and DEM
 collision can change motion or termination, but do not invent RASP knowledge,
 sensor detection, decisions, or narrative state.
+Ground-held aircraft now expose achieved `PARKED`/`HOLD_SHORT` operational
+state and movement `UNAVAILABLE` with the stable ground-dynamics cause. This is
+canonical entity state, not a RASP observation or inferred intent.
 
 Every A2A tick emits one state owned by `IAF` and one owned by `PAF`. Without a
 compiled admission, `vector.observer-state.v2` has
@@ -120,6 +123,8 @@ Separating saved-record and admission table declarations does not change RASP
 event, picture, or replay authority.
 Air mission lineage extends record admission only; it does not permit replay to
 derive observer information from model truth or re-run mission behavior.
+Frame schema v6 replays ground operational/movement availability exactly; RASP
+consumers may not convert unavailable movement into an observation or track.
 
 ## Air mission record storage
 
@@ -138,7 +143,7 @@ inside that archived pack. A later PostGIS row, catalogue revision or pack with
 the same regional label cannot replace it. This extends record identity only;
 it does not add a track, observation or RASP transition.
 
-New records use `vector.frames.columnar.v5` and `vector.pictures.v4`. They are
+New records use `vector.frames.columnar.v6` and `vector.pictures.v4`. They are
 the immutable projection of
 the tick boundary. During replay, the verified pictures member is reattached
 to decoded frames; replay never derives a track from stored world positions.
@@ -146,8 +151,9 @@ The admission check rejects a picture with a position, observed entity ID, or
 truth position. It verifies byte-for-byte equivalence to the tick projection;
 therefore a PLOT cannot be promoted by replay into an estimate or a renderable
 target. The reader retains explicit read-only compatibility with the previous
+`vector.frames.columnar.v5` / `vector.pictures.v4` pair and with the older
 `vector.frames.columnar.v4` / `vector.pictures.v3` pair, which may contain only
-observer state v2. A legacy member cannot carry v3 tracks. Cross-paired,
+observer state v2. A v4 member cannot carry v3 tracks. Cross-paired,
 missing, extra, or future frame/picture versions fail closed. Observation,
 track, and event source identities must also match the exact compiled scenario
 sensor projection; a valid pack digest beside a forged model ID is rejected.
@@ -181,6 +187,10 @@ and consistent all-member source forgery.
 `tests/air-mission.test.mjs` additionally covers deterministic mission identity,
 all classes/overlays/start postures, negative admission, server preservation,
 and exact VSR/report mission-lineage readback.
+Its ground-held regressions prove TS/Rust `PARKED`/`HOLD_SHORT` parity,
+unchanged position/fuel/mass/stores, rejected launch, and explicit unavailable
+movement; `tests/vector-record.test.mjs` proves v6 round-trip and v5/v4 plus
+v4/v3 read compatibility.
 `npm run performance:track-store:verify` gates two side-owned stores retaining
 50 tracks each at 20 Hz for five seconds below 75 ms p95 with bounded heap, a
 brute-force association oracle, and repeat digest. The same 100-track fixture
