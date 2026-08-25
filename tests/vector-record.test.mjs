@@ -26,7 +26,7 @@ import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
 import { bindVerificationTrackModelPack } from "../lib/engine/verification-track-fixture.ts";
 import {
-  assertPhaseAEnvironmentPack,
+  assertEnvironmentPack,
   environmentPackBinding,
 } from "../lib/geospatial/environment-pack.ts";
 
@@ -129,11 +129,25 @@ for (const backend of ["typescript", "rust-wasm"]) {
     );
     assert.equal(opened.result.engineRun.diagnostics.backend, backend);
     const recordedPack = opened.result.engineRun.scenario.geospatial.environmentPack;
-    assertPhaseAEnvironmentPack(recordedPack);
+    assertEnvironmentPack(recordedPack);
     assert.deepEqual(
       opened.result.engineRun.scenario.environment.environmentPack,
       environmentPackBinding(recordedPack),
       "replay must retain the exact admitted environment-pack binding instead of re-resolving a catalog selection",
+    );
+    const supersedingPreparation = prepareSimulation({
+      ...scenario,
+      wind: scenario.wind + 1,
+    }, scenario.profile, capabilities);
+    assert.notEqual(
+      supersedingPreparation.engineScenario.geospatial.environmentPack.identity.digest,
+      recordedPack.identity.digest,
+      "a later authored pack is a distinct immutable version",
+    );
+    assert.equal(
+      opened.result.engineRun.scenario.geospatial.environmentPack.identity.digest,
+      recordedPack.identity.digest,
+      "archived replay must not resolve against a later pack",
     );
     assert.deepEqual(
       opened.result.engineRun.scenario.entities.find((entity) => entity.id === "red-object-1")?.routePlan,

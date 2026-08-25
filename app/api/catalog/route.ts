@@ -6,9 +6,11 @@ import { enforceRateLimit } from "@/lib/security/runtime";
 import { admitCatalogCredibility } from "@/lib/catalog-admission";
 import {
   assertPublishedInstallationCatalogueRows,
+  assertPublishedRunwayCatalogueRows,
   INSTALLATION_CATALOGUE,
   INSTALLATION_CATALOGUE_IDENTITY,
 } from "@/lib/installations";
+import { assertPublishedEnvironmentPackRows } from "@/lib/geospatial/environment-pack";
 
 const CATALOG_TTL_MS = 5 * 60 * 1000;
 let catalogCache: { expiresAt: number; value: Record<string, unknown> } | undefined;
@@ -17,7 +19,7 @@ let catalogLoad: Promise<Record<string, unknown>> | undefined;
 async function loadCatalog() {
   if (catalogCache && catalogCache.expiresAt > Date.now()) return catalogCache.value;
   catalogLoad ??= withDatabase(async (sql) => {
-    const [platforms, weapons, subsystems, sources, compatibility, assertions, simulationModels, installations, studyAreas, scenarioTemplates, intendedUses, compiledModelPacks, credibilityManifests] = await Promise.all([
+    const [platforms, weapons, subsystems, sources, compatibility, assertions, simulationModels, installations, runways, environmentPacks, studyAreas, scenarioTemplates, intendedUses, compiledModelPacks, credibilityManifests] = await Promise.all([
       sql`SELECT * FROM platform_variants ORDER BY service, display_name`,
       sql`SELECT * FROM weapons ORDER BY category, display_name`,
       sql`SELECT * FROM subsystems ORDER BY kind, designation`,
@@ -25,7 +27,9 @@ async function loadCatalog() {
       sql`SELECT * FROM platform_weapon_compatibility ORDER BY platform_id, weapon_id`,
       sql`SELECT * FROM source_assertions ORDER BY entity_type, entity_id, field_path`,
       sql`SELECT * FROM simulation_models ORDER BY weapon_id, version`,
-      sql`SELECT id, service, name, icao_code, elevation_ft, runway_info, installation_type, ST_X(location) AS longitude, ST_Y(location) AS latitude, public_reference, source_id FROM installations ORDER BY service, name`,
+      sql`SELECT i.id, i.service, i.name, i.icao_code, i.elevation_ft, i.runway_info, i.installation_type, ST_X(i.location) AS longitude, ST_Y(i.location) AS latitude, i.public_reference, i.source_id, i.coordinate_datum, i.positional_uncertainty_m, i.provenance, i.review_state, (SELECT r.id FROM installation_runways r WHERE r.installation_id=i.id AND r.mission_start_eligibility='PUBLIC_EDUCATIONAL' ORDER BY r.id LIMIT 1) AS ground_start_runway_id, EXISTS (SELECT 1 FROM installation_runways r WHERE r.installation_id=i.id AND r.mission_start_eligibility='PUBLIC_EDUCATIONAL') AS ground_start_supported FROM installations i ORDER BY i.service, i.name`,
+      sql`SELECT id, installation_id, source_runway_id, source_airport_ident, designator, true_heading_deg, reciprocal_true_heading_deg, length_m, width_m, surface, closed_in_source, ST_AsGeoJSON(centreline, 15)::json AS centreline, threshold_elevations_msl_m, horizontal_datum, vertical_datum, positional_uncertainty_m, provenance, review_state, mission_start_eligibility, limitation, content_hash FROM installation_runways ORDER BY installation_id, id`,
+      sql`SELECT id, version, digest, schema_version, study_area_id, weather_preset_id, intended_use, provenance, ST_AsGeoJSON(coverage, 15)::json AS coverage, horizontal_datum, vertical_datum, source_vertical_datum, valid_from, valid_until, terrain_digest, atmosphere_digest, installation_catalogue_digest, superseded_at FROM environment_packs ORDER BY study_area_id, weather_preset_id, version`,
       sql`SELECT id, name, short_name, description, terrain_class, surface_elevation_m, ST_X(anchor) AS anchor_longitude, ST_Y(anchor) AS anchor_latitude, ST_AsGeoJSON(boundary)::json AS boundary, environment_presets, default_environment_preset_id, source_class FROM study_areas ORDER BY name`,
       sql`SELECT id, version, domain, title, status, package, schema_version, content_hash, engine_version, intended_use_id, intended_use_version, model_pack_id, model_pack_version, model_pack_digest FROM scenario_templates WHERE status = 'VALIDATED' ORDER BY domain, title`,
       sql`SELECT id, version, schema_version, definition, content_hash FROM intended_use_contracts ORDER BY id, version`,
@@ -39,9 +43,11 @@ async function loadCatalog() {
       credibilityManifests,
     });
     assertPublishedInstallationCatalogueRows(installations);
+    assertPublishedRunwayCatalogueRows(runways);
+    assertPublishedEnvironmentPackRows(environmentPacks);
     return {
       platforms, weapons, subsystems, sources, compatibility, assertions,
-      simulationModels, installations, studyAreas, scenarioTemplates, intendedUses,
+      simulationModels, installations, runways, environmentPacks, studyAreas, scenarioTemplates, intendedUses,
       compiledModelPacks, credibilityManifests, credibilityAdmissions,
       installationCatalogue: {
         schemaVersion: INSTALLATION_CATALOGUE.schemaVersion,
@@ -51,6 +57,7 @@ async function loadCatalog() {
         validity: INSTALLATION_CATALOGUE.validity,
         review: INSTALLATION_CATALOGUE.review,
         records: INSTALLATION_CATALOGUE.records,
+        runways: INSTALLATION_CATALOGUE.runways,
       },
     };
   }).then((value) => {

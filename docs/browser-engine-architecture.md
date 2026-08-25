@@ -56,6 +56,9 @@ geometry/transitions/radii, initial fuel, and admitted station/rule/quantity
 from `CompiledAirMission`. The mission editor's spatial route is retained only
 as an anti-staleness compatibility projection and does not become a second
 runtime input.
+The compiled scenario now carries a bounded `vector.environment-runtime-grid.v1`
+projection. Both TypeScript and Rust/WASM ticks sample that immutable terrain,
+atmosphere and wind payload; they never fetch provider or PostGIS data.
 
 Interactive workbench execution uses the module Worker in
 `lib/runtime/simulation.worker.ts`. This is a browser Web Worker and is unrelated
@@ -91,10 +94,18 @@ reuse storage. No `SharedArrayBuffer` or cross-origin isolation is required.
 
 ## Built Worker verification
 
-The built-Worker journey includes CAP/BVR with an exact Pathankot runway start
+The built-Worker journey includes CAP/BVR with an exact sourced Jodhpur runway start
 and proves that the admitted artifact, rather than a UI label, reaches a
 completed Worker run. Focused adapter tests tamper fuel after main-thread
 compilation and require the same stable code and field path as server admission.
+The environment-sampler module Worker admits only a complete digest-verified
+regional pack and caches at most four pack identities. A sample request is
+bounded by 4,096 queries and runs in 128-query scheduling chunks, yielding so a
+cancel message can be observed without terminating the Worker. Cancellation
+cleans request state; a subsequent retry against the same cached digest must
+succeed. Invalid/corrupt packs, missing digests, out-of-coverage/time/altitude
+queries and over-limit batches fail explicitly. The built Chromium gate proves
+regional load, mid-request cancellation and same-Worker recovery.
 
 `npm run worker:verify` loads the two production Worker artifacts from the
 declared Vinext client output directory, `dist/client/_next/static`. It requires

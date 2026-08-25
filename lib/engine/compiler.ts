@@ -18,18 +18,21 @@ import {
   CURRENT_MODEL_PACK_ID,
   CURRENT_MODEL_PACK_VERSION,
 } from "../reference-model-pack.ts";
-import { localFrameToGeographic } from "../geospatial/geodesy.ts";
 import {
   DEFAULT_WAYPOINT_ACCEPTANCE_RADIUS_M,
+  enginePositionToGeographic,
+  geographicToEnginePosition,
   ROUTE_PLAN_SCHEMA_VERSION,
-  geographicToLocal,
   scenarioOrigin,
 } from "../scenario-spatial.ts";
 import { buildSyntheticEnvironmentManifest } from "../geospatial/synthetic-environment.ts";
 import {
-  admitPhaseAEnvironmentPack,
+  admitEnvironmentPack,
+  createEnvironmentSampler,
   environmentPackBinding,
+  environmentRuntimeProjection,
 } from "../geospatial/environment-pack.ts";
+import { reconcileGroundStartElevation } from "../installations.ts";
 import {
   resolveInstallationOriginReference,
   type InstallationOriginReference,
@@ -260,7 +263,7 @@ export function compileScenario(
   // Admission resolves a single immutable environment package. The compiler,
   // engine and replay record consume this object; none may re-look up the
   // authored string IDs after this boundary.
-  const admittedEnvironment = admitPhaseAEnvironmentPack({
+  const admittedEnvironment = admitEnvironmentPack({
     studyAreaId: input.studyAreaId,
     weatherPresetId: input.weatherPresetId,
     effectiveWeather: {
@@ -290,7 +293,7 @@ export function compileScenario(
   // domains retain their existing inputs.
   const compiledAssignment = compiledAirMission?.assignment;
   const compiledBluePlan = compiledAirMission?.flightPlan;
-  const compiledBlueRoute = compiledBluePlan?.routePoints.map((point) => geographicToLocal({
+  const compiledBlueRoute = compiledBluePlan?.routePoints.map((point) => geographicToEnginePosition({
     longitude: point.position.longitude,
     latitude: point.position.latitude,
     altitudeM: point.position.altitude.valueM,
@@ -301,36 +304,85 @@ export function compileScenario(
   const runtimeBlueFuelPercent = compiledAssignment?.initialFuelPercent ?? input.blueFuelPercent;
   const runtimeBlueWeaponQuantity = compiledAssignment?.loadout.reduce((total, store) => total + store.quantity, 0) ?? input.blueWeaponQuantity;
   const runtimeBlueRadarMode = compiledAirMission?.policies.emission ?? input.blueRadarMode;
-  const admittedOriginReferences = [
-    [input.placement?.blueOriginReference, "placement.blue.originReference"],
-    [input.placement?.redOriginReference, "placement.red.originReference"],
-  ] as const;
-  admittedOriginReferences.forEach(([reference, fieldPath]) => {
-    resolveInstallationOriginReference({
-      reference,
-      studyAreaId: input.studyAreaId,
-      weatherPresetId: input.weatherPresetId,
-      fieldPath,
-    });
+  const environmentSampler = createEnvironmentSampler(environmentPack);
+  const blueOrigin = resolveInstallationOriginReference({
+    reference: input.placement?.blueOriginReference,
+    studyAreaId: input.studyAreaId,
+    weatherPresetId: input.weatherPresetId,
+    fieldPath: "placement.blue.originReference",
+    environmentPack,
+  });
+  const redOrigin = resolveInstallationOriginReference({
+    reference: input.placement?.redOriginReference,
+    studyAreaId: input.studyAreaId,
+    weatherPresetId: input.weatherPresetId,
+    fieldPath: "placement.red.originReference",
+    environmentPack,
   });
   const targetHeadingRad = ((180 - input.aspect) * Math.PI) / 180;
-  const blueStart = compiledAirMission?.start
-    ? geographicToLocal({
+  const authoredBlueStart = input.placement?.blueStart ?? {
+    x: 0,
+    y: 0,
+    z: input.altitude,
+  };
+  const authoredRedStart = input.placement?.redStart ?? {
+    x: input.range,
+    y: 0,
+    z: Math.max(0, input.altitude + input.targetDelta),
+  };
+  const reconcileRunwayStart = (input: {
+    position: Vec3;
+    runwayMslM: number;
+    longitude: number;
+    latitude: number;
+  }): Vec3 => {
+    const { position } = input;
+    const terrain = environmentSampler.terrain.sample({ eastM: position.x, northM: position.y });
+    if (!terrain.elevation) {
+      throw new TypeError("Ground-start runway has no admitted DEM surface.");
+    }
+    const resolved = reconcileGroundStartElevation(input.runwayMslM, terrain.elevation.valueM);
+    return geographicToEnginePosition({
+      longitude: input.longitude,
+      latitude: input.latitude,
+      altitudeM: resolved.valueM,
+      verticalDatum: "MSL",
+    }, studyArea);
+  };
+  const runwayStart = (origin: typeof blueOrigin, authoredStart: Vec3): Vec3 => {
+    if (!origin) return authoredStart;
+    const local = geographicToEnginePosition({
+      longitude: origin.groundStart.threshold.longitudeDeg,
+      latitude: origin.groundStart.threshold.latitudeDeg,
+      altitudeM: origin.groundStart.altitude.valueM,
+      verticalDatum: "MSL",
+    }, studyArea);
+    return reconcileRunwayStart({
+      position: local,
+      runwayMslM: origin.groundStart.altitude.valueM,
+      longitude: origin.groundStart.threshold.longitudeDeg,
+      latitude: origin.groundStart.threshold.latitudeDeg,
+    });
+  };
+  const compiledBlueStart = compiledAirMission?.start
+    ? geographicToEnginePosition({
         longitude: compiledAirMission.start.position.longitude,
         latitude: compiledAirMission.start.position.latitude,
         altitudeM: compiledAirMission.start.position.altitude.valueM,
         verticalDatum: "MSL",
       }, studyArea)
-    : input.placement?.blueStart ?? {
-    x: 0,
-    y: 0,
-    z: input.altitude,
-  };
-  const redStart = input.placement?.redStart ?? {
-    x: input.range,
-    y: 0,
-    z: Math.max(0, input.altitude + input.targetDelta),
-  };
+    : undefined;
+  const blueStart = compiledBlueStart
+    ? compiledAirMission!.start.entryState === "GROUND"
+      ? reconcileRunwayStart({
+          position: compiledBlueStart,
+          runwayMslM: compiledAirMission!.start.position.altitude.valueM,
+          longitude: compiledAirMission!.start.position.longitude,
+          latitude: compiledAirMission!.start.position.latitude,
+        })
+      : compiledBlueStart
+    : runwayStart(blueOrigin, authoredBlueStart);
+  const redStart = runwayStart(redOrigin, authoredRedStart);
   const blueHeadingRad = compiledAirMission
     ? compiledAirMission.start.headingSource === "FLIGHT_PLAN_FIRST_LEG"
       ? Math.atan2(
@@ -338,8 +390,20 @@ export function compileScenario(
           compiledBlueRoute![1].x - compiledBlueRoute![0].x,
         )
       : ((90 - compiledAirMission.start.runwayHeadingDegTrue!) * Math.PI) / 180
+    : blueOrigin
+      ? ((90 - blueOrigin.groundStart.trueHeadingDeg) * Math.PI) / 180
     : input.placement?.blueHeadingRad ?? 0;
-  const redHeadingRad = input.placement?.redHeadingRad ?? targetHeadingRad;
+  const redHeadingRad = redOrigin
+    ? ((90 - redOrigin.groundStart.trueHeadingDeg) * Math.PI) / 180
+    : input.placement?.redHeadingRad ?? targetHeadingRad;
+  const blueRoute = compiledBlueRoute?.length
+    ? compiledBlueRoute.map((point, index) => index === 0 ? { ...blueStart } : { ...point })
+    : input.placement?.blueRoute.length
+    ? input.placement.blueRoute.map((point, index) => index === 0 && blueOrigin ? { ...blueStart } : { ...point })
+    : undefined;
+  const redRoute = input.placement?.redRoute.length
+    ? input.placement.redRoute.map((point, index) => index === 0 && redOrigin ? { ...redStart } : { ...point })
+    : undefined;
   const movingTarget = input.domain === "A2A" || input.domain === "G2A";
   const blueIsAircraft = blueObject.kind === "AIRCRAFT";
   const blueAircraftModel = blueIsAircraft ? compiledAircraftRuntime(blueObject.id) : undefined;
@@ -410,10 +474,8 @@ export function compileScenario(
       kind: kindMap[blueObject.kind],
       symbolRole: blueObject.symbolRole,
       lifecycle: "ACTIVE",
-      route: compiledBlueRoute?.length
-        ? compiledBlueRoute.map((point) => ({ ...point }))
-        : input.placement?.blueRoute.length
-          ? input.placement.blueRoute.map((point) => ({ ...point }))
+      route: blueRoute
+        ? blueRoute
         : [
             blueStart,
             {
@@ -485,8 +547,8 @@ export function compileScenario(
       kind: kindMap[redObject.kind],
       symbolRole: redObject.symbolRole,
       lifecycle: "ACTIVE",
-      route: input.placement?.redRoute.length
-        ? input.placement.redRoute.map((point) => ({ ...point }))
+      route: redRoute
+        ? redRoute
         : [
             redStart,
             {
@@ -712,7 +774,7 @@ export function compileScenario(
       origin,
       initialPositions: entities.map((entity) => ({
         entityId: entity.id,
-        position: localFrameToGeographic(entity.initial.position, origin),
+        position: enginePositionToGeographic(entity.initial.position, origin),
       })),
       syntheticEnvironment,
       environmentPack,
@@ -727,6 +789,7 @@ export function compileScenario(
         z: 0,
       },
       atmosphere: "NASA_EDUCATIONAL_STANDARD",
+      runtimeEnvironment: environmentRuntimeProjection(environmentPack),
       environmentPack: environmentPackBinding(environmentPack),
       studyArea: {
         id: studyArea.id,

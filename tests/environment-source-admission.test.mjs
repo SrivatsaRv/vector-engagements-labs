@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import test from "node:test";
 import {
+  assertRegionalEnvironmentSourceBundle,
   assertEligibleForAreaEnvironmentPack,
   ingestSourcedPointAtmosphere,
 } from "../lib/geospatial/environment-source-admission.ts";
@@ -126,5 +127,43 @@ test("point-only source artifacts fail closed before area environment-pack use",
   assert.throws(
     () => assertEligibleForAreaEnvironmentPack(ingest("north-punjab-anchor")),
     /point-only and cannot admit an area environment pack/,
+  );
+});
+
+test("the frozen regional source bundle is area-eligible only with exact terrain, atmosphere, datum and licence evidence", () => {
+  const regionalDirectory = resolve("governance/environment-sources/regional-environment-v1");
+  const regionalManifest = JSON.parse(readFileSync(resolve(regionalDirectory, "manifest.v1.json"), "utf8"));
+  const compiledBytes = readFileSync(resolve(regionalDirectory, "compiled.v1.json"));
+  const compiled = JSON.parse(compiledBytes.toString("utf8"));
+
+  const admitted = assertRegionalEnvironmentSourceBundle({
+    manifest: regionalManifest,
+    compiled,
+    compiledBytes,
+  });
+  assert.equal(admitted.schemaVersion, "vector.regional-environment-source-bundle.v1");
+  assert.equal(admitted.regions.length, 6);
+  assert.equal(admitted.terrain.verticalDatum, "EGM2008");
+  assert.equal(admitted.terrain.derivedRuntimeDatum, "MSL");
+  assert.equal(admitted.atmosphere.horizontalDatum, "WGS84");
+  assert.equal(admitted.atmosphere.timeStandard, "UTC");
+  assert.ok(admitted.regions.every((region) => region.weatherPresets.length === 2));
+
+  const badBytes = Buffer.concat([compiledBytes, Buffer.from(" ")]);
+  assert.throws(
+    () => assertRegionalEnvironmentSourceBundle({ manifest: regionalManifest, compiled, compiledBytes: badBytes }),
+    /compiled regional source digest does not match/i,
+  );
+
+  const badDatum = structuredClone(compiled);
+  badDatum.terrain.verticalDatum = "UNDECLARED";
+  const badDatumBytes = Buffer.from(JSON.stringify(badDatum));
+  assert.throws(
+    () => assertRegionalEnvironmentSourceBundle({
+      manifest: { ...regionalManifest, compiledSha256: createHash("sha256").update(badDatumBytes).digest("hex") },
+      compiled: badDatum,
+      compiledBytes: badDatumBytes,
+    }),
+    /EGM2008/i,
   );
 });

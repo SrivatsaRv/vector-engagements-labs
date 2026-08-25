@@ -5940,6 +5940,8 @@ button:disabled,
 .origin-picker-menu > [role="option"].selected { background: #edf3f8; }
 .origin-picker-menu > .vector-select-empty { color: var(--muted); cursor: default; }
 .authoring-installation-marker { position: relative; width: 34px; height: 34px; padding: 0; border: 0; background: transparent; opacity: .82; cursor: pointer; }
+.authoring-installation-marker:disabled { cursor: not-allowed; filter: grayscale(1); opacity: .42; }
+.environment-pack-identity { position: absolute; z-index: 8; top: 10px; left: 10px; max-width: calc(100% - 20px); padding: 5px 8px; border: 1px solid rgba(110,137,157,.5); border-radius: 4px; background: rgba(10,20,29,.82); color: #d6e2ea; font: 600 10px/1.35 var(--font-mono); pointer-events: none; }
 .authoring-installation-marker svg { width: 34px; height: 34px; }
 .authoring-installation-marker > span { position: absolute; top: 31px; left: 50%; width: max-content; max-width: 130px; transform: translateX(-50%); padding: 2px 4px; border: 1px solid rgba(203,210,214,.88); background: rgba(255,255,255,.93); color: #4c5861; font-size: 8px; font-weight: 700; white-space: nowrap; }
 .authoring-route-summary button.active { min-height: 27px; padding: 0 7px; color: #fff; background: #263642; }

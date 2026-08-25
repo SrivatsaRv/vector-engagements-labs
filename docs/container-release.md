@@ -74,7 +74,15 @@ guard rejects any residual non-v4 row before application rollout.
 
 Domain-owned files under `db/schema/` are re-exported by `db/schema.ts` and
 therefore remain one Drizzle schema and one forward-migration sequence. The
-module split introduces no migration, table, or backup-format change.
+module split introduces no migration, table, or backup-format change. Regional
+environment delivery adds forward migration
+`014_environment_pack_runways.sql`: immutable content-addressed environment
+packs, PostGIS runway centrelines/elevation/provenance, and installation
+provenance columns. It also refreshes canonical v4 EnvironmentPack wording and
+hashes through `environment:migration:verify`. Snapshot before applying it.
+Rollback uses the prior image against the forward-migrated compatible schema;
+it does not delete pack or runway evidence. Restore remains the recovery path
+for a migration failure.
 
 Forward-only migrations execute as a health-gated one-shot job before the
 application starts. Production never runs the `seed` profile/service. Before a

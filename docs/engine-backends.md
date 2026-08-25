@@ -8,6 +8,9 @@ VECTOR has one engine contract and two browser implementations. The authored sce
 continues to execute the existing generic entity/route ABI and ignores that
 non-physics envelope; the backend adapter reattaches the already verified exact
 artifact so TypeScript and Rust results retain identical VSR authority.
+The Rust ABI admits `vector.environment-runtime-grid.v1` with the exact parent
+pack binding and implements the same grid/time interpolation, atmosphere
+derivation, wind consumption and DEM collision rules as TypeScript.
 
 The default backend is a Rust 2021 `cdylib` compiled for `wasm32-unknown-unknown`. This target has no operating-system dependency and executes inside the browser WebAssembly runtime. The module exposes a deliberately small C ABI:
 
@@ -51,6 +54,9 @@ It is not a separate product mode. Its purpose is controlled parity testing, dia
 
 Air runs add authored and compiled mission digests to backend-independent
 provenance. Backend choice cannot create, migrate, or repair mission intent.
+Backend provenance now sits beside one content-addressed regional pack. A run
+is rejected when the runtime grid, source grids or compact pack binding do not
+match the archived EnvironmentPack digest.
 
 The selected production backend is owned by the content-addressed
 `DeploymentCapabilityManifest`; it is not a scenario field, URL parameter,
@@ -90,6 +96,9 @@ entity contract. No mission class, scenario ID, or named aircraft selects a
 backend or physics branch. Likewise, a successfully validated Stage-B v2
 identity cannot cross this swap boundary until #154 and the later
 Worker/runtime/VSR owner add a separate admission contract.
+The backend-neutral scenario owns the complete preprocessed environment
+projection. Implementations may optimize sampling but may not re-resolve area
+names, query remote terrain/database state, or substitute atmosphere defaults.
 
 UI components do not import either numerical core. They call `simulate`, which compiles the scenario and dispatches through `runEngineBackend`. Observe, Explain, Compare, Save, and Report consume only the returned `EngineRun`. A later native service, worker pool, or higher-fidelity engine must implement this same boundary instead of branching presentation state.
 

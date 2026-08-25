@@ -11,6 +11,9 @@ one family must not imply changes to unrelated contracts.
 
 #### Model packs
 
+- Bind the independent regional EnvironmentPack/runtime-grid digest beside the
+  compiled model pack without changing named-system evidence authority.
+
 Model-pack persistence table declarations now live in the domain-owned
 `db/schema/model-pack.ts` module behind the unchanged aggregate Drizzle facade.
 Air flight assignments bind exact model-pack, aircraft and compatible
@@ -42,6 +45,14 @@ promotion remain downstream under #154, later #161 stages and #155.
 
 #### Database schema
 
+- Add migration 014 for immutable PostGIS environment packs, sourced runway
+  geometry/elevation/provenance, exact catalogue readback, and canonical v4
+  scenario-package EnvironmentPack wording/hashes.
+- Make migration 014 self-sufficient for production by installing its governed
+  source/installation prerequisites, 24 runways and 12 regional packs before
+  seed; protect every pack column except `superseded_at` with a live mutation
+  matrix.
+
 The aggregate `db/schema.ts` facade now re-exports domain-owned schema modules;
 table names, columns, constraints, and prior migrations are unchanged.
 Forward-only migration `013_air_mission_contract.sql` replaces exact v3 scenario
@@ -55,6 +66,12 @@ envelope for backend-independent VSR provenance.
 The WASM-capable Rust core also validates the exact-key compiled model-pack v2
 schema and reproduces the TypeScript digest on an anonymous fixture. This adds
 no exported simulation ABI, backend-selection rule or v2 runtime admission.
+- Add `vector.environment-runtime-grid.v1` terrain/atmosphere fields with exact
+  TypeScript/Rust interpolation and collision parity.
+- Propagate regional terrain/atmosphere coverage, validity and no-data failures
+  as stable Rust engine errors instead of a zero-surface or `NaN` substitute.
+
+No pending family-specific entry.
 
 #### Generic AAM verification
 
@@ -86,12 +103,27 @@ The Rust compiled-model-pack v2 identity validator is schema-only offline
 publication/readback support; it changes no equation, numerical path, runtime
 admission, or tick behavior.
 
+- Consume sourced density/wind per entity/time and use one admitted DEM for
+  AGL, below-terrain rejection and guided-vehicle impact.
+- Stop TypeScript and Rust/WASM at the same first unavailable regional sample;
+  legacy zero-plane/educational atmosphere behavior remains distinct and is
+  used only when no regional runtime projection exists.
+
+No pending family-specific entry.
+
 #### Browser Worker protocol
 
 The Worker independently recompiles and verifies Air mission/model/environment
 identity before caching or executing a runtime adapter.
+- Admit complete regional packs with four-pack cache bounds, 4,096-query limits,
+  cooperative 128-sample cancellation chunks and same-Worker retry recovery.
+
+No pending family-specific entry.
 
 #### Vector simulation records
+
+- Archive the complete regional pack/runtime projection and reject replay
+  substitution by a later or superseding pack identity.
 
 Saved-run record and admission tables now have separate domain-owned schema
 modules without changing their persisted representation.
@@ -118,6 +150,13 @@ All Air mission classes, overlays, flight plans, start postures, loadout/fuel,
 recovery, Worker/server admission, and VSR/report lineage share that contract.
 Migration `013_air_mission_contract.sql` freezes exact upgraded template JSON
 and hashes; no production seed or fallback default performs the migration.
+- Add exact `vector.installation-origin.v2` runway starts and fail-closed
+  runway/DEM reconciliation within a declared 30 m model envelope.
+- Validate ground-start tailwind from the sourced regional atmosphere plus
+  authored modifiers sampled at the runway threshold and readiness time.
+
+Scenario-template table declarations now live in `db/schema/scenarios.ts`
+behind the unchanged aggregate schema export.
 
 #### Scenario composition kernel
 

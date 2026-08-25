@@ -3,6 +3,7 @@ import { findPlatform, findWeapon, getSource } from "./capability-data.ts";
 import { getGovernedAircraftEvidenceClaim } from "./aircraft-evidence-registry.ts";
 import { getCatalogObject } from "./object-catalog.ts";
 import { findWeaponSimulationModel } from "./simulation-models.ts";
+import type { RegionalEnvironmentPack } from "./geospatial/environment-pack.ts";
 
 export type ReportLibraryScenario = {
   id: string;
@@ -268,12 +269,17 @@ export function buildReportExport(
       reviewState: "public-study",
       syntheticEnvironment:
         data.result.engineRun.scenario.geospatial.syntheticEnvironment,
+      environmentPack:
+        data.result.engineRun.scenario.geospatial.environmentPack,
     },
     limitations: [
       "Public-data educational approximation.",
       "Not verified weapon performance.",
       "Not current operational deployment information.",
       "Not an actual engagement prediction or weapon-control recommendation.",
+      ...(data.result.engineRun.scenario.geospatial.environmentPack.terrain.kind === "SOURCED_REGULAR_GRID"
+        ? (data.result.engineRun.scenario.geospatial.environmentPack as RegionalEnvironmentPack).limitations
+        : ["Synthetic environment pack remains a visible model assumption."]),
     ],
   };
 }

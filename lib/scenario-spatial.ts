@@ -112,11 +112,76 @@ export function geographicToLocal(
   );
 }
 
+/**
+ * Engine coordinates use local ENU east/north and an explicit metres-MSL
+ * vertical axis. Keep this adapter distinct from a full three-axis ENU
+ * transform so terrain, atmosphere, TypeScript and Rust share one datum.
+ */
+export function geographicToEnginePosition(
+  point: ScenarioSpatialPoint,
+  area: StudyArea,
+) {
+  const local = geographicToLocal(point, area);
+  return { x: local.x, y: local.y, z: point.altitudeM };
+}
+
+/** Invert the engine's hybrid ENU-horizontal/MSL-vertical position exactly. */
+export function enginePositionToGeographic(
+  point: { x: number; y: number; z: number },
+  origin: ScenarioOrigin,
+) {
+  let candidate = localFrameToGeographic({ x: point.x, y: point.y, z: 0 }, origin);
+  for (let iteration = 0; iteration < 3; iteration += 1) {
+    const project = (longitudeDeg: number, latitudeDeg: number) => geographicToLocalFrame({
+      longitudeDeg,
+      latitudeDeg,
+      altitude: { valueM: point.z, datum: "ELLIPSOID" },
+    }, origin);
+    const current = project(candidate.longitudeDeg, candidate.latitudeDeg);
+    const stepDeg = 1e-6;
+    const eastStep = project(candidate.longitudeDeg + stepDeg, candidate.latitudeDeg);
+    const northStep = project(candidate.longitudeDeg, candidate.latitudeDeg + stepDeg);
+    const j11 = (eastStep.x - current.x) / stepDeg;
+    const j21 = (eastStep.y - current.y) / stepDeg;
+    const j12 = (northStep.x - current.x) / stepDeg;
+    const j22 = (northStep.y - current.y) / stepDeg;
+    const determinant = j11 * j22 - j12 * j21;
+    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-9) {
+      throw new TypeError("Engine geographic inversion is singular.");
+    }
+    const errorX = current.x - point.x;
+    const errorY = current.y - point.y;
+    candidate = {
+      longitudeDeg: candidate.longitudeDeg - (errorX * j22 - errorY * j12) / determinant,
+      latitudeDeg: candidate.latitudeDeg - (j11 * errorY - j21 * errorX) / determinant,
+      altitude: { valueM: point.z, datum: "ELLIPSOID" },
+    };
+  }
+  return candidate;
+}
+
 export function localToGeographic(
   point: { x: number; y: number; z: number },
   area: StudyArea,
 ): ScenarioSpatialPoint {
   const ellipsoid = localFrameToGeographic(point, scenarioOrigin(area));
+  const msl = convertWithGeoid(ellipsoid, "MSL", {
+    schemaVersion: "vector.geoid-conversion.v1",
+    model: SYNTHETIC_ZERO_GEOID,
+  });
+  return {
+    longitude: msl.longitudeDeg,
+    latitude: msl.latitudeDeg,
+    altitudeM: msl.altitude.valueM,
+    verticalDatum: "MSL",
+  };
+}
+
+function engineToScenarioSpatial(
+  point: { x: number; y: number; z: number },
+  area: StudyArea,
+): ScenarioSpatialPoint {
+  const ellipsoid = enginePositionToGeographic(point, scenarioOrigin(area));
   const msl = convertWithGeoid(ellipsoid, "MSL", {
     schemaVersion: "vector.geoid-conversion.v1",
     model: SYNTHETIC_ZERO_GEOID,
@@ -140,8 +205,8 @@ export function createDefaultSpatialPlan(input: {
 }): ScenarioSpatialPlan {
   const blueLocal = { x: -input.rangeM / 2, y: 0, z: input.blueAltitudeM };
   const redLocal = { x: input.rangeM / 2, y: 0, z: input.redAltitudeM };
-  const blue = localToGeographic(blueLocal, input.studyArea);
-  const red = localToGeographic(redLocal, input.studyArea);
+  const blue = engineToScenarioSpatial(blueLocal, input.studyArea);
+  const red = engineToScenarioSpatial(redLocal, input.studyArea);
   return {
     blue: {
       position: blue,
@@ -149,7 +214,7 @@ export function createDefaultSpatialPlan(input: {
       speedMps: input.blueSpeedMps,
       route: [
         blue,
-        localToGeographic(
+        engineToScenarioSpatial(
           { x: blueLocal.x + input.blueSpeedMps * 120, y: 0, z: blueLocal.z },
           input.studyArea,
         ),
@@ -163,7 +228,7 @@ export function createDefaultSpatialPlan(input: {
       speedMps: input.redSpeedMps,
       route: [
         red,
-        localToGeographic(
+        engineToScenarioSpatial(
           {
             x:
               redLocal.x +

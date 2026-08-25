@@ -24,6 +24,8 @@ rendering sharpness; viewport width and height govern task geometry.
 Mission, CAP-area, runway and flight-plan editors collapse to one column below
 720 px, retain native labels and keyboard order, and never hide an admission
 error or move Run ahead of validation.
+Environment identity and base-availability text wrap without horizontal
+overflow; unsupported installation markers remain visible but disabled.
 
 - Construct always exposes its primary Next or Run action without horizontal scrolling.
 - Desktop preserves the left step rail, central task surface, and right scenario summary.
@@ -43,6 +45,9 @@ error or move Run ahead of validation.
   available for full-resolution inspection.
 
 ## Shared control and overlay contract
+
+Map and 3D overlays share the same pack version/digest, datum and source-time
+label. Loading or missing identity is explicit and does not substitute a default.
 
 VECTOR has one presentation-only overlay coordinator at the application root.
 Every custom Select, Menu, or Popover registers one trigger and one portalled
@@ -101,6 +106,8 @@ declared two-megabyte browser-test guard.
 Saved report provenance now includes the compiled Air mission identity and both
 digests without changing synchronized map/3D playback, telemetry, or timeline
 ownership.
+Observe presents the exact pack identity used by runtime and reports while
+terrain/environment loading remains Worker-owned and cancellable.
 
 The Observe workspace uses one centre-column grid. The Map or 3D surface owns
 the remaining row after the control strip and playback rail; it does not own a
@@ -139,6 +146,9 @@ The governed five-viewport journey edits CAP defaults, clears and restores an
 installation identity, authors a runway start, exercises keyboard route inputs,
 observes admission, and completes the production Worker. Focused record tests
 prove the same lineage survives report/VSR readback.
+The browser matrix switches to Rajasthan, selects the eligible Jodhpur runway,
+proves unsupported-point labelling, then completes a real Worker run across the
+supported viewports without error overlays or overflow.
 
 `npm run ui:responsive:verify` launches system Chrome at every viewport above.
 It validates the landing hero and live 3D preview, map tiles and canvas size, start/base markers, base-origin mutation,

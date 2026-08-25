@@ -59,8 +59,9 @@ test("governed study areas are migration data and local Compose keeps migration 
   assert.match(compose, /seed:[\s\S]*command: \["node", "dist\/admin\/seed-db\.mjs"\]/);
   assert.equal((compose.match(/\$\{VECTOR_IMAGE:-vector-engagement-lab:0\.1\.0-dev\}/g) ?? []).length, 3);
   assert.doesNotMatch(compose, /:latest(?:\s|$)/m);
-  assert.match(makefile, /npm run db:governed-data:verify\n\tnpm run db:seed/);
+  assert.match(makefile, /npm run db:governed-data:verify\n\tnpm run db:environment-upgrade:verify\n\tnpm run db:seed/);
   assert.match(packageJson, /"db:governed-data:verify"/);
+  assert.match(packageJson, /"db:environment-upgrade:verify"/);
   assert.match(dockerignore, /^engine-rust\/target$/m);
   assert.match(dockerignore, /^blog$/m);
   assert.match(dockerignore, /^outputs$/m);

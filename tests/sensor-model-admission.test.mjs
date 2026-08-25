@@ -46,6 +46,7 @@ async function twoTargetVerificationScenario() {
   const prepared = prepareSimulation(DEFAULT_SCENARIO);
   const binding = await bindVerificationTrackModelPack(prepared.engineScenario);
   const scenario = structuredClone(binding.scenario);
+  scenario.durationSeconds = 20;
   const observer = scenario.entities.find((entity) => entity.id === "blue-platform-1");
   const firstTarget = scenario.entities.find((entity) => entity.id === "red-object-1");
   assert.ok(observer && firstTarget);
@@ -63,7 +64,7 @@ async function twoTargetVerificationScenario() {
   secondTarget.initial.velocity = { x: 400, y: 0, z: 0 };
   secondTarget.initial.headingRad = 0;
   secondTarget.initial.massKg = secondTarget.aircraft.emptyMassKg + secondTarget.initial.fuelKg;
-  secondTarget.route = [start, { x: start.x + 20_000, y: start.y, z: start.z }];
+  secondTarget.route = [start, { x: start.x + 5_000, y: start.y, z: start.z }];
   secondTarget.routePlan = {
     schemaVersion: "vector.route-plan.v2",
     waypointAcceptanceRadiiM: [1, 500],

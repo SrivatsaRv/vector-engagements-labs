@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import {
   AIR_MISSION_SCHEMA_VERSION,
   AirMissionAdmissionError,
+  bindAdmittedEnvironmentRunway,
   bindRunwayEvidence,
   compileAirMissionDefinition,
   createDefaultAirMissionDefinition,
@@ -15,9 +16,9 @@ import { CURRENT_COMPILED_MODEL_PACK } from "../lib/engine/weapon-admission.ts";
 import { canonicalJson } from "../lib/canonical-json.ts";
 import { sha256HexSync } from "../lib/geospatial/digest.ts";
 import { createDefaultSpatialPlan } from "../lib/scenario-spatial.ts";
-import { localFrameToGeographic } from "../lib/geospatial/geodesy.ts";
 import { DEFAULT_SCENARIO, prepareSimulation, simulate } from "../lib/simulation.ts";
 import { getStudyArea } from "../lib/study-areas.ts";
+import { admitEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
 import { DEFAULT_SCENARIO_DEFINITION, SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { validateSavedScenario } from "../lib/security/saved-run.ts";
 import {
@@ -29,6 +30,8 @@ import {
   adaptPreparedSimulation,
   admitRuntimeModelPack,
 } from "../lib/runtime/model-pack-adapter.ts";
+import { runEngine } from "../lib/engine/core.ts";
+import { enginePositionToGeographic } from "../lib/scenario-spatial.ts";
 
 function fixture(missionClass = "TACTICAL_INTERCEPT") {
   const scenario = structuredClone(DEFAULT_SCENARIO);
@@ -51,22 +54,36 @@ function fixture(missionClass = "TACTICAL_INTERCEPT") {
 }
 
 function admittedGroundFixture(posture = "RUNWAY") {
-  const scenario = fixture("COMBAT_AIR_PATROL");
-  const threshold = { longitude: 75.633227, latitude: 32.236929, elevation: { valueM: 310, datum: "MSL" } };
+  let scenario = fixture("COMBAT_AIR_PATROL");
+  const area = getStudyArea("rajasthan-desert");
+  scenario = synchronizeScenarioAirMission({
+    ...scenario,
+    studyAreaId: area.id,
+    weatherPresetId: area.defaultWeatherPresetId,
+    spatialPlan: createDefaultSpatialPlan({
+      studyArea: area,
+      rangeM: scenario.range,
+      blueAltitudeM: scenario.altitude,
+      redAltitudeM: scenario.altitude + scenario.targetDelta,
+      blueSpeedMps: scenario.launcherSpeed,
+      redSpeedMps: scenario.targetSpeed,
+      crossingAngleDeg: scenario.aspect,
+    }),
+  }, CURRENT_COMPILED_MODEL_PACK);
+  const runway = bindAdmittedEnvironmentRunway({
+    environmentPack: admitEnvironmentPack({
+      studyAreaId: scenario.studyAreaId,
+      weatherPresetId: scenario.weatherPresetId,
+    }).pack,
+    installationId: "iaf-jodhpur",
+    runwayId: "runway:iaf-jodhpur:236786",
+  });
+  const threshold = runway.threshold;
   scenario.airMission.start = {
     posture,
-    installationId: "iaf-pathankot",
+    installationId: "iaf-jodhpur",
     installationSourceId: "iaf-stations-wikipedia",
-    runway: bindRunwayEvidence({
-      id: "educational-runway-fixture",
-      threshold,
-      end: { longitude: 75.654427, latitude: 32.236929, elevation: { valueM: 310, datum: "MSL" } },
-      headingDeg: 90,
-      lengthM: 2_000,
-      widthM: 40,
-      surface: "PAVED",
-      operationalState: "OPEN",
-    }, { state: "MODEL_ASSUMPTION", sourceId: "educational-runway-fixture" }),
+    runway,
     readinessDelaySeconds: posture === "GROUND_ALERT_QRA" ? 300 : 0,
     taxiFidelity: "ABSTRACTED",
     takeoffCondition: "Runway open and readiness delay elapsed.",
@@ -163,7 +180,7 @@ test("one flight-plan adapter controls compiled and runtime geometry, transition
 
   const prepared = prepareSimulation(scenario);
   const runtimeAircraft = prepared.engineScenario.entities.find((entity) => entity.id === "blue-platform-1");
-  const recordedRoutePoint = localFrameToGeographic(
+  const recordedRoutePoint = enginePositionToGeographic(
     runtimeAircraft.route[1],
     prepared.engineScenario.geospatial.origin,
   );
@@ -233,14 +250,16 @@ test("template, new visible draft, and JSON import compile through the identical
   );
 });
 
-test("forward migration freezes every canonical v4 template and exact content hash", () => {
-  const migration = readFileSync(new URL("../db/migrations/013_air_mission_contract.sql", import.meta.url), "utf8");
+test("forward migrations freeze every canonical v4 template and exact EnvironmentPack content hash", () => {
+  const airMigration = readFileSync(new URL("../db/migrations/013_air_mission_contract.sql", import.meta.url), "utf8");
+  const environmentMigration = readFileSync(new URL("../db/migrations/014_environment_pack_runways.sql", import.meta.url), "utf8");
   for (const definition of SCENARIO_LIBRARY) {
-    const tag = `vector_${definition.id.replaceAll("-", "_")}`;
-    assert.ok(migration.includes(`package=$${tag}$${canonicalJson(definition)}$${tag}$::jsonb`), definition.id);
-    assert.ok(migration.includes(`content_hash='${sha256HexSync(definition)}' WHERE id='${definition.id}' AND version='${definition.version}' AND schema_version='vector.scenario.v3'`), definition.id);
+    const tag = `vector_environment_${definition.id.replaceAll("-", "_")}`;
+    assert.ok(environmentMigration.includes(`package=$${tag}$${canonicalJson(definition)}$${tag}$::jsonb`), definition.id);
+    assert.ok(environmentMigration.includes(`content_hash='${sha256HexSync(definition)}' WHERE id='${definition.id}' AND version='${definition.version}' AND schema_version='vector.scenario.v4'`), definition.id);
   }
-  assert.match(migration, /WHERE schema_version <> 'vector\.scenario\.v4'/);
+  assert.match(airMigration, /WHERE schema_version <> 'vector\.scenario\.v4'/);
+  assert.match(environmentMigration, /package->>'environment' NOT LIKE 'Sourced regional terrain and atmosphere%'/);
 });
 
 test("CAP defaults are visible, editable, and causally change compiled patrol and fuel state", () => {
@@ -307,38 +326,15 @@ test("airborne and ground/runway starts are first-class and unsupported evidence
   const compiledAirborne = prepareSimulation(airborne).engineScenario.airMission;
   assert.equal(compiledAirborne.start.entryState, "AIRBORNE");
 
-  const runway = fixture();
-  runway.airMission.start = {
-    posture: "RUNWAY",
-    installationId: "iaf-pathankot",
-    installationSourceId: "iaf-stations-wikipedia",
-    runway: {
-      id: "unadmitted-runway",
-      threshold: { longitude: 75.633227, latitude: 32.236929, elevation: { valueM: 310, datum: "MSL" } },
-      end: { longitude: 75.654427, latitude: 32.236929, elevation: { valueM: 310, datum: "MSL" } },
-      headingDeg: 90,
-      lengthM: 2_000,
-      widthM: 40,
-      surface: "PAVED",
-      operationalState: "OPEN",
-      evidence: { state: "UNKNOWN", sourceId: "UNKNOWN", digest: "UNKNOWN" },
-    },
-    readinessDelaySeconds: 0,
-    taxiFidelity: "ABSTRACTED",
-    takeoffCondition: "Runway open and readiness delay elapsed.",
-    rejectedTakeoffCondition: "Ground envelope violation before release.",
-  };
+  const runway = admittedGroundFixture();
+  const admitted = structuredClone(runway.airMission.start.runway);
+  runway.airMission.start.runway.evidence = { state: "UNKNOWN", sourceId: "UNKNOWN", digest: "UNKNOWN" };
   assert.throws(
     () => prepareSimulation(runway),
     (error) => error instanceof AirMissionAdmissionError && error.code === "MISSION_RUNWAY_EVIDENCE_MISSING" && error.fieldPath === "start.runway.evidence",
   );
 
-  const runwayMaterial = structuredClone(runway.airMission.start.runway);
-  delete runwayMaterial.evidence;
-  runway.airMission.start.runway = bindRunwayEvidence(runwayMaterial, {
-    state: "MODEL_ASSUMPTION",
-    sourceId: "educational-runway-fixture",
-  });
+  runway.airMission.start.runway = admitted;
   const threshold = runway.airMission.start.runway.threshold;
   runway.spatialPlan.blue.position = {
     longitude: threshold.longitude,
@@ -358,13 +354,14 @@ test("airborne and ground/runway starts are first-class and unsupported evidence
     ground.entities.find((entity) => entity.id === "blue-platform-1").initial.velocity,
     { x: 0, y: 0, z: 0 },
   );
-  const groundResult = simulate(runway);
-  const firstGroundFrame = groundResult.engineRun.frames[0].entities.find((entity) => entity.id === "blue-platform-1");
+  const groundRun = runEngine({ ...ground, durationSeconds: ground.fixedStepSeconds });
+  const firstGroundFrame = groundRun.frames[0].entities.find((entity) => entity.id === "blue-platform-1");
   assert.equal(firstGroundFrame.speedMps, 0);
-  const firstGroundGeographic = groundResult.engineRun.frames[0].geographicPositions.find((item) => item.entityId === "blue-platform-1").position;
+  const firstGroundGeographic = groundRun.frames[0].geographicPositions.find((item) => item.entityId === "blue-platform-1").position;
   assert.ok(Math.abs(firstGroundGeographic.longitudeDeg - threshold.longitude) < 1e-9);
   assert.ok(Math.abs(firstGroundGeographic.latitudeDeg - threshold.latitude) < 1e-9);
-  assert.ok(Math.abs(firstGroundGeographic.altitude.valueM - threshold.elevation.valueM) < 1e-3);
+  assert.ok(firstGroundGeographic.altitude.valueM >= threshold.elevation.valueM);
+  assert.ok(Math.abs(firstGroundGeographic.altitude.valueM - firstGroundFrame.position.z) < 1e-9);
   const digests = new Set();
   for (const posture of ["PARKING", "RUNWAY", "GROUND_ALERT_QRA"]) {
     const variant = structuredClone(runway);
@@ -375,6 +372,41 @@ test("airborne and ground/runway starts are first-class and unsupported evidence
     digests.add(compiled.compiledDigest);
   }
   assert.equal(digests.size, 3);
+
+  const reciprocalScenario = admittedGroundFixture();
+  const reciprocal = bindAdmittedEnvironmentRunway({
+    environmentPack: admitEnvironmentPack({
+      studyAreaId: reciprocalScenario.studyAreaId,
+      weatherPresetId: reciprocalScenario.weatherPresetId,
+    }).pack,
+    installationId: "iaf-jodhpur",
+    runwayId: "runway:iaf-jodhpur:236786",
+    direction: "RECIPROCAL",
+  });
+  assert.deepEqual(reciprocal.threshold, admitted.end);
+  assert.deepEqual(reciprocal.end, admitted.threshold);
+  assert.equal(reciprocal.headingDeg, 224.8);
+  reciprocalScenario.airMission.start.runway = reciprocal;
+  reciprocalScenario.spatialPlan.blue.position = {
+    longitude: reciprocal.threshold.longitude,
+    latitude: reciprocal.threshold.latitude,
+    altitudeM: reciprocal.threshold.elevation.valueM,
+    verticalDatum: "MSL",
+  };
+  reciprocalScenario.spatialPlan.blue.route[0] = structuredClone(
+    reciprocalScenario.spatialPlan.blue.position,
+  );
+  reciprocalScenario.airMission.flightPlans[0].routePoints[0].position = {
+    longitude: reciprocal.threshold.longitude,
+    latitude: reciprocal.threshold.latitude,
+    altitude: structuredClone(reciprocal.threshold.elevation),
+  };
+  reciprocalScenario.wind = 0;
+  reciprocalScenario.windNorth = 0;
+  assert.throws(
+    () => prepareSimulation(reciprocalScenario),
+    /Runway threshold and admitted DEM elevations conflict outside the declared reconciliation envelope/,
+  );
 });
 
 test("unknown schema, dangling references, AGL without terrain, impossible time and reserve fail closed", () => {
@@ -466,7 +498,25 @@ test("runway identity, evidence, state, dimensions, surface, heading, and wind f
   crossInstallation.airMission.flightPlans[0].routePoints[0].position.longitude += 0.01;
   assert.throws(
     () => prepareSimulation(crossInstallation),
-    (error) => error instanceof AirMissionAdmissionError && error.code === "MISSION_RUNWAY_INVALID" && error.fieldPath === "start.runway.threshold",
+    (error) => error instanceof AirMissionAdmissionError && error.code === "MISSION_RUNWAY_INVALID" && ["start.runway", "start.runway.lengthM"].includes(error.fieldPath),
+  );
+});
+
+test("ground-start tailwind combines sourced atmosphere wind with authored modifiers", () => {
+  const scenario = admittedGroundFixture();
+  scenario.wind = 2;
+  scenario.windNorth = 2;
+  const headingRad = scenario.airMission.start.runway.headingDeg * Math.PI / 180;
+  const authoredOnlyTailwind = scenario.wind * Math.sin(headingRad)
+    + scenario.windNorth * Math.cos(headingRad);
+  assert.ok(authoredOnlyTailwind < 5, "the authored modifier alone must remain inside the envelope");
+  assert.throws(
+    () => prepareSimulation(scenario),
+    (error) => error instanceof AirMissionAdmissionError
+      && error.code === "MISSION_RUNWAY_INVALID"
+      && error.fieldPath === "start.runway.headingDeg"
+      && /Tailwind exceeds/u.test(error.message),
+    "the sourced grid plus authored modifier must reject at the runway admission boundary",
   );
 });
 

@@ -11,6 +11,7 @@ import {
 } from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
+import { geographicToEnginePosition } from "../lib/scenario-spatial.ts";
 import {
   decodeColumnarFrames,
   encodeColumnarFrames,
@@ -40,10 +41,58 @@ const assertPictureParity = (actual, expected, label) => {
   }
 };
 
+function regionalBoundaryCrossingScenario() {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const scenario = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const grid = scenario.environment.runtimeEnvironment.terrain.grid;
+  const eastDeg = grid.westDeg + grid.longitudeStepDeg * (grid.columns - 1);
+  const latitudeDeg = grid.southDeg + grid.latitudeStepDeg * (grid.rows - 1) / 2;
+  const position = (longitudeDeg) => geographicToEnginePosition({
+    longitude: longitudeDeg,
+    latitude: latitudeDeg,
+    altitudeM: 8_000,
+    verticalDatum: "MSL",
+  }, scenario.environment.studyArea);
+  const launcher = scenario.entities.find((entity) => entity.id === "blue-platform-1");
+  const target = scenario.entities.find((entity) => entity.id === "red-object-1");
+  const weapon = scenario.entities.find((entity) => entity.weapon);
+  assert.ok(launcher && target && weapon?.weapon, "regional crossing fixture requires launcher, target and weapon");
+  launcher.initial.position = position(eastDeg - 0.001);
+  target.initial.position = position(eastDeg - 0.004);
+  weapon.initial.position = { ...launcher.initial.position };
+  for (const entity of [launcher, target, weapon]) {
+    entity.initial.velocity = { x: 300, y: 0, z: 0 };
+    entity.initial.headingRad = 0;
+    entity.route = [];
+    delete entity.routePlan;
+  }
+  weapon.weapon.launchTimeSeconds = 0;
+  scenario.durationSeconds = 1;
+  scenario.completion.distanceMeters = 1;
+  return scenario;
+}
+
+test("TypeScript and Rust/WASM reject at the first regional sample after crossing coverage", () => {
+  const scenario = regionalBoundaryCrossingScenario();
+  assert.throws(
+    () => runEngineBackend(structuredClone(scenario), "typescript"),
+    /outside admitted terrain coverage or contains no-data/,
+  );
+  assert.throws(
+    () => runEngineBackend(structuredClone(scenario), "rust-wasm"),
+    /runtime environment terrain sample is outside admitted coverage or contains no-data/,
+  );
+});
+
 test("committed Rust/WASM artifact has a stable integrity identity", () => {
   assert.match(RUST_WASM_ENGINE_ARTIFACT.sha256, /^[a-f0-9]{64}$/);
   assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes > 100_000);
-  assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 500_000);
+  assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 550_000);
 });
 
 for (const definition of SCENARIO_LIBRARY) {

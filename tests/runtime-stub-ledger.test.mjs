@@ -11,8 +11,8 @@ import ledger from "../governance/runtime-stub-ledger.v1.json" with { type: "jso
 
 test("the runtime stub ledger is complete, ordered, source-backed, and executable", () => {
   const result = verifyRuntimeStubLedger();
-  assert.equal(result.entries, 30);
-  assert.equal(result.releaseBlocking, 30);
+  assert.equal(result.entries, 25);
+  assert.equal(result.releaseBlocking, 25);
   assert.ok(result.indicatorLines > 0);
   assert.equal(result.sourceLessPublicReferences, 9);
   assert.match(result.sha256, /^[a-f0-9]{64}$/u);
@@ -35,7 +35,7 @@ test("report examples have no production fallback allowance", () => {
     false,
   );
   assert.equal(
-    ledger.entries.find((entry) => entry.id === "STUB-15")?.classification,
+    ledger.entries.find((entry) => entry.id === "STUB-09")?.classification,
     "fixture_only",
   );
 });
@@ -76,10 +76,10 @@ test("deleting or suppressing a classified indicator requires a ledger update", 
 test("allowances cannot cite a missing owning issue entry", () => {
   const observations = collectIndicatorObservations(process.cwd(), ledger.indicatorPolicy);
   const tampered = structuredClone(ledger);
-  tampered.indicatorPolicy.allowances[0].entryIds = ["STUB-99"];
+  tampered.indicatorPolicy.allowances[0].entryIds = ["STUB-93"];
   assert.throws(
     () => validateIndicatorInventory(observations, tampered),
-    /references unknown STUB-99/,
+    /references unknown STUB-93/,
   );
 });
 

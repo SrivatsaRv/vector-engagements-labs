@@ -9,6 +9,9 @@ Air-domain saved-run admission requires the authored v1 mission unchanged,
 recompiles it against exact environment/model identities, and returns stable
 mission code/field-path errors. It never fills missing class, start, route,
 loadout, fuel, recovery, policy, engine, or support values.
+Saved-run admission validates the complete regional EnvironmentPack, compact
+runtime binding and exact runway origin schema. Corrupt, stale, unknown or
+cross-environment identities fail closed without catalogue fallback.
 
 Saved-run snapshots and saved-run admission counters now have separate
 domain-owned declaration modules behind the unchanged aggregate Drizzle schema.
@@ -82,6 +85,9 @@ all development ports on `127.0.0.1`.
 path as ordinary immutable instance fields. This representation is executable
 under both the built application loader and Node's strip-only TypeScript loader;
 it does not change catalog, tile, request-size, origin or storage admission.
+The catalog route exposes only PostGIS rows that exactly match governed pack,
+installation and runway artifacts. Geometry is serialized at sufficient
+precision for digest admission; mismatched or partial rows return no catalog.
 
 The shared public-API rate-window table is declared in
 `db/schema/public-api-admission.ts`; its limiter and relay behavior are
@@ -110,6 +116,9 @@ The contract ownership registry now maps the one Air mission implementation and
 regression suite to new material mission-contract and record-storage sections.
 The registry canonical digest and exact semantic declaration bind that new
 authority; no old heading is relabelled and no unrelated schema is introduced.
+Retiring #61's six completed runtime-stub rows is explicit governance data:
+regional source verification, immutable pack admission and browser/runtime
+tests replace those blockers; remaining assumptions stay separately disclosed.
 
 The hosted integration build reruns the issue #148 deny-network source verifier
 after creating the production output. A build that embeds a Stage-0 source

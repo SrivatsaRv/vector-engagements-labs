@@ -22,6 +22,9 @@ For an Air-domain v4 scenario, `scenario.json` contains the exact authored
 mission, `compiled.json` contains `vector.compiled-air-mission.v1`, and both
 `manifest.json` and `report.json` bind its ID/version plus authored and compiled
 SHA-256 digests.
+`compiled.json` now includes the full regional EnvironmentPack and bounded
+runtime terrain/atmosphere projection, including source time, datums, catalogue
+digest, limitations and per-field provenance.
 
 Saved-run snapshot table declarations are isolated in
 `db/schema/vector-record.ts`; admission quota tables are separately declared in
@@ -63,11 +66,14 @@ The reader still accepts prior valid records and does not rewrite their bytes.
 and SHA-256 digest beside the selected engine identity. Replay rejects a record
 when the compiled capability identity and record manifest disagree.
 
-For Phase A geographic runs, `compiled.json` also preserves the complete
-immutable `vector.environment-pack.v1` plus the compact runtime
-`{ schemaVersion, id, version, digest }` binding. Opening a VSR verifies the
-pack content digest and binding equality. A replay does not substitute the
-current study-area catalogue, its default weather, or a newer pack version.
+For geographic runs, `compiled.json` preserves the complete immutable
+`vector.environment-pack.v1`, the compact binding, and the exact bounded
+terrain/atmosphere runtime projection consumed by both engines. Opening a VSR
+verifies pack content and binding equality before exposing replay. The archived
+pack includes source/derived/authored field provenance, source time, terrain,
+atmosphere, installation/runway catalogue identity and limitations. A replay
+does not consult PostGIS or substitute a current/superseding pack, study-area
+default, runway record or weather version.
 
 Basemap tiles are referenced by provider and style revision, not silently embedded. A portable export may include explicitly licensed terrain or static assets. Missing optional assets must degrade to class silhouettes and a neutral terrain surface without changing telemetry.
 
@@ -99,6 +105,8 @@ state, event state, or replay-derived values.
 Mission lineage adds no parallel frame state. Ground starts are represented by
 the canonical aircraft entity at the runway threshold with zero speed in the
 first recorded frame; later motion remains the ordinary engine-frame contract.
+Recorded geographic/engine frames retain the exact environment-pack binding;
+sampled atmosphere and DEM effects are replay evidence, not recalculated fields.
 
 The schema-module split does not change frame, picture, event, or snapshot JSON
 fields.
@@ -139,6 +147,8 @@ weakens that check nor lets replay resolve or substitute a model pack.
 Readback recompiles the archived authored mission against the archived model
 and environment pack and requires exact equality across scenario, compiled,
 manifest, and report members before returning replay data.
+Regional replay verifies the embedded pack content digest, runtime-grid parent
+binding and installation-catalogue digest before any archived frame is exposed.
 
 Record digests and replay verification are unchanged by the persistence-module
 ownership split.
@@ -237,6 +247,9 @@ changes in this stage.
 Browsers receive the verified optional compiled mission envelope through the
 existing VSR reader. Unknown mission schemas or missing viewer-feature identity
 fail closed; presentation code cannot synthesize mission authority.
+The viewer validates the archived pack locally and requires no terrain provider
+or database. Unsupported future pack/runtime schemas fail before replay data is
+exposed.
 
 Browser and Worker consumers continue to receive saved records through the
 same aggregate persistence/API contract.
@@ -252,6 +265,8 @@ Current replay preserves mission class/regime, start posture, flight-plan,
 compiled aircraft ground envelope, exact station/rule loadout, fuel, and exact
 authored/compiled/model-pack digests as immutable provenance. It does not execute a
 virtual pilot or derive policy decisions during replay.
+Regional VSR replay is independent of later pack publication or supersession;
+tests create a distinct later digest and prove the archived digest is retained.
 
 No replay behavior or supported record version changes with the table-module
 refactor.

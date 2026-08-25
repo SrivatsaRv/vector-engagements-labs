@@ -28,6 +28,10 @@ Repository administrators retain emergency recovery authority but should not use
 
 ## Continuous integration
 
+Regional environment changes run the offline source/digest verifier in
+`ci-local`; release evidence additionally includes the built Worker
+cancel/retry gate and the bounded environment throughput/memory benchmark.
+
 `ci.yml` is one change-aware pull-request and `main` pipeline. Stage 0 computes
 the rename/copy-aware change set from the exact merge base and head revisions with the tracked
 classifier and always runs repository-policy regression tests. Independent
@@ -408,14 +412,20 @@ and must state their rationale and the owning issue; #66 owns those policy
 exceptions. A new fallback or model-assumption indicator without that evidence
 fails the local and PR gate.
 
-Air mission ground-start authoring registers its visible, content-addressed
-educational runway geometry as `STUB-30`. It remains a release-blocking explicit
-supported assumption owned by #60/#61: the compiler may admit only its exact
-declared evidence and the single content-addressed
-`vector.compiled-aircraft-ground-envelope.v1` `MODEL_ASSUMPTION` resolved from
-the immutable model pack. Scenario-authored minima, surface/tailwind values, or
-`SOURCED`/`CALIBRATED` labels are rejected; no installation or production claim
-may treat the assumption as sourced runway truth.
+Air mission ground-start authoring consumes the exact sourced runway geometry
+from the immutable EnvironmentPack. `STUB-24` remains a release-blocking
+explicit assumption owned by #60/#64 only for the content-addressed
+`vector.compiled-aircraft-ground-envelope.v1` resolved from the model pack.
+Scenario-authored minima, surface/tailwind values, or self-labelled evidence
+states are rejected; no installation or production claim may treat the ground
+performance envelope as validated platform data.
+
+`STUB-25` separately owns #61's visible runway/DEM elevation reconciliation.
+The regional pack uses the higher surface plus 0.01 m only inside its declared
+30 m disagreement envelope and rejects larger conflicts. It remains
+release-blocking until datum-compatible, cell-specific runway elevation
+evidence replaces that bounded public-educational assumption; it does not
+broaden `STUB-24` or turn the ground-performance envelope into sourced data.
 
 Browser/responsive checks and performance benchmarks are deliberately not run
 on GitHub-hosted pull-request runners. They remain explicit maintainer checks

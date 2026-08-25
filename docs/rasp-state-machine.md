@@ -11,6 +11,9 @@ is not admitted by the production deployment and makes no named-sensor claim.
 `vector.compiled-air-mission.v1` is immutable run provenance beside the engine
 scenario, not a second track/picture state machine. Start, route, fuel and store
 consequences enter through ordinary canonical entities and frames.
+Environment sampling is causal state input: sourced density/wind and DEM
+collision can change motion or termination, but do not invent RASP knowledge,
+sensor detection, decisions, or narrative state.
 
 Every A2A tick emits one state owned by `IAF` and one owned by `PAF`. Without a
 compiled admission, `vector.observer-state.v2` has
@@ -37,7 +40,7 @@ The run binding also carries a compiler-produced projection of the compiled
 observer models. Both engines require every entity admission field to exactly
 match one member of that projection. An entity admission cannot manufacture a
 sensor, range, field of view, kind, version, or evidence list by reusing a
-valid model-pack digest. Transport of the binding itself remains STUB-13 work.
+valid model-pack digest. Transport of the binding itself remains STUB-07 work.
 
 On a due v1 `SEARCH` scan, range and field-of-view checks may emit one `PLOT`.
 The PLOT is a non-positional measurement boundary: it has no observed entity
@@ -109,6 +112,9 @@ hides entities while this state is selected.
 The Rust compiled-model-pack v2 identity validator is confined to offline
 publication/readback. It adds no RASP event, picture, observer state, VSR field,
 or replay authority.
+Replay uses the complete archived regional pack and preprocessed runtime grid;
+it never looks up a current PostGIS pack or silently upgrades a superseded
+environment identity.
 
 Separating saved-record and admission table declarations does not change RASP
 event, picture, or replay authority.
@@ -125,6 +131,12 @@ that authored artifact against the archived environment pack and model-pack
 binding, then requires exact equality across all four members before any replay
 is exposed. A current catalog lookup, UI default, or report label cannot repair
 or replace missing mission intent.
+
+When the archived mission starts on a runway, its installation, runway geometry,
+MSL elevations, datum, source identity and evidence digest must equal the runway
+inside that archived pack. A later PostGIS row, catalogue revision or pack with
+the same regional label cannot replace it. This extends record identity only;
+it does not add a track, observation or RASP transition.
 
 New records use `vector.frames.columnar.v5` and `vector.pictures.v4`. They are
 the immutable projection of
@@ -153,6 +165,9 @@ This slice does not make tactical decisions, launch-authority, weapon-support,
 or Su-30MKI/F-16 radar claims. Parent issue #26 remains open.
 
 ## Regression evidence
+
+Issue #61 adds cross-backend environment parity plus archived-pack
+supersession regression without changing the governed RASP transition table.
 
 `tests/sensor-model-admission.test.mjs` proves production fail-closed behavior,
 source-pack determinism, exact TypeScript/Rust-WASM whole-state and event parity,

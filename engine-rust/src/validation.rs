@@ -683,6 +683,106 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         "environment.environmentPack.digest",
         &environment_pack.digest,
     )?;
+    if let Some(runtime) = scenario.environment.runtime_environment.as_ref() {
+        if runtime.schema_version != "vector.environment-runtime-grid.v1" {
+            return Err(invalid(
+                "environment.runtimeEnvironment.schemaVersion is unsupported",
+            ));
+        }
+        if runtime.environment_pack.id != environment_pack.id
+            || runtime.environment_pack.version != environment_pack.version
+            || runtime.environment_pack.digest != environment_pack.digest
+        {
+            return Err(invalid(
+                "environment.runtimeEnvironment pack identity does not match environmentPack",
+            ));
+        }
+        for (path, id, version, digest) in [
+            (
+                "terrain",
+                &runtime.terrain.id,
+                &runtime.terrain.version,
+                &runtime.terrain.digest,
+            ),
+            (
+                "atmosphere",
+                &runtime.atmosphere.id,
+                &runtime.atmosphere.version,
+                &runtime.atmosphere.digest,
+            ),
+        ] {
+            identifier(&format!("environment.runtimeEnvironment.{path}.id"), id)?;
+            identifier(
+                &format!("environment.runtimeEnvironment.{path}.version"),
+                version,
+            )?;
+            content_addressed_sha256(
+                &format!("environment.runtimeEnvironment.{path}.digest"),
+                digest,
+            )?;
+        }
+        let terrain = &runtime.terrain.grid;
+        if terrain.columns < 2
+            || terrain.rows < 2
+            || terrain.surface_elevation_msl_m.len() != terrain.columns * terrain.rows
+            || !terrain.west_deg.is_finite()
+            || !terrain.south_deg.is_finite()
+            || !(terrain.longitude_step_deg > 0.0 && terrain.latitude_step_deg > 0.0)
+            || terrain
+                .surface_elevation_msl_m
+                .iter()
+                .any(|value| !value.is_finite())
+        {
+            return Err(invalid(
+                "environment.runtimeEnvironment terrain grid is invalid",
+            ));
+        }
+        let atmosphere = &runtime.atmosphere.grid;
+        let expected = atmosphere
+            .columns
+            .saturating_mul(atmosphere.rows)
+            .saturating_mul(atmosphere.sample_count);
+        if atmosphere.columns < 2
+            || atmosphere.rows < 2
+            || atmosphere.sample_count < 2
+            || !atmosphere.west_deg.is_finite()
+            || !atmosphere.south_deg.is_finite()
+            || !(atmosphere.longitude_step_deg > 0.0 && atmosphere.latitude_step_deg > 0.0)
+            || !atmosphere.interval_seconds.is_finite()
+            || atmosphere.interval_seconds <= 0.0
+            || scenario.duration_seconds
+                > (atmosphere.sample_count - 1) as f64 * atmosphere.interval_seconds
+            || [
+                &atmosphere.temperature_c,
+                &atmosphere.surface_pressure_kpa,
+                &atmosphere.relative_humidity_percent,
+                &atmosphere.wind_east_mps,
+                &atmosphere.wind_north_mps,
+            ]
+            .iter()
+            .any(|values| values.len() != expected || values.iter().any(|value| !value.is_finite()))
+        {
+            return Err(invalid("environment.runtimeEnvironment atmosphere grid is invalid or does not cover the run"));
+        }
+        for (path, value) in [
+            ("anchor.longitude", runtime.anchor.longitude),
+            ("anchor.latitude", runtime.anchor.latitude),
+            (
+                "authoredModifiers.temperatureOffsetC",
+                runtime.authored_modifiers.temperature_offset_c,
+            ),
+            (
+                "authoredModifiers.windEastMps",
+                runtime.authored_modifiers.wind_east_mps,
+            ),
+            (
+                "authoredModifiers.windNorthMps",
+                runtime.authored_modifiers.wind_north_mps,
+            ),
+        ] {
+            finite(&format!("environment.runtimeEnvironment.{path}"), value)?;
+        }
+    }
     finite(
         "environment.studyArea.surfaceElevationM",
         scenario.environment.study_area.surface_elevation_m,

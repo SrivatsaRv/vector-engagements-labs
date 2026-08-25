@@ -123,6 +123,12 @@ working-tree files, resolves the documented harness entry point, installs the
 lockfile and runs `make ci-local`. Run it after the candidate commit exists. It
 is not evidence for uncommitted files.
 
+Database integration runs `db:environment-upgrade:verify` after migrations and
+before any seed command, proving production migration alone installs the exact
+canonical 21 installation prerequisites, 24 runway rows and 12 EnvironmentPack
+payloads. The later `db:verify` mutation matrix attempts to update every pack
+column and proves that only `superseded_at` is mutable.
+
 Database integration additionally runs `db:credibility:verify`, which confirms
 the live immutable triggers reject same-version mutation and malformed compiled
 pack insertion under rolled-back transactions. API tests assert that admitted

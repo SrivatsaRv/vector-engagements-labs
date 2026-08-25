@@ -66,6 +66,9 @@ callback links in diagram code.
 Migration `013_air_mission_contract.sql` updates only existing scenario-template
 packages and hashes. It does not read, rewrite, default, or otherwise change
 anonymous blog-comment rows or their admission/lifecycle contract.
+Issue #61 adds governed environment/runway records only to the simulation
+catalog. It does not promote those records into publishable blog comments or
+change comment admission, moderation, storage, or rendering semantics.
 
 The persisted comment table is declared in `db/schema/blog-comments.ts` and
 re-exported by the single aggregate `db/schema.ts` Drizzle facade.

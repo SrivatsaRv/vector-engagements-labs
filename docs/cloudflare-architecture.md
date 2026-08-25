@@ -45,6 +45,10 @@ Local Compose supplies equivalent database and telemetry endpoints through envir
 
 ## Production database provisioning
 
+Migration 014 provisions immutable environment-pack payload/coverage rows and
+PostGIS runway centrelines. Production seeding remains a controlled release
+action; runtime ticks never connect to this catalogue.
+
 VECTOR uses a managed PostgreSQL origin with PostGIS enabled. The protected
 GitHub `production` environment owns the deployment credentials. It accepts
 only protected branches and requires explicit maintainer approval before a job
@@ -107,6 +111,9 @@ The PostGIS gate now exercises both sides of the Air mission transition: current
 v3 production rows are valid pre-migration input, while post-migration and fresh
 databases must expose canonical `vector.scenario.v4` Air envelopes through the
 catalog and application verifier. A mixed catalogue fails closed.
+Deployment verifies 12 exact environment packs, 24 runway rows, 12 eligible
+starts, geometry/SRID validity, immutable-update rejection and live catalog API
+readback before browser verification.
 
 - The exact release commit has a successful Required PR Gate; release and
   deployment workflows re-run the gates appropriate to their authority.

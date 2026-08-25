@@ -24,6 +24,16 @@ generic model: airborne/Mach speed, zero-speed runway entry, fuel mass and
 installed store count. Existing point-mass equations, fixed-step integration,
 guidance, atmosphere and TypeScript/Rust numerical behavior are unchanged; no
 mission-class or named-scenario physics branch exists.
+Aircraft and guided-vehicle dynamics now sample sourced atmosphere and ENU wind
+at entity position/time. Initial/routes below the same DEM are rejected and
+guided-vehicle terrain impact terminates before invalid atmosphere lookup.
+When a regional runtime projection is present, TypeScript and Rust/WASM stop at
+the first terrain/atmosphere sampling request outside coverage or time validity,
+over missing data, or producing an invalid physical value. Rust propagates that
+condition as `InvalidScenario` through aircraft, weapon, collision and frame
+paths; it never converts terrain failure to `0 m MSL` or atmosphere failure to
+`NaN`. The zero reference plane and educational atmosphere below apply only to
+legacy/synthetic scenarios with no regional runtime projection.
 
 - fixed 50 ms integration step and sampled immutable frames;
 - WGS84/ECEF-derived local east/north/up coordinates with an immutable scenario origin;
@@ -138,7 +148,7 @@ model: it binds every admission field exactly to the compiler-produced
 observer-sensor projection carried in the run binding, then uses only the
 declared scan/range/FOV inputs and produces a non-positional PLOT. An
 entity-level caller cannot add a sensor beside a valid pack digest. The binding
-transport itself remains governed by STUB-13.
+transport itself remains governed by STUB-07.
 
 A distinct source-authored `ENGINE_VERIFICATION_ONLY` pack now admits
 `vector.observer-sensor-admission.v2` with an explicit generic measurement and

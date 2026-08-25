@@ -1,0 +1,1289 @@
+{
+  "schemaVersion": "vector.installation-catalogue.v2",
+  "id": "vector.public-reference-installations",
+  "version": "2.0.0",
+  "intendedUse": "PUBLIC_EDUCATIONAL",
+  "coverage": {
+    "declaredServiceCoverage": "BOUNDED_PUBLIC_REFERENCE_FIXTURE",
+    "includedRecordCount": 21,
+    "geographicCoverage": "Selected public-reference points only; this is not a geographic completeness claim.",
+    "installationTypeCoverage": [
+      "MAIN_OPERATING_BASE",
+      "FORWARD_OPERATING_BASE",
+      "AIR_STATION"
+    ],
+    "knownGaps": [
+      "This fixture is not a complete IAF or PAF installation catalogue.",
+      "OurAirports is community-maintained and provides no accuracy, fitness, navigation, readiness, occupancy, or current operational-status guarantee.",
+      "Only runways with both sourced thresholds, elevations, headings, dimensions, surface, and an open source state are eligible for public-educational ground starts."
+    ],
+    "runwayRecordCount": 24,
+    "eligibleRunwayRecordCount": 12
+  },
+  "validity": {
+    "retrievedOn": "2026-08-25",
+    "validFrom": null,
+    "validUntil": null
+  },
+  "review": {
+    "state": "PUBLIC_REFERENCE_UNVERIFIED",
+    "reviewedOn": "2026-08-25"
+  },
+  "sources": [
+    {
+      "id": "iaf-stations-wikipedia",
+      "title": "Indian Air Force stations public-reference fixture",
+      "publisher": "Wikipedia contributors",
+      "url": "https://en.wikipedia.org/wiki/Indian_Air_Force",
+      "license": "SOURCE_LICENSE_NOT_VERIFIED"
+    },
+    {
+      "id": "shield-paf-orbat-2026-05-19",
+      "title": "SHIELD Pakistan Air Force ORBAT seed",
+      "publisher": "Reach Defence SHIELD",
+      "url": "urn:shield:data:paf_orbat.json",
+      "license": "OPERATOR_SUPPLIED_PUBLIC_REFERENCE"
+    },
+    {
+      "id": "ourairports-7d6886315f6c249b3818930030871d9329cc3445",
+      "publisher": "OurAirports",
+      "title": "OurAirports airports and runways frozen revision",
+      "url": "https://github.com/davidmegginson/ourairports-data/tree/7d6886315f6c249b3818930030871d9329cc3445",
+      "license": "Unlicense"
+    }
+  ],
+  "records": [
+    {
+      "id": "iaf-adampur",
+      "service": "IAF",
+      "name": "Adampur AFS",
+      "longitude": 75.757256,
+      "latitude": 31.434879,
+      "type": "AIR_STATION",
+      "sourceId": "iaf-stations-wikipedia",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "Adampur AFS",
+        "Adampur Airport",
+        "VIAX"
+      ],
+      "runwaySourceAirportIdent": "VIAX",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:iaf-adampur:236624"
+      ],
+      "groundStartState": "UNSUPPORTED_INCOMPLETE_EVIDENCE"
+    },
+    {
+      "id": "iaf-ambala",
+      "service": "IAF",
+      "name": "Ambala AFS",
+      "longitude": 76.817778,
+      "latitude": 30.370556,
+      "type": "AIR_STATION",
+      "sourceId": "iaf-stations-wikipedia",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "Ambala AFS",
+        "Ambala Air Force Station",
+        "VIAM"
+      ],
+      "runwaySourceAirportIdent": "VIAM",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:iaf-ambala:236609",
+        "runway:iaf-ambala:236610"
+      ],
+      "groundStartState": "UNSUPPORTED_INCOMPLETE_EVIDENCE"
+    },
+    {
+      "id": "iaf-halwara",
+      "service": "IAF",
+      "name": "Halwara AFS",
+      "longitude": 75.633209,
+      "latitude": 30.748041,
+      "type": "AIR_STATION",
+      "sourceId": "iaf-stations-wikipedia",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "Halwara AFS",
+        "Halwara International Airport",
+        "VIHX"
+      ],
+      "runwaySourceAirportIdent": "VIHX",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:iaf-halwara:236651"
+      ],
+      "groundStartState": "UNSUPPORTED_INCOMPLETE_EVIDENCE"
+    },
+    {
+      "id": "iaf-pathankot",
+      "service": "IAF",
+      "name": "Pathankot AFS",
+      "longitude": 75.633227,
+      "latitude": 32.236929,
+      "type": "AIR_STATION",
+      "sourceId": "iaf-stations-wikipedia",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "Pathankot AFS",
+        "Pathankot Airport",
+        "VIPK"
+      ],
+      "runwaySourceAirportIdent": "VIPK",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:iaf-pathankot:236695"
+      ],
+      "groundStartState": "UNSUPPORTED_INCOMPLETE_EVIDENCE"
+    },
+    {
+      "id": "iaf-srinagar",
+      "service": "IAF",
+      "name": "Srinagar AFS",
+      "longitude": 74.765299,
+      "latitude": 33.994374,
+      "type": "AIR_STATION",
+      "sourceId": "iaf-stations-wikipedia",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "Srinagar AFS",
+        "Srinagar International Airport",
+        "VISR"
+      ],
+      "runwaySourceAirportIdent": "VISR",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:iaf-srinagar:236760"
+      ],
+      "groundStartState": "SUPPORTED_PUBLIC_EDUCATIONAL"
+    },
+    {
+      "id": "iaf-jodhpur",
+      "service": "IAF",
+      "name": "Jodhpur AFS",
+      "longitude": 73.048056,
+      "latitude": 26.251389,
+      "type": "AIR_STATION",
+      "sourceId": "iaf-stations-wikipedia",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "Jodhpur AFS",
+        "Jodhpur Airport",
+        "VIJO"
+      ],
+      "runwaySourceAirportIdent": "VIJO",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:iaf-jodhpur:236786"
+      ],
+      "groundStartState": "SUPPORTED_PUBLIC_EDUCATIONAL"
+    },
+    {
+      "id": "paf-nur-khan",
+      "service": "PAF",
+      "name": "PAF Base Nur Khan",
+      "icaoCode": "OPRN",
+      "longitude": 73.0992,
+      "latitude": 33.6167,
+      "elevationFt": 1668,
+      "runwayInfo": "RWY 09/27, 12/30",
+      "type": "MAIN_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Base Nur Khan",
+        "PAF Base Nur Khan (Benazir Bhutto International Airport)",
+        "OPRN"
+      ],
+      "runwaySourceAirportIdent": "OPRN",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:paf-nur-khan:238212"
+      ],
+      "groundStartState": "SUPPORTED_PUBLIC_EDUCATIONAL"
+    },
+    {
+      "id": "paf-peshawar",
+      "service": "PAF",
+      "name": "PAF Base Peshawar",
+      "icaoCode": "OPPS",
+      "longitude": 71.5144,
+      "latitude": 33.9933,
+      "elevationFt": 1180,
+      "runwayInfo": "RWY 17/35",
+      "type": "MAIN_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Base Peshawar",
+        "Bacha Khan International Airport",
+        "OPPS"
+      ],
+      "runwaySourceAirportIdent": "OPPS",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:paf-peshawar:238210"
+      ],
+      "groundStartState": "SUPPORTED_PUBLIC_EDUCATIONAL"
+    },
+    {
+      "id": "paf-asghar-khan",
+      "service": "PAF",
+      "name": "PAF Academy Asghar Khan",
+      "icaoCode": "OPRS",
+      "longitude": 71.9725,
+      "latitude": 34.0811,
+      "type": "AIR_STATION",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Academy Asghar Khan",
+        "Risalpur Air Base",
+        "OPRS"
+      ],
+      "runwaySourceAirportIdent": "OPRS",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:paf-asghar-khan:238198",
+        "runway:paf-asghar-khan:238199"
+      ],
+      "groundStartState": "SUPPORTED_PUBLIC_EDUCATIONAL"
+    },
+    {
+      "id": "paf-qadri",
+      "service": "PAF",
+      "name": "PAF Qadri",
+      "icaoCode": "OPSD",
+      "longitude": 75.5375,
+      "latitude": 35.3347,
+      "type": "FORWARD_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Qadri",
+        "Skardu International Airport",
+        "OPSD"
+      ],
+      "runwaySourceAirportIdent": "OPSD",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:paf-qadri:238215",
+        "runway:paf-qadri:238216"
+      ],
+      "groundStartState": "SUPPORTED_PUBLIC_EDUCATIONAL"
+    },
+    {
+      "id": "paf-mm-alam",
+      "service": "PAF",
+      "name": "PAF Base M.M. Alam",
+      "icaoCode": "OPMI",
+      "longitude": 71.5706,
+      "latitude": 32.5631,
+      "type": "MAIN_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Base M.M. Alam",
+        "Mianwali Air Base",
+        "OPMI"
+      ],
+      "runwaySourceAirportIdent": "OPMI",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:paf-mm-alam:238203",
+        "runway:paf-mm-alam:238204"
+      ],
+      "groundStartState": "UNSUPPORTED_INCOMPLETE_EVIDENCE"
+    },
+    {
+      "id": "paf-minhas",
+      "service": "PAF",
+      "name": "PAF Base Minhas",
+      "icaoCode": "OPMS",
+      "longitude": 72.4,
+      "latitude": 33.8703,
+      "type": "MAIN_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Base Minhas",
+        "Minhas Air Base",
+        "OPMS"
+      ],
+      "runwaySourceAirportIdent": "OPMS",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:paf-minhas:257442"
+      ],
+      "groundStartState": "UNSUPPORTED_INCOMPLETE_EVIDENCE"
+    },
+    {
+      "id": "paf-mushaf",
+      "service": "PAF",
+      "name": "PAF Base Mushaf",
+      "icaoCode": "OPSR",
+      "longitude": 72.6653,
+      "latitude": 32.0486,
+      "type": "MAIN_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Base Mushaf",
+        "Mushaf Air Base",
+        "OPSR"
+      ],
+      "runwaySourceAirportIdent": "OPSR",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [],
+      "groundStartState": "UNSUPPORTED_INCOMPLETE_EVIDENCE"
+    },
+    {
+      "id": "paf-murid",
+      "service": "PAF",
+      "name": "PAF Murid",
+      "icaoCode": "OPMU",
+      "longitude": 72.7756,
+      "latitude": 32.9094,
+      "type": "FORWARD_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Murid",
+        "PAF Murid Air Base",
+        "PK-0009"
+      ],
+      "runwaySourceAirportIdent": "PK-0009",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [],
+      "groundStartState": "UNSUPPORTED_INCOMPLETE_EVIDENCE"
+    },
+    {
+      "id": "paf-rafiqui",
+      "service": "PAF",
+      "name": "PAF Base Rafiqui",
+      "icaoCode": "OPRQ",
+      "longitude": 72.2824,
+      "latitude": 30.7581,
+      "type": "MAIN_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Base Rafiqui",
+        "Rafiqui Air Base",
+        "OPRQ"
+      ],
+      "runwaySourceAirportIdent": "OPRQ",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:paf-rafiqui:351281",
+        "runway:paf-rafiqui:351282"
+      ],
+      "groundStartState": "UNSUPPORTED_INCOMPLETE_EVIDENCE"
+    },
+    {
+      "id": "paf-shahbaz",
+      "service": "PAF",
+      "name": "PAF Base Shahbaz",
+      "icaoCode": "OPJA",
+      "longitude": 68.4497,
+      "latitude": 28.2842,
+      "type": "MAIN_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Base Shahbaz",
+        "Shahbaz Air Base",
+        "OPJA"
+      ],
+      "runwaySourceAirportIdent": "OPJA",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:paf-shahbaz:238184",
+        "runway:paf-shahbaz:238185"
+      ],
+      "groundStartState": "SUPPORTED_PUBLIC_EDUCATIONAL"
+    },
+    {
+      "id": "paf-masroor",
+      "service": "PAF",
+      "name": "PAF Base Masroor",
+      "icaoCode": "OPMR",
+      "longitude": 66.94,
+      "latitude": 24.8936,
+      "type": "MAIN_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Base Masroor",
+        "Masroor Air Base",
+        "OPMR"
+      ],
+      "runwaySourceAirportIdent": "OPMR",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:paf-masroor:238213",
+        "runway:paf-masroor:238214"
+      ],
+      "groundStartState": "SUPPORTED_PUBLIC_EDUCATIONAL"
+    },
+    {
+      "id": "paf-bholari",
+      "service": "PAF",
+      "name": "PAF Base Bholari",
+      "icaoCode": "OPBW",
+      "longitude": 68.0353,
+      "latitude": 25.2436,
+      "type": "MAIN_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Base Bholari",
+        "PAF Bholari",
+        "PK-0070"
+      ],
+      "runwaySourceAirportIdent": "PK-0070",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [],
+      "groundStartState": "UNSUPPORTED_INCOMPLETE_EVIDENCE"
+    },
+    {
+      "id": "paf-faisal",
+      "service": "PAF",
+      "name": "PAF Base Faisal",
+      "icaoCode": "OPSF",
+      "longitude": 67.1178,
+      "latitude": 24.8747,
+      "type": "MAIN_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Base Faisal",
+        "Faisal Air Base",
+        "OPSF"
+      ],
+      "runwaySourceAirportIdent": "OPSF",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:paf-faisal:238192"
+      ],
+      "groundStartState": "UNSUPPORTED_INCOMPLETE_EVIDENCE"
+    },
+    {
+      "id": "paf-sukkur",
+      "service": "PAF",
+      "name": "PAF Sukkur",
+      "icaoCode": "OPSK",
+      "longitude": 68.7919,
+      "latitude": 27.7219,
+      "type": "FORWARD_OPERATING_BASE",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Sukkur",
+        "Begum Nusrat Bhutto International Airport Sukkur",
+        "OPSK"
+      ],
+      "runwaySourceAirportIdent": "OPSK",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [
+        "runway:paf-sukkur:238197"
+      ],
+      "groundStartState": "SUPPORTED_PUBLIC_EDUCATIONAL"
+    },
+    {
+      "id": "paf-korangi-creek",
+      "service": "PAF",
+      "name": "PAF Korangi Creek",
+      "icaoCode": "OPKC",
+      "longitude": 67.1364,
+      "latitude": 24.7822,
+      "type": "AIR_STATION",
+      "sourceId": "shield-paf-orbat-2026-05-19",
+      "coordinateDatum": "WGS84",
+      "positionalUncertaintyM": null,
+      "provenance": "PUBLIC_REFERENCE",
+      "reviewState": "UNVERIFIED",
+      "aliases": [
+        "PAF Korangi Creek",
+        "Korangi Creek Airport",
+        "PK-0085"
+      ],
+      "runwaySourceAirportIdent": "PK-0085",
+      "runwayEvidence": "OURAIRPORTS_PUBLIC_DOMAIN",
+      "runwayIds": [],
+      "groundStartState": "UNSUPPORTED_INCOMPLETE_EVIDENCE"
+    }
+  ],
+  "runways": [
+    {
+      "id": "runway:iaf-adampur:236624",
+      "installationId": "iaf-adampur",
+      "sourceRunwayId": "236624",
+      "sourceAirportIdent": "VIAX",
+      "designator": "13/31",
+      "trueHeadingDeg": 133,
+      "reciprocalTrueHeadingDeg": 313,
+      "lengthM": 2755.087,
+      "widthM": 45.11,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": null,
+      "thresholdElevationsMslM": null,
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "INELIGIBLE",
+      "limitation": "Required runway geometry, dimension, heading, surface, or elevation evidence is incomplete."
+    },
+    {
+      "id": "runway:iaf-ambala:236609",
+      "installationId": "iaf-ambala",
+      "sourceRunwayId": "236609",
+      "sourceAirportIdent": "VIAM",
+      "designator": "12R/30L",
+      "trueHeadingDeg": 122,
+      "reciprocalTrueHeadingDeg": 302,
+      "lengthM": 2423.77,
+      "widthM": 45.72,
+      "surface": "ASP",
+      "closedInSource": true,
+      "centreline": null,
+      "thresholdElevationsMslM": null,
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "INELIGIBLE",
+      "limitation": "The source marks this runway closed; ground starts fail closed."
+    },
+    {
+      "id": "runway:iaf-ambala:236610",
+      "installationId": "iaf-ambala",
+      "sourceRunwayId": "236610",
+      "sourceAirportIdent": "VIAM",
+      "designator": "12L/30R",
+      "trueHeadingDeg": 122,
+      "reciprocalTrueHeadingDeg": 302,
+      "lengthM": 2811.475,
+      "widthM": 45.72,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": null,
+      "thresholdElevationsMslM": null,
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "INELIGIBLE",
+      "limitation": "Required runway geometry, dimension, heading, surface, or elevation evidence is incomplete."
+    },
+    {
+      "id": "runway:iaf-halwara:236651",
+      "installationId": "iaf-halwara",
+      "sourceRunwayId": "236651",
+      "sourceAirportIdent": "VIHX",
+      "designator": "13/31",
+      "trueHeadingDeg": 131,
+      "reciprocalTrueHeadingDeg": 311,
+      "lengthM": 3050.134,
+      "widthM": 45.11,
+      "surface": "PEM",
+      "closedInSource": false,
+      "centreline": null,
+      "thresholdElevationsMslM": null,
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "INELIGIBLE",
+      "limitation": "Required runway geometry, dimension, heading, surface, or elevation evidence is incomplete."
+    },
+    {
+      "id": "runway:iaf-jodhpur:236786",
+      "installationId": "iaf-jodhpur",
+      "sourceRunwayId": "236786",
+      "sourceAirportIdent": "VIJO",
+      "designator": "05/23",
+      "trueHeadingDeg": 44.8,
+      "reciprocalTrueHeadingDeg": 224.8,
+      "lengthM": 2744.724,
+      "widthM": 45.72,
+      "surface": "PEM",
+      "closedInSource": false,
+      "centreline": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.03919982910156,
+            26.242300033569336
+          ],
+          [
+            73.05850219726562,
+            26.259899139404297
+          ]
+        ]
+      },
+      "thresholdElevationsMslM": {
+        "low": 218.542,
+        "high": 210.312
+      },
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "PUBLIC_EDUCATIONAL",
+      "limitation": "Public-domain community reference only; not navigation, readiness, occupancy, or current operational-status evidence."
+    },
+    {
+      "id": "runway:iaf-pathankot:236695",
+      "installationId": "iaf-pathankot",
+      "sourceRunwayId": "236695",
+      "sourceAirportIdent": "VIPK",
+      "designator": "01/19",
+      "trueHeadingDeg": 9.2,
+      "reciprocalTrueHeadingDeg": 189.2,
+      "lengthM": 2734.056,
+      "widthM": 45.72,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": null,
+      "thresholdElevationsMslM": null,
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "INELIGIBLE",
+      "limitation": "Required runway geometry, dimension, heading, surface, or elevation evidence is incomplete."
+    },
+    {
+      "id": "runway:iaf-srinagar:236760",
+      "installationId": "iaf-srinagar",
+      "sourceRunwayId": "236760",
+      "sourceAirportIdent": "VISR",
+      "designator": "13/31",
+      "trueHeadingDeg": 136,
+      "reciprocalTrueHeadingDeg": 316,
+      "lengthM": 3685.032,
+      "widthM": 45.72,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            74.76069641113281,
+            33.999000549316406
+          ],
+          [
+            74.78780364990234,
+            33.97529983520508
+          ]
+        ]
+      },
+      "thresholdElevationsMslM": {
+        "low": 1654.15,
+        "high": 1674.876
+      },
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "PUBLIC_EDUCATIONAL",
+      "limitation": "Public-domain community reference only; not navigation, readiness, occupancy, or current operational-status evidence."
+    },
+    {
+      "id": "runway:paf-asghar-khan:238198",
+      "installationId": "paf-asghar-khan",
+      "sourceRunwayId": "238198",
+      "sourceAirportIdent": "OPRS",
+      "designator": "09R/27L",
+      "trueHeadingDeg": 92,
+      "reciprocalTrueHeadingDeg": 272,
+      "lengthM": 2769.108,
+      "widthM": 49.987,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            71.9563980102539,
+            34.080299377441406
+          ],
+          [
+            71.98629760742188,
+            34.07870101928711
+          ]
+        ]
+      },
+      "thresholdElevationsMslM": {
+        "low": 320.04,
+        "high": 320.04
+      },
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "PUBLIC_EDUCATIONAL",
+      "limitation": "Public-domain community reference only; not navigation, readiness, occupancy, or current operational-status evidence."
+    },
+    {
+      "id": "runway:paf-asghar-khan:238199",
+      "installationId": "paf-asghar-khan",
+      "sourceRunwayId": "238199",
+      "sourceAirportIdent": "OPRS",
+      "designator": "09L/27R",
+      "trueHeadingDeg": 92,
+      "reciprocalTrueHeadingDeg": 272,
+      "lengthM": 1780.032,
+      "widthM": 49.987,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            71.96420288085938,
+            34.08319854736328
+          ],
+          [
+            71.9834976196289,
+            34.08209991455078
+          ]
+        ]
+      },
+      "thresholdElevationsMslM": {
+        "low": 320.04,
+        "high": 320.04
+      },
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "PUBLIC_EDUCATIONAL",
+      "limitation": "Public-domain community reference only; not navigation, readiness, occupancy, or current operational-status evidence."
+    },
+    {
+      "id": "runway:paf-faisal:238192",
+      "installationId": "paf-faisal",
+      "sourceRunwayId": "238192",
+      "sourceAirportIdent": "OPSF",
+      "designator": "08/26",
+      "trueHeadingDeg": 79,
+      "reciprocalTrueHeadingDeg": 259,
+      "lengthM": 2456.688,
+      "widthM": 45.72,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": null,
+      "thresholdElevationsMslM": null,
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "INELIGIBLE",
+      "limitation": "Required runway geometry, dimension, heading, surface, or elevation evidence is incomplete."
+    },
+    {
+      "id": "runway:paf-masroor:238213",
+      "installationId": "paf-masroor",
+      "sourceRunwayId": "238213",
+      "sourceAirportIdent": "OPMR",
+      "designator": "04/22",
+      "trueHeadingDeg": 45,
+      "reciprocalTrueHeadingDeg": 225,
+      "lengthM": 2627.986,
+      "widthM": 36.576,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            66.93109893798828,
+            24.880199432373047
+          ],
+          [
+            66.94940185546875,
+            24.896799087524414
+          ]
+        ]
+      },
+      "thresholdElevationsMslM": {
+        "low": 10.668,
+        "high": 10.668
+      },
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "PUBLIC_EDUCATIONAL",
+      "limitation": "Public-domain community reference only; not navigation, readiness, occupancy, or current operational-status evidence."
+    },
+    {
+      "id": "runway:paf-masroor:238214",
+      "installationId": "paf-masroor",
+      "sourceRunwayId": "238214",
+      "sourceAirportIdent": "OPMR",
+      "designator": "09/27",
+      "trueHeadingDeg": 89.9,
+      "reciprocalTrueHeadingDeg": 269.9,
+      "lengthM": 2749.906,
+      "widthM": 60.96,
+      "surface": "CON",
+      "closedInSource": false,
+      "centreline": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            66.92630004882812,
+            24.898500442504883
+          ],
+          [
+            66.95349884033203,
+            24.898500442504883
+          ]
+        ]
+      },
+      "thresholdElevationsMslM": {
+        "low": 10.668,
+        "high": 10.668
+      },
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "PUBLIC_EDUCATIONAL",
+      "limitation": "Public-domain community reference only; not navigation, readiness, occupancy, or current operational-status evidence."
+    },
+    {
+      "id": "runway:paf-minhas:257442",
+      "installationId": "paf-minhas",
+      "sourceRunwayId": "257442",
+      "sourceAirportIdent": "OPMS",
+      "designator": "12/30",
+      "trueHeadingDeg": 121,
+      "reciprocalTrueHeadingDeg": 301,
+      "lengthM": 3032.76,
+      "widthM": 50.292,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": null,
+      "thresholdElevationsMslM": null,
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "INELIGIBLE",
+      "limitation": "Required runway geometry, dimension, heading, surface, or elevation evidence is incomplete."
+    },
+    {
+      "id": "runway:paf-mm-alam:238203",
+      "installationId": "paf-mm-alam",
+      "sourceRunwayId": "238203",
+      "sourceAirportIdent": "OPMI",
+      "designator": "06R/24L",
+      "trueHeadingDeg": 61.1,
+      "reciprocalTrueHeadingDeg": 241.1,
+      "lengthM": 3097.073,
+      "widthM": 47.549,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": null,
+      "thresholdElevationsMslM": null,
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "INELIGIBLE",
+      "limitation": "Required runway geometry, dimension, heading, surface, or elevation evidence is incomplete."
+    },
+    {
+      "id": "runway:paf-mm-alam:238204",
+      "installationId": "paf-mm-alam",
+      "sourceRunwayId": "238204",
+      "sourceAirportIdent": "OPMI",
+      "designator": "06L/24R",
+      "trueHeadingDeg": 61.1,
+      "reciprocalTrueHeadingDeg": 241.1,
+      "lengthM": 3154.07,
+      "widthM": 29.566,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": null,
+      "thresholdElevationsMslM": null,
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "INELIGIBLE",
+      "limitation": "Required runway geometry, dimension, heading, surface, or elevation evidence is incomplete."
+    },
+    {
+      "id": "runway:paf-nur-khan:238212",
+      "installationId": "paf-nur-khan",
+      "sourceRunwayId": "238212",
+      "sourceAirportIdent": "OPRN",
+      "designator": "12/30",
+      "trueHeadingDeg": 118.2,
+      "reciprocalTrueHeadingDeg": 298.2,
+      "lengthM": 3287.268,
+      "widthM": 45.72,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            73.08319854736328,
+            33.62379837036133
+          ],
+          [
+            73.114501953125,
+            33.609798431396484
+          ]
+        ]
+      },
+      "thresholdElevationsMslM": {
+        "low": 505.663,
+        "high": 505.054
+      },
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "PUBLIC_EDUCATIONAL",
+      "limitation": "Public-domain community reference only; not navigation, readiness, occupancy, or current operational-status evidence."
+    },
+    {
+      "id": "runway:paf-peshawar:238210",
+      "installationId": "paf-peshawar",
+      "sourceRunwayId": "238210",
+      "sourceAirportIdent": "OPPS",
+      "designator": "17/35",
+      "trueHeadingDeg": 175.9,
+      "reciprocalTrueHeadingDeg": 355.9,
+      "lengthM": 2743.2,
+      "widthM": 45.72,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            71.51349639892578,
+            34.00600051879883
+          ],
+          [
+            71.51570129394531,
+            33.98139953613281
+          ]
+        ]
+      },
+      "thresholdElevationsMslM": {
+        "low": 356.921,
+        "high": 369.113
+      },
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "PUBLIC_EDUCATIONAL",
+      "limitation": "Public-domain community reference only; not navigation, readiness, occupancy, or current operational-status evidence."
+    },
+    {
+      "id": "runway:paf-qadri:238215",
+      "installationId": "paf-qadri",
+      "sourceRunwayId": "238215",
+      "sourceAirportIdent": "OPSD",
+      "designator": "14R/32L",
+      "trueHeadingDeg": 147,
+      "reciprocalTrueHeadingDeg": 327,
+      "lengthM": 3656.076,
+      "widthM": 45.72,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            75.530502,
+            35.353298
+          ],
+          [
+            75.552299,
+            35.325699
+          ]
+        ]
+      },
+      "thresholdElevationsMslM": {
+        "low": 2211.629,
+        "high": 2225.345
+      },
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "PUBLIC_EDUCATIONAL",
+      "limitation": "Public-domain community reference only; not navigation, readiness, occupancy, or current operational-status evidence."
+    },
+    {
+      "id": "runway:paf-qadri:238216",
+      "installationId": "paf-qadri",
+      "sourceRunwayId": "238216",
+      "sourceAirportIdent": "OPSD",
+      "designator": "14L/32R",
+      "trueHeadingDeg": 153,
+      "reciprocalTrueHeadingDeg": 333,
+      "lengthM": 3656.076,
+      "widthM": 30.785,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            75.526802,
+            35.338402
+          ],
+          [
+            75.536903,
+            35.322601
+          ]
+        ]
+      },
+      "thresholdElevationsMslM": {
+        "low": 2226.564,
+        "high": 2229.612
+      },
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "PUBLIC_EDUCATIONAL",
+      "limitation": "Public-domain community reference only; not navigation, readiness, occupancy, or current operational-status evidence."
+    },
+    {
+      "id": "runway:paf-rafiqui:351281",
+      "installationId": "paf-rafiqui",
+      "sourceRunwayId": "351281",
+      "sourceAirportIdent": "OPRQ",
+      "designator": "15/33",
+      "trueHeadingDeg": 150,
+      "reciprocalTrueHeadingDeg": 330,
+      "lengthM": 3048,
+      "widthM": 48.768,
+      "surface": "ASPHALT",
+      "closedInSource": false,
+      "centreline": null,
+      "thresholdElevationsMslM": null,
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "INELIGIBLE",
+      "limitation": "Required runway geometry, dimension, heading, surface, or elevation evidence is incomplete."
+    },
+    {
+      "id": "runway:paf-rafiqui:351282",
+      "installationId": "paf-rafiqui",
+      "sourceRunwayId": "351282",
+      "sourceAirportIdent": "OPRQ",
+      "designator": "15R/33L",
+      "trueHeadingDeg": 150,
+      "reciprocalTrueHeadingDeg": 330,
+      "lengthM": 2932.481,
+      "widthM": 30.48,
+      "surface": "ASPHALT",
+      "closedInSource": false,
+      "centreline": null,
+      "thresholdElevationsMslM": null,
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "INELIGIBLE",
+      "limitation": "Required runway geometry, dimension, heading, surface, or elevation evidence is incomplete."
+    },
+    {
+      "id": "runway:paf-shahbaz:238184",
+      "installationId": "paf-shahbaz",
+      "sourceRunwayId": "238184",
+      "sourceAirportIdent": "OPJA",
+      "designator": "15/33",
+      "trueHeadingDeg": 147,
+      "reciprocalTrueHeadingDeg": 327,
+      "lengthM": 3060.192,
+      "widthM": 45.11,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            68.44139862060547,
+            28.295700073242188
+          ],
+          [
+            68.45809936523438,
+            28.2726993560791
+          ]
+        ]
+      },
+      "thresholdElevationsMslM": {
+        "low": 56.693,
+        "high": 58.217
+      },
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "PUBLIC_EDUCATIONAL",
+      "limitation": "Public-domain community reference only; not navigation, readiness, occupancy, or current operational-status evidence."
+    },
+    {
+      "id": "runway:paf-shahbaz:238185",
+      "installationId": "paf-shahbaz",
+      "sourceRunwayId": "238185",
+      "sourceAirportIdent": "OPJA",
+      "designator": "15L/33R",
+      "trueHeadingDeg": 147.3,
+      "reciprocalTrueHeadingDeg": 327.3,
+      "lengthM": 3072.689,
+      "widthM": 24.384,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": null,
+      "thresholdElevationsMslM": null,
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "INELIGIBLE",
+      "limitation": "Required runway geometry, dimension, heading, surface, or elevation evidence is incomplete."
+    },
+    {
+      "id": "runway:paf-sukkur:238197",
+      "installationId": "paf-sukkur",
+      "sourceRunwayId": "238197",
+      "sourceAirportIdent": "OPSK",
+      "designator": "14/32",
+      "trueHeadingDeg": 140.5,
+      "reciprocalTrueHeadingDeg": 320.5,
+      "lengthM": 2743.2,
+      "widthM": 29.87,
+      "surface": "ASP",
+      "closedInSource": false,
+      "centreline": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            68.78279876708984,
+            27.73150062561035
+          ],
+          [
+            68.80059814453125,
+            27.712400436401367
+          ]
+        ]
+      },
+      "thresholdElevationsMslM": {
+        "low": 59.741,
+        "high": 58.522
+      },
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "MSL_REPORTED_BY_SOURCE",
+      "positionalUncertaintyM": null,
+      "provenance": "SOURCED_DATASET",
+      "reviewState": "UNVERIFIED_PUBLIC_REFERENCE",
+      "missionStartEligibility": "PUBLIC_EDUCATIONAL",
+      "limitation": "Public-domain community reference only; not navigation, readiness, occupancy, or current operational-status evidence."
+    }
+  ]
+}

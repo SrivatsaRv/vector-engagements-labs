@@ -127,9 +127,10 @@ test("saved-run admission rejects stale selected-installation and runway identit
       routeAcceptanceRadiiM: [],
       routeWaypointTransitions: [],
       originReference: {
-        schemaVersion: "vector.installation-origin.v1",
+        schemaVersion: "vector.installation-origin.v2",
         installationId: "iaf-pathankot",
         sourceId: "iaf-stations-wikipedia",
+        startKind: "RUNWAY",
         environment: { studyAreaId: "north-punjab", weatherPresetId: "north-punjab-clear" },
         runwayId: "rwy-09",
       },
@@ -234,5 +235,5 @@ test("the aggregate Drizzle schema is exactly the union of its domain-owned modu
   const moduleKeys = modules.flatMap((module) => Object.keys(module)).sort();
   assert.equal(new Set(moduleKeys).size, moduleKeys.length);
   assert.deepEqual(Object.keys(aggregate).sort(), moduleKeys);
-  assert.equal(moduleKeys.length, 19);
+  assert.equal(moduleKeys.length, 21);
 });

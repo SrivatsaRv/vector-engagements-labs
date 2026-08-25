@@ -31,11 +31,14 @@ import {
   scale,
   subtract,
 } from "./vector.ts";
-import { localFrameToGeographic } from "../geospatial/geodesy.ts";
+import { enginePositionToGeographic } from "../scenario-spatial.ts";
 import {
-  assertPhaseAEnvironmentPack,
+  assertEnvironmentPack,
+  createEnvironmentSampler,
   environmentPackBinding,
+  environmentRuntimeProjection,
 } from "../geospatial/environment-pack.ts";
+import type { EnvironmentSample } from "../geospatial/environment-pack.ts";
 import { assertRuntimeModelPackDigest } from "./runtime-model-pack.ts";
 import {
   assertNoTruthIdentity,
@@ -356,7 +359,9 @@ function initialState(definition: EngineEntityDefinition): RuntimeState {
   };
 }
 
-function activeWind(scenario: EngineScenario, time: number) {
+type RuntimeEnvironmentSampler = ReturnType<typeof createEnvironmentSampler>;
+
+function activeWind(scenario: EngineScenario, time: number, baseWind = scenario.environment.windMps) {
   return scenario.events.reduce(
     (wind, event) =>
       event.type === "WIND_SHIFT" &&
@@ -365,8 +370,40 @@ function activeWind(scenario: EngineScenario, time: number) {
       event.vectorMps
         ? add(wind, event.vectorMps)
         : wind,
-    scenario.environment.windMps,
+    baseWind,
   );
+}
+
+function sampledEnvironment(
+  scenario: EngineScenario,
+  sampler: RuntimeEnvironmentSampler | undefined,
+  position: Vec3,
+  time: number,
+): { atmosphere: EnvironmentSample["atmosphere"]; windEnuMps: Vec3 } {
+  if (sampler) {
+    const sample = sampler.sample({
+      eastM: position.x,
+      northM: position.y,
+      upM: position.z,
+      modelTimeSeconds: time,
+    });
+    return { atmosphere: sample.atmosphere, windEnuMps: sample.windEnuMps };
+  }
+  return {
+    atmosphere: standardAtmosphere(position.z, scenario.environment.temperatureOffsetC),
+    windEnuMps: scenario.environment.windMps,
+  };
+}
+
+function terrainElevation(
+  sampler: RuntimeEnvironmentSampler | undefined,
+  position: Pick<Vec3, "x" | "y">,
+) {
+  const sample = sampler?.terrain.sample({ eastM: position.x, northM: position.y });
+  if (sampler && !sample?.elevation) {
+    throw new Error("Runtime position is outside admitted terrain coverage or contains no-data.");
+  }
+  return sample?.elevation?.valueM ?? 0;
 }
 
 function updateKinematicEntity(
@@ -374,6 +411,7 @@ function updateKinematicEntity(
   scenario: EngineScenario,
   time: number,
   dt: number,
+  environmentSampler?: RuntimeEnvironmentSampler,
 ) {
   if (state.lifecycle !== "ACTIVE" && state.lifecycle !== "TRACKING") return;
   const { kind } = state.definition;
@@ -441,11 +479,9 @@ function updateKinematicEntity(
   const steeringLimited =
     magnitude(requestedSteeringAcceleration) >
     magnitude(acceptedSteeringAcceleration) + 1e-9;
-  const atmosphere = standardAtmosphere(
-    state.position.z,
-    scenario.environment.temperatureOffsetC,
-  );
-  const airRelative = subtract(state.velocity, activeWind(scenario, time));
+  const environment = sampledEnvironment(scenario, environmentSampler, state.position, time);
+  const atmosphere = environment.atmosphere;
+  const airRelative = subtract(state.velocity, activeWind(scenario, time, environment.windEnuMps));
   const airspeed = Math.max(1, magnitude(airRelative));
   let longitudinalAcceleration = 0;
   {
@@ -564,6 +600,7 @@ function updateWeapon(
   scenario: EngineScenario,
   time: number,
   dt: number,
+  environmentSampler?: RuntimeEnvironmentSampler,
 ) {
   const weapon = state.definition.weapon;
   if (!weapon || state.lifecycle !== "ACTIVE") return;
@@ -572,6 +609,13 @@ function updateWeapon(
     state.lifecycle = "TERMINATED";
     state.phase = "Target unavailable";
     state.weaponFlightState = "TARGET_UNAVAILABLE";
+    return;
+  }
+  // Ground impact is evaluated before atmosphere lookup so a below-terrain
+  // state terminates deterministically instead of escaping through the
+  // atmosphere validity boundary. The run coordinator records the outcome.
+  if (time > 1 && state.position.z <= terrainElevation(environmentSampler, state.position)) {
+    state.phase = "Terrain impact";
     return;
   }
 
@@ -586,11 +630,9 @@ function updateWeapon(
     1 / (separation * separation),
   );
 
-  const atmosphere = standardAtmosphere(
-    state.position.z,
-    scenario.environment.temperatureOffsetC,
-  );
-  const wind = activeWind(scenario, time);
+  const environment = sampledEnvironment(scenario, environmentSampler, state.position, time);
+  const atmosphere = environment.atmosphere;
+  const wind = activeWind(scenario, time, environment.windEnuMps);
   const airRelativeVelocity = subtract(state.velocity, wind);
   const airspeed = Math.max(1, magnitude(airRelativeVelocity));
   const direction = normalize(state.velocity);
@@ -692,7 +734,7 @@ function updateWeapon(
   // for this first browser 3DOF model at the declared 50 ms step.
   state.velocity = add(state.velocity, scale(acceleration, dt));
   state.position = add(state.position, scale(state.velocity, dt));
-  state.position.z = Math.max(0, state.position.z);
+  state.position.z = Math.max(terrainElevation(environmentSampler, state.position), state.position.z);
   state.headingRad = Math.atan2(state.velocity.y, state.velocity.x);
   state.commandedG = magnitude(guidanceAcceleration) / G0;
   state.availableG = weapon.maximumCommandG;
@@ -713,12 +755,11 @@ function updateWeapon(
 function toFrame(
   state: RuntimeState,
   scenario: EngineScenario,
+  modelTimeSeconds: number,
+  environmentSampler?: RuntimeEnvironmentSampler,
 ): EngineEntityFrame {
   const speed = magnitude(state.velocity);
-  const atmosphere = standardAtmosphere(
-    state.position.z,
-    scenario.environment.temperatureOffsetC,
-  );
+  const atmosphere = sampledEnvironment(scenario, environmentSampler, state.position, modelTimeSeconds).atmosphere;
   return {
     id: state.definition.id,
     rddfId: state.definition.rddfId,
@@ -825,6 +866,7 @@ export class EngineSession {
   private readonly sampleEvery: number;
   private readonly terminalTick: number;
   private readonly recordingOrigin: EngineScenario["geospatial"]["origin"];
+  private readonly environmentSampler?: RuntimeEnvironmentSampler;
   private termination: EngineRun["termination"] = "time_limit";
   private closestApproachM = Number.POSITIVE_INFINITY;
   private peakCommandG = 0;
@@ -872,8 +914,9 @@ export class EngineSession {
       throw new Error("Engine environment pack and binding must be supplied together.");
     }
     if (admittedPack && recordedBinding) {
-      assertPhaseAEnvironmentPack(admittedPack);
+      assertEnvironmentPack(admittedPack);
       const environmentBinding = environmentPackBinding(admittedPack);
+      const runtimeProjection = environmentRuntimeProjection(admittedPack);
       if (
         recordedBinding.schemaVersion !== environmentBinding.schemaVersion ||
         recordedBinding.id !== environmentBinding.id ||
@@ -881,6 +924,12 @@ export class EngineSession {
         recordedBinding.digest !== environmentBinding.digest
       ) {
         throw new Error("Engine environment-pack binding does not match the admitted pack.");
+      }
+      if (!runtimeProjection || !scenario.environment.runtimeEnvironment
+        || scenario.environment.runtimeEnvironment.environmentPack.digest !== runtimeProjection.environmentPack.digest
+        || scenario.environment.runtimeEnvironment.terrain.digest !== runtimeProjection.terrain.digest
+        || scenario.environment.runtimeEnvironment.atmosphere.digest !== runtimeProjection.atmosphere.digest) {
+        throw new Error("Engine runtime environment projection does not match the admitted pack.");
       }
       if (
         scenario.environment.temperatureOffsetC !== admittedPack.weather.temperatureOffsetC ||
@@ -890,6 +939,17 @@ export class EngineSession {
         scenario.environment.studyArea.weatherPresetId !== admittedPack.content.weather.id
       ) {
         throw new Error("Engine environment values do not match the admitted environment pack.");
+      }
+      this.environmentSampler = createEnvironmentSampler(admittedPack);
+      for (const entity of scenario.entities) {
+        if (entity.kind !== "AIRCRAFT") continue;
+        const points = [entity.initial.position, ...(entity.route ?? [])];
+        for (const point of points) {
+          const surfaceMslM = terrainElevation(this.environmentSampler, point);
+          if (point.z <= surfaceMslM) {
+            throw new Error(`Aircraft ${entity.id} start or route point is at or below admitted terrain.`);
+          }
+        }
       }
     }
     for (const [index, event] of scenario.events.entries()) {
@@ -1149,10 +1209,15 @@ export class EngineSession {
     const frameIndex = this.frames.length;
     this.frames.push({
       t: modelTimeSeconds,
-      entities: visibleStates.map((state) => toFrame(state, this.scenario)),
+      entities: visibleStates.map((state) => toFrame(
+        state,
+        this.scenario,
+        modelTimeSeconds,
+        this.environmentSampler,
+      )),
       geographicPositions: visibleStates.map((state) => ({
         entityId: state.definition.id,
-        position: localFrameToGeographic(state.position, this.recordingOrigin),
+        position: enginePositionToGeographic(state.position, this.recordingOrigin),
       })),
       primaryWeaponId: primaryWeapon.definition.id,
       primaryTargetId: primaryTarget.definition.id,
@@ -1286,7 +1351,7 @@ export class EngineSession {
           (sinceLaunch > weapon.burnSeconds + 2 &&
             speed < 80 &&
             separationM > 1000) ||
-          (primaryWeapon.position.z <= 0 && time > 1)
+          (primaryWeapon.position.z <= terrainElevation(this.environmentSampler, primaryWeapon.position) && time > 1)
         ) {
           this.termination = "energy_depleted";
           this.completed = true;
@@ -1326,9 +1391,9 @@ export class EngineSession {
         [...this.states.values()].map((state) => [state.definition.id, state.lifecycle]),
       );
       for (const state of this.states.values())
-        updateKinematicEntity(state, scenario, time, scenario.fixedStepSeconds);
+        updateKinematicEntity(state, scenario, time, scenario.fixedStepSeconds, this.environmentSampler);
       for (const state of this.states.values())
-        updateWeapon(state, this.states, scenario, time, scenario.fixedStepSeconds);
+        updateWeapon(state, this.states, scenario, time, scenario.fixedStepSeconds, this.environmentSampler);
       this.integratedSteps = nextTick;
       batchSteps += 1;
       const nextEventTime = recordedModelTimeAtTick(nextTick, scenario.fixedStepSeconds);
@@ -1368,7 +1433,7 @@ export class EngineSession {
         const sinceLaunch = nextTime - (weapon.launchTimeSeconds ?? 0);
         if (
           (sinceLaunch > weapon.burnSeconds + 2 && speed < 80 && postSeparationM > 1000) ||
-          (primaryWeapon.position.z <= 0 && nextTime > 1)
+          (primaryWeapon.position.z <= terrainElevation(this.environmentSampler, primaryWeapon.position) && nextTime > 1)
         ) {
           this.termination = "energy_depleted";
           this.completed = true;

@@ -3358,6 +3358,13 @@
         },
         {
           "kind": "EXACT",
+          "value": "governance/installation-catalogue.v2.json",
+          "facets": [
+            "storage"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "lib/study-areas.ts",
           "facets": [
             "runtime",
@@ -3417,6 +3424,22 @@
           "facets": [
             "admission",
             "evidence",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/generate-environment-scenario-migration.ts",
+          "facets": [
+            "storage",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-environment.ts",
+          "facets": [
+            "runtime",
             "verification"
           ]
         }
@@ -4964,5 +4987,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "335b23bacdcee505f6678e9811a3734760951f5483f153ab34393d7c72557b5e"
+  "canonicalSha256": "3fc4211684e3690880a74d3817cadfc49196f4037cc81ec7b49a0b90e424ee59"
 }

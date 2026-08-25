@@ -1,0 +1,1107 @@
+{
+  "schemaVersion": "vector.regional-environment-source-manifest.v1",
+  "id": "vector.public-educational-regional-environment",
+  "version": "1.0.0",
+  "retrievedDate": "2026-08-25",
+  "intendedUse": "PUBLIC_EDUCATIONAL",
+  "areaAdmission": "ELIGIBLE",
+  "compiledPath": "compiled.v1.json",
+  "compiledSha256": "93f286c27214bdf9f48f0ca4f759d3ede685407b0e4a1009ab05763642eb2ead",
+  "installationCataloguePath": "governance/installation-catalogue.v2.json",
+  "installationCatalogueSha256": "7e82c1f1e0ddf75ead7629a207f1be3089ce153486ef0573575b118b90482f21",
+  "sources": {
+    "terrain": {
+      "publisher": "NOAA National Centers for Environmental Information",
+      "dataset": "ETOPO 2022 v1 Ice Surface 15 arc-second",
+      "datasetId": "ETOPO_2022_v1_15s",
+      "service": "NOAA CoastWatch ERDDAP griddap",
+      "sourceUrl": "https://coastwatch.pfeg.noaa.gov/erddap/griddap/ETOPO_2022_v1_15s.html",
+      "documentationUrl": "https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO2022/docs/1.2%20ETOPO%202022%20User%20Guide.pdf",
+      "licence": "PUBLIC_DOMAIN_US_GOVERNMENT",
+      "horizontalDatum": "WGS84",
+      "verticalDatum": "EGM2008",
+      "sourceResolutionDegrees": 0.004166666666666667,
+      "preprocessedStride": 24,
+      "preprocessedResolutionDegrees": 0.1,
+      "noDataPolicy": "FAIL_CLOSED",
+      "navigationUse": "PROHIBITED"
+    },
+    "atmosphere": {
+      "publisher": "NASA POWER",
+      "provider": "NASA Langley Research Center",
+      "service": "NASA POWER Hourly Point API",
+      "sourceUrl": "https://power.larc.nasa.gov/docs/services/api/temporal/hourly/",
+      "licence": "CC0-1.0",
+      "licenceDecisionUrl": "https://www.earthdata.nasa.gov/engage/open-data-services-software/data-use-policy",
+      "horizontalDatum": "WGS84",
+      "timeStandard": "UTC",
+      "parameters": [
+        "T2M",
+        "PS",
+        "RH2M",
+        "U10M",
+        "V10M"
+      ],
+      "gridColumns": 3,
+      "gridRows": 3,
+      "sampleIntervalSeconds": 3600,
+      "sampleCount": 24,
+      "verticalProfilePolicy": "DERIVED_HYPSOMETRIC_STANDARD_LAPSE_TO_20000_M"
+    },
+    "runways": {
+      "publisher": "OurAirports",
+      "repository": "https://github.com/davidmegginson/ourairports-data",
+      "commit": "7d6886315f6c249b3818930030871d9329cc3445",
+      "airportsSha256": "4e56f700c184c586fe26d897082d176829840574c360ace0e38590f7e69489fa",
+      "runwaysSha256": "582a52288d2a83a6f6de6a89b0355f5e9149bf057dd3d7769b95a10f8e01ff4f",
+      "licence": "Unlicense",
+      "licenceUrl": "https://github.com/davidmegginson/ourairports-data/blob/7d6886315f6c249b3818930030871d9329cc3445/LICENSE",
+      "fitness": "NO_GUARANTEE_NOT_FOR_NAVIGATION_OR_CURRENT_OPERATIONAL_STATUS",
+      "installationAirportIdentifiers": {
+        "iaf-adampur": "VIAX",
+        "iaf-ambala": "VIAM",
+        "iaf-halwara": "VIHX",
+        "iaf-pathankot": "VIPK",
+        "iaf-srinagar": "VISR",
+        "iaf-jodhpur": "VIJO",
+        "paf-nur-khan": "OPRN",
+        "paf-peshawar": "OPPS",
+        "paf-asghar-khan": "OPRS",
+        "paf-qadri": "OPSD",
+        "paf-mm-alam": "OPMI",
+        "paf-minhas": "OPMS",
+        "paf-mushaf": "OPSR",
+        "paf-murid": "PK-0009",
+        "paf-rafiqui": "OPRQ",
+        "paf-shahbaz": "OPJA",
+        "paf-masroor": "OPMR",
+        "paf-bholari": "PK-0070",
+        "paf-faisal": "OPSF",
+        "paf-sukkur": "OPSK",
+        "paf-korangi-creek": "PK-0085"
+      }
+    }
+  },
+  "artifacts": [
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-fair:r0c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-fair.r0c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=63.5&latitude=17&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "d85efa98f36ce1358251c2522d456841276165e0b18a001e6d4aefa3eecff7d8",
+      "longitudeDeg": 63.5,
+      "latitudeDeg": 17
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-fair:r0c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-fair.r0c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=68.35&latitude=17&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "d43f5a7c7f8375a915d0fbf673bab9f422fffefbce43f7a7d92a2f3eddae22f6",
+      "longitudeDeg": 68.35,
+      "latitudeDeg": 17
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-fair:r0c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-fair.r0c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=73.2&latitude=17&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "d3583eeff5083e9d0e9f150faaaf2e5791185b2e1aedd39f1a999524f3da503c",
+      "longitudeDeg": 73.2,
+      "latitudeDeg": 17
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-fair:r1c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-fair.r1c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=63.5&latitude=20.8&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "1b50965ea013591d12660c275370ab8d1b4325c07cabc9d1ca413463e6b85cf6",
+      "longitudeDeg": 63.5,
+      "latitudeDeg": 20.8
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-fair:r1c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-fair.r1c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=68.35&latitude=20.8&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "7bb0399fe2b6294a856f76e1600776ea4b16968e36e5cf414757df244c757bef",
+      "longitudeDeg": 68.35,
+      "latitudeDeg": 20.8
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-fair:r1c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-fair.r1c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=73.2&latitude=20.8&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "7e4b6b02e3c3faecccf1c85f520f2f01ad7ea0808b1af898c21b7e90e8be8eb5",
+      "longitudeDeg": 73.2,
+      "latitudeDeg": 20.8
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-fair:r2c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-fair.r2c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=63.5&latitude=24.6&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "9b5b6d8276e81b6821be7a885eaa393c434781051591ee1ffb93dfdda530567d",
+      "longitudeDeg": 63.5,
+      "latitudeDeg": 24.6
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-fair:r2c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-fair.r2c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=68.35&latitude=24.6&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "7bd47851f1e47b1ae0728cacccf2b0e891050e6b8cd6b8d8de0ced79787c5e2c",
+      "longitudeDeg": 68.35,
+      "latitudeDeg": 24.6
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-fair:r2c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-fair.r2c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=73.2&latitude=24.6&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "d93cde61ce2f3f77e18d2681f965490cfb08dc0968fa4a9826bd3d71115d4951",
+      "longitudeDeg": 73.2,
+      "latitudeDeg": 24.6
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-strong-wind:r0c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-strong-wind.r0c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=63.5&latitude=17&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "d673273bccfb95a2b9fa79d6bb634f9f5095fd90ea70649da269c381b207f5a3",
+      "longitudeDeg": 63.5,
+      "latitudeDeg": 17
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-strong-wind:r0c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-strong-wind.r0c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=68.35&latitude=17&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "705b2b948288284a63e0bef60043b083187cd30dc9403e97509334b95c1d8afa",
+      "longitudeDeg": 68.35,
+      "latitudeDeg": 17
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-strong-wind:r0c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-strong-wind.r0c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=73.2&latitude=17&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "f4c59ab2acf9c14793d5928f70681d026d14926cdcfe31a0a7087f049451cb65",
+      "longitudeDeg": 73.2,
+      "latitudeDeg": 17
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-strong-wind:r1c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-strong-wind.r1c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=63.5&latitude=20.8&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "8090ece6416708ab520da47e3a5951debb713c96bd7e13e191f7cb6169ac979d",
+      "longitudeDeg": 63.5,
+      "latitudeDeg": 20.8
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-strong-wind:r1c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-strong-wind.r1c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=68.35&latitude=20.8&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "e3efcf3113009021c1b02eec73525829ca51d9fb8af9eedf0ff2c9eda40b6c08",
+      "longitudeDeg": 68.35,
+      "latitudeDeg": 20.8
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-strong-wind:r1c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-strong-wind.r1c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=73.2&latitude=20.8&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "c0d17235c8aa36de86bd65fbe6c9bbf7ba1e9e077331679f2ecd2bc65f7c2413",
+      "longitudeDeg": 73.2,
+      "latitudeDeg": 20.8
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-strong-wind:r2c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-strong-wind.r2c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=63.5&latitude=24.6&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "c0b1db0b491ff862e9aacc2e730131ef453ee9d150b10046c3989dc6999fe2ba",
+      "longitudeDeg": 63.5,
+      "latitudeDeg": 24.6
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-strong-wind:r2c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-strong-wind.r2c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=68.35&latitude=24.6&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "33880ab11a528d11db2a70ac39b09f484306ad97ca4cc2a925ea9bb025c6a250",
+      "longitudeDeg": 68.35,
+      "latitudeDeg": 24.6
+    },
+    {
+      "id": "atmosphere:arabian-sea:arabian-sea-strong-wind:r2c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/arabian-sea.arabian-sea-strong-wind.r2c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=73.2&latitude=24.6&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "ee6a697c1633d44fab512aed559671ca18d60bf348efaf09a7450bd32289947d",
+      "longitudeDeg": 73.2,
+      "latitudeDeg": 24.6
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-fair:r0c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-fair.r0c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=67.3&latitude=20.4&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "abc91cc97524b37f4db46377156a8203fbd0c55cf528628ac6c10113a0299deb",
+      "longitudeDeg": 67.3,
+      "latitudeDeg": 20.4
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-fair:r0c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-fair.r0c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=70.25&latitude=20.4&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "d453e570392d403f683e6f590d52b6f1d2b9ab11d486edc58594af7352bdce2c",
+      "longitudeDeg": 70.25,
+      "latitudeDeg": 20.4
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-fair:r0c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-fair.r0c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=73.2&latitude=20.4&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "15685bdaf5e52ffae5cfd7139f914eeb7504e8975e9b2dd7eb21c400af7a609b",
+      "longitudeDeg": 73.2,
+      "latitudeDeg": 20.4
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-fair:r1c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-fair.r1c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=67.3&latitude=22.799999999999997&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "09873cb0de6526af25795415593fffb8e4adc39c3b93a3bb5223eae9dd2697ae",
+      "longitudeDeg": 67.3,
+      "latitudeDeg": 22.799999999999997
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-fair:r1c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-fair.r1c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=70.25&latitude=22.799999999999997&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "2670f2ece14ba5683ec65834cc0df087f36f4fb4b3534268cd8b6076189ff57f",
+      "longitudeDeg": 70.25,
+      "latitudeDeg": 22.799999999999997
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-fair:r1c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-fair.r1c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=73.2&latitude=22.799999999999997&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "444dc6a044c44c3c02e676cbfd3a604812052a38e26cf29915fb0a0a40bcb88d",
+      "longitudeDeg": 73.2,
+      "latitudeDeg": 22.799999999999997
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-fair:r2c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-fair.r2c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=67.3&latitude=25.2&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "ec869fd6c88a73aa74a6d909f29c20fde3f2573bd16f8bdea640f3dd6dccd9b0",
+      "longitudeDeg": 67.3,
+      "latitudeDeg": 25.2
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-fair:r2c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-fair.r2c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=70.25&latitude=25.2&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "e99c5d0fc7c6d6c2d0d14df02c68ccd5a1ef4f686b1a0c052bb2bdcb214bcde7",
+      "longitudeDeg": 70.25,
+      "latitudeDeg": 25.2
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-fair:r2c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-fair.r2c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=73.2&latitude=25.2&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "bcb4e99b6662cd17b234e129f397b9926c8cf61bbbe7d3e8336adf69cd7b4e18",
+      "longitudeDeg": 73.2,
+      "latitudeDeg": 25.2
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-haze:r0c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-haze.r0c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=67.3&latitude=20.4&start=20201115&end=20201115&format=JSON&time-standard=UTC",
+      "sha256": "57659787d272bb01c3605b081b7e24d01fd2b60ddf79f4a9a8dc85fb3621e0d1",
+      "longitudeDeg": 67.3,
+      "latitudeDeg": 20.4
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-haze:r0c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-haze.r0c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=70.25&latitude=20.4&start=20201115&end=20201115&format=JSON&time-standard=UTC",
+      "sha256": "3cafd7db0a9129a267024b93f168df4380f625a99290c26649c6ea363027f0ee",
+      "longitudeDeg": 70.25,
+      "latitudeDeg": 20.4
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-haze:r0c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-haze.r0c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=73.2&latitude=20.4&start=20201115&end=20201115&format=JSON&time-standard=UTC",
+      "sha256": "2a79c8b5c650195160136355d1245dae983ea75b843ea0518aa840261f99d8ce",
+      "longitudeDeg": 73.2,
+      "latitudeDeg": 20.4
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-haze:r1c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-haze.r1c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=67.3&latitude=22.799999999999997&start=20201115&end=20201115&format=JSON&time-standard=UTC",
+      "sha256": "48f0390d7cee64fb5e49b6b8bf2546fdfa1ae94ea48727116bda91dcc622d893",
+      "longitudeDeg": 67.3,
+      "latitudeDeg": 22.799999999999997
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-haze:r1c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-haze.r1c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=70.25&latitude=22.799999999999997&start=20201115&end=20201115&format=JSON&time-standard=UTC",
+      "sha256": "752059ff7d33ef65243cf62f7838d9c3021ad44d9e3fb4288c74d9ea2052faa4",
+      "longitudeDeg": 70.25,
+      "latitudeDeg": 22.799999999999997
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-haze:r1c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-haze.r1c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=73.2&latitude=22.799999999999997&start=20201115&end=20201115&format=JSON&time-standard=UTC",
+      "sha256": "f16757eb35d58f47d40a48b88a8bb1e803e06d593c9033f1441b8b62ac6c9cfd",
+      "longitudeDeg": 73.2,
+      "latitudeDeg": 22.799999999999997
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-haze:r2c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-haze.r2c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=67.3&latitude=25.2&start=20201115&end=20201115&format=JSON&time-standard=UTC",
+      "sha256": "4f02740cb3960bb4e7042fa5b763c368b21dd5805ce128ca1674cab4e100b853",
+      "longitudeDeg": 67.3,
+      "latitudeDeg": 25.2
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-haze:r2c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-haze.r2c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=70.25&latitude=25.2&start=20201115&end=20201115&format=JSON&time-standard=UTC",
+      "sha256": "97821e28a02578f73a8f27eb9a74f54b9da9280928ed65fae8380b037fab525a",
+      "longitudeDeg": 70.25,
+      "latitudeDeg": 25.2
+    },
+    {
+      "id": "atmosphere:coastal-gujarat:coastal-gujarat-haze:r2c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/coastal-gujarat.coastal-gujarat-haze.r2c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=73.2&latitude=25.2&start=20201115&end=20201115&format=JSON&time-standard=UTC",
+      "sha256": "5fc6f07ff974400388d26d9087b40c9c16ff9462c7718b8c52e388753671a8ac",
+      "longitudeDeg": 73.2,
+      "latitudeDeg": 25.2
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-cold-clear:r0c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-cold-clear.r0c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=75.5&latitude=32.5&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "baf020e65ff777fe21ceb67da63adaafece7b9fe7dbe5e35a312f678e7725b18",
+      "longitudeDeg": 75.5,
+      "latitudeDeg": 32.5
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-cold-clear:r0c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-cold-clear.r0c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=77.55&latitude=32.5&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "5c059ededa3faf8a72575b579f83db2b114fac0b6d90229059160245741ecdbf",
+      "longitudeDeg": 77.55,
+      "latitudeDeg": 32.5
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-cold-clear:r0c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-cold-clear.r0c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=79.6&latitude=32.5&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "8355d2a71f44bd90a2adeecff3f8006ccc960a089f9a7985b2d9f771e5470819",
+      "longitudeDeg": 79.6,
+      "latitudeDeg": 32.5
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-cold-clear:r1c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-cold-clear.r1c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=75.5&latitude=34.2&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "8daff321a8a05f637dd378922acc6b3baaa2feea8438609ba5f2de1607bf8864",
+      "longitudeDeg": 75.5,
+      "latitudeDeg": 34.2
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-cold-clear:r1c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-cold-clear.r1c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=77.55&latitude=34.2&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "1ca9ce6b1e2fa978f2267a3117ab2f9fe43c2dcb6e3a7adf575353d7c0e08a88",
+      "longitudeDeg": 77.55,
+      "latitudeDeg": 34.2
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-cold-clear:r1c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-cold-clear.r1c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=79.6&latitude=34.2&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "4ab160e924eaf9c2ecc7bce5512e81a6508eb2b581969973a92988118d4b3f57",
+      "longitudeDeg": 79.6,
+      "latitudeDeg": 34.2
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-cold-clear:r2c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-cold-clear.r2c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=75.5&latitude=35.9&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "3bb6430e88973f6b6c297896eae3cdd85361fc90217035ad070fe6ee8dcd187b",
+      "longitudeDeg": 75.5,
+      "latitudeDeg": 35.9
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-cold-clear:r2c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-cold-clear.r2c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=77.55&latitude=35.9&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "c136eddbe87c8930023014b707531f9efb759b4a321d9af72dae5530d594bc33",
+      "longitudeDeg": 77.55,
+      "latitudeDeg": 35.9
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-cold-clear:r2c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-cold-clear.r2c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=79.6&latitude=35.9&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "90f68a4397a2c706e9e3e6bef3ac651587b0b551027fec49b000019f9f1ba616",
+      "longitudeDeg": 79.6,
+      "latitudeDeg": 35.9
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-high-wind:r0c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-high-wind.r0c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=75.5&latitude=32.5&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "cc2eae24a1de045fd0226db39a9b287fd7bec78519eeaf074363a5e8c8aa9f54",
+      "longitudeDeg": 75.5,
+      "latitudeDeg": 32.5
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-high-wind:r0c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-high-wind.r0c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=77.55&latitude=32.5&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "2521ff4475b356c4e2798adab341535efefa13b7306d84dbe65bd69d8d5e92d5",
+      "longitudeDeg": 77.55,
+      "latitudeDeg": 32.5
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-high-wind:r0c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-high-wind.r0c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=79.6&latitude=32.5&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "cd14e779eee3afaf862ccc31d846a0131ceb1229b615c6239a8d4d555633977f",
+      "longitudeDeg": 79.6,
+      "latitudeDeg": 32.5
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-high-wind:r1c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-high-wind.r1c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=75.5&latitude=34.2&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "e1479d6cb8cae4c21da4e883f100db1bf66c45dd4e5e86eefa71c0a288cb5c35",
+      "longitudeDeg": 75.5,
+      "latitudeDeg": 34.2
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-high-wind:r1c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-high-wind.r1c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=77.55&latitude=34.2&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "cbd7915a45ff1aa03915c514ad5b934019ebf9adbe1ca5d8627b9e739827f183",
+      "longitudeDeg": 77.55,
+      "latitudeDeg": 34.2
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-high-wind:r1c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-high-wind.r1c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=79.6&latitude=34.2&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "65945f161a9ab64443f9ff78094ec472987bbc3c568c6325a3857b025f53d95c",
+      "longitudeDeg": 79.6,
+      "latitudeDeg": 34.2
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-high-wind:r2c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-high-wind.r2c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=75.5&latitude=35.9&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "8b5fa3ce9ef61aa63901fa634e441e4f20f92d8e4df3d5c77aa1d0396b8153a8",
+      "longitudeDeg": 75.5,
+      "latitudeDeg": 35.9
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-high-wind:r2c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-high-wind.r2c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=77.55&latitude=35.9&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "ba2dccaadb2a509984051e2e0358c9f5f509e659006700d10786a73379579b43",
+      "longitudeDeg": 77.55,
+      "latitudeDeg": 35.9
+    },
+    {
+      "id": "atmosphere:ladakh-high-altitude:ladakh-high-wind:r2c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/ladakh-high-altitude.ladakh-high-wind.r2c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=79.6&latitude=35.9&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "b1686bde4fcc1695c3bd8d9fa5f913bab3d51e6250ab4ce15dade1ab9bb1b14f",
+      "longitudeDeg": 79.6,
+      "latitudeDeg": 35.9
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-humid:r0c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-humid.r0c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=89.8&latitude=25.2&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "ac6ff0222bd96f13bf84895ec20466f20224dbf491e2bc858d5364e379b620c9",
+      "longitudeDeg": 89.8,
+      "latitudeDeg": 25.2
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-humid:r0c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-humid.r0c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=92.5&latitude=25.2&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "ed285d7092960f8bcc8fc39fc49ce00a0e623bfbb829f1b938afe888c8596356",
+      "longitudeDeg": 92.5,
+      "latitudeDeg": 25.2
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-humid:r0c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-humid.r0c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=95.2&latitude=25.2&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "368bcf7f32b4386b3a0775ac56b7823a4347ff338d0959188ad28c4e73574e2c",
+      "longitudeDeg": 95.2,
+      "latitudeDeg": 25.2
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-humid:r1c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-humid.r1c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=89.8&latitude=27.299999999999997&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "2e200bfe5ebed8841c3e2ce3679bdf549432902cbb7891caa73543ae370447cf",
+      "longitudeDeg": 89.8,
+      "latitudeDeg": 27.299999999999997
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-humid:r1c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-humid.r1c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=92.5&latitude=27.299999999999997&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "9d7e673a4391caa747456076b4bbd8df6d9a63ae693a51cd5e207d2308d2fd98",
+      "longitudeDeg": 92.5,
+      "latitudeDeg": 27.299999999999997
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-humid:r1c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-humid.r1c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=95.2&latitude=27.299999999999997&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "8232db9ddafc3cdd538fd77d0788c5631c09a5b679eece9bc8b6576354d3fddf",
+      "longitudeDeg": 95.2,
+      "latitudeDeg": 27.299999999999997
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-humid:r2c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-humid.r2c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=89.8&latitude=29.4&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "a7dd3f02b050312e456eb12dc5e91b71dd51e739e80d8a515396dead07bf5b25",
+      "longitudeDeg": 89.8,
+      "latitudeDeg": 29.4
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-humid:r2c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-humid.r2c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=92.5&latitude=29.4&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "1ee1b4f7e906970864ae644509cd5597ca2479df060844057f60055caba6cd86",
+      "longitudeDeg": 92.5,
+      "latitudeDeg": 29.4
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-humid:r2c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-humid.r2c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=95.2&latitude=29.4&start=20200315&end=20200315&format=JSON&time-standard=UTC",
+      "sha256": "aeb838e9dcedfcd49d30bbdf7dfa2881c246d8eb77594bac2e402d7808906270",
+      "longitudeDeg": 95.2,
+      "latitudeDeg": 29.4
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-monsoon:r0c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-monsoon.r0c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=89.8&latitude=25.2&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "4f3c1f3925334db98f6f6def10f0074188342465af9a940e2a9270f21f9454ba",
+      "longitudeDeg": 89.8,
+      "latitudeDeg": 25.2
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-monsoon:r0c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-monsoon.r0c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=92.5&latitude=25.2&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "2161eb349a14a8969428d177ac1977c1b40e00e41a214b0db665743cae55d236",
+      "longitudeDeg": 92.5,
+      "latitudeDeg": 25.2
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-monsoon:r0c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-monsoon.r0c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=95.2&latitude=25.2&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "4c65d30f8bb20b515a85d2dee79b909132904793d307742c395291d1af83af1a",
+      "longitudeDeg": 95.2,
+      "latitudeDeg": 25.2
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-monsoon:r1c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-monsoon.r1c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=89.8&latitude=27.299999999999997&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "c09aeab0d4d0ad432679d20865857e7b33c160c46e45f069f2b6bb77377b66af",
+      "longitudeDeg": 89.8,
+      "latitudeDeg": 27.299999999999997
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-monsoon:r1c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-monsoon.r1c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=92.5&latitude=27.299999999999997&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "2d46faf680798261f0a7f2226ee38e45c24d4579e00ccac629434d7176e98e2b",
+      "longitudeDeg": 92.5,
+      "latitudeDeg": 27.299999999999997
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-monsoon:r1c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-monsoon.r1c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=95.2&latitude=27.299999999999997&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "6a5c3f843ecb8ca1778df2a77398c662774ab77fa1e8c1050f89d67c485a7593",
+      "longitudeDeg": 95.2,
+      "latitudeDeg": 27.299999999999997
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-monsoon:r2c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-monsoon.r2c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=89.8&latitude=29.4&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "79c42a219684ce81582a3b9078face97656c28da42fb8f0af29831b96c3e604f",
+      "longitudeDeg": 89.8,
+      "latitudeDeg": 29.4
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-monsoon:r2c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-monsoon.r2c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=92.5&latitude=29.4&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "9a5f178bccff5a4c926a2c6d563ac651a16946c398338c91604c573f1398a1cb",
+      "longitudeDeg": 92.5,
+      "latitudeDeg": 29.4
+    },
+    {
+      "id": "atmosphere:north-east-mountains:north-east-monsoon:r2c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-east-mountains.north-east-monsoon.r2c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=95.2&latitude=29.4&start=20200715&end=20200715&format=JSON&time-standard=UTC",
+      "sha256": "1eafd71bdbe45b6f3e869d5ed1b91a0ccabce08f47e442d4aba83a132e9564bb",
+      "longitudeDeg": 95.2,
+      "latitudeDeg": 29.4
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-clear:r0c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-clear.r0c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=72.6&latitude=30.5&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "e71f64f320651c1e4cc2a72223c0f4b41de17691c4ac757c8a12bccbe562735a",
+      "longitudeDeg": 72.6,
+      "latitudeDeg": 30.5
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-clear:r0c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-clear.r0c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=74.5&latitude=30.5&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "41c48b945b6dce45a4f5da9e35a4ed94b70a9557b5367aaaaca99b193981dda5",
+      "longitudeDeg": 74.5,
+      "latitudeDeg": 30.5
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-clear:r0c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-clear.r0c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=76.4&latitude=30.5&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "9f6d675b137e76e592c06859de45dba5177b475796f559e63cf3941d9715799d",
+      "longitudeDeg": 76.4,
+      "latitudeDeg": 30.5
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-clear:r1c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-clear.r1c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=72.6&latitude=31.95&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "400379d3b9a3b6e983c21a57ea70478be195dc6671fa307157afefdcdfb54b7b",
+      "longitudeDeg": 72.6,
+      "latitudeDeg": 31.95
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-clear:r1c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-clear.r1c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=74.5&latitude=31.95&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "a4b458ec263d8db79254bc9cc3a7b932f51365aa776e9f8765a0b40e34511b0e",
+      "longitudeDeg": 74.5,
+      "latitudeDeg": 31.95
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-clear:r1c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-clear.r1c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=76.4&latitude=31.95&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "4d13a64b9de9adb5f7cb38ba571d751fe664d021a8f4e4c94d94cdb5c1561405",
+      "longitudeDeg": 76.4,
+      "latitudeDeg": 31.95
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-clear:r2c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-clear.r2c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=72.6&latitude=33.4&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "6fcb21831a42413c8757a8f4c9b42af4ebf3fb7a0ac6db458cddbf6d2730babc",
+      "longitudeDeg": 72.6,
+      "latitudeDeg": 33.4
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-clear:r2c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-clear.r2c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=74.5&latitude=33.4&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "75112191e75a83167143429749601439ac8fe45ca3898cef206b446fa440b9e5",
+      "longitudeDeg": 74.5,
+      "latitudeDeg": 33.4
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-clear:r2c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-clear.r2c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=76.4&latitude=33.4&start=20200115&end=20200115&format=JSON&time-standard=UTC",
+      "sha256": "9618f70d3ee75697ff595de0ba5d361b6838655cc43294f6694b9dbc748fefbe",
+      "longitudeDeg": 76.4,
+      "latitudeDeg": 33.4
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-hot:r0c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-hot.r0c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=72.6&latitude=30.5&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "35bf731a5d80ff1697369acc67622e6bdf2e77a90fe371f3240194225bafd921",
+      "longitudeDeg": 72.6,
+      "latitudeDeg": 30.5
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-hot:r0c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-hot.r0c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=74.5&latitude=30.5&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "2147bde9908ef145d85d62d0e2700ee7be5e33bc23712ee6a2202d0c3c23a222",
+      "longitudeDeg": 74.5,
+      "latitudeDeg": 30.5
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-hot:r0c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-hot.r0c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=76.4&latitude=30.5&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "59d0d268addc6d8966606cea0218f31c1b0dfcd1a2ec07f85b6f939ec2b793df",
+      "longitudeDeg": 76.4,
+      "latitudeDeg": 30.5
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-hot:r1c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-hot.r1c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=72.6&latitude=31.95&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "17f10748f2b7bf9806d33bb2d6db657202cfb5b476a3e56b6652568daa7d9342",
+      "longitudeDeg": 72.6,
+      "latitudeDeg": 31.95
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-hot:r1c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-hot.r1c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=74.5&latitude=31.95&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "1b59137535db362ebec0356785e58b80bd0d6493bb428f82a7ea9f2aeea72e9c",
+      "longitudeDeg": 74.5,
+      "latitudeDeg": 31.95
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-hot:r1c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-hot.r1c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=76.4&latitude=31.95&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "1fdd7668bcbcffe52632ccbe4abd60ce2cd17f7b84a59f760c346dfb6b08130b",
+      "longitudeDeg": 76.4,
+      "latitudeDeg": 31.95
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-hot:r2c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-hot.r2c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=72.6&latitude=33.4&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "b3eb2424ef2ac773417328f1c419a73ce585478edc115117139fd6c98681184a",
+      "longitudeDeg": 72.6,
+      "latitudeDeg": 33.4
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-hot:r2c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-hot.r2c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=74.5&latitude=33.4&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "e111d9388cc807acf882d4f049a5d31f72030e689c9ab63cb68369136761b661",
+      "longitudeDeg": 74.5,
+      "latitudeDeg": 33.4
+    },
+    {
+      "id": "atmosphere:north-punjab:north-punjab-hot:r2c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/north-punjab.north-punjab-hot.r2c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=76.4&latitude=33.4&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "bce967d772ce54e3fe5849e4fd9c2f8dfe987c16ad2446ef86e949990f2714a3",
+      "longitudeDeg": 76.4,
+      "latitudeDeg": 33.4
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-dust:r0c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-dust.r0c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=69.7&latitude=24.8&start=20200515&end=20200515&format=JSON&time-standard=UTC",
+      "sha256": "80e919283679ac1356d3be9e53b755ba8dafe236e34de88b48c708495ade3457",
+      "longitudeDeg": 69.7,
+      "latitudeDeg": 24.8
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-dust:r0c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-dust.r0c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=72.55000000000001&latitude=24.8&start=20200515&end=20200515&format=JSON&time-standard=UTC",
+      "sha256": "ccd4a89d5980b0bbf39416569691ab32cdc5ca3a61a9681bd73dbe4c897e1c20",
+      "longitudeDeg": 72.55000000000001,
+      "latitudeDeg": 24.8
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-dust:r0c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-dust.r0c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=75.4&latitude=24.8&start=20200515&end=20200515&format=JSON&time-standard=UTC",
+      "sha256": "faed6387e87ccdab2170beef6066e66a2077eae6768cccbd77809424a51a7751",
+      "longitudeDeg": 75.4,
+      "latitudeDeg": 24.8
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-dust:r1c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-dust.r1c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=69.7&latitude=27.3&start=20200515&end=20200515&format=JSON&time-standard=UTC",
+      "sha256": "0fc3f8e28ea0cb65fb4d5d1d3188e974f804aefa843a7c4083266093bf00b7a9",
+      "longitudeDeg": 69.7,
+      "latitudeDeg": 27.3
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-dust:r1c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-dust.r1c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=72.55000000000001&latitude=27.3&start=20200515&end=20200515&format=JSON&time-standard=UTC",
+      "sha256": "79f76da460d0905c6b7475f9989c786fabd0253e7118213c1b1873e431cc02ef",
+      "longitudeDeg": 72.55000000000001,
+      "latitudeDeg": 27.3
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-dust:r1c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-dust.r1c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=75.4&latitude=27.3&start=20200515&end=20200515&format=JSON&time-standard=UTC",
+      "sha256": "4f1e94d597734c45ced270fd93033e67fd454cf5b5369e8a907bf2d01507a142",
+      "longitudeDeg": 75.4,
+      "latitudeDeg": 27.3
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-dust:r2c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-dust.r2c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=69.7&latitude=29.8&start=20200515&end=20200515&format=JSON&time-standard=UTC",
+      "sha256": "fcecc15eb8dee363ada238c020cda58571b6c2d90b28f440fa0a1ef70eb556e2",
+      "longitudeDeg": 69.7,
+      "latitudeDeg": 29.8
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-dust:r2c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-dust.r2c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=72.55000000000001&latitude=29.8&start=20200515&end=20200515&format=JSON&time-standard=UTC",
+      "sha256": "fdc777d3c050ec6acae7049ba9679d61cfc977209837a97fcf80ae83327446f2",
+      "longitudeDeg": 72.55000000000001,
+      "latitudeDeg": 29.8
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-dust:r2c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-dust.r2c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=75.4&latitude=29.8&start=20200515&end=20200515&format=JSON&time-standard=UTC",
+      "sha256": "fa56fbdb44ce31fe9a272f4091c1ebb513e926c04ab37cbf3fe3fa6e9322ce81",
+      "longitudeDeg": 75.4,
+      "latitudeDeg": 29.8
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-hot-dry:r0c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-hot-dry.r0c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=69.7&latitude=24.8&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "907cd08cb312ca356dc6b616acb2524bf00a5ab38334d1db6001d5056beca08a",
+      "longitudeDeg": 69.7,
+      "latitudeDeg": 24.8
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-hot-dry:r0c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-hot-dry.r0c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=72.55000000000001&latitude=24.8&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "b080606f65db337b2f3352f5d9b3a0152c7c79d69d4278b94ff7419ee8360f8d",
+      "longitudeDeg": 72.55000000000001,
+      "latitudeDeg": 24.8
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-hot-dry:r0c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-hot-dry.r0c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=75.4&latitude=24.8&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "cfe244c82904b5e953cd9f80ad865700f6f121c04449dfce1d3773e327b33993",
+      "longitudeDeg": 75.4,
+      "latitudeDeg": 24.8
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-hot-dry:r1c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-hot-dry.r1c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=69.7&latitude=27.3&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "90dbc0957a6ae57438810dcf085cf97ec3dfc95c9fd00a8427ce107acaaab959",
+      "longitudeDeg": 69.7,
+      "latitudeDeg": 27.3
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-hot-dry:r1c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-hot-dry.r1c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=72.55000000000001&latitude=27.3&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "ab586c70e0712380cdaa520a903c24ef934759e3408a9a332356221951b3736d",
+      "longitudeDeg": 72.55000000000001,
+      "latitudeDeg": 27.3
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-hot-dry:r1c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-hot-dry.r1c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=75.4&latitude=27.3&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "9ffc62fe0ea45fb4f3f7fd83c672df04d46d4e2d654636dcb28b16e5cdda111d",
+      "longitudeDeg": 75.4,
+      "latitudeDeg": 27.3
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-hot-dry:r2c0",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-hot-dry.r2c0.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=69.7&latitude=29.8&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "69ea916cbdfe26933de822b56d5895fd216107e91744ff99c8d3eca55abdb8db",
+      "longitudeDeg": 69.7,
+      "latitudeDeg": 29.8
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-hot-dry:r2c1",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-hot-dry.r2c1.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=72.55000000000001&latitude=29.8&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "61d724d56a9ab3e5e76d83df9cd2276c180b90a271b54d9eb2f243ebd9efd595",
+      "longitudeDeg": 72.55000000000001,
+      "latitudeDeg": 29.8
+    },
+    {
+      "id": "atmosphere:rajasthan-desert:rajasthan-hot-dry:r2c2",
+      "kind": "NASA_POWER_HOURLY_POINT",
+      "path": "raw/rajasthan-desert.rajasthan-hot-dry.r2c2.power.json",
+      "url": "https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=T2M%2CPS%2CRH2M%2CU10M%2CV10M&community=SB&longitude=75.4&latitude=29.8&start=20200615&end=20200615&format=JSON&time-standard=UTC",
+      "sha256": "ffab67b0725c42d8f4e9e651f1e06a339949ad92872ef54814fb2d5be8ed1631",
+      "longitudeDeg": 75.4,
+      "latitudeDeg": 29.8
+    },
+    {
+      "id": "terrain:arabian-sea",
+      "kind": "NOAA_ETOPO_2022",
+      "path": "raw/arabian-sea.etopo.csv",
+      "url": "https://coastwatch.pfeg.noaa.gov/erddap/griddap/ETOPO_2022_v1_15s.csv0?z[(16.902083333333):24:(24.602083333333)][(63.402083333333):24:(73.202083333333)]",
+      "sha256": "cfdfe3b23f55c806f716be4ca3533407f813e04f9cf9988147f14057193ce5fa"
+    },
+    {
+      "id": "terrain:coastal-gujarat",
+      "kind": "NOAA_ETOPO_2022",
+      "path": "raw/coastal-gujarat.etopo.csv",
+      "url": "https://coastwatch.pfeg.noaa.gov/erddap/griddap/ETOPO_2022_v1_15s.csv0?z[(20.302083333333):24:(25.202083333333)][(67.202083333333):24:(73.202083333333)]",
+      "sha256": "ef7554d71646cc019646b467c125c94d64c117bfd0d16730e0b1534686ce70ff"
+    },
+    {
+      "id": "terrain:ladakh-high-altitude",
+      "kind": "NOAA_ETOPO_2022",
+      "path": "raw/ladakh-high-altitude.etopo.csv",
+      "url": "https://coastwatch.pfeg.noaa.gov/erddap/griddap/ETOPO_2022_v1_15s.csv0?z[(32.402083333333):24:(35.902083333333)][(75.402083333333):24:(79.602083333333)]",
+      "sha256": "2499fa23fa4fe177b5871cad37d9f7e01e0bf46b9df52f64f9d9c80a4a0a99c1"
+    },
+    {
+      "id": "terrain:north-east-mountains",
+      "kind": "NOAA_ETOPO_2022",
+      "path": "raw/north-east-mountains.etopo.csv",
+      "url": "https://coastwatch.pfeg.noaa.gov/erddap/griddap/ETOPO_2022_v1_15s.csv0?z[(25.102083333333):24:(29.402083333333)][(89.702083333333):24:(95.202083333333)]",
+      "sha256": "0ff43e273ea5f5feef5a6c42737599ad7d28e6fc29b3156bec17009d07f7492c"
+    },
+    {
+      "id": "terrain:north-punjab",
+      "kind": "NOAA_ETOPO_2022",
+      "path": "raw/north-punjab.etopo.csv",
+      "url": "https://coastwatch.pfeg.noaa.gov/erddap/griddap/ETOPO_2022_v1_15s.csv0?z[(30.402083333333):24:(33.402083333333)][(72.502083333333):24:(76.402083333333)]",
+      "sha256": "41d55daddfd59fdf409ecb804e79d02b6ccff0cae04d19e75db1a4f371fd53d0"
+    },
+    {
+      "id": "terrain:rajasthan-desert",
+      "kind": "NOAA_ETOPO_2022",
+      "path": "raw/rajasthan-desert.etopo.csv",
+      "url": "https://coastwatch.pfeg.noaa.gov/erddap/griddap/ETOPO_2022_v1_15s.csv0?z[(24.702083333333):24:(29.802083333333)][(69.602083333333):24:(75.402083333333)]",
+      "sha256": "e7eaa7ad6a5607ae0805e0d23b874d74093879db6fdccb3f4a8568721a083b27"
+    }
+  ],
+  "limitations": [
+    "ETOPO 2022 and OurAirports are not navigation data.",
+    "OurAirports does not prove current occupancy, readiness, assignment, or operational status.",
+    "NASA POWER provides gridded surface analysis values, not an observed atmosphere-aloft profile or operational forecast.",
+    "The derived vertical atmosphere profile is bounded to -500..20000 m MSL and fails closed outside the frozen 24-hour interval."
+  ]
+}

@@ -269,6 +269,34 @@ production-capacity evidence.
 | Cache cold and warm | Catalog p50, p95, p99, and cache-hit ratio |
 | 60-minute soak | Memory plateau, history bounds, file growth, and handle cleanup |
 | Failure and recovery | Invalid packages, timeouts, worker crashes, database restart, and retry boundaries |
+| Regional environment sampling | Exact-pack TS/Rust parity, 4,096-sample batches, p95 throughput, retained heap, cancellation and recovery |
+
+`performance:environment:verify` is the regional environment regression gate.
+It records runtime/OS/CPU/memory context, exact pack identity, 102,400 samples,
+4,096-sample batch size, p95 batch time, samples per second and retained heap
+growth. The local regression ceilings are 100 ms p95 per full batch and 64 MiB
+heap growth. They are development safeguards, not operational terrain accuracy
+or production-capacity claims. Browser responsiveness and cancellation are
+proved separately by `worker:verify` using the built module Worker.
+
+Regional admission caches only the exact, deeply frozen pack selected by the
+complete study-area, weather-preset and effective-weather tuple. Immutable-pack
+validation may be reused only for that already validated object identity;
+mutable copies and differently keyed weather inputs are fully revalidated and
+receive distinct content digests. The sampler prepares the invariant WGS84
+origin transform and interpolation axes once per sample, but retains the exact
+source grid, arithmetic, validity checks and fail-closed coverage boundary. It
+does not quantize coordinates, substitute defaults or weaken source identity.
+Each admitted immutable regional pack also owns one reusable sampler with two
+8,192-entry saturating bounds: exact horizontal coordinates cache the prepared WGS84
+and terrain result, while the full east/north/up/model-time tuple caches only
+the frozen numerical atmosphere/wind kernel. Returned samples remain distinct
+query records, different coordinates or times never alias, and eviction changes
+only recomputation cost—not numerical results or admission. These explicit
+bounds prevent deterministic repeated runs from growing cache memory without
+limit. Once a bound is full, unseen samples are recomputed exactly; admitted
+entries are not churned by a trajectory whose working set is just above the
+bound.
 
 The load harness records model-time throughput, tick duration, allocation count, process RSS, CPU utilization, queue depth and wait, active and failed jobs, cancellation latency, visible dropped frames, database latency, cache hit ratio, and simulation-record bytes.
 

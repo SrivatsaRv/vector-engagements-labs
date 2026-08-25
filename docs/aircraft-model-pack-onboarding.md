@@ -47,6 +47,9 @@ exact Stage-B resolver ---- (id, version, digest), foundation-only
 
 Raw or derivative bytes never become catalog, scenario, runtime, VSR, or UI
 authority. A rendered label cannot upgrade a gap state or make a pack admitted.
+Regional terrain, atmosphere, wind, datum and runway evidence remain a parallel
+content-addressed `EnvironmentPack` authority. They are composed only at the
+scenario/runtime boundary and never enter the Stage-B aircraft evidence chain.
 
 ## Schema and migration reference
 
@@ -70,6 +73,9 @@ raw artifact, derivative, and field-lineage records. `readLegacyCompiledModelPac
 exists for audit/read compatibility only. The Stage-B repository's
 `resolveForDeployment` always rejects; a later runtime-admission owner must add
 that authority without weakening this foundation.
+Migration 014's EnvironmentPack/runway tables and governed rows are therefore
+separate persistence contracts; they do not add aircraft-pack keys or silently
+promote a Stage-B identity.
 
 ## Closed requirements and evidence states
 
@@ -119,6 +125,9 @@ needs both roles, validation must use raw and derivative identities independent
 from its source evidence. Every non-available state requires a gap reason and
 cannot carry digests or a locator. Zero is a numeric value and never represents
 absence.
+Environment coverage, source time, terrain cells and runway eligibility cannot
+satisfy an aircraft requirement or repair an aircraft evidence gap; each family
+must pass its own admission contract before later scenario composition.
 
 ## Step-by-step onboarding
 
@@ -174,6 +183,9 @@ absence.
    bounded field lineage but never raw/derivative byte corpora or recipes.
 10. Stop. #154 must own scenario pack/configuration/station migration before a
     later #161 stage may load the pack in a Worker or retain it in a VSR.
+    That later composition must bind the aircraft pack and EnvironmentPack by
+    their independent exact identities; neither digest is derived from or
+    substituted for the other.
 
 The focused verification command is:
 
@@ -210,6 +222,9 @@ arguments retain their declared semantic order.
 Changing one raw byte fails against the old hash. After the raw record,
 derivative ancestry, and field binding are rebuilt, source, lineage, and compiled
 digests all change. Neither anonymous pack is production-admitted.
+The examples intentionally contain no terrain, atmosphere, wind or runway
+payload. Pairing either example with a regional EnvironmentPack would create a
+separate scenario identity without changing the compiled aircraft-pack digest.
 
 ## Bounds, storage, and recovery
 
@@ -250,6 +265,9 @@ Incomplete publications remain exportable through the integrity-only research
 backup/readback path so governed gaps are recoverable; they remain unavailable
 from `resolveExact` and every deployment path. Compiled-only export likewise
 accepts only complete foundation identities.
+EnvironmentPack database immutability and `superseded_at` lifecycle handling
+are verified by the geospatial persistence contract, not by this repository or
+its aircraft research backup format.
 
 ## Performance evidence
 
@@ -264,6 +282,8 @@ All p50, p95, p99, and maximum measurements were below their committed
 regression budgets. These are local
 foundation measurements, not browser/runtime throughput, x86-64 capacity, or a
 named-aircraft performance claim.
+The regional sampler has its own workload and memory/latency budgets; those
+measurements are not folded into Stage-B compile, publication or reuse timing.
 
 ## Troubleshooting
 
@@ -290,3 +310,6 @@ authority, station selection, the browser Worker protocol, VSR contents, or
 production persistence. The current Stage-B v2 contract is rejected before the
 runtime boundary. #142 retains its TP-1538-specific corpus/evaluator schema,
 and exact-subject evidence owners retain their admission authority.
+In particular, Stage B makes no claim over regional source licensing, WGS84 or
+vertical-datum conversion, sampled wind, terrain/LOS, runway admission, or
+EnvironmentPack production migration/readback.

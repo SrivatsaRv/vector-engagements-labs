@@ -14,12 +14,20 @@ VECTOR uses one product journey everywhere:
 
 ## Spatial contract
 
-A runnable scenario declares a PostGIS-backed `study_area_id` and a weather preset owned by that study area. A study area contains:
+A runnable scenario declares a PostGIS-backed `study_area_id`, a weather preset
+owned by that study area, and the one exact immutable regional EnvironmentPack
+resolved from that pair. The pack contains:
 
 - an EPSG:4326 boundary and anchor;
-- a terrain class and reference surface elevation;
-- public-educational environment presets;
-- an explicit data-state label.
+- sourced terrain and time-indexed atmosphere grids with field provenance;
+- explicit horizontal, source-vertical and runtime-vertical datums;
+- bounded installation/runway coverage and eligibility evidence; and
+- pack, terrain, atmosphere and catalogue versions/digests plus validity,
+  uncertainty, limitations and no-data policy.
+
+Terrain class, a scalar reference elevation and preset labels remain display
+metadata only. They cannot admit route altitude, collision, LOS, dynamics or a
+ground/runway start.
 
 An existing draft, import or saved run never falls back to the first study area
 or the area's default weather. Unknown and cross-area identities block
@@ -28,12 +36,14 @@ weather preset is applied only as a visible authoring action when the operator
 selects a valid study area.
 
 Configured authoring positions carry WGS84 longitude/latitude and an explicit
-MSL altitude. Compilation performs the declared geoid operation, converts to
-ECEF, then to the study area's stable local ENU frame. The record retains both
-local and WGS84 ellipsoid positions. The presentation layer projects recorded
-state; the map does not decide where a run occurred. The current deterministic
-zero-undulation geoid is an educational versioned fixture, not a regional geoid
-accuracy claim.
+MSL altitude. Compilation performs the declared geoid operation and records
+scenario-origin ENU east/north with an explicit metres-MSL runtime vertical
+axis. The record retains both engine-local and WGS84 positions through the
+inverse hybrid transform. The presentation layer projects recorded state; the
+map does not decide where a run occurred. The current deterministic
+zero-undulation display operation is an educational versioned fixture, not a
+regional geoid-accuracy claim; ETOPO source heights retain their explicit
+EGM2008 boundary in the pack.
 
 Both Construct and Observe use the same MapLibre navigation contract. The map starts flat; supports wheel zoom, drag pan, right-drag rotation, touch zoom/rotation, double-click zoom, and keyboard navigation; disables touch pitch and pitch-with-rotate; and exposes an explicit 0°/52° tilt preview. VECTOR-owned controls provide basemap selection, zoom, reset north/tilt, fit, cursor coordinates, zoom, bearing, and pitch. Standard, minimal, and low-light tactical basemaps are same-origin proxied and the selection persists in browser local storage. During waypoint placement the view is forced flat so a presentation gesture cannot obscure authored geometry. These camera and basemap choices are presentation state and never change simulation inputs.
 
@@ -42,6 +52,10 @@ Replay markers default to the catalog designation, such as `Su-30MKI`, `F-16C Bl
 The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-east mountains, the Arabian Sea, and coastal Gujarat. Their boundaries are educational visualization contexts, not operational engagement boxes. These governed rows are delivered by checksum-tracked migration and verified against the TypeScript contract; production deployment does not run the development seed. Selecting a study area is a directly visible preset choice. The first complete builder does not ask the operator to draw a study-area polygon.
 
 ## Scenario artifact
+
+The artifact binds one exact regional environment-pack ID/version/digest and an
+optional exact `vector.installation-origin.v2` runway identity. Compilation
+fails before producing a runnable artifact when either binding is stale.
 
 The persisted scenario-template table is declared by
 `db/schema/scenarios.ts` and re-exported from the one aggregate Drizzle schema.
@@ -69,6 +83,16 @@ units/datums, incompatible loadout/fuel, and unsupported start/runway state with
 a stable code, field path, and corrective guidance. It does not choose a study
 area, weather preset, installation, runway, aircraft, store, fuel state, or
 mission default to repair an import.
+
+A non-airborne start must bind the exact eligible runway carried by the
+selected regional EnvironmentPack. Compilation re-derives its threshold/end,
+true heading, dimensions, surface, MSL elevations and source digest from
+`vector.installation-catalogue.v2`; a user-authored or model-assumption runway
+substitution fails even if its coordinates look plausible. The separate
+aircraft ground-performance envelope remains a declared model assumption.
+Scenario cards and Air-mission validity limits name the sourced pack's
+coverage, time, resolution and uncertainty instead of claiming a standard
+atmosphere or absent terrain.
 
 Version 1 currently admits the BLUE launcher-side mission only; `RED` fails
 with `MISSION_SIDE_UNSUPPORTED` until an explicit opposing-side runtime mapping
@@ -257,10 +281,10 @@ Every
 route point also has a stable flight-plan ID, WGS84 longitude/latitude, explicit
 MSL altitude in metres, typed `START`/`FLY_BY`/`FLY_OVER` method, TAS in metres
 per second, a bounded acceptance radius in metres, optional ETA/TOT, lock state,
-closed task reference, and an ordered typed leg. AGL is rejected until
-an exact terrain dataset and conversion are admitted. Impossible ETA, zero
-legs, invalid turn state, and out-of-coverage points produce no runnable
-artifact.
+closed task reference, and an ordered typed leg. AGL admission requires the
+exact terrain dataset and datum conversion carried by the selected regional
+pack; missing/no-data terrain still fails closed. Impossible ETA, zero legs,
+invalid turn state, and out-of-coverage points produce no runnable artifact.
 
 The same UI exposes Tactical Intercept, Combat Air Patrol, Fighter Sweep, and
 Escort with BVR, WVR/BFM, and unrestricted/transition overlays. CAP visibly
@@ -278,12 +302,18 @@ surface, open/closed state, takeoff direction, readiness delay, and explicit
 taxi fidelity. Runway evidence is classified and content-addressed as
 `vector.runway-evidence.v1`; the digest binds geometry, source, and value state.
 The compiler resolves the installation inside the frozen environment pack,
-checks geometry/heading/length, aircraft surface/length/tailwind compatibility,
-and starts the aircraft at zero speed on the threshold. Missing evidence,
-closed/short/incompatible/adverse-wind runways, cross-pack installations, or a
-route whose first point differs from the threshold fail closed. Current runway
-defaults are visibly `MODEL_ASSUMPTION`/educational, never a claim that the
-public-reference installation catalog supplied runway evidence.
+re-derives the exact `SOURCED_DATASET` runway from catalogue v2, checks
+geometry/elevation/source/datum/heading/length, aircraft
+surface/length/tailwind compatibility, and starts the aircraft at zero speed on
+the threshold. Missing evidence, authored or model-assumption runway
+substitution, closed/short/incompatible/adverse-wind runways, cross-pack
+installations, or a route whose first point differs from the threshold fail
+closed. The bounded aircraft ground-performance envelope and DEM/runway
+reconciliation policy remain separately visible model assumptions; they never
+change the sourced runway identity. The start editor can reverse takeoff
+direction only by swapping the admitted runway's exact sourced threshold/end
+coordinates and MSL elevations, selecting its sourced reciprocal true heading,
+and recomputing the runway-evidence digest and first route point atomically.
 
 The next expansion adds database-backed arbitrary entity collections, supporting sensor nodes, target/launch relationship authoring, and the complete blank-scenario path. Those capabilities must extend the same scenario contract; they must not introduce a second simulation-state format.
 
@@ -295,6 +325,9 @@ The configured Air workflow now exposes one mission object across Define and
 Place & flight: class/regime and CAP policy/geometry controls, exact start and
 runway evidence, flight-plan constraints, loadout/fuel, validation digest, and
 the existing Run gate all edit or consume the same authored artifact.
+Construct shows the admitted pack version/digest and only offers runway-backed
+bases available inside that pack; unsupported installations remain visibly
+airborne-placement-only.
 
 The builder is one persistent desktop workspace, not a page-per-field wizard. The left rail owns the five Construct sections, the center owns the geographic placement surface and form for the selected object, and the right rail owns the selected entity, validation state, and compiled-summary preview. From 1280×720 upward all three remain visible; QHD and 4K expand the task surface, controls, map and typography rather than adding empty margins. On phones the same five-step state is presented as a single column with persistent actions; desktop rails are removed and no scenario state is discarded. Drawers may extend a rail but may not replace the map.
 
@@ -333,6 +366,9 @@ from static labels.
 `Scenario.airMission` is durable authored state; `CompiledAirMission` is the
 immutable run boundary; Worker/VSR/report views are read-only projections.
 React controls hold no second mission object and cannot override either digest.
+Changing coordinates clears a runway origin. Changing area/weather resolves a
+new exact pack and invalidates an origin that does not survive its coverage and
+runway admission checks.
 
 - Builder state is an editable draft scenario package.
 - A parameter change against governed model data is a scenario-local patch with
@@ -365,6 +401,9 @@ Mission fields are operator inputs only where a visible control or imported v1
 artifact supplies them. Compiler admission—not a label—decides whether class,
 route, start, runway, model, fuel, loadout and policy references are supported;
 autonomous pilot behavior remains unavailable.
+Study-area/weather selection chooses governed sourced grids. Wind and
+temperature edits remain `USER_AUTHORED` modifiers inside a new immutable pack;
+they never rewrite source fields or select a fallback environment.
 
 The operator chooses a preset study area and weather preset, selects catalog
 objects for Blue, Red, or neutral forces, places world entities, sets altitude,
@@ -400,8 +439,32 @@ reference, or map anchor.
   Disclosures retain independent state. Missing or permission-filtered catalog
   identities remain visibly unavailable for correction; a picker never displays
   its first option in place of the authored identity.
-- Selecting an airborne origin retains `vector.installation-origin.v1` with its installation ID, source ID, selected study-area ID and weather-preset ID. The compiler re-resolves all four values before producing an engine scenario. A missing/deleted installation, stale source, cross-environment reference, or legacy runway ID blocks compilation with a stable field-path error; it never becomes a coordinate-only origin. Manual drag explicitly clears that optional airborne-origin reference. Selecting a ground posture instead creates the separate `GroundStartAndRecovery` union member described above; it never upgrades the catalog's text-only runway note into evidence.
-- The five-viewport browser journey selects CAP/BVR, edits station time and the authoritative mission route, proves the compatibility projection readback, selects Pathankot AFS, proves keyboard route constraints and ground-start admission/readback, and completes a real production Worker run. Focused mission regressions independently prove all classes/overlays, all start postures, exact first-frame ground state, model-pack station/rule/capacity rejection, immutable ground-envelope binding, environment geometry regeneration, fuel/loadout mass consequence, stable negative codes, server admission, and VSR/report lineage.
+- Selecting an origin retains `vector.installation-origin.v2` with installation,
+  exact eligible runway, source, study-area and weather identities. The compiler
+  re-resolves that runway against the immutable regional pack before producing
+  an engine scenario. Missing/deleted installation, stale source,
+  cross-environment, incomplete or out-of-coverage runway evidence blocks
+  compilation at a stable field path. Manual drag clears the base/runway
+  identity and remains an explicitly airborne placement.
+- Ground-start wind admission samples the exact regional atmosphere grid at the
+  selected runway threshold and readiness/start model time. The sampler's
+  sourced east/north wind plus the authored weather modifiers is projected onto
+  the runway true heading and compared with the immutable aircraft ground
+  envelope. Modifier-only wind is never used as a substitute; missing coverage,
+  no-data or invalid time rejects the start at the same admission boundary.
+- The browser labels the bounded set as “bases available in this environment
+  pack.” Only installations with complete public-educational runway
+  geometry/elevation evidence enter origin pickers. Other catalog points remain
+  visible and are labelled airborne-placement-only; neither state claims current
+  operation, readiness or complete IAF/PAF coverage.
+- The five-viewport browser journey edits the authoritative Air mission and
+  route, switches to Rajasthan, selects the sourced Jodhpur runway, proves
+  keyboard route constraints and ground-start admission/readback, and completes
+  a production Worker run. Focused mission regressions independently prove all
+  classes/overlays/start postures, exact first-frame ground state,
+  model-pack station/rule/capacity rejection, environment geometry
+  regeneration, stable negative codes, server admission, and VSR/report
+  lineage.
 - Blue and Red start markers and waypoints are draggable. A numeric longitude or
   latitude edit has the same meaning as dragging a start: it explicitly changes
   the aircraft to a manual airborne placement and clears any installation-origin

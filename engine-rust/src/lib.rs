@@ -578,9 +578,9 @@ pub struct StudyArea {
     pub weather_preset_id: String,
 }
 
-/// Immutable Phase A environment identity. The complete canonical pack is
-/// retained in the TypeScript/VSR geospatial artifact; Rust admits this exact
-/// compact binding and must not resolve study-area strings at runtime.
+/// Immutable environment identity. The complete canonical Phase A or regional
+/// pack is retained in the TypeScript/VSR geospatial artifact; Rust admits this
+/// exact compact binding and must not resolve study-area strings at runtime.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentPackBinding {
@@ -592,12 +592,80 @@ pub struct EnvironmentPackBinding {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RuntimeTerrainGrid {
+    pub west_deg: f64,
+    pub south_deg: f64,
+    pub longitude_step_deg: f64,
+    pub latitude_step_deg: f64,
+    pub columns: usize,
+    pub rows: usize,
+    pub surface_elevation_msl_m: Vec<f64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeAtmosphereGrid {
+    pub interval_seconds: f64,
+    pub sample_count: usize,
+    pub west_deg: f64,
+    pub south_deg: f64,
+    pub longitude_step_deg: f64,
+    pub latitude_step_deg: f64,
+    pub columns: usize,
+    pub rows: usize,
+    pub temperature_c: Vec<f64>,
+    pub surface_pressure_kpa: Vec<f64>,
+    pub relative_humidity_percent: Vec<f64>,
+    pub wind_east_mps: Vec<f64>,
+    pub wind_north_mps: Vec<f64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeGrid<T> {
+    pub id: String,
+    pub version: String,
+    pub digest: String,
+    pub grid: T,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeDatasetIdentity {
+    pub id: String,
+    pub version: String,
+    pub digest: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthoredEnvironmentModifiers {
+    pub temperature_offset_c: f64,
+    pub wind_east_mps: f64,
+    pub wind_north_mps: f64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeEnvironmentProjection {
+    pub schema_version: String,
+    pub environment_pack: RuntimeDatasetIdentity,
+    pub anchor: StudyAreaAnchor,
+    pub terrain: RuntimeGrid<RuntimeTerrainGrid>,
+    pub atmosphere: RuntimeGrid<RuntimeAtmosphereGrid>,
+    pub authored_modifiers: AuthoredEnvironmentModifiers,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Environment {
     pub gravity_mps2: f64,
     pub temperature_offset_c: f64,
     pub wind_mps: Vec3,
     pub atmosphere: AtmosphereModel,
     pub environment_pack: EnvironmentPackBinding,
+    #[serde(default)]
+    pub runtime_environment: Option<RuntimeEnvironmentProjection>,
     pub study_area: StudyArea,
 }
 
@@ -1499,20 +1567,224 @@ fn atmosphere(altitude_m: f64, offset_c: f64) -> (f64, f64) {
     (density, speed_of_sound)
 }
 
-fn active_wind(scenario: &EngineScenario, time: f64) -> Vec3 {
-    scenario
-        .events
-        .iter()
-        .fold(scenario.environment.wind_mps, |wind, event| {
-            if event.event_type == EngineEventType::WindShift
-                && time >= event.start_seconds
-                && time < event.start_seconds + event.duration_seconds
-            {
-                wind.add(event.vector_mps)
-            } else {
-                wind
-            }
-        })
+fn local_to_geographic(position: Vec3, anchor: &StudyAreaAnchor) -> (f64, f64) {
+    const A: f64 = 6_378_137.0;
+    const INV_F: f64 = 298.257_223_563;
+    let f = 1.0 / INV_F;
+    let e2 = f * (2.0 - f);
+    let b = A * (1.0 - f);
+    let ep2 = (A * A - b * b) / (b * b);
+    let lon = anchor.longitude.to_radians();
+    let lat = anchor.latitude.to_radians();
+    let sin_lat = lat.sin();
+    let cos_lat = lat.cos();
+    let normal = A / (1.0 - e2 * sin_lat * sin_lat).sqrt();
+    let ox = normal * cos_lat * lon.cos();
+    let oy = normal * cos_lat * lon.sin();
+    let oz = normal * (1.0 - e2) * sin_lat;
+    let dx = -lon.sin() * position.x - sin_lat * lon.cos() * position.y
+        + cos_lat * lon.cos() * position.z;
+    let dy = lon.cos() * position.x - sin_lat * lon.sin() * position.y
+        + cos_lat * lon.sin() * position.z;
+    let dz = cos_lat * position.y + sin_lat * position.z;
+    let x = ox + dx;
+    let y = oy + dy;
+    let z = oz + dz;
+    let p = x.hypot(y);
+    let theta = (z * A).atan2(p * b);
+    let latitude = (z + ep2 * b * theta.sin().powi(3)).atan2(p - e2 * A * theta.cos().powi(3));
+    (y.atan2(x).to_degrees(), latitude.to_degrees())
+}
+
+fn axis(value: f64, start: f64, step: f64, count: usize) -> Option<(usize, f64)> {
+    if !value.is_finite() || !start.is_finite() || !step.is_finite() || step <= 0.0 || count < 2 {
+        return None;
+    }
+    let coordinate = (value - start) / step;
+    if !coordinate.is_finite() || coordinate < -1e-9 || coordinate > count as f64 - 1.0 + 1e-9 {
+        return None;
+    }
+    let bounded = coordinate.clamp(0.0, count as f64 - 1.0);
+    let lower = (bounded.floor() as usize).min(count - 2);
+    Some((lower, bounded - lower as f64))
+}
+
+fn bilinear_at_axes(
+    values: &[f64],
+    grid: &RuntimeAtmosphereGrid,
+    x: usize,
+    fx: f64,
+    y: usize,
+    fy: f64,
+    time_index: usize,
+) -> Result<f64, EngineError> {
+    let stride = grid.columns * grid.rows;
+    let at = |row: usize, column: usize| {
+        values
+            .get(time_index * stride + row * grid.columns + column)
+            .copied()
+    };
+    let south = at(y, x)
+        .zip(at(y, x + 1))
+        .map(|(west, east)| west * (1.0 - fx) + east * fx)
+        .ok_or_else(|| runtime_environment_error(ATMOSPHERE_COVERAGE_ERROR))?;
+    let north = at(y + 1, x)
+        .zip(at(y + 1, x + 1))
+        .map(|(west, east)| west * (1.0 - fx) + east * fx)
+        .ok_or_else(|| runtime_environment_error(ATMOSPHERE_COVERAGE_ERROR))?;
+    Ok(south * (1.0 - fy) + north * fy)
+}
+
+const TERRAIN_SAMPLE_ERROR: &str =
+    "runtime environment terrain sample is outside admitted coverage or contains no-data";
+const ATMOSPHERE_COVERAGE_ERROR: &str =
+    "runtime environment atmosphere sample is outside admitted coverage or contains no-data";
+const ATMOSPHERE_TIME_ERROR: &str =
+    "runtime environment atmosphere sample time is outside admitted validity";
+const ATMOSPHERE_VALUE_ERROR: &str = "runtime environment atmosphere sample contains invalid data";
+
+fn runtime_environment_error(message: &'static str) -> EngineError {
+    EngineError::InvalidScenario(message.to_string())
+}
+
+fn terrain_sample(
+    runtime: &RuntimeEnvironmentProjection,
+    position: Vec3,
+) -> Result<f64, EngineError> {
+    let grid = &runtime.terrain.grid;
+    let (lon, lat) = local_to_geographic(Vec3 { z: 0.0, ..position }, &runtime.anchor);
+    terrain_sample_at_geographic(grid, lon, lat)
+}
+
+fn terrain_sample_at_geographic(
+    grid: &RuntimeTerrainGrid,
+    lon: f64,
+    lat: f64,
+) -> Result<f64, EngineError> {
+    let (x, fx) = axis(lon, grid.west_deg, grid.longitude_step_deg, grid.columns)
+        .ok_or_else(|| runtime_environment_error(TERRAIN_SAMPLE_ERROR))?;
+    let (y, fy) = axis(lat, grid.south_deg, grid.latitude_step_deg, grid.rows)
+        .ok_or_else(|| runtime_environment_error(TERRAIN_SAMPLE_ERROR))?;
+    let at = |row: usize, column: usize| {
+        grid.surface_elevation_msl_m
+            .get(row * grid.columns + column)
+            .copied()
+    };
+    let south = at(y, x)
+        .zip(at(y, x + 1))
+        .map(|(west, east)| west * (1.0 - fx) + east * fx)
+        .ok_or_else(|| runtime_environment_error(TERRAIN_SAMPLE_ERROR))?;
+    let north = at(y + 1, x)
+        .zip(at(y + 1, x + 1))
+        .map(|(west, east)| west * (1.0 - fx) + east * fx)
+        .ok_or_else(|| runtime_environment_error(TERRAIN_SAMPLE_ERROR))?;
+    let elevation = south * (1.0 - fy) + north * fy;
+    if !elevation.is_finite() {
+        return Err(runtime_environment_error(TERRAIN_SAMPLE_ERROR));
+    }
+    Ok(elevation)
+}
+
+fn environment_sample(
+    scenario: &EngineScenario,
+    position: Vec3,
+    time: f64,
+) -> Result<(f64, f64, Vec3), EngineError> {
+    let Some(runtime) = scenario.environment.runtime_environment.as_ref() else {
+        let (density, sound) = atmosphere(position.z, scenario.environment.temperature_offset_c);
+        return Ok((density, sound, scenario.environment.wind_mps));
+    };
+    let grid = &runtime.atmosphere.grid;
+    let (lon, lat) = local_to_geographic(Vec3 { z: 0.0, ..position }, &runtime.anchor);
+    let (x, fx) = axis(lon, grid.west_deg, grid.longitude_step_deg, grid.columns)
+        .ok_or_else(|| runtime_environment_error(ATMOSPHERE_COVERAGE_ERROR))?;
+    let (y, fy) = axis(lat, grid.south_deg, grid.latitude_step_deg, grid.rows)
+        .ok_or_else(|| runtime_environment_error(ATMOSPHERE_COVERAGE_ERROR))?;
+    let coordinate = time / grid.interval_seconds;
+    if !time.is_finite()
+        || time < 0.0
+        || !coordinate.is_finite()
+        || coordinate > grid.sample_count as f64 - 1.0
+        || grid.sample_count < 2
+    {
+        return Err(runtime_environment_error(ATMOSPHERE_TIME_ERROR));
+    }
+    let lower = (coordinate.floor() as usize).min(grid.sample_count - 2);
+    let fraction = coordinate - lower as f64;
+    let temporal = |values: &[f64]| -> Result<f64, EngineError> {
+        let value = bilinear_at_axes(values, grid, x, fx, y, fy, lower)? * (1.0 - fraction)
+            + bilinear_at_axes(values, grid, x, fx, y, fy, lower + 1)? * fraction;
+        if value.is_finite() {
+            Ok(value)
+        } else {
+            Err(runtime_environment_error(ATMOSPHERE_VALUE_ERROR))
+        }
+    };
+    let surface_temperature_c = temporal(&grid.temperature_c)?;
+    let surface_pressure_kpa = temporal(&grid.surface_pressure_kpa)?;
+    let humidity = temporal(&grid.relative_humidity_percent)?;
+    let terrain = terrain_sample_at_geographic(&runtime.terrain.grid, lon, lat)?;
+    let surface_temperature_k =
+        surface_temperature_c + runtime.authored_modifiers.temperature_offset_c + 273.15;
+    let temperature_k = surface_temperature_k - 0.0065 * (position.z - terrain);
+    let pressure_kpa = surface_pressure_kpa
+        * (temperature_k / surface_temperature_k).powf(9.80665 / (287.05 * 0.0065));
+    let temperature_c = temperature_k - 273.15;
+    let saturation = 0.61094 * (17.625 * temperature_c / (temperature_c + 243.04)).exp();
+    let vapour = pressure_kpa.min(saturation * humidity / 100.0);
+    let density = ((pressure_kpa - vapour) * 1000.0) / (287.05 * temperature_k)
+        + (vapour * 1000.0) / (461.495 * temperature_k);
+    let sound = (1.4 * 287.05 * temperature_k).sqrt();
+    let east = temporal(&grid.wind_east_mps)? + runtime.authored_modifiers.wind_east_mps;
+    let north = temporal(&grid.wind_north_mps)? + runtime.authored_modifiers.wind_north_mps;
+    if !surface_temperature_k.is_finite()
+        || surface_temperature_k <= 0.0
+        || !temperature_k.is_finite()
+        || temperature_k <= 0.0
+        || !surface_pressure_kpa.is_finite()
+        || surface_pressure_kpa <= 0.0
+        || !humidity.is_finite()
+        || !(0.0..=100.0).contains(&humidity)
+        || !pressure_kpa.is_finite()
+        || pressure_kpa <= 0.0
+        || !density.is_finite()
+        || density <= 0.0
+        || !sound.is_finite()
+        || sound <= 0.0
+        || !east.is_finite()
+        || !north.is_finite()
+    {
+        return Err(runtime_environment_error(ATMOSPHERE_VALUE_ERROR));
+    }
+    Ok((
+        density,
+        sound,
+        Vec3 {
+            x: east,
+            y: north,
+            z: 0.0,
+        },
+    ))
+}
+
+fn terrain_elevation(scenario: &EngineScenario, position: Vec3) -> Result<f64, EngineError> {
+    match scenario.environment.runtime_environment.as_ref() {
+        Some(runtime) => terrain_sample(runtime, position),
+        None => Ok(0.0),
+    }
+}
+
+fn active_wind(scenario: &EngineScenario, time: f64, base: Vec3) -> Vec3 {
+    scenario.events.iter().fold(base, |wind, event| {
+        if event.event_type == EngineEventType::WindShift
+            && time >= event.start_seconds
+            && time < event.start_seconds + event.duration_seconds
+        {
+            wind.add(event.vector_mps)
+        } else {
+            wind
+        }
+    })
 }
 
 fn update_aircraft(
@@ -1591,11 +1863,10 @@ fn update_aircraft(
     }
     let accepted_steering = requested_steering.clamp_magnitude(model.maximum_command_g * G0);
     let steering_limited = requested_steering.magnitude() > accepted_steering.magnitude() + 1e-9;
-    let (density, speed_of_sound) =
-        atmosphere(state.position.z, scenario.environment.temperature_offset_c);
+    let (density, speed_of_sound, base_wind) = environment_sample(scenario, state.position, time)?;
     let airspeed = state
         .velocity
-        .subtract(active_wind(scenario, time))
+        .subtract(active_wind(scenario, time, base_wind))
         .magnitude()
         .max(1.0);
     let longitudinal_acceleration = {
@@ -1752,12 +2023,12 @@ fn update_weapon(
     scenario: &EngineScenario,
     time: f64,
     dt: f64,
-) {
+) -> Result<(), EngineError> {
     let Some(weapon) = states[index].definition.weapon.clone() else {
-        return;
+        return Ok(());
     };
     if states[index].lifecycle != EntityLifecycle::Active {
-        return;
+        return Ok(());
     }
     let Some(target) = states
         .iter()
@@ -1767,13 +2038,13 @@ fn update_weapon(
         states[index].lifecycle = EntityLifecycle::Terminated;
         states[index].phase = "Target unavailable".to_string();
         states[index].weapon_flight_state = Some(WeaponFlightState::TargetUnavailable);
-        return;
+        return Ok(());
     };
     if target.lifecycle == EntityLifecycle::Terminated {
         states[index].lifecycle = EntityLifecycle::Terminated;
         states[index].phase = "Target unavailable".to_string();
         states[index].weapon_flight_state = Some(WeaponFlightState::TargetUnavailable);
-        return;
+        return Ok(());
     }
     let state = &mut states[index];
     let since_launch = time - weapon.launch_time_seconds.unwrap_or(0.0);
@@ -1785,8 +2056,8 @@ fn update_weapon(
     let los_rate_vector = relative_position
         .cross(relative_velocity)
         .scale(1.0 / (separation * separation));
-    let (density, _) = atmosphere(state.position.z, scenario.environment.temperature_offset_c);
-    let wind = active_wind(scenario, time);
+    let (density, _, base_wind) = environment_sample(scenario, state.position, time)?;
+    let wind = active_wind(scenario, time, base_wind);
     let air_relative = state.velocity.subtract(wind);
     let airspeed = air_relative.magnitude().max(1.0);
     let direction = state.velocity.normalize();
@@ -1872,7 +2143,8 @@ fn update_weapon(
         .add(guidance);
     state.velocity = state.velocity.add(acceleration.scale(dt));
     state.position = state.position.add(state.velocity.scale(dt));
-    state.position.z = state.position.z.max(0.0);
+    let terrain = terrain_elevation(scenario, state.position)?;
+    state.position.z = state.position.z.max(terrain);
     state.heading_rad = state.velocity.y.atan2(state.velocity.x);
     state.commanded_g = guidance.magnitude() / G0;
     state.available_g = weapon.maximum_command_g;
@@ -1893,13 +2165,17 @@ fn update_weapon(
     } else {
         WeaponFlightState::Coast
     });
+    Ok(())
 }
 
-fn entity_frame(state: &RuntimeState, scenario: &EngineScenario) -> EntityFrame {
+fn entity_frame(
+    state: &RuntimeState,
+    scenario: &EngineScenario,
+    time: f64,
+) -> Result<EntityFrame, EngineError> {
     let speed = state.velocity.magnitude();
-    let (_, speed_of_sound) =
-        atmosphere(state.position.z, scenario.environment.temperature_offset_c);
-    EntityFrame {
+    let (_, speed_of_sound, _) = environment_sample(scenario, state.position, time)?;
+    Ok(EntityFrame {
         id: state.definition.id.clone(),
         rddf_id: state.definition.rddf_id.clone(),
         designation: state.definition.designation.clone(),
@@ -1926,7 +2202,7 @@ fn entity_frame(state: &RuntimeState, scenario: &EngineScenario) -> EntityFrame 
         weapon_flight_state: state.weapon_flight_state,
         value_state: state.definition.provenance.value_state,
         aircraft_control: state.aircraft_control.clone(),
-    }
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1940,21 +2216,21 @@ fn sampled_engine_frame(
     closure: f64,
     los_rate: f64,
     observer_states: Vec<ObserverState>,
-) -> EngineFrame {
-    EngineFrame {
+) -> Result<EngineFrame, EngineError> {
+    Ok(EngineFrame {
         t: (time * 1_000_000.0).round() / 1_000_000.0,
         entities: states
             .iter()
             .filter(|state| state.lifecycle != EntityLifecycle::Stowed)
-            .map(|state| entity_frame(state, scenario))
-            .collect(),
+            .map(|state| entity_frame(state, scenario, time))
+            .collect::<Result<Vec<_>, EngineError>>()?,
         primary_weapon_id: weapon_id.to_string(),
         primary_target_id: target_id.to_string(),
         separation_m: separation,
         closure_rate_mps: closure,
         line_of_sight_rate_rad_s: los_rate,
         observer_states,
-    }
+    })
 }
 
 fn envelopes(scenario: &EngineScenario) -> Vec<CoverageEnvelope> {
@@ -2230,7 +2506,9 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             };
             let since_launch = time - weapon.launch_time_seconds.unwrap_or(0.0);
             if (since_launch > weapon.burn_seconds + 2.0 && speed < 80.0 && separation > 1000.0)
-                || (states[weapon_index].position.z <= 0.0 && time > 1.0)
+                || (states[weapon_index].position.z
+                    <= terrain_elevation(&scenario, states[weapon_index].position)?
+                    && time > 1.0)
             {
                 termination = Termination::EnergyDepleted;
                 completed_this_tick = true;
@@ -2266,7 +2544,7 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                 closure,
                 los_rate,
                 current_observer_states.clone(),
-            ));
+            )?);
             recorded_entity_states += visible_states;
             if event_journal.has_pending() {
                 event_journal.commit_tick(tick, event_time, frame_index)?;
@@ -2287,7 +2565,7 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                 &scenario,
                 time,
                 scenario.fixed_step_seconds,
-            );
+            )?;
         }
         steps = next_tick;
         let next_event_time = recorded_model_time_at_tick(next_tick, scenario.fixed_step_seconds);
@@ -2331,7 +2609,9 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             if (since_launch > weapon.burn_seconds + 2.0
                 && speed < 80.0
                 && post_separation > 1000.0)
-                || (states[weapon_index].position.z <= 0.0 && next_time > 1.0)
+                || (states[weapon_index].position.z
+                    <= terrain_elevation(&scenario, states[weapon_index].position)?
+                    && next_time > 1.0)
             {
                 termination = Termination::EnergyDepleted;
                 completed_this_tick = true;
@@ -2409,7 +2689,7 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                 post_closure,
                 post_los_rate,
                 current_observer_states.clone(),
-            ));
+            )?);
             recorded_entity_states += visible_states;
             if event_journal.has_pending() {
                 event_journal.commit_tick(steps, next_event_time, frame_index)?;
@@ -2660,6 +2940,7 @@ mod tests {
                     version: "1.0.0".to_string(),
                     digest: format!("sha256:{}", "a".repeat(64)),
                 },
+                runtime_environment: None,
                 study_area: StudyArea {
                     id: "test-area".to_string(),
                     name: "Test area".to_string(),
@@ -2678,6 +2959,212 @@ mod tests {
             },
             events: Vec::new(),
         }
+    }
+
+    fn scenario_with_runtime_environment() -> Result<EngineScenario, Box<dyn std::error::Error>> {
+        let mut input = scenario();
+        input.duration_seconds = 0.5;
+        input.completion.distance_meters = 1.0;
+        for (index, entity) in input.entities.iter_mut().enumerate() {
+            entity.initial.position = Vec3 {
+                x: 80.0 + index as f64 * 5.0,
+                y: 0.0,
+                z: 8_000.0,
+            };
+            entity.initial.velocity = Vec3 {
+                x: 250.0,
+                y: 0.0,
+                z: 0.0,
+            };
+            entity.initial.heading_rad = 0.0;
+        }
+        let weapon = input.entities[2]
+            .weapon
+            .as_mut()
+            .ok_or("runtime environment fixture must have a weapon")?;
+        weapon.launch_time_seconds = Some(0.0);
+
+        let terrain_grid = RuntimeTerrainGrid {
+            west_deg: 0.0,
+            south_deg: -0.001,
+            longitude_step_deg: 0.001,
+            latitude_step_deg: 0.002,
+            columns: 2,
+            rows: 2,
+            surface_elevation_msl_m: vec![100.0; 4],
+        };
+        let atmosphere_grid = RuntimeAtmosphereGrid {
+            interval_seconds: 0.05,
+            sample_count: 11,
+            west_deg: 0.0,
+            south_deg: -0.001,
+            longitude_step_deg: 0.001,
+            latitude_step_deg: 0.002,
+            columns: 2,
+            rows: 2,
+            temperature_c: vec![15.0; 44],
+            surface_pressure_kpa: vec![101.325; 44],
+            relative_humidity_percent: vec![50.0; 44],
+            wind_east_mps: vec![0.0; 44],
+            wind_north_mps: vec![0.0; 44],
+        };
+        input.environment.runtime_environment = Some(RuntimeEnvironmentProjection {
+            schema_version: "vector.environment-runtime-grid.v1".to_string(),
+            environment_pack: RuntimeDatasetIdentity {
+                id: input.environment.environment_pack.id.clone(),
+                version: input.environment.environment_pack.version.clone(),
+                digest: input.environment.environment_pack.digest.clone(),
+            },
+            anchor: StudyAreaAnchor {
+                longitude: 0.0,
+                latitude: 0.0,
+            },
+            terrain: RuntimeGrid {
+                id: "terrain:test".to_string(),
+                version: "1.0.0".to_string(),
+                digest: format!("sha256:{}", "b".repeat(64)),
+                grid: terrain_grid,
+            },
+            atmosphere: RuntimeGrid {
+                id: "atmosphere:test".to_string(),
+                version: "1.0.0".to_string(),
+                digest: format!("sha256:{}", "c".repeat(64)),
+                grid: atmosphere_grid,
+            },
+            authored_modifiers: AuthoredEnvironmentModifiers {
+                temperature_offset_c: 0.0,
+                wind_east_mps: 0.0,
+                wind_north_mps: 0.0,
+            },
+        });
+        Ok(input)
+    }
+
+    #[test]
+    fn regional_runtime_rejects_the_first_tick_outside_terrain_coverage(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let error = match try_run_engine(scenario_with_runtime_environment()?) {
+            Ok(_) => return Err("a regional run continued outside terrain coverage".into()),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(
+                &error,
+                EngineError::InvalidScenario(message)
+                    if message == "runtime environment terrain sample is outside admitted coverage or contains no-data"
+            ),
+            "{error:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn regional_runtime_rejects_out_of_valid_time_and_missing_grid_data(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut outside_atmosphere = scenario_with_runtime_environment()?;
+        let runtime = outside_atmosphere
+            .environment
+            .runtime_environment
+            .as_mut()
+            .ok_or("fixture must have a runtime environment")?;
+        runtime.terrain.grid.west_deg = -1.0;
+        runtime.terrain.grid.south_deg = -1.0;
+        runtime.terrain.grid.longitude_step_deg = 2.0;
+        runtime.terrain.grid.latitude_step_deg = 2.0;
+        let error = match try_run_engine(outside_atmosphere) {
+            Ok(_) => return Err("a regional run continued outside atmosphere coverage".into()),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(
+                &error,
+                EngineError::InvalidScenario(message)
+                    if message == "runtime environment atmosphere sample is outside admitted coverage or contains no-data"
+            ),
+            "{error:?}"
+        );
+
+        let mut invalid_time = scenario_with_runtime_environment()?;
+        invalid_time.duration_seconds = 0.49;
+        let runtime = invalid_time
+            .environment
+            .runtime_environment
+            .as_mut()
+            .ok_or("fixture must have a runtime environment")?;
+        runtime.terrain.grid.west_deg = -1.0;
+        runtime.terrain.grid.south_deg = -1.0;
+        runtime.terrain.grid.longitude_step_deg = 2.0;
+        runtime.terrain.grid.latitude_step_deg = 2.0;
+        runtime.atmosphere.grid.west_deg = -1.0;
+        runtime.atmosphere.grid.south_deg = -1.0;
+        runtime.atmosphere.grid.longitude_step_deg = 2.0;
+        runtime.atmosphere.grid.latitude_step_deg = 2.0;
+        runtime.atmosphere.grid.interval_seconds = 0.049;
+        let target = invalid_time
+            .entities
+            .iter_mut()
+            .find(|entity| entity.id == "red-aircraft")
+            .ok_or("fixture must have a target")?;
+        target.initial.position.x = 10_000.0;
+        let error = match try_run_engine(invalid_time) {
+            Ok(_) => return Err("a regional run continued beyond atmosphere validity".into()),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(
+                &error,
+                EngineError::InvalidScenario(message)
+                    if message == "runtime environment atmosphere sample time is outside admitted validity"
+            ),
+            "{error:?}"
+        );
+
+        let mut missing_data = scenario_with_runtime_environment()?;
+        missing_data
+            .environment
+            .runtime_environment
+            .as_mut()
+            .ok_or("fixture must have a runtime environment")?
+            .atmosphere
+            .grid
+            .temperature_c
+            .pop();
+        let error = match try_run_engine(missing_data) {
+            Ok(_) => return Err("a regional run admitted missing atmosphere cells".into()),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(
+                &error,
+                EngineError::InvalidScenario(message)
+                    if message == "environment.runtimeEnvironment atmosphere grid is invalid or does not cover the run"
+            ),
+            "{error:?}"
+        );
+
+        let mut invalid_value = scenario_with_runtime_environment()?;
+        invalid_value
+            .environment
+            .runtime_environment
+            .as_mut()
+            .ok_or("fixture must have a runtime environment")?
+            .atmosphere
+            .grid
+            .relative_humidity_percent
+            .fill(150.0);
+        let error = match try_run_engine(invalid_value) {
+            Ok(_) => return Err("a regional run admitted invalid atmospheric values".into()),
+            Err(error) => error,
+        };
+        assert!(
+            matches!(
+                &error,
+                EngineError::InvalidScenario(message)
+                    if message == "runtime environment atmosphere sample contains invalid data"
+            ),
+            "{error:?}"
+        );
+        Ok(())
     }
 
     #[test]

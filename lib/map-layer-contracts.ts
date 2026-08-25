@@ -1,7 +1,7 @@
 import type { EngineEntityFrame } from "./engine/contracts.ts";
 import type { SimulationResult, Vec3 } from "./simulation.ts";
 import type { RecordedGeographicPosition, ScenarioOrigin } from "./geospatial/contracts.ts";
-import { localFrameToGeographic } from "./geospatial/geodesy.ts";
+import { enginePositionToGeographic } from "./scenario-spatial.ts";
 
 export type MapOrigin = { longitude: number; latitude: number };
 export type MapInstallationRecord = {
@@ -15,6 +15,8 @@ export type MapInstallationRecord = {
   source_id: string;
   longitude: number;
   latitude: number;
+  ground_start_supported?: boolean;
+  ground_start_runway_id?: string | null;
 };
 
 export function localToLngLat(
@@ -35,7 +37,7 @@ export function localToLngLat(
     },
     transformVersion: "vector.wgs84-ecef-local.v1",
   };
-  const geographic = localFrameToGeographic(
+  const geographic = enginePositionToGeographic(
     {
       x: position.x,
       y: position.y,
