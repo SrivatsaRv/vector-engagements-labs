@@ -70,12 +70,22 @@ no exported simulation ABI, backend-selection rule or v2 runtime admission.
   TypeScript/Rust interpolation and collision parity.
 - Propagate regional terrain/atmosphere coverage, validity and no-data failures
   as stable Rust engine errors instead of a zero-surface or `NaN` substitute.
+- Correct the documented production ABI inventory: the NASA generic-AAM symbol
+  belongs only to the separately built verification Rust/WASM artifact.
 
 No pending family-specific entry.
 
 #### Generic AAM verification
 
-No pending family-specific entry.
+- Bind offline admission to the exact raw NASA TM-109057 corpus bytes, correct
+  the production-ABI documentation to preserve the separate verification-only
+  Rust/WASM boundary, and close the named Apple M5 performance evidence
+  contract over immutable workload identity, exact Git state, both backend
+  distributions, memory and output size without mutable threshold overrides.
+- Reject dirty or unidentified benchmark state before measurement, and require
+  every measured TypeScript and Rust-WASM batch to reproduce the exact governed
+  per-case semantic outcomes, 12,145-frame total and sorted batch digest before
+  its timings can be admitted.
 
 #### Generic sensor source freeze
 

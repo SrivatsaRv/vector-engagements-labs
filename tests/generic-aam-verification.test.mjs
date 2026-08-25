@@ -11,6 +11,7 @@ import {
   genericAamVerificationInput,
   runGenericAamVerification,
   verifyGenericAamCorpus,
+  verifyGenericAamCorpusArtifact,
 } from "../lib/validation/generic-aam-verification.ts";
 
 const corpusPath = new URL(
@@ -49,10 +50,8 @@ function assertCloseStructure(actual, expected, label = "value") {
 }
 
 test("the exact NASA artifact and verification-only corpus verify offline", () => {
-  const report = verifyGenericAamCorpus(
-    JSON.parse(readFileSync(corpusPath, "utf8")),
-    readFileSync(sourcePath),
-  );
+  const corpusBytes = readFileSync(corpusPath);
+  const report = verifyGenericAamCorpusArtifact(JSON.parse(corpusBytes), corpusBytes, readFileSync(sourcePath));
   assert.deepEqual(report, {
     schemaVersion: "vector.weapon-verification-corpus-report.v1",
     corpusId: "nasa-tm-109057-generic-aam-verification-corpus.v5",
@@ -70,6 +69,17 @@ test("the exact NASA artifact and verification-only corpus verify offline", () =
     { degrees: 20, printedRadians: 0.349064 },
     { degrees: 30, printedRadians: 0.523596 },
   ]);
+});
+
+test("the exact v5 corpus bytes cannot be replaced by a canonically equivalent file", () => {
+  const corpusBytes = readFileSync(corpusPath);
+  const candidate = JSON.parse(corpusBytes);
+  const reformatted = Buffer.from(`${JSON.stringify(candidate, null, 2)}\n`);
+  assert.deepEqual(JSON.parse(reformatted), candidate);
+  assert.throws(
+    () => verifyGenericAamCorpusArtifact(candidate, reformatted, readFileSync(sourcePath)),
+    /corpus bytes/i,
+  );
 });
 
 test("immutable v3 and v4 corpus/workload bytes remain retained beside the v5 successor", () => {

@@ -31,6 +31,12 @@ Repository administrators retain emergency recovery authority but should not use
 Regional environment changes run the offline source/digest verifier in
 `ci-local`; release evidence additionally includes the built Worker
 cancel/retry gate and the bounded environment throughput/memory benchmark.
+`performance-local` runs the isolated generic-AAM verifier first so its closed
+named-hardware profile is measured before unrelated capacity workloads can
+consume the host. The gate rejects a dirty or unidentified repository before
+measurement and rejects every backend batch whose governed frame count or
+semantic outcome differs; only an uncontaminated clean-commit run is
+publication evidence.
 
 `ci.yml` is one change-aware pull-request and `main` pipeline. Stage 0 computes
 the rename/copy-aware change set from the exact merge base and head revisions with the tracked
