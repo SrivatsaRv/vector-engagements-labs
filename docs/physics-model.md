@@ -8,6 +8,12 @@ Vector currently uses a deterministic three-dimensional point-mass reference eng
 
 ## Integrated model
 
+Air mission compilation changes only admitted initial/route inputs to this
+generic model: airborne/Mach speed, zero-speed runway entry, fuel mass and
+installed store count. Existing point-mass equations, fixed-step integration,
+guidance, atmosphere and TypeScript/Rust numerical behavior are unchanged; no
+mission-class or named-scenario physics branch exists.
+
 - fixed 50 ms integration step and sampled immutable frames;
 - WGS84/ECEF-derived local east/north/up coordinates with an immutable scenario origin;
 - educational standard atmosphere, density, speed of sound, and Mach;

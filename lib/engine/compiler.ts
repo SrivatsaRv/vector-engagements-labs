@@ -34,6 +34,11 @@ import {
   type InstallationOriginReference,
 } from "../mission-admission.ts";
 import { bindRuntimeModelPackDigest } from "./runtime-model-pack.ts";
+import {
+  compileAirMissionDefinition,
+  type AirMissionDefinition,
+} from "../air-mission.ts";
+import type { Scenario } from "../simulation.ts";
 
 export type ScenarioCompilerInput = {
   id: string;
@@ -57,6 +62,8 @@ export type ScenarioCompilerInput = {
   targetSpeed: number;
   blueFuelPercent: number;
   redFuelPercent: number;
+  blueWeaponQuantity: number;
+  redWeaponQuantity: number;
   blueRadarMode?: "ACTIVE" | "SILENT";
   redRadarMode?: "ACTIVE" | "SILENT";
   windEastMps: number;
@@ -66,6 +73,8 @@ export type ScenarioCompilerInput = {
   windShiftEastMps: number;
   windShiftNorthMps: number;
   seed: number;
+  airMission?: AirMissionDefinition;
+  authoredScenario?: Scenario;
   placement?: {
     blueStart: Vec3;
     redStart: Vec3;
@@ -239,6 +248,9 @@ export function compileScenario(
   input: ScenarioCompilerInput,
   profile: CompilerProfile,
 ): EngineScenario {
+  if (!Number.isInteger(input.blueWeaponQuantity) || input.blueWeaponQuantity <= 0 || input.blueWeaponQuantity > 64 || !Number.isInteger(input.redWeaponQuantity) || input.redWeaponQuantity < 0 || input.redWeaponQuantity > 64) {
+    throw new Error("Compiled loadout quantities must be bounded integers.");
+  }
   const blueObject = getCatalogObject(input.bluePlatformId);
   const blueSystem = getCatalogObject(input.blueSystemId);
   const redObject = getCatalogObject(input.redObjectId);
@@ -257,6 +269,27 @@ export function compileScenario(
     },
   });
   const { studyArea, weatherPreset, pack: environmentPack } = admittedEnvironment;
+  const compiledAirMission = input.airMission
+    ? input.authoredScenario
+      ? compileAirMissionDefinition(input.airMission, {
+          scenario: input.authoredScenario,
+          modelPackDigest: CURRENT_MODEL_PACK_DIGEST,
+          environmentPackDigest: environmentPack.identity.digest,
+          environmentPack,
+        })
+      : (() => {
+          throw new Error("An authored Air mission requires its exact scenario context.");
+        })()
+    : undefined;
+  // A2A runtime values cross this single adapter only after the authored
+  // Scenario and Air mission have been proven identical above. The placement
+  // vectors are the admitted WGS84-to-local conversion of the exact mission
+  // flight plan; fuel, loadout, policy and start are read from the compiled
+  // artifact itself. Legacy non-Air domains retain their existing inputs.
+  const compiledAssignment = compiledAirMission?.authored.assignments[0];
+  const runtimeBlueFuelPercent = compiledAssignment?.initialFuelPercent ?? input.blueFuelPercent;
+  const runtimeBlueWeaponQuantity = compiledAssignment?.loadout.stores.reduce((total, store) => total + store.quantity, 0) ?? input.blueWeaponQuantity;
+  const runtimeBlueRadarMode = compiledAirMission?.authored.policies.emission ?? input.blueRadarMode;
   const admittedOriginReferences = [
     [input.placement?.blueOriginReference, "placement.blue.originReference"],
     [input.placement?.redOriginReference, "placement.red.originReference"],
@@ -317,7 +350,7 @@ export function compileScenario(
       }
     : undefined;
   const blueFuelKg = blueAircraft
-    ? blueAircraft.fuelCapacityKg * (input.blueFuelPercent / 100)
+    ? blueAircraft.fuelCapacityKg * (runtimeBlueFuelPercent / 100)
     : 0;
   const redFuelKg = redAircraft
     ? redAircraft.fuelCapacityKg * (input.redFuelPercent / 100)
@@ -375,16 +408,21 @@ export function compileScenario(
       },
       initial: {
         position: { ...blueStart },
-        velocity: velocity(blueIsAircraft ? input.launcherSpeed : 0, blueHeadingRad),
+        velocity: velocity(
+          blueIsAircraft
+            ? compiledAirMission?.start.initialSpeedMps ?? input.launcherSpeed
+            : 0,
+          blueHeadingRad,
+        ),
         headingRad: blueHeadingRad,
         massKg: blueAircraft
-          ? blueAircraft.emptyMassKg + blueFuelKg + assumptions.launchMassKg
+          ? blueAircraft.emptyMassKg + blueFuelKg + assumptions.launchMassKg * runtimeBlueWeaponQuantity
           : 12000,
         fuelKg: blueFuelKg,
       },
       aircraft: blueAircraft,
       observerSensor: blueIsAircraft
-        ? compiledObserverSensorRuntime(blueObject.id, input.blueRadarMode ?? "SILENT")
+        ? compiledObserverSensorRuntime(blueObject.id, runtimeBlueRadarMode ?? "SILENT")
         : undefined,
     },
     blueObject.id,
@@ -442,7 +480,7 @@ export function compileScenario(
         massKg: redAircraft
           ? redAircraft.emptyMassKg +
             redFuelKg +
-            (redCompiledWeapon?.weapon.launchMassKg ?? 0)
+            (redCompiledWeapon?.weapon.launchMassKg ?? 0) * input.redWeaponQuantity
           : 10000,
         fuelKg: redFuelKg,
       },
@@ -457,12 +495,12 @@ export function compileScenario(
     redAircraftModel?.version ?? "static-object-v1.0.0",
   );
 
-  const blueWeapon = withProvenance(
+  const blueWeapons = Array.from({ length: runtimeBlueWeaponQuantity }, (_, index) => withProvenance(
     {
-      id: "blue-weapon-1",
+      id: `blue-weapon-${index + 1}`,
       rddfId: `rddf://component/guided-weapon/${blueSystem.id}`,
       designation: blueSystem.designation,
-      callsign: "BLUE WEAPON 1",
+      callsign: `BLUE WEAPON ${index + 1}`,
       affiliation: "BLUE",
       kind: "GUIDED_WEAPON",
       symbolRole: blueSystem.symbolRole,
@@ -478,7 +516,7 @@ export function compileScenario(
         launchPlatformId: bluePlatform.id,
         targetEntityId: redTarget.id,
         guidance: input.guidance,
-        launchTimeSeconds: 0,
+        launchTimeSeconds: index === 0 ? 0 : null,
         ...assumptions,
         commandedCruiseAltitudeM:
           input.domain === "G2G" ? input.cruiseAltitude : input.altitude,
@@ -490,24 +528,24 @@ export function compileScenario(
     blueCompiledWeapon.weapon.id,
     "MODEL_ASSUMPTION",
     blueCompiledWeapon.weapon.version,
-  );
+  ));
 
   const entities: EngineEntityDefinition[] = [
     bluePlatform,
     redTarget,
-    blueWeapon,
+    ...blueWeapons,
   ];
 
   if (redSystem) {
     const redModel = redCompiledWeapon!;
     const redAssumptions = compiledWeaponRuntime(redModel.weapon);
     entities.push(
-      withProvenance(
+      ...Array.from({ length: input.redWeaponQuantity }, (_, index) => withProvenance(
         {
-          id: "red-weapon-1",
+          id: `red-weapon-${index + 1}`,
           rddfId: `rddf://component/guided-weapon/${redSystem.id}`,
           designation: redSystem.designation,
-          callsign: "RED WEAPON 1",
+          callsign: `RED WEAPON ${index + 1}`,
           affiliation: "RED",
           kind: "GUIDED_WEAPON",
           symbolRole: redSystem.symbolRole,
@@ -533,7 +571,7 @@ export function compileScenario(
         redModel.weapon.id,
         "MODEL_ASSUMPTION",
         redModel.weapon.version,
-      ),
+      )),
     );
   }
 
@@ -598,6 +636,7 @@ export function compileScenario(
     seed: input.seed,
     durationSeconds: input.domain === "G2G" ? 240 : 140,
     fixedStepSeconds: 0.05,
+    ...(compiledAirMission ? { airMission: compiledAirMission } : {}),
     modelPack: bindRuntimeModelPackDigest({
       schemaVersion: COMPILED_MODEL_PACK_SCHEMA_VERSION,
       id: CURRENT_MODEL_PACK_ID,

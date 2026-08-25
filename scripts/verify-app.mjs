@@ -157,7 +157,7 @@ try {
     (item) => item.id === "a2a-crossing-intercept" && item.version === "1.0.0",
   );
   assert.ok(template);
-  assert.equal(template.schema_version, "vector.scenario.v3");
+  assert.equal(template.schema_version, "vector.scenario.v4");
   assert.match(template.content_hash, /^[0-9a-f]{64}$/);
   assert.equal(template.engine_version, "browser-point-mass-v0.5");
   assert.equal(template.intended_use_id, template.package.intendedUse.id);

@@ -8,6 +8,10 @@ is not admitted by the production deployment and makes no named-sensor claim.
 
 ## Canonical boundary
 
+`vector.compiled-air-mission.v1` is immutable run provenance beside the engine
+scenario, not a second track/picture state machine. Start, route, fuel and store
+consequences enter through ordinary canonical entities and frames.
+
 Every A2A tick emits one state owned by `IAF` and one owned by `PAF`. Without a
 compiled admission, `vector.observer-state.v2` has
 `sensorState: UNSUPPORTED`, `observationCount: 0`, `trackState: UNSUPPORTED`,
@@ -104,6 +108,19 @@ hides entities while this state is selected.
 
 Separating saved-record and admission table declarations does not change RASP
 event, picture, or replay authority.
+Air mission lineage extends record admission only; it does not permit replay to
+derive observer information from model truth or re-run mission behavior.
+
+## Air mission record storage
+
+For `vector.scenario.v4` Air runs, the VSR manifest also binds
+`vector.compiled-air-mission.v1` by mission ID/version, authored digest, and
+compiled digest. The same lineage appears in `compiled.json` and `report.json`;
+`scenario.json` retains the authored `vector.air-mission.v1`. Opening recompiles
+that authored artifact against the archived environment pack and model-pack
+binding, then requires exact equality across all four members before any replay
+is exposed. A current catalog lookup, UI default, or report label cannot repair
+or replace missing mission intent.
 
 New records use `vector.frames.columnar.v5` and `vector.pictures.v4`. They are
 the immutable projection of
@@ -142,6 +159,9 @@ state rejection. `tests/track-store.test.mjs` covers transition, multi-track
 association, transactionality, and admission causes.
 `tests/vector-record.test.mjs` covers new/legacy reads, schema-pair admission,
 and consistent all-member source forgery.
+`tests/air-mission.test.mjs` additionally covers deterministic mission identity,
+all classes/overlays/start postures, negative admission, server preservation,
+and exact VSR/report mission-lineage readback.
 `npm run performance:track-store:verify` gates two side-owned stores retaining
 50 tracks each at 20 Hz for five seconds below 75 ms p95 with bounded heap, a
 brute-force association oracle, and repeat digest. The same 100-track fixture

@@ -11,6 +11,8 @@ import {
   CURRENT_MODEL_PACK_ID,
   CURRENT_MODEL_PACK_VERSION,
 } from "./reference-model-pack.ts";
+import { createDefaultAirMissionDefinition } from "./air-mission.ts";
+import { createDefaultSpatialPlan } from "./scenario-spatial.ts";
 
 export type { EngagementDomain } from "./simulation.ts";
 export type ScenarioComplexity = "Foundation" | "Intermediate" | "Advanced";
@@ -84,7 +86,7 @@ const scenario = (patch: Partial<Scenario>): Scenario => {
   const configured = { ...DEFAULT_SCENARIO, ...patch };
   const area = getStudyArea(configured.studyAreaId);
   const weatherPreset = getWeatherPreset(area, configured.weatherPresetId);
-  return {
+  const authored: Scenario = {
     ...configured,
     wind: patch.wind ?? weatherPreset.windEastMps,
     windNorth: patch.windNorth ?? weatherPreset.windNorthMps,
@@ -92,6 +94,26 @@ const scenario = (patch: Partial<Scenario>): Scenario => {
     humidityPercent: patch.humidityPercent ?? weatherPreset.humidityPercent,
     temperatureOffset:
       patch.temperatureOffset ?? weatherPreset.temperatureOffsetC,
+  };
+  if (authored.domain !== "A2A") return authored;
+  const withSpatialPlan: Scenario = {
+    ...authored,
+    spatialPlan: authored.spatialPlan ?? createDefaultSpatialPlan({
+      studyArea: area,
+      rangeM: authored.range,
+      blueAltitudeM: authored.altitude,
+      redAltitudeM: authored.altitude + authored.targetDelta,
+      blueSpeedMps: authored.launcherSpeed,
+      redSpeedMps: authored.targetSpeed,
+      crossingAngleDeg: authored.aspect,
+    }),
+  };
+  return {
+    ...withSpatialPlan,
+    airMission: withSpatialPlan.airMission ?? createDefaultAirMissionDefinition({
+      scenario: withSpatialPlan,
+      modelPackDigest: CURRENT_MODEL_PACK_DIGEST,
+    }),
   };
 };
 

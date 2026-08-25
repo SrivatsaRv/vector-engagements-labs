@@ -34,6 +34,13 @@ export type ReportData = {
     frameHash?: string;
     intendedUse?: { id: string; version: string };
     modelPack?: { id: string; version: string; digest: string };
+    airMission?: {
+      schemaVersion: "vector.compiled-air-mission.v1";
+      id: string;
+      version: string;
+      authoredDigest: string;
+      compiledDigest: string;
+    };
     credibilityManifest?: {
       id: string;
       version: string;
@@ -118,6 +125,7 @@ export function buildReportExport(
         modelScope: library.scope,
       },
       configuration: {
+        airMission: data.packageProvenance?.airMission ?? null,
         blueTeam: {
           service: bluePlatform?.service ?? blueObject.country,
           platform: bluePlatform?.designation ?? blueObject.designation,

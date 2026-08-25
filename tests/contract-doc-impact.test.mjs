@@ -2422,6 +2422,9 @@ test("the repository policy maps real simulation identities to their exact owner
   assert.deepEqual(exactRule(mission, "lib/object-catalog.ts").facets, ["schema", "ui"]);
   assert.deepEqual(exactRule(mission, "lib/scenario-spatial.ts").facets, ["schema", "ui"]);
   assert.deepEqual(exactRule(mission, "lib/simulation.ts").facets, ["runtime", "schema", "vsr"]);
+  assert.deepEqual(exactRule(mission, "lib/air-mission.ts").facets, ["admission", "datum", "digest", "runtime", "schema", "ui", "unit", "vsr"]);
+  assert.deepEqual(mission.testRules.find((rule) => rule.kind === "EXACT" && rule.value === "tests/air-mission.test.mjs").facets, ["admission", "datum", "digest", "runtime", "schema", "storage", "ui", "unit", "verification", "vsr"]);
+  assert.deepEqual(requiredSections(mission, "lib/air-mission.ts"), ["MISSION_AIR_MISSION_CONTRACT", "MISSION_BUILDER_EXPANSION", "MISSION_RECORD_REPLAY", "MISSION_SCENARIO_ARTIFACT", "MISSION_STATE_MACHINE"]);
   assert.equal(mission.owningSections.some((section) => section.sectionId === "MISSION_INTEGRATED_MODEL"), false);
   assert.equal(mission.owningSections.some((section) => section.sectionId === "MISSION_SPATIAL_CONTRACT"), false);
   assert.deepEqual(requiredSections(mission, "lib/information-state.ts"), ["MISSION_RECORD_REPLAY", "MISSION_STATE_MACHINE"]);

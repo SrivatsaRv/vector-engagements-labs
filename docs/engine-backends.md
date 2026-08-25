@@ -4,6 +4,11 @@ VECTOR has one engine contract and two browser implementations. The authored sce
 
 ## Rust / WebAssembly
 
+`EngineScenario.airMission` is an optional compiled lineage envelope. Rust/WASM
+continues to execute the existing generic entity/route ABI and ignores that
+non-physics envelope; the backend adapter reattaches the already verified exact
+artifact so TypeScript and Rust results retain identical VSR authority.
+
 The default backend is a Rust 2021 `cdylib` compiled for `wasm32-unknown-unknown`. This target has no operating-system dependency and executes inside the browser WebAssembly runtime. The module exposes a deliberately small C ABI:
 
 - `vector_abi_version()` identifies the stable adapter contract;
@@ -37,6 +42,9 @@ It is not a separate product mode. Its purpose is controlled parity testing, dia
 
 ## Selection and provenance
 
+Air runs add authored and compiled mission digests to backend-independent
+provenance. Backend choice cannot create, migrate, or repair mission intent.
+
 The selected production backend is owned by the content-addressed
 `DeploymentCapabilityManifest`; it is not a scenario field, URL parameter,
 saved-run preference or browser control. TypeScript is selected for the current
@@ -66,6 +74,11 @@ committed, integrity-checked artifact and does not install a compiler at runtime
   verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
 
 ## Swap boundary
+
+The swap boundary consumes mission-authoritative start speed, fuel mass, and
+store count only after the compiler has reconciled them with the generic engine
+entity contract. No mission class, scenario ID, or named aircraft selects a
+backend or physics branch.
 
 UI components do not import either numerical core. They call `simulate`, which compiles the scenario and dispatches through `runEngineBackend`. Observe, Explain, Compare, Save, and Report consume only the returned `EngineRun`. A later native service, worker pool, or higher-fidelity engine must implement this same boundary instead of branching presentation state.
 

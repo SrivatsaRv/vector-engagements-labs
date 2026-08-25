@@ -45,14 +45,45 @@ The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-eas
 
 The persisted scenario-template table is declared by
 `db/schema/scenarios.ts` and re-exported from the one aggregate Drizzle schema.
+Air packages use canonical `vector.scenario.v4`; non-Air packages share that
+package envelope without acquiring an Air mission object.
 
-Construct produces a `vector.scenario.v3` package with an intended-use identity
-and immutable compiled model-pack identity/digest. Compilation produces an
-immutable engine scenario containing all spawned entities, initial states,
-events, environment, study-area context, completion rules, model IDs, and the
-same digest. Simulation produces ordered engine frames. Saving a report records
-both artifacts, credibility limitations, and their hashes so replay never
-depends on mutable UI state.
+## Air mission contract
+
+Construct produces a `vector.scenario.v4` package with an intended-use identity,
+immutable compiled model-pack identity/digest, and, for Air-domain work, exactly
+one `vector.air-mission.v1` object. `lib/air-mission.ts` is the exported adapter
+boundary for downstream capability work: it owns the mission taxonomy,
+flight-plan points and typed legs, start/recovery posture, assignment, loadout,
+fuel, class-specific task fields, policy references, provenance, assumptions,
+and validity limits. A consumer such as the capability kernel extends or
+references this interface; it must not create a parallel mission schema.
+
+`compileAirMissionDefinition` resolves that authored object once against the
+exact model-pack and environment-pack identities and returns
+`vector.compiled-air-mission.v1`. SHA-256 covers canonical authored content and
+the compiled binding separately. The compiler rejects unknown root fields,
+schema versions, stale model/environment identities, duplicate/dangling/cyclic
+route references, route/spatial disagreement, missing class fields, invalid
+units/datums, incompatible loadout/fuel, and unsupported start/runway state with
+a stable code, field path, and corrective guidance. It does not choose a study
+area, weather preset, installation, runway, aircraft, store, fuel state, or
+mission default to repair an import.
+
+The compiled engine scenario carries the complete immutable mission artifact
+beside all spawned entities, initial states, events, environment, study-area
+context, completion rules, and model IDs. The existing simulation Worker runs
+only this compiler output and independently recompiles the authored mission at
+its model-pack adapter boundary, rejecting any mismatch before caching or
+execution. Server saved-run admission invokes the same compiler and stable
+error taxonomy. VSR `scenario.json`, `compiled.json`, `manifest.json`,
+and `report.json` preserve and cross-check the exact authored and compiled
+digests, so replay and reporting never depend on mutable UI or current catalogs.
+The forward-only `013_air_mission_contract.sql` migration replaces each exact
+v3 template package and content hash with its canonical v4 value; production
+preflight accepts only a wholly v3 or wholly v4 catalogue, the migration rejects
+any residual non-v4 row, and postflight validates every v4 Air mission envelope.
+Deployment does not depend on a seed mutation.
 
 ## Builder expansion boundary
 
@@ -73,11 +104,49 @@ all-fly-by semantics: an omitted transition array is compiled as `START` then
 `FLY_BY` for every remaining route point. New authoring always emits v2; a
 present but malformed v2 transition array is rejected rather than downgraded.
 
+Air mission authoring uses that spatial editor through one draft adapter. Every
+route point also has a stable flight-plan ID, WGS84 longitude/latitude, explicit
+MSL altitude in metres, typed `START`/`FLY_BY`/`FLY_OVER` method, TAS in metres
+per second, optional ETA/TOT, lock state, task reference, and an ordered typed
+leg. The compiler requires exact equality between the mission flight plan and
+the spatial route; neither copy may override the other. AGL is rejected until
+an exact terrain dataset and conversion are admitted. Impossible ETA, zero
+legs, invalid turn state, and out-of-coverage points produce no runnable
+artifact.
+
+The same UI exposes Tactical Intercept, Combat Air Patrol, Fighter Sweep, and
+Escort with BVR, WVR/BFM, and unrestricted/transition overlays. CAP visibly
+loads editable patrol/prosecution geometry, on-station/flight counts, station
+time, emission policy, fuel reserve, weapon threshold, completion, recovery,
+and divert fields. Class-specific required fields are a discriminated union;
+changing the class creates the matching visible draft rather than relabeling a
+different task object.
+
+`AIRBORNE`, `PARKING`, `RUNWAY`, and `GROUND_ALERT_QRA` are first-class starts.
+An airborne start references the first flight-plan point and must be above the
+admitted MSL reference surface. Ground starts own installation and source IDs,
+runway threshold/end WGS84 geometry, MSL elevation, heading, length, width,
+surface, open/closed state, takeoff direction, readiness delay, and explicit
+taxi fidelity. Runway evidence is classified and content-addressed as
+`vector.runway-evidence.v1`; the digest binds geometry, source, and value state.
+The compiler resolves the installation inside the frozen environment pack,
+checks geometry/heading/length, aircraft surface/length/tailwind compatibility,
+and starts the aircraft at zero speed on the threshold. Missing evidence,
+closed/short/incompatible/adverse-wind runways, cross-pack installations, or a
+route whose first point differs from the threshold fail closed. Current runway
+defaults are visibly `MODEL_ASSUMPTION`/educational, never a claim that the
+public-reference installation catalog supplied runway evidence.
+
 The next expansion adds database-backed arbitrary entity collections, supporting sensor nodes, target/launch relationship authoring, and the complete blank-scenario path. Those capabilities must extend the same scenario contract; they must not introduce a second simulation-state format.
 
 The internal `vector.scenario-draft.v1` state contract now provides the safe authoring foundation: an actually empty draft, stable entity and waypoint IDs, draft revisions, geographic position, heading, speed, routes, loadouts, target/launch references, dependency-safe deletion, duplication, and blocking validation. It remains unexposed until the blank-scenario surface can compile and run the authored package end to end; VECTOR does not ship a builder button that terminates in an incomplete workflow.
 
 ## Full builder UX specification
+
+The configured Air workflow now exposes one mission object across Define and
+Place & flight: class/regime and CAP policy/geometry controls, exact start and
+runway evidence, flight-plan constraints, loadout/fuel, validation digest, and
+the existing Run gate all edit or consume the same authored artifact.
 
 The builder is one persistent desktop workspace, not a page-per-field wizard. The left rail owns the five Construct sections, the center owns the geographic placement surface and form for the selected object, and the right rail owns the selected entity, validation state, and compiled-summary preview. From 1280×720 upward all three remain visible; QHD and 4K expand the task surface, controls, map and typography rather than adding empty margins. On phones the same five-step state is presented as a single column with persistent actions; desktop rails are removed and no scenario state is discarded. Drawers may extend a rail but may not replace the map.
 
@@ -113,6 +182,10 @@ from static labels.
 
 ### Artifact and state boundaries
 
+`Scenario.airMission` is durable authored state; `CompiledAirMission` is the
+immutable run boundary; Worker/VSR/report views are read-only projections.
+React controls hold no second mission object and cannot override either digest.
+
 - Builder state is an editable draft scenario package.
 - A parameter change against governed model data is a scenario-local patch with
   old value, new value, SI unit, reason, timestamp, author, evidence, model ID,
@@ -139,6 +212,11 @@ A field change after a run increments the draft revision, invalidates Save and R
 - Permit keyboard operation and provide closed, hover, active, loading, disabled and error states for every control.
 
 ## Operator input versus governed behavior
+
+Mission fields are operator inputs only where a visible control or imported v1
+artifact supplies them. Compiler admission—not a label—decides whether class,
+route, start, runway, model, fuel, loadout and policy references are supported;
+autonomous pilot behavior remains unavailable.
 
 The operator chooses a preset study area and weather preset, selects catalog
 objects for Blue, Red, or neutral forces, places world entities, sets altitude,
@@ -174,8 +252,8 @@ reference, or map anchor.
   Disclosures retain independent state. Missing or permission-filtered catalog
   identities remain visibly unavailable for correction; a picker never displays
   its first option in place of the authored identity.
-- Selecting an origin retains `vector.installation-origin.v1` with its installation ID, source ID, selected study-area ID and weather-preset ID. The compiler re-resolves all four values before producing an engine scenario. A missing/deleted installation, stale source, cross-environment reference, or runway ID blocks compilation with a stable field-path error; it never becomes a coordinate-only origin. Manual drag explicitly clears that optional airborne-origin reference. Ground/runway starts remain unavailable because the current catalog has only point locations and text runway notes, not admitted runway geometry or start evidence.
-- The five-viewport browser journey opens the affiliation-scoped shared origin Select, selects Pathankot AFS, verifies the rendered installation identity and governed coordinates, then completes a real Worker run after an explicit manual-airborne edit. The mission-admission regression independently proves that this selected identity is present in the compiled engine scenario and changes the frozen environment digest.
+- Selecting an airborne origin retains `vector.installation-origin.v1` with its installation ID, source ID, selected study-area ID and weather-preset ID. The compiler re-resolves all four values before producing an engine scenario. A missing/deleted installation, stale source, cross-environment reference, or legacy runway ID blocks compilation with a stable field-path error; it never becomes a coordinate-only origin. Manual drag explicitly clears that optional airborne-origin reference. Selecting a ground posture instead creates the separate `GroundStartAndRecovery` union member described above; it never upgrades the catalog's text-only runway note into evidence.
+- The five-viewport browser journey selects CAP/BVR, edits station time, selects Pathankot AFS, proves keyboard route constraints and ground-start admission/readback, and completes a real production Worker run. Focused mission regressions independently prove all classes/overlays, all start postures, exact first-frame ground state, fuel/loadout mass consequence, stable negative codes, server admission, and VSR/report lineage.
 - Blue and Red start markers and waypoints are draggable. A numeric longitude or
   latitude edit has the same meaning as dragging a start: it explicitly changes
   the aircraft to a manual airborne placement and clears any installation-origin
@@ -190,12 +268,14 @@ reference, or map anchor.
 - Numeric editors retain intermediate text. Empty, non-finite, out-of-area, negative, over-limit, and uncommitted values keep the operator in Place & flight and block validation instead of being discarded, normalized, or clamped into a different scenario.
 - Drag and numeric edits synchronize starting distance, altitude difference, aspect, and platform speeds before compilation.
 - Validation blocks non-finite state, negative speed or altitude, invalid headings, mismatched route origins, zero-length route legs, missing or invalid `vector.route-plan.v2` radii or transitions, and any start or waypoint outside the preset boundary.
-- The current Air deployment exposes only admitted route, flight-state, loadout,
-  and frozen-environment inputs. Sensor, data-link, AEW, EW, defensive-turn,
-  g-demand, and tactical-decision controls are unavailable until their owning
-  runtime contracts are admitted. They cannot alter an authored run by a hidden
-  default or label-only setting.
+- The current Air deployment admits all four mission classes, all three
+  engagement overlays, and all four start postures through one mission schema.
+  Route, start, loadout quantity, fuel, and frozen-environment inputs have the
+  compiled/runtime consequences described above. Mission policy is authored,
+  validated, content-addressed and recorded, but autonomous virtual-pilot
+  behavior remains owned by #38; this contract does not invent defensive turns,
+  launch decisions, sensor effects, or weapon support from policy labels.
 - Saved-run admission rejects retired `maneuver`, `targetG`, `blueDecision`, and
-  `redDecision` fields rather than silently accepting a historic no-op. A future
-  mission-policy artifact must replace them as one versioned, compiled contract;
-  it cannot restore UI strings independently of runtime command consumption.
+  `redDecision` fields and missing/unknown Air mission objects. It preserves v4
+  mission intent unchanged or rejects it; it never reconstructs mission class,
+  start, support, model, engine, loadout, fuel, or policy from a historic no-op.

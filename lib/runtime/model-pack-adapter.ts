@@ -6,6 +6,8 @@ import {
 import type { PreparedSimulation } from "../simulation.ts";
 import type { RuntimeModelPackAdapter } from "./protocol.ts";
 import { assertRuntimeModelPackDigest } from "../engine/runtime-model-pack.ts";
+import { compileAirMissionDefinition } from "../air-mission.ts";
+import { admitPhaseAEnvironmentPack } from "../geospatial/environment-pack.ts";
 
 export async function adaptPreparedSimulation(
   prepared: PreparedSimulation,
@@ -41,6 +43,35 @@ export async function admitRuntimeModelPack(
   assertRuntimeModelPackDigest(pack.prepared.engineScenario.modelPack);
   if (!manifest.admittedModelPackDigests.includes(pack.prepared.engineScenario.modelPack.digest)) {
     throw new Error("The runtime model-pack digest is not admitted by this deployment.");
+  }
+  const { scenario, engineScenario } = pack.prepared;
+  if (scenario.domain === "A2A") {
+    if (!scenario.airMission || !engineScenario.airMission) {
+      throw new Error("The Worker requires matching authored and compiled Air mission artifacts.");
+    }
+    const admittedEnvironment = admitPhaseAEnvironmentPack({
+      studyAreaId: scenario.studyAreaId,
+      weatherPresetId: scenario.weatherPresetId,
+      effectiveWeather: {
+        windEastMps: scenario.wind,
+        windNorthMps: scenario.windNorth,
+        temperatureOffsetC: scenario.temperatureOffset,
+      },
+    });
+    const verifiedMission = compileAirMissionDefinition(scenario.airMission, {
+      scenario,
+      modelPackDigest: engineScenario.modelPack.digest,
+      environmentPackDigest: admittedEnvironment.pack.identity.digest,
+      environmentPack: admittedEnvironment.pack,
+    });
+    if (
+      verifiedMission.authoredDigest !== engineScenario.airMission.authoredDigest
+      || verifiedMission.compiledDigest !== engineScenario.airMission.compiledDigest
+    ) {
+      throw new Error("The Worker Air mission does not match the compiled runtime artifact.");
+    }
+  } else if (scenario.airMission || engineScenario.airMission) {
+    throw new Error("A non-Air Worker pack cannot add Air mission authority.");
   }
   return {
     schemaVersion: manifest.schemaVersion,

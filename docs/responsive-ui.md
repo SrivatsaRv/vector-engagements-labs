@@ -21,6 +21,10 @@ rendering sharpness; viewport width and height govern task geometry.
 
 ## Behavioral rules
 
+Mission, CAP-area, runway and flight-plan editors collapse to one column below
+720 px, retain native labels and keyboard order, and never hide an admission
+error or move Run ahead of validation.
+
 - Construct always exposes its primary Next or Run action without horizontal scrolling.
 - Desktop preserves the left step rail, central task surface, and right scenario summary.
 - Phone removes the desktop rails instead of compressing them into unusable columns.
@@ -80,6 +84,11 @@ Browser-owned native `select` is an explicit exception: it retains UA focus,
 keyboard, touch, and popup behavior and carries
 `data-vector-overlay-exempt="ua-native-select"`; VECTOR does not partially wrap
 or attempt to coordinate the UA-owned option window.
+The Air mission class, engagement regime, policy, recovery, start-posture,
+runway-surface and flight-leg role controls deliberately use that complete
+native exception. Each carries the same exemption marker, while aircraft,
+weapon, origin and basemap identity pickers continue to use the shared Select;
+the mission editor does not introduce another portal or overlay coordinator.
 
 The affected interaction budget is open/direct-handoff p95 no greater than
 100 ms with cumulative layout shift no greater than 0.05. A 100-cycle warm
@@ -88,6 +97,10 @@ leave no detached portal after unmount, and keep post-GC heap growth within the
 declared two-megabyte browser-test guard.
 
 ## Observe viewport shell
+
+Saved report provenance now includes the compiled Air mission identity and both
+digests without changing synchronized map/3D playback, telemetry, or timeline
+ownership.
 
 The Observe workspace uses one centre-column grid. The Map or 3D surface owns
 the remaining row after the control strip and playback rail; it does not own a
@@ -121,6 +134,11 @@ recorded frame, selected playback time, map camera truth, or another
 Disclosure's state.
 
 ## Automated proof
+
+The governed five-viewport journey edits CAP defaults, clears and restores an
+installation identity, authors a runway start, exercises keyboard route inputs,
+observes admission, and completes the production Worker. Focused record tests
+prove the same lineage survives report/VSR readback.
 
 `npm run ui:responsive:verify` launches system Chrome at every viewport above.
 It validates the landing hero and live 3D preview, map tiles and canvas size, start/base markers, base-origin mutation,

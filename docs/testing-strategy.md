@@ -68,6 +68,18 @@ pack insertion under rolled-back transactions. API tests assert that admitted
 credibility, limitations, persisted run provenance, and the Validate surface
 all carry the same pack digest.
 
+Air-mission verification uses the exported `AirMissionDefinition` adapter at
+template creation, JSON import, compiler admission, the production Worker
+boundary, saved-run readback and VSR replay. Its focused regressions cover every
+mission class, engagement overlay and start posture; hostile nested authority,
+non-finite or out-of-area geometry, stale environment/runway evidence, invalid
+time and fuel constraints, cross-model loadouts, digest tampering and missing
+persisted intent; and causal first-frame, fuel, mass and store consequences.
+The database gate must prove both an all-v3 pre-migration state and the exact
+all-v4 result of migration `013_air_mission_contract.sql`; mixed versions fail.
+Browser completion evidence includes the governed viewport matrix and a real
+built Worker run from mission authoring through report provenance.
+
 Aircraft-model verification additionally runs `reference-aircraft:verify`.
 The gate checks immutable NASA source identities, deterministic trim
 propagation, every declared external time-history tolerance, malformed and

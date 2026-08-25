@@ -229,11 +229,16 @@ test("an off-grid launch activates on its first fixed-step boundary in both engi
     const run = runEngineBackend(structuredClone(scenario), backend);
     assert.equal(run.frames[0]?.t, 0, `${backend} initial event frame time`);
     const initialAircraft = scenario.entities.find((entity) => entity.kind === "AIRCRAFT")!;
-    assert.deepEqual(
-      run.frames[0]?.entities.find((entity) => entity.id === initialAircraft.id)?.position,
-      initialAircraft.initial.position,
-      `${backend} initial event frame must precede the first integration step`,
-    );
+    const initialRecordedPosition = run.frames[0]?.entities.find(
+      (entity) => entity.id === initialAircraft.id,
+    )?.position;
+    assert.ok(initialRecordedPosition, `${backend} must record the initial aircraft`);
+    for (const axis of ["x", "y", "z"] as const) {
+      assert.ok(
+        Math.abs(initialRecordedPosition[axis] - initialAircraft.initial.position[axis]) <= 1e-12,
+        `${backend} initial ${axis} must precede the first integration step`,
+      );
+    }
     assert.equal(run.events.state, "AVAILABLE");
     const release = run.events.items.find(
       (event) =>

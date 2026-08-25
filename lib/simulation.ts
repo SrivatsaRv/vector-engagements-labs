@@ -13,6 +13,7 @@ import type {
   EngineRun,
   EngineScenario,
 } from "./engine/contracts.ts";
+import type { AirMissionDefinition } from "./air-mission.ts";
 import {
   admitScenarioCapabilities,
   createVerificationDeploymentCapabilities,
@@ -126,6 +127,8 @@ export type Scenario = {
   humidityPercent: number;
   temperatureOffset: number;
   spatialPlan?: ScenarioSpatialPlan;
+  /** The single authored Air mission contract. Legacy non-Air fixtures may omit it. */
+  airMission?: AirMissionDefinition;
   lossIncreaseAt: number | null;
   lossIncreaseAmount: number;
   seed: number;
@@ -537,6 +540,8 @@ export function prepareSimulation(
       targetSpeed: input.targetSpeed,
       blueFuelPercent: input.blueFuelPercent,
       redFuelPercent: input.redFuelPercent,
+      blueWeaponQuantity: input.blueWeaponQuantity,
+      redWeaponQuantity: input.redWeaponQuantity,
       blueRadarMode: input.blueRadarMode,
       redRadarMode: input.redRadarMode,
       windEastMps: input.wind,
@@ -547,6 +552,8 @@ export function prepareSimulation(
       windShiftNorthMps: 0,
       seed: input.seed,
       placement,
+      airMission: input.airMission,
+      authoredScenario: input,
     },
     profile,
   );

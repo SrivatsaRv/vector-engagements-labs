@@ -1,6 +1,6 @@
 import type { ScenarioDefinition } from "./scenarios.ts";
 
-export const SCENARIO_PACKAGE_SCHEMA_VERSION = "vector.scenario.v3";
+export const SCENARIO_PACKAGE_SCHEMA_VERSION = "vector.scenario.v4";
 
 export type StoredScenarioPackage = {
   id: string;
@@ -44,7 +44,8 @@ export function isScenarioDefinition(value: unknown): value is ScenarioDefinitio
       candidate.scenario.objective &&
       candidate.scenario.studyAreaId &&
       candidate.scenario.weatherPresetId &&
-      Number.isFinite(candidate.scenario.seed),
+      Number.isFinite(candidate.scenario.seed) &&
+      (candidate.scenario.domain !== "A2A" || candidate.scenario.airMission?.schemaVersion === "vector.air-mission.v1"),
   );
 }
 

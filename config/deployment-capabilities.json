@@ -24,8 +24,8 @@
       "operatorGuidance": "Use an admitted Air domain scenario."
     }
   },
-  "missionClasses": ["TACTICAL_INTERCEPT"],
-  "startPostures": ["AIRBORNE"],
+  "missionClasses": ["TACTICAL_INTERCEPT", "COMBAT_AIR_PATROL", "FIGHTER_SWEEP", "ESCORT"],
+  "startPostures": ["AIRBORNE", "PARKING", "RUNWAY", "GROUND_ALERT_QRA"],
   "optionalCapabilities": {
     "environment": {
       "state": "ENABLED",

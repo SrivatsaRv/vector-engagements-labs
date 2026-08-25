@@ -169,6 +169,10 @@ sensor/track state, weapon support, virtual-pilot behaviour, arbitrary browser
 scenario injection, and Rust/WASM cooperative cancellation as unavailable.
 Those states are not converted to synthetic sensors, weapons, decisions, or
 cancellation results.
+The workload may obtain admitted aircraft and guided-vehicle blueprints from an
+Air template, but it removes the template's compiled mission authority and
+selects its own exact two-vehicle inventory. Mission loadout quantity must not
+silently change the frozen 100-entity verification mix.
 
 The default automated regression ceilings are p95 below 1,000 ms per complete
 five-second workload and heap growth below 256 MiB on the local process. They
@@ -235,6 +239,11 @@ result, not the combined 100-entity 8 ms Worker tick target, browser rendering
 proof, x86-64 capacity result, or named-sensor performance claim.
 
 ## Required performance test matrix
+
+Air mission delivery retains the existing engine/Worker capacity gates and adds
+no per-tick catalogue or database work. Mission compilation and Worker
+re-admission occur once before execution; the applicable local performance gate
+must pass on the frozen completion candidate beside TypeScript/Rust parity.
 
 | Test | Purpose |
 | --- | --- |

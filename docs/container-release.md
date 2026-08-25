@@ -67,6 +67,11 @@ that prior digest and repeats the same no-build Compose operation.
 
 ## Migration, backup, and restore order
 
+Scenario migration `013_air_mission_contract.sql` is forward-only. The preflight
+verifier accepts only a catalogue that is wholly v3 or wholly v4, the migration
+atomically installs the eight canonical v4 packages and hashes, and its final
+guard rejects any residual non-v4 row before application rollout.
+
 Domain-owned files under `db/schema/` are re-exported by `db/schema.ts` and
 therefore remain one Drizzle schema and one forward-migration sequence. The
 module split introduces no migration, table, or backup-format change.

@@ -62,7 +62,7 @@ function createExampleReport(): StoredReport {
     engine: ENGINE_VERSION,
     profileVersion: "public-study-v0.5",
     packageProvenance: {
-      schemaVersion: "vector.scenario.v3",
+      schemaVersion: "vector.scenario.v4",
       contentHash: "example",
       draftRevision: 0,
       intendedUse: DEFAULT_SCENARIO_DEFINITION.intendedUse,
@@ -566,6 +566,12 @@ export default function ReportPage() {
                     {data.packageProvenance?.modelPack
                       ? `${data.packageProvenance.modelPack.id}@${data.packageProvenance.modelPack.version} · ${data.packageProvenance.modelPack.digest.slice(0, 16)}`
                       : "Not recorded"}
+                  </dd>
+                  <dt>Compiled Air mission</dt>
+                  <dd>
+                    {data.packageProvenance?.airMission
+                      ? `${data.packageProvenance.airMission.id}@${data.packageProvenance.airMission.version} · authored ${data.packageProvenance.airMission.authoredDigest.slice(0, 16)} · compiled ${data.packageProvenance.airMission.compiledDigest.slice(0, 16)}`
+                      : "Not applicable or not recorded"}
                   </dd>
                   <dt>Credibility state</dt>
                   <dd>
