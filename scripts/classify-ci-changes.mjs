@@ -1,7 +1,41 @@
 import { appendFileSync, readFileSync } from "node:fs";
+import { isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { parseNameStatusZ } from "./lib/contract-doc-impact.mjs";
+const invariant = (condition, message) => {
+  if (!condition) throw new Error(message);
+};
+
+export function normalizeRepositoryPath(value, label = "repository path") {
+  invariant(typeof value === "string" && value.trim().length > 0, `${label} must be a non-empty string.`);
+  invariant(value === value.normalize("NFC"), `${label} must use NFC Unicode normalization.`);
+  invariant(!isAbsolute(value), `${label} must be relative.`);
+  invariant(!value.includes("\\") && !/[\u0000-\u001f\u007f]/u.test(value), `${label} must not contain controls and must use normalized POSIX separators.`);
+  const parts = value.split("/");
+  invariant(parts.every((part) => part && part !== "." && part !== ".."), `${label} must be a normalized repository path.`);
+  return value;
+}
+
+export function parseNameStatusZ(raw) {
+  const decoded = Buffer.isBuffer(raw) ? new TextDecoder("utf-8", { fatal: true }).decode(raw) : String(raw);
+  const fields = decoded.split("\u0000");
+  if (fields.at(-1) === "") fields.pop();
+  const operations = [];
+  for (let index = 0; index < fields.length;) {
+    const status = fields[index++];
+    invariant(/^(?:[AMDTUXB]|R\d{1,3}|C\d{1,3})$/u.test(status), `Invalid diff status ${status || "missing"}.`);
+    if (status.startsWith("R") || status.startsWith("C")) {
+      invariant(index + 1 < fields.length, `Truncated ${status} diff record.`);
+      const oldPath = normalizeRepositoryPath(fields[index++], "old diff path");
+      const path = normalizeRepositoryPath(fields[index++], "new diff path");
+      operations.push({ status, oldPath, path });
+    } else {
+      invariant(index < fields.length, `Truncated ${status} diff record.`);
+      operations.push({ status, oldPath: null, path: normalizeRepositoryPath(fields[index++], "diff path") });
+    }
+  }
+  return operations;
+}
 
 const patternInventory = (...patterns) => patterns.map((pattern) => ({ source: pattern.source, flags: pattern.flags }));
 const deepFreeze = (value) => {
@@ -54,6 +88,7 @@ export const CLASSIFIER_DECISION_CONTRACT = deepFreeze({
         /^scripts\/classify-ci-changes\.mjs$/,
         /^scripts\/contract-doc-probes\//,
         /^scripts\/lib\/contract-doc-impact\.mjs$/,
+        /^scripts\/lib\/git-name-status\.mjs$/,
         /^scripts\/run-managed-server\.mjs$/,
         /^scripts\/verify-contract-doc-impact\.mjs$/,
         /^tests\/contract-doc-impact\.test\.mjs$/,

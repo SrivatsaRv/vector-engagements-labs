@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { classifyChanges } from "../scripts/classify-ci-changes.mjs";
-import { parseNameStatusZ } from "../scripts/lib/contract-doc-impact.mjs";
+import { parseNameStatusZ } from "../scripts/lib/git-name-status.mjs";
 
 const selected = (files) => {
   const jobs = classifyChanges(files);
@@ -26,6 +26,7 @@ test("contract-documentation policy surfaces fail closed across every hosted gat
     "scripts/contract-doc-probes/classifier-decision-identity.v1.mjs",
     "scripts/contract-doc-probes/required-gate-invariants.v1.mjs",
     "scripts/lib/contract-doc-impact.mjs",
+    "scripts/lib/git-name-status.mjs",
     "scripts/verify-contract-doc-impact.mjs",
     "tests/contract-doc-impact.test.mjs",
     "package.json",
@@ -448,6 +449,7 @@ test("workflow changes fail closed through every available gate", () => {
   assert.deepEqual(selected(["scripts/classify-ci-changes.mjs"]), everyGate);
   assert.deepEqual(selected(["governance/contract-doc-ownership.v1.json"]), everyGate);
   assert.deepEqual(selected(["scripts/lib/contract-doc-impact.mjs"]), everyGate);
+  assert.deepEqual(selected(["scripts/lib/git-name-status.mjs"]), everyGate);
   assert.deepEqual(selected(["scripts/verify-contract-doc-impact.mjs"]), everyGate);
   assert.deepEqual(selected(["tests/contract-doc-impact.test.mjs"]), everyGate);
 });

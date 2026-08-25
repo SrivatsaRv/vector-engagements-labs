@@ -185,7 +185,11 @@ async function governanceProbeFixture(files) {
   runGit(root, ["init", "--quiet"]);
   runGit(root, ["config", "user.email", "tests@example.invalid"]);
   runGit(root, ["config", "user.name", "VECTOR tests"]);
-  for (const [path, content] of Object.entries(files)) {
+  const materializedFiles = { ...files };
+  if (Object.hasOwn(materializedFiles, "scripts/classify-ci-changes.mjs") && !Object.hasOwn(materializedFiles, "scripts/lib/git-name-status.mjs")) {
+    materializedFiles["scripts/lib/git-name-status.mjs"] = await readFile(resolve("scripts/lib/git-name-status.mjs"), "utf8");
+  }
+  for (const [path, content] of Object.entries(materializedFiles)) {
     await mkdir(dirname(join(root, path)), { recursive: true });
     await writeFile(join(root, path), content);
   }
@@ -397,6 +401,278 @@ test("semantic changes require the exact owning section to change materially", a
   assert.throws(
     () => verifyContractDocImpact({ rootDirectory: fixture.root, baseSha: fixture.baseSha, headSha: unrelatedHead, declaration: declaration(), policy: { ...policy, canonicalSha256: undefined } }),
     /changed outside every registered owning section/i,
+  );
+});
+
+test("post-bootstrap policy may introduce only revision-bound semantic owning sections", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const newSection = {
+    sectionId: "NEW_CONTRACT",
+    path: "docs/new-contract.md",
+    heading: "## New contract",
+    facets: ["runtime"],
+  };
+  const newFamily = {
+    id: "NEW_FAMILY",
+    workstream: "staff-architecture",
+    implementationRules: [{ kind: "EXACT", value: "lib/new-contract.ts", facets: ["runtime"] }],
+    testRules: [],
+    generatedGroups: [],
+    owningSections: [newSection],
+    migrationSections: [],
+  };
+  const headPolicy = {
+    ...policy,
+    families: [...policy.families, newFamily],
+    canonicalSha256: undefined,
+  };
+  const semanticDeclaration = {
+    schemaVersion: DECLARATION_SCHEMA,
+    families: [{
+      familyId: "NEW_FAMILY",
+      disposition: "SEMANTIC",
+      owningSections: [newSection],
+      rationale: "The new runtime contract and its first maintained owning section are introduced together.",
+      evidence: [{ kind: "TEST", value: "node --test tests/new-contract.test.mjs" }],
+      migration: {
+        state: "NOT_APPLICABLE",
+        documents: [],
+        rationale: "The new contract adds no persisted representation or migration.",
+      },
+      exemptionEvidence: null,
+    }],
+  };
+
+  await writeFile(join(fixture.root, "lib", "new-contract.ts"), "export const runtime = 1;\n");
+  await writeFile(join(fixture.root, "docs", "new-contract.md"), "# New contract\n\n## New contract\n\nVersion one.\n");
+  const headSha = await commit(fixture.root, "introduce governed contract section");
+
+  assert.equal(verifyContractDocImpact({
+    rootDirectory: fixture.root,
+    baseSha: fixture.baseSha,
+    headSha,
+    declaration: semanticDeclaration,
+    basePolicy: { ...policy, canonicalSha256: undefined },
+    headPolicy,
+  }).state, "VERIFIED");
+
+  await writeFile(join(fixture.root, "docs", "new-contract.md"), "# New contract\n\n## New contract\n");
+  const emptySectionHead = await commit(fixture.root, "empty governed contract section");
+  assert.throws(
+    () => verifyContractDocImpact({
+      rootDirectory: fixture.root,
+      baseSha: fixture.baseSha,
+      headSha: emptySectionHead,
+      declaration: semanticDeclaration,
+      basePolicy: { ...policy, canonicalSha256: undefined },
+      headPolicy,
+    }),
+    /newly registered.*material contract content/i,
+  );
+
+  await writeFile(join(fixture.root, "docs", "new-contract.md"), "# New contract\n\n## New contract\n\n<!-- TODO: document this contract -->\n");
+  const commentOnlyHead = await commit(fixture.root, "placeholder-only governed contract section");
+  assert.throws(
+    () => verifyContractDocImpact({
+      rootDirectory: fixture.root,
+      baseSha: fixture.baseSha,
+      headSha: commentOnlyHead,
+      declaration: semanticDeclaration,
+      basePolicy: { ...policy, canonicalSha256: undefined },
+      headPolicy,
+    }),
+    /newly registered.*material contract content/i,
+  );
+
+  await writeFile(join(fixture.root, "docs", "new-contract.md"), "# New contract\n\n## New contract\n\n<!-- unfinished placeholder\n");
+  const unclosedCommentHead = await commit(fixture.root, "unclosed comment-only governed contract section");
+  assert.throws(
+    () => verifyContractDocImpact({
+      rootDirectory: fixture.root,
+      baseSha: fixture.baseSha,
+      headSha: unclosedCommentHead,
+      declaration: semanticDeclaration,
+      basePolicy: { ...policy, canonicalSha256: undefined },
+      headPolicy,
+    }),
+    /newly registered.*material contract content/i,
+  );
+
+  await writeFile(join(fixture.root, "docs", "new-contract.md"), "# New contract\n\n## New contract\n\n<div></div>\n");
+  const emptyHtmlHead = await commit(fixture.root, "empty raw HTML governed contract section");
+  assert.throws(
+    () => verifyContractDocImpact({
+      rootDirectory: fixture.root,
+      baseSha: fixture.baseSha,
+      headSha: emptyHtmlHead,
+      declaration: semanticDeclaration,
+      basePolicy: { ...policy, canonicalSha256: undefined },
+      headPolicy,
+    }),
+    /newly registered.*material contract content/i,
+  );
+
+  await writeFile(join(fixture.root, "docs", "new-contract.md"), "# New contract\n\n## New contract\n\n### Placeholder\n");
+  const emptySubheadingHead = await commit(fixture.root, "empty subordinate governed contract heading");
+  assert.throws(
+    () => verifyContractDocImpact({
+      rootDirectory: fixture.root,
+      baseSha: fixture.baseSha,
+      headSha: emptySubheadingHead,
+      declaration: semanticDeclaration,
+      basePolicy: { ...policy, canonicalSha256: undefined },
+      headPolicy,
+    }),
+    /newly registered.*material contract content/i,
+  );
+
+  const renderedPlaceholderBodies = [
+    ["&nbsp;", "named whitespace entity"],
+    ["&#8203;", "numeric zero-width entity"],
+    ["[placeholder]: https://example.invalid", "reference definition"],
+    ["[](https://example.invalid)", "empty link"],
+    ["<style>body { display: none; }</style>", "non-rendered style block"],
+    ["<span hidden>TODO</span>", "hidden raw HTML content"],
+    ["<span aria-hidden=\"true\">TODO</span>", "aria-hidden raw HTML content"],
+    ["<span style=\"display: none\">TODO</span>", "styled hidden raw HTML content"],
+    ["<title>TODO</title>", "non-rendered title content"],
+    ["<dialog>TODO</dialog>", "closed dialog content"],
+    ["<details><summary></summary>TODO</details>", "collapsed details content"],
+    ["<style>.hidden { display: none; }</style>\n\n<span class=\"hidden\">TODO</span>", "class-hidden raw HTML content"],
+    ["<div hidden>\n\nTODO\n\n</div>", "cross-block hidden raw HTML content"],
+    ["<dialog>\n\nTODO\n\n</dialog>", "cross-block closed dialog content"],
+    ["<details>\n\nTODO\n\n</details>", "cross-block collapsed details content"],
+    ["<style>p { display: none; }</style>\n\nTODO", "cross-block stylesheet-hidden paragraph"],
+    ["<style>li { display: none; }</style>\n\n- TODO", "cross-block stylesheet-hidden list"],
+    ["<div\n title=\"contract\">\n</div>", "multiline empty raw HTML"],
+    ["<div title=\">contract\"></div>", "quoted-angle empty raw HTML"],
+    ["> ### Placeholder", "blockquoted empty heading"],
+    ["- ### Placeholder", "list-contained empty heading"],
+  ];
+  for (const [body, label] of renderedPlaceholderBodies) {
+    await writeFile(join(fixture.root, "docs", "new-contract.md"), `# New contract\n\n## New contract\n\n${body}\n`);
+    const placeholderHead = await commit(fixture.root, `reject ${label}`);
+    assert.throws(
+      () => verifyContractDocImpact({
+        rootDirectory: fixture.root,
+        baseSha: fixture.baseSha,
+        headSha: placeholderHead,
+        declaration: semanticDeclaration,
+        basePolicy: { ...policy, canonicalSha256: undefined },
+        headPolicy,
+      }),
+      /newly registered.*material contract content/i,
+      label,
+    );
+  }
+
+  const materialBodies = [
+    ["<https://example.invalid/contract>", "visible Markdown autolink"],
+    ["```ts\ntype Contract = Readonly<Record<string, number>>;\n```", "visible fenced code"],
+    ["- Contract requirement one", "visible list item"],
+  ];
+  for (const [body, label] of materialBodies) {
+    await writeFile(join(fixture.root, "docs", "new-contract.md"), `# New contract\n\n## New contract\n\n${body}\n`);
+    const materialHead = await commit(fixture.root, `admit ${label}`);
+    assert.equal(verifyContractDocImpact({
+      rootDirectory: fixture.root,
+      baseSha: fixture.baseSha,
+      headSha: materialHead,
+      declaration: semanticDeclaration,
+      basePolicy: { ...policy, canonicalSha256: undefined },
+      headPolicy,
+    }).state, "VERIFIED", label);
+  }
+
+  const docsCurrent = structuredClone(semanticDeclaration);
+  docsCurrent.families[0].disposition = "DOCS_ALREADY_CURRENT";
+  docsCurrent.families[0].exemptionEvidence = {
+    kind: "DOCS_ALREADY_CURRENT",
+    sections: [{ ...newSection, contentSha256: sha("a"), documentedAtCommit: fixture.baseSha }],
+    migrationSections: [],
+  };
+  assert.throws(
+    () => verifyContractDocImpact({
+      rootDirectory: fixture.root,
+      baseSha: fixture.baseSha,
+      headSha,
+      declaration: docsCurrent,
+      basePolicy: { ...policy, canonicalSha256: undefined },
+      headPolicy,
+    }),
+    /newly registered.*SEMANTIC/i,
+  );
+});
+
+test("an existing family may add a new semantic section but cannot relabel an unchanged heading", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const runtimeSection = {
+    sectionId: "EXAMPLE_NEW_RUNTIME",
+    path: "docs/runtime-contract.md",
+    heading: "## Runtime contract",
+    facets: ["runtime"],
+  };
+  const headPolicy = {
+    ...policy,
+    families: [{
+      ...policy.families[0],
+      implementationRules: [
+        ...policy.families[0].implementationRules,
+        { kind: "EXACT", value: "lib/runtime-contract.ts", facets: ["runtime"] },
+      ],
+      owningSections: [...policy.families[0].owningSections, runtimeSection],
+    }],
+    canonicalSha256: undefined,
+  };
+  await writeFile(join(fixture.root, "lib", "runtime-contract.ts"), "export const runtime = 1;\n");
+  await writeFile(join(fixture.root, "docs", "runtime-contract.md"), "# Runtime\n\n## Runtime contract\n\nVersion one.\n");
+  const headSha = await commit(fixture.root, "add runtime section to existing family");
+  assert.equal(verifyContractDocImpact({
+    rootDirectory: fixture.root,
+    baseSha: fixture.baseSha,
+    headSha,
+    declaration: declaration({ owningSections: [runtimeSection] }),
+    basePolicy: { ...policy, canonicalSha256: undefined },
+    headPolicy,
+  }).state, "VERIFIED");
+
+  const relabelSection = {
+    sectionId: "RELABEL_OLD_HEADING",
+    path: "docs/example.md",
+    heading: "## Other",
+    facets: ["schema"],
+  };
+  const relabelFamily = {
+    id: "RELABEL_FAMILY",
+    workstream: "staff-architecture",
+    implementationRules: [{ kind: "EXACT", value: "lib/example.ts", facets: ["schema"] }],
+    testRules: [],
+    generatedGroups: [],
+    owningSections: [relabelSection],
+    migrationSections: [],
+  };
+  const relabelPolicy = {
+    ...policy,
+    families: [...policy.families, relabelFamily],
+    allowedMultiFamilyPaths: ["docs/example.md", "lib/example.ts"],
+    canonicalSha256: undefined,
+  };
+  await rm(join(fixture.root, "docs", "runtime-contract.md"));
+  await rm(join(fixture.root, "lib", "runtime-contract.ts"));
+  await writeFile(join(fixture.root, "docs", "example.md"), "# Example\n\n## Contract\n\nVersion two.\n\n## Other\n\nStable.\n");
+  const relabelHeadSha = await commit(fixture.root, "change a different section while relabelling an old heading");
+  assert.throws(
+    () => verifyContractDocImpact({
+      rootDirectory: fixture.root,
+      baseSha: fixture.baseSha,
+      headSha: relabelHeadSha,
+      declaration: declaration(),
+      basePolicy: { ...policy, canonicalSha256: undefined },
+      headPolicy: relabelPolicy,
+    }),
+    /newly registered.*heading.*already exists at the merge base/i,
   );
 });
 
@@ -1531,18 +1807,45 @@ test("the classifier identity probe binds a new rule even when no tracked path s
   );
   const headSha = await commit(root, "silently change an unenumerated classifier boundary");
   const output = execFileSync("node", [
-    resolve("scripts/contract-doc-probes/classifier-decision-identity.v1.mjs"),
+    resolve("scripts/contract-doc-probes/classifier-decision-identity.v2.mjs"),
     "vector.contract-doc-probe.v1",
     root,
     baseSha,
     headSha,
     "DELIVERY_CONTRACT_GOVERNANCE",
-    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V1",
+    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V2",
     "INTERNAL_REFACTOR",
   ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
   const result = JSON.parse(output);
   assert.equal(result.assertions[0].status, "FAIL");
   assert.notEqual(result.assertions[0].beforeSha256, result.assertions[0].afterSha256);
+});
+
+test("the V1 and V2 classifier probes admit an unchanged dependency-isolated name-status matrix", async (t) => {
+  const classifierSource = await readFile(resolve("scripts/classify-ci-changes.mjs"), "utf8");
+  const helperSource = await readFile(resolve("scripts/lib/contract-doc-impact.mjs"), "utf8");
+  const root = await governanceProbeFixture({
+    "scripts/classify-ci-changes.mjs": classifierSource,
+    "scripts/lib/contract-doc-impact.mjs": helperSource,
+  });
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const unchangedSha = await commit(root, "unchanged dependency-isolated classifier");
+  for (const version of ["v1", "v2"]) {
+    const probeId = `DELIVERY_CLASSIFIER_DECISION_IDENTITY_${version.toUpperCase()}`;
+    const output = execFileSync("node", [
+      resolve(`scripts/contract-doc-probes/classifier-decision-identity.${version}.mjs`),
+      "vector.contract-doc-probe.v1",
+      root,
+      unchangedSha,
+      unchangedSha,
+      "DELIVERY_CONTRACT_GOVERNANCE",
+      probeId,
+      "INTERNAL_REFACTOR",
+    ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+    const result = JSON.parse(output);
+    assert.equal(result.assertions[0].status, "PASS", `${version} probe must remain executable`);
+    assert.equal(result.assertions[0].beforeSha256, result.assertions[0].afterSha256);
+  }
 });
 
 test("the classifier has no mutable post-snapshot rule authority", async (t) => {
@@ -1571,13 +1874,13 @@ test("the classifier has no mutable post-snapshot rule authority", async (t) => 
     await writeFile(join(root, "scripts", "classify-ci-changes.mjs"), mutatedSource);
     const headSha = await commit(root, `${name} mutation`);
     assert.throws(() => execFileSync("node", [
-      resolve("scripts/contract-doc-probes/classifier-decision-identity.v1.mjs"),
+      resolve("scripts/contract-doc-probes/classifier-decision-identity.v2.mjs"),
       "vector.contract-doc-probe.v1",
       root,
       baseSha,
       headSha,
       "DELIVERY_CONTRACT_GOVERNANCE",
-      "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V1",
+      "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V2",
       "INTERNAL_REFACTOR",
     ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }), undefined, name);
   }
@@ -1603,13 +1906,13 @@ test("the classifier rejects an unfrozen decision inventory", async (t) => {
   await writeFile(join(root, "scripts", "classify-ci-changes.mjs"), mutableSource);
   const headSha = await commit(root, "remove classifier freeze");
   assert.throws(() => execFileSync("node", [
-    resolve("scripts/contract-doc-probes/classifier-decision-identity.v1.mjs"),
+    resolve("scripts/contract-doc-probes/classifier-decision-identity.v2.mjs"),
     "vector.contract-doc-probe.v1",
     root,
     baseSha,
     headSha,
     "DELIVERY_CONTRACT_GOVERNANCE",
-    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V1",
+    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V2",
     "INTERNAL_REFACTOR",
   ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }));
 });
@@ -1631,13 +1934,13 @@ test("the classifier probe binds complete module source outside exported decisio
   await writeFile(join(root, "scripts", "classify-ci-changes.mjs"), monkeyPatchedSource);
   const headSha = await commit(root, "inject unsampled top-level classifier authority");
   const output = execFileSync("node", [
-    resolve("scripts/contract-doc-probes/classifier-decision-identity.v1.mjs"),
+    resolve("scripts/contract-doc-probes/classifier-decision-identity.v2.mjs"),
     "vector.contract-doc-probe.v1",
     root,
     baseSha,
     headSha,
     "DELIVERY_CONTRACT_GOVERNANCE",
-    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V1",
+    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V2",
     "INTERNAL_REFACTOR",
   ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
   const result = JSON.parse(output);
@@ -1667,15 +1970,15 @@ test("the classifier probe rejects self-erasing import-time authority", async (t
   await writeFile(join(root, "scripts", "classify-ci-changes.mjs"), maliciousSource);
   const headSha = await commit(root, "self-erasing import-time classifier authority");
   assert.throws(() => execFileSync("node", [
-    resolve("scripts/contract-doc-probes/classifier-decision-identity.v1.mjs"),
+    resolve("scripts/contract-doc-probes/classifier-decision-identity.v2.mjs"),
     "vector.contract-doc-probe.v1",
     root,
     baseSha,
     headSha,
     "DELIVERY_CONTRACT_GOVERNANCE",
-    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V1",
+    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V2",
     "INTERNAL_REFACTOR",
-  ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }), /Classifier module changed during execution/i);
+  ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }), /Classifier module or name-status parser changed during execution/i);
 });
 
 test("the classifier probe keeps evidence hashing outside candidate module authority", async (t) => {
@@ -1704,13 +2007,13 @@ test("the classifier probe keeps evidence hashing outside candidate module autho
   await writeFile(join(root, "scripts", "classify-ci-changes.mjs"), reboundHashSource);
   const headSha = await commit(root, "rebind candidate hash authority");
   const output = execFileSync("node", [
-    resolve("scripts/contract-doc-probes/classifier-decision-identity.v1.mjs"),
+    resolve("scripts/contract-doc-probes/classifier-decision-identity.v2.mjs"),
     "vector.contract-doc-probe.v1",
     root,
     baseSha,
     headSha,
     "DELIVERY_CONTRACT_GOVERNANCE",
-    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V1",
+    "DELIVERY_CLASSIFIER_DECISION_IDENTITY_V2",
     "INTERNAL_REFACTOR",
   ], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
   const result = JSON.parse(output);

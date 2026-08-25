@@ -116,6 +116,9 @@ test("local, hosted, and clean-clone gates execute the same documentation-impact
   assert.match(contractDocs, /target: wasm32-unknown-unknown/);
   assert.match(contractDocs, /Swatinem\/rust-cache@/);
   assert.match(contractDocs, /workspaces: engine-rust/);
+  const nodeInstall = contractDocs.indexOf("run: npm ci --ignore-scripts");
+  assert.ok(nodeInstall > contractDocs.indexOf("uses: actions/setup-node@"), "contract documentation dependencies install before Node is pinned");
+  assert.ok(nodeInstall < contractDocs.indexOf("node scripts/verify-contract-doc-impact.mjs --github-event"), "contract documentation validator runs before locked dependencies are installed");
   assert.ok(contractDocs.indexOf("target: wasm32-unknown-unknown") < contractDocs.indexOf("node scripts/verify-contract-doc-impact.mjs --github-event"));
   assert.match(contractDocs, /node scripts\/verify-contract-doc-impact\.mjs --github-event/);
   assert.match(workflow, /contract_docs_state/);

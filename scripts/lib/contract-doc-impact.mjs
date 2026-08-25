@@ -1,7 +1,12 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { relative, resolve, sep } from "node:path";
+import { JSDOM } from "jsdom";
+import { marked } from "marked";
+import { normalizeRepositoryPath, parseNameStatusZ } from "./git-name-status.mjs";
+
+export { parseNameStatusZ } from "./git-name-status.mjs";
 
 export const DECLARATION_SCHEMA = "vector.contract-doc-impact-declaration.v1";
 export const POLICY_SCHEMA = "vector.contract-doc-ownership.v1";
@@ -275,15 +280,6 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function normalizeRepositoryPath(value, label = "repository path") {
-  requiredString(value, label);
-  invariant(!isAbsolute(value), `${label} must be relative.`);
-  invariant(!value.includes("\\") && !/[\u0000-\u001f\u007f]/u.test(value), `${label} must not contain controls and must use normalized POSIX separators.`);
-  const parts = value.split("/");
-  invariant(parts.every((part) => part && part !== "." && part !== ".."), `${label} must be a normalized repository path.`);
-  return value;
-}
-
 function assertNoSymlink(rootDirectory, repositoryPath) {
   if (!rootDirectory) return;
   const root = realpathSync(rootDirectory);
@@ -327,6 +323,21 @@ function validateSection(section, label) {
 
 function sectionKey(section) {
   return `${section.sectionId}\u0000${section.path}\u0000${section.heading}\u0000${[...section.facets].sort().join(",")}`;
+}
+
+function policyHasSection(policy, familyId, section) {
+  const family = policy.families.find((candidate) => candidate.id === familyId);
+  if (!family) return false;
+  const registered = new Set([...family.owningSections, ...family.migrationSections].map(sectionKey));
+  return registered.has(sectionKey(section));
+}
+
+function newlyRegisteredSections(basePolicy, headPolicy) {
+  return headPolicy.families.flatMap((family) => (
+    [...family.owningSections, ...family.migrationSections]
+      .filter((section) => !policyHasSection(basePolicy, family.id, section))
+      .map((section) => ({ familyId: family.id, section }))
+  ));
 }
 
 function sortedUniqueStrings(values, label) {
@@ -674,27 +685,6 @@ export function extractDeclarationFromPullRequestBody(body, policy) {
   return validateDeclaration(parseStrictJson(raw, "contract documentation declaration"), policy);
 }
 
-export function parseNameStatusZ(raw) {
-  const decoded = Buffer.isBuffer(raw) ? new TextDecoder("utf-8", { fatal: true }).decode(raw) : String(raw);
-  const fields = decoded.split("\u0000");
-  if (fields.at(-1) === "") fields.pop();
-  const operations = [];
-  for (let index = 0; index < fields.length;) {
-    const status = fields[index++];
-    invariant(/^(?:[AMDTUXB]|R\d{1,3}|C\d{1,3})$/u.test(status), `Invalid diff status ${status || "missing"}.`);
-    if (status.startsWith("R") || status.startsWith("C")) {
-      invariant(index + 1 < fields.length, `Truncated ${status} diff record.`);
-      const oldPath = normalizeRepositoryPath(fields[index++], "old diff path");
-      const path = normalizeRepositoryPath(fields[index++], "new diff path");
-      operations.push({ status, oldPath, path });
-    } else {
-      invariant(index < fields.length, `Truncated ${status} diff record.`);
-      operations.push({ status, oldPath: null, path: normalizeRepositoryPath(fields[index++], "diff path") });
-    }
-  }
-  return operations;
-}
-
 function git(rootDirectory, arguments_, options = {}) {
   return execFileSync("git", arguments_, { cwd: rootDirectory, encoding: options.encoding ?? "utf8", maxBuffer: 64 * 1024 * 1024 });
 }
@@ -755,6 +745,28 @@ function optionalMarkdownSection(content, heading, label) {
 
 function materiallyNormalized(content) {
   return content.replace(/\s+/gu, " ").trim();
+}
+
+function hasMaterialMarkdownBody(content) {
+  const tokens = marked.lexer(content);
+  const containsRawHtml = (value) => {
+    if (Array.isArray(value)) return value.some(containsRawHtml);
+    if (!value || typeof value !== "object") return false;
+    if (value.type === "html") return true;
+    return ["tokens", "items", "header", "rows"].some((key) => containsRawHtml(value[key]));
+  };
+  if (containsRawHtml(tokens)) return false;
+  const admissibleTokens = tokens.filter((token) => !["def", "heading"].includes(token.type));
+  admissibleTokens.links = tokens.links;
+  const rendered = marked.parser(admissibleTokens);
+  const fragment = JSDOM.fragment(rendered);
+  for (const element of fragment.querySelectorAll("h1, h2, h3, h4, h5, h6, script, style, template, noscript, svg, math")) {
+    element.remove();
+  }
+  const visibleText = (fragment.textContent ?? "")
+    .normalize("NFC")
+    .replace(/[\p{Cc}\p{Cf}\p{Z}]/gu, "");
+  return /[\p{L}\p{N}]/u.test(visibleText);
 }
 
 function changedPathsForFamily(pathClassifications, familyId) {
@@ -841,6 +853,19 @@ export function verifyContractDocImpact({
     invariant(beforeFamilies.every((familyId) => afterFamilies.includes(familyId)), `Head policy removes family ownership from ${path}.`);
   }
   const changedPaths = [...new Set(operations.flatMap((operation) => [operation.oldPath, operation.path]).filter(Boolean))].sort();
+  const introducedSections = policyBootstrap ? [] : newlyRegisteredSections(basePolicy, headPolicy);
+  for (const { familyId, section: introducedSection } of introducedSections) {
+    const baseDocument = contentAt(root, mergeBase, introducedSection.path);
+    invariant(
+      baseDocument === null
+        || optionalMarkdownSection(baseDocument, introducedSection.heading, `${introducedSection.path} at base`) === null,
+      `${familyId} newly registered section ${introducedSection.sectionId} heading already exists at the merge base and cannot be relabelled as new authority.`,
+    );
+    invariant(
+      changedPaths.includes(introducedSection.path),
+      `${familyId} newly registered section ${introducedSection.sectionId} requires an exact owning document change in its introducing revision.`,
+    );
+  }
   const pathClassifications = [];
   const familyIds = new Set();
   for (const operation of operations) {
@@ -871,14 +896,27 @@ export function verifyContractDocImpact({
       const changedSections = sections.filter((section) => {
         const beforeContent = contentAt(root, mergeBase, section.path);
         const afterContent = contentAt(root, head, section.path);
-        if (beforeContent === null || afterContent === null) return true;
-        const before = optionalMarkdownSection(beforeContent, section.heading, `${section.path} at base`);
-        if (before === null && policyBootstrap) {
+        if (afterContent === null) return true;
+        const after = markdownSection(afterContent, section.heading, `${section.path} at head`);
+        const introducedAtHead = !policyBootstrap && !policyHasSection(basePolicy, match.familyId, section);
+        if (beforeContent === null && (policyBootstrap || introducedAtHead)) {
+          invariant(
+            hasMaterialMarkdownBody(after),
+            `${match.familyId} newly registered section ${section.sectionId} must contain material contract content.`,
+          );
           bootstrapRegisteredSectionPaths.add(section.path);
-          return false;
+          return introducedAtHead;
+        }
+        const before = optionalMarkdownSection(beforeContent, section.heading, `${section.path} at base`);
+        if (before === null && (policyBootstrap || introducedAtHead)) {
+          invariant(
+            hasMaterialMarkdownBody(after),
+            `${match.familyId} newly registered section ${section.sectionId} must contain material contract content.`,
+          );
+          bootstrapRegisteredSectionPaths.add(section.path);
+          return introducedAtHead;
         }
         invariant(before !== null, `${section.path} at base is missing registered heading ${section.heading}.`);
-        const after = markdownSection(afterContent, section.heading, `${section.path} at head`);
         return materiallyNormalized(before) !== materiallyNormalized(after);
       });
       if (changedSections.length > 0) {
@@ -942,6 +980,12 @@ export function verifyContractDocImpact({
     const requiredSections = requiredSectionsForFamily(pathClassifications, family);
     const requiredOwningSections = requiredSections.owningSections;
     const requiredMigrationSections = requiredSections.migrationSections;
+    const introducesRegisteredSection = [...requiredOwningSections, ...requiredMigrationSections]
+      .some((section) => !policyBootstrap && !policyHasSection(basePolicy, familyId, section));
+    invariant(
+      !introducesRegisteredSection || item.disposition === "SEMANTIC",
+      `${familyId} newly registered contract section requires SEMANTIC disposition in its introducing revision.`,
+    );
     const retiresGeneratedOutput = validatedRuleRetirements.some((retirement) => retirement.familyId === familyId && retirement.inventory === "GENERATED_OUTPUT");
     invariant(!retiresGeneratedOutput || item.disposition === "SEMANTIC", `${familyId} generated output retirement requires SEMANTIC disposition.`);
     exactSectionInventory(item.owningSections, requiredOwningSections, `${familyId} owning sections`);
@@ -952,7 +996,13 @@ export function verifyContractDocImpact({
       for (const section of requiredOwningSections) {
         const before = optionalMarkdownSection(contentAt(root, mergeBase, section.path), section.heading, `${section.path} at base`);
         const after = markdownSection(contentAt(root, head, section.path), section.heading, `${section.path} at head`);
-        invariant((before === null && policyBootstrap) || materiallyNormalized(before) !== materiallyNormalized(after), `${familyId} owning section ${section.path} ${section.heading} did not change materially.`);
+        const introducedAtHead = !policyBootstrap && !policyHasSection(basePolicy, familyId, section);
+        invariant(
+          before === null
+            ? policyBootstrap || introducedAtHead
+            : materiallyNormalized(before) !== materiallyNormalized(after),
+          `${familyId} owning section ${section.path} ${section.heading} did not change materially.`,
+        );
       }
       if (requiredMigrationSections.length) {
         invariant(item.migration.state === "UPDATED", `${familyId} requires updated migration/changelog sections.`);
@@ -960,7 +1010,13 @@ export function verifyContractDocImpact({
         for (const section of requiredMigrationSections) {
           const before = optionalMarkdownSection(contentAt(root, mergeBase, section.path), section.heading, `${section.path} at base`);
           const after = markdownSection(contentAt(root, head, section.path), section.heading, `${section.path} at head`);
-          invariant((before === null && policyBootstrap) || materiallyNormalized(before) !== materiallyNormalized(after), `${familyId} migration section ${section.path} ${section.heading} did not change materially.`);
+          const introducedAtHead = !policyBootstrap && !policyHasSection(basePolicy, familyId, section);
+          invariant(
+            before === null
+              ? policyBootstrap || introducedAtHead
+              : materiallyNormalized(before) !== materiallyNormalized(after),
+            `${familyId} migration section ${section.path} ${section.heading} did not change materially.`,
+          );
         }
       } else {
         invariant(item.migration.state === "NOT_APPLICABLE" && item.migration.documents.length === 0, `${familyId} has no registered migration section; migration must be NOT_APPLICABLE.`);
