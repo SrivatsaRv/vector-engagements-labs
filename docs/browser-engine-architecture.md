@@ -51,6 +51,10 @@ Air-domain adapters now carry the exact authored and compiled
 Worker independently recompiles mission, flight-plan, start, loadout, fuel,
 model-pack, and environment-pack inputs and requires the same compiled digest;
 main-thread validation is not trusted as Worker admission.
+The #190 high-energy crossing package uses this same digest/ref protocol and
+adapter. The Worker has no scenario-ID or named-aircraft branch; it executes the
+ninth scenario through the ordinary fixed-step runtime and records its canonical
+frames, events, observer pictures and report in the same VSR envelope.
 Store-transfer admission follows the same rule: the Worker carries the authored
 request, full compiled transfer, ordered compiler authority seal and compact
 entity binding unchanged. It records either one accepted/achieved transfer or
@@ -126,6 +130,11 @@ verification-only manifest to exercise an unselected backend: that would be
 correctly rejected as stale at the Worker boundary. Cross-backend numerical
 parity remains owned by `tests/engine-backends.test.mjs` outside the deployed
 browser admission path.
+For #190, this built gate selects the governed 44 km/105-degree crossing
+challenge, opens `report.json` and `frames.arrow` from the transferred VSR, and
+requires a successful `threshold_reached` termination after 120 seconds but
+before 140 seconds with terminal separation at or below 180 m. A title, rendered
+path or progress message cannot satisfy that assertion.
 The #187 built-browser journey additionally proves the exact store identity is
 absent before and appears once at the transfer frame, with the same outcome in
 telemetry/report playback and successful cancellation/retry recovery.

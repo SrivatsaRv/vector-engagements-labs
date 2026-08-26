@@ -7,7 +7,10 @@ import { chromium } from "playwright-core";
 import { buildSync } from "esbuild";
 import { adaptPreparedSimulation } from "../lib/runtime/model-pack-adapter.ts";
 import { prepareSimulation } from "../lib/simulation.ts";
-import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
+import {
+  HIGH_ENERGY_CROSSING_CHALLENGE_ID,
+  SCENARIO_LIBRARY,
+} from "../lib/scenarios.ts";
 import {
   DEPLOYMENT_CAPABILITIES,
   createVerificationDeploymentCapabilities,
@@ -43,6 +46,11 @@ type WorkerVerificationResult = {
   verificationAdmissionError: string;
   transferredByteLength: number;
   detachedAfterRecycle: boolean;
+  termination: string;
+  successful: boolean;
+  timeOfFlightSeconds: number;
+  closestApproachM: number;
+  finalSeparationM: number;
 };
 
 const {
@@ -85,7 +93,11 @@ const origin = `http://127.0.0.1:${address.port}`;
 const chromePath = process.env.VECTOR_CHROME_PATH ?? chromium.executablePath();
 const browser = await chromium.launch({ executablePath: chromePath, headless: true });
 
-const scenario = SCENARIO_LIBRARY[0].scenario;
+const challenge = SCENARIO_LIBRARY.find(
+  (definition) => definition.id === HIGH_ENERGY_CROSSING_CHALLENGE_ID,
+);
+if (!challenge) throw new Error("High-energy crossing challenge is missing.");
+const scenario = challenge.scenario;
 const pack = await adaptPreparedSimulation(
   prepareSimulation(scenario, scenario.profile, DEPLOYMENT_CAPABILITIES),
 );
@@ -257,6 +269,23 @@ try {
           (member) => member.path === "frames.arrow",
         );
         if (!framesMember) throw new Error("Worker record omitted frames.arrow.");
+        const reportMember = archiveHeader.members.find(
+          (member) => member.path === "report.json",
+        );
+        if (!reportMember) throw new Error("Worker record omitted report.json.");
+        const reportStart = 12 + archiveHeaderLength + reportMember.offset;
+        const report = JSON.parse(
+          new TextDecoder().decode(
+            archive.subarray(reportStart, reportStart + reportMember.byteLength),
+          ),
+        ) as {
+          result: {
+            successful: boolean;
+            termination: string;
+            closestApproach: number;
+            timeOfFlight: number;
+          };
+        };
         const framesStart = 12 + archiveHeaderLength + framesMember.offset;
         const frames = archive.subarray(
           framesStart,
@@ -308,6 +337,11 @@ try {
           verificationAdmissionError,
           transferredByteLength,
           detachedAfterRecycle,
+          termination: report.result.termination,
+          successful: report.result.successful,
+          timeOfFlightSeconds: report.result.timeOfFlight,
+          closestApproachM: report.result.closestApproach,
+          finalSeparationM: frameHeader.frames.at(-1)?.separationM ?? Number.NaN,
         };
       },
       { pack, stalePack, verificationPack, workerUrl: `${origin}/assets/${workerName}` },
@@ -327,6 +361,11 @@ try {
   assert.ok(result.states.includes("failed"));
   assert.match(result.staleAdmissionError, /capability-manifest-stale/);
   assert.match(result.verificationAdmissionError, /capability-manifest-stale/);
+  assert.equal(result.termination, "threshold_reached");
+  assert.equal(result.successful, true);
+  assert.ok(result.timeOfFlightSeconds > 120 && result.timeOfFlightSeconds < 140);
+  assert.ok(result.closestApproachM > 150 && result.closestApproachM <= 180);
+  assert.ok(result.finalSeparationM <= 180);
 
   const cancellation = await page.evaluate(
     async ({ pack, workerUrl }) => {

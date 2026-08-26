@@ -79,6 +79,11 @@ promote a Stage-B identity.
 
 ## Closed requirements and evidence states
 
+The #190 scenario does not admit a new aircraft or weapon model pack. It binds
+the already published `vector-scalar-study-models@0.8.0` identity and retains
+named Su-30MKI/F-16C performance as unsupported; scenario inputs remain
+`MODEL_ASSUMPTION` rather than new source evidence.
+
 The requirement profile uses stable requirement IDs and the closed data-family
 set: aerodynamics, propulsion, flight controls, mass properties,
 stations/stores, and sensors. Every requirement declares:
@@ -130,6 +135,10 @@ satisfy an aircraft requirement or repair an aircraft evidence gap; each family
 must pass its own admission contract before later scenario composition.
 
 ## Step-by-step onboarding
+
+No onboarding publication step is performed for #190. The scenario migration
+may reference only the exact existing compiled-pack ID, version and digest, and
+database readback fails if any of those three fields diverges.
 
 1. Define one intended-use requirement profile. Keep requirement IDs stable;
    declare only the data families, selectors, configurations, source coverage,
@@ -202,6 +211,10 @@ the repository policy.
 
 ## Anonymous worked example
 
+The #190 named presentation does not alter or supersede the anonymous onboarding
+proof. Its regression consumes the current compiled pack only after ordinary
+admission and makes no new named-data assertion.
+
 The generated serialized archives
 `anonymous-pack-alpha.governed.v2.json` and
 `anonymous-pack-bravo.governed.v2.json` use the same generator, compiler,
@@ -227,6 +240,11 @@ payload. Pairing either example with a regional EnvironmentPack would create a
 separate scenario identity without changing the compiled aircraft-pack digest.
 
 ## Bounds, storage, and recovery
+
+The ninth scenario is a separate immutable template row; it does not copy,
+mutate or republish source, derivative, credibility or compiled-pack records.
+Recovery therefore restores migration 016 and the already referenced pack as
+independent content-addressed artifacts.
 
 Stage B rejects before publication when any artifact exceeds 32 MiB, either raw
 or derivative corpus exceeds 64 MiB total, the v2 source exceeds 8 MiB,
@@ -271,6 +289,12 @@ its aircraft research backup format.
 
 ## Performance evidence
 
+The #190 release evidence runs the nine-scenario engine benchmark with the same
+compiled-pack reuse path. The eight historical workloads retain their 75 ms p95
+budget and the new six-entity challenge has a separately reported 110 ms p95
+tier. Its late 131.2-second model time is a deterministic simulated duration,
+not 131.2 seconds of wall time or a new pack-capacity claim.
+
 The immutable workload
 `fixtures/performance/model-pack-foundation-workload.v1.json` has digest
 `8a438546acdfc3d3bf49d8052e26865c275f2d3fa9b935763e1271438f706e5c`
@@ -300,6 +324,10 @@ measurements are not folded into Stage-B compile, publication or reuse timing.
 | non-promotable until runtime admission lands | Stage B is being used as Stage D | complete #154 first, then the separately reviewed Worker/runtime/VSR admission stage |
 
 ## Nonclaims and deferred owners
+
+The #190 package does not promote generic coefficients into Su-30MKI, F-16C or
+Astra performance authority. Its 180 m terminal geometry is not detection,
+launch-zone, fuze, hit, damage, kill, probability-of-kill or tactical evidence.
 
 The #182 ground-dynamics projection is a separately bounded
 `MODEL_ASSUMPTION` for generic educational roll, rotation and climbout. It does

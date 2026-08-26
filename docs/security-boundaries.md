@@ -122,6 +122,12 @@ spending limits and abuse monitoring remain deployment duties.
 
 ## Delivery trust
 
+Migration 016's duplicated canonical package/readback bytes contain two visible
+`MODEL_ASSUMPTION` and two fixed duel-slot indicators. The runtime-stub ledger
+classifies them under release-blocking STUB-01/STUB-02 and STUB-04 respectively,
+owned by #64/#28/#38/#60. The governed challenge therefore cannot be used to
+retire named-model or generic-force-package debt merely because it completes.
+
 The Rust/WASM artifact now binds the exact Binaryen 131.0.0 optimization policy
 into its source identity and verifies optimized bytes, length and required ABI
 exports before embedding. The optimizer is build-time only and cannot be

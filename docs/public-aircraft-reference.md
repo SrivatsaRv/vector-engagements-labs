@@ -48,6 +48,12 @@ Measured locally on 2026-08-12 using Node.js v24.3.0 on Apple M5 arm64:
 
 These numbers are a local regression record, not an x86-64, browser rendering, capacity or named-aircraft performance claim.
 
+Issue #190 raises the governed development-scenario inventory from eight to
+nine by adding a named Su-30MKI/F-16 crossing challenge. That catalog identity
+does not change this evidence state: the challenge still executes the anonymous
+assumption pack, and neither the NASA generic F-16 check case nor its measured
+errors admit PAF F-16C Block 52 or IAF Su-30MKI performance.
+
 The separate issue #150 historical external-store source quarantine adds
 16,435,557 bytes of exact NASA source, metadata, policy, and declared full-page
 render assets under `governance/nasa-historical-f16-store-source/`. Those bytes

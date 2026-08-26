@@ -56,8 +56,8 @@ test("stored scenario validation binds database identity to package identity", a
   );
 });
 
-test("the eight development templates have unique immutable identities", async () => {
-  assert.equal(SCENARIO_LIBRARY.length, 8);
+test("the nine development templates have unique immutable identities", async () => {
+  assert.equal(SCENARIO_LIBRARY.length, 9);
   const identities = SCENARIO_LIBRARY.map(
     (definition) => `${definition.id}@${definition.version}`,
   );

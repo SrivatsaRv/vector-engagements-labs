@@ -188,6 +188,9 @@ const fixedRuns: [RunVariant, RunVariant, RunVariant] = [
   },
 ];
 
+export const HIGH_ENERGY_CROSSING_CHALLENGE_ID =
+  "a2a-high-energy-crossing-challenge";
+
 export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
@@ -572,6 +575,61 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
       launcherSpeed: 0,
       targetSpeed: 0,
       wind: 22,
+    }),
+  },
+  {
+    ...PACKAGE_GOVERNANCE,
+    id: HIGH_ENERGY_CROSSING_CHALLENGE_ID,
+    version: "1.0.0",
+    domain: "A2A",
+    title: "High-energy crossing challenge: Su-30MKI versus F-16C",
+    summary:
+      "Run a non-default, late-completing crossing geometry that puts the current Astra study model near its deterministic time and energy boundary.",
+    blue: "Su-30MKI carrying Astra Mk 1",
+    red: "PAF F-16C Block 52 carrying AIM-120C-5",
+    targetProfile: "PAF F-16C Block 52",
+    theatre: "Open training airspace",
+    complexity: "Advanced",
+    scope:
+      "One assumption-backed launcher, one manoeuvring target, and one guided fly-out; the 180 m terminal geometry threshold is not a hit or kill claim.",
+    tags: ["fighter vs fighter", "crossing challenge", "energy boundary"],
+    targetMotion: "moving",
+    environment:
+      "Sourced regional terrain and atmosphere · exact EnvironmentPack identity recorded",
+    focusOptions: movingFocus,
+    runVariants: movingRuns,
+    presetRationale: {
+      profile:
+        "The 44 km start is a non-default deterministic challenge for the current Astra model assumption. It is not a published or operational engagement-range claim.",
+      geometry:
+        "A 105° crossing angle and 1,500 m altitude difference produce a late-completing crossing intercept rather than the library baseline or a simple head-on closure.",
+      conditions:
+        "The case keeps the governed North Punjab winter atmosphere, explicit routes, 70% authored fuel, and two installed stores per aircraft. Sensor, EW, damage, fuze, tactics, and probability of kill remain unavailable.",
+    },
+    scenario: scenario({
+      domain: "A2A",
+      name: "High-energy crossing challenge: Su-30MKI versus PAF F-16C Block 52",
+      objective:
+        "Test whether the current generic point-mass and Astra study assumptions can complete a demanding 44 km, 105° crossing geometry before the 140 second model limit.",
+      bluePlatformId: "su-30mki",
+      blueSystemId: "astra-mk1",
+      redObjectId: "f-16c-block52-paf",
+      redSystemId: "aim-120c5",
+      studyAreaId: "north-punjab",
+      weatherPresetId: "north-punjab-clear",
+      profile: "medium",
+      guidance: "direct",
+      altitude: 8500,
+      targetDelta: 1500,
+      range: 44000,
+      aspect: 105,
+      launcherSpeed: 270,
+      targetSpeed: 250,
+      blueFuelPercent: 70,
+      redFuelPercent: 70,
+      blueWeaponQuantity: 2,
+      redWeaponQuantity: 2,
+      seed: 42,
     }),
   },
 ];

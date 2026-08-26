@@ -13,6 +13,12 @@ VECTOR keeps the compact A2A/A2G/G2A/G2G identifiers for scanning, but gives eac
 
 These labels are intentionally narrower than operational doctrine. VECTOR is a public-data educational model and does not claim to simulate the full counterair, counterland, strategic-attack, or targeting processes. UI copy names the configured platform, weapon, target, and information state whenever the catalog contains them; “abstract profile” is not used as a substitute for incomplete data.
 
+The scenario library contains nine governed entries. Its third A2A entry is the
+non-default **High-energy crossing challenge: Su-30MKI versus F-16C**. The title
+describes the authored aircraft identities and geometry; it does not promote the
+anonymous assumption model pack into named-platform performance evidence or
+describe the 180 m terminal geometry as a hit, kill, or combat outcome.
+
 `RELEASE` and `JETTISON` describe only the generic public-educational lifecycle
 selected by authored intent. They do not imply safe separation, emergency
 procedure fidelity, named-aircraft/store carriage, or weapon effectiveness.

@@ -17,10 +17,19 @@ import { CURRENT_COMPILED_MODEL_PACK } from "../lib/engine/weapon-admission.ts";
 import { canonicalJson } from "../lib/canonical-json.ts";
 import { sha256HexSync } from "../lib/geospatial/digest.ts";
 import { createDefaultSpatialPlan } from "../lib/scenario-spatial.ts";
-import { DEFAULT_SCENARIO, prepareSimulation, simulate } from "../lib/simulation.ts";
+import {
+  DEFAULT_SCENARIO,
+  prepareSimulation,
+  simulate,
+  simulateWithCapabilitiesForVerification,
+} from "../lib/simulation.ts";
 import { getStudyArea } from "../lib/study-areas.ts";
 import { admitEnvironmentPack, createEnvironmentSampler } from "../lib/geospatial/environment-pack.ts";
-import { DEFAULT_SCENARIO_DEFINITION, SCENARIO_LIBRARY } from "../lib/scenarios.ts";
+import {
+  DEFAULT_SCENARIO_DEFINITION,
+  HIGH_ENERGY_CROSSING_CHALLENGE_ID,
+  SCENARIO_LIBRARY,
+} from "../lib/scenarios.ts";
 import { validateSavedScenario } from "../lib/security/saved-run.ts";
 import {
   createVectorSimulationRecord,
@@ -35,6 +44,7 @@ import {
 } from "../lib/runtime/model-pack-adapter.ts";
 import { runEngine } from "../lib/engine/core.ts";
 import { runEngineBackend } from "../lib/engine/backend.ts";
+import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
 import { assertSimulationEventStream } from "../lib/engine/simulation-events.ts";
 import { enginePositionToGeographic } from "../lib/scenario-spatial.ts";
 import { VECTOR_ENGINE_WASM_BASE64 } from "../lib/engine/generated/vector-engine-wasm.ts";
@@ -112,6 +122,29 @@ function fixture(missionClass = "TACTICAL_INTERCEPT") {
     modelPack: CURRENT_COMPILED_MODEL_PACK,
   });
   return scenario;
+}
+
+const highEnergyCrossingChallenge = SCENARIO_LIBRARY.find(
+  (definition) => definition.id === HIGH_ENERGY_CROSSING_CHALLENGE_ID,
+);
+
+function highEnergyCrossingCapabilities(backend) {
+  return createVerificationDeploymentCapabilities(backend, ["A2A"]);
+}
+
+function highEnergyCrossingControl() {
+  const scenario = structuredClone(highEnergyCrossingChallenge.scenario);
+  scenario.range = 46_000;
+  scenario.spatialPlan = createDefaultSpatialPlan({
+    studyArea: getStudyArea(scenario.studyAreaId),
+    rangeM: scenario.range,
+    blueAltitudeM: scenario.altitude,
+    redAltitudeM: scenario.altitude + scenario.targetDelta,
+    blueSpeedMps: scenario.launcherSpeed,
+    redSpeedMps: scenario.targetSpeed,
+    crossingAngleDeg: scenario.aspect,
+  });
+  return synchronizeScenarioAirMission(scenario, CURRENT_COMPILED_MODEL_PACK);
 }
 
 function admittedGroundFixture(posture = "RUNWAY") {
@@ -348,27 +381,133 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
   const airMigration = readFileSync(new URL("../db/migrations/013_air_mission_contract.sql", import.meta.url), "utf8");
   const environmentMigration = readFileSync(new URL("../db/migrations/014_environment_pack_runways.sql", import.meta.url), "utf8");
   const groundDynamicsMigration = readFileSync(new URL("../db/migrations/015_generic_ground_dynamics.sql", import.meta.url), "utf8");
+  const challengeMigration = readFileSync(new URL("../db/migrations/016_high_energy_crossing_challenge.sql", import.meta.url), "utf8");
   assert.equal(
     createHash("sha256").update(environmentMigration).digest("hex"),
     "c40e91b0fbbf2ee5110ae601dba676d2feec1957ebb440db81703c1696cbd227",
     "migration 014 remains the frozen historical EnvironmentPack/runway snapshot",
   );
+  assert.equal(
+    createHash("sha256").update(groundDynamicsMigration).digest("hex"),
+    "ed5a04b32ae3f634c28394a17c98232474a737ce466fca58fc0bca21235fe35b",
+    "migration 015 remains the frozen historical ground-dynamics snapshot",
+  );
   for (const definition of SCENARIO_LIBRARY) {
-    const tag = `vector_ground_dynamics_${definition.id.replaceAll("-", "_")}`;
-    assert.ok(groundDynamicsMigration.includes(`$${tag}$${canonicalJson(definition)}$${tag}$::jsonb`), definition.id);
+    const isChallenge = definition.id === HIGH_ENERGY_CROSSING_CHALLENGE_ID;
+    const migration = isChallenge ? challengeMigration : groundDynamicsMigration;
+    const tag = isChallenge
+      ? "vector_high_energy_crossing_challenge"
+      : `vector_ground_dynamics_${definition.id.replaceAll("-", "_")}`;
+    assert.ok(migration.includes(`$${tag}$${canonicalJson(definition)}$${tag}$::jsonb`), definition.id);
     assert.ok(
-      groundDynamicsMigration.includes(`INSERT INTO scenario_templates (id,version,domain,title,status,package,schema_version,content_hash,engine_version,study_area_id,intended_use_id,intended_use_version,model_pack_id,model_pack_version,model_pack_digest) VALUES ('${definition.id}','${definition.version}'`),
+      migration.includes("INSERT INTO scenario_templates")
+        && migration.includes(`'${definition.id}','${definition.version}'`),
       `${definition.id} self-sufficient upsert`,
     );
-    assert.ok(groundDynamicsMigration.includes(`$${tag}$::jsonb,'vector.scenario.v4','${sha256HexSync(definition)}'`), definition.id);
+    assert.ok(migration.includes(`$${tag}$::jsonb,'vector.scenario.v4','${sha256HexSync(definition)}'`), definition.id);
     assert.ok(
-      groundDynamicsMigration.includes(`('${definition.id}','${definition.version}','vector.scenario.v4','${sha256HexSync(definition)}','${definition.environment.replaceAll("'", "''")}')`),
+      isChallenge
+        ? migration.includes(`current.id='${definition.id}'`) && migration.includes(`current.content_hash='${sha256HexSync(definition)}'`)
+        : migration.includes(`('${definition.id}','${definition.version}','vector.scenario.v4','${sha256HexSync(definition)}','${definition.environment.replaceAll("'", "''")}')`),
       `${definition.id} exact readback identity`,
     );
   }
   assert.match(airMigration, /WHERE schema_version <> 'vector\.scenario\.v4'/);
   assert.match(environmentMigration, /package->>'environment' NOT LIKE 'Sourced regional terrain and atmosphere%'/);
   assert.match(groundDynamicsMigration, /Generic ground-dynamics migration exact scenario identity\/hash readback failed/);
+  assert.match(challengeMigration, /High-energy crossing challenge exact identity\/hash readback failed/);
+});
+
+test("the governed high-energy crossing challenge owns exact non-default inputs and explicit nonclaims", () => {
+  assert.ok(highEnergyCrossingChallenge, "challenge scenario is missing");
+  assert.deepEqual(
+    {
+      rangeM: highEnergyCrossingChallenge.scenario.range,
+      crossingAngleDeg: highEnergyCrossingChallenge.scenario.aspect,
+      blueAltitudeMslM: highEnergyCrossingChallenge.scenario.altitude,
+      redAltitudeMslM: highEnergyCrossingChallenge.scenario.altitude + highEnergyCrossingChallenge.scenario.targetDelta,
+      blueTasMps: highEnergyCrossingChallenge.scenario.launcherSpeed,
+      redTasMps: highEnergyCrossingChallenge.scenario.targetSpeed,
+      blueFuelPercent: highEnergyCrossingChallenge.scenario.blueFuelPercent,
+      redFuelPercent: highEnergyCrossingChallenge.scenario.redFuelPercent,
+      blueStores: highEnergyCrossingChallenge.scenario.blueWeaponQuantity,
+      redStores: highEnergyCrossingChallenge.scenario.redWeaponQuantity,
+      guidance: highEnergyCrossingChallenge.scenario.guidance,
+      seed: highEnergyCrossingChallenge.scenario.seed,
+      studyAreaId: highEnergyCrossingChallenge.scenario.studyAreaId,
+      weatherPresetId: highEnergyCrossingChallenge.scenario.weatherPresetId,
+    },
+    {
+      rangeM: 44_000,
+      crossingAngleDeg: 105,
+      blueAltitudeMslM: 8_500,
+      redAltitudeMslM: 10_000,
+      blueTasMps: 270,
+      redTasMps: 250,
+      blueFuelPercent: 70,
+      redFuelPercent: 70,
+      blueStores: 2,
+      redStores: 2,
+      guidance: "direct",
+      seed: 42,
+      studyAreaId: "north-punjab",
+      weatherPresetId: "north-punjab-clear",
+    },
+  );
+  assert.equal(highEnergyCrossingChallenge.intendedUse.id, "vector.intended-use.geometry-teaching");
+  assert.equal(highEnergyCrossingChallenge.scenario.airMission.intendedUse, "PUBLIC_EDUCATIONAL");
+  assert.equal(highEnergyCrossingChallenge.scenario.airMission.provenance.valueState, "MODEL_ASSUMPTION");
+  assert.match(highEnergyCrossingChallenge.scope, /not a hit or kill claim/i);
+  assert.match(highEnergyCrossingChallenge.presetRationale.conditions, /Sensor, EW, damage, fuze, tactics, and probability of kill remain unavailable/i);
+});
+
+test("the challenge completes late with TypeScript/Rust terminal and causal-event parity while the harder control fails", () => {
+  assert.ok(highEnergyCrossingChallenge, "challenge scenario is missing");
+  const typescript = simulateWithCapabilitiesForVerification(
+    highEnergyCrossingChallenge.scenario,
+    highEnergyCrossingCapabilities("typescript"),
+  );
+  const repeated = simulateWithCapabilitiesForVerification(
+    highEnergyCrossingChallenge.scenario,
+    highEnergyCrossingCapabilities("typescript"),
+  );
+  const rust = simulateWithCapabilitiesForVerification(
+    highEnergyCrossingChallenge.scenario,
+    highEnergyCrossingCapabilities("rust-wasm"),
+  );
+  const control = simulateWithCapabilitiesForVerification(
+    highEnergyCrossingControl(),
+    highEnergyCrossingCapabilities("typescript"),
+  );
+
+  assert.equal(typescript.termination, "threshold_reached");
+  assert.equal(typescript.successful, true);
+  assert.ok(typescript.timeOfFlight > 120 && typescript.timeOfFlight < 140);
+  assert.ok(typescript.closestApproach > 150 && typescript.closestApproach <= 180);
+  assert.ok(typescript.endSpeed > 200);
+  assert.equal(typescript.engineRun.diagnostics.nonFiniteStateCount, 0);
+  assert.deepEqual(repeated, typescript, "the exact authored seed and package must replay deterministically");
+
+  assert.equal(rust.termination, typescript.termination);
+  assert.equal(rust.frames.length, typescript.frames.length);
+  assert.deepEqual(rust.engineRun.events, typescript.engineRun.events);
+  assertContractParity(rust.engineRun.frames.at(-1), typescript.engineRun.frames.at(-1), "terminalFrame");
+  assertContractParity(rust.closestApproach, typescript.closestApproach, "closestApproachM");
+  assertContractParity(rust.timeOfFlight, typescript.timeOfFlight, "timeOfFlightSeconds");
+  assert.equal(typescript.engineRun.events.items.at(-1)?.payload.termination, "threshold_reached");
+
+  assert.ok(typescript.pictures.length > 0);
+  assert.ok(typescript.pictures.every((picture) =>
+    picture.sensorState === "UNSUPPORTED"
+      && picture.trackState === "UNSUPPORTED"
+      && picture.visible === false
+      && !("position" in picture)
+  ));
+
+  assert.equal(control.termination, "time_limit");
+  assert.equal(control.successful, false);
+  assert.equal(control.timeOfFlight, 140);
+  assert.ok(control.closestApproach > 180);
 });
 
 test("CAP defaults are visible, editable, and causally change compiled patrol and fuel state", () => {
