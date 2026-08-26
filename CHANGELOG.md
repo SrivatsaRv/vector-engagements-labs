@@ -222,6 +222,11 @@ No pending family-specific entry.
 
 #### Vector simulation records
 
+- Reject malformed numeric types, non-finite values, range/integer violations
+  and excess authored precision before saved-run recomputation, VSR creation or
+  persistence. This reuses browser/Worker admission codes and field paths and
+  does not change the VSR schema or replay authority.
+
 - Archive the complete regional pack/runtime projection and reject replay
   substitution by a later or superseding pack identity.
 - Add `vector.frames.columnar.v6` operational/movement value-state metadata for
@@ -240,6 +245,12 @@ writer/reader, Worker, or replay behavior.
 
 #### Capability descriptors
 
+- Give live authoring controls stable semantic IDs and block Run while an
+  editable numeric control contains raw text that has not passed syntax, range,
+  integer and precision admission. Repeat structured type/range/precision,
+  whole-mission relational, server and final-engine admission; ordinary
+  authored scalars have a three-fractional-digit ceiling. This does not broaden
+  deployment capability.
 - Aircraft and weapon capability choices now consume the shared root-owned
   Select while preserving stale authored identities as unavailable. This is a
   presentation-only migration; deployment admission and catalog authority are
@@ -250,6 +261,14 @@ writer/reader, Worker, or replay behavior.
 
 #### Mission scenarios
 
+- Add `vector.scenario-control-authority.v1` as the content-addressed migration
+  inventory for all 40 legacy Scenario fields. Strict raw admission covers the
+  current editable Air-mission numeric controls, and shared structured
+  admission returns the same stable code/path from frontend, saved-run server
+  and final engine preparation. The Air-mission compiler enforces the same
+  scalar precision ceiling in the production Worker without creating a
+  parallel canonical scenario schema; digest/runtime-contrast completion
+  remains open under #193.
 - Add the immutable `a2a-high-energy-crossing-challenge@1.0.0` package with
   explicit 44 km/105-degree geometry, airborne state, fuel, loadout, route,
   environment and generic-model nonclaims. TypeScript, Rust/WASM and the built

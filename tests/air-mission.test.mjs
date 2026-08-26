@@ -1267,13 +1267,13 @@ test("runway identity, evidence, state, dimensions, surface, heading, and wind f
     [(scenario) => { editRunway(scenario, { headingDeg: 180 }); }, "MISSION_RUNWAY_INVALID", "start.runway.headingDeg"],
     [(scenario) => {
       const heading = scenario.airMission.start.runway.headingDeg * Math.PI / 180;
-      scenario.wind = 50 * Math.sin(heading);
-      scenario.windNorth = 50 * Math.cos(heading);
+      scenario.wind = Math.round(50 * Math.sin(heading) * 1_000) / 1_000;
+      scenario.windNorth = Math.round(50 * Math.cos(heading) * 1_000) / 1_000;
     }, "MISSION_RUNWAY_INVALID", "start.runway.headingDeg"],
     [(scenario) => {
       const heading = scenario.airMission.start.runway.headingDeg * Math.PI / 180;
-      scenario.wind = 50 * Math.cos(heading);
-      scenario.windNorth = -50 * Math.sin(heading);
+      scenario.wind = Math.round(50 * Math.cos(heading) * 1_000) / 1_000;
+      scenario.windNorth = Math.round(-50 * Math.sin(heading) * 1_000) / 1_000;
     }, "MISSION_RUNWAY_INVALID", "start.runway.headingDeg"],
   ];
   for (const [mutate, code, fieldPath] of cases) {
@@ -1371,6 +1371,26 @@ test("Worker and server admission return the same stable Air mission error", asy
   await assert.rejects(
     () => admitRuntimeModelPack(workerPack),
     (error) => error instanceof AirMissionAdmissionError && error.code === "MISSION_FUEL_INVALID" && error.fieldPath === "assignments[0].initialFuelPercent",
+  );
+});
+
+test("frontend-derived mission input and server/Worker admission share the three-decimal scalar ceiling", async () => {
+  const invalid = fixture();
+  invalid.airMission.fuel.reservePercent = 12.3456;
+  assert.throws(
+    () => validateSavedScenario(invalid, DEFAULT_SCENARIO_DEFINITION),
+    (error) => error.code === "MISSION_NUMERIC_PRECISION_INVALID"
+      && error.fieldPath === "fuel.reservePercent",
+  );
+
+  const prepared = prepareSimulation(fixture());
+  prepared.scenario.airMission.fuel.reservePercent = 12.3456;
+  const workerPack = await adaptPreparedSimulation(prepared);
+  await assert.rejects(
+    () => admitRuntimeModelPack(workerPack),
+    (error) => error instanceof AirMissionAdmissionError
+      && error.code === "MISSION_NUMERIC_PRECISION_INVALID"
+      && error.fieldPath === "fuel.reservePercent",
   );
 });
 

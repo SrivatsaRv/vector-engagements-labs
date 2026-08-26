@@ -8,6 +8,11 @@ is not admitted by the production deployment and makes no named-sensor claim.
 
 ## Canonical boundary
 
+Numeric syntax, structured type/finiteness/range/precision and whole-scenario
+relational admission all precede canonical runtime state. RASP receives only a
+compiled admitted scenario; it cannot round, coerce, default or otherwise
+repair an invalid authoring value into a picture, track, event or explanation.
+
 The #190 crossing run does not promote model truth into an observation: both
 side pictures remain `sensorState=UNSUPPORTED`, `trackState=UNSUPPORTED`,
 invisible and position-free at every recorded tick, including the 180 m
@@ -126,6 +131,11 @@ hides entities while this state is selected.
 
 ## Record and replay
 
+A draft that fails control, structured or relational admission produces no run
+and therefore no VSR. Replay is not a second authoring boundary: it verifies
+the archived admitted identities and bytes and never reinterprets malformed
+text, rounds a value, or supplies a missing default.
+
 For #190 the Worker writes the same canonical frames, events, unsupported
 pictures and `threshold_reached` report into one content-addressed VSR. The
 built verifier reads `report.json` and `frames.arrow` from that record; replay
@@ -154,6 +164,12 @@ boundary frame. Replay never reruns release physics or reconstructs a missing
 store, and a rejected outcome leaves the store stowed.
 
 ## Air mission record storage
+
+Saved-run creation repeats the shared structured numeric and Air-mission
+compiler checks before recomputation or persistence. An invalid type,
+non-finite value, out-of-range value or excess precision returns the same stable
+code and field path used by browser/Worker admission and creates no database
+row or record member.
 
 Migration 016 stores the exact canonical #190 v4 package, content hash, current
 model-pack digest and North Punjab study-area identity as a ninth immutable
@@ -214,6 +230,13 @@ This slice does not make tactical decisions, launch-authority, weapon-support,
 or Su-30MKI/F-16 radar claims. Parent issue #26 remains open.
 
 ## Regression evidence
+
+Issue #193 adds exhaustive authority inventory and malformed-number tests,
+boundary/adjacent/precision cases, a component proof that rejected raw text is
+retained but never committed, and browser/server/final-engine agreement on the
+same error code and field path. Existing Air-mission tests remain the
+cross-field admission matrix for route identity, timing, fuel/reserve,
+loadout, runway/weather and class-specific task relationships.
 
 #182 adds direct TypeScript/Rust hostile admission, one-transition-per-tick,
 force/energy/fuel/climb/convergence oracles, Worker completion, VSR tamper and

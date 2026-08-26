@@ -24,6 +24,9 @@ rendering sharpness; viewport width and height govern task geometry.
 Mission, CAP-area, runway and flight-plan editors collapse to one column below
 720 px, retain native labels and keyboard order, and never hide an admission
 error or move Run ahead of validation.
+Malformed numeric text remains in its control at every viewport, with its
+inline error and Run-blocked state visible; responsive reflow cannot coerce,
+discard or replace the authored text.
 Environment identity and base-availability text wrap without horizontal
 overflow; unsupported installation markers remain visible but disabled.
 
@@ -68,6 +71,9 @@ name includes both the field label and current value. Arrow, Home, End,
 Enter/Space, Escape, Tab, and bounded typeahead behavior are covered by the
 component contract. A stale authored identity is displayed as unavailable and
 associated with an error; the first current option is never substituted.
+The trigger also forwards the authoring contract's stable semantic control ID.
+That identifier supports control-matrix and browser selection only; it does not
+change overlay ownership, focus, placement or the selected catalog identity.
 
 The shared Menu follows the menu-button pattern: opening moves focus to the
 first enabled menu item, Arrow/Home/End moves real item focus, and action or
@@ -108,6 +114,9 @@ substitute a default value.
 
 ## Observe viewport shell
 
+Observe is unavailable while any raw authoring control is invalid. A failed
+attempt returns the operator to Construct and does not present the previous run
+as the result of the invalid draft.
 Saved report provenance now includes the compiled Air mission identity and both
 digests without changing synchronized map/3D playback, telemetry, or timeline
 ownership.
@@ -156,6 +165,10 @@ Disclosure's state.
 
 ## Automated proof
 
+Focused component proof injects malformed numeric text atomically, verifies it
+remains visible and uncommitted, then admits a valid replacement. The complete
+browser journey remains responsible for proving that only an admitted draft can
+enter the production Worker and Observe workspace.
 The governed five-viewport journey edits CAP defaults, clears and restores an
 installation identity, authors a runway start, exercises keyboard route inputs,
 observes admission, and completes the production Worker. Focused record tests

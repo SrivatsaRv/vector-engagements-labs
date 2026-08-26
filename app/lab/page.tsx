@@ -114,6 +114,11 @@ import {
   updateScenarioAirMissionRoutePoint,
 } from "@/lib/air-mission";
 import { CURRENT_COMPILED_MODEL_PACK } from "@/lib/engine/weapon-admission";
+import { NumericAuthoringInput } from "@/components/NumericAuthoringInput";
+import {
+  MAX_WGS84_FRACTION_DIGITS,
+  type NumericAuthority,
+} from "@/lib/scenario-control-authority";
 
 type Workspace = "configure" | "run" | "results";
 type PlaybackSurface = "MAP" | "THREE_D";
@@ -280,6 +285,9 @@ function LabWorkbench({
   const [catalogCredibility, setCatalogCredibility] =
     useState<CatalogCredibilityAdmission | null>(null);
   const [spatialInputsValid, setSpatialInputsValid] = useState(true);
+  const [invalidAuthoringControls, setInvalidAuthoringControls] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [playbackSurface, setPlaybackSurface] =
     useState<PlaybackSurface>("MAP");
   const [telemetryExpanded, setTelemetryExpanded] = useState(false);
@@ -296,20 +304,32 @@ function LabWorkbench({
     sessionStorage.setItem("vector.telemetry.expanded.v1", String(expanded));
     setTelemetryExpanded(expanded);
   }, []);
+  const authoringInputsValid = invalidAuthoringControls.size === 0;
+  const setAuthoringControlValidity = useCallback((controlId: string, valid: boolean) => {
+    setInvalidAuthoringControls((current) => {
+      const next = new Set(current);
+      if (valid) next.delete(controlId);
+      else next.add(controlId);
+      if (next.size === current.size && [...next].every((id) => current.has(id))) return current;
+      return next;
+    });
+  }, []);
   const validations = useMemo(() => {
     const items = validateScenario(definition, scenario);
-    return spatialInputsValid
+    return spatialInputsValid && authoringInputsValid
       ? items
       : [
           ...items,
           {
             id: "authored-flight-input",
-            label: "A flight input is invalid",
-            detail: "Correct the marked start or route value in Place & flight.",
+            label: "An authored input is invalid",
+            detail: authoringInputsValid
+              ? "Correct the marked start or route value in Place & flight."
+              : `Correct ${invalidAuthoringControls.size} malformed numeric input${invalidAuthoringControls.size === 1 ? "" : "s"} before admission.`,
             state: "error" as const,
           },
         ];
-  }, [definition, scenario, spatialInputsValid]);
+  }, [authoringInputsValid, definition, invalidAuthoringControls.size, scenario, spatialInputsValid]);
   const blueSystem = getCatalogObject(scenario.blueSystemId);
   const runtimeBusy =
     runtimeState === "initialization" ||
@@ -483,7 +503,7 @@ function LabWorkbench({
       return;
     }
     const checks = validateScenario(definition, scenario);
-    if (!spatialInputsValid || !canConduct(checks)) {
+    if (!spatialInputsValid || !authoringInputsValid || !canConduct(checks)) {
       setWorkspace("configure");
       setBuildStep(4);
       return;
@@ -527,7 +547,7 @@ function LabWorkbench({
         detail: `${getCatalogObject(scenario.blueSystemId).designation} · ${findWeaponSimulationModel(scenario.blueSystemId)?.id ?? "model unavailable"}@${findWeaponSimulationModel(scenario.blueSystemId)?.version ?? "unknown"} · ${scenario.guidance} path · ${formatDistanceKm(scenario.range)} km`,
       },
     ]);
-  }, [catalogState, definition, draftRevision, scenario, simulationClient, spatialInputsValid]);
+  }, [authoringInputsValid, catalogState, definition, draftRevision, scenario, simulationClient, spatialInputsValid]);
 
   useEffect(() => {
     if (!playing) return;
@@ -808,6 +828,7 @@ function LabWorkbench({
           environmentPacks={catalogEnvironmentPacks}
           spatialInputsValid={spatialInputsValid}
           onSpatialValidityChange={setSpatialInputsValid}
+          onAuthoringControlValidity={setAuthoringControlValidity}
           run={run}
         />
       )}
@@ -1058,6 +1079,7 @@ function ConfigureWorkspace({
   environmentPacks,
   spatialInputsValid,
   onSpatialValidityChange,
+  onAuthoringControlValidity,
   run,
 }: {
   definition: ScenarioDefinition;
@@ -1076,6 +1098,7 @@ function ConfigureWorkspace({
   environmentPacks: CatalogEnvironmentPack[];
   spatialInputsValid: boolean;
   onSpatialValidityChange: (valid: boolean) => void;
+  onAuthoringControlValidity: (controlId: string, valid: boolean) => void;
   run: () => void;
 }) {
   const [contextExpanded, setContextExpanded] = useState(true);
@@ -1527,6 +1550,7 @@ function ConfigureWorkspace({
             <label className="field">
               <span>Run name</span>
               <input
+                data-control-id="scenario.name"
                 value={scenario.name}
                 onChange={(event) => update("name", event.target.value)}
               />
@@ -1534,6 +1558,7 @@ function ConfigureWorkspace({
             <label className="field">
               <span>What this run compares</span>
               <textarea
+                data-control-id="scenario.objective"
                 value={scenario.objective}
                 onChange={(event) => update("objective", event.target.value)}
               />
@@ -1549,6 +1574,7 @@ function ConfigureWorkspace({
                   <label className="field">
                     <span>Mission class</span>
                     <select
+                      data-control-id="airMission.missionClass"
                       aria-label="Mission class"
                       data-vector-overlay-exempt="ua-native-select"
                       value={scenario.airMission.missionClass}
@@ -1567,6 +1593,7 @@ function ConfigureWorkspace({
                   <label className="field">
                     <span>Engagement regime</span>
                     <select
+                      data-control-id="airMission.regime"
                       aria-label="Engagement regime"
                       data-vector-overlay-exempt="ua-native-select"
                       value={scenario.airMission.regime}
@@ -1585,6 +1612,7 @@ function ConfigureWorkspace({
                   <div className="cap-contract" role="group" aria-label="CAP defaults">
                     <div className="advanced-grid">
                       <Range
+                        controlId="airMission.tasks.cap.onStationMinutes"
                         label="CAP on-station time"
                         value={scenario.airMission.tasks.onStationMinutes}
                         min={5}
@@ -1595,27 +1623,56 @@ function ConfigureWorkspace({
                       />
                       <label className="field">
                         <span>On-station count</span>
-                        <input type="number" min={1} aria-label="CAP on-station count" value={scenario.airMission.tasks.onStationCount} onChange={(event) => updateCapTasks({ onStationCount: Number(event.target.value) })} />
+                        <NumericAuthoringInput
+                          controlId="airMission.tasks.cap.onStationCount"
+                          ariaLabel="CAP on-station count"
+                          value={scenario.airMission.tasks.onStationCount}
+                          authority={numericAuthority(1, 64, 0, "aircraft", true)}
+                          onChange={(value) => updateCapTasks({ onStationCount: value! })}
+                          onValidityChange={onAuthoringControlValidity}
+                        />
                       </label>
                       <label className="field">
                         <span>Flight size</span>
-                        <input type="number" min={1} aria-label="CAP flight size" value={scenario.airMission.tasks.flightSize} onChange={(event) => updateCapTasks({ flightSize: Number(event.target.value) })} />
+                        <NumericAuthoringInput
+                          controlId="airMission.tasks.cap.flightSize"
+                          ariaLabel="CAP flight size"
+                          value={scenario.airMission.tasks.flightSize}
+                          authority={numericAuthority(1, 64, 0, "aircraft", true)}
+                          onChange={(value) => updateCapTasks({ flightSize: value! })}
+                          onValidityChange={onAuthoringControlValidity}
+                        />
                       </label>
                       <label className="field">
                         <span>Patrol pattern</span>
-                        <select aria-label="CAP patrol pattern" data-vector-overlay-exempt="ua-native-select" value={scenario.airMission.tasks.patrolPattern} onChange={() => updateCapTasks({ patrolPattern: "RACETRACK" })}>
+                        <select data-control-id="airMission.tasks.cap.patrolPattern" aria-label="CAP patrol pattern" data-vector-overlay-exempt="ua-native-select" value={scenario.airMission.tasks.patrolPattern} onChange={() => updateCapTasks({ patrolPattern: "RACETRACK" })}>
                           <option value="RACETRACK">Racetrack</option>
                         </select>
                       </label>
                       <label className="field">
                         <span>Investigation limit (m)</span>
-                        <input type="number" min={1} aria-label="CAP investigation limit" value={scenario.airMission.tasks.investigationLimitM} onChange={(event) => updateCapTasks({ investigationLimitM: Number(event.target.value) })} />
+                        <NumericAuthoringInput
+                          controlId="airMission.tasks.cap.investigationLimitM"
+                          ariaLabel="CAP investigation limit"
+                          value={scenario.airMission.tasks.investigationLimitM}
+                          authority={numericAuthority(1, 2_000_000, 0, "m")}
+                          onChange={(value) => updateCapTasks({ investigationLimitM: value! })}
+                          onValidityChange={onAuthoringControlValidity}
+                        />
                       </label>
                       <label className="field">
                         <span>Prosecution limit (m)</span>
-                        <input type="number" min={1} aria-label="CAP prosecution limit" value={scenario.airMission.tasks.prosecutionLimitM} onChange={(event) => updateCapTasks({ prosecutionLimitM: Number(event.target.value) })} />
+                        <NumericAuthoringInput
+                          controlId="airMission.tasks.cap.prosecutionLimitM"
+                          ariaLabel="CAP prosecution limit"
+                          value={scenario.airMission.tasks.prosecutionLimitM}
+                          authority={numericAuthority(1, 2_000_000, 0, "m")}
+                          onChange={(value) => updateCapTasks({ prosecutionLimitM: value! })}
+                          onValidityChange={onAuthoringControlValidity}
+                        />
                       </label>
                       <Range
+                        controlId="airMission.fuel.reservePercent"
                         label="Fuel reserve"
                         value={scenario.airMission.fuel.reservePercent}
                         min={5}
@@ -1629,11 +1686,19 @@ function ConfigureWorkspace({
                       />
                       <label className="field">
                         <span>Weapon RTB threshold</span>
-                        <input type="number" min={0} aria-label="CAP weapon RTB threshold" value={scenario.airMission.fuel.weaponRtbThreshold} onChange={(event) => update("airMission", { ...scenario.airMission!, fuel: { ...scenario.airMission!.fuel, weaponRtbThreshold: Number(event.target.value) } })} />
+                        <NumericAuthoringInput
+                          controlId="airMission.fuel.weaponRtbThreshold"
+                          ariaLabel="CAP weapon RTB threshold"
+                          value={scenario.airMission.fuel.weaponRtbThreshold}
+                          authority={numericAuthority(0, 64, 0, "stores", true)}
+                          onChange={(value) => update("airMission", { ...scenario.airMission!, fuel: { ...scenario.airMission!.fuel, weaponRtbThreshold: value! } })}
+                          onValidityChange={onAuthoringControlValidity}
+                        />
                       </label>
                       <label className="field">
                         <span>Emission policy</span>
                         <select
+                          data-control-id="airMission.policies.emission"
                           aria-label="Emission policy"
                           data-vector-overlay-exempt="ua-native-select"
                           value={scenario.airMission.policies.emission}
@@ -1648,7 +1713,7 @@ function ConfigureWorkspace({
                       </label>
                       <label className="field">
                         <span>Weapon policy</span>
-                        <select aria-label="Weapon policy" data-vector-overlay-exempt="ua-native-select" value={scenario.airMission.policies.weapon} onChange={(event) => update("airMission", { ...scenario.airMission!, policies: { ...scenario.airMission!.policies, weapon: event.target.value as NonNullable<Scenario["airMission"]>["policies"]["weapon"] } })}>
+                        <select data-control-id="airMission.policies.weapon" aria-label="Weapon policy" data-vector-overlay-exempt="ua-native-select" value={scenario.airMission.policies.weapon} onChange={(event) => update("airMission", { ...scenario.airMission!, policies: { ...scenario.airMission!.policies, weapon: event.target.value as NonNullable<Scenario["airMission"]>["policies"]["weapon"] } })}>
                           <option value="HOLD">Hold</option>
                           <option value="TIGHT">Tight</option>
                           <option value="FREE_WITHIN_BOUNDARY">Free within boundary</option>
@@ -1656,25 +1721,25 @@ function ConfigureWorkspace({
                       </label>
                       <label className="field">
                         <span>Recovery</span>
-                        <input aria-label="Recovery policy" value={scenario.airMission.recoveryCondition} onChange={(event) => update("airMission", { ...scenario.airMission!, recoveryCondition: event.target.value })} />
+                        <input data-control-id="airMission.recoveryCondition" aria-label="Recovery policy" value={scenario.airMission.recoveryCondition} onChange={(event) => update("airMission", { ...scenario.airMission!, recoveryCondition: event.target.value })} />
                       </label>
                       <label className="field">
                         <span>Recovery installation</span>
-                        <select aria-label="Recovery installation" data-vector-overlay-exempt="ua-native-select" value={scenario.airMission.fuel.recoveryInstallationId ?? ""} onChange={(event) => update("airMission", { ...scenario.airMission!, fuel: { ...scenario.airMission!.fuel, recoveryInstallationId: event.target.value || null } })}>
+                        <select data-control-id="airMission.fuel.recoveryInstallationId" aria-label="Recovery installation" data-vector-overlay-exempt="ua-native-select" value={scenario.airMission.fuel.recoveryInstallationId ?? ""} onChange={(event) => update("airMission", { ...scenario.airMission!, fuel: { ...scenario.airMission!.fuel, recoveryInstallationId: event.target.value || null } })}>
                           <option value="">Not assigned</option>
                           {installations.map((installation) => <option key={installation.id} value={installation.id}>{installation.name}</option>)}
                         </select>
                       </label>
                       <label className="field">
                         <span>Divert installation</span>
-                        <select aria-label="Divert installation" data-vector-overlay-exempt="ua-native-select" value={scenario.airMission.fuel.divertInstallationId ?? ""} onChange={(event) => update("airMission", { ...scenario.airMission!, fuel: { ...scenario.airMission!.fuel, divertInstallationId: event.target.value || null } })}>
+                        <select data-control-id="airMission.fuel.divertInstallationId" aria-label="Divert installation" data-vector-overlay-exempt="ua-native-select" value={scenario.airMission.fuel.divertInstallationId ?? ""} onChange={(event) => update("airMission", { ...scenario.airMission!, fuel: { ...scenario.airMission!.fuel, divertInstallationId: event.target.value || null } })}>
                           <option value="">Not assigned</option>
                           {installations.map((installation) => <option key={installation.id} value={installation.id}>{installation.name}</option>)}
                         </select>
                       </label>
                       <label className="field">
                         <span>Completion</span>
-                        <input aria-label="CAP completion condition" value={scenario.airMission.tasks.completionCondition} onChange={(event) => updateCapTasks({ completionCondition: event.target.value })} />
+                        <input data-control-id="airMission.tasks.cap.completionCondition" aria-label="CAP completion condition" value={scenario.airMission.tasks.completionCondition} onChange={(event) => updateCapTasks({ completionCondition: event.target.value })} />
                       </label>
                     </div>
                     {(["patrolArea", "prosecutionArea"] as const).map((areaKey) => {
@@ -1687,11 +1752,25 @@ function ConfigureWorkspace({
                               <div key={`${area.id}-${index}`}>
                                 <label className="field">
                                   <span>Vertex {index + 1} longitude</span>
-                                  <input type="number" step="0.000001" aria-label={`${areaKey} vertex ${index + 1} longitude`} value={vertex.longitude} onChange={(event) => updateCapAreaVertex(areaKey, index, "longitude", Number(event.target.value))} />
+                                  <NumericAuthoringInput
+                                    controlId={`airMission.tasks.cap.${areaKey}.vertices[${index}].longitude`}
+                                    ariaLabel={`${areaKey} vertex ${index + 1} longitude`}
+                                    value={vertex.longitude}
+                                    authority={numericAuthority(-180, 180, MAX_WGS84_FRACTION_DIGITS, "deg_WGS84")}
+                                    onChange={(value) => updateCapAreaVertex(areaKey, index, "longitude", value!)}
+                                    onValidityChange={onAuthoringControlValidity}
+                                  />
                                 </label>
                                 <label className="field">
                                   <span>Vertex {index + 1} latitude</span>
-                                  <input type="number" step="0.000001" aria-label={`${areaKey} vertex ${index + 1} latitude`} value={vertex.latitude} onChange={(event) => updateCapAreaVertex(areaKey, index, "latitude", Number(event.target.value))} />
+                                  <NumericAuthoringInput
+                                    controlId={`airMission.tasks.cap.${areaKey}.vertices[${index}].latitude`}
+                                    ariaLabel={`${areaKey} vertex ${index + 1} latitude`}
+                                    value={vertex.latitude}
+                                    authority={numericAuthority(-90, 90, MAX_WGS84_FRACTION_DIGITS, "deg_WGS84")}
+                                    onChange={(value) => updateCapAreaVertex(areaKey, index, "latitude", value!)}
+                                    onValidityChange={onAuthoringControlValidity}
+                                  />
                                 </label>
                               </div>
                             ))}
@@ -1735,6 +1814,7 @@ function ConfigureWorkspace({
                 </header>
                 {scenario.domain !== "G2A" && (
                   <ObjectPicker
+                    controlId="scenario.bluePlatformId"
                     label="Aircraft variant"
                     value={scenario.bluePlatformId}
                     options={launchPlatforms}
@@ -1743,6 +1823,7 @@ function ConfigureWorkspace({
                   />
                 )}
                 <ObjectPicker
+                  controlId="scenario.blueSystemId"
                   label={
                     scenario.domain === "G2A"
                       ? "Air-defence system"
@@ -1754,6 +1835,7 @@ function ConfigureWorkspace({
                   onChange={selectSystem}
                 />
                 <Quantity
+                  controlId="scenario.blueWeaponQuantity"
                   label="Weapon quantity"
                   value={scenario.blueWeaponQuantity}
                   team="blue"
@@ -1775,6 +1857,7 @@ function ConfigureWorkspace({
                   <em>{redPlatformRecord?.status ?? redObject.dataState}</em>
                 </header>
                 <ObjectPicker
+                  controlId="scenario.redObjectId"
                   label={fixed ? "Fixed objective" : "Aircraft variant"}
                   value={scenario.redObjectId}
                   options={opposingObjects}
@@ -1784,6 +1867,7 @@ function ConfigureWorkspace({
                 {scenario.domain === "A2A" && redSystems.length > 0 && (
                   <>
                     <ObjectPicker
+                      controlId="scenario.redSystemId"
                       label="Selected weapon"
                       value={scenario.redSystemId}
                       options={redSystems}
@@ -1791,6 +1875,7 @@ function ConfigureWorkspace({
                       onChange={(value) => update("redSystemId", value)}
                     />
                     <Quantity
+                      controlId="scenario.redWeaponQuantity"
                       label="Weapon quantity"
                       value={scenario.redWeaponQuantity}
                       team="red"
@@ -1819,6 +1904,7 @@ function ConfigureWorkspace({
             {scenario.domain === "A2A" || scenario.domain === "A2G" ? (
               <div className="advanced-grid">
                 <Range
+                  controlId="scenario.launcherSpeed"
                   label={`${bluePlatform.designation} launch speed`}
                   value={scenario.launcherSpeed}
                   min={0}
@@ -1829,6 +1915,7 @@ function ConfigureWorkspace({
                 />
                 {!fixed && (
                   <Range
+                    controlId="scenario.targetSpeed"
                     label={`${redObject.designation} speed`}
                     value={scenario.targetSpeed}
                     min={80}
@@ -1839,6 +1926,7 @@ function ConfigureWorkspace({
                   />
                 )}
                 <Range
+                  controlId="scenario.blueFuelPercent"
                   label="Blue fuel state"
                   value={scenario.blueFuelPercent}
                   min={20}
@@ -1849,6 +1937,7 @@ function ConfigureWorkspace({
                 />
                 {!fixed && (
                   <Range
+                    controlId="scenario.redFuelPercent"
                     label="Red fuel state"
                     value={scenario.redFuelPercent}
                     min={20}
@@ -1977,6 +2066,7 @@ function ConfigureWorkspace({
                 <label className="field">
                   <span>Start posture</span>
                   <select
+                    data-control-id="airMission.start.posture"
                     aria-label="Start posture"
                     data-vector-overlay-exempt="ua-native-select"
                     value={scenario.airMission.start.posture}
@@ -2011,14 +2101,16 @@ function ConfigureWorkspace({
                       </div>
                       <label className="field">
                         <span>Readiness delay (s)</span>
-                        <input
-                          type="number"
-                          aria-label="Readiness delay"
+                        <NumericAuthoringInput
+                          controlId="airMission.start.readinessDelaySeconds"
+                          ariaLabel="Readiness delay"
                           value={scenario.airMission.start.readinessDelaySeconds}
-                          onChange={(event) => update("airMission", {
+                          authority={numericAuthority(0, 86_400, 0, "s")}
+                          onChange={(value) => update("airMission", {
                             ...scenario.airMission!,
-                            start: { ...scenario.airMission!.start, readinessDelaySeconds: Number(event.target.value) } as NonNullable<Scenario["airMission"]>["start"],
+                            start: { ...scenario.airMission!.start, readinessDelaySeconds: value! } as NonNullable<Scenario["airMission"]>["start"],
                           })}
+                          onValidityChange={onAuthoringControlValidity}
                         />
                       </label>
                     </div>
@@ -2044,6 +2136,7 @@ function ConfigureWorkspace({
                           <label className="field">
                             <span>Operation</span>
                             <select
+                              data-control-id="airMission.assignments[0].storeTransfer.requests[0].operation"
                               aria-label="Store transfer operation"
                               data-vector-overlay-exempt="ua-native-select"
                               value={request.operation}
@@ -2055,25 +2148,29 @@ function ConfigureWorkspace({
                           </label>
                           <label className="field">
                             <span>Requested model time (s)</span>
-                            <input
-                              type="number"
-                              min={0}
-                              step={0.05}
-                              aria-label="Store transfer requested time"
+                            <NumericAuthoringInput
+                              controlId="airMission.assignments[0].storeTransfer.requests[0].requestedTimeSeconds"
+                              ariaLabel="Store transfer requested time"
                               value={request.requestedTimeSeconds}
-                              onChange={(event) => updateStoreTransfer({ requestedTimeSeconds: Number(event.target.value) })}
+                              authority={numericAuthority(0, 300, 3, "s")}
+                              onChange={(value) => updateStoreTransfer({ requestedTimeSeconds: value! })}
+                              onValidityChange={onAuthoringControlValidity}
                             />
                           </label>
                           <label className="field">
                             <span>Installed drag area (m²)</span>
-                            <input
-                              type="number"
-                              min={AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.minimum}
-                              max={AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.maximum}
-                              step={0.001}
-                              aria-label="Store installed drag area"
+                            <NumericAuthoringInput
+                              controlId="airMission.assignments[0].storeTransfer.requests[0].installedDragAreaM2"
+                              ariaLabel="Store installed drag area"
                               value={request.installedDragAreaM2}
-                              onChange={(event) => updateStoreTransfer({ installedDragAreaM2: Number(event.target.value) })}
+                              authority={numericAuthority(
+                                AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.minimum,
+                                AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.maximum,
+                                3,
+                                "m2",
+                              )}
+                              onChange={(value) => updateStoreTransfer({ installedDragAreaM2: value! })}
+                              onValidityChange={onAuthoringControlValidity}
                             />
                           </label>
                         </div>
@@ -2104,6 +2201,7 @@ function ConfigureWorkspace({
                         <label className="field">
                           <span>Task reference</span>
                           <select
+                            data-control-id={`airMission.flightPlans[0].routePoints[${index}].taskRef`}
                             aria-label={`${point.id} task reference`}
                             data-vector-overlay-exempt="ua-native-select"
                             value={point.taskRef ?? ""}
@@ -2117,37 +2215,41 @@ function ConfigureWorkspace({
                         </label>
                         <label className="field">
                           <span>Longitude (WGS84 deg)</span>
-                          <input
-                            type="number"
-                            step="0.000001"
-                            aria-label={`${point.id} longitude`}
+                          <NumericAuthoringInput
+                            controlId={`airMission.flightPlans[0].routePoints[${index}].longitude`}
+                            ariaLabel={`${point.id} longitude`}
                             value={point.position.longitude}
-                            onChange={(event) => updateMissionRoutePoint(index, { position: { ...point.position, longitude: Number(event.target.value) } })}
+                            authority={numericAuthority(-180, 180, MAX_WGS84_FRACTION_DIGITS, "deg_WGS84")}
+                            onChange={(value) => updateMissionRoutePoint(index, { position: { ...point.position, longitude: value! } })}
+                            onValidityChange={onAuthoringControlValidity}
                           />
                         </label>
                         <label className="field">
                           <span>Latitude (WGS84 deg)</span>
-                          <input
-                            type="number"
-                            step="0.000001"
-                            aria-label={`${point.id} latitude`}
+                          <NumericAuthoringInput
+                            controlId={`airMission.flightPlans[0].routePoints[${index}].latitude`}
+                            ariaLabel={`${point.id} latitude`}
                             value={point.position.latitude}
-                            onChange={(event) => updateMissionRoutePoint(index, { position: { ...point.position, latitude: Number(event.target.value) } })}
+                            authority={numericAuthority(-90, 90, MAX_WGS84_FRACTION_DIGITS, "deg_WGS84")}
+                            onChange={(value) => updateMissionRoutePoint(index, { position: { ...point.position, latitude: value! } })}
+                            onValidityChange={onAuthoringControlValidity}
                           />
                         </label>
                         <label className="field">
                           <span>Altitude (m MSL)</span>
-                          <input
-                            type="number"
-                            step="1"
-                            aria-label={`${point.id} altitude metres MSL`}
+                          <NumericAuthoringInput
+                            controlId={`airMission.flightPlans[0].routePoints[${index}].altitudeMslM`}
+                            ariaLabel={`${point.id} altitude metres MSL`}
                             value={point.position.altitude.valueM}
-                            onChange={(event) => updateMissionRoutePoint(index, { position: { ...point.position, altitude: { ...point.position.altitude, valueM: Number(event.target.value) } } })}
+                            authority={numericAuthority(0, 30_000, 1, "m_MSL")}
+                            onChange={(value) => updateMissionRoutePoint(index, { position: { ...point.position, altitude: { ...point.position.altitude, valueM: value! } } })}
+                            onValidityChange={onAuthoringControlValidity}
                           />
                         </label>
                         <label className="field">
                           <span>Turn method</span>
                           <select
+                            data-control-id={`airMission.flightPlans[0].routePoints[${index}].turnMethod`}
                             aria-label={`${point.id} turn method`}
                             data-vector-overlay-exempt="ua-native-select"
                             value={point.turnMethod}
@@ -2159,47 +2261,52 @@ function ConfigureWorkspace({
                         </label>
                         <label className="field">
                           <span>Acceptance radius (m)</span>
-                          <input
-                            type="number"
-                            min="1"
-                            max="25000"
-                            aria-label={`${point.id} acceptance radius metres`}
+                          <NumericAuthoringInput
+                            controlId={`airMission.flightPlans[0].routePoints[${index}].acceptanceRadiusM`}
+                            ariaLabel={`${point.id} acceptance radius metres`}
                             value={point.acceptanceRadiusM}
                             disabled={index === 0 || point.turnMethod === "FLY_OVER"}
-                            onChange={(event) => updateMissionRoutePoint(index, { acceptanceRadiusM: Number(event.target.value) })}
+                            authority={numericAuthority(1, 25_000, 1, "m")}
+                            onChange={(value) => updateMissionRoutePoint(index, { acceptanceRadiusM: value! })}
+                            onValidityChange={onAuthoringControlValidity}
                           />
                         </label>
                         <label className="field">
                           <span>ETA (model s, optional)</span>
-                          <input
-                            type="number"
-                            aria-label={`${point.id} ETA`}
-                            value={point.constraint.etaSeconds ?? ""}
-                            onChange={(event) => updateMissionRoutePoint(index, {
+                          <NumericAuthoringInput
+                            controlId={`airMission.flightPlans[0].routePoints[${index}].etaSeconds`}
+                            ariaLabel={`${point.id} ETA`}
+                            value={point.constraint.etaSeconds}
+                            authority={numericAuthority(0, 86_400, 3, "s", false, true)}
+                            onChange={(value) => updateMissionRoutePoint(index, {
                               constraint: {
                                 ...point.constraint,
-                                etaSeconds: event.target.value === "" ? undefined : Number(event.target.value),
+                                etaSeconds: value ?? undefined,
                               },
                             })}
+                            onValidityChange={onAuthoringControlValidity}
                           />
                         </label>
                         <label className="field">
                           <span>TOT (model s, optional)</span>
-                          <input
-                            type="number"
-                            aria-label={`${point.id} total time on target`}
-                            value={point.constraint.totalTimeOnTargetSeconds ?? ""}
-                            onChange={(event) => updateMissionRoutePoint(index, {
+                          <NumericAuthoringInput
+                            controlId={`airMission.flightPlans[0].routePoints[${index}].totalTimeOnTargetSeconds`}
+                            ariaLabel={`${point.id} total time on target`}
+                            value={point.constraint.totalTimeOnTargetSeconds}
+                            authority={numericAuthority(0, 86_400, 3, "s", false, true)}
+                            onChange={(value) => updateMissionRoutePoint(index, {
                               constraint: {
                                 ...point.constraint,
-                                totalTimeOnTargetSeconds: event.target.value === "" ? undefined : Number(event.target.value),
+                                totalTimeOnTargetSeconds: value ?? undefined,
                               },
                             })}
+                            onValidityChange={onAuthoringControlValidity}
                           />
                         </label>
                         <label className="field checkbox-field">
                           <span>Constraint lock</span>
                           <input
+                            data-control-id={`airMission.flightPlans[0].routePoints[${index}].constraintLocked`}
                             type="checkbox"
                             aria-label={`${point.id} constraint lock`}
                             checked={point.constraint.locked}
@@ -2215,6 +2322,7 @@ function ConfigureWorkspace({
                     <label className="field" key={leg.id}>
                       <span>{leg.id} · {leg.fromPointId} → {leg.toPointId}</span>
                       <select
+                        data-control-id={`airMission.flightPlans[0].legs[${index}].role`}
                         aria-label={`${leg.id} role`}
                         data-vector-overlay-exempt="ua-native-select"
                         value={leg.role}
@@ -2236,6 +2344,7 @@ function ConfigureWorkspace({
             )}
             <div className="compact-controls">
               <Range
+                controlId="scenario.range"
                 label="Starting distance"
                 value={scenario.range / 1000}
                 min={5}
@@ -2257,6 +2366,7 @@ function ConfigureWorkspace({
                 }}
               />
               <Range
+                controlId="scenario.altitude"
                 label={fixed ? "Launch elevation" : "Launch altitude"}
                 value={scenario.altitude}
                 min={0}
@@ -2271,6 +2381,7 @@ function ConfigureWorkspace({
               />
               {scenario.domain === "G2G" && (
                 <Range
+                  controlId="scenario.cruiseAltitude"
                   label="Commanded cruise altitude"
                   value={scenario.cruiseAltitude}
                   min={30}
@@ -2281,6 +2392,7 @@ function ConfigureWorkspace({
                 />
               )}
               <Range
+                controlId="scenario.targetDelta"
                 label={
                   fixed
                     ? "Objective elevation difference"
@@ -2335,6 +2447,7 @@ function ConfigureWorkspace({
                 <div className="advanced-grid">
                   {!fixed && (
                     <Range
+                      controlId="scenario.aspect"
                       label="Starting crossing angle"
                       value={scenario.aspect}
                       min={0}
@@ -2357,6 +2470,7 @@ function ConfigureWorkspace({
                     />
                   )}
                   <Range
+                    controlId="scenario.temperatureOffset"
                     label="Temperature difference from standard day"
                     value={scenario.temperatureOffset}
                     min={-20}
@@ -2401,6 +2515,7 @@ function ConfigureWorkspace({
           <section className="authoring-section">
             <CapabilityNotice />
             <Range
+              controlId="scenario.wind"
               label="Eastward wind velocity"
               value={scenario.wind}
               min={-40}
@@ -2793,11 +2908,13 @@ function WeaponDetails({ weaponId }: { weaponId: string }) {
 }
 
 function Quantity({
+  controlId,
   label,
   value,
   team,
   onChange,
 }: {
+  controlId: string;
   label: string;
   value: number;
   team: "blue" | "red";
@@ -2808,6 +2925,7 @@ function Quantity({
       <span>{label}</span>
       <div>
         <button
+          data-control-id={`${controlId}.decrement`}
           type="button"
           disabled={value <= 0}
           aria-label={`Decrease ${label}`}
@@ -2817,6 +2935,7 @@ function Quantity({
         </button>
         <output>{value}</output>
         <button
+          data-control-id={`${controlId}.increment`}
           type="button"
           disabled={value >= 6}
           aria-label={`Increase ${label}`}
@@ -2830,6 +2949,7 @@ function Quantity({
 }
 
 function Range({
+  controlId,
   label,
   value,
   min,
@@ -2838,6 +2958,7 @@ function Range({
   unit,
   onChange,
 }: {
+  controlId: string;
   label: string;
   value: number;
   min: number;
@@ -2854,6 +2975,7 @@ function Range({
         <small>{unit}</small>
       </output>
       <input
+        data-control-id={controlId}
         type="range"
         aria-label={label}
         value={value}
@@ -2865,6 +2987,24 @@ function Range({
     </label>
   );
 }
+
+const numericAuthority = (
+  minimum: number,
+  maximum: number,
+  precision: number,
+  unit: string,
+  integer = false,
+  nullable = false,
+): NumericAuthority => ({
+  kind: "NUMBER",
+  minimum,
+  maximum,
+  integer,
+  nullable,
+  precision,
+  unit,
+});
+
 function Playback({
   result,
   time,

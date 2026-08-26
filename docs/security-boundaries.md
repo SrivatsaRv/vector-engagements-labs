@@ -5,6 +5,14 @@ callers are treated as attacker controlled before database or upstream work.
 
 ## Saved runs
 
+Before simulation or storage, the server repeats the shared structured-number
+admission and the full Air-mission/scenario compiler. It rejects wrong JSON
+types, non-finite numbers, range and integer violations, and excess fractional
+precision with a stable code and field path. Ordinary authored scalars permit
+at most three fractional digits; explicitly governed coordinate fields preserve
+their higher exact-geometry precision. Rejection occurs before recomputation,
+VSR creation and database mutation.
+
 Air-domain saved-run admission requires the authored v1 mission unchanged,
 recompiles it against exact environment/model identities, and returns stable
 mission code/field-path errors. It never fills missing class, start, route,

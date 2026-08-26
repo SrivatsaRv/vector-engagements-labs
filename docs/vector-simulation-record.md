@@ -14,6 +14,11 @@ Primary references:
 
 ## Archive contents
 
+No archive is created from a draft that fails lexical, structured numeric or
+whole-scenario admission. This gate changes no VSR member or schema: it ensures
+that `scenario.json` and `compiled.json` can contain only the admitted authored
+values and their exact compiled consequence.
+
 An admitted takeoff archive includes canonical operational frames and transition
 events beside the unchanged compiled Air-mission/model/environment identities.
 It records movement value state, controller values, fuel, total mass and
@@ -110,6 +115,10 @@ it is not displayed as if it were a separate model sample.
 
 ## Frame contract
 
+Frames contain only state produced from a compiled admitted scenario. Raw
+authoring strings and rejected numeric values never enter a frame, and the
+record writer does not round or normalize them as a fallback.
+
 At an accepted airborne-transfer boundary, the launcher frame contains the
 exact post-transfer mass/fuel/installed-drag state and the spawned store first
 appears with the launcher's retained position/velocity. A rejected outcome
@@ -164,6 +173,11 @@ environment dataset.
 Weapons remain loadout inventory before launch. Aircraft frames preserve the installed inventory identities and total store mass while the weapon is stowed. A launch event removes that store and its declared launch mass from the aircraft once, then creates the weapon's first world sample with the launch platform position and inherited velocity. Static objects may omit unchanged samples. The viewer interpolates only properties explicitly declared interpolable.
 
 ## Integrity and replay
+
+Scenario and compiled digests bind the exact admitted numeric representation.
+An input rejected for type, finiteness, range, integer or precision has no run
+identity, record digest or replay path; record verification cannot manufacture
+one by coercion, rounding or default substitution.
 
 Record admission cross-checks each transfer outcome against its authoritative
 compiled identity, event tick/frame, launcher/store membership and exact
@@ -287,6 +301,11 @@ authoritative v2 stream.
 
 ## Browser and interoperability boundary
 
+The browser owns raw lexical feedback, while the Worker and saved-run boundary
+repeat the shared structured and relational admission semantics. A transport
+adapter may serialize an admitted value but may not broaden its type, precision
+or cross-field validity.
+
 The Worker transfers the recorded runway lifecycle and controller/value-state
 fields through the existing VSR boundary. Browser map, 3D, telemetry, timeline
 and report consumers select the same frame and may not synthesize missing phase,
@@ -315,6 +334,10 @@ same aggregate persistence/API contract.
 VSR is designed for browser production and playback. Frames use a transferable columnar buffer so a Web Worker, TypeScript engine or Rust/WASM engine can produce the same record contract. An ACMI 2.2 exporter can be added as an interoperability adapter; ACMI is not used as VECTOR's internal source of model truth because it does not carry VECTOR's full coefficient, provenance and scenario contracts.
 
 ## Implemented replay boundary
+
+Replay remains read-only with respect to authored input. It exposes the exact
+validated scenario and compiled values stored in the VSR and has no repair,
+rounding or default path for rejected authoring data.
 
 The implemented ground-operation replay covers the admitted generic roll,
 rotation and climbout sequence through `ENROUTE`, with exact events and

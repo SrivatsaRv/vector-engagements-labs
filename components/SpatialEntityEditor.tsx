@@ -13,6 +13,10 @@ import {
 } from "@/lib/scenario-spatial";
 import type { RouteWaypointTransition } from "@/lib/scenario-spatial";
 import type { StudyArea } from "@/lib/study-areas";
+import {
+  admitRawNumber,
+  type NumericAuthority,
+} from "@/lib/scenario-control-authority";
 
 type Props = {
   team: "blue" | "red";
@@ -36,10 +40,29 @@ type WaypointDraft = PointDraft & {
 
 const formatCoordinate = (value: number) => String(Number(value.toFixed(6)));
 const formatScalar = (value: number) => String(Number(value.toFixed(3)));
-const parseFinite = (value: string) => {
-  if (!value.trim()) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+const numeric = (
+  minimum: number,
+  maximum: number,
+  precision: number,
+  unit: string,
+): NumericAuthority => ({
+  kind: "NUMBER",
+  minimum,
+  maximum,
+  integer: false,
+  nullable: false,
+  precision,
+  unit,
+});
+const LONGITUDE = numeric(-180, 180, 15, "deg_WGS84");
+const LATITUDE = numeric(-90, 90, 15, "deg_WGS84");
+const ALTITUDE = numeric(0, 25_000, 3, "m_MSL");
+const HEADING = numeric(0, 359.999, 3, "deg_true");
+const SPEED = numeric(0, 1_500, 3, "m/s");
+const ACCEPTANCE_RADIUS = numeric(1, 25_000, 3, "m");
+const parseStrict = (value: string, authority: NumericAuthority) => {
+  const admitted = admitRawNumber(value, authority);
+  return admitted.ok ? admitted.value : null;
 };
 const close = (left: number, right: number, tolerance: number) =>
   Math.abs(left - right) <= tolerance;
@@ -65,18 +88,15 @@ function waypointDraft(
 }
 
 function pointError(draft: PointDraft, area: StudyArea) {
-  const longitude = parseFinite(draft.longitude);
-  const latitude = parseFinite(draft.latitude);
-  const altitudeM = parseFinite(draft.altitudeM);
+  const longitude = parseStrict(draft.longitude, LONGITUDE);
+  const latitude = parseStrict(draft.latitude, LATITUDE);
+  const altitudeM = parseStrict(draft.altitudeM, ALTITUDE);
   if (longitude === null || latitude === null || altitudeM === null) {
     return "Enter finite longitude, latitude, and altitude values.";
   }
   const [[west, south], [east, north]] = area.bounds;
   if (longitude < west || longitude > east || latitude < south || latitude > north) {
     return `Position must be inside ${area.shortName}.`;
-  }
-  if (altitudeM < 0 || altitudeM > 25_000) {
-    return "Altitude must be from 0 to 25,000 m MSL.";
   }
   return null;
 }
@@ -91,8 +111,8 @@ function toPoint(draft: PointDraft): ScenarioSpatialPoint {
 }
 
 function acceptanceRadiusError(value: string) {
-  const radius = parseFinite(value);
-  return radius === null || radius < 1 || radius > 25_000
+  const radius = parseStrict(value, ACCEPTANCE_RADIUS);
+  return radius === null
     ? "Waypoint acceptance radius must be from 1 to 25,000 m."
     : null;
 }
@@ -120,12 +140,12 @@ export function SpatialEntityEditor({
   );
 
   const startError = pointError(start, studyArea);
-  const headingValue = parseFinite(heading);
+  const headingValue = parseStrict(heading, HEADING);
   const headingError =
     headingValue === null || headingValue < 0 || headingValue >= 360
       ? "Heading must be from 0 degrees inclusive to 360 degrees exclusive."
       : null;
-  const speedValue = parseFinite(speed);
+  const speedValue = parseStrict(speed, SPEED);
   const speedError =
     speedValue === null || speedValue < 0 || speedValue > 1_500
       ? "Speed must be from 0 to 1,500 m/s."
@@ -242,6 +262,7 @@ export function SpatialEntityEditor({
         <label>
           Longitude
           <input
+            data-control-id={`spatial.${team}.start.longitude`}
             aria-invalid={Boolean(startError)}
             aria-describedby={startError ? `${id}-start-error` : undefined}
             inputMode="decimal"
@@ -256,6 +277,7 @@ export function SpatialEntityEditor({
         <label>
           Latitude
           <input
+            data-control-id={`spatial.${team}.start.latitude`}
             aria-invalid={Boolean(startError)}
             aria-describedby={startError ? `${id}-start-error` : undefined}
             inputMode="decimal"
@@ -270,6 +292,7 @@ export function SpatialEntityEditor({
         <label>
           Altitude <span>m MSL</span>
           <input
+            data-control-id={`spatial.${team}.start.altitude`}
             aria-invalid={Boolean(startError)}
             aria-describedby={startError ? `${id}-start-error` : undefined}
             inputMode="decimal"
@@ -284,6 +307,7 @@ export function SpatialEntityEditor({
         <label>
           Heading <span>° true</span>
           <input
+            data-control-id={`spatial.${team}.start.heading`}
             aria-invalid={Boolean(headingError)}
             aria-describedby={headingError ? `${id}-heading-error` : undefined}
             inputMode="decimal"
@@ -296,6 +320,7 @@ export function SpatialEntityEditor({
         <label>
           True airspeed <span>m/s</span>
           <input
+            data-control-id={`spatial.${team}.start.speed`}
             aria-invalid={Boolean(speedError)}
             aria-describedby={speedError ? `${id}-speed-error` : undefined}
             inputMode="decimal"
@@ -352,6 +377,7 @@ export function SpatialEntityEditor({
                 {field === "altitudeM" && <span>m MSL</span>}
                 {field === "acceptanceRadiusM" && <span>m</span>}
                 <input
+                  data-control-id={`spatial.${team}.route[*].${field}`}
                   aria-invalid={Boolean(waypointErrors[index])}
                   aria-describedby={waypointErrors[index] ? `${id}-waypoint-${index}-error` : undefined}
                   inputMode="decimal"
@@ -374,6 +400,7 @@ export function SpatialEntityEditor({
             <label>
               Transition
               <select
+                data-control-id={`spatial.${team}.route[*].transition`}
                 data-vector-overlay-exempt="ua-native-select"
                 value={draft.transition}
                 onChange={(event) =>

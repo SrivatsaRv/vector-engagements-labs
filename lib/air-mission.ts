@@ -15,6 +15,11 @@ import {
   validateScenarioModelInstance,
   type CompiledModelPack,
 } from "./model-pack.ts";
+import {
+  MAX_AUTHORED_SCALAR_FRACTION_DIGITS,
+  MAX_WGS84_FRACTION_DIGITS,
+  hasDeclaredPrecision,
+} from "./scenario-control-authority.ts";
 
 export const AIR_MISSION_SCHEMA_VERSION = "vector.air-mission.v1" as const;
 export const COMPILED_AIR_MISSION_SCHEMA_VERSION = "vector.compiled-air-mission.v1" as const;
@@ -377,6 +382,7 @@ export type CompiledAirborneStoreTransfer = {
 export type AirMissionAdmissionCode =
   | "MISSION_SCHEMA_UNSUPPORTED"
   | "MISSION_SCHEMA_INVALID"
+  | "MISSION_NUMERIC_PRECISION_INVALID"
   | "MISSION_CLASS_FIELDS_MISMATCH"
   | "MISSION_SIDE_UNSUPPORTED"
   | "MISSION_ENVIRONMENT_MISMATCH"
@@ -475,6 +481,17 @@ function exactRecord(value: unknown, keys: readonly string[], path: string): ass
 
 function fail(code: AirMissionAdmissionCode, fieldPath: string, message: string, guidance: string): never {
   throw new AirMissionAdmissionError(code, fieldPath, message, guidance);
+}
+
+function requireAuthoredPrecision(value: unknown, precision: number, fieldPath: string) {
+  if (typeof value === "number" && Number.isFinite(value) && !hasDeclaredPrecision(value, precision)) {
+    fail(
+      "MISSION_NUMERIC_PRECISION_INVALID",
+      fieldPath,
+      `${fieldPath} exceeds ${precision} fractional digits.`,
+      `Round the authored value to at most ${precision} fractional digits; WGS84 source geometry remains separately governed.`,
+    );
+  }
 }
 
 function areaAround(longitude: number, latitude: number, id: string): MissionArea {
@@ -978,6 +995,8 @@ function validateArea(area: MissionArea, path: string, studyAreaId: string) {
     if (!Number.isFinite(point.longitude) || !Number.isFinite(point.latitude) || !isPointInsideStudyArea({ ...point, altitudeM: 0, verticalDatum: "MSL" }, studyArea)) {
       fail("MISSION_AREA_INVALID", `${path}.vertices[${index}]`, "Mission-area vertices must be finite and inside the selected study area.", "Move the polygon inside environment coverage.");
     }
+    requireAuthoredPrecision(point.longitude, MAX_WGS84_FRACTION_DIGITS, `${path}.vertices[${index}].longitude`);
+    requireAuthoredPrecision(point.latitude, MAX_WGS84_FRACTION_DIGITS, `${path}.vertices[${index}].latitude`);
     const next = area.vertices[(index + 1) % area.vertices.length];
     twiceArea += point.longitude * next.latitude - next.longitude * point.latitude;
   });
@@ -1027,6 +1046,17 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
       const speedKeys = point.constraint.speed.kind === "TAS" ? ["kind", "valueMps"] : ["kind", "value"];
       exactRecord(point.constraint.speed, speedKeys, `${pointPath}.constraint.speed`);
       if (!nonEmptyText(point.id) || !["START", "FLY_BY", "FLY_OVER"].includes(point.turnMethod) || !Number.isFinite(point.acceptanceRadiusM) || point.acceptanceRadiusM < 1 || point.acceptanceRadiusM > 25_000 || (pointIndex === 0 && point.acceptanceRadiusM !== 1) || (point.turnMethod === "FLY_OVER" && point.acceptanceRadiusM !== 1) || (point.taskRef !== null && !nonEmptyText(point.taskRef)) || typeof point.constraint.locked !== "boolean" || !["MSL", "AGL"].includes(point.position.altitude.datum) || !["TAS", "MACH"].includes(point.constraint.speed.kind)) fail("MISSION_SCHEMA_INVALID", pointPath, "Route-point identity, turn, acceptance radius, datum, speed, lock, or task reference is invalid.", "Author an exact typed route point with a bounded radius; START and FLY_OVER use 1 metre.");
+      requireAuthoredPrecision(point.position.longitude, MAX_WGS84_FRACTION_DIGITS, `${pointPath}.position.longitude`);
+      requireAuthoredPrecision(point.position.latitude, MAX_WGS84_FRACTION_DIGITS, `${pointPath}.position.latitude`);
+      requireAuthoredPrecision(point.position.altitude.valueM, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${pointPath}.position.altitude.valueM`);
+      requireAuthoredPrecision(point.acceptanceRadiusM, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${pointPath}.acceptanceRadiusM`);
+      requireAuthoredPrecision(
+        point.constraint.speed.kind === "TAS" ? point.constraint.speed.valueMps : point.constraint.speed.value,
+        MAX_AUTHORED_SCALAR_FRACTION_DIGITS,
+        `${pointPath}.constraint.speed`,
+      );
+      if (point.constraint.etaSeconds !== undefined) requireAuthoredPrecision(point.constraint.etaSeconds, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${pointPath}.constraint.etaSeconds`);
+      if (point.constraint.totalTimeOnTargetSeconds !== undefined) requireAuthoredPrecision(point.constraint.totalTimeOnTargetSeconds, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${pointPath}.constraint.totalTimeOnTargetSeconds`);
       const expectedTaskRef = pointIndex === 0 ? "MISSION_START" : mission.missionClass;
       if (point.taskRef !== null && point.taskRef !== expectedTaskRef) fail("MISSION_REFERENCE_UNKNOWN", `${pointPath}.taskRef`, "Route point references a missing or unrelated mission task.", `Reference ${expectedTaskRef} or leave the optional task reference empty.`);
     });
@@ -1074,6 +1104,8 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
         if (!nonEmptyText(request.id) || !nonEmptyText(request.launcherEntityId) || !nonEmptyText(request.storeEntityId) || !Number.isSafeInteger(request.storeOrdinal) || request.storeOrdinal < 1 || !nonEmptyText(request.stationId) || !nonEmptyText(request.storeSourceObjectId) || !["RELEASE", "JETTISON"].includes(request.operation) || !Number.isFinite(request.requestedTimeSeconds) || request.requestedTimeSeconds < 0 || !Number.isFinite(request.installedDragAreaM2) || request.installedDragAreaM2 < AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.minimum || request.installedDragAreaM2 > AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.maximum || !["MODEL_ASSUMPTION", "USER_AUTHORED"].includes(request.valueState) || !Array.isArray(request.evidenceRefIds) || !request.evidenceRefIds.length || request.evidenceRefIds.some((id) => !nonEmptyText(id)) || !Array.isArray(request.limitationIds) || !request.limitationIds.length || request.limitationIds.some((id) => !nonEmptyText(id))) {
           fail("MISSION_SCHEMA_INVALID", requestPath, "Store-transfer request identity, operation, SI values, provenance, or authority is invalid.", "Author finite physical transfer intent with exact identities and evidence/limitation references.");
         }
+        requireAuthoredPrecision(request.requestedTimeSeconds, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${requestPath}.requestedTimeSeconds`);
+        requireAuthoredPrecision(request.installedDragAreaM2, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${requestPath}.installedDragAreaM2`);
       });
     }
     if (!nonEmptyText(assignment.id) || !nonEmptyText(assignment.flightPlanId) || !nonEmptyText(assignment.aircraftId) || !/^[0-9a-f]{64}$/.test(assignment.aircraftModelPackDigest) || assignment.loadout.schemaVersion !== "vector.loadout-plan.v1" || assignment.loadout.compatibility !== "COMPILED_MODEL_PACK" || assignment.groundCompatibility.schemaVersion !== "vector.aircraft-ground-envelope-binding.v1" || !nonEmptyText(assignment.groundCompatibility.envelopeId) || !/^[0-9a-f]{64}$/.test(assignment.groundCompatibility.envelopeDigest)) fail("MISSION_SCHEMA_INVALID", path, "Assignment identity, model binding, loadout, or ground-envelope binding is invalid.", "Bind one exact flight, aircraft model pack, loadout, and content-addressed assumption envelope.");
@@ -1164,6 +1196,7 @@ export function compileAirMissionDefinition(
     if (assignment.aircraftModelPackDigest !== modelPackDigest) fail("MISSION_MODEL_PACK_MISMATCH", `${path}.aircraftModelPackDigest`, "Flight assignment model-pack digest is not the admitted digest.", "Recompile the mission against the selected immutable model pack.");
     if (assignment.aircraftId !== context.scenario.bluePlatformId) fail("MISSION_MODEL_PACK_MISMATCH", `${path}.aircraftId`, "Flight assignment aircraft identity does not match the scenario selection.", "Select the assigned compiled aircraft.");
     if (!Number.isFinite(assignment.initialFuelPercent) || assignment.initialFuelPercent <= 0 || assignment.initialFuelPercent > 100) fail("MISSION_FUEL_INVALID", `${path}.initialFuelPercent`, "Initial fuel must be finite and in (0, 100] percent.", "Choose a physically bounded initial fuel state.");
+    requireAuthoredPrecision(assignment.initialFuelPercent, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${path}.initialFuelPercent`);
     if (assignment.initialFuelPercent !== context.scenario.blueFuelPercent) fail("MISSION_FUEL_INVALID", `${path}.initialFuelPercent`, "Mission fuel disagrees with the scenario fuel input.", "Edit fuel through the mission assignment.");
     if (assignment.loadout.schemaVersion !== "vector.loadout-plan.v1" || assignment.loadout.compatibility !== "COMPILED_MODEL_PACK" || assignment.loadout.stores.length !== 1) fail("MISSION_LOADOUT_INVALID", `${path}.loadout`, "The current assignment requires one compiled-model-pack loadout entry.", "Choose the one admitted compatible weapon/station entry.");
     let resolvedConfiguration: ReturnType<typeof resolveAircraftConfiguration> | undefined;
@@ -1194,6 +1227,7 @@ export function compileAirMissionDefinition(
     if (!resolvedConfiguration || assignment.groundCompatibility.envelopeId !== resolvedConfiguration.groundEnvelope.id || assignment.groundCompatibility.envelopeDigest !== resolvedConfiguration.groundEnvelope.digest) fail("MISSION_RUNWAY_INVALID", `${path}.groundCompatibility`, "The authored ground-envelope binding does not match the immutable compiled MODEL_ASSUMPTION resolver.", "Rebind the mission to the exact admitted model-pack digest and aircraft identity; authored performance values are not accepted.");
   });
   if (!Number.isFinite(mission.fuel.reservePercent) || mission.fuel.reservePercent < 0 || mission.fuel.reservePercent > 100) fail("MISSION_FUEL_INVALID", "fuel.reservePercent", "Fuel reserve must be from 0 to 100 percent.", "Provide an explicit bounded reserve.");
+  requireAuthoredPrecision(mission.fuel.reservePercent, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "fuel.reservePercent");
   if (!Number.isInteger(mission.fuel.weaponRtbThreshold) || mission.fuel.weaponRtbThreshold < 0 || mission.fuel.weaponRtbThreshold > context.scenario.blueWeaponQuantity) fail("MISSION_FUEL_INVALID", "fuel.weaponRtbThreshold", "Weapon RTB threshold must be a bounded store count.", "Choose an integer from zero through the admitted loadout quantity.");
   if (mission.assignments.some((assignment) => assignment.initialFuelPercent <= mission.fuel.reservePercent)) fail("MISSION_FUEL_RESERVE_INSUFFICIENT", "fuel.reservePercent", "Initial fuel does not exceed the declared reserve.", "Increase initial fuel or reduce the reserve after reviewing recovery needs.");
   if (new Set(mission.assignedTargetIds).size !== mission.assignedTargetIds.length || mission.assignedTargetIds.length !== 1 || mission.assignedTargetIds[0] !== "red-object-1") fail("MISSION_REFERENCE_UNKNOWN", "assignedTargetIds", "The assigned target is missing, duplicated, or not present in the compiled scenario.", "Select the exact compiled target identity.");
@@ -1275,6 +1309,7 @@ export function compileAirMissionDefinition(
     if (runway.lengthM < groundEnvelope.minimumRunwayLengthM) fail("MISSION_RUNWAY_INVALID", "start.runway.lengthM", "Runway is shorter than the assigned aircraft ground envelope.", "Choose a longer runway or a different admitted aircraft configuration.");
     if (!groundEnvelope.compatibleSurfaces.includes(runway.surface)) fail("MISSION_RUNWAY_INVALID", "start.runway.surface", "Runway surface is incompatible with the assigned aircraft ground envelope.", "Choose a compatible surface.");
     if (!Number.isFinite(groundStart.readinessDelaySeconds) || groundStart.readinessDelaySeconds < 0) fail("MISSION_RUNWAY_INVALID", "start.readinessDelaySeconds", "Readiness delay must be finite and non-negative.", "Provide seconds from model start.");
+    requireAuthoredPrecision(groundStart.readinessDelaySeconds, 0, "start.readinessDelaySeconds");
     const runwayEnginePosition = geographicToEnginePosition({
       longitude: runway.threshold.longitude,
       latitude: runway.threshold.latitude,
@@ -1316,21 +1351,29 @@ export function compileAirMissionDefinition(
     case "TACTICAL_INTERCEPT":
       validateArea(mission.tasks.defendedArea, "tasks.defendedArea", mission.studyAreaId);
       if (mission.tasks.contactCategory !== "HOSTILE_AIR_CONTACT" || !["ONBOARD_RADAR", "DATALINK", "AIRBORNE_EARLY_WARNING", "VISUAL"].includes(mission.tasks.initialTrackSource) || !Number.isFinite(mission.tasks.initialTrackUncertaintyM) || mission.tasks.initialTrackUncertaintyM < 0 || mission.tasks.trigger !== "CONTACT_ENTERS_DEFENDED_AREA" || mission.tasks.objective !== "IDENTIFY_SHADOW_OR_ENGAGE" || ![mission.tasks.commitCondition, mission.tasks.abortCondition, mission.tasks.disengageCondition].every(nonEmptyText)) fail("MISSION_CLASS_FIELDS_MISMATCH", "tasks", "Tactical Intercept requires a bounded track, trigger, objective, and explicit commit/abort/disengage conditions.", "Author every Tactical Intercept task field.");
+      requireAuthoredPrecision(mission.tasks.initialTrackUncertaintyM, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "tasks.initialTrackUncertaintyM");
       break;
     case "COMBAT_AIR_PATROL":
       validateArea(mission.tasks.patrolArea, "tasks.patrolArea", mission.studyAreaId);
       if (mission.tasks.prosecutionArea) validateArea(mission.tasks.prosecutionArea, "tasks.prosecutionArea", mission.studyAreaId);
       if (!Number.isInteger(mission.tasks.onStationCount) || mission.tasks.onStationCount <= 0 || !Number.isInteger(mission.tasks.flightSize) || mission.tasks.flightSize <= 0 || mission.tasks.onStationCount > mission.tasks.flightSize || !Number.isFinite(mission.tasks.onStationMinutes) || mission.tasks.onStationMinutes <= 0 || mission.tasks.patrolPattern !== "RACETRACK" || mission.tasks.relief !== "FUEL_OR_TIME" || !Number.isFinite(mission.tasks.investigationLimitM) || mission.tasks.investigationLimitM <= 0 || !Number.isFinite(mission.tasks.prosecutionLimitM) || mission.tasks.prosecutionLimitM < mission.tasks.investigationLimitM || !nonEmptyText(mission.tasks.completionCondition)) fail("MISSION_CLASS_FIELDS_MISMATCH", "tasks", "CAP geometry, staffing, duration, relief, investigation/prosecution limits, and completion must be valid.", "Provide visible CAP task values with on-station count within flight size and prosecution at least as large as investigation.");
+      requireAuthoredPrecision(mission.tasks.onStationMinutes, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "tasks.onStationMinutes");
+      requireAuthoredPrecision(mission.tasks.investigationLimitM, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "tasks.investigationLimitM");
+      requireAuthoredPrecision(mission.tasks.prosecutionLimitM, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "tasks.prosecutionLimitM");
       break;
     case "FIGHTER_SWEEP":
       validateArea(mission.tasks.sweepArea, "tasks.sweepArea", mission.studyAreaId);
       validateArea(mission.tasks.engagementBoundary, "tasks.engagementBoundary", mission.studyAreaId);
       exactRecord(mission.tasks.targetWindow, ["startsSeconds", "endsSeconds"], "tasks.targetWindow");
       if (!Number.isFinite(mission.tasks.targetWindow.startsSeconds) || mission.tasks.targetWindow.startsSeconds < 0 || !Number.isFinite(mission.tasks.targetWindow.endsSeconds) || mission.tasks.targetWindow.endsSeconds <= mission.tasks.targetWindow.startsSeconds || mission.tasks.formation !== "PAIR" || !Array.isArray(mission.tasks.contactCategories) || mission.tasks.contactCategories.length !== 1 || mission.tasks.contactCategories[0] !== "HOSTILE_AIR_CONTACT" || mission.tasks.supportRelationship !== "MUTUAL_SUPPORT" || !nonEmptyText(mission.tasks.completionCondition)) fail("MISSION_CLASS_FIELDS_MISMATCH", "tasks", "Fighter Sweep requires a valid target window, formation, contact category, support relationship, and completion.", "Author every Fighter Sweep task field.");
+      requireAuthoredPrecision(mission.tasks.targetWindow.startsSeconds, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "tasks.targetWindow.startsSeconds");
+      requireAuthoredPrecision(mission.tasks.targetWindow.endsSeconds, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "tasks.targetWindow.endsSeconds");
       break;
     case "ESCORT":
       if (mission.tasks.protectedPackageId !== "red-object-1" || !firstPlan.routePoints.some((point) => point.id === (mission.tasks as Extract<AirMissionTasks, { kind: "ESCORT" }>).joinUpPointId)) fail("MISSION_REFERENCE_UNKNOWN", "tasks.joinUpPointId", "Escort join-up must reference the compiled protected package and a route point.", "Select the exact existing package and join-up point.");
       if (!Number.isFinite(mission.tasks.joinUpTimeSeconds) || mission.tasks.joinUpTimeSeconds < 0 || mission.tasks.escortGeometry !== "BRACKET" || !Number.isFinite(mission.tasks.threatResponseRadiusM) || mission.tasks.threatResponseRadiusM <= 0 || !Number.isInteger(mission.tasks.investigatorCount) || mission.tasks.investigatorCount < 0 || !Number.isInteger(mission.tasks.engagerCount) || mission.tasks.engagerCount <= 0 || mission.tasks.splitRejoinPolicy !== "REJOIN_AFTER_RESPONSE" || !nonEmptyText(mission.tasks.detachCondition) || !nonEmptyText(mission.tasks.completionCondition)) fail("MISSION_CLASS_FIELDS_MISMATCH", "tasks", "Escort requires valid join-up timing, geometry, response radius, allocation, split/rejoin, detach, and completion fields.", "Author every Escort task field.");
+      requireAuthoredPrecision(mission.tasks.joinUpTimeSeconds, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "tasks.joinUpTimeSeconds");
+      requireAuthoredPrecision(mission.tasks.threatResponseRadiusM, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "tasks.threatResponseRadiusM");
       break;
   }
 
