@@ -17,7 +17,10 @@ The scenario library contains nine governed entries. Its third A2A entry is the
 non-default **High-energy crossing challenge: Su-30MKI versus F-16C**. The title
 describes the authored aircraft identities and geometry; it does not promote the
 anonymous assumption model pack into named-platform performance evidence or
-describe the 180 m terminal geometry as a hit, kill, or combat outcome.
+describe its 25 m verification-only geometric intercept as target damage, a
+kill, probability of kill, or named-weapon effectiveness. Product copy uses
+“geometric intercept” only when the engine emitted the typed terminal event and
+must show that target effect is not modelled.
 
 `RELEASE` and `JETTISON` describe only the generic public-educational lifecycle
 selected by authored intent. They do not imply safe separation, emergency

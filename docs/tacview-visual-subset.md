@@ -49,9 +49,11 @@ derives an outcome.
 The high-energy crossing challenge uses this unchanged grammar: its two
 aircraft and launched stores are drawn only from canonical recorded world
 frames, while observer-track presentation remains explicitly unavailable
-because the bound assumption pack admits no sensor model. A 180 m geometry
-threshold changes run termination, not the symbol source state and not the
-meaning of the rendered marks.
+because the bound assumption pack admits no sensor model. The engine-owned
+25 m verification-only geometric-intercept criterion changes weapon lifecycle
+and run termination, not the symbol source state and not the meaning of the
+rendered marks. Presentation may annotate the typed terminal event, but it may
+not derive a hit, damage or kill from marker proximity.
 An airborne store therefore becomes renderable only when the canonical boundary
 frame contains its exact entity identity. The transfer outcome may annotate
 that frame, but presentation cannot create the mark early, repair a rejected
@@ -175,8 +177,9 @@ This split permits one simulation event to produce different messages for Model
 Truth, IAF, or PAF only when the selected view is allowed to know it. A hidden
 truth event must not leak through a message, count, search result, or tooltip.
 
-The current engine foundation produces only run and entity-lifecycle events.
-The Situation Log UI, observer-safe message projection, sensor/track messages,
+The current engine foundation produces run/entity lifecycle, aircraft
+operational-state, airborne-transfer, verification-track and weapon-termination
+events. The Situation Log UI, observer-safe message projection,
 launch/guidance/support messages, selection/scrub interaction, and dense-log
 performance remain follow-up #41 slices gated by their owning #26, #28, and #38
 contracts. Until those slices land, the product must show an explicit

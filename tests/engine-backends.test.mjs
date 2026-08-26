@@ -93,7 +93,7 @@ test("TypeScript and Rust/WASM reject at the first regional sample after crossin
 test("committed Rust/WASM artifact has a stable integrity identity", () => {
   assert.match(RUST_WASM_ENGINE_ARTIFACT.sha256, /^[a-f0-9]{64}$/);
   assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes > 100_000);
-  assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 550_000);
+  assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 575_000);
   assert.equal(
     VECTOR_ENGINE_WASM_OPTIMIZER,
     "binaryen@131.0.0 -O3 -S2 rust-wasm-features-v1",
@@ -472,6 +472,33 @@ test("both engines terminate an admitted weapon when its assigned target is unav
       "TARGET_UNAVAILABLE",
       `${name} VSR weapon state`,
     );
+  }
+});
+
+test("both engines reject malformed weapon termination authority before integration", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const cases = [
+    (value) => { value.schemaVersion = "vector.weapon-termination-model.v0"; },
+    (value) => { value.intendedUse = "OPERATIONAL"; },
+    (value) => { value.criterion = "RENDERER_DISTANCE"; },
+    (value) => { value.interceptRadiusM = 0; },
+    (value) => { value.maximumFlightTimeSeconds = Number.NaN; },
+  ];
+  for (const mutate of cases) {
+    for (const backend of ["typescript", "rust-wasm"]) {
+      const scenario = structuredClone(baseline);
+      const termination = scenario.entities.find((entity) => entity.weapon).weapon.termination;
+      mutate(termination);
+      assert.throws(
+        () => runEngineBackend(scenario, backend),
+        /termination|finite number|finite positive number|invalid type: null, expected f64/i,
+        backend,
+      );
+    }
   }
 });
 

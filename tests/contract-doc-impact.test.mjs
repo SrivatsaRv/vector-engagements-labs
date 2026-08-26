@@ -2477,6 +2477,9 @@ test("the repository policy maps real simulation identities to their exact owner
   assert.deepEqual(exactRule(mission, "lib/scenario-spatial.ts").facets, ["schema", "ui"]);
   assert.deepEqual(exactRule(mission, "lib/simulation.ts").facets, ["runtime", "schema", "vsr"]);
   assert.deepEqual(exactRule(mission, "lib/air-mission.ts").facets, ["admission", "datum", "digest", "runtime", "schema", "ui", "unit", "vsr"]);
+  assert.deepEqual(exactRule(mission, "scripts/generate-weapon-termination-migration.ts").facets, ["digest", "schema", "storage"]);
+  assert.deepEqual(exactRule(modelPack, "scripts/generate-weapon-termination-migration.ts").facets, ["digest", "schema", "storage"]);
+  assert.deepEqual(physics.testRules.find((rule) => rule.kind === "EXACT" && rule.value === "tests/weapon-termination.test.mjs").facets, ["verification"]);
   assert.deepEqual(mission.testRules.find((rule) => rule.kind === "EXACT" && rule.value === "tests/air-mission.test.mjs").facets, ["admission", "datum", "digest", "runtime", "schema", "storage", "ui", "unit", "verification", "vsr"]);
   assert.deepEqual(requiredSections(mission, "lib/air-mission.ts"), ["MISSION_AIR_MISSION_CONTRACT", "MISSION_BUILDER_EXPANSION", "MISSION_CONTROL_ADMISSION_REGRESSION", "MISSION_RECORD_REPLAY", "MISSION_SCENARIO_ARTIFACT", "MISSION_STATE_MACHINE"]);
   assert.equal(mission.owningSections.some((section) => section.sectionId === "MISSION_INTEGRATED_MODEL"), false);

@@ -342,9 +342,20 @@ test("every configured library baseline remains valid and numerically finite", (
       definition.scenario,
       allDomainCapabilities,
     );
-    assert.equal(result.successful, result.termination === "threshold_reached");
+    assert.equal(
+      result.successful,
+      ["threshold_reached", "weapon_intercept"].includes(result.termination),
+    );
     assert.ok(
-      ["threshold_reached", "energy_depleted", "time_limit"].includes(
+      [
+        "threshold_reached",
+        "energy_depleted",
+        "time_limit",
+        "weapon_intercept",
+        "weapon_miss",
+        "weapon_expired",
+        "weapon_failed",
+      ].includes(
         result.termination,
       ),
     );

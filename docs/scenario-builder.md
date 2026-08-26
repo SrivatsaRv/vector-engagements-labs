@@ -94,18 +94,21 @@ direct guided path, and the exact North Punjab clear-winter EnvironmentPack.
 
 Those values are normal scenario inputs consumed through the existing compiler;
 there is no actor-name, scenario-name, or presentation-label branch in the
-runtime. Under the current admitted generic point-mass/Astra assumptions, both
-TypeScript and Rust/WASM reach the declared 180 m geometry-completion threshold
-after 120 model seconds and before the 140 second limit. A 46,000 m control with
-the other inputs held constant reaches the time limit instead. That contrast is
-a deterministic regression boundary, not named-aircraft or named-weapon
-performance evidence.
+runtime. Under the current generic point-mass and verification-only termination
+assumptions, both TypeScript and Rust/WASM reach an engine-owned geometric
+intercept at 131.9 model seconds with a 21.836104 m closest approach inside the
+compiled 25 m radius. A 46,000 m control with the other inputs held constant
+reaches the 140 s time limit with a 530.164926 m closest approach instead. That
+contrast is a deterministic regression boundary, not named-aircraft or
+named-weapon performance evidence.
 
 The package and report remain `PUBLIC_EDUCATIONAL` and `MODEL_ASSUMPTION`.
-Reaching 180 m does not establish detection, track, launch authorization, fuze,
-hit, damage, kill, probability of kill, launch-zone, tactics, or real-world
-effectiveness. Observer pictures remain explicitly `UNSUPPORTED` with no
-inferred position because this deployment has no admitted sensor model.
+Reaching the geometric radius does not establish detection, track, launch
+authorization, fuze, hit, damage, kill, probability of kill, launch-zone,
+tactics, or real-world effectiveness. The terminal event explicitly records
+`targetEffect: NOT_MODELLED`, and the target remains active. Observer pictures
+remain `UNSUPPORTED` with no inferred position because this deployment has no
+admitted sensor model.
 
 ## Air mission contract
 
@@ -120,6 +123,9 @@ rounding or defaulting a value.
 Spatial altitude and its Air-mission route projection import the same shared
 three-fractional-digit authority; a value accepted by the map editor cannot be
 rejected later by a conflicting local precision rule.
+Air-mission compilation binds each admitted store to the selected immutable
+model pack, including its termination authority. Mission labels, loadout names
+and task class cannot alter the termination criterion or infer a target effect.
 
 The #190 package carries its 44 km/105-degree geometry, MSL altitudes, TAS
 speeds, 70% fuel and two-store Blue assignment through the existing authored
@@ -369,6 +375,9 @@ evidence must include malformed text, boundary and adjacent values, applicable
 cross-field combinations, and a proof that invalid raw state cannot enter the
 Worker. This is the required expansion rule for nested mission inputs as well
 as the legacy flat scenario controls.
+Future terminal-effect authoring must extend the governed model-pack and engine
+contracts; it cannot be added as a presentation-only dropdown. This slice adds
+no editable fuze, warhead, lethality, damage or kill control.
 
 The high-energy crossing challenge is a governed configured template, not a
 scenario-name branch. Its fields remain the same visible range, aspect,
@@ -568,6 +577,11 @@ A field change after a run increments the draft revision, invalidates Save and R
 - Permit keyboard operation and provide closed, hover, active, loading, disabled and error states for every control.
 
 ## Operator input versus governed behavior
+
+The 25 m intercept radius and 180 s maximum flight time are model-pack
+assumptions, not editable operator decisions. The operator-authored legacy
+completion distance remains recorded for compatibility but has no released-
+weapon terminal authority.
 
 Mission fields are operator inputs only where a visible control or imported v1
 artifact supplies them. Compiler admission—not a label—decides whether class,

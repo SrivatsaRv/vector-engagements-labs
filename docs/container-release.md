@@ -67,6 +67,11 @@ that prior digest and repeats the same no-build Compose operation.
 
 ## Migration, backup, and restore order
 
+Migration `017_weapon_termination_model.sql` follows 016 and appends the 1.1.0
+intended use, 0.9.0 pack, 1.3.0 credibility manifest and nine exact scenario
+bindings. Backup/restore verification must retain those rows and their digests;
+older migration bytes are checked before 017 generation is accepted.
+
 Migration `015_generic_ground_dynamics.sql` deterministically upserts only its
 eight historical canonical v4 scenario-package rows and hashes affected by ground-envelope
 v2, so migrate-before-seed fresh installs and upgrades share one result.

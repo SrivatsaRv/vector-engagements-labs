@@ -156,6 +156,13 @@ function compiledWeaponRuntime(weapon: (typeof CURRENT_COMPILED_MODEL_PACK.weapo
     maximumCommandG: weapon.maximumCommandLoadFactorG,
     seekerActivationRangeM: weapon.seekerActivationRangeM,
     datalinkUpdateSeconds: weapon.datalinkUpdatePeriodS,
+    termination: {
+      schemaVersion: weapon.termination.schemaVersion,
+      intendedUse: weapon.termination.intendedUse,
+      criterion: weapon.termination.criterion,
+      interceptRadiusM: weapon.termination.interceptRadiusM,
+      maximumFlightTimeSeconds: weapon.termination.maximumFlightTimeS,
+    },
   };
 }
 

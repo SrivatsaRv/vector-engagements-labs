@@ -199,7 +199,7 @@ test("ordinary scenario synchronization preserves authored store-transfer intent
     percentile: 0.95,
     maximumP95Ms: 100,
     maximumFramesPerRun: 150,
-    maximumOptimizedWasmBytes: 550_000,
+    maximumOptimizedWasmBytes: 575_000,
     backends: ["typescript", "rust-wasm"],
   });
   const scenario = createGenericAirborneStoreTransferScenario();

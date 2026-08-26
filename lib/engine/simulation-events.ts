@@ -48,6 +48,7 @@ const PAYLOAD_KINDS = [
   "ENTITY_LIFECYCLE_CHANGED",
   "AIRCRAFT_OPERATIONAL_STATE_CHANGED",
   "AIRBORNE_STORE_TRANSFER_OUTCOME",
+  "WEAPON_TERMINATED",
   "RUN_COMPLETED",
   "TRACK_STATE_CHANGED",
 ] as const;
@@ -67,11 +68,18 @@ const ACTIVE_LIFECYCLES = ["ACTIVE", "TRACKING", "ENGAGING"] as const;
 const TERMINATIONS = [
   "threshold_reached",
   "energy_depleted",
+  "weapon_intercept",
+  "weapon_miss",
+  "weapon_expired",
+  "weapon_failed",
   "target_unavailable",
   "time_limit",
   "invalid_scenario",
 ] as const;
-const PARTICIPANT_ROLES = ["ACTOR", "SUBJECT", "LAUNCHER", "WEAPON", "SENSOR"] as const;
+const PARTICIPANT_ROLES = ["ACTOR", "SUBJECT", "LAUNCHER", "WEAPON", "TARGET", "SENSOR"] as const;
+const WEAPON_TERMINAL_STATES = ["INTERCEPT", "MISS", "EXPIRED", "FAILED", "SELF_DESTRUCT", "TARGET_UNAVAILABLE"] as const;
+const WEAPON_NON_TERMINAL_STATES = ["STOWED", "BOOST", "COAST", "TERMINAL_GUIDANCE"] as const;
+const WEAPON_TERMINATION_CAUSES = ["GEOMETRIC_INTERCEPT", "ENERGY_DEPLETED", "FLIGHT_TIME_EXPIRED", "TERRAIN_IMPACT", "TARGET_UNAVAILABLE"] as const;
 const TRACK_STATES = ["TENTATIVE", "CONFIRMED", "COASTING", "LOST"] as const;
 const TRACK_FROM_STATES = ["NONE", ...TRACK_STATES] as const;
 const TRACK_CAUSES = [
@@ -217,11 +225,17 @@ function payloadSortKey(payload: SimulationEventPayload) {
       payload.requestedTimeSeconds, payload.requestedTick, payload.transferDigest,
     ]);
   }
+  if (payload.kind === "WEAPON_TERMINATED") {
+    return canonicalJson([
+      "5", payload.schemaVersion, payload.weaponId, payload.targetId,
+      payload.from, payload.to, payload.cause, payload.occurrenceTimeSeconds,
+    ]);
+  }
   if (payload.kind === "RUN_COMPLETED") {
-    return canonicalJson(["5", payload.schemaVersion, payload.termination]);
+    return canonicalJson(["6", payload.schemaVersion, payload.termination]);
   }
   return canonicalJson([
-    "6", payload.schemaVersion, payload.perspective, payload.trackId,
+    "7", payload.schemaVersion, payload.perspective, payload.trackId,
     payload.from, payload.to, payload.cause, payload.sensorModelId,
     payload.sensorModelVersion, payload.modelPackDigest, payload.sourceSequence,
     payload.sourceTimeSeconds, payload.estimateValueState, payload.uncertaintyValueState,
@@ -284,6 +298,35 @@ function assertPayload(value: unknown, index: number): asserts value is Simulati
     member(value.from, LIFECYCLES, `Simulation event ${index} prior lifecycle`);
     member(value.to, LIFECYCLES, `Simulation event ${index} next lifecycle`);
     if (value.from === value.to) throw new Error(`Simulation event ${index} records an unchanged lifecycle.`);
+  } else if (value.kind === "WEAPON_TERMINATED") {
+    exactKeys(value, [
+      "kind", "schemaVersion", "weaponId", "targetId", "from", "to", "cause",
+      "criterion", "closestApproachM", "occurrenceTimeSeconds", "interceptRadiusM",
+      "maximumFlightTimeSeconds", "targetEffect",
+    ], [], `Simulation event ${index} payload`);
+    if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.WEAPON_TERMINATED) throw new Error(`Simulation event ${index} payload schema is unsupported.`);
+    nonEmptyString(value.weaponId, `Simulation event ${index} weapon ID`);
+    nonEmptyString(value.targetId, `Simulation event ${index} target ID`);
+    member(value.from, WEAPON_NON_TERMINAL_STATES, `Simulation event ${index} prior weapon state`);
+    member(value.to, WEAPON_TERMINAL_STATES, `Simulation event ${index} terminal weapon state`);
+    member(value.cause, WEAPON_TERMINATION_CAUSES, `Simulation event ${index} weapon termination cause`);
+    if (value.criterion !== "GEOMETRIC_CLOSEST_APPROACH" || value.targetEffect !== "NOT_MODELLED") throw new Error(`Simulation event ${index} weapon termination authority is unsupported.`);
+    for (const [field, fieldValue] of [
+      ["closest approach", value.closestApproachM],
+      ["occurrence time", value.occurrenceTimeSeconds],
+      ["intercept radius", value.interceptRadiusM],
+      ["maximum flight time", value.maximumFlightTimeSeconds],
+    ] as const) {
+      if (!Number.isFinite(fieldValue) || (fieldValue as number) < 0) throw new Error(`Simulation event ${index} ${field} is invalid.`);
+    }
+    if ((value.interceptRadiusM as number) <= 0 || (value.maximumFlightTimeSeconds as number) <= 0) throw new Error(`Simulation event ${index} weapon termination limits are invalid.`);
+    const causeMatchesState =
+      (value.to === "INTERCEPT" && value.cause === "GEOMETRIC_INTERCEPT" && (value.closestApproachM as number) <= (value.interceptRadiusM as number)) ||
+      (value.to === "MISS" && value.cause === "ENERGY_DEPLETED") ||
+      (value.to === "EXPIRED" && value.cause === "FLIGHT_TIME_EXPIRED") ||
+      (value.to === "FAILED" && value.cause === "TERRAIN_IMPACT") ||
+      (value.to === "TARGET_UNAVAILABLE" && value.cause === "TARGET_UNAVAILABLE");
+    if (!causeMatchesState) throw new Error(`Simulation event ${index} weapon terminal state and cause are inconsistent.`);
   } else if (value.kind === "RUN_COMPLETED") {
     exactKeys(value, ["kind", "schemaVersion", "termination"], [], `Simulation event ${index} payload`);
     if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_COMPLETED) throw new Error(`Simulation event ${index} payload schema is unsupported.`);
@@ -620,6 +663,7 @@ export function assertSimulationEventStream(
   const consumedFrameTransitionsByTrack = new Map<string, number>();
   const lastEventIdByTrack = new Map<string, string>();
   let prior: SimulationEventV2 | undefined;
+  let weaponTerminationEvents = 0;
   for (const [index, raw] of values.entries()) {
     if (!isRecord(raw)) throw new Error(`Simulation event ${index} must be an object.`);
     exactKeys(raw, ["schemaVersion", "id", "sequence", "localKey", "tick", "modelTimeSeconds", "frameIndex", "phase", "producer", "knowledgeScope", "participants", "causeEventIds", "payload"], ["ownerAffiliation", "correlationId"], `Simulation event ${index}`);
@@ -634,7 +678,7 @@ export function assertSimulationEventStream(
     member(raw.phase, PHASES, `Simulation event ${index} phase`);
     if (!isRecord(raw.producer)) throw new Error(`Simulation event ${index} producer must be an object.`);
     exactKeys(raw.producer, ["subsystem"], ["entityId"], `Simulation event ${index} producer`);
-    member(raw.producer.subsystem, ["RUN_COORDINATOR", "ENTITY_LIFECYCLE", "AIRCRAFT_DYNAMICS", "SENSOR_TRACK"], `Simulation event ${index} producer subsystem`);
+    member(raw.producer.subsystem, ["RUN_COORDINATOR", "ENTITY_LIFECYCLE", "AIRCRAFT_DYNAMICS", "WEAPON_DYNAMICS", "SENSOR_TRACK"], `Simulation event ${index} producer subsystem`);
     if (raw.producer.entityId !== undefined) nonEmptyString(raw.producer.entityId, `Simulation event ${index} producer entity`);
     member(raw.knowledgeScope, ["WORLD", "SIDE_OWNED"], `Simulation event ${index} knowledge scope`);
     if (raw.ownerAffiliation !== undefined) member(raw.ownerAffiliation, ["BLUE", "RED", "NEUTRAL"], `Simulation event ${index} owner affiliation`);
@@ -824,6 +868,27 @@ export function assertSimulationEventStream(
       ) {
         throw new Error(`Simulation store-transfer event ${event.id} has invalid authority, ownership, or achieved frame state.`);
       }
+    } else if (event.payload.kind === "WEAPON_TERMINATED") {
+      weaponTerminationEvents += 1;
+      const payload = event.payload;
+      const weapon = entityById.get(payload.weaponId);
+      const target = entityById.get(payload.targetId);
+      const frameWeapon = frame.entities.find((candidate) => candidate.id === payload.weaponId);
+      const admission = weapon?.weapon?.termination;
+      if (
+        event.phase !== "TERMINATION" || event.producer.subsystem !== "WEAPON_DYNAMICS" ||
+        event.producer.entityId !== payload.weaponId || !weapon || weapon.kind !== "GUIDED_WEAPON" ||
+        !target || !frameWeapon || frameWeapon.lifecycle !== "TERMINATED" ||
+        frameWeapon.weaponFlightState !== payload.to || weapon.weapon?.targetEntityId !== payload.targetId ||
+        event.participants.length !== 2 ||
+        !event.participants.some((item) => item.entityId === payload.weaponId && item.role === "WEAPON") ||
+        !event.participants.some((item) => item.entityId === payload.targetId && item.role === "TARGET") ||
+        !admission || admission.criterion !== payload.criterion ||
+        admission.interceptRadiusM !== payload.interceptRadiusM ||
+        admission.maximumFlightTimeSeconds !== payload.maximumFlightTimeSeconds ||
+        payload.occurrenceTimeSeconds < event.modelTimeSeconds - scenario.fixedStepSeconds - 1e-9 ||
+        payload.occurrenceTimeSeconds > event.modelTimeSeconds + 1e-9
+      ) throw new Error(`Simulation weapon-termination event ${event.id} has invalid authority, ownership, or achieved frame state.`);
     } else {
       const entityId = event.producer.entityId;
       const entity = entityId ? entityById.get(entityId) : undefined;
@@ -887,6 +952,10 @@ export function assertSimulationEventStream(
     const typed = values as readonly SimulationEventV2[];
     if (typed[0]?.payload.kind !== "RUN_STARTED") throw new Error("Simulation event stream is missing RUN_STARTED.");
     if (typed.at(-1)?.payload.kind !== "RUN_COMPLETED") throw new Error("Simulation event stream is missing RUN_COMPLETED.");
+    const weaponTerminalRun = ["weapon_intercept", "weapon_miss", "weapon_expired", "weapon_failed", "target_unavailable"].includes(termination);
+    if (weaponTerminationEvents !== (weaponTerminalRun ? 1 : 0)) {
+      throw new Error("Simulation event stream does not contain the exact weapon termination required by the run outcome.");
+    }
     for (const entity of scenario.entities) {
       if (
         entity.lifecycle !== "STOWED" &&

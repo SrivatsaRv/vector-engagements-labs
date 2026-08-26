@@ -63,7 +63,10 @@ legacy/synthetic scenarios with no regional runtime projection.
   mutation;
 - G2G commanded cruise altitude, with a terminal blend to objective elevation for direct paths and a higher commanded apex for lofted paths;
 - governed wind-shift events;
-- closest approach, completion, energy, target-unavailable, and time termination; non-finite-state checks; and dry-mass margin diagnostics.
+- engine-owned between-step closest approach; verification-only geometric
+  intercept; energy miss; flight-time expiry; terrain failure;
+  target-unavailable and run-time termination; non-finite-state checks; and
+  dry-mass margin diagnostics.
 
 Installed store drag for that transfer uses an authored/model-assumption SI
 area admitted only in the inclusive `[0.001, 1] m²` interval. This bounded
@@ -71,16 +74,38 @@ generic discontinuity is not ejector force, safe separation, named carriage,
 named store aerodynamics or weapon-effectiveness fidelity.
 
 Weapon frames carry a closed achieved flight-state value: `STOWED`, `BOOST`,
-`COAST`, `TERMINAL_GUIDANCE`, or `TARGET_UNAVAILABLE`. It is derived by the
-engine from launch/lifecycle and propulsion/guidance conditions and is replayed
-unchanged by consumers. It is not a seeker, target-track, data-link, or support
-claim. Typed seeker and support state remains blocked on the #26/#28 interface
-and must fail closed rather than being inferred from a weapon name or truth.
+`COAST`, `TERMINAL_GUIDANCE`, `INTERCEPT`, `MISS`, `EXPIRED`, `FAILED`,
+`SELF_DESTRUCT`, or `TARGET_UNAVAILABLE`. `SELF_DESTRUCT` is reserved by the
+closed state contract but has no achieved transition in this slice. The engine
+derives every other state from launch/lifecycle, propulsion/guidance and the
+compiled termination authority, and replay preserves it unchanged. These are
+not seeker, target-track, data-link, support, fuze, damage or kill claims.
+Typed seeker and support state remains blocked on the #26/#28 interface and
+must fail closed rather than being inferred from a weapon name or truth.
 The current compiled weapon admissions explicitly record `UNAVAILABLE` seeker
 and support requirements plus `SCHEDULED_TEST_ONLY` launch authorization. The
 existing deterministic fly-out remains a bounded educational trajectory test;
 it does not claim operational seeker acquisition, data-link support, warning,
 or support loss/recovery.
+
+Every compiled weapon now binds `vector.weapon-termination-model.v1` with
+`ENGINE_VERIFICATION_ONLY` intended use, a
+`GEOMETRIC_CLOSEST_APPROACH` criterion, positive SI intercept radius and
+positive SI maximum flight time. The current assumption values are 25 m and
+180 s. Each fixed step minimizes the linearly interpolated relative-position
+segment, so a crossing between retained samples cannot be missed. The fixed
+precedence is target unavailable, geometric intercept, terrain impact,
+flight-time expiry, then energy-depleted miss. A terminal result ends the
+weapon lifecycle and emits one typed event at the exact retained boundary; the
+event may carry a within-step occurrence time. The old scenario
+`completion.distanceMeters` field remains a legacy profile boundary and cannot
+terminate a released weapon. Map/3D proximity is presentation-only.
+
+`INTERCEPT` means only that the verification trajectory entered the admitted
+geometric radius. The target remains `ACTIVE`, and the canonical event records
+`targetEffect: NOT_MODELLED`. No current equation models a fuze, warhead,
+damage, destruction, kill, probability of kill or named-weapon terminal
+performance.
 
 If an admitted weapon's assigned target is already terminated or becomes
 terminated, both engines set its achieved state to `TARGET_UNAVAILABLE`,
@@ -151,6 +176,11 @@ the manifest schema nor its source subjects.
 Aircraft motion uses the same standard atmosphere and wind field as a launched vehicle. Each fixed step consumes identity-bearing, compiled one-dimensional tables for zero-lift drag by Mach, induced drag at the admitted reference angle of attack, thrust by throttle, and fuel-flow coefficient by throttle. The TypeScript and Rust engines linearly interpolate only within an ordered table's declared coverage; an invalid table, missing full-throttle value, or an out-of-coverage input rejects the run instead of extrapolating or falling back to a compiler scalar. The present tables are still versioned model assumptions, not named-aircraft fidelity data. The engine resolves dynamic pressure, load-factor lift demand, drag, available thrust, fuel flow, mass, and the steering limit on every fixed step. Aircraft admission requires initial mass to equal admitted empty mass, initial fuel, and the launch mass of every linked stowed store. Fuel burn cannot reduce mass below empty mass plus installed-store mass. Release removes the store identity and its declared launch mass once, and the weapon inherits launcher position, velocity, and heading. The engine steers the velocity vector towards the next authored three-dimensional route point. `vector.route-plan.v1` supplies a typed fly-by acceptance radius in metres for each waypoint after the start. The route controller changes to the next leg only after entering that declared capture distance (or the fixed-step travel guard); this transition is executed by both engines and is visible in the recorded route-point index and trajectory. It records the requested velocity and steering acceleration, controller-accepted steering acceleration, achieved velocity, active route-point index, load-factor limiter state, store mass, and installed-store identities. The requested steering acceleration is the controller's instantaneous route-change demand before limiting; it is not an aerodynamic capability, pilot input, or named-aircraft performance claim. It does not use the scenario intent label to invent a turn or a permanent circular path. An aircraft without an admitted aircraft model is rejected. This is an educational point-mass route executor, not a flight-manual or manufacturer engine deck.
 
 ## Generic configuration-contrast evidence
+
+The high-energy crossing challenge and its 46 km control are now a termination
+contrast: one enters the compiled 25 m radius at 131.9 s and the other reaches
+140 s at 530.164926 m. Varying the legacy completion distance does not change
+the terminal result, proving that field is not causal authority.
 
 `tests/aircraft-configuration-contrast.test.mjs` executes one identical
 three-dimensional route and controller request with three deliberately distinct,
@@ -230,6 +260,11 @@ apply jamming, link it, or support a weapon. An unavailable path yields
 Complete nonlinear aircraft coefficient-table and engine-map execution; store drag, station moments, jettison, and other store-consumption events; maneuvering 6DOF attitude/control transients; pilot decision logic; take-off, landing, and runway operations; detailed seeker/autopilot/fuze/warhead behavior; production terrain ingestion or terrain-aware sensor state; waveform-level EW and countermeasures; probability of kill; validated operational routes or current force disposition.
 
 ## Rust/WASM gate
+
+The gate now includes exact terminal-state/event parity, malformed termination-
+model rejection and between-step closest-approach agreement for all nine
+canonical scenarios. The optimized artifact remains below the explicit 575,000-
+byte regression ceiling.
 
 The Rust integrator may replace the TypeScript numerical loop only after deterministic parity, numerical-tolerance, malformed-package, extreme-condition, lifecycle, and benchmark tests pass. JavaScript remains responsible for product state and rendering; batches will use a browser Worker.
 

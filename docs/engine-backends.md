@@ -79,6 +79,14 @@ SI projection, completeness and final digests, and returns only the exact pack
 identity. V2 remains non-promotable: the function is not part of the simulation
 ABI above and cannot construct runtime state or select a backend.
 
+Weapon termination is backend-neutral. Each weapon carries one compiled
+`vector.weapon-termination-model.v1`; both implementations reject wrong schema,
+intended use, criterion, non-finite or non-positive radius/time before the first
+tick. Both minimize the same between-step relative-position segment, apply the
+same terminal precedence, update the achieved weapon state and emit the same
+`WEAPON_TERMINATED` payload. The legacy scenario completion distance and any
+renderer distance are outside this authority.
+
 ## TypeScript reference
 
 The TypeScript engine is retained as an independently executable reference implementation. It uses the same coordinate frames, atmosphere, entity lifecycle, identity-bearing aircraft table interpolation with fail-closed coverage, aircraft state update, proportional-navigation guidance, coverage-envelope generation, termination rules, and sampling cadence.
@@ -86,6 +94,10 @@ The TypeScript engine is retained as an independently executable reference imple
 It is not a separate product mode. Its purpose is controlled parity testing, diagnosis, and performance comparison while the Rust implementation matures.
 
 ## Selection and provenance
+
+Both backends retain the exact 0.9.0 model-pack digest and the same compiled
+termination-model fields in run provenance. Backend selection cannot replace
+that authority or change an intercept into a damage/kill claim.
 
 Generic runway execution does not select a backend or a named model. Both
 backends retain the same mission, model-pack, EnvironmentPack and optimized
@@ -151,6 +163,11 @@ runtime.
   verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
 
 ## Swap boundary
+
+Weapon terminal transitions sit inside the shared backend contract: either
+implementation must produce the same achieved state, cause, occurrence time
+and event payload. No TypeScript-only, WASM-only or browser-only branch may
+invent terminal state.
 
 The ground-to-air swap is achieved-state-driven: only the recorded `ENROUTE`
 transition releases the aircraft from the ground-operation integrator to the

@@ -157,6 +157,14 @@ generic operation/installed-drag assumptions release-blocking. The inclusive
 `[0.001, 1] m²` validity is documented and authority-sealed; changing that
 policy requires a new reviewed contract rather than caller data.
 
+Migration 017 and its generated model-pack fixture are accepted only when the
+registered generator reproduces their exact bytes, model-pack digest, intended
+use, and scenario-template readback identities. STUB-27 keeps the 25 m
+geometric closest-approach and 180 s expiry values release-blocking and binds
+their explicit `NOT_MODELLED` target effect; neither a caller nor a renderer
+may promote that verification-only termination into fuze, damage, kill, or
+named-weapon authority.
+
 Issue #151's generic mission-policy source policy scans every production and
 runtime-fixture root for exact hashes and SHA-256-confirmed raw or
 contiguous-base64 embedded fingerprints of all governed external PDFs,

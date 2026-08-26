@@ -144,6 +144,12 @@ finiteness, range and integer checks still run before compilation. A dedicated
 regression injects string, `NaN` and out-of-range duplicate values and proves
 final simulation preparation fails closed.
 
+The catalog-admission regression resolves the same current immutable model-pack
+fixture used by every scenario package. When migration 017 advances that
+identity to 0.9.0, the regression must advance with it and still falsify a
+missing pack, payload-digest mismatch, missing limitations and mismatched
+approval state before any scenario becomes runnable.
+
 This baseline does not satisfy #193 by itself. Completion additionally requires
 machine-readable registration for every nested Air-mission and presentation
 control, deterministic constrained cross-field combinations, Worker/server
@@ -152,6 +158,12 @@ runtime configuration contrasts and a CI artifact that reports uncovered
 matrix rows.
 
 ## Existing baseline
+
+Weapon-termination regression now includes independent relative-segment
+closest-approach cases, malformed admission, maximum-flight expiry, legacy-
+distance non-authority, nine-scenario TypeScript/Rust parity and built-Worker
+event/lifecycle readback. Every geometric-intercept assertion also verifies
+that target effect is not modelled.
 
 The generic sensor Stage-0 generator, deny-network verifier, and adversarial
 suite are mandatory quality checks. `worker-local` and hosted integration rerun

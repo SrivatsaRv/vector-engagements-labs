@@ -110,6 +110,13 @@ function testScenario() {
             supportRequirement: "UNAVAILABLE",
             launchAuthorization: "SCHEDULED_TEST_ONLY",
           },
+          termination: {
+            schemaVersion: "vector.weapon-termination-model.v1",
+            intendedUse: "ENGINE_VERIFICATION_ONLY",
+            criterion: "GEOMETRIC_CLOSEST_APPROACH",
+            interceptRadiusM: 25,
+            maximumFlightTimeSeconds: 10,
+          },
         },
       },
     ],
@@ -219,6 +226,64 @@ test("weapon flight state is a closed achieved-state contract", () => {
       .filter((entity) => entity.kind !== "GUIDED_WEAPON")
       .every((entity) => entity.weaponFlightState === undefined),
   );
+});
+
+test("engine owns geometric intercept termination and records no target-effect claim", () => {
+  const scenarioWithLegacyAllowance = (distanceMeters) => {
+    const scenario = admitTestAircraft(testScenario());
+    scenario.completion.distanceMeters = distanceMeters;
+    const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
+    const red = scenario.entities.find((entity) => entity.id === "aircraft-red");
+    red.initial.position = { x: 20, y: 0, z: 8000 };
+    red.initial.velocity = { ...blue.initial.velocity };
+    return scenario;
+  };
+  const run = runEngine(scenarioWithLegacyAllowance(1));
+  const permissiveLegacyRun = runEngine(scenarioWithLegacyAllowance(10_000));
+  assert.equal(run.termination, "weapon_intercept");
+  assert.equal(permissiveLegacyRun.termination, "weapon_intercept");
+  assert.equal(
+    permissiveLegacyRun.closestApproachM,
+    run.closestApproachM,
+    "legacy scenario distance allowance must not author weapon termination",
+  );
+  assert.ok(run.closestApproachM <= 25);
+  const terminal = run.events.items.find((event) => event.payload.kind === "WEAPON_TERMINATED");
+  assert.ok(terminal);
+  assert.equal(terminal.payload.to, "INTERCEPT");
+  assert.equal(terminal.payload.cause, "GEOMETRIC_INTERCEPT");
+  assert.equal(terminal.payload.targetEffect, "NOT_MODELLED");
+  assert.ok(terminal.payload.occurrenceTimeSeconds >= 0 && terminal.payload.occurrenceTimeSeconds <= 0.05);
+  const finalWeapon = run.frames.at(-1).entities.find((entity) => entity.id === "weapon-blue");
+  const finalTarget = run.frames.at(-1).entities.find((entity) => entity.id === "aircraft-red");
+  assert.equal(finalWeapon.lifecycle, "TERMINATED");
+  assert.equal(finalWeapon.weaponFlightState, "INTERCEPT");
+  assert.equal(finalTarget.lifecycle, "ACTIVE", "geometric intercept must not invent target damage or kill");
+});
+
+test("maximum admitted flight time terminates the weapon as expired", () => {
+  const scenario = admitTestAircraft(testScenario());
+  scenario.entities.find((entity) => entity.weapon).weapon.termination.maximumFlightTimeSeconds = 0.1;
+  const run = runEngine(scenario);
+  assert.equal(run.termination, "weapon_expired");
+  const terminal = run.events.items.find((event) => event.payload.kind === "WEAPON_TERMINATED");
+  assert.equal(terminal?.payload.to, "EXPIRED");
+  assert.equal(terminal?.payload.cause, "FLIGHT_TIME_EXPIRED");
+});
+
+test("weapon termination admission fails closed before integration", () => {
+  const cases = [
+    ["schema", (value) => { value.schemaVersion = "vector.weapon-termination-model.v0"; }],
+    ["intended use", (value) => { value.intendedUse = "OPERATIONAL"; }],
+    ["criterion", (value) => { value.criterion = "RENDERER_DISTANCE"; }],
+    ["intercept radius", (value) => { value.interceptRadiusM = Number.NaN; }],
+    ["maximum flight time", (value) => { value.maximumFlightTimeSeconds = 0; }],
+  ];
+  for (const [name, mutate] of cases) {
+    const scenario = admitTestAircraft(testScenario());
+    mutate(scenario.entities.find((entity) => entity.weapon).weapon.termination);
+    assert.throws(() => runEngine(scenario), /no valid termination admission/, name);
+  }
 });
 
 test("engine rejects removed and malformed runtime events", () => {

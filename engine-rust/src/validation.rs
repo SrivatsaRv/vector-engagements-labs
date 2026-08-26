@@ -950,6 +950,22 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
             &format!("{root}.weapon.commandedCruiseAltitudeM"),
             weapon.commanded_cruise_altitude_m,
         )?;
+        if weapon.termination.schema_version != "vector.weapon-termination-model.v1"
+            || weapon.termination.intended_use != "ENGINE_VERIFICATION_ONLY"
+            || weapon.termination.criterion != "GEOMETRIC_CLOSEST_APPROACH"
+        {
+            return Err(invalid(format!(
+                "{root}.weapon.termination has unsupported authority"
+            )));
+        }
+        positive(
+            &format!("{root}.weapon.termination.interceptRadiusM"),
+            weapon.termination.intercept_radius_m,
+        )?;
+        positive(
+            &format!("{root}.weapon.termination.maximumFlightTimeSeconds"),
+            weapon.termination.maximum_flight_time_seconds,
+        )?;
         sha256_digest(
             &format!("{root}.weapon.admission.modelPackDigest"),
             &weapon.admission.model_pack_digest,

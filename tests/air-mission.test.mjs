@@ -396,6 +396,7 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
   const environmentMigration = readFileSync(new URL("../db/migrations/014_environment_pack_runways.sql", import.meta.url), "utf8");
   const groundDynamicsMigration = readFileSync(new URL("../db/migrations/015_generic_ground_dynamics.sql", import.meta.url), "utf8");
   const challengeMigration = readFileSync(new URL("../db/migrations/016_high_energy_crossing_challenge.sql", import.meta.url), "utf8");
+  const terminationMigration = readFileSync(new URL("../db/migrations/017_weapon_termination_model.sql", import.meta.url), "utf8");
   assert.equal(
     createHash("sha256").update(environmentMigration).digest("hex"),
     "c40e91b0fbbf2ee5110ae601dba676d2feec1957ebb440db81703c1696cbd227",
@@ -406,12 +407,14 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
     "ed5a04b32ae3f634c28394a17c98232474a737ce466fca58fc0bca21235fe35b",
     "migration 015 remains the frozen historical ground-dynamics snapshot",
   );
+  assert.equal(
+    createHash("sha256").update(challengeMigration).digest("hex"),
+    "c7105993b3e56b9bee8bac5f71d2133e40bf998b36b99d7066caec50c6f72553",
+    "migration 016 remains the frozen historical challenge snapshot",
+  );
   for (const definition of SCENARIO_LIBRARY) {
-    const isChallenge = definition.id === HIGH_ENERGY_CROSSING_CHALLENGE_ID;
-    const migration = isChallenge ? challengeMigration : groundDynamicsMigration;
-    const tag = isChallenge
-      ? "vector_high_energy_crossing_challenge"
-      : `vector_ground_dynamics_${definition.id.replaceAll("-", "_")}`;
+    const migration = terminationMigration;
+    const tag = `vector_weapon_termination_${definition.id.replaceAll("-", "_")}`;
     assert.ok(migration.includes(`$${tag}$${canonicalJson(definition)}$${tag}$::jsonb`), definition.id);
     assert.ok(
       migration.includes("INSERT INTO scenario_templates")
@@ -420,9 +423,7 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
     );
     assert.ok(migration.includes(`$${tag}$::jsonb,'vector.scenario.v4','${sha256HexSync(definition)}'`), definition.id);
     assert.ok(
-      isChallenge
-        ? migration.includes(`current.id='${definition.id}'`) && migration.includes(`current.content_hash='${sha256HexSync(definition)}'`)
-        : migration.includes(`('${definition.id}','${definition.version}','vector.scenario.v4','${sha256HexSync(definition)}','${definition.environment.replaceAll("'", "''")}')`),
+      migration.includes(`('${definition.id}','${definition.version}','${sha256HexSync(definition)}','${definition.intendedUse.version}','${definition.modelPack.version}','${definition.modelPack.digest}')`),
       `${definition.id} exact readback identity`,
     );
   }
@@ -430,6 +431,8 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
   assert.match(environmentMigration, /package->>'environment' NOT LIKE 'Sourced regional terrain and atmosphere%'/);
   assert.match(groundDynamicsMigration, /Generic ground-dynamics migration exact scenario identity\/hash readback failed/);
   assert.match(challengeMigration, /High-energy crossing challenge exact identity\/hash readback failed/);
+  assert.match(terminationMigration, /Weapon termination model-pack exact identity readback failed/);
+  assert.match(terminationMigration, /Weapon termination scenario exact identity readback failed/);
 });
 
 test("the governed high-energy crossing challenge owns exact non-default inputs and explicit nonclaims", () => {
@@ -471,7 +474,7 @@ test("the governed high-energy crossing challenge owns exact non-default inputs 
   assert.equal(highEnergyCrossingChallenge.intendedUse.id, "vector.intended-use.geometry-teaching");
   assert.equal(highEnergyCrossingChallenge.scenario.airMission.intendedUse, "PUBLIC_EDUCATIONAL");
   assert.equal(highEnergyCrossingChallenge.scenario.airMission.provenance.valueState, "MODEL_ASSUMPTION");
-  assert.match(highEnergyCrossingChallenge.scope, /not a hit or kill claim/i);
+  assert.match(highEnergyCrossingChallenge.scope, /not a target-damage or kill claim/i);
   assert.match(highEnergyCrossingChallenge.presetRationale.conditions, /Sensor, EW, damage, fuze, tactics, and probability of kill remain unavailable/i);
 });
 
@@ -494,10 +497,10 @@ test("the challenge completes late with TypeScript/Rust terminal and causal-even
     highEnergyCrossingCapabilities("typescript"),
   );
 
-  assert.equal(typescript.termination, "threshold_reached");
+  assert.equal(typescript.termination, "weapon_intercept");
   assert.equal(typescript.successful, true);
   assert.ok(typescript.timeOfFlight > 120 && typescript.timeOfFlight < 140);
-  assert.ok(typescript.closestApproach > 150 && typescript.closestApproach <= 180);
+  assert.ok(typescript.closestApproach > 20 && typescript.closestApproach <= 25);
   assert.ok(typescript.endSpeed > 200);
   assert.equal(typescript.engineRun.diagnostics.nonFiniteStateCount, 0);
   assert.deepEqual(repeated, typescript, "the exact authored seed and package must replay deterministically");
@@ -508,7 +511,11 @@ test("the challenge completes late with TypeScript/Rust terminal and causal-even
   assertContractParity(rust.engineRun.frames.at(-1), typescript.engineRun.frames.at(-1), "terminalFrame");
   assertContractParity(rust.closestApproach, typescript.closestApproach, "closestApproachM");
   assertContractParity(rust.timeOfFlight, typescript.timeOfFlight, "timeOfFlightSeconds");
-  assert.equal(typescript.engineRun.events.items.at(-1)?.payload.termination, "threshold_reached");
+  assert.equal(typescript.engineRun.events.items.at(-1)?.payload.termination, "weapon_intercept");
+  const terminal = typescript.engineRun.events.items.at(-2)?.payload;
+  assert.equal(terminal?.kind, "WEAPON_TERMINATED");
+  assert.equal(terminal?.to, "INTERCEPT");
+  assert.equal(terminal?.targetEffect, "NOT_MODELLED");
 
   assert.ok(typescript.pictures.length > 0);
   assert.ok(typescript.pictures.every((picture) =>
@@ -521,7 +528,7 @@ test("the challenge completes late with TypeScript/Rust terminal and causal-even
   assert.equal(control.termination, "time_limit");
   assert.equal(control.successful, false);
   assert.equal(control.timeOfFlight, 140);
-  assert.ok(control.closestApproach > 180);
+  assert.ok(control.closestApproach > 25);
 });
 
 test("CAP defaults are visible, editable, and causally change compiled patrol and fuel state", () => {
@@ -1356,7 +1363,7 @@ test("missions without a transfer plan retain the exact legacy v1 digest shape",
   assert.equal(Object.hasOwn(compiled.assignment, "storeTransferAuthorityDigest"), false);
   assert.equal(
     compiled.compiledDigest,
-    "00e6dec9b67697daea4c166348b1120cfc750537ec26d06eb2b81922108777ee",
+    "1e02ba55a111bd4fad3cda1df39142e78222efe831d84fdfc9fb858a3560036f",
   );
 });
 

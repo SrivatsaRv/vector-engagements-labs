@@ -591,7 +591,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     theatre: "Open training airspace",
     complexity: "Advanced",
     scope:
-      "One assumption-backed launcher, one manoeuvring target, and one guided fly-out; the 180 m terminal geometry threshold is not a hit or kill claim.",
+      "One assumption-backed launcher, one manoeuvring target, and one guided fly-out; the engine-owned 25 m verification-only geometric intercept is not a target-damage or kill claim.",
     tags: ["fighter vs fighter", "crossing challenge", "energy boundary"],
     targetMotion: "moving",
     environment:

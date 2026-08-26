@@ -38,6 +38,10 @@ criteria remain open.
 
 ## Current admitted surface
 
+- The admitted model-pack identity advances to the immutable 0.9.0 digest. This
+  admits the verification-only weapon-termination projection but does not admit
+  a fuze, warhead, damage, kill or named-system effectiveness capability.
+
 - A2A plus Tactical Intercept, Combat Air Patrol, Fighter Sweep, Escort and the
   `AIRBORNE`, `PARKING`, `RUNWAY`, and `GROUND_ALERT_QRA` start postures are
   admitted through `vector.air-mission.v1`. A ground start still requires an

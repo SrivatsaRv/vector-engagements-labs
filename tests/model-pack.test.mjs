@@ -32,7 +32,7 @@ import { createAnonymousGovernedPublication } from "../scripts/lib/anonymous-mod
 
 const fixture = JSON.parse(
   await readFile(
-    new URL("../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json", import.meta.url),
+    new URL("../fixtures/model-packs/vector-scalar-study-v0.9.compiled.json", import.meta.url),
     "utf8",
   ),
 );
@@ -58,7 +58,30 @@ test("model source compiles deterministically to the committed immutable SI fixt
   assert.equal(first.pack.weapons[0].seekerMode, "UNAVAILABLE");
   assert.equal(first.pack.weapons[0].supportRequirement, "UNAVAILABLE");
   assert.equal(first.pack.weapons[0].launchAuthorization, "SCHEDULED_TEST_ONLY");
+  assert.deepEqual(first.pack.weapons[0].termination, {
+    schemaVersion: "vector.weapon-termination-model.v1",
+    intendedUse: "ENGINE_VERIFICATION_ONLY",
+    criterion: "GEOMETRIC_CLOSEST_APPROACH",
+    interceptRadiusM: 25,
+    maximumFlightTimeS: 180,
+  });
   assert.ok(first.pack.aircraft.every((aircraft) => aircraft.performanceAdmission.state === "UNSUPPORTED"));
+});
+
+test("weapon termination authority is complete, typed, finite, and positive at model-pack compilation", async () => {
+  const cases = [
+    ["missing", (source) => { delete source.weapons[0].termination; }],
+    ["schema", (source) => { source.weapons[0].termination.schemaVersion = "vector.weapon-termination-model.v0"; }],
+    ["intended use", (source) => { source.weapons[0].termination.intendedUse = "OPERATIONAL"; }],
+    ["criterion", (source) => { source.weapons[0].termination.criterion = "RENDERER_DISTANCE"; }],
+    ["radius", (source) => { source.weapons[0].termination.interceptRadius.value = Number.NaN; }],
+    ["flight time", (source) => { source.weapons[0].termination.maximumFlightTime.value = 0; }],
+  ];
+  for (const [name, mutate] of cases) {
+    const source = cloneSource();
+    mutate(source);
+    await assert.rejects(() => compileModelPack(source), ModelPackValidationError, name);
+  }
 });
 
 test("one physical value changes the digest and invalidates approved evidence", async () => {

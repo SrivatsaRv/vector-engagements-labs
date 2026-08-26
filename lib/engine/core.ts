@@ -9,6 +9,7 @@ import type {
   EngineScenario,
   AircraftOperationalState,
   WeaponFlightState,
+  WeaponTerminalState,
   SimulationEventPayload,
 } from "./contracts.ts";
 import { SIMULATION_EVENT_PAYLOAD_SCHEMAS } from "./contracts.ts";
@@ -52,6 +53,7 @@ import type { SimulationEventReceipt } from "./simulation-events.ts";
 import type { TrackTransitionCommit } from "./contracts.ts";
 import { sha256HexSync } from "../geospatial/digest.ts";
 import { AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2 } from "../air-mission.ts";
+import { closestApproachOnRelativeSegment } from "./weapon-termination.ts";
 
 type RuntimeState = {
   definition: EngineEntityDefinition;
@@ -1030,6 +1032,95 @@ function updateWeapon(
       : "COAST";
 }
 
+type WeaponTerminationEvaluation = {
+  payload: Extract<SimulationEventPayload, { kind: "WEAPON_TERMINATED" }>;
+  runTermination: Extract<EngineRun["termination"], "weapon_intercept" | "weapon_miss" | "weapon_expired" | "weapon_failed" | "target_unavailable">;
+};
+
+function evaluateWeaponTermination(
+  weaponState: RuntimeState,
+  targetState: RuntimeState,
+  from: WeaponFlightState | undefined,
+  relativeStartM: Vec3,
+  relativeEndM: Vec3,
+  stepStartTimeSeconds: number,
+  fixedStepSeconds: number,
+  environmentSampler?: RuntimeEnvironmentSampler,
+): WeaponTerminationEvaluation | null {
+  const weapon = weaponState.definition.weapon;
+  if (!weapon || weaponState.definition.weapon?.storeTransfer?.operation === "JETTISON" || from === undefined || from === "STOWED") return null;
+  if (["INTERCEPT", "MISS", "EXPIRED", "FAILED", "SELF_DESTRUCT", "TARGET_UNAVAILABLE"].includes(from)) return null;
+
+  const closest = closestApproachOnRelativeSegment(relativeStartM, relativeEndM);
+  const endTimeSeconds = stepStartTimeSeconds + fixedStepSeconds;
+  const sinceLaunchSeconds = endTimeSeconds - (weapon.launchTimeSeconds ?? 0);
+  let to: WeaponTerminalState | undefined;
+  let cause: WeaponTerminationEvaluation["payload"]["cause"] | undefined;
+  let occurrenceTimeSeconds = endTimeSeconds;
+  let runTermination: WeaponTerminationEvaluation["runTermination"] | undefined;
+
+  if (weaponState.weaponFlightState === "TARGET_UNAVAILABLE" || targetState.lifecycle === "TERMINATED") {
+    to = "TARGET_UNAVAILABLE";
+    cause = "TARGET_UNAVAILABLE";
+    runTermination = "target_unavailable";
+  } else if (closest.distanceM <= weapon.termination.interceptRadiusM) {
+    to = "INTERCEPT";
+    cause = "GEOMETRIC_INTERCEPT";
+    runTermination = "weapon_intercept";
+    occurrenceTimeSeconds = stepStartTimeSeconds + closest.fraction * fixedStepSeconds;
+  } else if (
+    weaponState.position.z <= terrainElevation(environmentSampler, weaponState.position) &&
+    endTimeSeconds > 1
+  ) {
+    to = "FAILED";
+    cause = "TERRAIN_IMPACT";
+    runTermination = "weapon_failed";
+  } else if (sinceLaunchSeconds >= weapon.termination.maximumFlightTimeSeconds) {
+    to = "EXPIRED";
+    cause = "FLIGHT_TIME_EXPIRED";
+    runTermination = "weapon_expired";
+  } else if (
+    sinceLaunchSeconds > weapon.burnSeconds + 2 &&
+    magnitude(weaponState.velocity) < 80 &&
+    closest.distanceM > 1000
+  ) {
+    to = "MISS";
+    cause = "ENERGY_DEPLETED";
+    runTermination = "weapon_miss";
+  }
+  if (!to || !cause || !runTermination) return null;
+
+  weaponState.lifecycle = "TERMINATED";
+  weaponState.weaponFlightState = to;
+  weaponState.phase = to === "INTERCEPT"
+    ? "Geometric intercept"
+    : to === "TARGET_UNAVAILABLE"
+      ? "Target unavailable"
+      : to === "FAILED"
+        ? "Terrain impact"
+        : to === "EXPIRED"
+          ? "Flight time expired"
+          : "Miss";
+  return {
+    runTermination,
+    payload: {
+      kind: "WEAPON_TERMINATED",
+      schemaVersion: SIMULATION_EVENT_PAYLOAD_SCHEMAS.WEAPON_TERMINATED,
+      weaponId: weaponState.definition.id,
+      targetId: targetState.definition.id,
+      from: from as Exclude<WeaponFlightState, WeaponTerminalState>,
+      to,
+      cause,
+      criterion: weapon.termination.criterion,
+      closestApproachM: Number(closest.distanceM.toFixed(6)),
+      occurrenceTimeSeconds: Number(occurrenceTimeSeconds.toFixed(6)),
+      interceptRadiusM: weapon.termination.interceptRadiusM,
+      maximumFlightTimeSeconds: weapon.termination.maximumFlightTimeSeconds,
+      targetEffect: "NOT_MODELLED",
+    },
+  };
+}
+
 function toFrame(
   state: RuntimeState,
   scenario: EngineScenario,
@@ -1337,6 +1428,7 @@ export class EngineSession {
         throw new Error(`Weapon ${entity.id} launches outside the executable run window.`);
       }
       const admission = entity.weapon.admission;
+      const termination = entity.weapon.termination;
       if (
         !admission ||
         admission.modelPackDigest !== scenario.modelPack.digest ||
@@ -1349,6 +1441,18 @@ export class EngineSession {
         !admittedLaunchAuthorizations.has(admission.launchAuthorization)
       ) {
         throw new Error(`Weapon ${entity.id} has no valid compiled admission.`);
+      }
+      if (
+        !termination ||
+        termination.schemaVersion !== "vector.weapon-termination-model.v1" ||
+        termination.intendedUse !== "ENGINE_VERIFICATION_ONLY" ||
+        termination.criterion !== "GEOMETRIC_CLOSEST_APPROACH" ||
+        !Number.isFinite(termination.interceptRadiusM) ||
+        termination.interceptRadiusM <= 0 ||
+        !Number.isFinite(termination.maximumFlightTimeSeconds) ||
+        termination.maximumFlightTimeSeconds <= 0
+      ) {
+        throw new Error(`Weapon ${entity.id} has no valid termination admission.`);
       }
       const transfer = entity.weapon.storeTransfer;
       const launcher = scenario.entities.find((candidate) => candidate.id === entity.weapon!.launchPlatformId);
@@ -1882,28 +1986,9 @@ export class EngineSession {
           this.nonFiniteStateCount += 1;
       }
 
-      if (primaryWeapon.weaponFlightState === "TARGET_UNAVAILABLE") {
-        this.termination = "target_unavailable";
-        this.completed = true;
-      } else if (separationM <= scenario.completion.distanceMeters) {
-        this.termination = "threshold_reached";
-        this.completed = true;
-      } else if (tick >= this.terminalTick) {
+      if (tick >= this.terminalTick) {
         this.termination = "time_limit";
         this.completed = true;
-      } else {
-        const speed = magnitude(primaryWeapon.velocity);
-        const weapon = primaryWeapon.definition.weapon!;
-        const sinceLaunch = time - (weapon.launchTimeSeconds ?? 0);
-        if (primaryWeapon.lifecycle !== "STOWED" && (
-          (sinceLaunch > weapon.burnSeconds + 2 &&
-            speed < 80 &&
-            separationM > 1000) ||
-          (primaryWeapon.position.z <= terrainElevation(this.environmentSampler, primaryWeapon.position) && time > 1)
-        )) {
-          this.termination = "energy_depleted";
-          this.completed = true;
-        }
       }
       const nextTick = tick + 1;
       const nextTime = modelTimeAtTick(nextTick, scenario.fixedStepSeconds);
@@ -1941,6 +2026,7 @@ export class EngineSession {
       const beforeOperationalUpdates = new Map(
         [...this.states.values()].map((state) => [state.definition.id, state.aircraftOperationalState]),
       );
+      const priorWeaponFlightState = primaryWeapon.weaponFlightState;
       for (const state of this.states.values())
         updateKinematicEntity(state, scenario, time, scenario.fixedStepSeconds, this.environmentSampler);
       for (const state of this.states.values())
@@ -1948,6 +2034,24 @@ export class EngineSession {
       this.integratedSteps = nextTick;
       batchSteps += 1;
       const nextEventTime = recordedModelTimeAtTick(nextTick, scenario.fixedStepSeconds);
+      const postRelativePosition = subtract(primaryTarget.position, primaryWeapon.position);
+      const postSeparationM = magnitude(postRelativePosition);
+      const stepClosestApproach = closestApproachOnRelativeSegment(relativePosition, postRelativePosition);
+      this.closestApproachM = Math.min(this.closestApproachM, stepClosestApproach.distanceM);
+      const weaponTermination = evaluateWeaponTermination(
+        primaryWeapon,
+        primaryTarget,
+        priorWeaponFlightState,
+        relativePosition,
+        postRelativePosition,
+        time,
+        scenario.fixedStepSeconds,
+        this.environmentSampler,
+      );
+      if (weaponTermination) {
+        this.termination = weaponTermination.runTermination;
+        this.completed = true;
+      }
       for (const state of this.states.values()) {
         const prior = beforeUpdates.get(state.definition.id)!;
         if (prior === state.lifecycle) continue;
@@ -1992,20 +2096,27 @@ export class EngineSession {
           },
         });
       }
-      const postRelativePosition = subtract(primaryTarget.position, primaryWeapon.position);
-      const postSeparationM = magnitude(postRelativePosition);
-      this.closestApproachM = Math.min(this.closestApproachM, postSeparationM);
-      if (primaryWeapon.weaponFlightState === "TARGET_UNAVAILABLE") {
-        this.termination = "target_unavailable";
-        this.completed = true;
-      } else if (postSeparationM <= scenario.completion.distanceMeters) {
-        this.termination = "threshold_reached";
-        this.completed = true;
+      if (weaponTermination) {
+        const payload = weaponTermination.payload;
+        this.eventJournal.emit({
+          localKey: `weapon-terminated:${payload.weaponId}`,
+          tick: this.integratedSteps,
+          modelTimeSeconds: nextEventTime,
+          phase: "TERMINATION",
+          producer: { subsystem: "WEAPON_DYNAMICS", entityId: payload.weaponId },
+          knowledgeScope: "WORLD",
+          participants: [
+            { entityId: payload.weaponId, role: "WEAPON" },
+            { entityId: payload.targetId, role: "TARGET" },
+          ],
+          causes: [],
+          payload,
+        });
       } else {
         const speed = magnitude(primaryWeapon.velocity);
         const weapon = primaryWeapon.definition.weapon!;
         const sinceLaunch = nextTime - (weapon.launchTimeSeconds ?? 0);
-        if (primaryWeapon.lifecycle !== "STOWED" && (
+        if (weapon.storeTransfer?.operation === "JETTISON" && primaryWeapon.lifecycle !== "STOWED" && (
           (sinceLaunch > weapon.burnSeconds + 2 && speed < 80 && postSeparationM > 1000) ||
           (primaryWeapon.position.z <= terrainElevation(this.environmentSampler, primaryWeapon.position) && nextTime > 1)
         )) {

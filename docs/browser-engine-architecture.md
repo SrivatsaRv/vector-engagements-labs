@@ -46,6 +46,11 @@ and neither backend changes scenario or frame schemas.
 
 ## Dedicated simulation Worker
 
+The Worker transports the compiler-admitted weapon-termination model unchanged
+and returns the engine-owned terminal state and event in the VSR. It cannot use
+renderer distance, progress state or a legacy profile threshold to terminate a
+weapon.
+
 Air-domain adapters now carry the exact authored and compiled
 `vector.air-mission.v1` lineage. Before caching a structured-cloned adapter, the
 Worker independently recompiles mission, flight-plan, start, loadout, fuel,
@@ -132,9 +137,11 @@ parity remains owned by `tests/engine-backends.test.mjs` outside the deployed
 browser admission path.
 For #190, this built gate selects the governed 44 km/105-degree crossing
 challenge, opens `report.json` and `frames.arrow` from the transferred VSR, and
-requires a successful `threshold_reached` termination after 120 seconds but
-before 140 seconds with terminal separation at or below 180 m. A title, rendered
-path or progress message cannot satisfy that assertion.
+requires a successful `weapon_intercept` termination at 131.9 s with a
+21.836104 m closest approach inside the compiled 25 m verification-only radius.
+It also requires the typed `WEAPON_TERMINATED` event, the terminal weapon frame,
+an active target and `targetEffect: NOT_MODELLED`. A title, rendered path,
+renderer proximity or progress message cannot satisfy that assertion.
 The #187 built-browser journey additionally proves the exact store identity is
 absent before and appears once at the transfer frame, with the same outcome in
 telemetry/report playback and successful cancellation/retry recovery.

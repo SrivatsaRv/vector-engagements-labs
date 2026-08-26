@@ -18,6 +18,10 @@ No archive is created from a draft that fails lexical, structured numeric or
 whole-scenario admission. This gate changes no VSR member or schema: it ensures
 that `scenario.json` and `compiled.json` can contain only the admitted authored
 values and their exact compiled consequence.
+A weapon-terminal archive contains the compiled termination authority, the
+terminal achieved frame and exactly one `WEAPON_TERMINATED` event. The event
+records `targetEffect: NOT_MODELLED`; no archive consumer may promote geometric
+intercept to damage or kill.
 
 An admitted takeoff archive includes canonical operational frames and transition
 events beside the unchanged compiled Air-mission/model/environment identities.
@@ -158,9 +162,11 @@ velocity and steering acceleration, controller-accepted steering acceleration,
 achieved velocity, limiter state,
 installed-store mass, and the sorted identities of installed stores.
 Weapon samples additionally record the closed achieved `weaponFlightState`
-(`BOOST`, `COAST`, `TERMINAL_GUIDANCE`, or `TARGET_UNAVAILABLE` after launch).
+(`BOOST`, `COAST`, `TERMINAL_GUIDANCE`, `INTERCEPT`, `MISS`, `EXPIRED`,
+`FAILED`, reserved `SELF_DESTRUCT`, or `TARGET_UNAVAILABLE` after launch).
 This is distinct from free-text presentation phase and does not imply seeker or
-support availability.
+support availability. An `INTERCEPT` sample is geometric evidence only; it
+does not change the target lifecycle or assert damage or kill.
 The columnar frame codec preserves these values so replay and live playback use
 the same control evidence without rerunning the engine.
 
@@ -218,8 +224,8 @@ The manifest records SHA-256 hashes for the canonical scenario, compiled engine 
 `vector.simulation-event.v2` stream. It is not rebuilt from sampled frames and
 does not contain display-ready English. The current closed producer set is
 `RUN_STARTED`, `ENTITY_ENTERED_WORLD`, `ENTITY_LIFECYCLE_CHANGED`,
-`AIRCRAFT_OPERATIONAL_STATE_CHANGED`, `TRACK_STATE_CHANGED`, and
-`RUN_COMPLETED`. The aircraft event is produced by `AIRCRAFT_DYNAMICS` at the
+`AIRCRAFT_OPERATIONAL_STATE_CHANGED`, `WEAPON_TERMINATED`,
+`TRACK_STATE_CHANGED`, and `RUN_COMPLETED`. The aircraft event is produced by `AIRCRAFT_DYNAMICS` at the
 exact retained frame for every governed hold/roll/rotate/climbout/enroute
 transition and binds the ground-dynamics digest plus movement value state.
 `TRACK_STATE_CHANGED` is available
@@ -227,9 +233,16 @@ only for the source-authored generic engine-verification model and records an
 opaque side-owned track transition with exact source sequence/time and typed
 cause. Payload v3 retains the exact opaque observation ID for
 observation-driven transitions and `null` for coast/loss transitions.
-Launch-decision, guidance, support, and weapon-termination events remain
-unavailable until their owning contracts produce them; the record and browser
-may not infer them.
+`WEAPON_TERMINATED` is produced by `WEAPON_DYNAMICS`. Its v1 payload binds the
+weapon and target, prior and achieved weapon state, typed cause, the
+`GEOMETRIC_CLOSEST_APPROACH` criterion, closest approach, within-step
+occurrence time, admitted 25 m radius, admitted 180 s maximum flight time and
+`targetEffect: NOT_MODELLED`. Exactly one such event is required for a weapon
+intercept, miss, expiry, terrain failure or target-unavailable run. The event
+frame must contain the terminated weapon in the matching achieved state;
+geometric intercept leaves the target active. Launch-decision, guidance and
+support events remain unavailable until their owning contracts produce them;
+the record and browser may not infer them.
 
 The `vector.simulation-event.v2` envelope is immutable. Each payload variant
 carries a separate `vector.simulation-event-payload.<family>.vN` identity.
@@ -305,6 +318,9 @@ The browser owns raw lexical feedback, while the Worker and saved-run boundary
 repeat the shared structured and relational admission semantics. A transport
 adapter may serialize an admitted value but may not broaden its type, precision
 or cross-field validity.
+Browser consumers receive weapon terminal state and event evidence through the
+same VSR transfer as every other canonical frame/event. Map and 3D proximity,
+labels or playback sampling cannot replace or amend that evidence.
 
 The Worker transfers the recorded runway lifecycle and controller/value-state
 fields through the existing VSR boundary. Browser map, 3D, telemetry, timeline
@@ -338,6 +354,9 @@ VSR is designed for browser production and playback. Frames use a transferable c
 Replay remains read-only with respect to authored input. It exposes the exact
 validated scenario and compiled values stored in the VSR and has no repair,
 rounding or default path for rejected authoring data.
+Replay now covers engine-owned weapon intercept, miss, expiry, terrain failure
+and target-unavailable outcomes with exact payload validation. It remains
+read-only and does not compute a fuze, target effect, damage state or kill.
 
 The implemented ground-operation replay covers the admitted generic roll,
 rotation and climbout sequence through `ENROUTE`, with exact events and

@@ -268,8 +268,12 @@ the parallel unit-test process prevents source-verification work, JIT warmup or
 the broad-suite heap from becoming timing authority. The gate measures engine
 execution after compilation; it is not named-aircraft, runway-capacity,
 browser-rendering or server-throughput evidence. Publication also retains the
-existing sub-550,000-byte optimized WASM gate and the complete repository
-performance matrix on the clean candidate SHA.
+shared sub-575,000-byte optimized WASM gate and the complete repository
+performance matrix on the clean candidate SHA. The #28 terminal-event and
+between-step closest-approach contract increases the optimized artifact to
+556,589 bytes; its explicit regression ceiling is 575,000 bytes. The additional
+25,000-byte headroom is bounded release capacity, not evidence of faster
+execution or greater physics fidelity.
 
 #187 leaves that governed #182 fixture and benchmark unchanged. Its separate
 `performance:generic-airborne-store-transfer:verify` process composes an
@@ -278,7 +282,7 @@ explicit RELEASE request onto the admitted takeoff fixture and executes a
 three predeclared warmups and 20 measured samples; the report retains every
 sample, nearest-rank p50/p95 and the maximum separately. Every run must retain
 exactly one accepted/achieved transfer outcome, fewer than 150 frames, a p95
-below 100 ms, and the same optimized-WASM size ceiling below 550,000 bytes.
+below 100 ms, and the shared optimized-WASM size ceiling below 575,000 bytes.
 This workload proves only the generic `PUBLIC_EDUCATIONAL` / assumption-backed
 mechanism. It is not named-aircraft/store, carriage, safe-separation,
 weapon-effectiveness, browser-rendering, server-throughput, landing or recovery
