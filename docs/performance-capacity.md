@@ -271,7 +271,7 @@ browser-rendering or server-throughput evidence. Publication also retains the
 shared sub-575,000-byte optimized WASM gate and the complete repository
 performance matrix on the clean candidate SHA. The #28 terminal-event and
 between-step closest-approach contract increases the optimized artifact to
-556,974 bytes; its explicit regression ceiling is 575,000 bytes. The additional
+556,940 bytes; its explicit regression ceiling is 575,000 bytes. The additional
 25,000-byte headroom is bounded release capacity, not evidence of faster
 execution or greater physics fidelity.
 

@@ -899,7 +899,10 @@ function updateWeapon(
     return;
   }
 
-  const sinceLaunch = time - (weapon.launchTimeSeconds ?? 0);
+  const sinceLaunch = time - achievedWeaponLaunchTimeSeconds(
+    weapon,
+    scenario.fixedStepSeconds,
+  );
   const relativePosition = subtract(target.position, state.position);
   const separation = Math.max(1, magnitude(relativePosition));
   const los = normalize(relativePosition);
@@ -1037,6 +1040,16 @@ type WeaponTerminationEvaluation = {
   runTermination: Extract<EngineRun["termination"], "weapon_intercept" | "weapon_miss" | "weapon_expired" | "weapon_failed" | "target_unavailable">;
 };
 
+function achievedWeaponLaunchTimeSeconds(
+  weapon: NonNullable<EngineEntityDefinition["weapon"]>,
+  fixedStepSeconds: number,
+): number {
+  return modelTimeAtTick(
+    firstFixedStepTickAtOrAfter(weapon.launchTimeSeconds ?? 0, fixedStepSeconds),
+    fixedStepSeconds,
+  );
+}
+
 function weaponActiveStepFraction(
   weaponState: RuntimeState,
   stepStartTimeSeconds: number,
@@ -1045,7 +1058,8 @@ function weaponActiveStepFraction(
   const weapon = weaponState.definition.weapon;
   if (!weapon) return 1;
   const expiryTimeSeconds =
-    (weapon.launchTimeSeconds ?? 0) + weapon.termination.maximumFlightTimeSeconds;
+    achievedWeaponLaunchTimeSeconds(weapon, fixedStepSeconds) +
+    weapon.termination.maximumFlightTimeSeconds;
   return Math.max(
     0,
     Math.min(1, (expiryTimeSeconds - stepStartTimeSeconds) / fixedStepSeconds),
@@ -1076,7 +1090,7 @@ function evaluateWeaponTermination(
   if (["INTERCEPT", "MISS", "EXPIRED", "FAILED", "SELF_DESTRUCT", "TARGET_UNAVAILABLE"].includes(from)) return null;
 
   const endTimeSeconds = stepStartTimeSeconds + fixedStepSeconds;
-  const launchTimeSeconds = weapon.launchTimeSeconds ?? 0;
+  const launchTimeSeconds = achievedWeaponLaunchTimeSeconds(weapon, fixedStepSeconds);
   const expiryTimeSeconds = launchTimeSeconds + weapon.termination.maximumFlightTimeSeconds;
   const activeStepFraction = weaponActiveStepFraction(
     weaponState,
@@ -2175,7 +2189,10 @@ export class EngineSession {
       } else {
         const speed = magnitude(primaryWeapon.velocity);
         const weapon = primaryWeapon.definition.weapon!;
-        const sinceLaunch = nextTime - (weapon.launchTimeSeconds ?? 0);
+        const sinceLaunch = nextTime - achievedWeaponLaunchTimeSeconds(
+          weapon,
+          scenario.fixedStepSeconds,
+        );
         if (weapon.storeTransfer?.operation === "JETTISON" && primaryWeapon.lifecycle !== "STOWED" && (
           (sinceLaunch > weapon.burnSeconds + 2 && speed < 80 && postSeparationM > 1000) ||
           (primaryWeapon.position.z <= terrainElevation(this.environmentSampler, primaryWeapon.position) && nextTime > 1)

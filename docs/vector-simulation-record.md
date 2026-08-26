@@ -248,6 +248,12 @@ geometric intercept leaves the target active. Launch-decision, guidance and
 support events remain unavailable until their owning contracts produce them;
 the record and browser may not infer them.
 
+For `FLIGHT_TIME_EXPIRED`, replay independently derives the achieved launch
+boundary from the authored schedule and fixed step, adds the admitted maximum
+flight time, and requires the event's six-decimal occurrence time to equal that
+exact value. Rehashing a record after changing the timestamp cannot create a
+valid expiry event.
+
 The `vector.simulation-event.v2` envelope is immutable. Each payload variant
 carries a separate `vector.simulation-event-payload.<family>.vN` identity.
 Adding a producer under #26, #28, or #38 therefore requires a governed payload

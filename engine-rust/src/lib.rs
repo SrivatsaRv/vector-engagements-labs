@@ -2610,7 +2610,8 @@ fn update_weapon(
         return Ok(());
     }
     let state = &mut states[index];
-    let since_launch = time - weapon.launch_time_seconds.unwrap_or(0.0);
+    let since_launch =
+        time - achieved_weapon_launch_time_seconds(&weapon, scenario.fixed_step_seconds);
     let relative_position = target.position.subtract(state.position);
     let separation = relative_position.magnitude().max(1.0);
     let los = relative_position.normalize();
@@ -2913,6 +2914,16 @@ fn closest_approach_on_relative_segment(start: Vec3, end: Vec3) -> SegmentCloses
     }
 }
 
+fn achieved_weapon_launch_time_seconds(weapon: &WeaponModel, fixed_step_seconds: f64) -> f64 {
+    model_time_at_tick(
+        first_fixed_step_tick_at_or_after(
+            weapon.launch_time_seconds.unwrap_or(0.0),
+            fixed_step_seconds,
+        ),
+        fixed_step_seconds,
+    )
+}
+
 fn weapon_active_step_fraction(
     weapon_state: &RuntimeState,
     step_start_time_seconds: f64,
@@ -2921,8 +2932,8 @@ fn weapon_active_step_fraction(
     let Some(weapon) = weapon_state.definition.weapon.as_ref() else {
         return 1.0;
     };
-    let expiry_time_seconds =
-        weapon.launch_time_seconds.unwrap_or(0.0) + weapon.termination.maximum_flight_time_seconds;
+    let expiry_time_seconds = achieved_weapon_launch_time_seconds(weapon, fixed_step_seconds)
+        + weapon.termination.maximum_flight_time_seconds;
     ((expiry_time_seconds - step_start_time_seconds) / fixed_step_seconds).clamp(0.0, 1.0)
 }
 
@@ -2976,7 +2987,7 @@ fn evaluate_weapon_termination(
         return None;
     }
     let end_time_seconds = step_start_time_seconds + fixed_step_seconds;
-    let launch_time_seconds = weapon.launch_time_seconds.unwrap_or(0.0);
+    let launch_time_seconds = achieved_weapon_launch_time_seconds(weapon, fixed_step_seconds);
     let expiry_time_seconds = launch_time_seconds + weapon.termination.maximum_flight_time_seconds;
     let active_step_fraction =
         weapon_active_step_fraction(weapon_state, step_start_time_seconds, fixed_step_seconds);
@@ -3419,7 +3430,8 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                         "primary weapon lost its model during integration".to_string(),
                     )
                 })?;
-            let since_launch = next_time - weapon.launch_time_seconds.unwrap_or(0.0);
+            let since_launch = next_time
+                - achieved_weapon_launch_time_seconds(weapon, scenario.fixed_step_seconds);
             if weapon.store_transfer.as_ref().is_some_and(|transfer| {
                 transfer.transfer.operation == StoreTransferOperation::Jettison
             }) && states[weapon_index].lifecycle != EntityLifecycle::Stowed
@@ -4327,6 +4339,51 @@ mod tests {
             }
         });
         assert_eq!(occurrence, Some(0.075));
+        Ok(())
+    }
+
+    #[test]
+    fn off_grid_weapon_lifetime_starts_at_achieved_activation_boundary(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut input = scenario();
+        let weapon = input
+            .entities
+            .iter_mut()
+            .find(|entity| entity.id == "blue-weapon")
+            .and_then(|entity| entity.weapon.as_mut())
+            .ok_or("scenario has no weapon")?;
+        weapon.launch_time_seconds = Some(0.025);
+        weapon.termination.intercept_radius_m = 0.1;
+        weapon.termination.maximum_flight_time_seconds = 0.01;
+        input.duration_seconds = 1.0;
+
+        let run = try_run_engine(input)?;
+        let entry_time = run.events.items.iter().find_map(|event| {
+            if event.producer.entity_id.as_deref() == Some("blue-weapon")
+                && matches!(
+                    &event.payload,
+                    simulation_events::SimulationEventPayload::EntityEnteredWorld { .. }
+                )
+            {
+                Some(event.model_time_seconds)
+            } else {
+                None
+            }
+        });
+        let expiry_time = run.events.items.iter().find_map(|event| {
+            if let simulation_events::SimulationEventPayload::WeaponTerminated {
+                occurrence_time_seconds,
+                ..
+            } = &event.payload
+            {
+                Some(*occurrence_time_seconds)
+            } else {
+                None
+            }
+        });
+        assert_eq!(run.termination, Termination::WeaponExpired);
+        assert_eq!(entry_time, Some(0.05));
+        assert_eq!(expiry_time, Some(0.06));
         Ok(())
     }
 

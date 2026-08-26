@@ -114,7 +114,9 @@ no exported simulation ABI, backend-selection rule or v2 runtime admission.
 - Add exact TypeScript/Rust `vector.weapon-termination-model.v1` admission,
   between-step closest approach, closed terminal states and canonical
   `WEAPON_TERMINATED` event parity. Source discriminators are mandatory,
-  pre-launch geometry is excluded, and the optimized artifact is 556,974 bytes.
+  pre-launch geometry is excluded, off-grid lifetime begins at achieved world
+  entry, replay recomputes exact expiry authority, and the optimized artifact
+  is 556,940 bytes.
 - Pin the Rust/WASM post-link size policy to Binaryen 131.0.0 with an explicit
   admitted feature set; bind that policy into the generated module identity and
   retain an explicit sub-575,000-byte browser artifact gate.
@@ -258,7 +260,9 @@ No pending family-specific entry.
   approach, exact event-distance to frozen-report binding, exact
   terminal-state/cause to run-outcome binding and explicit `NOT_MODELLED`
   target effect. Miss, expiry and failure reports retain their exact causal
-  result reason instead of falling through to a time-limit explanation.
+  result reason instead of falling through to a time-limit explanation. Expiry
+  occurrence time is bound to achieved launch plus admitted maximum lifetime,
+  so a hash-resealed timestamp substitution fails replay.
 
 Saved-run record and admission tables now have separate domain-owned schema
 modules without changing their persisted representation.

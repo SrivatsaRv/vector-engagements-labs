@@ -297,6 +297,25 @@ test("an in-step expiry excludes later geometric closest approach", () => {
   );
 });
 
+test("off-grid weapon lifetime starts at the achieved activation boundary", () => {
+  const scenario = admitTestAircraft(testScenario());
+  const weapon = scenario.entities.find((entity) => entity.weapon);
+  weapon.weapon.launchTimeSeconds = 0.025;
+  weapon.weapon.termination.interceptRadiusM = 0.1;
+  weapon.weapon.termination.maximumFlightTimeSeconds = 0.01;
+
+  const run = runEngine(scenario);
+  const entry = run.events.items.find(
+    (event) => event.payload.kind === "ENTITY_ENTERED_WORLD" && event.producer.entityId === weapon.id,
+  );
+  const terminal = run.events.items.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  assert.equal(run.termination, "weapon_expired");
+  assert.equal(entry?.modelTimeSeconds, 0.05);
+  assert.equal(terminal?.payload.occurrenceTimeSeconds, 0.06);
+});
+
 test("a non-intercept termination event records the lifetime closest approach", () => {
   const scenario = admitTestAircraft(testScenario());
   const red = scenario.entities.find((entity) => entity.id === "aircraft-red");

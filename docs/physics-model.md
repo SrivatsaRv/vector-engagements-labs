@@ -98,7 +98,10 @@ minimizes the linearly interpolated relative-position segment, so a crossing
 between retained samples cannot be missed. The fixed
 precedence is target unavailable, geometric intercept during the admitted
 flight lifetime, exact flight-time expiry, terrain impact, then energy-depleted
-miss. When expiry falls inside a fixed step, closest approach is evaluated only
+miss. The flight lifetime starts at the achieved world-entry boundary: the
+first fixed-step boundary at or after the requested launch time. An off-grid
+request therefore does not consume lifetime while the weapon remains stowed.
+When expiry falls inside a fixed step, closest approach is evaluated only
 over the pre-expiry subsegment; later geometry cannot become an intercept or
 reduce the recorded closest approach. A terminal result ends the
 weapon lifecycle and emits one typed event at the exact retained boundary; the

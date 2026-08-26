@@ -895,6 +895,21 @@ export function assertSimulationEventStream(
         payload.occurrenceTimeSeconds < event.modelTimeSeconds - scenario.fixedStepSeconds - 1e-9 ||
         payload.occurrenceTimeSeconds > event.modelTimeSeconds + 1e-9
       ) throw new Error(`Simulation weapon-termination event ${event.id} has invalid authority, ownership, or achieved frame state.`);
+      if (payload.cause === "FLIGHT_TIME_EXPIRED") {
+        const achievedLaunchTimeSeconds = modelTimeAtTick(
+          firstFixedStepTickAtOrAfter(
+            weapon.weapon.launchTimeSeconds ?? 0,
+            scenario.fixedStepSeconds,
+          ),
+          scenario.fixedStepSeconds,
+        );
+        const expectedExpiryTimeSeconds = Number((
+          achievedLaunchTimeSeconds + admission.maximumFlightTimeSeconds
+        ).toFixed(6));
+        if (payload.occurrenceTimeSeconds !== expectedExpiryTimeSeconds) {
+          throw new Error(`Simulation weapon-termination event ${event.id} does not match the exact admitted expiry time.`);
+        }
+      }
     } else {
       const entityId = event.producer.entityId;
       const entity = entityId ? entityById.get(entityId) : undefined;

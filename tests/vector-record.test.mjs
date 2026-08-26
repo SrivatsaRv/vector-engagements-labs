@@ -207,6 +207,38 @@ test("VSR admits an off-grid scheduled launch at its first fixed-step boundary",
   assert.equal(opened.result.engineRun.frames[entry.frameIndex].t, 2.05);
 });
 
+test("VSR rejects a hash-resealed expiry time that contradicts the achieved launch boundary", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const prepared = prepareSimulation(scenario);
+  const weapon = prepared.engineScenario.entities.find((entity) =>
+    entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds === 0
+  );
+  assert.ok(weapon?.weapon);
+  weapon.weapon.termination.interceptRadiusM = 0.1;
+  weapon.weapon.termination.maximumFlightTimeSeconds = 0.075;
+  prepared.engineScenario.durationSeconds = 1;
+  const engineRun = runEngineBackend(prepared.engineScenario, "typescript");
+  const result = buildSimulationResult(prepared, engineRun);
+  assert.equal(result.termination, "weapon_expired");
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const events = structuredClone(result.engineRun.events.items);
+  const terminal = events.find((event) => event.payload.kind === "WEAPON_TERMINATED");
+  assert.ok(terminal);
+  assert.equal(terminal.payload.occurrenceTimeSeconds, 0.075);
+  terminal.payload.occurrenceTimeSeconds = 0.06;
+  const corrupt = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /does not match the exact admitted expiry time/,
+  );
+});
+
 test("VSR content identity and stable event ordering are deterministic", async () => {
   const scenario = SCENARIO_LIBRARY[1].scenario;
   const prepared = prepareSimulation(scenario);

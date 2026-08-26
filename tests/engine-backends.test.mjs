@@ -513,6 +513,35 @@ test("both engines exclude a geometric intercept occurring after an in-step expi
   }
 });
 
+test("both engines start off-grid weapon lifetime at the achieved activation boundary", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const weapon = baseline.entities.find((entity) => entity.weapon);
+  assert.ok(weapon?.weapon);
+  weapon.weapon.launchTimeSeconds = 0.025;
+  weapon.weapon.termination.interceptRadiusM = 0.1;
+  weapon.weapon.termination.maximumFlightTimeSeconds = 0.01;
+  baseline.durationSeconds = 1;
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const run = runEngineBackend(structuredClone(baseline), backend);
+    const entry = run.events.items.find(
+      (event) => event.payload.kind === "ENTITY_ENTERED_WORLD" && event.producer.entityId === weapon.id,
+    );
+    const terminal = run.events.items.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    );
+    assert.equal(run.termination, "weapon_expired", backend);
+    assert.equal(entry?.modelTimeSeconds, 0.05, backend);
+    assert.equal(terminal?.payload.occurrenceTimeSeconds, 0.06, backend);
+  }
+});
+
 test("both engines bind non-intercept events to the lifetime closest approach", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
   const baseline = structuredClone(

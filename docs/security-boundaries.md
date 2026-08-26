@@ -169,7 +169,9 @@ use, and scenario-template readback identities. STUB-27 keeps the 25 m
 geometric closest-approach and 180 s expiry values release-blocking and binds
 their explicit `NOT_MODELLED` target effect; neither a caller nor a renderer
 may promote that verification-only termination into fuze, damage, kill, or
-named-weapon authority.
+named-weapon authority. VSR replay recomputes the achieved fixed-step launch
+boundary plus the admitted maximum lifetime and rejects any hash-resealed
+expiry event carrying a different occurrence time.
 
 Issue #151's generic mission-policy source policy scans every production and
 runtime-fixture root for exact hashes and SHA-256-confirmed raw or
