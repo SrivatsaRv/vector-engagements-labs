@@ -6,13 +6,15 @@
 
 The verifier is offline and cannot fetch replacement evidence. Numeric transcription, interpolation, and runtime tests belong to later #142 children and must not be credited to #143.
 
-## Value-free TP-1538 aerodynamic tooling
+## TP-1538 aerodynamic verification corpus
 
-The #142 gate separately admits two complete, isolated manual transcripts, reports every structural/state/printed-string mismatch, requires source-page adjudication for each difference, and validates one immutable 48-table/14,705-position corpus. Focused tests reject OCR/imported numeric methods, missing/reordered/duplicate coordinates, altered pages or configurations, unavailable-cell coercion, forged recomputed digests, caller mutation, extrapolation, and production imports or bundles. Independent source-page oracles cover exact knots, interior interpolation, increments, derivatives, configuration selection, published symmetry, Appendix B assembly order, and the explicitly withheld one-dimensional `CN_AILERON_INCREMENT` assembly term.
+The #142 gate admits two complete, isolated manual transcripts, reports every structural/state/printed-string mismatch, requires source-page adjudication for each difference, and validates one immutable 48-table/14,705-position corpus. The admitted corpus has canonical SHA-256 `24833d23b6ba542cdda4152e9f0eeac4a5936e827c9c4367d25eb70e11a724d2`; its 13,587 available, 37 printed-blank, one illegible, and 1,080 out-of-domain decisions replay from embedded lineage. Focused tests reject OCR/imported numeric methods, missing/reordered/duplicate coordinates, altered pages or configurations, unavailable-cell coercion, forged recomputed digests, caller mutation, extrapolation, and production imports or bundles. Independent source-page oracles cover exact knots, interior interpolation, increments, derivatives, configuration selection, published symmetry, Appendix B assembly order, and the explicitly withheld one-dimensional `CN_AILERON_INCREMENT` assembly term.
 
 The admitted corpus must then replay identical full-state results through TypeScript and the generated-schema Rust/WASM verifier, survive bounded UTF-8 record readback, and recover a separate verification-only Worker from the same corpus after termination. Corpus admission replays each resolved state/value and `AGREED_DOUBLE_ENTRY` or `SOURCE_ADJUDICATED` label from the exact embedded transcripts and complete frozen adjudication artifact. That artifact's content digest and comparison raw/canonical binding are part of the corpus digest, so a recomputed top-level digest cannot detach a value from its evidence lineage or collapse two raw-distinct evidence chains. The immutable performance workload binds its corpus, requests, expected results and runtime identity; its executable policy rejects dirty or unidentified measurement state and validates every complete measured output against the frozen result digest. Pre-optimization admission, 4,096-operation batch, Worker, memory and WASM-size limits are maintained in [`tp1538-aero-verification.md`](tp1538-aero-verification.md). `make ci-local`, exact-SHA clean-clone execution, and built-bundle isolation remain completion gates rather than substitutes for the independent numeric workflow.
 
-`make tp1538-adjudication-local` independently exercises the value-free decision CLI over two bounded `TEST_ONLY_SYNTHETIC` mismatches. It proves immutable comparison admission; exact create/apply/validate/freeze state transitions; complete, duplicate-free mismatch coverage; canonical digest naming; exclusive `0444` persistence and raw readback; finalizer consumption; corpus retention/replay of the frozen artifact and comparison raw/canonical binding; raw-distinct evidence-chain identity; and hostile page, coordinate, decision, state/value, rationale, actor, stale-digest, symlink, oversize and tamper rejection. No real transcript path, comparison, value, digest, progress count or decision is a fixture or test input.
+## Value-free TP-1538 aerodynamic tooling
+
+`make tp1538-adjudication-local` independently exercises the decision CLI over two bounded `TEST_ONLY_SYNTHETIC` mismatches. It proves immutable comparison admission; exact create/apply/validate/freeze state transitions; complete, duplicate-free mismatch coverage; canonical digest naming; exclusive `0444` persistence and raw readback; finalizer consumption; corpus retention/replay of the frozen artifact and comparison raw/canonical binding; raw-distinct evidence-chain identity; and hostile page, coordinate, decision, state/value, rationale, actor, stale-digest, symlink, oversize and tamper rejection. The separate `make tp1538-aero-local` gate regenerates the real workload byte-for-byte and runs real-corpus page oracles, full-state parity, record, Worker-replacement, size and isolation evidence.
 
 ## Generic mission-policy Stage-0 source freeze
 
@@ -123,12 +125,13 @@ blank or structurally invalid images, reproduces the three upright display
 derivatives, and checks every source/display mapping. It never extracts numeric
 values or equations, and source PDFs remain authoritative.
 
-The value-free TP-1538 tooling baseline verifies the complete empty coordinate
-inventory, exact-key admission, bounded immutable storage, synthetic
-TypeScript/Rust-WASM full-state parity, isolated Worker recovery, generated
-artifact freshness and performance-evidence policy. These tests cannot be
-credited as either real transcript, page-grounded numeric oracle, comparison,
-adjudication or final-corpus evidence for parent #142.
+The TP-1538 baseline retains the complete empty-coordinate and hostile
+synthetic-tooling controls, then independently admits the real content-addressed
+corpus and frozen workload. It checks exact source/transcript/comparison/
+adjudication identities, page-grounded knots and unavailable marks, independent
+bilinear and trilinear interior values, a derivative, Appendix B assembly,
+complete TypeScript/Rust-WASM state parity, bounded record readback, replacement
+Worker recovery, production isolation and the 500,000-byte WASM ceiling.
 
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and
 production-audit checks. It first runs the same contract-documentation impact

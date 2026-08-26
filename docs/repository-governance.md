@@ -50,12 +50,13 @@ publication evidence. It then runs the generic takeoff benchmark in its own
 process with explicit warmups and 20 retained samples per backend; the parallel
 unit-test process validates the profile but is never timing authority.
 
-The value-free TP-1538 tooling child adds its generated Rust-schema freshness,
-Rust formatting/clippy/test/rustdoc and embedded-WASM freshness checks to the
-same `ci-local` sequence. The production audit and ordinary application build
-must remain free of its verification-only subject, corpus and evaluator
-markers. Real transcript, comparison, adjudication and corpus artifacts are
-not CI fixtures for this tooling child.
+The TP-1538 family adds generated Rust-schema and 4,096-operation workload
+freshness, Rust formatting/clippy/test/rustdoc, embedded-WASM freshness, and
+real-corpus page-oracle/parity/Worker/readback checks to the same `ci-local`
+sequence. The corpus and workload paths select quality, web-contract and Rust
+verification, while verifier source paths select their Rust owner. The
+production audit and ordinary application build must remain free of this
+verification-only subject, corpus and evaluator authority.
 
 The same family owns the offline adjudication manager and its focused hostile
 test as exact governed paths. `ci-quality` runs
@@ -63,10 +64,13 @@ test as exact governed paths. `ci-quality` runs
 `TEST_ONLY_SYNTHETIC` mismatches to prove comparison admission, exact decision
 coverage, immutable freeze/readback, finalizer consumption, and corpus replay
 of the frozen adjudication content digest plus comparison raw/canonical
-binding. The family also
+binding. `make tp1538-aero-local` separately verifies the admitted real corpus
+and deterministic workload; `npm run tp1538:aero:benchmark` additionally
+requires an exact clean commit and records admission, TypeScript, Rust/WASM,
+Worker, RSS, output and module-size evidence against predeclared limits. The family also
 owns its distinct TP-1538 changelog heading; adding those rules is a semantic
-ownership-policy change, not permission to commit a real transcript,
-comparison, decision, corpus value or progress identity.
+ownership-policy change and does not grant the verification corpus production
+or named-aircraft authority.
 
 `ci.yml` is one change-aware pull-request and `main` pipeline. Stage 0 computes
 the rename/copy-aware change set from the exact merge base and head revisions with the tracked

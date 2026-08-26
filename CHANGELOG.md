@@ -121,6 +121,16 @@ No pending family-specific entry.
 
 #### TP-1538 verification tooling
 
+- Admit the complete content-addressed NASA TP-1538 generic-F-16 aerodynamic
+  corpus after two isolated 14,705-position transcriptions, deterministic
+  comparison, and 1,311 page-grounded adjudications. Preserve all 13,587
+  available, 37 printed-blank, one illegible, and 1,080 out-of-domain states.
+- Add independent page/cell, interpolation, derivative and Appendix B assembly
+  oracles; a frozen mixed 4,096-operation workload; full TypeScript/Rust-WASM
+  semantic parity; bounded record readback; Worker replacement; production
+  isolation; clean-repository performance evidence; and a generated WASM-size
+  gate. The admitted subject remains `NASA_GENERIC_F16` with deployment class
+  `ENGINE_VERIFICATION_ONLY` and provides no named F-16 runtime authority.
 - Add the offline `vector.tp1538-adjudication-decisions.v1` create, source-read
   apply, exact-coverage validation and immutable freeze CLI. The finalizer now
   requires and embeds its digest-named, read-only artifact, content digest, and

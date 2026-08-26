@@ -303,6 +303,24 @@ test("generic AAM validation and generated verifier paths select Rust ownership"
   }
 });
 
+test("TP-1538 corpus, workload, and verifier paths select quality and Rust verification", () => {
+  for (const path of [
+    "governance/nasa-tp1538-generic-f16-aero-verification-corpus.v1.json",
+    "fixtures/public-reference/nasa-tp1538-aero/workload.v1.json",
+  ]) {
+    const gates = selected([path]);
+    assert.equal(gates.includes("quality"), true, `${path} must select quality verification`);
+    assert.equal(gates.includes("rust_tests"), true, `${path} must select Rust verification`);
+  }
+  for (const path of [
+    "lib/validation/tp1538-aero-verification-wasm.ts",
+    "scripts/benchmark-tp1538-aero.mjs",
+    "verification-rust/tp1538-aero/src/model.rs",
+  ]) {
+    assert.equal(selected([path]).includes("rust_tests"), true, `${path} must select Rust verification`);
+  }
+});
+
 test("every registered persistence executable selects database integration", () => {
   for (const path of [
     "scripts/seed-db.ts",

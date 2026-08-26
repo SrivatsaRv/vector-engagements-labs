@@ -41,14 +41,7 @@ function getVerifier() {
   return exports;
 }
 
-export function runRustWasmTp1538AeroBatch(
-  corpusCandidate: unknown,
-  expectedCorpusSha256: string,
-  lookupRequests: Tp1538AeroLookupRequest[],
-  assemblyRequests: Tp1538AeroAssemblyInput[],
-): Tp1538EvaluatorBatchResult {
-  const batch = createTp1538EvaluatorBatch(corpusCandidate, expectedCorpusSha256, lookupRequests, assemblyRequests);
-  const encoded = new TextEncoder().encode(JSON.stringify(batch));
+function executeEncodedBatch(encoded: Uint8Array): unknown {
   const wasm = getVerifier();
   if (encoded.byteLength > wasm.vector_tp1538_aero_max_input_len()) throw new Error("TP-1538 verification input exceeds its isolated ABI limit.");
   const pointer = wasm.vector_tp1538_aero_input_reserve(encoded.byteLength);
@@ -57,7 +50,33 @@ export function runRustWasmTp1538AeroBatch(
   const succeeded = wasm.vector_tp1538_aero_run_json() === 1;
   const output = new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, wasm.vector_tp1538_aero_output_ptr(), wasm.vector_tp1538_aero_output_len()));
   if (!succeeded) throw new Error(`TP-1538 verification artifact rejected input: ${output}`);
-  return validateTp1538EvaluatorBatchResult(corpusCandidate, batch, JSON.parse(output), expectedCorpusSha256);
+  return JSON.parse(output);
+}
+
+export function prepareRustWasmTp1538AeroBatch(
+  corpusCandidate: unknown,
+  expectedCorpusSha256: string,
+  lookupRequests: Tp1538AeroLookupRequest[],
+  assemblyRequests: Tp1538AeroAssemblyInput[],
+) {
+  const corpus = structuredClone(corpusCandidate);
+  const batch = createTp1538EvaluatorBatch(corpus, expectedCorpusSha256, lookupRequests, assemblyRequests);
+  const encoded = new TextEncoder().encode(JSON.stringify(batch));
+  return Object.freeze({
+    encodedBytes: encoded.byteLength,
+    executeCandidate: () => executeEncodedBatch(encoded),
+    validateCandidate: (candidate: unknown) => validateTp1538EvaluatorBatchResult(corpus, batch, candidate, expectedCorpusSha256),
+  });
+}
+
+export function runRustWasmTp1538AeroBatch(
+  corpusCandidate: unknown,
+  expectedCorpusSha256: string,
+  lookupRequests: Tp1538AeroLookupRequest[],
+  assemblyRequests: Tp1538AeroAssemblyInput[],
+): Tp1538EvaluatorBatchResult {
+  const prepared = prepareRustWasmTp1538AeroBatch(corpusCandidate, expectedCorpusSha256, lookupRequests, assemblyRequests);
+  return prepared.validateCandidate(prepared.executeCandidate());
 }
 
 export const TP1538_AERO_VERIFIER_ARTIFACT = {

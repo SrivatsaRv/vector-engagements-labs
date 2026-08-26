@@ -734,7 +734,7 @@ export function createTp1538AdjudicatedCorpus({ left, right, comparison, compari
       const key = decisionKey(inventory.id, leftCell.coordinate);
       const decision = decisionByKey.get(key);
       const state = decision?.chosenState ?? leftCell.state;
-      const printedValue = decision?.chosenPrintedValue ?? leftCell.printedValue;
+      const printedValue = decision ? decision.chosenPrintedValue : leftCell.printedValue;
       const pdfPage = pdfPageForCell(inventory, leftCell.coordinate);
       const page = pageDescriptor(pdfPage);
       return {
@@ -850,7 +850,7 @@ export function validateTp1538Corpus(corpus, { expectedCorpusSha256 } = {}) {
       const transcriptCell = corpus.transcriptions.left.tables[tableIndex].cells[cellIndex];
       const decision = embeddedDecisionByKey.get(decisionKey(expected.id, cell.coordinate));
       const resolvedState = decision?.chosenState ?? transcriptCell.state;
-      const resolvedPrintedValue = decision?.chosenPrintedValue ?? transcriptCell.printedValue;
+      const resolvedPrintedValue = decision ? decision.chosenPrintedValue : transcriptCell.printedValue;
       if (cell.state !== resolvedState || cell.printedValue !== resolvedPrintedValue) throw new Error(`${expected.id} corpus cell does not match its transcript or adjudication lineage.`);
       exactKeys(cell.lineage, LINEAGE_KEYS, `${expected.id} cell lineage`);
       const pdfPage = pdfPageForCell(expected, cell.coordinate);

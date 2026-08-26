@@ -2421,11 +2421,15 @@ test("the repository policy maps real simulation identities to their exact owner
   assert.deepEqual(exactRule(tp1538Aero, "scripts/freeze-tp1538-transcription.mjs").facets, ["admission", "digest", "evidence", "schema", "verification"]);
   assert.deepEqual(exactRule(tp1538Aero, "scripts/workers/tp1538-aero-verification.worker.ts").facets, ["admission", "schema", "verification"]);
   assert.deepEqual(exactRule(tp1538Aero, "scripts/lib/tp1538-aero-performance-evidence.mjs").facets, ["digest", "verification"]);
+  assert.deepEqual(exactRule(tp1538Aero, "governance/nasa-tp1538-generic-f16-aero-verification-corpus.v1.json").facets, ["admission", "datum", "digest", "evidence", "schema", "unit", "validity", "verification"]);
+  assert.deepEqual(exactRule(tp1538Aero, "fixtures/public-reference/nasa-tp1538-aero/workload.v1.json").facets, ["datum", "digest", "verification"]);
+  assert.deepEqual(exactRule(tp1538Aero, "scripts/benchmark-tp1538-aero.mjs").facets, ["digest", "verification"]);
   assert.deepEqual(exactRule(tp1538Aero, "lib/validation/tp1538-aero-verification-wasm.ts").facets, ["datum", "digest", "schema", "unit", "validity", "verification"]);
   assert.deepEqual(tp1538Aero.testRules.find((rule) => rule.value === "tests/tp1538-aero-performance-evidence.test.mjs").facets, ["digest", "verification"]);
+  assert.deepEqual(tp1538Aero.testRules.find((rule) => rule.value === "tests/tp1538-aero-reference.test.mjs").facets, ["admission", "datum", "digest", "evidence", "schema", "unit", "validity", "verification", "vsr"]);
   assert.deepEqual(
     tp1538Aero.generatedGroups.map(({ id }) => id),
-    ["TP1538_RUST_SCHEMA", "TP1538_AERO_VERIFIER_WASM"],
+    ["TP1538_RUST_SCHEMA", "TP1538_AERO_VERIFIER_WASM", "TP1538_AERO_PERFORMANCE_WORKLOAD"],
   );
   assert.equal(
     tp1538Aero.migrationSections.some((section) => section.sectionId === "TP1538_AERO_CHANGE_RECORD" && section.path === "docs/tp1538-aero-verification.md"),
