@@ -584,6 +584,35 @@ test("VSR rejects unsupported, reordered, and causally corrupt v2 event streams"
   );
 });
 
+test("VSR rejects a hash-resealed terminal-event distance that contradicts the report", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const result = simulate(scenario);
+  assert.equal(result.engineRun.termination, "weapon_intercept");
+  assert.equal(result.engineRun.events.state, "AVAILABLE");
+  const record = await createVectorSimulationRecord(
+    prepareSimulation(scenario),
+    result,
+    createdAt,
+  );
+  const events = structuredClone(result.engineRun.events.items);
+  const terminal = events.find((event) => event.payload.kind === "WEAPON_TERMINATED");
+  assert.ok(terminal);
+  terminal.payload.closestApproachM += 1;
+  const corrupt = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /does not match the recorded run closest approach/,
+  );
+});
+
 test("VSR rejects a lifecycle event whose valid from-enum falsifies canonical history", async () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);

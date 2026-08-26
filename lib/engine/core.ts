@@ -2274,7 +2274,13 @@ export class EngineSession {
           : 0,
       },
     };
-    assertSimulationEventStream(events, run.frames, run.scenario, run.termination);
+    assertSimulationEventStream(
+      events,
+      run.frames,
+      run.scenario,
+      run.termination,
+      run.closestApproachM,
+    );
     return run;
   }
 }

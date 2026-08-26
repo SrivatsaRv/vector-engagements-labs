@@ -533,6 +533,7 @@ export async function createVectorSimulationRecord(
     result.engineRun.frames,
     result.engineRun.scenario,
     result.engineRun.termination,
+    result.engineRun.closestApproachM,
   );
   const pictures = result.pictures;
   const canonicalEngineScenario = {
@@ -852,6 +853,7 @@ export async function openVectorSimulationRecord(
       decodedFrames,
       compiled.engineScenario,
       report.engine.termination,
+      report.engine.closestApproachM,
     );
   }
   if (scenario.airMission) {

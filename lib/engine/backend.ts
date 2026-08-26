@@ -174,6 +174,7 @@ export function runRustWasmEngine(scenario: EngineScenario): EngineRun {
     run.frames,
     scenario,
     run.termination,
+    run.closestApproachM,
   );
   return withGeospatialRecord(scenario, run);
 }

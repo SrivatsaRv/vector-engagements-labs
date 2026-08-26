@@ -254,8 +254,9 @@ No pending family-specific entry.
   map/3D, telemetry, timeline and report never reconstruct release physics.
 - Retain one typed `WEAPON_TERMINATED` event for every engine-owned weapon
   terminal outcome, including the cumulative admitted-lifetime closest
-  approach, exact terminal-state/cause to run-outcome binding and explicit
-  `NOT_MODELLED` target effect.
+  approach, exact event-distance to frozen-report binding, exact
+  terminal-state/cause to run-outcome binding and explicit `NOT_MODELLED`
+  target effect.
 
 Saved-run record and admission tables now have separate domain-owned schema
 modules without changing their persisted representation.

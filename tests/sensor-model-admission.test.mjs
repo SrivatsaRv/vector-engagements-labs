@@ -464,5 +464,6 @@ test("both engines reject observation, track, and event sources forged beside a 
     forged.frames,
     scenario,
     forged.termination,
+    forged.closestApproachM,
   ), /compiled scenario|admitted scenario/i);
 });

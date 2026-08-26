@@ -268,6 +268,7 @@ test("an off-grid launch activates on its first fixed-step boundary in both engi
       run.frames,
       run.scenario,
       run.termination,
+      run.closestApproachM,
     );
   }
 });
@@ -295,6 +296,7 @@ test("a launch just after a grid boundary is not rounded back to the prior tick"
       run.frames,
       run.scenario,
       run.termination,
+      run.closestApproachM,
     );
   }
 });
@@ -317,7 +319,7 @@ test("the tick-owned clock admits the reported millisecond-grid launch in both e
     assert.ok(release, `${backend} must record the millisecond-grid store release`);
     assert.equal(release.tick, 1008);
     assert.equal(release.modelTimeSeconds, 1.008);
-    assertSimulationEventStream(run.events.items, run.frames, run.scenario, run.termination);
+    assertSimulationEventStream(run.events.items, run.frames, run.scenario, run.termination, run.closestApproachM);
   }
 
   const baseline = runEngineBackend(structuredClone(scenario), "typescript");
@@ -423,7 +425,7 @@ test("terminal fixed-step boundary is a half-open launch window in both engines"
     );
     assert.equal(entry?.tick, 4, `${backend} last executable pre-terminal launch`);
     assert.equal(entry?.modelTimeSeconds, 0.2);
-    assertSimulationEventStream(run.events.items, run.frames, run.scenario, run.termination);
+    assertSimulationEventStream(run.events.items, run.frames, run.scenario, run.termination, run.closestApproachM);
   }
 
   for (const batchSize of [1, 2, 128]) {
@@ -504,6 +506,7 @@ test("runtime decoding fails closed for unknown variants, payload versions, fiel
       run.frames,
       run.scenario,
       run.termination,
+      run.closestApproachM,
     ));
   }
 });
@@ -518,7 +521,7 @@ test("runtime decoding rejects duplicate producer-local keys within one tick", (
   assert.ok(sameTick.length > 1);
   sameTick[1]!.localKey = sameTick[0]!.localKey;
   assert.throws(
-    () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination),
+    () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination, run.closestApproachM),
     /repeats local key/,
   );
 });
@@ -533,7 +536,7 @@ test("delivered cause-free payload families reject invented backward causal edge
   assert.equal(completed.payload.kind, "RUN_COMPLETED");
   completed.causeEventIds = [events[0]!.id];
   assert.throws(
-    () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination),
+    () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination, run.closestApproachM),
     /payload family does not admit causal references/,
   );
 });
@@ -555,14 +558,14 @@ test("runtime decoding rejects a valid enum that falsifies lifecycle history", (
     assert.equal(transition.payload.to, "TERMINATED");
     transition.payload.from = "TRACKING";
     assert.throws(
-      () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination),
+      () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination, run.closestApproachM),
       /prior canonical lifecycle/,
       `${backend} history corruption must fail closed`,
     );
   }
 });
 
-test("runtime decoding binds weapon terminal state and cause to the run outcome", () => {
+test("runtime decoding binds weapon terminal state, cause, and distance to the run", () => {
   const scenario = admittedScenario();
   const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
   weapon.weapon!.termination.maximumFlightTimeSeconds = 0.1;
@@ -582,8 +585,25 @@ test("runtime decoding binds weapon terminal state and cause to the run outcome"
   terminalWeapon.weaponFlightState = "MISS";
 
   assert.throws(
-    () => assertSimulationEventStream(events, frames, run.scenario, run.termination),
+    () => assertSimulationEventStream(events, frames, run.scenario, run.termination, run.closestApproachM),
     /does not match the exact run outcome/,
+  );
+
+  const distanceEvents = structuredClone(run.events.items);
+  const distanceTerminal = distanceEvents.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  )!;
+  assert.equal(distanceTerminal.payload.kind, "WEAPON_TERMINATED");
+  distanceTerminal.payload.closestApproachM += 1;
+  assert.throws(
+    () => assertSimulationEventStream(
+      distanceEvents,
+      run.frames,
+      run.scenario,
+      run.termination,
+      run.closestApproachM,
+    ),
+    /does not match the recorded run closest approach/,
   );
 });
 
@@ -607,7 +627,7 @@ test("runtime decoding binds world entry and run completion to their true bounda
   entry.modelTimeSeconds = 2.25;
   entry.frameIndex = laterActiveFrame;
   assert.throws(
-    () => assertSimulationEventStream(delayedEntry, run.frames, run.scenario, run.termination),
+    () => assertSimulationEventStream(delayedEntry, run.frames, run.scenario, run.termination, run.closestApproachM),
     /declared launch boundary/,
   );
 
@@ -620,7 +640,7 @@ test("runtime decoding binds world entry and run completion to their true bounda
   completed.modelTimeSeconds = 2.75;
   completed.frameIndex = earlierFrame;
   assert.throws(
-    () => assertSimulationEventStream(earlyCompletion, run.frames, run.scenario, run.termination),
+    () => assertSimulationEventStream(earlyCompletion, run.frames, run.scenario, run.termination, run.closestApproachM),
     /final retained frame/,
   );
 });

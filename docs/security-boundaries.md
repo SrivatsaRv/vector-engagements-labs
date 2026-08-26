@@ -34,6 +34,8 @@ Weapon-terminal replay requires the event's achieved state and typed cause to
 map exactly to the saved run outcome. It also retains the cumulative minimum
 separation over the admitted weapon lifetime; a caller cannot substitute the
 terminal step's separation or reseal a contradictory event, frame and report.
+The read boundary compares the event value to the canonical six-decimal
+projection of `report.engine.closestApproachM` before exposing replay.
 
 Saved-run snapshots and saved-run admission counters now have separate
 domain-owned declaration modules behind the unchanged aggregate Drizzle schema.

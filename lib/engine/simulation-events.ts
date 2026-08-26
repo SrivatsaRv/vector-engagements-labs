@@ -566,7 +566,11 @@ export function assertSimulationEventStream(
   frames: readonly EngineFrame[],
   scenario: EngineScenario,
   termination: EngineTermination,
+  closestApproachM: number,
 ): asserts values is readonly SimulationEventV2[] {
+  if (typeof closestApproachM !== "number" || Number.isNaN(closestApproachM) || closestApproachM < 0) {
+    throw new Error("Simulation event stream has an invalid run closest approach.");
+  }
   if (values.length > MAX_SIMULATION_EVENTS) throw new Error(`Simulation event stream exceeds ${MAX_SIMULATION_EVENTS} events.`);
   const entityById = new Map(scenario.entities.map((entity) => [entity.id, entity]));
   const lifecycleByEntity = new Map<string, EntityLifecycle>(
@@ -975,6 +979,12 @@ export function assertSimulationEventStream(
         weaponTerminationPayload.cause !== expectedWeaponTermination.cause)
     ) {
       throw new Error("Simulation weapon-termination event does not match the exact run outcome.");
+    }
+    if (
+      expectedWeaponTermination &&
+      weaponTerminationPayload?.closestApproachM !== Number(closestApproachM.toFixed(6))
+    ) {
+      throw new Error("Simulation weapon-termination event does not match the recorded run closest approach.");
     }
     for (const entity of scenario.entities) {
       if (

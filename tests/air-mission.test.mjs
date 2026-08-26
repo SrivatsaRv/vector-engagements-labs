@@ -990,7 +990,7 @@ test("governed generic runway authority drives causal roll, rotation, and climbo
     event.payload.kind === "AIRCRAFT_OPERATIONAL_STATE_CHANGED" && event.payload.to === "ROTATE");
   rotateEvent.payload.to = "CLIMBOUT";
   assert.throws(
-    () => assertSimulationEventStream(tamperedEvents, runs[0].frames, runs[0].scenario, runs[0].termination),
+    () => assertSimulationEventStream(tamperedEvents, runs[0].frames, runs[0].scenario, runs[0].termination, runs[0].closestApproachM),
     /aircraft operational transition|frame state|duplicate transition/i,
   );
 
