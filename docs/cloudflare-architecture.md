@@ -107,6 +107,12 @@ Worker version is created.
 
 ## Deployment gates
 
+The migration gate now upgrades an existing eight-template catalog through
+`016_high_energy_crossing_challenge.sql` and requires nine validated rows on
+readback. The new row must retain the current intended-use, model-pack and study
+area identities; the existing platform, installation, runway and EnvironmentPack
+counts remain unchanged.
+
 The PostGIS gate now exercises both sides of the Air mission transition: current
 v3 production rows are valid pre-migration input, while post-migration and fresh
 databases must expose canonical `vector.scenario.v4` Air envelopes through the

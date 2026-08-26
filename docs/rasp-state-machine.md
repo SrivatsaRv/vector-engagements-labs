@@ -8,6 +8,11 @@ is not admitted by the production deployment and makes no named-sensor claim.
 
 ## Canonical boundary
 
+The #190 crossing run does not promote model truth into an observation: both
+side pictures remain `sensorState=UNSUPPORTED`, `trackState=UNSUPPORTED`,
+invisible and position-free at every recorded tick, including the 180 m
+geometry-completion boundary.
+
 The ground-operation state sequence is fixed and one-way for the admitted
 mechanism: `PARKED`/`HOLD_SHORT` → `TAKEOFF_ROLL` → `ROTATE` → `CLIMBOUT` →
 `ENROUTE`. At most one transition commits per integer tick; skipped or forbidden
@@ -121,6 +126,11 @@ hides entities while this state is selected.
 
 ## Record and replay
 
+For #190 the Worker writes the same canonical frames, events, unsupported
+pictures and `threshold_reached` report into one content-addressed VSR. The
+built verifier reads `report.json` and `frames.arrow` from that record; replay
+does not rerun physics or infer a successful engagement from a title or path.
+
 Ground-operation frames and `AIRCRAFT_OPERATIONAL_STATE_CHANGED` events replay
 as recorded, including tick/frame identity, movement value state, controller
 request/accept/achievement, fuel, mass and installed-store inventory. Replay
@@ -144,6 +154,11 @@ boundary frame. Replay never reruns release physics or reconstructs a missing
 store, and a rejected outcome leaves the store stowed.
 
 ## Air mission record storage
+
+Migration 016 stores the exact canonical #190 v4 package, content hash, current
+model-pack digest and North Punjab study-area identity as a ninth immutable
+template. `ON CONFLICT DO NOTHING` plus full readback prevents an existing
+identity from being silently rewritten.
 
 Runway lifecycle storage retains the full compiled mission lineage plus the
 exact ground-dynamics, runway and environment bindings used during execution.
@@ -220,6 +235,13 @@ and consistent all-member source forgery.
 `tests/air-mission.test.mjs` additionally covers deterministic mission identity,
 all classes/overlays/start postures, negative admission, server preservation,
 and exact VSR/report mission-lineage readback.
+For #190 it also fixes one demanding non-default A2A package and one nearby
+harder control. It requires exact authored inputs and governance, repeated-run
+determinism, completion after 120 seconds but before the 140 second ceiling, a
+closest approach inside the 180 m geometry threshold, and failure of the
+otherwise-identical 46 km control. The same regression compares the complete
+TypeScript/Rust terminal frame and causal-event stream and keeps every observer
+picture fail-closed as `UNSUPPORTED`.
 It also pins the pre-transfer compiled-mission v1 digest and exact assignment
 key set for a mission without a transfer plan, proving that new compilation and
 VSR readback do not synthesize empty transfer authority into legacy records.

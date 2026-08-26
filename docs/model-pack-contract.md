@@ -288,6 +288,11 @@ database.
 
 ## Intended use and credibility
 
+The #190 crossing package remains bound to
+`vector.intended-use.geometry-teaching@1.0.0`, the current generic model pack,
+and `MODEL_ASSUMPTION` scenario provenance. Familiar platform/weapon labels do
+not raise its credibility or admit named performance.
+
 Every Air mission declares `PUBLIC_EDUCATIONAL`, explicit assumptions and
 validity limits. A mission/task label cannot promote context evidence or a
 named-aircraft association into executable performance authority.
@@ -433,6 +438,11 @@ compiler. Production admission cannot consume or relabel this adapter.
 
 ## Scenario binding and patches
 
+The ninth governed template records the exact current model-pack ID, version
+and digest in both its package and relational columns. Its non-default geometry,
+fuel and loadout are scenario inputs, not patches to compiled coefficients or
+catalog facts.
+
 Ground Air scenarios add one exact `vector.aircraft-ground-operation.v2`
 binding beside the existing model-pack identity. Its mission, runway evidence,
 posture, and release fields are compiler-owned and exact-key validated; it does
@@ -482,6 +492,10 @@ Draft patch addition creates a new revision.
 
 ## Loadout compatibility
 
+The #190 template selects two Astra stores for Blue and two AIM-120C-5 stores
+for Red only through existing station/store compatibility and quantity limits.
+It adds no station, compatibility rule, store property or release authority.
+
 An installed store remains inventory while its launch platform carries a
 ground-operation binding and has not reached `ENROUTE`. Neither scheduled launch time nor an
 otherwise valid station/rule admission can release it; mass and store identity
@@ -526,6 +540,10 @@ incompatible data rejects the scenario; it never falls back to the legacy model
 authoring list or a weapon-name heuristic.
 
 ## Persistence
+
+Migration 016 persists one canonical scenario row referencing the existing
+compiled model-pack digest; it does not duplicate or mutate the pack. A
+conflicting row is left untouched and then rejected by exact full-row readback.
 
 Air scenario packages persist the authored mission and exact model-pack digest
 inside canonical v4 JSON. Saved runs and VSRs additionally retain the compiled
@@ -581,7 +599,7 @@ adds:
 Hashes have database format constraints. Source, compiled pack, and credibility
 rows use immutable `(id, version)` identities. The deterministic seed publishes
 one current source/pack, a model-pack manifest, an engine manifest, and binds all
-eight scenario fixtures to them. `scripts/verify-db.mjs` verifies row counts,
+nine scenario fixtures to them. `scripts/verify-db.mjs` verifies row counts,
 digest equality, SI state, manifest binding, and scenario-package binding.
 
 Migration
@@ -695,6 +713,11 @@ environment envelope rejects the pack during compilation and Rust/WASM
 validation. The runtime must not fill the gap with a scalar fallback.
 
 ## Verification
+
+The #190 regression admits the same pack independently through TypeScript and
+Rust/WASM, compares the complete terminal frame and event stream, and runs a
+nearby failing control. Database verification separately requires the ninth
+row's exact intended-use and model-pack bindings.
 
 `tests/air-mission.test.mjs` covers all class/overlay/start combinations,
 canonical digest repeatability, units/datums, closed route/task references,

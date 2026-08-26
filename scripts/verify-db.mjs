@@ -5,6 +5,7 @@ import { admitEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
 import { sha256Identity } from "../lib/geospatial/digest.ts";
 import { INSTALLATION_CATALOGUE, PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import { STUDY_AREAS } from "../lib/study-areas.ts";
+import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import {
   CURRENT_INTENDED_USE_ID,
   CURRENT_INTENDED_USE_VERSION,
@@ -117,7 +118,7 @@ try {
   assert.equal(counts.eligible_runways, 12);
   assert.equal(counts.environment_packs, 12);
   assert.equal(counts.study_areas, 6);
-  assert.equal(counts.scenarios, 8);
+  assert.equal(counts.scenarios, SCENARIO_LIBRARY.length);
 
   const [geospatial] = await sql`SELECT
     ST_SRID(location)::int AS srid,

@@ -1,6 +1,9 @@
 import { performance } from "node:perf_hooks";
 import { arch, cpus, platform, release, totalmem } from "node:os";
-import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
+import {
+  HIGH_ENERGY_CROSSING_CHALLENGE_ID,
+  SCENARIO_LIBRARY,
+} from "../lib/scenarios.ts";
 import {
   prepareSimulation,
   simulateWithCapabilitiesForVerification,
@@ -32,6 +35,9 @@ const capabilities = Object.fromEntries(
 const warmupRounds = 2;
 const measuredRounds = Number(process.env.VECTOR_BENCHMARK_ROUNDS ?? 25);
 const maximumP95Ms = Number(process.env.VECTOR_MAX_ENGINE_P95_MS ?? 75);
+const maximumChallengeP95Ms = Number(
+  process.env.VECTOR_MAX_CHALLENGE_P95_MS ?? 110,
+);
 
 const backends: EngineBackendId[] = ["typescript", "rust-wasm"];
 const coldStartMs: Partial<Record<EngineBackendId, number>> = {};
@@ -70,12 +76,19 @@ for (const backend of backends) {
 
 const summary = (backend: EngineBackendId) => {
   const backendSamples = samples.filter((sample) => sample.backend === backend);
-  const durations = backendSamples
+  const sortedDurations = (selected: typeof backendSamples) => selected
     .map((sample) => sample.durationMs)
     .sort((a, b) => a - b);
-  const percentile = (value: number) =>
-    durations[
-      Math.min(durations.length - 1, Math.ceil(durations.length * value) - 1)
+  const durations = sortedDurations(backendSamples);
+  const historicalDurations = sortedDurations(backendSamples.filter(
+    (sample) => sample.id !== HIGH_ENERGY_CROSSING_CHALLENGE_ID,
+  ));
+  const challengeDurations = sortedDurations(backendSamples.filter(
+    (sample) => sample.id === HIGH_ENERGY_CROSSING_CHALLENGE_ID,
+  ));
+  const percentile = (values: number[], fraction: number) =>
+    values[
+      Math.min(values.length - 1, Math.ceil(values.length * fraction) - 1)
     ];
   const totalModelFrames = backendSamples.reduce(
     (sum, sample) => sum + sample.frames,
@@ -87,8 +100,10 @@ const summary = (backend: EngineBackendId) => {
     coldStartMs: Number(coldStartMs[backend]!.toFixed(3)),
     measuredRuns: backendSamples.length,
     totalModelFrames,
-    p50Ms: Number(percentile(0.5).toFixed(3)),
-    p95Ms: Number(percentile(0.95).toFixed(3)),
+    p50Ms: Number(percentile(durations, 0.5).toFixed(3)),
+    p95Ms: Number(percentile(durations, 0.95).toFixed(3)),
+    historicalP95Ms: Number(percentile(historicalDurations, 0.95).toFixed(3)),
+    challengeP95Ms: Number(percentile(challengeDurations, 0.95).toFixed(3)),
     maxMs: Number(durations.at(-1)!.toFixed(3)),
     framesPerWallSecond: Math.round(totalModelFrames / (totalWallMs / 1000)),
   };
@@ -153,18 +168,27 @@ const result = {
     memoryBytes: totalmem(),
   },
   scenarios: SCENARIO_LIBRARY.length,
+  warmupRounds,
   rustWasmBytes: RUST_WASM_ENGINE_ARTIFACT.bytes,
   backends: backendResults,
   publicAircraftReference: referenceBenchmarks,
   transportEvidence,
-  regressionLimitP95Ms: maximumP95Ms,
+  regressionLimitsP95Ms: {
+    historical: maximumP95Ms,
+    highEnergyCrossingChallenge: maximumChallengeP95Ms,
+  },
 };
 
 process.stdout.write(`${JSON.stringify(result)}\n`);
 for (const backend of backendResults) {
-  if (backend.p95Ms > maximumP95Ms) {
+  if (backend.historicalP95Ms > maximumP95Ms) {
     throw new Error(
-      `${backend.backend} engine p95 ${backend.p95Ms} ms exceeded ${maximumP95Ms} ms regression limit`,
+      `${backend.backend} historical engine p95 ${backend.historicalP95Ms} ms exceeded ${maximumP95Ms} ms regression limit`,
+    );
+  }
+  if (backend.challengeP95Ms > maximumChallengeP95Ms) {
+    throw new Error(
+      `${backend.backend} high-energy crossing p95 ${backend.challengeP95Ms} ms exceeded ${maximumChallengeP95Ms} ms challenge limit`,
     );
   }
 }

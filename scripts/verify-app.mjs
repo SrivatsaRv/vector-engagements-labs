@@ -209,7 +209,7 @@ try {
   const pafInstallations = catalog.installations.filter((item) => item.service === "PAF");
   assert.equal(pafInstallations.length, 15);
   assert.ok(pafInstallations.every((item) => item.icao_code && item.source_id === "shield-paf-orbat-2026-05-19"));
-  assert.equal(catalog.scenarioTemplates.length, 8);
+  assert.equal(catalog.scenarioTemplates.length, 9);
   const template = catalog.scenarioTemplates.find(
     (item) => item.id === "a2a-crossing-intercept" && item.version === "1.0.0",
   );

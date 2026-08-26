@@ -52,7 +52,7 @@ the aggregate schema facade.
 
 This slice deliberately remains **4 catalog platforms, 3 scenario-selectable
 platforms, 8 weapons, 8 model sets, 21
-public-reference installations, and 8 scenario templates**. The installation
+public-reference installations, and 9 scenario templates**. The installation
 catalogue contains six IAF context points and all 15 PAF points present in
 SHIELD's `apps/backend/data/paf_orbat.json` seed. It is explicitly
 `BOUNDED_PUBLIC_REFERENCE_FIXTURE`, never a complete IAF/PAF order of battle.
@@ -194,8 +194,10 @@ stored.
 
 Migration 014 remains the immutable installation/runway/EnvironmentPack source
 snapshot after #182. Migration 015 neither copies nor rewrites those governed
-rows; it consumes their existing identities while upserting and verifying only
-the eight current canonical scenario packages.
+rows; it consumes their existing identities while upserting and verifying the
+eight historical canonical scenario packages. Migration 016 independently
+adds and reads back the ninth package, the governed high-energy crossing
+challenge, without rewriting any published historical package.
 
 Installation and study-area table definitions are owned by
 `db/schema/geospatial.ts`; this module split does not change their PostGIS

@@ -11,6 +11,9 @@ one family must not imply changes to unrelated contracts.
 
 #### Model packs
 
+- Bind the #190 high-energy crossing scenario to the unchanged current generic
+  model-pack ID/version/digest and existing compatibility rules. No coefficient,
+  source, credibility, intended-use, named-performance or pack schema changes.
 - Bind the independent regional EnvironmentPack/runtime-grid digest beside the
   compiled model pack without changing named-system evidence authority.
 - Add a content-addressed generic `MODEL_ASSUMPTION` ground-dynamics projection
@@ -52,6 +55,11 @@ promotion remain downstream under #154, later #161 stages and #155.
 
 #### Database schema
 
+- Add forward-only migration 016 for the exact governed high-energy
+  Su-30MKI/F-16C crossing-challenge package. The migration is independently
+  generated and verified, self-upserts the ninth immutable scenario, and reads
+  back its complete identity/hash without modifying migration 015's eight-row
+  historical snapshot.
 - Add forward-only migration 015 to refresh immutable canonical v4 scenario
   packages/hashes after the ground-envelope v2 digest change. It self-upserts
   all eight rows before seed and reads back exact identity/schema/hash/environment
@@ -198,6 +206,11 @@ No pending family-specific entry.
 
 #### Browser Worker protocol
 
+The production-built Worker verifier now conducts the governed #190
+high-energy crossing package and opens its transferred VSR to assert the
+terminal `report.json` result and `frames.arrow` separation. The Worker
+protocol and deployment-selected backend remain unchanged.
+
 The Worker independently recompiles and verifies Air mission/model/environment
 identity before caching or executing a runtime adapter.
 - Admit complete regional packs with four-pack cache bounds, 4,096-query limits,
@@ -236,6 +249,12 @@ writer/reader, Worker, or replay behavior.
   virtual-pilot policy behavior.
 
 #### Mission scenarios
+
+- Add the immutable `a2a-high-energy-crossing-challenge@1.0.0` package with
+  explicit 44 km/105-degree geometry, airborne state, fuel, loadout, route,
+  environment and generic-model nonclaims. TypeScript, Rust/WASM and the built
+  browser Worker reach the 180 m geometry threshold after 120 seconds, while an
+  otherwise-identical 46 km control reaches the 140 second time limit.
 
 Air templates advance to `vector.scenario.v4` with one authored
 `vector.air-mission.v1` and content-addressed `vector.compiled-air-mission.v1`.

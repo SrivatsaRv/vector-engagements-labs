@@ -76,7 +76,36 @@ The persisted scenario-template table is declared by
 Air packages use canonical `vector.scenario.v4`; non-Air packages share that
 package envelope without acquiring an Air mission object.
 
+### Governed high-energy crossing challenge
+
+Issue #190 adds `a2a-high-energy-crossing-challenge@1.0.0` as an immutable
+non-default Su-30MKI/F-16C demonstration package. It starts at 44,000 m
+horizontal range and 105 degrees crossing angle. Blue is authored airborne at
+8,500 m MSL and 270 m/s TAS; Red is at 10,000 m MSL and 250 m/s TAS. Both sides
+carry two installed stores and 70% authored fuel. The package binds seed 42, a
+direct guided path, and the exact North Punjab clear-winter EnvironmentPack.
+
+Those values are normal scenario inputs consumed through the existing compiler;
+there is no actor-name, scenario-name, or presentation-label branch in the
+runtime. Under the current admitted generic point-mass/Astra assumptions, both
+TypeScript and Rust/WASM reach the declared 180 m geometry-completion threshold
+after 120 model seconds and before the 140 second limit. A 46,000 m control with
+the other inputs held constant reaches the time limit instead. That contrast is
+a deterministic regression boundary, not named-aircraft or named-weapon
+performance evidence.
+
+The package and report remain `PUBLIC_EDUCATIONAL` and `MODEL_ASSUMPTION`.
+Reaching 180 m does not establish detection, track, launch authorization, fuze,
+hit, damage, kill, probability of kill, launch-zone, tactics, or real-world
+effectiveness. Observer pictures remain explicitly `UNSUPPORTED` with no
+inferred position because this deployment has no admitted sensor model.
+
 ## Air mission contract
+
+The #190 package carries its 44 km/105-degree geometry, MSL altitudes, TAS
+speeds, 70% fuel and two-store Blue assignment through the existing authored
+and compiled Air-mission contracts. No schema field or mission-policy authority
+is added; those SI values are package-owned `MODEL_ASSUMPTION` inputs.
 
 The compiled ground envelope advances to v2 only for the bounded
 `PUBLIC_EDUCATIONAL` roll/rotation/climbout mechanism. It declares closed SI
@@ -313,6 +342,11 @@ layers remain with #155, #87, #60 and the runtime owners.
 
 ## Builder expansion boundary
 
+The high-energy crossing challenge is a governed configured template, not a
+scenario-name branch. Its fields remain the same visible range, aspect,
+altitude, speed, fuel, loadout, route, environment and seed inputs that the
+general builder/import path consumes and may later edit into a new package.
+
 Ground-start authoring exposes the governed inputs and recorded result states;
 the UI does not derive rotation, liftoff, climb path, speed or controller
 acceptance. Those values arrive only from the Worker/VSR canonical frame.
@@ -321,7 +355,7 @@ time and installed-drag area within `[0.001, 1] m²`. It cannot edit model-pack
 mass/station/rule identity or mark a request accepted/achieved; those outcomes
 come only from the engine-owned event.
 
-The configured-template builder edits every input used by the eight validated templates. Its **Place & flight** surface now performs direct geographic start placement, heading, altitude and speed editing, and Blue/Red route and waypoint authoring inside a selected preset study area. Map gestures and numeric fields update one spatial plan; compilation converts it to local east-north-up engine state. The admitted point-mass aircraft controller executes compiled three-dimensional route points and records requested, accepted, and achieved movement. The authored route remains visible beside the computed track so the two cannot be confused.
+The configured-template builder edits every input used by the nine validated templates. Its **Place & flight** surface now performs direct geographic start placement, heading, altitude and speed editing, and Blue/Red route and waypoint authoring inside a selected preset study area. Map gestures and numeric fields update one spatial plan; compilation converts it to local east-north-up engine state. The admitted point-mass aircraft controller executes compiled three-dimensional route points and records requested, accepted, and achieved movement. The authored route remains visible beside the computed track so the two cannot be confused.
 
 Each configured route now compiles a `vector.route-plan.v2` constraint with one
 acceptance radius and one transition mode per route point. The initial point has

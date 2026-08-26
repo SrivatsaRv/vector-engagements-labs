@@ -46,6 +46,12 @@ used by the engagement map, scenario-authoring map, entity legend and
 emits either an available display mark or an explicit unavailable mark. It
 never accepts raw map coordinates, creates an entity, creates a track, or
 derives an outcome.
+The high-energy crossing challenge uses this unchanged grammar: its two
+aircraft and launched stores are drawn only from canonical recorded world
+frames, while observer-track presentation remains explicitly unavailable
+because the bound assumption pack admits no sensor model. A 180 m geometry
+threshold changes run termination, not the symbol source state and not the
+meaning of the rendered marks.
 An airborne store therefore becomes renderable only when the canonical boundary
 frame contains its exact entity identity. The transfer outcome may annotate
 that frame, but presentation cannot create the mark early, repair a rejected

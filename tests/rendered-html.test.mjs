@@ -50,8 +50,12 @@ test("server-renders the scenario library and configured workbench", async () =>
     workbenchResponse.text(),
   ]);
   assert.match(library, /Su-30MKI \/ Astra versus F-16C Block 52/);
+  assert.match(
+    library,
+    /High-energy crossing challenge: Su-30MKI versus F-16C/,
+  );
   assert.match(library, /All scenarios/);
-  assert.match(library, />8</);
+  assert.match(library, />9</);
   assert.match(workbench, /Review the configured experiment/);
   assert.match(workbench, /Run baseline/);
   assert.match(

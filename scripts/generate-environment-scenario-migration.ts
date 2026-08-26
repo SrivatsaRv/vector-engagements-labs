@@ -6,8 +6,15 @@ import { canonicalJson } from "../lib/canonical-json.ts";
 import { admitEnvironmentPack, type RegionalEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
 import { sha256HexSync, sha256Identity } from "../lib/geospatial/digest.ts";
 import { INSTALLATION_CATALOGUE, INSTALLATION_DATABASE_SOURCES, PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
-import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
+import {
+  HIGH_ENERGY_CROSSING_CHALLENGE_ID,
+  SCENARIO_LIBRARY,
+} from "../lib/scenarios.ts";
 import { STUDY_AREAS } from "../lib/study-areas.ts";
+
+const historicalScenarioDefinitions = SCENARIO_LIBRARY.filter(
+  (definition) => definition.id !== HIGH_ENERGY_CROSSING_CHALLENGE_ID,
+);
 
 const migrationPath = resolve("db/migrations/014_environment_pack_runways.sql");
 const successorMigrationPath = resolve("db/migrations/015_generic_ground_dynamics.sql");
@@ -69,7 +76,7 @@ const environmentPackStatements = environmentPacks.map(({ pack, studyAreaId, wea
   `INSERT INTO environment_packs (id,version,digest,schema_version,study_area_id,weather_preset_id,intended_use,provenance,coverage,horizontal_datum,vertical_datum,source_vertical_datum,valid_from,valid_until,terrain_digest,atmosphere_digest,installation_catalogue_digest,payload) VALUES (${sqlText(pack.identity.id)},${sqlText(pack.identity.version)},${sqlText(pack.identity.digest)},${sqlText(pack.schemaVersion)},${sqlText(studyAreaId)},${sqlText(weatherPresetId)},${sqlText(pack.intendedUse)},${sqlText(pack.provenance)},ST_SetSRID(ST_GeomFromGeoJSON(${sqlText(canonicalJson(pack.coverage.geometry))}),4326),${sqlText(pack.coverage.horizontalDatum)},${sqlText(pack.coverage.verticalDatum)},${sqlText(pack.coverage.sourceVerticalDatum)},${sqlText(pack.validity.startsAt)}::timestamptz,${sqlText(pack.validity.endsAt)}::timestamptz,${sqlText(pack.terrain.digest)},${sqlText(pack.atmosphere.digest)},${sqlText(pack.installationCoverage.catalogue.digest)},${sqlJson(pack)}) ON CONFLICT (id,version,digest) DO NOTHING;`,
 ).join("\n");
 
-const scenarioStatements = SCENARIO_LIBRARY.map((definition) => {
+const scenarioStatements = historicalScenarioDefinitions.map((definition) => {
   const tag = `vector_environment_${definition.id.replaceAll("-", "_")}`;
   const packageJson = canonicalJson(definition);
   if (packageJson.includes(`$${tag}$`)) throw new Error(`Dollar-quote collision for ${definition.id}.`);
@@ -105,7 +112,7 @@ const end = existing.indexOf(endMarker);
 if (start < 0 || end < start) throw new Error("Environment scenario migration markers are missing or out of order.");
 const expected = `${existing.slice(0, start)}${generated}${existing.slice(end + endMarker.length)}`;
 
-const summary = `${PUBLIC_INSTALLATIONS.length} installations, ${INSTALLATION_CATALOGUE.runways.length} runways, ${environmentPacks.length} EnvironmentPacks, and ${SCENARIO_LIBRARY.length} scenario packages`;
+const summary = `${PUBLIC_INSTALLATIONS.length} installations, ${INSTALLATION_CATALOGUE.runways.length} runways, ${environmentPacks.length} EnvironmentPacks, and ${historicalScenarioDefinitions.length} historical scenario packages`;
 if (checkOnly) {
   if (existing !== expected) throw new Error("Environment scenario migration is stale; run npm run environment:migration:generate.");
   process.stdout.write(`verified ${summary}\n`);

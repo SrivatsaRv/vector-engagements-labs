@@ -240,6 +240,23 @@ proof, x86-64 capacity result, or named-sensor performance claim.
 
 ## Required performance test matrix
 
+Issue #190 preserves the 75 ms p95 limit for the eight historical scenario
+workloads and adds an explicit 110 ms p95 tier for the ninth high-energy
+crossing challenge. Each backend still runs two complete warmup rounds and 25
+measured runs of every scenario; the report exposes the combined, historical,
+and challenge p95 values rather than hiding the added workload in one relaxed
+aggregate. This measured tier covers a six-entity, 527-frame run that spends
+most of its late flight inside terminal-guidance updates. It is a local Node
+regression bound, not a browser-frame, production-capacity or named-system
+performance claim. Canonical observer-picture rejection and byte-equivalence
+assertions remain unchanged.
+
+On 2026-08-26, Node v24.3.0 on an Apple M5 arm64 measured TypeScript historical
+/ challenge p95 at 58.127 / 103.610 ms and Rust/WASM at 71.008 / 68.123 ms
+across 225 measured runs per backend. All four tier checks passed; the combined
+TypeScript p95 of 100.226 ms is retained in the report but does not replace either
+explicit workload limit.
+
 #182 adds a focused regression workload in the standalone
 `performance:generic-takeoff:verify` process. Each TypeScript and Rust/WASM
 backend executes three predeclared warmups followed by 20 measured,

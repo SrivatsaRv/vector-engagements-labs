@@ -316,6 +316,13 @@ The current map envelopes are `DECLARED`. The LOS fixture results are
 
 ## Verification and tolerances
 
+Migration 016 adds the #190 scenario by referencing the already admitted North
+Punjab/clear EnvironmentPack identity; it adds no terrain, atmosphere, datum,
+coverage or sampling value. Database upgrade verification now expects the
+governed scenario-library count while continuing to require exactly the same 12
+EnvironmentPacks, and the frozen migration-014 generator excludes the new
+scenario so its historical source snapshot cannot drift.
+
 After forward migration 015 exists, `environment:migration:verify` treats
 `014_environment_pack_runways.sql` as a historical artifact frozen at SHA-256
 `c40e91b0fbbf2ee5110ae601dba676d2feec1957ebb440db81703c1696cbd227`.
