@@ -208,6 +208,12 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
     assertStructuredScenarioNumbers(input);
   } catch (error) {
     if (error instanceof ScenarioControlAdmissionError) {
+      // Preserve the public v1 saved-run error contract for this legacy
+      // compiler-derived projection while still running the shared domain
+      // admission before any downstream compilation or persistence.
+      if (error.fieldPath === "$.range") {
+        throw new PublicApiError(400, "invalid_range");
+      }
       throw new PublicApiError(
         400,
         error.code,

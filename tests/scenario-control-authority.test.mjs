@@ -174,6 +174,38 @@ test("structured-number-admission: type, finite, precision and range checks repe
   });
 });
 
+test("duplicate-authority projections skip only precision and retain domain admission", () => {
+  const scenario = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
+  scenario.range = 44_000.125;
+  assert.equal(
+    validateStructuredScenarioNumbers(scenario).some((error) => error.fieldPath === "$.range"),
+    false,
+    "a compiler-derived duplicate may retain sub-metre precision",
+  );
+
+  for (const [value, code] of [
+    ["44000", "CONTROL_NUMBER_TYPE"],
+    [Number.NaN, "CONTROL_NUMBER_NONFINITE"],
+    [4_999, "CONTROL_NUMBER_RANGE"],
+  ]) {
+    const candidate = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
+    candidate.range = value;
+    assert.deepEqual(
+      validateStructuredScenarioNumbers(candidate).find((error) => error.fieldPath === "$.range"),
+      { fieldPath: "$.range", code },
+    );
+  }
+
+  const nonFinite = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
+  nonFinite.altitude = Number.NaN;
+  assert.throws(
+    () => prepareSimulation(nonFinite),
+    (error) => error instanceof ScenarioControlAdmissionError
+      && error.code === "CONTROL_NUMBER_NONFINITE"
+      && error.fieldPath === "$.altitude",
+  );
+});
+
 test("structured-scenario-admission: browser, server and final compiler boundary reject the same over-precision field", () => {
   const scenario = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
   scenario.windNorth = 1.2345;

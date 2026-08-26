@@ -14,6 +14,7 @@ import {
 import type { RouteWaypointTransition } from "@/lib/scenario-spatial";
 import type { StudyArea } from "@/lib/study-areas";
 import {
+  MAX_AUTHORED_SCALAR_FRACTION_DIGITS,
   admitRawNumber,
   type NumericAuthority,
 } from "@/lib/scenario-control-authority";
@@ -56,10 +57,10 @@ const numeric = (
 });
 const LONGITUDE = numeric(-180, 180, 15, "deg_WGS84");
 const LATITUDE = numeric(-90, 90, 15, "deg_WGS84");
-const ALTITUDE = numeric(0, 25_000, 3, "m_MSL");
-const HEADING = numeric(0, 359.999, 3, "deg_true");
-const SPEED = numeric(0, 1_500, 3, "m/s");
-const ACCEPTANCE_RADIUS = numeric(1, 25_000, 3, "m");
+const ALTITUDE = numeric(0, 25_000, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "m_MSL");
+const HEADING = numeric(0, 359.999, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "deg_true");
+const SPEED = numeric(0, 1_500, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "m/s");
+const ACCEPTANCE_RADIUS = numeric(1, 25_000, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "m");
 const parseStrict = (value: string, authority: NumericAuthority) => {
   const admitted = admitRawNumber(value, authority);
   return admitted.ok ? admitted.value : null;

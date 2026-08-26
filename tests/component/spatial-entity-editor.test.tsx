@@ -88,9 +88,9 @@ describe("SpatialEntityEditor", () => {
     const altitude = within(route).getByRole("textbox", { name: /^altitude/i });
 
     await user.clear(altitude);
-    await user.type(altitude, "9200");
+    await user.type(altitude, "9200.123");
     await user.keyboard("{Enter}");
-    expect(altitude).toHaveValue("9200");
+    expect(altitude).toHaveValue("9200.123");
     await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(true));
 
     await user.click(screen.getByRole("button", { name: /add by coordinates/i }));

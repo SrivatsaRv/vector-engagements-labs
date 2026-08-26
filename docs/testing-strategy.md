@@ -139,6 +139,10 @@ regressions cover class-owned fields, route/start identity, ETA/TOT, fuel and
 reserve, loadout capacity, runway/wind, store transfer and environment binding.
 Computed legacy duplicate projections are not relabelled authored inputs; their
 compiler consistency checks remain authoritative until #154 removes them.
+Their computed precision is exempt, but structured type, nullability,
+finiteness, range and integer checks still run before compilation. A dedicated
+regression injects string, `NaN` and out-of-range duplicate values and proves
+final simulation preparation fails closed.
 
 This baseline does not satisfy #193 by itself. Completion additionally requires
 machine-readable registration for every nested Air-mission and presentation

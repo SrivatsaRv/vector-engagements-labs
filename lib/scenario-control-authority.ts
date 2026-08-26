@@ -245,8 +245,7 @@ export function hasDeclaredPrecision(value: number, precision: number): boolean 
   return Math.abs(scaled - Math.round(scaled)) <= tolerance;
 }
 
-/** Shared structured-value gate used after UI parsing and at server/engine boundaries. */
-export function admitStructuredNumber(
+function admitStructuredNumberDomain(
   value: unknown,
   authority: NumericAuthority,
 ): RawNumberAdmission {
@@ -267,10 +266,21 @@ export function admitStructuredNumber(
   if (authority.integer && !Number.isInteger(value)) {
     return { ok: false, code: "CONTROL_NUMBER_INTEGER" };
   }
-  if (!hasDeclaredPrecision(value, authority.precision)) {
+  return { ok: true, value };
+}
+
+/** Shared structured-value gate used after UI parsing and at server/engine boundaries. */
+export function admitStructuredNumber(
+  value: unknown,
+  authority: NumericAuthority,
+): RawNumberAdmission {
+  const domain = admitStructuredNumberDomain(value, authority);
+  if (!domain.ok || domain.value === null) return domain;
+  const admittedValue = domain.value;
+  if (!hasDeclaredPrecision(admittedValue, authority.precision)) {
     return { ok: false, code: "CONTROL_NUMBER_PRECISION" };
   }
-  return { ok: true, value };
+  return domain;
 }
 
 export function validateStructuredScenarioNumbers(value: unknown) {
@@ -284,11 +294,13 @@ export function validateStructuredScenarioNumbers(value: unknown) {
   const errors: Array<{ fieldPath: string; code: ScenarioNumberAdmissionCode }> = [];
   for (const [field, row] of Object.entries(LEGACY_SCENARIO_CONTROL_AUTHORITY)) {
     if (!row.numeric) continue;
-    // Duplicate legacy projections are derived from canonical spatial/mission
-    // state and can contain higher-precision computed values. Their owning
-    // compiler consistency checks validate them until #154 removes the fields.
-    if (row.causalState === "DUPLICATE_AUTHORITY") continue;
-    const result = admitStructuredNumber(input[field], row.numeric);
+    // Duplicate legacy projections may contain higher-precision computed
+    // values, but they remain untrusted input until #154 removes them. Skip
+    // only authored precision; type, nullability, finiteness, range and integer
+    // constraints still fail closed before compilation.
+    const result = row.causalState === "DUPLICATE_AUTHORITY"
+      ? admitStructuredNumberDomain(input[field], row.numeric)
+      : admitStructuredNumber(input[field], row.numeric);
     if (!result.ok) errors.push({ fieldPath: `$.${field}`, code: result.code });
   }
   return errors;

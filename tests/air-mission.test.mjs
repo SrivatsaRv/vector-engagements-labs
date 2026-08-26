@@ -319,6 +319,20 @@ test("one flight-plan adapter controls compiled and runtime geometry, transition
   assert.ok(Math.abs(recordedRoutePoint.longitudeDeg - editedLongitude) < 1e-9);
 });
 
+test("spatial and Air-mission altitude authoring share the three-decimal contract", () => {
+  let scenario = fixture();
+  scenario.spatialPlan.blue.position.altitudeM = 8_500.123;
+  scenario.spatialPlan.blue.route[0].altitudeM = 8_500.123;
+  scenario.altitude = 8_500.123;
+  scenario = synchronizeScenarioAirMission(scenario, CURRENT_COMPILED_MODEL_PACK);
+
+  assert.equal(
+    scenario.airMission.flightPlans[0].routePoints[0].position.altitude.valueM,
+    8_500.123,
+  );
+  assert.doesNotThrow(() => prepareSimulation(scenario));
+});
+
 test("compiled model-pack admission rejects unknown stations, rules, and quantities above immutable capacity", () => {
   const cases = [
     [(store) => { store.stationId = "deleted-station"; }, "assignments[0].loadout.stores[0].stationId"],

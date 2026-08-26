@@ -117,6 +117,9 @@ fractional digits so an existing content-addressed source geometry is not
 silently rounded. The compiler repeats type, finiteness, range, integer and
 precision checks and reports a stable code and field path rather than coercing,
 rounding or defaulting a value.
+Spatial altitude and its Air-mission route projection import the same shared
+three-fractional-digit authority; a value accepted by the map editor cannot be
+rejected later by a conflicting local precision rule.
 
 The #190 package carries its 44 km/105-degree geometry, MSL altitudes, TAS
 speeds, 70% fuel and two-store Blue assignment through the existing authored
@@ -614,9 +617,9 @@ Admission is repeated at four boundaries:
    compiler gates, so bypassing React cannot admit a different value.
 
 Ordinary operator-authored scalar values permit no more than three fractional
-digits, and individual domains may be stricter. Count fields are integers;
-current readiness delay is integer seconds; route altitude and acceptance
-radius use one fractional digit. WGS84 positions are an explicit exception:
+digits, and individual domains may be stricter. Count fields and the current
+readiness delay are integers; spatial and Air-mission altitude use the same
+shared three-digit ceiling. WGS84 positions are an explicit exception:
 the existing content-addressed regional/source geometry can retain up to 15
 fractional digits so validation does not rewrite its identity. That coordinate
 precision is not a general exemption for fuel, time, speed, mass, drag, wind or
