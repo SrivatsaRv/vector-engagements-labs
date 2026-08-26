@@ -265,7 +265,9 @@ No pending family-specific entry.
   target effect. Miss, expiry and failure reports retain their exact causal
   result reason instead of falling through to a time-limit explanation. Expiry
   occurrence time is bound to achieved launch plus admitted maximum lifetime,
-  so a hash-resealed timestamp substitution fails replay.
+  and boundary-only miss, terrain and target-unavailable causes are bound to
+  their exact terminal event time, so hash-resealed timestamp substitutions
+  fail replay.
 
 Saved-run record and admission tables now have separate domain-owned schema
 modules without changing their persisted representation.

@@ -171,7 +171,9 @@ their explicit `NOT_MODELLED` target effect; neither a caller nor a renderer
 may promote that verification-only termination into fuze, damage, kill, or
 named-weapon authority. VSR replay recomputes the achieved fixed-step launch
 boundary plus the admitted maximum lifetime and rejects any hash-resealed
-expiry event carrying a different occurrence time.
+expiry event carrying a different occurrence time. Boundary-only miss, terrain
+and target-unavailable causes likewise require exact equality with the terminal
+event boundary.
 
 Issue #151's generic mission-policy source policy scans every production and
 runtime-fixture root for exact hashes and SHA-256-confirmed raw or

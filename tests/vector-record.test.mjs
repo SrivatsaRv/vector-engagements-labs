@@ -239,6 +239,36 @@ test("VSR rejects a hash-resealed expiry time that contradicts the achieved laun
   );
 });
 
+test("VSR rejects a hash-resealed boundary-cause occurrence time", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2g-emitter-corridor",
+  ).scenario;
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2G"]);
+  const prepared = prepareSimulation(scenario, scenario.profile, capabilities);
+  const result = simulateWithCapabilitiesForVerification(scenario, capabilities);
+  assert.equal(result.engineRun.termination, "weapon_failed");
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const events = structuredClone(result.engineRun.events.items);
+  const terminal = events.find((event) => event.payload.kind === "WEAPON_TERMINATED");
+  assert.ok(terminal);
+  assert.equal(terminal.payload.cause, "TERRAIN_IMPACT");
+  assert.equal(terminal.payload.occurrenceTimeSeconds, terminal.modelTimeSeconds);
+  terminal.payload.occurrenceTimeSeconds = Number((
+    terminal.modelTimeSeconds - prepared.engineScenario.fixedStepSeconds / 2
+  ).toFixed(6));
+  const corrupt = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /does not match its exact terminal boundary time/,
+  );
+});
+
 test("VSR content identity and stable event ordering are deterministic", async () => {
   const scenario = SCENARIO_LIBRARY[1].scenario;
   const prepared = prepareSimulation(scenario);

@@ -252,7 +252,9 @@ For `FLIGHT_TIME_EXPIRED`, replay independently derives the achieved launch
 boundary from the authored schedule and fixed step, adds the admitted maximum
 flight time, and requires the event's six-decimal occurrence time to equal that
 exact value. Rehashing a record after changing the timestamp cannot create a
-valid expiry event.
+valid expiry event. Energy-depleted miss, terrain impact and target-unavailable
+are boundary-only causes and must equal their retained terminal event time;
+only geometric closest-approach intercept may retain another within-step time.
 
 The `vector.simulation-event.v2` envelope is immutable. Each payload variant
 carries a separate `vector.simulation-event-payload.<family>.vN` identity.

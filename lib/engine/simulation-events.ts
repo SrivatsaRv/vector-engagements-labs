@@ -909,6 +909,11 @@ export function assertSimulationEventStream(
         if (payload.occurrenceTimeSeconds !== expectedExpiryTimeSeconds) {
           throw new Error(`Simulation weapon-termination event ${event.id} does not match the exact admitted expiry time.`);
         }
+      } else if (
+        payload.cause !== "GEOMETRIC_INTERCEPT" &&
+        payload.occurrenceTimeSeconds !== event.modelTimeSeconds
+      ) {
+        throw new Error(`Simulation weapon-termination event ${event.id} does not match its exact terminal boundary time.`);
       }
     } else {
       const entityId = event.producer.entityId;
