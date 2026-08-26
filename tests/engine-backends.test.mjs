@@ -475,6 +475,44 @@ test("both engines terminate an admitted weapon when its assigned target is unav
   }
 });
 
+test("both engines exclude a geometric intercept occurring after an in-step expiry", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
+  const red = baseline.entities.find((entity) => entity.id === "red-object-1");
+  const weapon = baseline.entities.find((entity) => entity.weapon);
+  assert.ok(blue && red && weapon?.weapon);
+  blue.initial.position = { x: 0, y: 0, z: 8000 };
+  blue.initial.velocity = { x: 250, y: 0, z: 0 };
+  red.initial.position = { x: 100, y: 0, z: 8000 };
+  red.initial.velocity = { x: -600, y: 0, z: 0 };
+  delete blue.route;
+  delete blue.routePlan;
+  delete red.route;
+  delete red.routePlan;
+  weapon.weapon.termination.maximumFlightTimeSeconds = 0.075;
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const expired = runEngineBackend(structuredClone(baseline), backend);
+    const longerLivedScenario = structuredClone(baseline);
+    longerLivedScenario.entities.find((entity) => entity.weapon)
+      .weapon.termination.maximumFlightTimeSeconds = 0.1;
+    const longerLived = runEngineBackend(longerLivedScenario, backend);
+    assert.equal(expired.termination, "weapon_expired", backend);
+    assert.equal(longerLived.termination, "weapon_intercept", backend);
+    const terminal = expired.events.items.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    );
+    assert.equal(terminal?.payload.occurrenceTimeSeconds, 0.075, backend);
+    assert.ok(expired.closestApproachM > 25, backend);
+  }
+});
+
 test("both engines reject malformed weapon termination authority before integration", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
   const baseline = simulateWithCapabilitiesForVerification(

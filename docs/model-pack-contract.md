@@ -564,9 +564,11 @@ authoring list or a weapon-name heuristic.
 ## Persistence
 
 Migration 017 publishes the immutable intended-use 1.1.0, model-pack 0.9.0,
-credibility-manifest 1.3.0 and compiled-pack records, then rebinds all nine
-canonical scenario packages to those exact identities. It uses append-only
-insert semantics and exact readback; migrations 015 and 016 remain byte-frozen.
+credibility-manifest 1.3.0 and compiled-pack records, then publishes `1.1.0`
+versions of all nine canonical scenario packages against those exact
+identities. The historical `1.0.0` rows remain addressable. It uses append-only
+`ON CONFLICT DO NOTHING` semantics and exact readback; migrations 015 and 016
+remain byte-frozen.
 
 Air scenario packages persist the authored mission and exact model-pack digest
 inside canonical v4 JSON. Saved runs and VSRs additionally retain the compiled

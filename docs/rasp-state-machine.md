@@ -172,8 +172,9 @@ compiler checks before recomputation or persistence. An invalid type,
 non-finite value, out-of-range value or excess precision returns the same stable
 code and field path used by browser/Worker admission and creates no database
 row or record member.
-Migration 017 publishes the immutable 0.9.0 model pack and rebinds all nine
-canonical scenario packages to it without rewriting migrations 015 or 016.
+Migration 017 publishes the immutable 0.9.0 model pack and new `1.1.0`
+versions of all nine canonical scenario packages without rewriting either the
+existing `1.0.0` rows or migrations 015 and 016.
 Saved-run identity therefore retains the exact termination authority that
 produced its terminal event.
 

@@ -271,6 +271,32 @@ test("maximum admitted flight time terminates the weapon as expired", () => {
   assert.equal(terminal?.payload.cause, "FLIGHT_TIME_EXPIRED");
 });
 
+test("an in-step expiry excludes later geometric closest approach", () => {
+  const scenarioAtLifetime = (maximumFlightTimeSeconds) => {
+    const scenario = admitTestAircraft(testScenario());
+    const red = scenario.entities.find((entity) => entity.id === "aircraft-red");
+    red.initial.position = { x: 100, y: 0, z: 8000 };
+    red.initial.velocity = { x: -600, y: 0, z: 0 };
+    scenario.entities.find((entity) => entity.weapon)
+      .weapon.termination.maximumFlightTimeSeconds = maximumFlightTimeSeconds;
+    return scenario;
+  };
+
+  const expired = runEngine(scenarioAtLifetime(0.075));
+  const longerLived = runEngine(scenarioAtLifetime(0.1));
+  assert.equal(expired.termination, "weapon_expired");
+  assert.equal(longerLived.termination, "weapon_intercept");
+  const terminal = expired.events.items.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  assert.equal(terminal?.payload.occurrenceTimeSeconds, 0.075);
+  assert.ok(
+    expired.closestApproachM > expired.scenario.entities.find((entity) => entity.weapon)
+      .weapon.termination.interceptRadiusM,
+    "post-expiry geometry must not reduce the recorded closest approach",
+  );
+});
+
 test("weapon termination admission fails closed before integration", () => {
   const cases = [
     ["schema", (value) => { value.schemaVersion = "vector.weapon-termination-model.v0"; }],

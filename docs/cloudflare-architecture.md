@@ -48,6 +48,10 @@ Local Compose supplies equivalent database and telemetry endpoints through envir
 Migration 014 provisions immutable environment-pack payload/coverage rows and
 PostGIS runway centrelines. Production seeding remains a controlled release
 action; runtime ticks never connect to this catalogue.
+Migration 017 independently publishes both the retained 0.8.0 authority chain
+for scenario `1.0.0` and the new 0.9.0 authority chain for scenario `1.1.0`.
+Reference-data seeding uses insert-only conflict handling, so an existing
+content identity cannot be rewritten by a later deploy or administrative seed.
 
 VECTOR uses a managed PostgreSQL origin with PostGIS enabled. The protected
 GitHub `production` environment owns the deployment credentials. It accepts
@@ -107,11 +111,12 @@ Worker version is created.
 
 ## Deployment gates
 
-The migration gate now upgrades an existing eight-template catalog through
-`016_high_energy_crossing_challenge.sql` and requires nine validated rows on
-readback. The new row must retain the current intended-use, model-pack and study
-area identities; the existing platform, installation, runway and EnvironmentPack
-counts remain unchanged.
+The migration gate upgrades the nine-template `1.0.0` catalog through
+`017_weapon_termination_model.sql` and requires 18 validated rows on readback:
+nine immutable historical versions and nine new `1.1.0` versions. It also
+requires two intended-use versions, two compiled model packs and their exact
+model-pack credibility manifests. The existing platform, installation, runway
+and EnvironmentPack counts remain unchanged.
 
 The PostGIS gate now exercises both sides of the Air mission transition: current
 v3 production rows are valid pre-migration input, while post-migration and fresh

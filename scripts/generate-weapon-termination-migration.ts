@@ -28,13 +28,44 @@ const bundle = await compileModelPack(source);
 const intendedUse = source.intendedUses[0]!;
 const manifest = bundle.credibilityManifest;
 const sourceHash = createHash("sha256").update(canonicalJson(source)).digest("hex");
+const historicalFixture = JSON.parse(
+  readFileSync(resolve("fixtures/model-packs/vector-scalar-study-v0.8.compiled.json"), "utf8"),
+) as { pack: Record<string, unknown>; credibilityManifest: Record<string, unknown> };
+const historicalSource = structuredClone(source);
+historicalSource.version = "0.8.0";
+historicalSource.intendedUses[0]!.version = "1.0.0";
+historicalSource.intendedUses[0]!.unsupportedInterpretations = historicalSource.intendedUses[0]!
+  .unsupportedInterpretations.filter(
+    (value) => value !== "target damage, destruction, or kill from a geometric weapon intercept",
+  );
+historicalSource.credibility.version = "1.2.0";
+historicalSource.credibility.intendedUseRefs[0]!.version = "1.0.0";
+for (const weapon of historicalSource.weapons) {
+  delete (weapon as unknown as Record<string, unknown>).termination;
+}
+const historicalSourceHash = createHash("sha256")
+  .update(canonicalJson(historicalSource))
+  .digest("hex");
+if (historicalSourceHash !== "01bf4211dc40c6c3055be2afc2ed69d82782731627cef9fea67cac003be4bfed") {
+  throw new Error(`Historical model-pack 0.8.0 source identity drifted: ${historicalSourceHash}.`);
+}
+if (
+  historicalFixture.pack.id !== source.id ||
+  historicalFixture.pack.version !== "0.8.0" ||
+  historicalFixture.pack.digest !== "199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73" ||
+  historicalFixture.credibilityManifest.id !== manifest.id ||
+  historicalFixture.credibilityManifest.version !== "1.2.0"
+) {
+  throw new Error("Historical model-pack 0.8.0 fixture identity drifted.");
+}
+const historicalIntendedUse = historicalSource.intendedUses[0]!;
 const migrationPath = resolve("db/migrations/017_weapon_termination_model.sql");
 const startMarker = "-- BEGIN GENERATED WEAPON TERMINATION MODEL";
 const endMarker = "-- END GENERATED WEAPON TERMINATION MODEL";
 
 const scenarioStatements = SCENARIO_LIBRARY.map((definition) => {
   const tag = `vector_weapon_termination_${definition.id.replaceAll("-", "_")}`;
-  return `INSERT INTO scenario_templates (id,version,domain,title,status,package,schema_version,content_hash,engine_version,study_area_id,intended_use_id,intended_use_version,model_pack_id,model_pack_version,model_pack_digest) VALUES (${sqlText(definition.id)},${sqlText(definition.version)},${sqlText(definition.domain)},${sqlText(definition.title)},'VALIDATED',${dollarJson(tag, definition)},${sqlText(SCENARIO_PACKAGE_SCHEMA_VERSION)},${sqlText(sha256HexSync(definition))},${sqlText(ENGINE_VERSION)},${sqlText(definition.scenario.studyAreaId)},${sqlText(definition.intendedUse.id)},${sqlText(definition.intendedUse.version)},${sqlText(definition.modelPack.id)},${sqlText(definition.modelPack.version)},${sqlText(definition.modelPack.digest)}) ON CONFLICT (id,version) DO UPDATE SET domain=EXCLUDED.domain,title=EXCLUDED.title,status=EXCLUDED.status,package=EXCLUDED.package,schema_version=EXCLUDED.schema_version,content_hash=EXCLUDED.content_hash,engine_version=EXCLUDED.engine_version,study_area_id=EXCLUDED.study_area_id,intended_use_id=EXCLUDED.intended_use_id,intended_use_version=EXCLUDED.intended_use_version,model_pack_id=EXCLUDED.model_pack_id,model_pack_version=EXCLUDED.model_pack_version,model_pack_digest=EXCLUDED.model_pack_digest;`;
+  return `INSERT INTO scenario_templates (id,version,domain,title,status,package,schema_version,content_hash,engine_version,study_area_id,intended_use_id,intended_use_version,model_pack_id,model_pack_version,model_pack_digest) VALUES (${sqlText(definition.id)},${sqlText(definition.version)},${sqlText(definition.domain)},${sqlText(definition.title)},'VALIDATED',${dollarJson(tag, definition)},${sqlText(SCENARIO_PACKAGE_SCHEMA_VERSION)},${sqlText(sha256HexSync(definition))},${sqlText(ENGINE_VERSION)},${sqlText(definition.scenario.studyAreaId)},${sqlText(definition.intendedUse.id)},${sqlText(definition.intendedUse.version)},${sqlText(definition.modelPack.id)},${sqlText(definition.modelPack.version)},${sqlText(definition.modelPack.digest)}) ON CONFLICT (id,version) DO NOTHING;`;
 }).join("\n");
 
 const expectedRows = SCENARIO_LIBRARY.map((definition) =>
@@ -43,6 +74,23 @@ const expectedRows = SCENARIO_LIBRARY.map((definition) =>
 
 const generated = `${startMarker}
 -- Immutable verification-only geometric weapon-termination authority owned by issue #28.
+-- Retain the complete 0.8.0 authority chain required by immutable scenario@1.0.0 rows.
+INSERT INTO intended_use_contracts (id,version,schema_version,definition,content_hash)
+VALUES (${sqlText(historicalIntendedUse.id)},${sqlText(historicalIntendedUse.version)},${sqlText(historicalIntendedUse.schemaVersion)},${dollarJson("vector_weapon_termination_historical_intended_use", historicalIntendedUse)},${sqlText(sha256HexSync(historicalIntendedUse))})
+ON CONFLICT (id,version) DO NOTHING;
+
+INSERT INTO model_pack_sources (id,version,schema_version,definition,content_hash,lifecycle_status)
+VALUES (${sqlText(historicalSource.id)},${sqlText(historicalSource.version)},${sqlText(historicalSource.schemaVersion)},${dollarJson("vector_weapon_termination_historical_source", historicalSource)},${sqlText(historicalSourceHash)},'PUBLISHED')
+ON CONFLICT (id,version) DO NOTHING;
+
+INSERT INTO credibility_manifests (id,version,schema_version,subject_kind,subject_id,subject_digest,manifest,content_hash,approval_state)
+VALUES (${sqlText(String(historicalFixture.credibilityManifest.id))},${sqlText(String(historicalFixture.credibilityManifest.version))},${sqlText(String(historicalFixture.credibilityManifest.schemaVersion))},'MODEL_PACK',${sqlText(String(historicalFixture.pack.id))},${sqlText(String(historicalFixture.pack.digest))},${dollarJson("vector_weapon_termination_historical_manifest", historicalFixture.credibilityManifest)},${sqlText(String(historicalFixture.credibilityManifest.contentDigest))},${sqlText(String(historicalFixture.credibilityManifest.approvalState))})
+ON CONFLICT (id,version) DO NOTHING;
+
+INSERT INTO compiled_model_packs (id,version,schema_version,source_id,source_version,source_hash,digest,payload,credibility_manifest_id,credibility_manifest_version)
+VALUES (${sqlText(String(historicalFixture.pack.id))},${sqlText(String(historicalFixture.pack.version))},${sqlText(String(historicalFixture.pack.schemaVersion))},${sqlText(historicalSource.id)},${sqlText(historicalSource.version)},${sqlText(historicalSourceHash)},${sqlText(String(historicalFixture.pack.digest))},${dollarJson("vector_weapon_termination_historical_pack", historicalFixture.pack)},${sqlText(String(historicalFixture.credibilityManifest.id))},${sqlText(String(historicalFixture.credibilityManifest.version))})
+ON CONFLICT (id,version) DO NOTHING;
+
 INSERT INTO intended_use_contracts (id,version,schema_version,definition,content_hash)
 VALUES (${sqlText(intendedUse.id)},${sqlText(intendedUse.version)},${sqlText(intendedUse.schemaVersion)},${dollarJson("vector_weapon_termination_intended_use", intendedUse)},${sqlText(sha256HexSync(intendedUse))})
 ON CONFLICT (id,version) DO NOTHING;
@@ -65,6 +113,15 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM compiled_model_packs
+    WHERE id=${sqlText(String(historicalFixture.pack.id))} AND version=${sqlText(String(historicalFixture.pack.version))}
+      AND source_hash=${sqlText(historicalSourceHash)}
+      AND digest=${sqlText(String(historicalFixture.pack.digest))}
+      AND payload=${dollarJson("vector_weapon_termination_historical_pack", historicalFixture.pack)}
+  ) THEN
+    RAISE EXCEPTION 'Historical model-pack 0.8.0 exact identity readback failed';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM compiled_model_packs
     WHERE id=${sqlText(bundle.pack.id)} AND version=${sqlText(bundle.pack.version)}
       AND digest=${sqlText(bundle.pack.digest)} AND payload=${dollarJson("vector_weapon_termination_pack", bundle.pack)}
   ) THEN
@@ -82,6 +139,18 @@ BEGIN
        OR current.model_pack_digest<>expected.model_pack_digest
   ) THEN
     RAISE EXCEPTION 'Weapon termination scenario exact identity readback failed';
+  END IF;
+  IF (
+    SELECT count(*) FROM scenario_templates
+    WHERE version='1.0.0'
+      AND id IN (${SCENARIO_LIBRARY.map((definition) => sqlText(definition.id)).join(",")})
+      AND intended_use_id=${sqlText(historicalIntendedUse.id)}
+      AND intended_use_version=${sqlText(historicalIntendedUse.version)}
+      AND model_pack_id=${sqlText(String(historicalFixture.pack.id))}
+      AND model_pack_version=${sqlText(String(historicalFixture.pack.version))}
+      AND model_pack_digest=${sqlText(String(historicalFixture.pack.digest))}
+  ) <> ${SCENARIO_LIBRARY.length} THEN
+    RAISE EXCEPTION 'Historical scenario 1.0.0 authority retention failed';
   END IF;
 END $$;
 ${endMarker}`;

@@ -149,6 +149,12 @@ fixture used by every scenario package. When migration 017 advances that
 identity to 0.9.0, the regression must advance with it and still falsify a
 missing pack, payload-digest mismatch, missing limitations and mismatched
 approval state before any scenario becomes runnable.
+Migration regression also proves that all nine new packages use `1.1.0`, that
+the nine historical `1.0.0` identities remain present, and that migration 017
+contains no update path for an existing `(id, version)`. Engine regression
+contrasts a 75 ms lifetime with a 100 ms control in the same crossing geometry:
+the former expires at the exact in-step boundary while the latter intercepts,
+with identical TypeScript and Rust/WASM results.
 
 This baseline does not satisfy #193 by itself. Completion additionally requires
 machine-readable registration for every nested Air-mission and presentation

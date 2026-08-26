@@ -109,7 +109,7 @@ try {
       { id: CURRENT_INTENDED_USE_ID, version: CURRENT_INTENDED_USE_VERSION },
     ],
   );
-  assert.equal(catalog.credibilityAdmissions.length, 1);
+  assert.equal(catalog.credibilityAdmissions.length, 2);
   const currentPack = catalog.compiledModelPacks.find(
     (item) => item.id === CURRENT_MODEL_PACK_ID && item.version === CURRENT_MODEL_PACK_VERSION,
   );
@@ -125,13 +125,17 @@ try {
     currentPack.digest,
   );
   assert.ok(catalog.credibilityManifests.some((item) => item.subject_kind === "ENGINE"));
-  assert.equal(catalog.credibilityAdmissions[0].state, "ADMITTED_WITH_LIMITATIONS");
+  const currentAdmission = catalog.credibilityAdmissions.find(
+    (item) => item.modelPack.digest === CURRENT_MODEL_PACK_DIGEST,
+  );
+  assert.ok(currentAdmission);
+  assert.equal(currentAdmission.state, "ADMITTED_WITH_LIMITATIONS");
   assert.equal(
-    catalog.credibilityAdmissions[0].modelPack.digest,
+    currentAdmission.modelPack.digest,
     CURRENT_MODEL_PACK_DIGEST,
   );
   assert.ok(
-    catalog.credibilityAdmissions[0].credibilityManifest.limitations.some(
+    currentAdmission.credibilityManifest.limitations.some(
       (item) => item.severity === "BLOCKING",
     ),
   );
@@ -219,11 +223,24 @@ try {
   const pafInstallations = catalog.installations.filter((item) => item.service === "PAF");
   assert.equal(pafInstallations.length, 15);
   assert.ok(pafInstallations.every((item) => item.icao_code && item.source_id === "shield-paf-orbat-2026-05-19"));
-  assert.equal(catalog.scenarioTemplates.length, 9);
-  const template = catalog.scenarioTemplates.find(
+  assert.equal(catalog.scenarioTemplates.length, 18);
+  assert.equal(
+    catalog.scenarioTemplates.filter((item) => item.version === "1.0.0").length,
+    9,
+  );
+  assert.equal(
+    catalog.scenarioTemplates.filter((item) => item.version === "1.1.0").length,
+    9,
+  );
+  const historicalTemplate = catalog.scenarioTemplates.find(
     (item) => item.id === "a2a-crossing-intercept" && item.version === "1.0.0",
   );
+  const template = catalog.scenarioTemplates.find(
+    (item) => item.id === "a2a-crossing-intercept" && item.version === "1.1.0",
+  );
+  assert.ok(historicalTemplate);
   assert.ok(template);
+  assert.notEqual(historicalTemplate.content_hash, template.content_hash);
   assert.equal(template.schema_version, "vector.scenario.v4");
   assert.match(template.content_hash, /^[0-9a-f]{64}$/);
   assert.equal(template.engine_version, "browser-point-mass-v0.5");
@@ -243,7 +260,7 @@ try {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       scenarioId: "a2a-crossing-intercept",
-      scenarioVersion: "1.0.0",
+      scenarioVersion: "1.1.0",
       scenarioSchemaVersion: template.schema_version,
       scenarioContentHash: "0".repeat(64),
       draftRevision: 0,
@@ -257,7 +274,7 @@ try {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       scenarioId: "a2a-crossing-intercept",
-      scenarioVersion: "1.0.0",
+      scenarioVersion: "1.1.0",
       scenarioSchemaVersion: template.schema_version,
       scenarioContentHash: template.content_hash,
       draftRevision: 0,

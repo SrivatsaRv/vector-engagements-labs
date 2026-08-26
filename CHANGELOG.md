@@ -60,8 +60,9 @@ promotion remain downstream under #154, later #161 stages and #155.
 #### Database schema
 
 - Add forward-only migration 017 for intended-use 1.1.0, model-pack 0.9.0,
-  credibility 1.3.0 and all nine exact scenario bindings while freezing
-  migrations 015 and 016 by SHA-256.
+  credibility 1.3.0 and new `1.1.0` versions of all nine exact scenario
+  bindings while retaining every `1.0.0` row and freezing migrations 015 and
+  016 by SHA-256.
 - Add forward-only migration 016 for the exact governed high-energy
   Su-30MKI/F-16C crossing-challenge package. The migration is independently
   generated and verified, self-upserts the ninth immutable scenario, and reads

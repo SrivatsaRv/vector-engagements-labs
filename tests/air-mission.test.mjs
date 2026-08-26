@@ -419,7 +419,7 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
     assert.ok(
       migration.includes("INSERT INTO scenario_templates")
         && migration.includes(`'${definition.id}','${definition.version}'`),
-      `${definition.id} self-sufficient upsert`,
+      `${definition.id} self-sufficient immutable publication`,
     );
     assert.ok(migration.includes(`$${tag}$::jsonb,'vector.scenario.v4','${sha256HexSync(definition)}'`), definition.id);
     assert.ok(
@@ -427,6 +427,16 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
       `${definition.id} exact readback identity`,
     );
   }
+  assert.ok(
+    SCENARIO_LIBRARY.every((definition) => definition.version === "1.1.0"),
+    "termination authority is published only under new scenario identities",
+  );
+  assert.match(terminationMigration, /ON CONFLICT \(id,version\) DO NOTHING/);
+  assert.doesNotMatch(
+    terminationMigration,
+    /ON CONFLICT \(id,version\) DO UPDATE/,
+    "migration 017 must never overwrite an immutable scenario identity",
+  );
   assert.match(airMigration, /WHERE schema_version <> 'vector\.scenario\.v4'/);
   assert.match(environmentMigration, /package->>'environment' NOT LIKE 'Sourced regional terrain and atmosphere%'/);
   assert.match(groundDynamicsMigration, /Generic ground-dynamics migration exact scenario identity\/hash readback failed/);

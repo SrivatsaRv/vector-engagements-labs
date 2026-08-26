@@ -195,7 +195,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
     id: "a2a-crossing-intercept",
-    version: "1.0.0",
+    version: "1.1.0",
     domain: "A2A",
     title: "Su-30MKI / Astra versus F-16C Block 52",
     summary:
@@ -238,7 +238,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
     id: "a2a-defensive-break",
-    version: "1.0.0",
+    version: "1.1.0",
     domain: "A2A",
     title: "Mirage 2000H / MICA IR versus F-16C Block 52",
     summary:
@@ -283,7 +283,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
     id: "a2g-emitter-corridor",
-    version: "1.0.0",
+    version: "1.1.0",
     domain: "A2G",
     title: "Radar suppression: fixed P-18 site",
     summary:
@@ -332,7 +332,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
     id: "a2g-protected-node",
-    version: "1.0.0",
+    version: "1.1.0",
     domain: "A2G",
     title: "Air strike: hardened aircraft shelters",
     summary:
@@ -381,7 +381,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
     id: "g2a-point-defence",
-    version: "1.0.0",
+    version: "1.1.0",
     domain: "G2A",
     title: "Akash versus crossing F-16C Block 52",
     summary:
@@ -430,7 +430,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
     id: "g2a-layered-screen",
-    version: "1.0.0",
+    version: "1.1.0",
     domain: "G2A",
     title: "S-200 track hand-off and intercept",
     summary:
@@ -479,7 +479,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
     id: "g2g-supersonic-corridor",
-    version: "1.0.0",
+    version: "1.1.0",
     domain: "G2G",
     title: "BrahMos flight path to a fixed P-18 site",
     summary:
@@ -529,7 +529,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
     id: "g2g-defended-route",
-    version: "1.0.0",
+    version: "1.1.0",
     domain: "G2G",
     title: "BrahMos route to a fixed command site",
     summary:
@@ -580,7 +580,7 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
     id: HIGH_ENERGY_CROSSING_CHALLENGE_ID,
-    version: "1.0.0",
+    version: "1.1.0",
     domain: "A2A",
     title: "High-energy crossing challenge: Su-30MKI versus F-16C",
     summary:

@@ -1037,6 +1037,29 @@ type WeaponTerminationEvaluation = {
   runTermination: Extract<EngineRun["termination"], "weapon_intercept" | "weapon_miss" | "weapon_expired" | "weapon_failed" | "target_unavailable">;
 };
 
+function weaponActiveStepFraction(
+  weaponState: RuntimeState,
+  stepStartTimeSeconds: number,
+  fixedStepSeconds: number,
+): number {
+  const weapon = weaponState.definition.weapon;
+  if (!weapon) return 1;
+  const expiryTimeSeconds =
+    (weapon.launchTimeSeconds ?? 0) + weapon.termination.maximumFlightTimeSeconds;
+  return Math.max(
+    0,
+    Math.min(1, (expiryTimeSeconds - stepStartTimeSeconds) / fixedStepSeconds),
+  );
+}
+
+function relativePositionAtFraction(start: Vec3, end: Vec3, fraction: number): Vec3 {
+  return {
+    x: start.x + (end.x - start.x) * fraction,
+    y: start.y + (end.y - start.y) * fraction,
+    z: start.z + (end.z - start.z) * fraction,
+  };
+}
+
 function evaluateWeaponTermination(
   weaponState: RuntimeState,
   targetState: RuntimeState,
@@ -1051,9 +1074,21 @@ function evaluateWeaponTermination(
   if (!weapon || weaponState.definition.weapon?.storeTransfer?.operation === "JETTISON" || from === undefined || from === "STOWED") return null;
   if (["INTERCEPT", "MISS", "EXPIRED", "FAILED", "SELF_DESTRUCT", "TARGET_UNAVAILABLE"].includes(from)) return null;
 
-  const closest = closestApproachOnRelativeSegment(relativeStartM, relativeEndM);
   const endTimeSeconds = stepStartTimeSeconds + fixedStepSeconds;
-  const sinceLaunchSeconds = endTimeSeconds - (weapon.launchTimeSeconds ?? 0);
+  const launchTimeSeconds = weapon.launchTimeSeconds ?? 0;
+  const expiryTimeSeconds = launchTimeSeconds + weapon.termination.maximumFlightTimeSeconds;
+  const activeStepFraction = weaponActiveStepFraction(
+    weaponState,
+    stepStartTimeSeconds,
+    fixedStepSeconds,
+  );
+  const activeRelativeEndM = relativePositionAtFraction(
+    relativeStartM,
+    relativeEndM,
+    activeStepFraction,
+  );
+  const closest = closestApproachOnRelativeSegment(relativeStartM, activeRelativeEndM);
+  const sinceLaunchSeconds = endTimeSeconds - launchTimeSeconds;
   let to: WeaponTerminalState | undefined;
   let cause: WeaponTerminationEvaluation["payload"]["cause"] | undefined;
   let occurrenceTimeSeconds = endTimeSeconds;
@@ -1063,11 +1098,20 @@ function evaluateWeaponTermination(
     to = "TARGET_UNAVAILABLE";
     cause = "TARGET_UNAVAILABLE";
     runTermination = "target_unavailable";
-  } else if (closest.distanceM <= weapon.termination.interceptRadiusM) {
+  } else if (
+    expiryTimeSeconds > stepStartTimeSeconds &&
+    closest.distanceM <= weapon.termination.interceptRadiusM
+  ) {
     to = "INTERCEPT";
     cause = "GEOMETRIC_INTERCEPT";
     runTermination = "weapon_intercept";
-    occurrenceTimeSeconds = stepStartTimeSeconds + closest.fraction * fixedStepSeconds;
+    occurrenceTimeSeconds =
+      stepStartTimeSeconds + closest.fraction * activeStepFraction * fixedStepSeconds;
+  } else if (expiryTimeSeconds <= endTimeSeconds) {
+    to = "EXPIRED";
+    cause = "FLIGHT_TIME_EXPIRED";
+    runTermination = "weapon_expired";
+    occurrenceTimeSeconds = expiryTimeSeconds;
   } else if (
     weaponState.position.z <= terrainElevation(environmentSampler, weaponState.position) &&
     endTimeSeconds > 1
@@ -1075,10 +1119,6 @@ function evaluateWeaponTermination(
     to = "FAILED";
     cause = "TERRAIN_IMPACT";
     runTermination = "weapon_failed";
-  } else if (sinceLaunchSeconds >= weapon.termination.maximumFlightTimeSeconds) {
-    to = "EXPIRED";
-    cause = "FLIGHT_TIME_EXPIRED";
-    runTermination = "weapon_expired";
   } else if (
     sinceLaunchSeconds > weapon.burnSeconds + 2 &&
     magnitude(weaponState.velocity) < 80 &&
@@ -2036,7 +2076,20 @@ export class EngineSession {
       const nextEventTime = recordedModelTimeAtTick(nextTick, scenario.fixedStepSeconds);
       const postRelativePosition = subtract(primaryTarget.position, primaryWeapon.position);
       const postSeparationM = magnitude(postRelativePosition);
-      const stepClosestApproach = closestApproachOnRelativeSegment(relativePosition, postRelativePosition);
+      const activeStepFraction = weaponActiveStepFraction(
+        primaryWeapon,
+        time,
+        scenario.fixedStepSeconds,
+      );
+      const admittedPostRelativePosition = relativePositionAtFraction(
+        relativePosition,
+        postRelativePosition,
+        activeStepFraction,
+      );
+      const stepClosestApproach = closestApproachOnRelativeSegment(
+        relativePosition,
+        admittedPostRelativePosition,
+      );
       this.closestApproachM = Math.min(this.closestApproachM, stepClosestApproach.distanceM);
       const weaponTermination = evaluateWeaponTermination(
         primaryWeapon,

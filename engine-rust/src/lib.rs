@@ -2913,6 +2913,23 @@ fn closest_approach_on_relative_segment(start: Vec3, end: Vec3) -> SegmentCloses
     }
 }
 
+fn weapon_active_step_fraction(
+    weapon_state: &RuntimeState,
+    step_start_time_seconds: f64,
+    fixed_step_seconds: f64,
+) -> f64 {
+    let Some(weapon) = weapon_state.definition.weapon.as_ref() else {
+        return 1.0;
+    };
+    let expiry_time_seconds =
+        weapon.launch_time_seconds.unwrap_or(0.0) + weapon.termination.maximum_flight_time_seconds;
+    ((expiry_time_seconds - step_start_time_seconds) / fixed_step_seconds).clamp(0.0, 1.0)
+}
+
+fn relative_position_at_fraction(start: Vec3, end: Vec3, fraction: f64) -> Vec3 {
+    start.add(end.subtract(start).scale(fraction))
+}
+
 #[derive(Clone, Copy, Debug)]
 struct WeaponTerminationDecision {
     run_termination: Termination,
@@ -2957,9 +2974,15 @@ fn evaluate_weapon_termination(
     ) {
         return None;
     }
-    let closest = closest_approach_on_relative_segment(relative_start_m, relative_end_m);
     let end_time_seconds = step_start_time_seconds + fixed_step_seconds;
-    let since_launch_seconds = end_time_seconds - weapon.launch_time_seconds.unwrap_or(0.0);
+    let launch_time_seconds = weapon.launch_time_seconds.unwrap_or(0.0);
+    let expiry_time_seconds = launch_time_seconds + weapon.termination.maximum_flight_time_seconds;
+    let active_step_fraction =
+        weapon_active_step_fraction(weapon_state, step_start_time_seconds, fixed_step_seconds);
+    let active_relative_end_m =
+        relative_position_at_fraction(relative_start_m, relative_end_m, active_step_fraction);
+    let closest = closest_approach_on_relative_segment(relative_start_m, active_relative_end_m);
+    let since_launch_seconds = end_time_seconds - launch_time_seconds;
     let (to, cause, run_termination, occurrence_time_seconds) = if weapon_state.weapon_flight_state
         == Some(WeaponFlightState::TargetUnavailable)
         || target_lifecycle == EntityLifecycle::Terminated
@@ -2970,25 +2993,27 @@ fn evaluate_weapon_termination(
             Termination::TargetUnavailable,
             end_time_seconds,
         )
-    } else if closest.distance_m <= weapon.termination.intercept_radius_m {
+    } else if expiry_time_seconds > step_start_time_seconds
+        && closest.distance_m <= weapon.termination.intercept_radius_m
+    {
         (
             WeaponFlightState::Intercept,
             "GEOMETRIC_INTERCEPT",
             Termination::WeaponIntercept,
-            step_start_time_seconds + closest.fraction * fixed_step_seconds,
+            step_start_time_seconds + closest.fraction * active_step_fraction * fixed_step_seconds,
+        )
+    } else if expiry_time_seconds <= end_time_seconds {
+        (
+            WeaponFlightState::Expired,
+            "FLIGHT_TIME_EXPIRED",
+            Termination::WeaponExpired,
+            expiry_time_seconds,
         )
     } else if terrain_impact && end_time_seconds > 1.0 {
         (
             WeaponFlightState::Failed,
             "TERRAIN_IMPACT",
             Termination::WeaponFailed,
-            end_time_seconds,
-        )
-    } else if since_launch_seconds >= weapon.termination.maximum_flight_time_seconds {
-        (
-            WeaponFlightState::Expired,
-            "FLIGHT_TIME_EXPIRED",
-            Termination::WeaponExpired,
             end_time_seconds,
         )
     } else if since_launch_seconds > weapon.burn_seconds + 2.0
@@ -3295,8 +3320,17 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             .position
             .subtract(states[weapon_index].position);
         let post_separation = post_relative_position.magnitude();
-        let step_closest =
-            closest_approach_on_relative_segment(relative_position, post_relative_position);
+        let active_step_fraction =
+            weapon_active_step_fraction(&states[weapon_index], time, scenario.fixed_step_seconds);
+        let admitted_post_relative_position = relative_position_at_fraction(
+            relative_position,
+            post_relative_position,
+            active_step_fraction,
+        );
+        let step_closest = closest_approach_on_relative_segment(
+            relative_position,
+            admitted_post_relative_position,
+        );
         closest = closest.min(step_closest.distance_m);
         let target_lifecycle = states[target_index].lifecycle;
         let terrain_impact = states[weapon_index].position.z
@@ -4217,6 +4251,73 @@ mod tests {
             .ok_or("run has no weapon world-entry event")?;
         assert_eq!(entry.tick, 4);
         assert_eq!(entry.model_time_seconds, 0.2);
+        Ok(())
+    }
+
+    #[test]
+    fn in_step_expiry_excludes_later_geometric_closest_approach(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let scenario_at_lifetime =
+            |maximum_flight_time_seconds: f64| -> Result<EngineScenario, &'static str> {
+                let mut input = scenario();
+                let blue = input
+                    .entities
+                    .iter_mut()
+                    .find(|entity| entity.id == "blue-aircraft")
+                    .ok_or("scenario has no launcher")?;
+                blue.initial.position = Vec3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 8_000.0,
+                };
+                blue.initial.velocity = Vec3 {
+                    x: 250.0,
+                    y: 0.0,
+                    z: 0.0,
+                };
+                let red = input
+                    .entities
+                    .iter_mut()
+                    .find(|entity| entity.id == "red-aircraft")
+                    .ok_or("scenario has no target")?;
+                red.initial.position = Vec3 {
+                    x: 100.0,
+                    y: 0.0,
+                    z: 8_000.0,
+                };
+                red.initial.velocity = Vec3 {
+                    x: -600.0,
+                    y: 0.0,
+                    z: 0.0,
+                };
+                let weapon = input
+                    .entities
+                    .iter_mut()
+                    .find(|entity| entity.id == "blue-weapon")
+                    .and_then(|entity| entity.weapon.as_mut())
+                    .ok_or("scenario has no weapon")?;
+                weapon.launch_time_seconds = Some(0.0);
+                weapon.termination.maximum_flight_time_seconds = maximum_flight_time_seconds;
+                Ok(input)
+            };
+
+        let expired = try_run_engine(scenario_at_lifetime(0.075)?)?;
+        let longer_lived = try_run_engine(scenario_at_lifetime(0.1)?)?;
+        assert_eq!(expired.termination, Termination::WeaponExpired);
+        assert_eq!(longer_lived.termination, Termination::WeaponIntercept);
+        assert!(expired.closest_approach_m > 25.0);
+        let occurrence = expired.events.items.iter().find_map(|event| {
+            if let simulation_events::SimulationEventPayload::WeaponTerminated {
+                occurrence_time_seconds,
+                ..
+            } = &event.payload
+            {
+                Some(*occurrence_time_seconds)
+            } else {
+                None
+            }
+        });
+        assert_eq!(occurrence, Some(0.075));
         Ok(())
     }
 
