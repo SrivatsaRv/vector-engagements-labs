@@ -117,6 +117,9 @@ no exported simulation ABI, backend-selection rule or v2 runtime admission.
   pre-launch geometry is excluded, off-grid lifetime begins at achieved world
   entry, replay recomputes exact expiry authority, and the optimized artifact
   is 556,940 bytes.
+- Rebind the immutable model-pack foundation performance workload to the
+  compiler-produced anonymous-pack identity after termination authority became
+  mandatory, preserving fail-closed benchmark admission.
 - Pin the Rust/WASM post-link size policy to Binaryen 131.0.0 with an explicit
   admitted feature set; bind that policy into the generated module identity and
   retain an explicit sub-575,000-byte browser artifact gate.

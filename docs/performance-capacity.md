@@ -295,7 +295,7 @@ must pass on the frozen completion candidate beside TypeScript/Rust parity.
 
 The Stage-B #170 workload is separately frozen at
 `fixtures/performance/model-pack-foundation-workload.v1.json`, digest
-`8a438546acdfc3d3bf49d8052e26865c275f2d3fa9b935763e1271438f706e5c`.
+`80853b04efb2396524217edac7937db2be673b7bd5e9ccdea70f44ae161c0796`.
 Measured on 2026-08-25 using Node.js v24.3.0 on an Apple M5 arm64 with 10
 logical cores and 16 GiB memory, its compile/publish/exact-lookup/research-
 export/research-import p99 values were 95.936/89.550/13.506/22.244/113.104 ms.

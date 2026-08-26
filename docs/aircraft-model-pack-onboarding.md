@@ -318,7 +318,7 @@ simulated duration, not 131.9 seconds of wall time or a new pack-capacity claim.
 
 The immutable workload
 `fixtures/performance/model-pack-foundation-workload.v1.json` has digest
-`8a438546acdfc3d3bf49d8052e26865c275f2d3fa9b935763e1271438f706e5c`
+`80853b04efb2396524217edac7937db2be673b7bd5e9ccdea70f44ae161c0796`
 and measures compile, atomic publish, exact lookup, research export/import and
 1/10/100/500-instance compiled reuse. On 2026-08-25, Node v24.3.0 on an Apple M5
 arm64 with 10 logical cores and 16 GiB memory measured p99 values of 95.936,
