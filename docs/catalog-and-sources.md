@@ -4,7 +4,7 @@
 
 Issue #143 freezes NASA-TP-1538, *Simulator study of stall/post-stall characteristics of a fighter airplane with relaxed longitudinal static stability* (1979-12-01; Nguyen, Ogburn, Gilbert, Kibler, Brown, and Deal), and its NTRS metadata under `governance/sources/nasa-tp1538/`. `vector.tp1538-source-manifest.v1` binds that exact bibliographic identity, the official hashes, public-use rights and export decision, the corrected 59-page inventory, and deterministic lossless full-page crops. The offline verifier fails closed on title, report number, publication date, authors, source, metadata, page-map, rights, crop, schema, path, or hash drift.
 
-This is source evidence for the later #142 generic-F-16 verification corpus. It is not a catalog aircraft model and cannot be assigned to a scenario or named F-16 variant.
+Issue #142 admits the complete derivative as `governance/nasa-tp1538-generic-f16-aero-verification-corpus.v1.json`, canonical SHA-256 `24833d23b6ba542cdda4152e9f0eeac4a5936e827c9c4367d25eb70e11a724d2`. Its 48 tables and 14,705 positions preserve source-page/crop lineage, both independent transcripts, the exact comparison, and every adjudication. It is not a catalog aircraft model and cannot be assigned to a scenario or named F-16 variant.
 
 This aerodynamic source family remains distinct from the issue #148 generic
 sensor source freeze; neither artifact may supply evidence or authority to the

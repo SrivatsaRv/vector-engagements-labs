@@ -164,7 +164,9 @@ The immutable evidence identities for the first #135 slice are:
 TP-1538 publishes numeric aerodynamic tables in Table III (PDF pages 51–97,
 report pages 45–91) and mass/dimensional data in Table I (PDF/report pages
 49/43). The issue #142 corpus is a separately owned `NASA_GENERIC_F16`,
-`ENGINE_VERIFICATION_ONLY` derivative with no registry or production-runtime
+`ENGINE_VERIFICATION_ONLY` derivative with canonical SHA-256
+`24833d23b6ba542cdda4152e9f0eeac4a5936e827c9c4367d25eb70e11a724d2`, 48
+tables, and 14,705 explicit cell states. It has no registry or production-runtime
 authority; it cannot upgrade this registry subject or satisfy a named aircraft
 capability. TM-2003-212145 publishes the simulated mass properties in Table 1
 (PDF/report pages 48/33), but directs the actual aerodynamic and propulsion

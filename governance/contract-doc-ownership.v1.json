@@ -1881,6 +1881,26 @@
         },
         {
           "kind": "EXACT",
+          "value": "governance/nasa-tp1538-generic-f16-aero-verification-corpus.v1.json",
+          "facets": ["admission", "datum", "digest", "evidence", "schema", "unit", "validity", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "fixtures/public-reference/nasa-tp1538-aero/workload.v1.json",
+          "facets": ["datum", "digest", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/generate-tp1538-aero-workload.mjs",
+          "facets": ["datum", "digest", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-tp1538-aero.mjs",
+          "facets": ["digest", "verification"]
+        },
+        {
+          "kind": "EXACT",
           "value": "scripts/workers/tp1538-aero-verification.worker.ts",
           "facets": ["admission", "schema", "verification"]
         },
@@ -1920,6 +1940,11 @@
           "kind": "EXACT",
           "value": "tests/tp1538-aero-performance-evidence.test.mjs",
           "facets": ["digest", "verification"]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/tp1538-aero-reference.test.mjs",
+          "facets": ["admission", "datum", "digest", "evidence", "schema", "unit", "validity", "verification", "vsr"]
         }
       ],
       "generatedGroups": [
@@ -1974,6 +1999,42 @@
             }
           ],
           "freshnessArgv": ["node", "scripts/build-tp1538-aero-verifier.mjs", "--check"]
+        },
+        {
+          "id": "TP1538_AERO_PERFORMANCE_WORKLOAD",
+          "toolchainId": "NODE",
+          "outputRules": [
+            {
+              "kind": "EXACT",
+              "value": "fixtures/public-reference/nasa-tp1538-aero/workload.v1.json",
+              "facets": ["datum", "digest", "verification"]
+            }
+          ],
+          "inputRules": [
+            {
+              "kind": "EXACT",
+              "value": "governance/nasa-tp1538-generic-f16-aero-verification-corpus.v1.json",
+              "facets": ["datum", "digest", "verification"]
+            },
+            {
+              "kind": "EXACT",
+              "value": "lib/validation/tp1538-aero-verification.ts",
+              "facets": ["datum", "schema", "unit", "validity", "verification"]
+            },
+            {
+              "kind": "EXACT",
+              "value": "scripts/lib/tp1538-aero-performance-evidence.mjs",
+              "facets": ["digest", "verification"]
+            }
+          ],
+          "generatorRules": [
+            {
+              "kind": "EXACT",
+              "value": "scripts/generate-tp1538-aero-workload.mjs",
+              "facets": ["datum", "digest", "verification"]
+            }
+          ],
+          "freshnessArgv": ["node", "scripts/generate-tp1538-aero-workload.mjs", "--check"]
         }
       ],
       "owningSections": [
@@ -1981,6 +2042,12 @@
           "sectionId": "TP1538_AERO_TESTING",
           "path": "docs/testing-strategy.md",
           "heading": "## Value-free TP-1538 aerodynamic tooling",
+          "facets": ["verification"]
+        },
+        {
+          "sectionId": "TP1538_AERO_COMPLETION_TESTING",
+          "path": "docs/testing-strategy.md",
+          "heading": "## TP-1538 aerodynamic verification corpus",
           "facets": ["verification"]
         },
         {
@@ -5356,5 +5423,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "95975c56370c375c46885887a012d2162842c2dcba781397a72208fae9c52409"
+  "canonicalSha256": "226470b07e59d6751ec9d80b90b707ed7a3a0e1d2166cc55fd27eeb29e1b84fa"
 }

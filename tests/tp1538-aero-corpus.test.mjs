@@ -411,6 +411,35 @@ test("every mismatch requires one exact page-grounded adjudication decision", ()
   assert.equal(corpus.tables[0].cells[0].value, 31_415.9265);
 });
 
+test("an adjudicated unavailable state clears an available entrant value", () => {
+  const a = blankComplete({ transcriptionId: "TP1538_A_STATE_TEST", entrantId: "A", isolationSessionId: "state-a" });
+  const b = blankComplete({ transcriptionId: "TP1538_B_STATE_TEST", entrantId: "B", isolationSessionId: "state-b" });
+  a.tables[0].cells[0].state = "AVAILABLE";
+  a.tables[0].cells[0].printedValue = "31415.92650";
+  const frozenA = completeTp1538Transcription({ ...a, status: "DRAFT", contentSha256: null });
+  const frozenB = completeTp1538Transcription({ ...b, status: "DRAFT", contentSha256: null });
+  const comparison = compareTp1538Transcriptions(frozenA, frozenB);
+  const binding = frozenSyntheticAdjudication(comparison, [{
+    tableId: "CX_BASE",
+    coordinate: { alphaDeg: -20, betaDeg: -30, stabilatorDeg: -25 },
+    chosenState: "PRINTED_BLANK",
+    chosenPrintedValue: null,
+    adjudicatorId: "TEST_ONLY_SYNTHETIC_ADJUDICATOR",
+    pdfPage: 51,
+    rationale: "Re-read the printed TEST_ONLY_SYNTHETIC cell and confirmed it is blank.",
+  }]);
+  const corpus = createTp1538AdjudicatedCorpus({
+    left: frozenA,
+    right: frozenB,
+    comparison,
+    ...binding,
+  });
+  assert.deepEqual(
+    { state: corpus.tables[0].cells[0].state, printedValue: corpus.tables[0].cells[0].printedValue, value: corpus.tables[0].cells[0].value },
+    { state: "PRINTED_BLANK", printedValue: null, value: null },
+  );
+});
+
 test("verification-only corpus authority is absent from production source and bundles", () => {
   assert.ok(verifyTp1538AeroProductionIsolation() > 0);
   const scratch = mkdtempSync(join(tmpdir(), "vector-tp1538-aero-isolation-"));

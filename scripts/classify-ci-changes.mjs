@@ -146,12 +146,14 @@ export const CLASSIFIER_DECISION_CONTRACT = deepFreeze({
         /^engine-rust\//,
         /^fixtures\/public-reference\//,
         /^verification-rust\/generic-aam\//,
+        /^verification-rust\/tp1538-aero\//,
+        /^governance\/nasa-tp1538-generic-f16-aero-verification-corpus\.v1\.json$/,
         /^lib\/canonical-json\.ts$/,
         /^lib\/engine\//,
-        /^lib\/validation\/(?:public-aircraft-reference|generic-aam-verification|generic-aam-verification-wasm|generated\/generic-aam-verifier-wasm)\.ts$/,
+        /^lib\/validation\/(?:public-aircraft-reference|generic-aam-verification|generic-aam-verification-wasm|generated\/generic-aam-verifier-wasm|tp1538-aero-verification|tp1538-aero-verification-wasm|generated\/tp1538-aero-verifier-wasm)\.ts$/,
         /^lib\/(?:model-pack|reference-model-pack|simulation-models)\.ts$/,
-        /^scripts\/(?:benchmark-generic-aam|build-generic-aam-verifier|build-rust-engine|generate-model-pack-fixture|generate-nasa-generic-aam-workload|verify-nasa-generic-aam-reference|verify-public-aircraft-reference)\.(?:mjs|ts)$/,
-        /^tests\/(?:generic-aam-oracles|generic-aam-verification)\.test\.mjs$/,
+        /^scripts\/(?:benchmark-generic-aam|benchmark-tp1538-aero|build-generic-aam-verifier|build-rust-engine|build-tp1538-aero-verifier|generate-model-pack-fixture|generate-nasa-generic-aam-workload|generate-tp1538-aero-workload|verify-nasa-generic-aam-reference|verify-public-aircraft-reference)\.(?:mjs|ts)$/,
+        /^tests\/(?:generic-aam-oracles|generic-aam-verification|tp1538-aero-reference)\.test\.mjs$/,
       ),
     },
     {
@@ -160,6 +162,7 @@ export const CLASSIFIER_DECISION_CONTRACT = deepFreeze({
       patterns: patternInventory(
         /^engine-rust\/(?:Cargo\.toml|Cargo\.lock)$/,
         /^verification-rust\/generic-aam\/(?:Cargo\.toml|Cargo\.lock)$/,
+        /^verification-rust\/tp1538-aero\/(?:Cargo\.toml|Cargo\.lock)$/,
       ),
     },
     {
@@ -195,6 +198,14 @@ export const CLASSIFIER_DECISION_CONTRACT = deepFreeze({
       patterns: patternInventory(
         /^governance\/nasa-tm-109057-generic-aam-verification-corpus\.v[1-5]\.json$/,
         /^fixtures\/public-reference\/nasa-tm-109057\//,
+      ),
+    },
+    {
+      id: "TP1538_AERO_VERIFICATION_CORPUS",
+      effect: ["quality", "rust_tests", "web_tests"],
+      patterns: patternInventory(
+        /^governance\/nasa-tp1538-generic-f16-aero-verification-corpus\.v1\.json$/,
+        /^fixtures\/public-reference\/nasa-tp1538-aero\//,
       ),
     },
     {
