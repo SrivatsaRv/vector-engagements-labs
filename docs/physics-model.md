@@ -91,9 +91,11 @@ or support loss/recovery.
 Every compiled weapon now binds `vector.weapon-termination-model.v1` with
 `ENGINE_VERIFICATION_ONLY` intended use, a
 `GEOMETRIC_CLOSEST_APPROACH` criterion, positive SI intercept radius and
-positive SI maximum flight time. The current assumption values are 25 m and
-180 s. Each fixed step minimizes the linearly interpolated relative-position
-segment, so a crossing between retained samples cannot be missed. The fixed
+positive SI maximum flight time. All three categorical discriminators must be
+present explicitly in source; compilation never supplies a missing authority
+value. The current assumption values are 25 m and 180 s. Each fixed step
+minimizes the linearly interpolated relative-position segment, so a crossing
+between retained samples cannot be missed. The fixed
 precedence is target unavailable, geometric intercept during the admitted
 flight lifetime, exact flight-time expiry, terrain impact, then energy-depleted
 miss. When expiry falls inside a fixed step, closest approach is evaluated only
@@ -101,8 +103,9 @@ over the pre-expiry subsegment; later geometry cannot become an intercept or
 reduce the recorded closest approach. A terminal result ends the
 weapon lifecycle and emits one typed event at the exact retained boundary; the
 event may carry a within-step occurrence time and always carries the cumulative
-minimum separation achieved over the admitted weapon lifetime, not merely the
-terminal step's separation. The old scenario
+minimum separation achieved from the admitted launch boundary through
+termination, excluding every stowed/pre-launch separation and not merely using
+the terminal step's separation. The old scenario
 `completion.distanceMeters` field remains a legacy profile boundary and cannot
 terminate a released weapon. Map/3D proximity is presentation-only.
 

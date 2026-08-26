@@ -711,7 +711,9 @@ Each compiled weapon now also carries one exact-key
 `vector.weapon-termination-model.v1`: `ENGINE_VERIFICATION_ONLY`,
 `GEOMETRIC_CLOSEST_APPROACH`, a positive SI intercept radius, and a positive SI
 maximum flight time. The current pack uses 25 m and 180 s as visible model
-assumptions. Both engines validate that projection before integration. It owns
+assumptions. Source must explicitly carry the schema, intended-use and criterion
+discriminators; absent fields reject instead of inheriting compiler defaults.
+Both engines validate that projection before integration. It owns
 only geometric intercept, flight-time expiry, energy miss, terrain failure and
 target-unavailable termination; the legacy scenario completion distance and
 all renderer distances have no weapon-terminal authority. It does not model a

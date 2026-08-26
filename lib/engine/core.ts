@@ -1964,6 +1964,9 @@ export class EngineSession {
         );
         if (transfer) storeTransferEvents.push(transfer);
       }
+      const primaryWeaponActivatedThisTick =
+        beforeActivation.get(primaryWeapon.definition.id) === "STOWED" &&
+        primaryWeapon.lifecycle !== "STOWED";
       for (const state of this.states.values()) {
         const prior = beforeActivation.get(state.definition.id)!;
         if (prior !== "STOWED" || state.lifecycle === "STOWED") continue;
@@ -2006,7 +2009,9 @@ export class EngineSession {
       this.updateObserverState(tick, eventTime);
       const relativePosition = subtract(primaryTarget.position, primaryWeapon.position);
       const separationM = magnitude(relativePosition);
-      this.closestApproachM = Math.min(this.closestApproachM, separationM);
+      this.closestApproachM = primaryWeaponActivatedThisTick
+        ? separationM
+        : Math.min(this.closestApproachM, separationM);
       this.peakCommandG = Math.max(this.peakCommandG, primaryWeapon.commandedG);
       const dryMass = primaryWeapon.definition.weapon?.dryMassKg ?? 0;
       this.minimumMassMarginKg = Math.min(

@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DEFAULT_SCENARIO,
+  buildSimulationResult,
   buildRaspTrack,
   getFrameAt,
+  prepareSimulation,
   simulate,
   simulateWithCapabilitiesForVerification,
   standardAtmosphere,
@@ -325,6 +327,33 @@ test("runtime does not terminate on the legacy profile-distance allowance", () =
   const result = simulate({ ...DEFAULT_SCENARIO, range: 90000 });
   assert.doesNotMatch(result.reason, /distance allowance|study boundary/i);
   assert.ok(result.timeOfFlight > 0);
+});
+
+test("each weapon-terminal result carries its own causal reason instead of a time-limit claim", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const prepared = prepareSimulation(
+    SCENARIO_LIBRARY[0].scenario,
+    SCENARIO_LIBRARY[0].scenario.profile,
+    capabilities,
+  );
+  const baseline = runEngine(prepared.engineScenario);
+  const cases = [
+    ["weapon_miss", "The weapon terminated as a miss after its admitted energy continuation condition failed."],
+    ["weapon_expired", "The weapon reached its admitted verification-only maximum flight time."],
+    ["weapon_failed", "The weapon terminated after terrain impact."],
+  ];
+  for (const [termination, expectedReason] of cases) {
+    const result = buildSimulationResult(prepared, { ...baseline, termination });
+    assert.equal(result.reason, expectedReason, termination);
+    assert.doesNotMatch(result.reason, /run reached .* model seconds/i, termination);
+  }
+
+  const conductedFailure = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY.find((entry) => entry.id === "a2g-emitter-corridor").scenario,
+    createVerificationDeploymentCapabilities("typescript", ["A2G"]),
+  );
+  assert.equal(conductedFailure.termination, "weapon_failed");
+  assert.equal(conductedFailure.reason, "The weapon terminated after terrain impact.");
 });
 
 test("every configured library baseline remains valid and numerically finite", () => {

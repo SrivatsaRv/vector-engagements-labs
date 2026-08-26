@@ -3169,6 +3169,9 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
         let before_activation: Vec<EntityLifecycle> =
             states.iter().map(|state| state.lifecycle).collect();
         let store_transfers = activate_weapons(&mut states, tick, terminal_tick, &scenario)?;
+        let primary_weapon_activated_this_tick = before_activation[weapon_index]
+            == EntityLifecycle::Stowed
+            && states[weapon_index].lifecycle != EntityLifecycle::Stowed;
         for (index, state) in states.iter().enumerate() {
             if before_activation[index] != EntityLifecycle::Stowed
                 || state.lifecycle == EntityLifecycle::Stowed
@@ -3227,7 +3230,11 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
         let closure = -relative_velocity.dot(los);
         let los_rate = relative_position.cross(relative_velocity).magnitude()
             / (separation * separation).max(1.0);
-        closest = closest.min(separation);
+        closest = if primary_weapon_activated_this_tick {
+            separation
+        } else {
+            closest.min(separation)
+        };
         peak_g = peak_g.max(states[weapon_index].commanded_g);
         let dry_mass = states[weapon_index]
             .definition
@@ -4400,6 +4407,42 @@ mod tests {
             .subtract(final_weapon.position)
             .magnitude();
         assert!(run.closest_approach_m < terminal_separation_m);
+        Ok(())
+    }
+
+    #[test]
+    fn stowed_geometry_is_excluded_from_weapon_lifetime_closest_approach(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut input = scenario();
+        let red = input
+            .entities
+            .iter_mut()
+            .find(|entity| entity.id == "red-aircraft")
+            .ok_or("scenario has no target")?;
+        red.initial.position = Vec3 {
+            x: 250.0,
+            y: 0.0,
+            z: 8_000.0,
+        };
+        red.initial.velocity = Vec3 {
+            x: -250.0,
+            y: 0.0,
+            z: 0.0,
+        };
+        let weapon = input
+            .entities
+            .iter_mut()
+            .find(|entity| entity.id == "blue-weapon")
+            .and_then(|entity| entity.weapon.as_mut())
+            .ok_or("scenario has no weapon")?;
+        weapon.launch_time_seconds = Some(1.0);
+        weapon.termination.intercept_radius_m = 0.1;
+        weapon.termination.maximum_flight_time_seconds = 0.1;
+        input.duration_seconds = 2.0;
+
+        let run = try_run_engine(input)?;
+        assert_eq!(run.termination, Termination::WeaponExpired);
+        assert!(run.closest_approach_m > 100.0);
         Ok(())
     }
 

@@ -20,7 +20,9 @@ anonymous assumption model pack into named-platform performance evidence or
 describe its 25 m verification-only geometric intercept as target damage, a
 kill, probability of kill, or named-weapon effectiveness. Product copy uses
 “geometric intercept” only when the engine emitted the typed terminal event and
-must show that target effect is not modelled.
+must show that target effect is not modelled. Miss, flight-time expiry and
+terrain failure each use their causal terminal reason; none may fall through to
+copy claiming that the scenario reached its model-time limit.
 
 `RELEASE` and `JETTISON` describe only the generic public-educational lifecycle
 selected by authored intent. They do not imply safe separation, emergency

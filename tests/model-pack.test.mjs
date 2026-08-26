@@ -71,6 +71,9 @@ test("model source compiles deterministically to the committed immutable SI fixt
 test("weapon termination authority is complete, typed, finite, and positive at model-pack compilation", async () => {
   const cases = [
     ["missing", (source) => { delete source.weapons[0].termination; }],
+    ["missing schema", (source) => { delete source.weapons[0].termination.schemaVersion; }],
+    ["missing intended use", (source) => { delete source.weapons[0].termination.intendedUse; }],
+    ["missing criterion", (source) => { delete source.weapons[0].termination.criterion; }],
     ["schema", (source) => { source.weapons[0].termination.schemaVersion = "vector.weapon-termination-model.v0"; }],
     ["intended use", (source) => { source.weapons[0].termination.intendedUse = "OPERATIONAL"; }],
     ["criterion", (source) => { source.weapons[0].termination.criterion = "RENDERER_DISTANCE"; }],

@@ -324,6 +324,26 @@ test("a non-intercept termination event records the lifetime closest approach", 
   assert.ok(run.closestApproachM < terminalSeparationM);
 });
 
+test("stowed pre-launch geometry cannot reduce the weapon-lifetime closest approach", () => {
+  const scenario = admitTestAircraft(testScenario());
+  const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
+  const red = scenario.entities.find((entity) => entity.id === "aircraft-red");
+  const weapon = scenario.entities.find((entity) => entity.weapon);
+  red.initial.position = { x: 250, y: 0, z: 8000 };
+  red.initial.velocity = { x: -250, y: 0, z: 0 };
+  weapon.initial.position = { ...blue.initial.position };
+  weapon.weapon.launchTimeSeconds = 1;
+  weapon.weapon.termination.interceptRadiusM = 0.1;
+  weapon.weapon.termination.maximumFlightTimeSeconds = 0.1;
+
+  const run = runEngine(scenario);
+  assert.equal(run.termination, "weapon_expired");
+  assert.ok(
+    run.closestApproachM > 100,
+    `pre-launch crossing leaked into the lifetime minimum: ${run.closestApproachM}`,
+  );
+});
+
 test("weapon termination admission fails closed before integration", () => {
   const cases = [
     ["schema", (value) => { value.schemaVersion = "vector.weapon-termination-model.v0"; }],

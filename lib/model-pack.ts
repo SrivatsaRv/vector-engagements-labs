@@ -1454,6 +1454,15 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
     const dryMassKg = normalizeQuantity(issues, `weapons[${index}].dryMass`, item.dryMass, "kg", evidenceIds);
     const termination = item.termination as WeaponTerminationModelSource | undefined;
     if (!termination || typeof termination !== "object") issues.push(`weapons[${index}].termination is required`);
+    if (termination?.schemaVersion !== "vector.weapon-termination-model.v1") {
+      issues.push(`weapons[${index}].termination.schemaVersion is required and unsupported`);
+    }
+    if (termination?.intendedUse !== "ENGINE_VERIFICATION_ONLY") {
+      issues.push(`weapons[${index}].termination.intendedUse is required and unsupported`);
+    }
+    if (termination?.criterion !== "GEOMETRIC_CLOSEST_APPROACH") {
+      issues.push(`weapons[${index}].termination.criterion is required and unsupported`);
+    }
     const invalidRadius = { value: Number.NaN, unit: "m" as const, evidenceRefIds: [] };
     const invalidTime = { value: Number.NaN, unit: "s" as const, evidenceRefIds: [] };
     if (dryMassKg > launchMassKg) issues.push(`weapons[${index}].dryMass must not exceed launchMass`);
@@ -1478,9 +1487,9 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
       thrustTaperSpeedMps: normalizeQuantity(issues, `weapons[${index}].thrustTaperSpeed`, item.thrustTaperSpeed, "m/s", evidenceIds),
       navigationConstant: normalizeQuantity(issues, `weapons[${index}].navigationConstant`, item.navigationConstant, "1", evidenceIds),
       termination: {
-        schemaVersion: termination?.schemaVersion ?? "vector.weapon-termination-model.v1",
-        intendedUse: termination?.intendedUse ?? "ENGINE_VERIFICATION_ONLY",
-        criterion: termination?.criterion ?? "GEOMETRIC_CLOSEST_APPROACH",
+        schemaVersion: termination?.schemaVersion as CompiledWeaponModel["termination"]["schemaVersion"],
+        intendedUse: termination?.intendedUse as CompiledWeaponModel["termination"]["intendedUse"],
+        criterion: termination?.criterion as CompiledWeaponModel["termination"]["criterion"],
         interceptRadiusM: normalizeQuantity(issues, `weapons[${index}].termination.interceptRadius`, termination?.interceptRadius ?? invalidRadius, "m", evidenceIds),
         maximumFlightTimeS: normalizeQuantity(issues, `weapons[${index}].termination.maximumFlightTime`, termination?.maximumFlightTime ?? invalidTime, "s", evidenceIds),
       },

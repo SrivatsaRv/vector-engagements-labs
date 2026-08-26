@@ -559,6 +559,43 @@ test("both engines bind non-intercept events to the lifetime closest approach", 
   }
 });
 
+test("both engines exclude stowed geometry from the weapon-lifetime closest approach", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
+  const red = baseline.entities.find((entity) => entity.id === "red-object-1");
+  const weapon = baseline.entities.find((entity) => entity.weapon);
+  assert.ok(blue && red && weapon?.weapon);
+  blue.initial.position = { x: 0, y: 0, z: 8000 };
+  blue.initial.velocity = { x: 250, y: 0, z: 0 };
+  red.initial.position = { x: 250, y: 0, z: 8000 };
+  red.initial.velocity = { x: -250, y: 0, z: 0 };
+  weapon.initial.position = { ...blue.initial.position };
+  weapon.initial.velocity = { ...blue.initial.velocity };
+  for (const entity of [blue, red]) {
+    delete entity.route;
+    delete entity.routePlan;
+  }
+  weapon.weapon.launchTimeSeconds = 1;
+  weapon.weapon.termination.interceptRadiusM = 0.1;
+  weapon.weapon.termination.maximumFlightTimeSeconds = 0.1;
+  baseline.durationSeconds = 2;
+
+  const runs = ["typescript", "rust-wasm"].map((backend) =>
+    runEngineBackend(structuredClone(baseline), backend));
+  for (const [index, run] of runs.entries()) {
+    const backend = index === 0 ? "typescript" : "rust-wasm";
+    assert.equal(run.termination, "weapon_expired", backend);
+    assert.ok(run.closestApproachM > 100, `${backend} included pre-launch geometry`);
+  }
+  close(runs[0].closestApproachM, runs[1].closestApproachM, 1e-9, "post-launch closest approach parity");
+});
+
 test("both engines reject malformed weapon termination authority before integration", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
   const baseline = simulateWithCapabilitiesForVerification(

@@ -113,7 +113,8 @@ no exported simulation ABI, backend-selection rule or v2 runtime admission.
   the optimized module below the explicit 575,000-byte ceiling.
 - Add exact TypeScript/Rust `vector.weapon-termination-model.v1` admission,
   between-step closest approach, closed terminal states and canonical
-  `WEAPON_TERMINATED` event parity. The optimized artifact is 556,589 bytes.
+  `WEAPON_TERMINATED` event parity. Source discriminators are mandatory,
+  pre-launch geometry is excluded, and the optimized artifact is 556,974 bytes.
 - Pin the Rust/WASM post-link size policy to Binaryen 131.0.0 with an explicit
   admitted feature set; bind that policy into the generated module identity and
   retain an explicit sub-575,000-byte browser artifact gate.
@@ -256,7 +257,8 @@ No pending family-specific entry.
   terminal outcome, including the cumulative admitted-lifetime closest
   approach, exact event-distance to frozen-report binding, exact
   terminal-state/cause to run-outcome binding and explicit `NOT_MODELLED`
-  target effect.
+  target effect. Miss, expiry and failure reports retain their exact causal
+  result reason instead of falling through to a time-limit explanation.
 
 Saved-run record and admission tables now have separate domain-owned schema
 modules without changing their persisted representation.

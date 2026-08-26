@@ -242,7 +242,8 @@ intercept, miss, expiry, terrain failure or target-unavailable run. The event
 frame must contain the terminated weapon in the matching achieved state; its
 state and cause must map exactly to the `RUN_COMPLETED` outcome, and its closest
 approach must equal the canonical six-decimal projection of the frozen report's
-cumulative minimum over the admitted weapon lifetime;
+cumulative minimum from the admitted launch boundary through termination;
+stowed/pre-launch geometry is excluded;
 geometric intercept leaves the target active. Launch-decision, guidance and
 support events remain unavailable until their owning contracts produce them;
 the record and browser may not infer them.
