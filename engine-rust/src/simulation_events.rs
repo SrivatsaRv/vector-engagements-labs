@@ -3,7 +3,8 @@ use std::collections::{HashMap, HashSet};
 use serde::Serialize;
 
 use crate::{
-    Affiliation, AircraftOperationalState, EngineError, EntityKind, EntityLifecycle, Termination,
+    Affiliation, AirborneStoreTransfer, AircraftOperationalState, EngineError, EntityKind,
+    EntityLifecycle, StoreTransferOperation, Termination,
 };
 
 pub const SIMULATION_EVENT_SCHEMA: &str = "vector.simulation-event.v2";
@@ -14,10 +15,26 @@ pub const LIFECYCLE_CHANGED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.entity-lifecycle-changed.v1";
 pub const AIRCRAFT_OPERATIONAL_CHANGED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.aircraft-operational-state-changed.v1";
+pub const AIRBORNE_STORE_TRANSFER_OUTCOME_PAYLOAD_SCHEMA: &str =
+    "vector.simulation-event-payload.airborne-store-transfer-outcome.v1";
 pub const RUN_COMPLETED_PAYLOAD_SCHEMA: &str = "vector.simulation-event-payload.run-completed.v1";
 pub const TRACK_CHANGED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.track-state-changed.v3";
 pub const MAX_SIMULATION_EVENTS: usize = 100_000;
+
+pub struct AirborneStoreTransferOutcomeEvent<'a> {
+    pub transfer: &'a AirborneStoreTransfer,
+    pub installed_drag_newtons: f64,
+    pub launcher_mass_before_kg: f64,
+    pub launcher_mass_after_kg: f64,
+    pub launcher_fuel_before_kg: f64,
+    pub launcher_fuel_after_kg: f64,
+    pub installed_drag_area_before_m2: f64,
+    pub installed_drag_area_after_m2: f64,
+    pub accepted: bool,
+    pub limiter: &'static str,
+    pub cause: &'static str,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub enum SimulationEventPhase {
@@ -156,6 +173,49 @@ pub enum SimulationEventPayload {
         #[serde(rename = "groundDynamicsDigest")]
         ground_dynamics_digest: String,
     },
+    #[serde(rename = "AIRBORNE_STORE_TRANSFER_OUTCOME")]
+    AirborneStoreTransferOutcome {
+        #[serde(rename = "schemaVersion")]
+        schema_version: &'static str,
+        #[serde(rename = "transferId")]
+        transfer_id: String,
+        #[serde(rename = "launcherId")]
+        launcher_id: String,
+        #[serde(rename = "stationId")]
+        station_id: String,
+        #[serde(rename = "storeId")]
+        store_id: String,
+        operation: StoreTransferOperation,
+        #[serde(rename = "requestedTimeSeconds")]
+        requested_time_seconds: f64,
+        #[serde(rename = "requestedTick")]
+        requested_tick: u64,
+        requested: bool,
+        accepted: bool,
+        achieved: bool,
+        limiter: &'static str,
+        cause: &'static str,
+        #[serde(rename = "storeMassKg")]
+        store_mass_kg: f64,
+        #[serde(rename = "installedDragAreaM2")]
+        installed_drag_area_m2: f64,
+        #[serde(rename = "installedDragNewtons")]
+        installed_drag_newtons: f64,
+        #[serde(rename = "launcherMassBeforeKg")]
+        launcher_mass_before_kg: f64,
+        #[serde(rename = "launcherMassAfterKg")]
+        launcher_mass_after_kg: f64,
+        #[serde(rename = "launcherFuelBeforeKg")]
+        launcher_fuel_before_kg: f64,
+        #[serde(rename = "launcherFuelAfterKg")]
+        launcher_fuel_after_kg: f64,
+        #[serde(rename = "installedDragAreaBeforeM2")]
+        installed_drag_area_before_m2: f64,
+        #[serde(rename = "installedDragAreaAfterM2")]
+        installed_drag_area_after_m2: f64,
+        #[serde(rename = "transferDigest")]
+        transfer_digest: String,
+    },
     #[serde(rename = "RUN_COMPLETED")]
     RunCompleted {
         #[serde(rename = "schemaVersion")]
@@ -236,8 +296,9 @@ impl SimulationEventPayload {
             Self::EntityEnteredWorld { .. } => 1,
             Self::EntityLifecycleChanged { .. } => 2,
             Self::AircraftOperationalStateChanged { .. } => 3,
-            Self::RunCompleted { .. } => 4,
-            Self::TrackStateChanged { .. } => 5,
+            Self::AirborneStoreTransferOutcome { .. } => 4,
+            Self::RunCompleted { .. } => 5,
+            Self::TrackStateChanged { .. } => 6,
         }
     }
 
@@ -284,10 +345,40 @@ impl SimulationEventPayload {
                 movement_value_state,
                 ground_dynamics_digest,
             ],
+            Self::AirborneStoreTransferOutcome {
+                schema_version,
+                transfer_id,
+                launcher_id,
+                station_id,
+                store_id,
+                operation,
+                requested_time_seconds,
+                requested_tick,
+                transfer_digest,
+                ..
+            } => {
+                return serde_json::to_string(&serde_json::json!([
+                    "4",
+                    schema_version,
+                    transfer_id,
+                    launcher_id,
+                    station_id,
+                    store_id,
+                    operation,
+                    requested_time_seconds,
+                    requested_tick,
+                    transfer_digest,
+                ]))
+                .map_err(|error| {
+                    EngineError::Serialization(format!(
+                        "could not encode simulation event payload key: {error}"
+                    ))
+                });
+            }
             Self::RunCompleted {
                 schema_version,
                 termination,
-            } => vec!["4", schema_version, termination_key(*termination)],
+            } => vec!["5", schema_version, termination_key(*termination)],
             Self::TrackStateChanged {
                 schema_version,
                 perspective,
@@ -306,7 +397,7 @@ impl SimulationEventPayload {
                 uncertainty_value_state,
             } => {
                 return serde_json::to_string(&serde_json::json!([
-                    "5",
+                    "6",
                     schema_version,
                     perspective,
                     track_id,
@@ -562,6 +653,63 @@ impl SimulationEventDraft {
                 to,
                 movement_value_state: "VALID",
                 ground_dynamics_digest: ground_dynamics_digest.to_string(),
+            },
+        }
+    }
+
+    pub fn airborne_store_transfer_outcome(
+        tick: u64,
+        time: f64,
+        outcome: AirborneStoreTransferOutcomeEvent<'_>,
+    ) -> Self {
+        let transfer = outcome.transfer;
+        Self {
+            local_key: format!("airborne-store-transfer:{}", transfer.id),
+            tick,
+            model_time_seconds: time,
+            phase: SimulationEventPhase::Weapon,
+            producer: SimulationEventProducer {
+                subsystem: SimulationEventSubsystem::AircraftDynamics,
+                entity_id: Some(transfer.launcher_entity_id.clone()),
+            },
+            owner_affiliation: None,
+            knowledge_scope: SimulationEventKnowledgeScope::World,
+            participants: vec![
+                SimulationEventParticipant {
+                    entity_id: transfer.launcher_entity_id.clone(),
+                    role: SimulationEventParticipantRole::Launcher,
+                },
+                SimulationEventParticipant {
+                    entity_id: transfer.store_entity_id.clone(),
+                    role: SimulationEventParticipantRole::Weapon,
+                },
+            ],
+            causes: Vec::new(),
+            correlation_id: None,
+            payload: SimulationEventPayload::AirborneStoreTransferOutcome {
+                schema_version: AIRBORNE_STORE_TRANSFER_OUTCOME_PAYLOAD_SCHEMA,
+                transfer_id: transfer.id.clone(),
+                launcher_id: transfer.launcher_entity_id.clone(),
+                station_id: transfer.station_id.clone(),
+                store_id: transfer.store_entity_id.clone(),
+                operation: transfer.operation,
+                requested_time_seconds: transfer.requested_time_seconds,
+                requested_tick: transfer.requested_tick,
+                requested: true,
+                accepted: outcome.accepted,
+                achieved: outcome.accepted,
+                limiter: outcome.limiter,
+                cause: outcome.cause,
+                store_mass_kg: transfer.store_mass_kg,
+                installed_drag_area_m2: transfer.installed_drag_area_m2,
+                installed_drag_newtons: outcome.installed_drag_newtons,
+                launcher_mass_before_kg: outcome.launcher_mass_before_kg,
+                launcher_mass_after_kg: outcome.launcher_mass_after_kg,
+                launcher_fuel_before_kg: outcome.launcher_fuel_before_kg,
+                launcher_fuel_after_kg: outcome.launcher_fuel_after_kg,
+                installed_drag_area_before_m2: outcome.installed_drag_area_before_m2,
+                installed_drag_area_after_m2: outcome.installed_drag_area_after_m2,
+                transfer_digest: transfer.digest.clone(),
             },
         }
     }

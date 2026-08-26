@@ -254,6 +254,19 @@ browser-rendering or server-throughput evidence. Publication also retains the
 existing sub-550,000-byte optimized WASM gate and the complete repository
 performance matrix on the clean candidate SHA.
 
+#187 leaves that governed #182 fixture and benchmark unchanged. Its separate
+`performance:generic-airborne-store-transfer:verify` process composes an
+explicit RELEASE request onto the admitted takeoff fixture and executes a
+25-second takeoff-plus-transfer run. Each TypeScript and Rust/WASM backend uses
+three predeclared warmups and 20 measured samples; the report retains every
+sample, nearest-rank p50/p95 and the maximum separately. Every run must retain
+exactly one accepted/achieved transfer outcome, fewer than 150 frames, a p95
+below 100 ms, and the same optimized-WASM size ceiling below 550,000 bytes.
+This workload proves only the generic `PUBLIC_EDUCATIONAL` / assumption-backed
+mechanism. It is not named-aircraft/store, carriage, safe-separation,
+weapon-effectiveness, browser-rendering, server-throughput, landing or recovery
+performance evidence.
+
 Air mission delivery retains the existing engine/Worker capacity gates and adds
 no per-tick catalogue or database work. Mission compilation and Worker
 re-admission occur once before execution; the applicable local performance gate

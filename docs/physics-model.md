@@ -56,9 +56,19 @@ legacy/synthetic scenarios with no regional runtime projection.
 - causal generic runway hold, roll, rotation and climbout with recorded
   requested/accepted/achieved movement, limiter, fuel/mass/store continuity,
   transition events, and stable fuel/force/overrun failures;
+- one generic public-educational airborne RELEASE/JETTISON boundary after an
+  achieved airborne state: exact store mass and installed drag are removed
+  once, fuel is unchanged, and the spawned store inherits the retained launcher
+  position/velocity; operational rejection records typed limiter/cause without
+  mutation;
 - G2G commanded cruise altitude, with a terminal blend to objective elevation for direct paths and a higher commanded apex for lofted paths;
 - governed wind-shift events;
 - closest approach, completion, energy, target-unavailable, and time termination; non-finite-state checks; and dry-mass margin diagnostics.
+
+Installed store drag for that transfer uses an authored/model-assumption SI
+area admitted only in the inclusive `[0.001, 1] m²` interval. This bounded
+generic discontinuity is not ejector force, safe separation, named carriage,
+named store aerodynamics or weapon-effectiveness fidelity.
 
 Weapon frames carry a closed achieved flight-state value: `STOWED`, `BOOST`,
 `COAST`, `TERMINAL_GUIDANCE`, or `TARGET_UNAVAILABLE`. It is derived by the

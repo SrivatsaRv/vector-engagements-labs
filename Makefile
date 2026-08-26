@@ -58,6 +58,7 @@ performance-local:
 	npm run performance:environment:verify
 	npm run performance:track-store:verify
 	npm run capacity:baseline:verify
+	npm run performance:generic-airborne-store-transfer:verify
 
 capacity-baseline-local:
 	npm run capacity:baseline:verify

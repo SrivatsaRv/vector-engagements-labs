@@ -57,6 +57,11 @@ Runway-start artifacts now bind the exact generic ground-dynamics projection
 and its validity/evidence/limitation digest beside the already sourced runway,
 environment, fuel, mass and installed-store identities. The compiler rejects
 missing or mismatched authority before constructing runtime tick state.
+An optional airborne-transfer artifact adds the exact authored request, full
+compiled transfer, ordered compiler authority seal and compact entity binding.
+Its operation, tick, station/store identity, model-pack mass and bounded
+installed-drag assumption are immutable run inputs; missing or divergent copies
+fail before ticks.
 
 The artifact binds one exact regional environment-pack ID/version/digest and an
 optional exact `vector.installation-origin.v2` runway identity. Compilation
@@ -77,6 +82,13 @@ The compiled ground envelope advances to v2 only for the bounded
 `PUBLIC_EDUCATIONAL` roll/rotation/climbout mechanism. It declares closed SI
 inputs and wind/mass/fuel/runway limits; no Air-mission label can promote a
 named aircraft, TP-1538 value, landing, recovery or store-release capability.
+
+#187 adds a separate optional `vector.airborne-store-transfer-plan.v1` after an
+achieved airborne state. Compilation binds exact launcher/station/store,
+operation, integer tick, model-pack mass, SI installed-drag area, evidence and
+the `[0.001, 1] m²` validity into the full mission and an independent ordered
+authority seal. It remains generic public-educational and does not change the
+ground-operation nonclaim above.
 
 Construct produces a `vector.scenario.v4` package with an intended-use identity,
 immutable compiled model-pack identity/digest, and, for Air-domain work, exactly
@@ -155,6 +167,17 @@ interface, achieved-state/inventory guards and bounded-command consumer.
 The kernel remains an identity/admission adapter: it verifies the expanded
 ground-dynamics projection and digest but neither calculates takeoff physics nor
 copies that authority into a kernel-owned schema.
+
+For optional airborne store transfers, the adapter now also verifies the full
+ordered compiled projection against the authored Air-mission requests. It
+requires exact transfer and validity keys, launcher/store/station/operation
+identity, integer requested tick, positive model-pack mass, the governed
+`[0.001, 1] m²` installed-drag interval, each transfer content digest and the
+aggregate `vector.airborne-store-transfer-authority.v1` seal. The seal binds the
+aircraft source object, authored mission digest and ordered transfer digests;
+missing, reordered, caller-resealed or divergent projections fail closed. The
+kernel still does not decide whether a transfer is accepted or achieved: that
+causal outcome remains owned by the simulation runtime.
 
 The `SCENARIO_COMPOSITION_KERNEL` family owns one coordinated TypeScript
 contract set: `vector.scenario-kernel.v1`, the governed capability
@@ -293,6 +316,10 @@ layers remain with #155, #87, #60 and the runtime owners.
 Ground-start authoring exposes the governed inputs and recorded result states;
 the UI does not derive rotation, liftoff, climb path, speed or controller
 acceptance. Those values arrive only from the Worker/VSR canonical frame.
+Airborne-transfer authoring likewise exposes only exact operation, requested
+time and installed-drag area within `[0.001, 1] m²`. It cannot edit model-pack
+mass/station/rule identity or mark a request accepted/achieved; those outcomes
+come only from the engine-owned event.
 
 The configured-template builder edits every input used by the eight validated templates. Its **Place & flight** surface now performs direct geographic start placement, heading, altitude and speed editing, and Blue/Red route and waypoint authoring inside a selected preset study area. Map gestures and numeric fields update one spatial plan; compilation converts it to local east-north-up engine state. The admitted point-mass aircraft controller executes compiled three-dimensional route points and records requested, accepted, and achieved movement. The authored route remains visible beside the computed track so the two cannot be confused.
 
@@ -427,6 +454,24 @@ React controls hold no second mission object and cannot override either digest.
 Changing coordinates clears a runway origin. Changing area/weather resolves a
 new exact pack and invalidates an origin that does not survive its coverage and
 runway admission checks.
+
+An optional `vector.airborne-store-transfer-plan.v1` is likewise authored
+mission intent, never compiler invention. Each request names the exact launcher,
+installed ordinal, station, store source object, RELEASE or JETTISON operation,
+requested SI time, installed drag area, value state, evidence and limitations.
+The versioned validity projection admits installed drag area only in the
+inclusive `[0.001, 1] m²` interval. That bound is a compiler-owned
+public-educational validity rule, not named carriage data; the model pack still
+owns store mass and the request retains its `MODEL_ASSUMPTION` or
+`USER_AUTHORED` state. The UI and both runtime backends enforce the same exact
+limits.
+Compilation requires the executable fixed step and terminal duration, derives
+the first integer tick at or after the request, and binds ordered transfer
+digests plus the authored mission digest into one independent
+`vector.airborne-store-transfer-authority.v1` seal. A compact entity copy cannot
+promote itself; Rust reads and validates the full compiled AirMission before it
+admits that copy. A fully recompiled, internally consistent mission is new
+authoring, while caller-side resealing beside an unchanged authority seal fails.
 
 - Builder state is an editable draft scenario package.
 - A parameter change against governed model data is a scenario-local patch with

@@ -22,6 +22,10 @@ sensor detection, decisions, or narrative state.
 Ground-held aircraft now expose achieved `PARKED`/`HOLD_SHORT` operational
 state and movement `UNAVAILABLE` with the stable ground-dynamics cause. This is
 canonical entity state, not a RASP observation or inferred intent.
+Airborne store transfer is also an engine-owned lifecycle boundary, not a RASP
+decision. Its canonical outcome records requested/accepted/achieved,
+limiter/cause and exact store identity; RASP consumers cannot turn a rejected
+request into an observation or an achieved world entity.
 
 Every A2A tick emits one state owned by `IAF` and one owned by `PAF`. Without a
 compiled admission, `vector.observer-state.v2` has
@@ -135,6 +139,9 @@ Air mission lineage extends record admission only; it does not permit replay to
 derive observer information from model truth or re-run mission behavior.
 Frame schema v6 replays ground operational/movement availability exactly; RASP
 consumers may not convert unavailable movement into an observation or track.
+Accepted or rejected store-transfer outcomes replay from the archived event and
+boundary frame. Replay never reruns release physics or reconstructs a missing
+store, and a rejected outcome leaves the store stowed.
 
 ## Air mission record storage
 

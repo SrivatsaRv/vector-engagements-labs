@@ -216,8 +216,14 @@ function validateCompiledAirMissionLineage(
     );
   }
   const assignment = airRecord(compiled.assignment, "$.compiledAirMission.assignment");
+  const hasStoreTransferAuthority = Object.hasOwn(
+    assignment,
+    "storeTransferAuthorityDigest",
+  );
   airExactKeys(assignment, [
     "id", "flightPlanId", "aircraftId", "initialFuelPercent", "loadout", "groundEnvelope",
+    "storeTransfers",
+    ...(hasStoreTransferAuthority ? ["storeTransferAuthorityDigest"] : []),
   ], "$.compiledAirMission.assignment");
   const authoredAssignment = mission.assignments.find(({ id }) => id === compiled.assignment.id);
   if (!authoredAssignment
@@ -230,6 +236,94 @@ function validateCompiledAirMissionLineage(
       "KERNEL_AIR_MISSION_INVALID",
       "$.compiledAirMission.assignment",
       "Compiled Air mission assignment disagrees with its authored assignment.",
+    );
+  }
+  if (!Array.isArray(compiled.assignment.storeTransfers)) {
+    airFail(
+      "KERNEL_AIR_MISSION_INVALID",
+      "$.compiledAirMission.assignment.storeTransfers",
+      "Compiled Air mission store transfers must be an ordered array.",
+    );
+  }
+  const authoredRequests = authoredAssignment.storeTransferPlan?.requests ?? [];
+  if (compiled.assignment.storeTransfers.length !== authoredRequests.length) {
+    airFail(
+      "KERNEL_AIR_MISSION_INVALID",
+      "$.compiledAirMission.assignment.storeTransfers",
+      "Compiled store-transfer cardinality disagrees with authored mission intent.",
+    );
+  }
+  compiled.assignment.storeTransfers.forEach((transfer, index) => {
+    const path = `$.compiledAirMission.assignment.storeTransfers[${index}]`;
+    const transferRecord = airRecord(transfer, path);
+    airExactKeys(transferRecord, [
+      "schemaVersion", "authority", "validity", "id", "launcherEntityId",
+      "launcherSourceObjectId", "storeEntityId", "storeSourceObjectId", "storeModelId",
+      "storeOrdinal", "stationId", "compatibilityRuleId", "operation",
+      "requestedTimeSeconds", "requestedTick", "storeMassKg", "installedDragAreaM2",
+      "valueState", "evidenceRefIds", "limitationIds", "digest",
+    ], path);
+    const validity = airRecord(transfer.validity, `${path}.validity`);
+    airExactKeys(validity, [
+      "schemaVersion", "intendedUse", "mechanism", "minimumInstalledDragAreaM2",
+      "maximumInstalledDragAreaM2",
+    ], `${path}.validity`);
+    const request = authoredRequests[index];
+    if (!request
+      || transfer.schemaVersion !== "vector.compiled-airborne-store-transfer.v1"
+      || transfer.authority !== "GENERIC_PUBLIC_EDUCATIONAL"
+      || validity.schemaVersion !== "vector.airborne-store-transfer-validity.v1"
+      || validity.intendedUse !== "PUBLIC_EDUCATIONAL"
+      || validity.mechanism !== "AIRBORNE_STORE_RELEASE_OR_JETTISON"
+      || validity.minimumInstalledDragAreaM2 !== 0.001
+      || validity.maximumInstalledDragAreaM2 !== 1
+      || transfer.launcherSourceObjectId !== authoredAssignment.aircraftId
+      || transfer.id !== request.id
+      || transfer.launcherEntityId !== request.launcherEntityId
+      || transfer.storeEntityId !== request.storeEntityId
+      || transfer.storeSourceObjectId !== request.storeSourceObjectId
+      || transfer.storeOrdinal !== request.storeOrdinal
+      || transfer.stationId !== request.stationId
+      || transfer.operation !== request.operation
+      || transfer.requestedTimeSeconds !== request.requestedTimeSeconds
+      || transfer.installedDragAreaM2 !== request.installedDragAreaM2
+      || transfer.valueState !== request.valueState
+      || canonicalJson(transfer.evidenceRefIds) !== canonicalJson(request.evidenceRefIds)
+      || canonicalJson(transfer.limitationIds) !== canonicalJson(request.limitationIds)
+      || !Number.isInteger(transfer.requestedTick)
+      || transfer.requestedTick < 0
+      || !Number.isFinite(transfer.storeMassKg)
+      || transfer.storeMassKg <= 0
+      || !RAW_DIGEST.test(transfer.digest)) {
+      airFail(
+        "KERNEL_AIR_MISSION_INVALID",
+        path,
+        "Compiled store transfer disagrees with its authored intent or governed validity.",
+      );
+    }
+    const transferMaterial = structuredClone(transfer) as Record<string, unknown>;
+    delete transferMaterial.digest;
+    if (sha256HexSync(transferMaterial) !== transfer.digest) {
+      airFail(
+        "KERNEL_AIR_MISSION_INVALID",
+        `${path}.digest`,
+        "Compiled store-transfer digest does not bind its exact content.",
+      );
+    }
+  });
+  const expectedTransferAuthority = compiled.assignment.storeTransfers.length > 0
+    ? sha256HexSync({
+        schemaVersion: "vector.airborne-store-transfer-authority.v1",
+        aircraftSourceObjectId: authoredAssignment.aircraftId,
+        authoredDigest: compiled.authoredDigest,
+        transferDigests: compiled.assignment.storeTransfers.map(({ digest }) => digest),
+      })
+    : undefined;
+  if (compiled.assignment.storeTransferAuthorityDigest !== expectedTransferAuthority) {
+    airFail(
+      "KERNEL_AIR_MISSION_INVALID",
+      "$.compiledAirMission.assignment.storeTransferAuthorityDigest",
+      "Compiled store-transfer authority does not bind the ordered authored projection.",
     );
   }
   const envelope = airRecord(

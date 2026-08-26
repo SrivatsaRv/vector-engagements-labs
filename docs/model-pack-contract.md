@@ -437,6 +437,10 @@ Ground Air scenarios add one exact `vector.aircraft-ground-operation.v2`
 binding beside the existing model-pack identity. Its mission, runway evidence,
 posture, and release fields are compiler-owned and exact-key validated; it does
 not add or override aerodynamic, propulsion, or control values.
+An authored airborne transfer binds the same pack identity to exact aircraft,
+store, station, rule and store mass, while operation/time/installed-drag intent
+remains separately authored and authority-sealed. It is not a catalog patch and
+cannot rewrite pack content.
 
 User-authored wind/temperature changes create a distinct environment-pack
 digest. They are not model-pack patches and cannot rewrite sourced grid fields.
@@ -502,8 +506,10 @@ platform/store combinations. The compiled engine package derives installed
 aircraft inventory only from linked stowed weapon entities. Their declared
 launch masses are included in aircraft initial mass and transferred out of the
 aircraft exactly once at release. Store drag, station moments, and jettison
-remain outside the current model and must not be inferred from compatibility
-metadata.
+must not be inferred from compatibility metadata. #187 adds only an explicitly
+authored generic installed-drag-area contribution in `[0.001, 1] m²` and an
+unpowered JETTISON coast; station moments, ejector transients, safe separation
+and named carriage aerodynamics remain outside the model.
 
 The v2 governance configuration IDs and exact resolver do not alter these v1
 station/loadout rules, create a scenario configuration selector, or infer
@@ -638,6 +644,24 @@ rejects new-run admission; historical v1 records retain their explicit
 `GROUND_DYNAMICS_MODEL_UNAVAILABLE` state. Neither boundary permits
 named-platform performance, landing/recovery, store release, or a fallback to
 scalar envelope assumptions or the airborne controller.
+
+Issue #187 adds one separate generic public-educational airborne store-transfer
+consumer. The model pack remains authoritative for aircraft/store/station/rule
+identity and store mass; authored mission intent owns operation, time and the
+bounded installed-drag-area assumption. Its versioned validity projection fixes
+the admitted inclusive interval at `[0.001, 1] m²`; both exact boundaries are
+valid and any non-finite or out-of-range value fails compilation/admission. The
+interval and authored/model-assumption value state are authority-sealed and
+replayed independently by Rust, while the UI publishes the same limits. Runtime
+admission requires an airborne
+start or achieved `ENROUTE`, the independently sealed full AirMission, the exact
+remaining installed inventory, and matching compact projection. One accepted
+request removes one store mass and its installed drag contribution without
+changing fuel, then instantiates the store at the launcher's exact boundary
+position and velocity. RELEASE enables only the existing generic guided path;
+JETTISON is an unpowered generic ballistic coast. Neither operation claims
+ejection transients, safe separation, named carriage/aerodynamics, named weapon
+fidelity, TP-1538 authority, landing or recovery.
 
 Mission/capability consumers import the exported `AirMissionDefinition` and
 `CompiledAirMission` types from `lib/air-mission.ts`. They may attach downstream

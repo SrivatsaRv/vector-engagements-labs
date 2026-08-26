@@ -93,6 +93,11 @@ export default function ReportPage() {
   >(sampleMode ? "example" : runId ? "loading" : "error");
   const [exportState, setExportState] = useState<ActionState>("idle");
   const [printState, setPrintState] = useState<PrintState>("idle");
+  const storeTransfers = data?.result.engineRun.events.state === "AVAILABLE"
+    ? data.result.engineRun.events.items.filter(
+        (event) => event.payload.kind === "AIRBORNE_STORE_TRANSFER_OUTCOME",
+      )
+    : [];
 
   useEffect(() => {
     if (sampleMode || !runId) return;
@@ -508,6 +513,20 @@ export default function ReportPage() {
                   <dd>{scenario.humidityPercent}%</dd>
                 </dl>
               </ReportSection>
+              {storeTransfers.length > 0 && (
+                <ReportSection title="Airborne store transfers">
+                  <dl data-testid="report-airborne-store-transfers">
+                    {storeTransfers.map((event) => event.payload.kind === "AIRBORNE_STORE_TRANSFER_OUTCOME" && (
+                      <div key={event.id}>
+                        <dt>{event.payload.storeId} · {event.modelTimeSeconds.toFixed(2)} s</dt>
+                        <dd>
+                          {event.payload.operation} · requested {String(event.payload.requested)} / accepted {String(event.payload.accepted)} / achieved {String(event.payload.achieved)} · {event.payload.stationId} · {event.payload.limiter} · {event.payload.cause} · {event.payload.transferDigest.slice(0, 16)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </ReportSection>
+              )}
               <ReportSection title="Next controlled comparison">
                 <p>
                   Change one input: starting distance, flight path, wind

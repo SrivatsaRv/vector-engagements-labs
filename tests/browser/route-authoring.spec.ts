@@ -462,6 +462,13 @@ test("a current deployment manifest drives the real Worker run after route recov
   await expect(missionStart).toContainText("224.8° true");
   await missionStart.getByRole("button", { name: "Reverse takeoff direction" }).click();
   await expect(missionStart).toContainText("44.8° true");
+  const transferEditor = missionStart.getByRole("region", { name: "Airborne store transfer" });
+  await transferEditor.getByRole("button", { name: "Author store 1 transfer request" }).click();
+  await transferEditor.getByRole("combobox", { name: "Store transfer operation" }).selectOption("JETTISON");
+  await transferEditor.getByRole("spinbutton", { name: "Store transfer requested time" }).fill("20");
+  await transferEditor.getByRole("spinbutton", { name: "Store installed drag area" }).fill("0.08");
+  await expect(transferEditor).toContainText(/blue-weapon-1 · su-30mki-study-station/i);
+  await expect(transferEditor).toContainText(/no named-aircraft\/store, safe-separation, landing, or recovery fidelity/i);
 
   // The mission editor is the authority. Its single route adapter updates the
   // legacy spatial projection atomically; the Worker later consumes the
@@ -574,9 +581,22 @@ test("a current deployment manifest drives the real Worker run after route recov
     await expect(page.locator(".playback [data-display-time]")).toHaveAttribute("data-display-time", phaseDisplayTime!);
     await expect(page.locator(".telemetry-title [data-display-time]")).toHaveAttribute("data-display-time", phaseDisplayTime!);
   }
+  const recordedEntities = page.getByRole("list", { name: "Recorded entities" }).locator("li");
+  const preTransferEntityIds = await recordedEntities.evaluateAll((items) =>
+    items.map((item) => item.getAttribute("data-entity-id")),
+  );
+  expect(preTransferEntityIds).not.toContain("blue-weapon-1");
   await timeline.focus();
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowLeft");
+  await expect(page.getByTestId("airborne-store-transfer-outcome")).toContainText(
+    /JETTISON achieved · blue-weapon-1 .* AIRBORNE_TRANSFER_ADMITTED/,
+  );
+  const postTransferEntityIds = await recordedEntities.evaluateAll((items) =>
+    items.map((item) => item.getAttribute("data-entity-id")),
+  );
+  expect(postTransferEntityIds).toHaveLength(preTransferEntityIds.length + 1);
+  expect(postTransferEntityIds.filter((id) => id === "blue-weapon-1")).toHaveLength(1);
   const mapDisplayTime = await page.locator(".engagement-map-shell").getAttribute("data-display-time");
   expect(mapDisplayTime).not.toBeNull();
   await expect(page.locator(".playback [data-display-time]")).toHaveAttribute("data-display-time", mapDisplayTime!);
@@ -587,10 +607,9 @@ test("a current deployment manifest drives the real Worker run after route recov
   await expect(routeTransition).toHaveAttribute("data-frame-index", await page.locator(".engagement-map-shell").getAttribute("data-display-frame-index") ?? "");
   await expect(routeTransition).toContainText(/Fly-over|Fly-by|Route complete|unavailable/i);
   await expect(page.locator(".current-geometry")).not.toContainText("Relative-position diagram");
-  await expect(page.locator(".current-geometry")).toContainText("ENROUTE");
-  await expect(page.locator(".current-geometry")).toContainText("Movement");
-  await expect(page.locator(".current-geometry")).toContainText("VALID");
-  await expect(page.locator(".current-geometry")).not.toContainText("Aircraft movement is unavailable");
+  await expect(page.locator(".current-geometry")).toContainText("WEAPON TO TARGET");
+  await expect(page.locator(".current-geometry")).toContainText("COAST");
+  await expect(page.locator(".current-geometry")).toContainText("Weapon speed");
   await expect(page.locator(".telemetry.is-collapsed")).toBeVisible();
   const telemetryToggle = page.getByRole("button", { name: /expand telemetry/i });
   await expect(telemetryToggle).toHaveAttribute("aria-expanded", "false");
@@ -650,6 +669,13 @@ test("a current deployment manifest drives the real Worker run after route recov
   }
   await page.getByRole("button", { name: "3D", exact: true }).click();
   await expect(page.locator(".simulation-scene")).toHaveAttribute("data-display-time", mapDisplayTime!);
+  await expect(
+    page.getByRole("list", { name: "Recorded entities" }).locator('[data-entity-id="blue-weapon-1"]'),
+  ).toHaveCount(1);
   await expect(page.locator(".current-geometry")).toHaveAttribute("data-display-time", mapDisplayTime!);
+  await page.getByRole("button", { name: "Explain & report", exact: true }).click();
+  await expect(page.getByTestId("results-airborne-store-transfer")).toContainText(
+    /JETTISON achieved[\s\S]*blue-weapon-1[\s\S]*AIRBORNE_TRANSFER_ADMITTED/,
+  );
   expect(runtimeErrors).toEqual([]);
 });

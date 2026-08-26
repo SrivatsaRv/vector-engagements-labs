@@ -33,6 +33,11 @@ mission-scenario owner. The declaration gate therefore covers its schema,
 digest and storage facets alongside the generated forward migration; it does
 not classify the generator as tooling-only or create a second contract family.
 
+#187 registers its composed takeoff-plus-transfer workload, benchmark and
+focused regression as exact engine-verification paths. The existing #182
+takeoff fixture/benchmark remain unchanged; `performance-local` runs the
+separate 3-warmup/20-sample transfer process and retains the maximum beside p95.
+
 Regional environment changes run the offline source/digest verifier in
 `ci-local`; release evidence additionally includes the built Worker
 cancel/retry gate and the bounded environment throughput/memory benchmark.

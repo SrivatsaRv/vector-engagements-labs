@@ -27,6 +27,10 @@ import {
 } from "../mission-admission.ts";
 import { finiteNumber, PublicApiError, shortString } from "./public-api.ts";
 import { SAVED_RUN_LIFECYCLE_POLICY } from "./admission-policy.ts";
+import {
+  ENGINE_FIXED_STEP_SECONDS,
+  engineDurationSecondsForDomain,
+} from "../engine/compiler.ts";
 
 const domains = new Set(["A2A", "A2G", "G2A", "G2G"]);
 const profiles = new Set(["short", "medium", "sustained"]);
@@ -289,6 +293,8 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
         modelPack: CURRENT_COMPILED_MODEL_PACK,
         environmentPackDigest: environment.pack.identity.digest,
         environmentPack: environment.pack,
+        fixedStepSeconds: ENGINE_FIXED_STEP_SECONDS,
+        durationSeconds: engineDurationSecondsForDomain(scenario.domain),
       });
     }
   } catch (error) {

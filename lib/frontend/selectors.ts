@@ -10,6 +10,53 @@ export type SelectedDisplayFrame = {
   displayTimeSeconds: number;
 };
 
+export type AirborneStoreTransferOutcome = {
+  eventId: string;
+  frameIndex: number;
+  modelTimeSeconds: number;
+  launcherId: string;
+  storeId: string;
+  stationId: string;
+  operation: "RELEASE" | "JETTISON";
+  requested: true;
+  accepted: boolean;
+  achieved: boolean;
+  limiter: "NONE" | "AIRCRAFT_STATE" | "STORE_INVENTORY" | "DRAG_AUTHORITY";
+  cause: "AIRBORNE_TRANSFER_ADMITTED" | "AIRCRAFT_NOT_ENROUTE" | "STORE_NOT_INSTALLED" | "INSTALLED_DRAG_EXCEEDED";
+  transferDigest: string;
+};
+
+/** Reads only the canonical event stream up to the selected retained frame. */
+export function selectAirborneStoreTransferOutcomes(
+  result: SimulationResult,
+  selected: SelectedDisplayFrame,
+): AirborneStoreTransferOutcome[] {
+  const events = result.engineRun.events.state === "AVAILABLE"
+    ? result.engineRun.events.items
+    : [];
+  return events.flatMap((event) => {
+    if (
+      event.payload.kind !== "AIRBORNE_STORE_TRANSFER_OUTCOME" ||
+      event.frameIndex > selected.frameIndex
+    ) return [];
+    return [{
+      eventId: event.id,
+      frameIndex: event.frameIndex,
+      modelTimeSeconds: event.modelTimeSeconds,
+      launcherId: event.payload.launcherId,
+      storeId: event.payload.storeId,
+      stationId: event.payload.stationId,
+      operation: event.payload.operation,
+      requested: event.payload.requested,
+      accepted: event.payload.accepted,
+      achieved: event.payload.achieved,
+      limiter: event.payload.limiter,
+      cause: event.payload.cause,
+      transferDigest: event.payload.transferDigest,
+    }];
+  });
+}
+
 export type RouteTransitionState =
   | {
       state: "ACTIVE";

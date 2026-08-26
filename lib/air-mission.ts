@@ -8,6 +8,7 @@ import {
 import { geographicToEnginePosition, isPointInsideStudyArea } from "./scenario-spatial.ts";
 import { getStudyArea } from "./study-areas.ts";
 import type { Scenario } from "./simulation.ts";
+import { firstFixedStepTickAtOrAfter } from "./engine/simulation-events.ts";
 import { createEnvironmentSampler, type EnvironmentPack } from "./geospatial/environment-pack.ts";
 import {
   ModelPackValidationError,
@@ -248,6 +249,24 @@ export type AirMissionDefinition = {
       stores: Array<{ stationId: string; weaponId: string; quantity: number; compatibilityRuleId: string }>;
       compatibility: "COMPILED_MODEL_PACK";
     };
+    /** Authored command intent; compilation binds it to the admitted loadout. */
+    storeTransferPlan?: {
+      schemaVersion: "vector.airborne-store-transfer-plan.v1";
+      requests: Array<{
+        id: string;
+        launcherEntityId: string;
+        storeEntityId: string;
+        storeOrdinal: number;
+        stationId: string;
+        storeSourceObjectId: string;
+        operation: "RELEASE" | "JETTISON";
+        requestedTimeSeconds: number;
+        installedDragAreaM2: number;
+        valueState: "MODEL_ASSUMPTION" | "USER_AUTHORED";
+        evidenceRefIds: string[];
+        limitationIds: string[];
+      }>;
+    };
     groundCompatibility: {
       schemaVersion: "vector.aircraft-ground-envelope-binding.v1";
       envelopeId: string;
@@ -320,6 +339,41 @@ export type AircraftGroundEnvelope = {
   digest: string;
 };
 
+export const AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2 = Object.freeze({
+  minimum: 0.001,
+  maximum: 1,
+});
+
+export type CompiledAirborneStoreTransfer = {
+  schemaVersion: "vector.compiled-airborne-store-transfer.v1";
+  authority: "GENERIC_PUBLIC_EDUCATIONAL";
+  validity: {
+    schemaVersion: "vector.airborne-store-transfer-validity.v1";
+    intendedUse: "PUBLIC_EDUCATIONAL";
+    mechanism: "AIRBORNE_STORE_RELEASE_OR_JETTISON";
+    minimumInstalledDragAreaM2: number;
+    maximumInstalledDragAreaM2: number;
+  };
+  id: string;
+  launcherEntityId: string;
+  launcherSourceObjectId: string;
+  storeEntityId: string;
+  storeSourceObjectId: string;
+  storeModelId: string;
+  storeOrdinal: number;
+  stationId: string;
+  compatibilityRuleId: string;
+  operation: "RELEASE" | "JETTISON";
+  requestedTimeSeconds: number;
+  requestedTick: number;
+  storeMassKg: number;
+  installedDragAreaM2: number;
+  valueState: "MODEL_ASSUMPTION" | "USER_AUTHORED";
+  evidenceRefIds: string[];
+  limitationIds: string[];
+  digest: string;
+};
+
 export type AirMissionAdmissionCode =
   | "MISSION_SCHEMA_UNSUPPORTED"
   | "MISSION_SCHEMA_INVALID"
@@ -376,6 +430,8 @@ export type CompiledAirMission = {
     initialFuelPercent: number;
     loadout: Array<{ stationId: string; weaponId: string; quantity: number; compatibilityRuleId: string }>;
     groundEnvelope: AircraftGroundEnvelope;
+    storeTransfers: CompiledAirborneStoreTransfer[];
+    storeTransferAuthorityDigest?: string;
   };
   policies: AirMissionDefinition["policies"];
   start: {
@@ -582,6 +638,71 @@ function resolveAircraftConfiguration(input: {
   return { aircraft, weapon, station, rule, groundEnvelope: compileGroundEnvelope(pack, aircraft) };
 }
 
+function compileAirborneStoreTransfers(input: {
+  mission: AirMissionDefinition;
+  modelPack: Readonly<CompiledModelPack>;
+  start: CompiledAirMission["start"];
+  fixedStepSeconds: number;
+  durationSeconds: number;
+}): CompiledAirborneStoreTransfer[] {
+  const assignment = input.mission.assignments[0];
+  const store = assignment.loadout.stores[0];
+  const plan = assignment.storeTransferPlan;
+  if (!plan) return [];
+  const resolved = resolveAircraftConfiguration({
+    pack: input.modelPack,
+    aircraftId: assignment.aircraftId,
+    weaponId: store.weaponId,
+    quantity: store.quantity,
+    stationId: store.stationId,
+    compatibilityRuleId: store.compatibilityRuleId,
+  });
+  const common = {
+    schemaVersion: "vector.compiled-airborne-store-transfer.v1" as const,
+    authority: "GENERIC_PUBLIC_EDUCATIONAL" as const,
+    validity: {
+      schemaVersion: "vector.airborne-store-transfer-validity.v1" as const,
+      intendedUse: "PUBLIC_EDUCATIONAL" as const,
+      mechanism: "AIRBORNE_STORE_RELEASE_OR_JETTISON" as const,
+      minimumInstalledDragAreaM2: AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.minimum,
+      maximumInstalledDragAreaM2: AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.maximum,
+    },
+    launcherSourceObjectId: assignment.aircraftId,
+    storeModelId: resolved.weapon.id,
+    compatibilityRuleId: store.compatibilityRuleId,
+    storeMassKg: resolved.weapon.launchMassKg,
+  };
+  return plan.requests.map((request, index) => {
+    const requestedTick = firstFixedStepTickAtOrAfter(request.requestedTimeSeconds, input.fixedStepSeconds);
+    const terminalTick = firstFixedStepTickAtOrAfter(input.durationSeconds, input.fixedStepSeconds);
+    if (requestedTick >= terminalTick) {
+      fail(
+        "MISSION_LOADOUT_INVALID",
+        `assignments[0].storeTransferPlan.requests[${index}].requestedTimeSeconds`,
+        "Store-transfer request is at or beyond the terminal tick.",
+        "Choose a requested time whose canonical integer tick is inside the executable run window.",
+      );
+    }
+    const withoutDigest = {
+      ...common,
+      id: request.id,
+      launcherEntityId: request.launcherEntityId,
+      storeEntityId: request.storeEntityId,
+      storeSourceObjectId: request.storeSourceObjectId,
+      storeOrdinal: request.storeOrdinal,
+      stationId: request.stationId,
+      operation: request.operation,
+      requestedTimeSeconds: request.requestedTimeSeconds,
+      requestedTick,
+      installedDragAreaM2: request.installedDragAreaM2,
+      valueState: request.valueState,
+      evidenceRefIds: [...request.evidenceRefIds],
+      limitationIds: [...request.limitationIds],
+    };
+    return { ...withoutDigest, digest: sha256HexSync(withoutDigest) };
+  });
+}
+
 export function createDefaultAirMissionDefinition(input: {
   scenario: MissionScenario;
   missionClass?: AirMissionClass;
@@ -681,6 +802,55 @@ export function createDefaultAirMissionDefinition(input: {
 }
 
 /**
+ * Author one explicit generic transfer request before compilation. The SI
+ * carriage area is caller-authored and remains distinct from free-flight drag.
+ */
+export function authorGenericAirborneStoreTransfer(input: {
+  mission: AirMissionDefinition;
+  modelPack: Readonly<CompiledModelPack>;
+  storeOrdinal: number;
+  operation: "RELEASE" | "JETTISON";
+  requestedTimeSeconds: number;
+  installedDragAreaM2: number;
+  valueState?: "MODEL_ASSUMPTION" | "USER_AUTHORED";
+}): AirMissionDefinition {
+  const mission = structuredClone(input.mission);
+  const assignment = mission.assignments[0];
+  const store = assignment?.loadout.stores[0];
+  if (!assignment || !store || !Number.isSafeInteger(input.storeOrdinal) || input.storeOrdinal < 1 || input.storeOrdinal > store.quantity) {
+    fail("MISSION_LOADOUT_INVALID", "assignments[0].storeTransferPlan", "Store-transfer request does not identify an installed store ordinal.", "Select an exact installed store ordinal from the admitted loadout.");
+  }
+  const resolved = resolveAircraftConfiguration({
+    pack: input.modelPack,
+    aircraftId: assignment.aircraftId,
+    weaponId: store.weaponId,
+    quantity: store.quantity,
+    stationId: store.stationId,
+    compatibilityRuleId: store.compatibilityRuleId,
+  });
+  const storeEntityId = `blue-weapon-${input.storeOrdinal}`;
+  assignment.storeTransferPlan ??= {
+    schemaVersion: "vector.airborne-store-transfer-plan.v1",
+    requests: [],
+  };
+  assignment.storeTransferPlan.requests.push({
+    id: `${assignment.id}-store-transfer-${input.storeOrdinal}`,
+    launcherEntityId: "blue-platform-1",
+    storeEntityId,
+    storeOrdinal: input.storeOrdinal,
+    stationId: store.stationId,
+    storeSourceObjectId: store.weaponId,
+    operation: input.operation,
+    requestedTimeSeconds: input.requestedTimeSeconds,
+    installedDragAreaM2: input.installedDragAreaM2,
+    valueState: input.valueState ?? "MODEL_ASSUMPTION",
+    evidenceRefIds: [...resolved.weapon.evidenceRefIds],
+    limitationIds: [...resolved.weapon.limitationIds],
+  });
+  return mission;
+}
+
+/**
  * Rebuild the route/loadout/fuel adapter fields from one Scenario edit while
  * retaining the operator-authored mission policy. The compiler still rejects
  * stale imported objects; this helper is only for visible draft edits.
@@ -724,6 +894,12 @@ export function synchronizeScenarioAirMission(
       version: current.version,
       start: structuredClone(environmentChanged ? next.start : current.start),
       regime: current.regime,
+      assignments: next.assignments.map((assignment, index) => ({
+        ...assignment,
+        ...(current.assignments[index]?.storeTransferPlan
+          ? { storeTransferPlan: structuredClone(current.assignments[index].storeTransferPlan) }
+          : {}),
+      })),
       tasks: synchronizedTasks,
       policies: structuredClone(current.policies),
       fuel: environmentChanged
@@ -878,11 +1054,28 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
 
   mission.assignments.forEach((assignment, index) => {
     const path = `assignments[${index}]`;
-    exactRecord(assignment, ["id", "flightPlanId", "aircraftId", "aircraftModelPackDigest", "initialFuelPercent", "loadout", "groundCompatibility"], path);
+    exactRecord(assignment, [
+      "id", "flightPlanId", "aircraftId", "aircraftModelPackDigest",
+      "initialFuelPercent", "loadout", "groundCompatibility",
+      ...(assignment.storeTransferPlan ? ["storeTransferPlan"] : []),
+    ], path);
     exactRecord(assignment.loadout, ["schemaVersion", "stores", "compatibility"], `${path}.loadout`);
     exactRecord(assignment.groundCompatibility, ["schemaVersion", "envelopeId", "envelopeDigest"], `${path}.groundCompatibility`);
     if (!Array.isArray(assignment.loadout.stores)) fail("MISSION_SCHEMA_INVALID", path, "Assignment stores must be an explicit array.", "Author an exact compiled-model-pack loadout binding.");
     assignment.loadout.stores.forEach((store, storeIndex) => exactRecord(store, ["stationId", "weaponId", "quantity", "compatibilityRuleId"], `${path}.loadout.stores[${storeIndex}]`));
+    if (assignment.storeTransferPlan) {
+      exactRecord(assignment.storeTransferPlan, ["schemaVersion", "requests"], `${path}.storeTransferPlan`);
+      if (assignment.storeTransferPlan.schemaVersion !== "vector.airborne-store-transfer-plan.v1" || !Array.isArray(assignment.storeTransferPlan.requests)) {
+        fail("MISSION_SCHEMA_INVALID", `${path}.storeTransferPlan`, "Store-transfer plan is malformed.", "Author the exact v1 transfer-plan schema and explicit requests.");
+      }
+      assignment.storeTransferPlan.requests.forEach((request, requestIndex) => {
+        const requestPath = `${path}.storeTransferPlan.requests[${requestIndex}]`;
+        exactRecord(request, ["id", "launcherEntityId", "storeEntityId", "storeOrdinal", "stationId", "storeSourceObjectId", "operation", "requestedTimeSeconds", "installedDragAreaM2", "valueState", "evidenceRefIds", "limitationIds"], requestPath);
+        if (!nonEmptyText(request.id) || !nonEmptyText(request.launcherEntityId) || !nonEmptyText(request.storeEntityId) || !Number.isSafeInteger(request.storeOrdinal) || request.storeOrdinal < 1 || !nonEmptyText(request.stationId) || !nonEmptyText(request.storeSourceObjectId) || !["RELEASE", "JETTISON"].includes(request.operation) || !Number.isFinite(request.requestedTimeSeconds) || request.requestedTimeSeconds < 0 || !Number.isFinite(request.installedDragAreaM2) || request.installedDragAreaM2 < AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.minimum || request.installedDragAreaM2 > AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.maximum || !["MODEL_ASSUMPTION", "USER_AUTHORED"].includes(request.valueState) || !Array.isArray(request.evidenceRefIds) || !request.evidenceRefIds.length || request.evidenceRefIds.some((id) => !nonEmptyText(id)) || !Array.isArray(request.limitationIds) || !request.limitationIds.length || request.limitationIds.some((id) => !nonEmptyText(id))) {
+          fail("MISSION_SCHEMA_INVALID", requestPath, "Store-transfer request identity, operation, SI values, provenance, or authority is invalid.", "Author finite physical transfer intent with exact identities and evidence/limitation references.");
+        }
+      });
+    }
     if (!nonEmptyText(assignment.id) || !nonEmptyText(assignment.flightPlanId) || !nonEmptyText(assignment.aircraftId) || !/^[0-9a-f]{64}$/.test(assignment.aircraftModelPackDigest) || assignment.loadout.schemaVersion !== "vector.loadout-plan.v1" || assignment.loadout.compatibility !== "COMPILED_MODEL_PACK" || assignment.groundCompatibility.schemaVersion !== "vector.aircraft-ground-envelope-binding.v1" || !nonEmptyText(assignment.groundCompatibility.envelopeId) || !/^[0-9a-f]{64}$/.test(assignment.groundCompatibility.envelopeDigest)) fail("MISSION_SCHEMA_INVALID", path, "Assignment identity, model binding, loadout, or ground-envelope binding is invalid.", "Bind one exact flight, aircraft model pack, loadout, and content-addressed assumption envelope.");
   });
 
@@ -904,7 +1097,7 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
 
 export function compileAirMissionDefinition(
   input: AirMissionDefinition,
-  context: { scenario: MissionScenario; modelPack: Readonly<CompiledModelPack>; environmentPackDigest: string; environmentPack?: Readonly<EnvironmentPack> },
+  context: { scenario: MissionScenario; modelPack: Readonly<CompiledModelPack>; environmentPackDigest: string; environmentPack?: Readonly<EnvironmentPack>; fixedStepSeconds?: number; durationSeconds?: number },
 ): CompiledAirMission {
   if (input?.schemaVersion !== AIR_MISSION_SCHEMA_VERSION) fail("MISSION_SCHEMA_UNSUPPORTED", "schemaVersion", "The Air mission schema version is unsupported.", `Use ${AIR_MISSION_SCHEMA_VERSION}.`);
   const mission: unknown = structuredClone(input);
@@ -986,6 +1179,18 @@ export function compileAirMissionDefinition(
         compatibilityRuleId: store.compatibilityRuleId,
       });
     });
+    if (assignment.storeTransferPlan) {
+      const requests = assignment.storeTransferPlan.requests;
+      const ids = new Set<string>();
+      const stores = new Set<string>();
+      for (const [requestIndex, request] of requests.entries()) {
+        const requestPath = `${path}.storeTransferPlan.requests[${requestIndex}]`;
+        if (ids.has(request.id) || stores.has(request.storeEntityId)) fail("MISSION_LOADOUT_INVALID", requestPath, "Store-transfer request is duplicated or replayed.", "Declare at most one request per exact installed store identity.");
+        ids.add(request.id);
+        stores.add(request.storeEntityId);
+        if (request.launcherEntityId !== "blue-platform-1" || request.storeEntityId !== `blue-weapon-${request.storeOrdinal}` || request.storeOrdinal > context.scenario.blueWeaponQuantity || request.stationId !== assignment.loadout.stores[0].stationId || request.storeSourceObjectId !== assignment.loadout.stores[0].weaponId) fail("MISSION_LOADOUT_INVALID", requestPath, "Store-transfer request does not identify the exact compiled launcher, station, and installed store.", "Bind the request to the exact compiled entity, store ordinal, station, and source object.");
+      }
+    }
     if (!resolvedConfiguration || assignment.groundCompatibility.envelopeId !== resolvedConfiguration.groundEnvelope.id || assignment.groundCompatibility.envelopeDigest !== resolvedConfiguration.groundEnvelope.digest) fail("MISSION_RUNWAY_INVALID", `${path}.groundCompatibility`, "The authored ground-envelope binding does not match the immutable compiled MODEL_ASSUMPTION resolver.", "Rebind the mission to the exact admitted model-pack digest and aircraft identity; authored performance values are not accepted.");
   });
   if (!Number.isFinite(mission.fuel.reservePercent) || mission.fuel.reservePercent < 0 || mission.fuel.reservePercent > 100) fail("MISSION_FUEL_INVALID", "fuel.reservePercent", "Fuel reserve must be from 0 to 100 percent.", "Provide an explicit bounded reserve.");
@@ -1130,6 +1335,20 @@ export function compileAirMissionDefinition(
   }
 
   const authoredDigest = sha256HexSync(mission);
+  const storeTransfers = mission.assignments[0].storeTransferPlan
+    ? (() => {
+        if (context.fixedStepSeconds === undefined || context.durationSeconds === undefined) {
+          fail("MISSION_SCHEMA_INVALID", "assignments[0].storeTransferPlan", "Store-transfer compilation requires the exact executable step and duration.", "Compile through the scenario adapter with explicit fixed-step and terminal boundaries.");
+        }
+        return compileAirborneStoreTransfers({
+          mission,
+          modelPack: context.modelPack,
+          start,
+          fixedStepSeconds: context.fixedStepSeconds,
+          durationSeconds: context.durationSeconds,
+        });
+      })()
+    : [];
   const withoutDigest = {
     schemaVersion: COMPILED_AIR_MISSION_SCHEMA_VERSION,
     id: mission.id,
@@ -1153,6 +1372,17 @@ export function compileAirMissionDefinition(
         stationId: mission.assignments[0].loadout.stores[0].stationId,
         compatibilityRuleId: mission.assignments[0].loadout.stores[0].compatibilityRuleId,
       }).groundEnvelope,
+      storeTransfers,
+      ...(storeTransfers.length > 0
+        ? {
+            storeTransferAuthorityDigest: sha256HexSync({
+              schemaVersion: "vector.airborne-store-transfer-authority.v1",
+              aircraftSourceObjectId: mission.assignments[0].aircraftId,
+              authoredDigest,
+              transferDigests: storeTransfers.map((transfer) => transfer.digest),
+            }),
+          }
+        : {}),
     },
     policies: structuredClone(mission.policies),
     start,

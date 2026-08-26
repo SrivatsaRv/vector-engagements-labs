@@ -9,6 +9,7 @@ import type {
   EngineScenario,
   AircraftOperationalState,
   WeaponFlightState,
+  SimulationEventPayload,
 } from "./contracts.ts";
 import { SIMULATION_EVENT_PAYLOAD_SCHEMAS } from "./contracts.ts";
 import { SIMULATION_EVENT_SCHEMA } from "./contracts.ts";
@@ -50,6 +51,7 @@ import {
 import type { SimulationEventReceipt } from "./simulation-events.ts";
 import type { TrackTransitionCommit } from "./contracts.ts";
 import { sha256HexSync } from "../geospatial/digest.ts";
+import { AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2 } from "../air-mission.ts";
 
 type RuntimeState = {
   definition: EngineEntityDefinition;
@@ -63,6 +65,8 @@ type RuntimeState = {
   availableG: number;
   storeMassKg: number;
   installedStoreIds: Set<string>;
+  installedStoreDragAreaM2: number;
+  storeTransferAttempted: boolean;
   dragNewtons: number;
   thrustNewtons: number;
   phase: string;
@@ -351,6 +355,8 @@ function initialState(definition: EngineEntityDefinition): RuntimeState {
     availableG: definition.weapon?.maximumCommandG ?? 9,
     storeMassKg: 0,
     installedStoreIds: new Set(),
+    installedStoreDragAreaM2: 0,
+    storeTransferAttempted: false,
     dragNewtons: 0,
     thrustNewtons: 0,
     phase: definition.lifecycle === "STOWED" ? "Stowed" : "Initial state",
@@ -528,7 +534,8 @@ function updateKinematicEntity(
     const dragCoefficient =
       interpolateTable(model.zeroLiftDragByMach, mach) +
       interpolateTable(model.inducedDragByAngleOfAttackRad, 0) * liftCoefficient * liftCoefficient;
-    const drag = dynamicPressure * model.referenceAreaM2 * dragCoefficient;
+    const installedStoreDrag = dynamicPressure * state.installedStoreDragAreaM2;
+    const drag = dynamicPressure * model.referenceAreaM2 * dragCoefficient + installedStoreDrag;
     const maximumThrust = interpolateTable(model.thrustByThrottle, 1);
     if (!(maximumThrust > 0)) {
       throw new Error(`Admitted table ${model.thrustByThrottle.id} has no positive full-throttle thrust.`);
@@ -610,7 +617,8 @@ function updateGroundAircraft(
   const dragCoefficient = interpolateTable(model.zeroLiftDragByMach, airspeed / speedOfSound)
     + interpolateTable(model.inducedDragByAngleOfAttackRad, 0)
       * operation.takeoffLiftCoefficient * operation.takeoffLiftCoefficient;
-  const drag = dynamicPressure * model.referenceAreaM2 * dragCoefficient;
+  const installedStoreDrag = dynamicPressure * state.installedStoreDragAreaM2;
+  const drag = dynamicPressure * model.referenceAreaM2 * dragCoefficient + installedStoreDrag;
   const thrust = interpolateTable(model.thrustByThrottle, 1);
   const fuelCoefficient = interpolateTable(model.fuelFlowByThrottle, 1);
   if (!(thrust > 0) || state.fuelKg <= 0) {
@@ -728,9 +736,10 @@ function activateWeapon(
   tick: number,
   scenario: EngineScenario,
   terminalTick: number,
-) {
+  environmentSampler?: RuntimeEnvironmentSampler,
+): Extract<SimulationEventPayload, { kind: "AIRBORNE_STORE_TRANSFER_OUTCOME" }> | null {
   const weapon = state.definition.weapon;
-  if (!weapon || weapon.launchTimeSeconds === null) return;
+  if (!weapon || weapon.launchTimeSeconds === null) return null;
   const activationTick = firstFixedStepTickAtOrAfter(
     weapon.launchTimeSeconds,
     scenario.fixedStepSeconds,
@@ -740,26 +749,105 @@ function activateWeapon(
     weapon.launchTimeSeconds > scenario.durationSeconds ||
     activationTick >= terminalTick ||
     tick < activationTick
-  ) return;
+  ) return null;
   const launcher = states.get(weapon.launchPlatformId);
-  if (launcher) {
-    if (launcher.definition.kind === "AIRCRAFT") {
-      if (launcher.definition.groundOperation) return;
+  if (!launcher) {
+    throw new Error(`[STORE_TRANSFER_LAUNCHER_ABSENT] Store ${state.definition.id} has no launcher.`);
+  }
+  let transferEvent: Extract<SimulationEventPayload, { kind: "AIRBORNE_STORE_TRANSFER_OUTCOME" }> | null = null;
+  if (launcher.definition.kind === "AIRCRAFT") {
+    const transfer = weapon.storeTransfer;
+    if (!transfer) {
+      if (scenario.airMission) {
+        // Existing airborne v1 missions retain their pre-#187 scheduled path;
+        // a ground mission without an authored plan cannot promote itself.
+        if (launcher.definition.groundOperation) return null;
+      }
       if (!launcher.installedStoreIds.delete(state.definition.id)) {
         throw new Error(
-          `Aircraft ${launcher.definition.id} does not carry store ${state.definition.id}.`,
+          `[STORE_TRANSFER_STORE_ABSENT] Aircraft ${launcher.definition.id} does not carry store ${state.definition.id}.`,
         );
       }
       launcher.storeMassKg -= weapon.launchMassKg;
       launcher.massKg -= weapon.launchMassKg;
+    } else {
+      if (state.storeTransferAttempted) return null;
+      state.storeTransferAttempted = true;
+      const priorDragAreaM2 = launcher.installedStoreDragAreaM2;
+      const launcherMassBeforeKg = launcher.massKg;
+      const launcherFuelBeforeKg = launcher.fuelKg;
+      const outcome = (
+        accepted: boolean,
+        limiter: Extract<SimulationEventPayload, { kind: "AIRBORNE_STORE_TRANSFER_OUTCOME" }>["limiter"],
+        cause: Extract<SimulationEventPayload, { kind: "AIRBORNE_STORE_TRANSFER_OUTCOME" }>["cause"],
+        installedDragNewtons = 0,
+      ): Extract<SimulationEventPayload, { kind: "AIRBORNE_STORE_TRANSFER_OUTCOME" }> => ({
+        kind: "AIRBORNE_STORE_TRANSFER_OUTCOME",
+        schemaVersion: SIMULATION_EVENT_PAYLOAD_SCHEMAS.AIRBORNE_STORE_TRANSFER_OUTCOME,
+        transferId: transfer.id,
+        launcherId: launcher.definition.id,
+        stationId: transfer.stationId,
+        storeId: state.definition.id,
+        operation: transfer.operation,
+        requestedTimeSeconds: transfer.requestedTimeSeconds,
+        requestedTick: transfer.requestedTick,
+        requested: true,
+        accepted,
+        achieved: accepted,
+        limiter,
+        cause,
+        storeMassKg: transfer.storeMassKg,
+        installedDragAreaM2: transfer.installedDragAreaM2,
+        installedDragNewtons,
+        launcherMassBeforeKg,
+        launcherMassAfterKg: launcher.massKg,
+        launcherFuelBeforeKg,
+        launcherFuelAfterKg: launcher.fuelKg,
+        installedDragAreaBeforeM2: priorDragAreaM2,
+        installedDragAreaAfterM2: launcher.installedStoreDragAreaM2,
+        transferDigest: transfer.digest,
+      });
+      if (launcher.aircraftOperationalState !== "ENROUTE") {
+        return outcome(false, "AIRCRAFT_STATE", "AIRCRAFT_NOT_ENROUTE");
+      }
+      if (!launcher.installedStoreIds.has(state.definition.id)) {
+        return outcome(false, "STORE_INVENTORY", "STORE_NOT_INSTALLED");
+      }
+      if (priorDragAreaM2 + 1e-12 < transfer.installedDragAreaM2) {
+        return outcome(false, "DRAG_AUTHORITY", "INSTALLED_DRAG_EXCEEDED");
+      }
+      const environment = sampledEnvironment(
+        scenario,
+        environmentSampler,
+        launcher.position,
+        modelTimeAtTick(tick, scenario.fixedStepSeconds),
+      );
+      const wind = activeWind(
+        scenario,
+        modelTimeAtTick(tick, scenario.fixedStepSeconds),
+        environment.windEnuMps,
+      );
+      const airspeed = magnitude(subtract(launcher.velocity, wind));
+      const dynamicPressure = 0.5 * environment.atmosphere.densityKgM3 * airspeed * airspeed;
+      const transferredDragNewtons = dynamicPressure * transfer.installedDragAreaM2;
+      launcher.installedStoreIds.delete(state.definition.id);
+      launcher.installedStoreDragAreaM2 = Math.max(
+        0,
+        priorDragAreaM2 - transfer.installedDragAreaM2,
+      );
+      launcher.dragNewtons = Math.max(0, launcher.dragNewtons - transferredDragNewtons);
+      launcher.storeMassKg -= weapon.launchMassKg;
+      launcher.massKg -= weapon.launchMassKg;
+      transferEvent = outcome(true, "NONE", "AIRBORNE_TRANSFER_ADMITTED", transferredDragNewtons);
     }
-    state.position = { ...launcher.position };
-    state.velocity = { ...launcher.velocity };
-    state.headingRad = launcher.headingRad;
   }
+  state.position = { ...launcher.position };
+  state.velocity = { ...launcher.velocity };
+  state.headingRad = launcher.headingRad;
   state.lifecycle = "ACTIVE";
-  state.phase = "Launched";
-  state.weaponFlightState = "BOOST";
+  state.phase = weapon.storeTransfer?.operation === "JETTISON" ? "Jettisoned" : "Launched";
+  state.weaponFlightState = weapon.storeTransfer?.operation === "JETTISON" ? "COAST" : "BOOST";
+  return transferEvent;
 }
 
 function updateWeapon(
@@ -772,18 +860,40 @@ function updateWeapon(
 ) {
   const weapon = state.definition.weapon;
   if (!weapon || state.lifecycle !== "ACTIVE") return;
-  const target = states.get(weapon.targetEntityId);
-  if (!target || target.lifecycle === "TERMINATED") {
-    state.lifecycle = "TERMINATED";
-    state.phase = "Target unavailable";
-    state.weaponFlightState = "TARGET_UNAVAILABLE";
-    return;
-  }
   // Ground impact is evaluated before atmosphere lookup so a below-terrain
   // state terminates deterministically instead of escaping through the
   // atmosphere validity boundary. The run coordinator records the outcome.
   if (time > 1 && state.position.z <= terrainElevation(environmentSampler, state.position)) {
     state.phase = "Terrain impact";
+    return;
+  }
+
+  if (weapon.storeTransfer?.operation === "JETTISON") {
+    const environment = sampledEnvironment(scenario, environmentSampler, state.position, time);
+    const wind = activeWind(scenario, time, environment.windEnuMps);
+    const airRelativeVelocity = subtract(state.velocity, wind);
+    const airspeed = Math.max(1, magnitude(airRelativeVelocity));
+    const dynamicPressure = 0.5 * environment.atmosphere.densityKgM3 * airspeed * airspeed;
+    const drag = dynamicPressure * weapon.dragCoefficient * weapon.referenceAreaM2;
+    const acceleration = add(
+      scale(normalize(airRelativeVelocity), -drag / state.massKg),
+      { x: 0, y: 0, z: -scenario.environment.gravityMps2 },
+    );
+    state.velocity = add(state.velocity, scale(acceleration, dt));
+    state.position = add(state.position, scale(state.velocity, dt));
+    state.dragNewtons = drag;
+    state.thrustNewtons = 0;
+    state.commandedG = 0;
+    state.phase = "Jettisoned";
+    state.weaponFlightState = "COAST";
+    return;
+  }
+
+  const target = states.get(weapon.targetEntityId);
+  if (!target || target.lifecycle === "TERMINATED") {
+    state.lifecycle = "TERMINATED";
+    state.phase = "Target unavailable";
+    state.weaponFlightState = "TARGET_UNAVAILABLE";
     return;
   }
 
@@ -1201,6 +1311,18 @@ export class EngineSession {
       "SCHEDULED_TEST_ONLY",
       "TRACK_REQUIRED",
     ]);
+    if (scenario.airMission) {
+      const missionMaterial = structuredClone(scenario.airMission) as Record<string, unknown>;
+      delete missionMaterial.compiledDigest;
+      if (
+        sha256HexSync(scenario.airMission.authored) !== scenario.airMission.authoredDigest ||
+        sha256HexSync(missionMaterial) !== scenario.airMission.compiledDigest
+      ) {
+        throw new Error("Air mission lineage digest is invalid.");
+      }
+    }
+    const admittedTransferIds = new Set<string>();
+    const admittedTransferStores = new Set<string>();
     for (const entity of scenario.entities) {
       if (!entity.weapon) continue;
       const launchTimeSeconds = entity.weapon.launchTimeSeconds;
@@ -1228,6 +1350,87 @@ export class EngineSession {
       ) {
         throw new Error(`Weapon ${entity.id} has no valid compiled admission.`);
       }
+      const transfer = entity.weapon.storeTransfer;
+      const launcher = scenario.entities.find((candidate) => candidate.id === entity.weapon!.launchPlatformId);
+      const fullTransferForStore = scenario.airMission?.assignment.storeTransfers.find(
+        (candidate) => candidate.storeEntityId === entity.id,
+      );
+      const missionLauncher = launcher?.kind === "AIRCRAFT" && scenario.airMission &&
+        launcher.provenance.sourceObjectId === scenario.airMission.assignment.aircraftId &&
+        (transfer !== undefined || fullTransferForStore !== undefined);
+      if (missionLauncher) {
+        const full = fullTransferForStore;
+        const exactTransferFields = [
+          "authority", "compatibilityRuleId", "digest", "evidenceRefIds", "id",
+          "installedDragAreaM2", "launcherEntityId", "launcherSourceObjectId",
+          "limitationIds", "operation", "requestedTick", "requestedTimeSeconds",
+          "schemaVersion", "stationId", "storeEntityId", "storeMassKg", "storeModelId",
+          "storeOrdinal", "storeSourceObjectId", "validity", "valueState",
+        ];
+        const compact = transfer
+          ? (() => {
+              const value = structuredClone(transfer) as Record<string, unknown>;
+              delete value.missionDigest;
+              return value;
+            })()
+          : undefined;
+        const digestMaterial = full
+          ? (() => {
+              const value = structuredClone(full) as Record<string, unknown>;
+              delete value.digest;
+              return value;
+            })()
+          : undefined;
+        if (
+          !scenario.airMission || !transfer || !full || !compact || !digestMaterial ||
+          JSON.stringify(Object.keys(full).sort()) !== JSON.stringify(exactTransferFields) ||
+          transfer.missionDigest !== scenario.airMission.compiledDigest ||
+          sha256HexSync(compact) !== sha256HexSync(full) ||
+          sha256HexSync(digestMaterial) !== full.digest ||
+          full.schemaVersion !== "vector.compiled-airborne-store-transfer.v1" ||
+          full.authority !== "GENERIC_PUBLIC_EDUCATIONAL" ||
+          full.validity.schemaVersion !== "vector.airborne-store-transfer-validity.v1" ||
+          full.validity.intendedUse !== "PUBLIC_EDUCATIONAL" ||
+          full.validity.mechanism !== "AIRBORNE_STORE_RELEASE_OR_JETTISON" ||
+          full.validity.minimumInstalledDragAreaM2 !== AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.minimum ||
+          full.validity.maximumInstalledDragAreaM2 !== AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.maximum ||
+          !["MODEL_ASSUMPTION", "USER_AUTHORED"].includes(full.valueState) ||
+          !["RELEASE", "JETTISON"].includes(full.operation) ||
+          (full.requestedTimeSeconds !== null &&
+            (!Number.isFinite(full.requestedTimeSeconds) || full.requestedTimeSeconds < 0)) ||
+          full.requestedTimeSeconds !== entity.weapon.launchTimeSeconds ||
+          full.requestedTick !== firstFixedStepTickAtOrAfter(full.requestedTimeSeconds, scenario.fixedStepSeconds) ||
+          full.requestedTimeSeconds !== null &&
+            firstFixedStepTickAtOrAfter(full.requestedTimeSeconds, scenario.fixedStepSeconds) >= this.terminalTick ||
+          !Number.isFinite(full.storeMassKg) || full.storeMassKg <= 0 ||
+          full.storeMassKg !== entity.weapon.launchMassKg ||
+          !Number.isFinite(full.installedDragAreaM2) ||
+          full.installedDragAreaM2 < full.validity.minimumInstalledDragAreaM2 ||
+          full.installedDragAreaM2 > full.validity.maximumInstalledDragAreaM2 ||
+          !full.evidenceRefIds.length || !full.limitationIds.length ||
+          full.launcherEntityId !== launcher.id ||
+          full.launcherSourceObjectId !== launcher.provenance.sourceObjectId ||
+          full.storeEntityId !== entity.id ||
+          full.storeSourceObjectId !== entity.provenance.sourceObjectId ||
+          full.storeModelId !== entity.provenance.modelId ||
+          full.stationId !== entity.weapon.admission.stationId ||
+          full.compatibilityRuleId !== entity.weapon.admission.compatibilityRuleId ||
+          !Number.isSafeInteger(full.storeOrdinal) || full.storeOrdinal < 1 ||
+          admittedTransferIds.has(full.id) || admittedTransferStores.has(full.storeEntityId)
+        ) {
+          throw new Error(`[STORE_TRANSFER_AUTHORITY_INVALID] Store ${entity.id} has no exact compiled airborne-transfer authority.`);
+        }
+        admittedTransferIds.add(full.id);
+        admittedTransferStores.add(full.storeEntityId);
+      } else if (transfer !== undefined) {
+        throw new Error(`[STORE_TRANSFER_LAUNCHER_INVALID] Store ${entity.id} transfer authority requires an aircraft launcher.`);
+      }
+    }
+    if (
+      scenario.airMission &&
+      admittedTransferIds.size !== scenario.airMission.assignment.storeTransfers.length
+    ) {
+      throw new Error("[STORE_TRANSFER_AUTHORITY_INVALID] Air mission contains an absent or duplicate store-transfer authority.");
     }
     for (const entity of scenario.entities) {
       const sensor = entity.observerSensor;
@@ -1438,6 +1641,7 @@ export class EngineSession {
       if (!launcher || launcher.definition.kind !== "AIRCRAFT") continue;
       launcher.installedStoreIds.add(store.id);
       launcher.storeMassKg += store.weapon.launchMassKg;
+      launcher.installedStoreDragAreaM2 += store.weapon.storeTransfer?.installedDragAreaM2 ?? 0;
     }
     this.primaryWeapon = this.states.get(
       scenario.entities.find(
@@ -1603,8 +1807,18 @@ export class EngineSession {
       const beforeActivation = new Map(
         [...this.states.values()].map((state) => [state.definition.id, state.lifecycle]),
       );
-      for (const state of this.states.values())
-        activateWeapon(state, this.states, tick, scenario, this.terminalTick);
+      const storeTransferEvents: Array<Extract<SimulationEventPayload, { kind: "AIRBORNE_STORE_TRANSFER_OUTCOME" }>> = [];
+      for (const state of this.states.values()) {
+        const transfer = activateWeapon(
+          state,
+          this.states,
+          tick,
+          scenario,
+          this.terminalTick,
+          this.environmentSampler,
+        );
+        if (transfer) storeTransferEvents.push(transfer);
+      }
       for (const state of this.states.values()) {
         const prior = beforeActivation.get(state.definition.id)!;
         if (prior !== "STOWED" || state.lifecycle === "STOWED") continue;
@@ -1626,6 +1840,22 @@ export class EngineSession {
             entityKind: state.definition.kind,
             lifecycle: state.lifecycle as Exclude<typeof state.lifecycle, "STOWED" | "TERMINATED">,
           },
+        });
+      }
+      for (const payload of storeTransferEvents) {
+        this.eventJournal.emit({
+          localKey: `airborne-store-transfer:${payload.transferId}`,
+          tick,
+          modelTimeSeconds: eventTime,
+          phase: "WEAPON",
+          producer: { subsystem: "AIRCRAFT_DYNAMICS", entityId: payload.launcherId },
+          knowledgeScope: "WORLD",
+          participants: [
+            { entityId: payload.launcherId, role: "LAUNCHER" },
+            { entityId: payload.storeId, role: "WEAPON" },
+          ],
+          causes: [],
+          payload,
         });
       }
       this.updateObserverState(tick, eventTime);

@@ -51,6 +51,10 @@ Air-domain adapters now carry the exact authored and compiled
 Worker independently recompiles mission, flight-plan, start, loadout, fuel,
 model-pack, and environment-pack inputs and requires the same compiled digest;
 main-thread validation is not trusted as Worker admission.
+Store-transfer admission follows the same rule: the Worker carries the authored
+request, full compiled transfer, ordered compiler authority seal and compact
+entity binding unchanged. It records either one accepted/achieved transfer or
+one typed operational rejection; it cannot repair or promote a compact copy.
 For Air scenarios, the compiler materializes BLUE start/heading, route-plan v2
 geometry/transitions/radii, initial fuel, and admitted station/rule/quantity
 from `CompiledAirMission`. The mission editor's spatial route is retained only
@@ -122,6 +126,9 @@ verification-only manifest to exercise an unselected backend: that would be
 correctly rejected as stale at the Worker boundary. Cross-backend numerical
 parity remains owned by `tests/engine-backends.test.mjs` outside the deployed
 browser admission path.
+The #187 built-browser journey additionally proves the exact store identity is
+absent before and appears once at the transfer frame, with the same outcome in
+telemetry/report playback and successful cancellation/retry recovery.
 
 ## Clock ownership
 

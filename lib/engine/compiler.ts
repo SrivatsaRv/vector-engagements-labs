@@ -44,6 +44,11 @@ import {
 } from "../air-mission.ts";
 import type { Scenario } from "../simulation.ts";
 
+export const ENGINE_FIXED_STEP_SECONDS = 0.05;
+export function engineDurationSecondsForDomain(domain: EngagementDomain) {
+  return domain === "G2G" ? 240 : 140;
+}
+
 export type ScenarioCompilerInput = {
   id: string;
   version: string;
@@ -280,6 +285,8 @@ export function compileScenario(
           modelPack: CURRENT_COMPILED_MODEL_PACK,
           environmentPackDigest: environmentPack.identity.digest,
           environmentPack,
+          fixedStepSeconds: ENGINE_FIXED_STEP_SECONDS,
+          durationSeconds: engineDurationSecondsForDomain(input.domain),
         })
       : (() => {
           throw new Error("An authored Air mission requires its exact scenario context.");
@@ -638,9 +645,14 @@ export function compileScenario(
     redAircraftModel?.version ?? "static-object-v1.0.0",
   );
 
-  const blueWeapons = Array.from({ length: runtimeBlueWeaponQuantity }, (_, index) => withProvenance(
+  const blueWeapons = Array.from({ length: runtimeBlueWeaponQuantity }, (_, index) => {
+    const storeEntityId = `blue-weapon-${index + 1}`;
+    const storeTransfer = compiledAirMission?.assignment.storeTransfers.find(
+      (candidate) => candidate.storeEntityId === storeEntityId,
+    );
+    return withProvenance(
     {
-      id: `blue-weapon-${index + 1}`,
+      id: storeEntityId,
       rddfId: `rddf://component/guided-weapon/${blueSystem.id}`,
       designation: blueSystem.designation,
       callsign: `BLUE WEAPON ${index + 1}`,
@@ -659,19 +671,24 @@ export function compileScenario(
         launchPlatformId: bluePlatform.id,
         targetEntityId: redTarget.id,
         guidance: input.guidance,
-        launchTimeSeconds: index === 0 ? 0 : null,
+        launchTimeSeconds: storeTransfer?.requestedTimeSeconds
+          ?? (index === 0 ? 0 : null),
         ...assumptions,
         commandedCruiseAltitudeM:
           input.domain === "G2G" ? input.cruiseAltitude : input.altitude,
         navigationConstant: assumptions.navigationConstant,
         admission: blueCompiledWeapon.admission,
+        ...(storeTransfer
+          ? { storeTransfer: { ...structuredClone(storeTransfer), missionDigest: compiledAirMission!.compiledDigest } }
+          : {}),
       },
     },
     blueSystem.id,
     blueCompiledWeapon.weapon.id,
     "MODEL_ASSUMPTION",
     blueCompiledWeapon.weapon.version,
-  ));
+  );
+  });
 
   const entities: EngineEntityDefinition[] = [
     bluePlatform,
@@ -777,8 +794,8 @@ export function compileScenario(
     domain: input.domain,
     name: input.name,
     seed: input.seed,
-    durationSeconds: input.domain === "G2G" ? 240 : 140,
-    fixedStepSeconds: 0.05,
+    durationSeconds: engineDurationSecondsForDomain(input.domain),
+    fixedStepSeconds: ENGINE_FIXED_STEP_SECONDS,
     ...(compiledAirMission ? { airMission: compiledAirMission } : {}),
     ...(bluePlatform.groundOperation
       ? { airMissionRuntime: structuredClone(bluePlatform.groundOperation) }

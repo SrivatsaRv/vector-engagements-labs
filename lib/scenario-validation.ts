@@ -17,6 +17,10 @@ import {
 } from "./air-mission.ts";
 import { CURRENT_COMPILED_MODEL_PACK } from "./engine/weapon-admission.ts";
 import { admitPhaseAEnvironmentPack } from "./geospatial/environment-pack.ts";
+import {
+  ENGINE_FIXED_STEP_SECONDS,
+  engineDurationSecondsForDomain,
+} from "./engine/compiler.ts";
 
 export type ValidationState = "pass" | "warning" | "error";
 export type ValidationItem = {
@@ -119,6 +123,8 @@ export function validateScenario(
         modelPack: CURRENT_COMPILED_MODEL_PACK,
         environmentPackDigest: environment.pack.identity.digest,
         environmentPack: environment.pack,
+        fixedStepSeconds: ENGINE_FIXED_STEP_SECONDS,
+        durationSeconds: engineDurationSecondsForDomain(scenario.domain),
       });
       missionValidation = {
         id: "air-mission",

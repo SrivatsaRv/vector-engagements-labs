@@ -106,6 +106,8 @@ import {
   selectRouteTransitionStates,
 } from "@/lib/frontend/selectors";
 import {
+  AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2,
+  authorGenericAirborneStoreTransfer,
   bindRunwayEvidence,
   createDefaultAirMissionDefinition,
   synchronizeScenarioAirMission,
@@ -899,6 +901,13 @@ function LabWorkbench({
                     : "Not launched"}
                 />
               </div>
+              <button
+                type="button"
+                className="compact-results-navigation"
+                onClick={() => setWorkspace("results")}
+              >
+                Explain &amp; report
+              </button>
             </div>
             <div
               className={`scene-wrap ${playbackSurface === "MAP" ? "map-surface" : "three-d-surface"}`}
@@ -1289,6 +1298,41 @@ function ConfigureWorkspace({
     patch: Partial<NonNullable<Scenario["airMission"]>["flightPlans"][number]["routePoints"][number]>,
   ) => {
     setScenario((current) => updateScenarioAirMissionRoutePoint(current, index, patch));
+  };
+  const authorStoreTransfer = () => {
+    setScenario((current) => {
+      if (!current.airMission) return current;
+      return {
+        ...current,
+        airMission: authorGenericAirborneStoreTransfer({
+          mission: current.airMission,
+          modelPack: CURRENT_COMPILED_MODEL_PACK,
+          storeOrdinal: 1,
+          operation: "RELEASE",
+          requestedTimeSeconds: current.airMission.start.posture === "AIRBORNE" ? 0 : 20,
+          installedDragAreaM2: 0.08,
+          valueState: "USER_AUTHORED",
+        }),
+      };
+    });
+  };
+  const updateStoreTransfer = (
+    patch: Partial<NonNullable<NonNullable<Scenario["airMission"]>["assignments"][number]["storeTransferPlan"]>["requests"][number]>,
+  ) => {
+    setScenario((current) => {
+      if (!current.airMission?.assignments[0].storeTransferPlan?.requests[0]) return current;
+      const airMission = structuredClone(current.airMission);
+      Object.assign(airMission.assignments[0].storeTransferPlan!.requests[0], patch);
+      return { ...current, airMission };
+    });
+  };
+  const clearStoreTransfer = () => {
+    setScenario((current) => {
+      if (!current.airMission) return current;
+      const airMission = structuredClone(current.airMission);
+      delete airMission.assignments[0].storeTransferPlan;
+      return { ...current, airMission };
+    });
   };
   const updateMissionLegRole = (
     index: number,
@@ -1989,6 +2033,68 @@ function ConfigureWorkspace({
                     </dl>
                   </div>
                 )}
+                <div className="flight-plan-contract" role="region" aria-label="Airborne store transfer">
+                  <span>AIRBORNE STORE TRANSFER · generic public educational</span>
+                  {scenario.airMission.assignments[0].storeTransferPlan?.requests[0] ? (() => {
+                    const request = scenario.airMission!.assignments[0].storeTransferPlan!.requests[0];
+                    return (
+                      <fieldset>
+                        <legend>{request.storeEntityId} · {request.stationId}</legend>
+                        <div className="advanced-grid">
+                          <label className="field">
+                            <span>Operation</span>
+                            <select
+                              aria-label="Store transfer operation"
+                              data-vector-overlay-exempt="ua-native-select"
+                              value={request.operation}
+                              onChange={(event) => updateStoreTransfer({ operation: event.target.value as typeof request.operation })}
+                            >
+                              <option value="RELEASE">Release · generic guided path</option>
+                              <option value="JETTISON">Jettison · unpowered coast</option>
+                            </select>
+                          </label>
+                          <label className="field">
+                            <span>Requested model time (s)</span>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.05}
+                              aria-label="Store transfer requested time"
+                              value={request.requestedTimeSeconds}
+                              onChange={(event) => updateStoreTransfer({ requestedTimeSeconds: Number(event.target.value) })}
+                            />
+                          </label>
+                          <label className="field">
+                            <span>Installed drag area (m²)</span>
+                            <input
+                              type="number"
+                              min={AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.minimum}
+                              max={AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.maximum}
+                              step={0.001}
+                              aria-label="Store installed drag area"
+                              value={request.installedDragAreaM2}
+                              onChange={(event) => updateStoreTransfer({ installedDragAreaM2: Number(event.target.value) })}
+                            />
+                          </label>
+                        </div>
+                        <p>
+                          Exact authored request · {request.valueState.toLowerCase().replaceAll("_", " ")} · no named-aircraft/store, safe-separation, landing, or recovery fidelity.
+                        </p>
+                        <button type="button" className="tool-button" onClick={clearStoreTransfer}>
+                          Remove transfer request
+                        </button>
+                      </fieldset>
+                    );
+                  })() : (
+                    <div className="fixed-condition">
+                      <strong>No airborne transfer request authored.</strong>
+                      <p>The compiler will not invent operation, time, station, store, or installed drag authority.</p>
+                      <button type="button" className="tool-button" onClick={authorStoreTransfer}>
+                        Author store 1 transfer request
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="flight-plan-contract" role="region" aria-label="Mission flight plan constraints">
                   <span>FLIGHT PLAN · vector.flight-plan.v1</span>
                   {scenario.airMission.flightPlans[0].routePoints.map((point, index) => (
@@ -2523,6 +2629,11 @@ function ResultsWorkspace({
   const blueSystem = getCatalogObject(scenario.blueSystemId);
   const redObject = getCatalogObject(scenario.redObjectId);
   const redSystem = getCatalogObject(scenario.redSystemId);
+  const transferOutcomes = result.engineRun.events.state === "AVAILABLE"
+    ? result.engineRun.events.items.filter(
+        (event) => event.payload.kind === "AIRBORNE_STORE_TRANSFER_OUTCOME",
+      )
+    : [];
   return (
     <section className="debrief-workspace">
       <header>
@@ -2581,6 +2692,16 @@ function ResultsWorkspace({
         </article>
         <article className="event-log">
           <h2>What happened</h2>
+          {transferOutcomes.map((event) => event.payload.kind === "AIRBORNE_STORE_TRANSFER_OUTCOME" && (
+            <div key={event.id} data-testid="results-airborne-store-transfer">
+              <time>{event.modelTimeSeconds.toFixed(2)} s</time>
+              <i className={event.payload.achieved ? "run" : "fault"} />
+              <span>
+                <strong>{event.payload.operation} {event.payload.achieved ? "achieved" : "rejected"}</strong>
+                <small>{event.payload.storeId} · {event.payload.stationId} · {event.payload.limiter} · {event.payload.cause}</small>
+              </span>
+            </div>
+          ))}
           {events.map((event) => (
             <div key={event.id}>
               <time>{event.time.toFixed(1)} s</time>

@@ -24,10 +24,17 @@ pub const MAX_RECORDED_ENTITY_STATES: u64 = 1_000_000;
 const MAX_IDENTIFIER_BYTES: usize = 128;
 const MAX_LABEL_BYTES: usize = 512;
 const MAX_DURATION_SECONDS: f64 = 3_600.0;
+const STORE_AUTHORITY_INVALID: &str = "[STORE_TRANSFER_AUTHORITY_INVALID]";
 
 pub(crate) struct GroundMissionAuthority {
     pub(crate) binding: crate::AircraftGroundOperation,
     pub(crate) aircraft_source_object_id: String,
+}
+
+pub(crate) struct StoreMissionAuthority {
+    pub(crate) transfers: Vec<crate::AirborneStoreTransfer>,
+    pub(crate) aircraft_source_object_id: String,
+    pub(crate) compiled_digest: String,
 }
 
 fn mission_string<'a>(mission: &'a Value, pointer: &str) -> Result<&'a str, EngineError> {
@@ -45,6 +52,16 @@ fn mission_number(mission: &Value, pointer: &str) -> Result<f64, EngineError> {
         .ok_or_else(|| invalid("Air mission authority is invalid"))
 }
 
+fn mission_string_array_equals(value: Option<&Value>, expected: &[String]) -> bool {
+    value.and_then(Value::as_array).is_some_and(|actual| {
+        actual.len() == expected.len()
+            && actual
+                .iter()
+                .zip(expected)
+                .all(|(left, right)| left.as_str() == Some(right.as_str()))
+    })
+}
+
 fn canonical_json_digest_without_digest(value: &Value) -> Result<String, EngineError> {
     let mut material = value.clone();
     material
@@ -54,6 +71,160 @@ fn canonical_json_digest_without_digest(value: &Value) -> Result<String, EngineE
     let bytes = serde_json::to_vec(&material)
         .map_err(|error| EngineError::Serialization(error.to_string()))?;
     Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+pub(crate) fn validate_air_mission_store_authority(
+    mission: Option<&Value>,
+) -> Result<Option<StoreMissionAuthority>, EngineError> {
+    let Some(mission) = mission else {
+        return Ok(None);
+    };
+    let compiled_digest = mission_string(mission, "/compiledDigest")?;
+    let authored_digest = mission_string(mission, "/authoredDigest")?;
+    sha256_digest("airMission.compiledDigest", compiled_digest)?;
+    sha256_digest("airMission.authoredDigest", authored_digest)?;
+    let aircraft_source_object_id = mission_string(mission, "/assignment/aircraftId")?;
+    if mission_string(mission, "/authored/assignments/0/aircraftId")? != aircraft_source_object_id {
+        return Err(invalid(STORE_AUTHORITY_INVALID));
+    }
+    let values = mission
+        .pointer("/assignment/storeTransfers")
+        .and_then(Value::as_array)
+        .ok_or_else(|| invalid(STORE_AUTHORITY_INVALID))?;
+    let requests = mission
+        .pointer("/authored/assignments/0/storeTransferPlan/requests")
+        .and_then(Value::as_array);
+    if values.is_empty() && requests.is_none() {
+        return Ok(Some(StoreMissionAuthority {
+            transfers: Vec::new(),
+            aircraft_source_object_id: aircraft_source_object_id.to_string(),
+            compiled_digest: compiled_digest.to_string(),
+        }));
+    }
+    let requests = requests.ok_or_else(|| invalid(STORE_AUTHORITY_INVALID))?;
+    if requests.len() != values.len() {
+        return Err(invalid(STORE_AUTHORITY_INVALID));
+    }
+    let mut ids = HashSet::new();
+    let mut stores = HashSet::new();
+    let mut transfers = Vec::with_capacity(values.len());
+    for value in values {
+        let transfer: crate::AirborneStoreTransfer =
+            serde_json::from_value(value.clone()).map_err(|_| invalid(STORE_AUTHORITY_INVALID))?;
+        let validity = transfer
+            .validity
+            .as_object()
+            .filter(|validity| {
+                validity.len() == 5
+                    && [
+                        "schemaVersion",
+                        "intendedUse",
+                        "mechanism",
+                        "minimumInstalledDragAreaM2",
+                        "maximumInstalledDragAreaM2",
+                    ]
+                    .iter()
+                    .all(|key| validity.contains_key(*key))
+            })
+            .ok_or_else(|| invalid(STORE_AUTHORITY_INVALID))?;
+        let minimum_drag_area_m2 = validity
+            .get("minimumInstalledDragAreaM2")
+            .and_then(Value::as_f64)
+            .ok_or_else(|| invalid(STORE_AUTHORITY_INVALID))?;
+        let maximum_drag_area_m2 = validity
+            .get("maximumInstalledDragAreaM2")
+            .and_then(Value::as_f64)
+            .ok_or_else(|| invalid(STORE_AUTHORITY_INVALID))?;
+        if transfer.schema_version != "vector.compiled-airborne-store-transfer.v1"
+            || transfer.authority != "GENERIC_PUBLIC_EDUCATIONAL"
+            || validity.get("schemaVersion").and_then(Value::as_str)
+                != Some("vector.airborne-store-transfer-validity.v1")
+            || validity.get("intendedUse").and_then(Value::as_str) != Some("PUBLIC_EDUCATIONAL")
+            || validity.get("mechanism").and_then(Value::as_str)
+                != Some("AIRBORNE_STORE_RELEASE_OR_JETTISON")
+            || minimum_drag_area_m2 != 0.001
+            || maximum_drag_area_m2 != 1.0
+            || !matches!(
+                transfer.value_state.as_str(),
+                "MODEL_ASSUMPTION" | "USER_AUTHORED"
+            )
+            || transfer.id.is_empty()
+            || transfer.launcher_entity_id.is_empty()
+            || transfer.launcher_source_object_id != aircraft_source_object_id
+            || transfer.store_entity_id.is_empty()
+            || transfer.store_source_object_id.is_empty()
+            || transfer.store_model_id.is_empty()
+            || transfer.store_ordinal == 0
+            || transfer.station_id.is_empty()
+            || transfer.compatibility_rule_id.is_empty()
+            || !transfer.requested_time_seconds.is_finite()
+            || transfer.requested_time_seconds < 0.0
+            || !transfer.store_mass_kg.is_finite()
+            || transfer.store_mass_kg <= 0.0
+            || !transfer.installed_drag_area_m2.is_finite()
+            || transfer.installed_drag_area_m2 < minimum_drag_area_m2
+            || transfer.installed_drag_area_m2 > maximum_drag_area_m2
+            || transfer.evidence_ref_ids.is_empty()
+            || transfer.evidence_ref_ids.iter().any(String::is_empty)
+            || transfer.limitation_ids.is_empty()
+            || transfer.limitation_ids.iter().any(String::is_empty)
+            || canonical_json_digest_without_digest(value)? != transfer.digest
+            || !ids.insert(transfer.id.clone())
+            || !stores.insert(transfer.store_entity_id.clone())
+        {
+            return Err(invalid(STORE_AUTHORITY_INVALID));
+        }
+        let request = requests
+            .iter()
+            .find(|candidate| {
+                candidate.pointer("/id").and_then(Value::as_str) == Some(transfer.id.as_str())
+            })
+            .ok_or_else(|| invalid(STORE_AUTHORITY_INVALID))?;
+        let request_operation = mission_string(request, "/operation")?;
+        let operation = match transfer.operation {
+            crate::StoreTransferOperation::Release => "RELEASE",
+            crate::StoreTransferOperation::Jettison => "JETTISON",
+        };
+        if mission_string(request, "/launcherEntityId")? != transfer.launcher_entity_id
+            || mission_string(request, "/storeEntityId")? != transfer.store_entity_id
+            || mission_number(request, "/storeOrdinal")? != transfer.store_ordinal as f64
+            || mission_string(request, "/stationId")? != transfer.station_id
+            || mission_string(request, "/storeSourceObjectId")? != transfer.store_source_object_id
+            || request_operation != operation
+            || mission_number(request, "/requestedTimeSeconds")? != transfer.requested_time_seconds
+            || mission_number(request, "/installedDragAreaM2")? != transfer.installed_drag_area_m2
+            || mission_string(request, "/valueState")? != transfer.value_state
+            || !mission_string_array_equals(
+                request.pointer("/evidenceRefIds"),
+                &transfer.evidence_ref_ids,
+            )
+            || !mission_string_array_equals(
+                request.pointer("/limitationIds"),
+                &transfer.limitation_ids,
+            )
+        {
+            return Err(invalid(STORE_AUTHORITY_INVALID));
+        }
+        transfers.push(transfer);
+    }
+    let authority_digest = mission_string(mission, "/assignment/storeTransferAuthorityDigest")?;
+    sha256_digest("storeTransferAuthorityDigest", authority_digest)?;
+    let authority_material = serde_json::json!({
+        "schemaVersion": "vector.airborne-store-transfer-authority.v1",
+        "aircraftSourceObjectId": aircraft_source_object_id,
+        "authoredDigest": authored_digest,
+        "transferDigests": transfers.iter().map(|transfer| transfer.digest.as_str()).collect::<Vec<_>>(),
+    });
+    let authority_bytes = serde_json::to_vec(&authority_material)
+        .map_err(|error| EngineError::Serialization(error.to_string()))?;
+    if format!("{:x}", Sha256::digest(authority_bytes)) != authority_digest {
+        return Err(invalid(STORE_AUTHORITY_INVALID));
+    }
+    Ok(Some(StoreMissionAuthority {
+        transfers,
+        aircraft_source_object_id: aircraft_source_object_id.to_string(),
+        compiled_digest: compiled_digest.to_string(),
+    }))
 }
 
 pub(crate) fn validate_air_mission_authority(
@@ -1138,6 +1309,59 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
                 )));
             }
         }
+    }
+    let mut admitted_transfer_ids = HashSet::new();
+    let mut admitted_transfer_stores = HashSet::new();
+    for entity in &scenario.entities {
+        let Some(weapon) = entity.weapon.as_ref() else {
+            continue;
+        };
+        let full = scenario
+            .air_mission_store_transfers
+            .iter()
+            .find(|transfer| transfer.store_entity_id == entity.id);
+        let compact = weapon.store_transfer.as_ref();
+        if full.is_none() && compact.is_none() {
+            continue;
+        }
+        let full = full.ok_or_else(|| invalid(STORE_AUTHORITY_INVALID))?;
+        let compact = compact.ok_or_else(|| invalid(STORE_AUTHORITY_INVALID))?;
+        let launcher = scenario
+            .entities
+            .iter()
+            .find(|candidate| candidate.id == weapon.launch_platform_id)
+            .ok_or_else(|| invalid("[STORE_TRANSFER_LAUNCHER_ABSENT] Store launcher is absent"))?;
+        let transfer_tick = first_fixed_step_tick_at_or_after(
+            full.requested_time_seconds,
+            scenario.fixed_step_seconds,
+        );
+        if compact.transfer != *full
+            || scenario.air_mission_compiled_digest.as_deref()
+                != Some(compact.mission_digest.as_str())
+            || scenario
+                .air_mission_store_aircraft_source_object_id
+                .as_deref()
+                != Some(full.launcher_source_object_id.as_str())
+            || launcher.kind != crate::EntityKind::Aircraft
+            || launcher.id != full.launcher_entity_id
+            || launcher.provenance.source_object_id != full.launcher_source_object_id
+            || entity.id != full.store_entity_id
+            || entity.provenance.source_object_id != full.store_source_object_id
+            || entity.provenance.model_id != full.store_model_id
+            || weapon.admission.station_id != full.station_id
+            || weapon.admission.compatibility_rule_id != full.compatibility_rule_id
+            || weapon.launch_mass_kg != full.store_mass_kg
+            || weapon.launch_time_seconds != Some(full.requested_time_seconds)
+            || full.requested_tick != transfer_tick
+            || transfer_tick >= integrated_steps
+            || !admitted_transfer_ids.insert(full.id.as_str())
+            || !admitted_transfer_stores.insert(full.store_entity_id.as_str())
+        {
+            return Err(invalid(STORE_AUTHORITY_INVALID));
+        }
+    }
+    if admitted_transfer_ids.len() != scenario.air_mission_store_transfers.len() {
+        return Err(invalid(STORE_AUTHORITY_INVALID));
     }
     let ground_aircraft: Vec<_> = scenario
         .entities
