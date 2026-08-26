@@ -18,6 +18,9 @@ An admitted takeoff archive includes canonical operational frames and transition
 events beside the unchanged compiled Air-mission/model/environment identities.
 It records movement value state, controller values, fuel, total mass and
 installed-store identities; it does not store a presentation-generated path.
+An airborne-transfer archive additionally retains the full compiled transfer
+authority, exact outcome event and boundary frame. It does not add a parallel
+member or recompute release/jettison during replay.
 
 The Rust crate's compiled-model-pack v2 identity validator is an offline
 publication/readback check only. Its result is not a VSR member and it does not
@@ -107,6 +110,11 @@ it is not displayed as if it were a separate model sample.
 
 ## Frame contract
 
+At an accepted airborne-transfer boundary, the launcher frame contains the
+exact post-transfer mass/fuel/installed-drag state and the spawned store first
+appears with the launcher's retained position/velocity. A rejected outcome
+leaves the store stowed and the launcher frame unchanged.
+
 Aircraft frames retain exact `aircraftOperationalState`,
 `aircraftMovementValueState`, SI speed/position/mass/fuel values, installed
 stores and requested/accepted/achieved controller vectors. Valid zero movement
@@ -156,6 +164,17 @@ environment dataset.
 Weapons remain loadout inventory before launch. Aircraft frames preserve the installed inventory identities and total store mass while the weapon is stowed. A launch event removes that store and its declared launch mass from the aircraft once, then creates the weapon's first world sample with the launch platform position and inherited velocity. Static objects may omit unchanged samples. The viewer interpolates only properties explicitly declared interpolable.
 
 ## Integrity and replay
+
+Record admission cross-checks each transfer outcome against its authoritative
+compiled identity, event tick/frame, launcher/store membership and exact
+before/after discontinuity. Missing, duplicated, reordered or digest-mutated
+transfer evidence fails closed rather than being reconstructed.
+
+Compiled Air-mission v1 records without an authored transfer plan retain their
+historical assignment shape and digest: neither an empty `storeTransfers` field
+nor an authority seal is synthesized during readback. This keeps pre-transfer
+VSRs byte-compatible while requiring both fields for newly authored non-empty
+transfer plans.
 
 Ground-operation replay verifies the mission and ground-dynamics lineage plus
 the canonical event/frame stream before exposing any phase or controller value.
@@ -272,6 +291,9 @@ The Worker transfers the recorded runway lifecycle and controller/value-state
 fields through the existing VSR boundary. Browser map, 3D, telemetry, timeline
 and report consumers select the same frame and may not synthesize missing phase,
 speed, path or control values.
+Those consumers apply the same rule to store transfer: exact entity-set change
+and typed requested/accepted/achieved outcome come from the verified record,
+not UI state or an authored request alone.
 
 The compiled-model-pack v2 identity validator is not a browser/Worker or VSR
 viewer API. No replay consumer, transfer payload, or interoperability adapter
@@ -298,6 +320,18 @@ The implemented ground-operation replay covers the admitted generic roll,
 rotation and climbout sequence through `ENROUTE`, with exact events and
 fuel/mass/store continuity. Taxi, rejected-takeoff braking, landing, recovery
 and ground-held store release remain unavailable.
+
+The #187 airborne transfer outcome is part of the existing canonical simulation
+event member, not a parallel replay schema. Its retained boundary frame and
+event jointly preserve exact launcher/station/store/operation/tick identity,
+requested/accepted/achieved state, limiter/cause, pre/post launcher mass and
+fuel, pre/post installed drag area, removed drag force and transfer digest.
+Map, 3D, telemetry, timeline and report read that same event/frame pair; replay
+never reruns release physics or reconstructs a missing transfer. Tampering with
+the discontinuity, ownership, digest, tick or achieved frame fails record
+admission. Rejected dynamic requests terminate fail-closed with explicit
+requested=true, accepted=false, achieved=false limiter/cause evidence and do
+not create a misleading successful VSR.
 
 No VSR version, persisted field, record writer/reader behavior, or replay
 authority changes with the offline compiled-model-pack v2 validator.

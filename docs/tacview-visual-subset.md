@@ -46,6 +46,13 @@ used by the engagement map, scenario-authoring map, entity legend and
 emits either an available display mark or an explicit unavailable mark. It
 never accepts raw map coordinates, creates an entity, creates a track, or
 derives an outcome.
+An airborne store therefore becomes renderable only when the canonical boundary
+frame contains its exact entity identity. The transfer outcome may annotate
+that frame, but presentation cannot create the mark early, repair a rejected
+request or infer achievement from an authored command. Any store named by a
+recorded transfer outcome is removed from the legacy scheduled-launch marker
+path even when the outcome is rejected; rejection therefore remains stowed and
+has no false launch marker.
 
 The grammar carries affiliation, supported kind/role pair, lifecycle, optional
 recorded heading, selection and one source state: `WORLD`, `OBSERVED_TRACK`,
@@ -84,6 +91,9 @@ frame, create an observation, change lifecycle, or mutate the VSR.
 - **Terminated** remains in replay history with reduced opacity and a termination mark.
 
 A weapon therefore does not appear beside its aircraft before launch. At launch it becomes a new world entity at the launch platform’s recorded position and inherits the launch platform’s velocity.
+For generic JETTISON the new entity uses the same transfer-boundary identity,
+position and velocity rule, then remains on the unpowered generic coast path;
+the symbol does not claim safe separation or named-store behavior.
 
 The catalog owns `symbolRole`; the compiler copies it to the immutable engine
 scenario; every engine frame preserves it. Map, 3D, legend, and report render

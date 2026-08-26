@@ -59,6 +59,7 @@ export const SIMULATION_EVENT_PAYLOAD_SCHEMAS = {
   ENTITY_ENTERED_WORLD: "vector.simulation-event-payload.entity-entered-world.v1",
   ENTITY_LIFECYCLE_CHANGED: "vector.simulation-event-payload.entity-lifecycle-changed.v1",
   AIRCRAFT_OPERATIONAL_STATE_CHANGED: "vector.simulation-event-payload.aircraft-operational-state-changed.v1",
+  AIRBORNE_STORE_TRANSFER_OUTCOME: "vector.simulation-event-payload.airborne-store-transfer-outcome.v1",
   RUN_COMPLETED: "vector.simulation-event-payload.run-completed.v1",
   TRACK_STATE_CHANGED: "vector.simulation-event-payload.track-state-changed.v3",
 } as const;
@@ -305,6 +306,32 @@ export type SimulationEventPayload =
       groundDynamicsDigest: string;
     }
   | {
+      kind: "AIRBORNE_STORE_TRANSFER_OUTCOME";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.AIRBORNE_STORE_TRANSFER_OUTCOME;
+      transferId: string;
+      launcherId: string;
+      stationId: string;
+      storeId: string;
+      operation: "RELEASE" | "JETTISON";
+      requestedTimeSeconds: number;
+      requestedTick: number;
+      requested: true;
+      accepted: boolean;
+      achieved: boolean;
+      limiter: "NONE" | "AIRCRAFT_STATE" | "STORE_INVENTORY" | "DRAG_AUTHORITY";
+      cause: "AIRBORNE_TRANSFER_ADMITTED" | "AIRCRAFT_NOT_ENROUTE" | "STORE_NOT_INSTALLED" | "INSTALLED_DRAG_EXCEEDED";
+      storeMassKg: number;
+      installedDragAreaM2: number;
+      installedDragNewtons: number;
+      launcherMassBeforeKg: number;
+      launcherMassAfterKg: number;
+      launcherFuelBeforeKg: number;
+      launcherFuelAfterKg: number;
+      installedDragAreaBeforeM2: number;
+      installedDragAreaAfterM2: number;
+      transferDigest: string;
+    }
+  | {
       kind: "TRACK_STATE_CHANGED";
       schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.TRACK_STATE_CHANGED;
       perspective: ObserverPerspective;
@@ -440,6 +467,10 @@ export type WeaponAdmission = {
   launchAuthorization: WeaponLaunchAuthorization;
 };
 
+export type AirborneStoreTransferBinding = import("../air-mission.ts").CompiledAirborneStoreTransfer & {
+  missionDigest: string;
+};
+
 /** A compiled flight-plan constraint; waypoint 0 is the aircraft start. */
 export type RoutePlan = {
   /** v1 remains replayable with its documented all-fly-by semantics. */
@@ -485,6 +516,7 @@ export type EngineEntityDefinition = {
     datalinkUpdateSeconds: number;
     commandedCruiseAltitudeM: number;
     admission: WeaponAdmission;
+    storeTransfer?: AirborneStoreTransferBinding;
   };
   sensor?: {
     detectionRadiusM: number;

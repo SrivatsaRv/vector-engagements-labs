@@ -36,6 +36,8 @@ overflow; unsupported installation markers remain visible but disabled.
 - The live 3D renderer observes its container, so orientation changes and panel reflow update the WebGL viewport without stretching or clipping.
 - Landing copy, calls to action and live preview remain within the first natural reading sequence on small screens; no fixed hero height creates blank space.
 - Report reading width remains bounded even when operational maps expand.
+- On compact run results, an always-visible `Explain & report` action preserves
+  access when the desktop navigation rail is intentionally hidden.
 - Portalled transient controls remain inside the visual viewport and safe-area
   insets, avoid the sticky Construct action rail, and scroll internally without
   shifting the workspace.
@@ -100,6 +102,9 @@ The affected interaction budget is open/direct-handoff p95 no greater than
 stability check must retain one surface, show no coordinator-listener growth,
 leave no detached portal after unmount, and keep post-GC heap growth within the
 declared two-megabyte browser-test guard.
+The airborne-transfer editor exposes the same inclusive `[0.001, 1] m²`
+installed-drag validity as compilation; compact layouts do not hide its error or
+substitute a default value.
 
 ## Observe viewport shell
 
@@ -113,6 +118,10 @@ VSR frame and presents recorded operational and movement state. It distinguishes
 valid zero readiness hold from positive roll/rotate/climbout movement and from
 an unavailable or terminal state. The installed store stays stowed; the
 surface never creates a weapon entity or recomputes a takeoff path.
+For an accepted airborne transfer, Observe shows the exact new store identity
+only from the transfer frame onward and reads requested/accepted/achieved,
+limiter/cause and before/after mass/fuel/drag from the canonical event. A
+rejected request remains explicit and does not create a symbol.
 
 The Observe workspace uses one centre-column grid. The Map or 3D surface owns
 the remaining row after the control strip and playback rail; it does not own a
@@ -156,6 +165,9 @@ Current Geometry renders the recorded `ENROUTE` and `VALID` state after the
 preserved hold/roll/rotate/climbout extrema while no launched store exists. The
 proof runs at phone, tablet, laptop, desktop, and full-HD
 viewports; it does not substitute a UI fixture for the Worker/VSR boundary.
+The #187 journey extends that same five-project matrix with an authored
+JETTISON, exact before/after entity-set assertion, Worker completion, telemetry
+outcome, map/3D frame agreement, report readback and no runtime errors.
 The browser matrix switches to Rajasthan, selects the eligible Jodhpur runway,
 proves unsupported-point labelling, then completes a real Worker run across the
 supported viewports without error overlays or overflow.

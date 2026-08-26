@@ -17,6 +17,9 @@ one family must not imply changes to unrelated contracts.
   and exact `ADMITTED_GENERIC_EDUCATIONAL` runtime binding. This authorizes only
   bounded runway roll/rotation/climbout; no TP-1538 value, named-aircraft,
   landing/recovery, store-release, named propulsion or control-law claim is added.
+- Bind generic airborne-transfer store mass/station/rule identity to the admitted
+  model pack while preserving the authored `[0.001, 1] m²` installed-drag
+  assumption and all named-fidelity nonclaims.
 
 Model-pack persistence table declarations now live in the domain-owned
 `db/schema/model-pack.ts` module behind the unchanged aggregate Drizzle facade.
@@ -89,6 +92,9 @@ no exported simulation ABI, backend-selection rule or v2 runtime admission.
   bind compact tick fields to the full Air mission, then preserve exact
   hold/roll/rotate/climbout/enroute transitions, fuel/mass/store histories and
   controller requested/accepted/achieved values through Worker and VSR replay.
+- Add the independently sealed airborne-transfer projection and exact
+  accepted/rejected event parity to the existing TypeScript/Rust ABI, retaining
+  the optimized module below 550,000 bytes.
 - Pin the Rust/WASM post-link size policy to Binaryen 131.0.0 with an explicit
   admitted feature set; bind that policy into the generated module identity and
   keep the existing sub-550,000-byte browser artifact gate without relaxing it.
@@ -165,6 +171,18 @@ admission, or tick behavior.
   authoritative compiled Air mission, and make Worker/VSR presentation select
   the actual held aircraft instead of dereferencing or materializing its stowed
   primary store.
+- Add the #187 generic public-educational airborne transfer contract. Authored
+  RELEASE/JETTISON requests bind exact launcher, station, store ordinal,
+  integer tick, installed drag area, loadout/model evidence and one independent
+  compiler-owned authority seal. TypeScript and direct Rust/WASM remove exactly
+  one store mass and installed drag contribution, preserve fuel, inherit the
+  launcher boundary position/velocity, and emit one VSR-owned requested /
+  accepted / achieved outcome. This is not safe-separation, weapon-guidance,
+  named-aircraft, named-store, carriage-performance, landing or recovery
+  fidelity; TP-1538 supplies no value or runtime authority here. The exact
+  installed-drag-area validity is the inclusive `[0.001, 1] m²` interval, and
+  #187 owns a separate 25-second takeoff-plus-transfer performance workload so
+  the governed #182 takeoff workload remains unchanged.
 
 No pending family-specific entry.
 
@@ -174,6 +192,8 @@ The Worker independently recompiles and verifies Air mission/model/environment
 identity before caching or executing a runtime adapter.
 - Admit complete regional packs with four-pack cache bounds, 4,096-query limits,
   cooperative 128-sample cancellation chunks and same-Worker retry recovery.
+- Re-admit the full authored/compiled/compact airborne-transfer lineage and
+  return its exact canonical outcome through the real built Worker.
 
 No pending family-specific entry.
 
@@ -185,6 +205,8 @@ No pending family-specific entry.
   ground-held and admitted takeoff aircraft, exact controller values and
   lifecycle transition events while retaining read-only v5/v4 and v4/v3
   frame/picture compatibility. Replay rejects tampered or synthesized movement.
+- Retain the exact airborne-transfer outcome and boundary frame so replay,
+  map/3D, telemetry, timeline and report never reconstruct release physics.
 
 Saved-run record and admission tables now have separate domain-owned schema
 modules without changing their persisted representation.
@@ -220,6 +242,12 @@ and hashes; no production seed or fallback default performs the migration.
   runway/DEM reconciliation within a declared 30 m model envelope.
 - Validate ground-start tailwind from the sourced regional atmosphere plus
   authored modifiers sampled at the runway threshold and readiness time.
+- Add optional authored RELEASE/JETTISON requests with exact integer tick,
+  store identity, operation, installed-drag validity, authority seal and
+  requested/accepted/achieved runtime outcome.
+- Preserve the historical compiled-mission v1 digest when no transfer plan is
+  authored, and prevent rejected governed transfers from falling through to a
+  legacy launch marker.
 
 Scenario-template table declarations now live in `db/schema/scenarios.ts`
 behind the unchanged aggregate schema export.
@@ -229,6 +257,10 @@ behind the unchanged aggregate schema export.
 The kernel adapter now exact-key validates the generic ground-dynamics
 projection and rejects unsupported authority or resealed compact promotion. It
 continues to own identity/admission only and does not execute takeoff physics.
+- Extend that identity/admission boundary to the ordered airborne-store
+  transfer projection: exact authored request lineage, validity keys, per-item
+  digests and the aggregate authority seal must all agree before execution;
+  acceptance and achieved transfer state remain runtime-owned.
 
 `vector.scenario-kernel.v1` now owns arbitrary affiliations, organization
 structure, multi-domain entity identities, authored task graphs and six-surface

@@ -306,6 +306,12 @@ The #182 ground-dynamics projection is a separately bounded
 not consume either isolated TP-1538 transcription, authorize a named aircraft,
 or close the #64 reference-aircraft, route, landing and recovery work.
 
+#187 adds only a generic public-educational airborne transfer consumer. The
+model pack supplies exact store/station/rule identity and store mass; authored
+intent supplies RELEASE/JETTISON, requested time and a visibly assumption-backed
+installed-drag area inside `[0.001, 1] m²`. It adds no named carriage,
+safe-separation, store aerodynamics or weapon-effectiveness authority.
+
 This foundation makes no named-aircraft, weapon, sensor, mission-policy, flight-
 control, or UI capability claim. Rust/WASM participation validates only the
 bounded compiled schema and digest; it does not admit the pack to execution or

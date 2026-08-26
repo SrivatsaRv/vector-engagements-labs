@@ -750,6 +750,9 @@ a {
   letter-spacing: .06em;
   text-transform: uppercase;
 }
+.compact-results-navigation {
+  display: none;
+}
 .live-metrics {
   margin-left: auto;
   height: 100%;
@@ -6186,6 +6189,17 @@ button:disabled,
   .scenario-name strong { font-size: 10px; }
   .lab-header nav,
   .lab-actions { display: none; }
+  .compact-results-navigation {
+    display: inline-flex;
+    min-height: var(--vector-control-height);
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--blue);
+    font-size: 10px;
+    font-weight: 750;
+  }
   .lab-notice { min-width: 0; padding: 0 12px; font-size: 9px; }
   .lab-notice span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .build-workspace { grid-template-columns: minmax(0, 1fr); }

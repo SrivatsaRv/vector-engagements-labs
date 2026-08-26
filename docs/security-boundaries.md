@@ -17,6 +17,11 @@ posture, release, and runway-evidence binding. A digest-valid hostile mutation,
 unknown field, or mismatched archived identity is rejected; replay never repairs
 it by substituting a current mission or by presenting unavailable movement as a
 valid zero-valued dynamics result.
+Store-transfer replay additionally revalidates the full authored/compiled
+request, ordered authority seal and compact entity binding. Caller mutation of
+identity, tick, station/rule, operation, mass, installed drag or validity cannot
+be repaired by resealing exposed compact digests. Operational airborne-state or
+inventory rejection is retained explicitly and never materializes a store.
 
 Saved-run snapshots and saved-run admission counters now have separate
 domain-owned declaration modules behind the unchanged aggregate Drizzle schema.
@@ -132,6 +137,11 @@ tests replace those blockers; remaining assumptions stay separately disclosed.
 Source-freeze validators may recognize the `MODEL_ASSUMPTION` vocabulary only
 through issue-owned ledger exemptions that prove the records remain value-less
 governance assertions and cannot provide runtime or mission-policy authority.
+The ownership registry separately maps #187's composed fixture, benchmark and
+focused regression to the engine performance section, while STUB-26 keeps its
+generic operation/installed-drag assumptions release-blocking. The inclusive
+`[0.001, 1] m²` validity is documented and authority-sealed; changing that
+policy requires a new reviewed contract rather than caller data.
 
 Issue #151's generic mission-policy source policy scans every production and
 runtime-fixture root for exact hashes and SHA-256-confirmed raw or

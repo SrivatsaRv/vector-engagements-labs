@@ -1,4 +1,4 @@
-import { sha256Hex } from "../canonical-json.ts";
+import { canonicalJson, sha256Hex } from "../canonical-json.ts";
 import {
   admitWorkerCapabilityManifest,
   type CapabilityManifestIdentity,
@@ -64,10 +64,13 @@ export async function admitRuntimeModelPack(
       modelPack: CURRENT_COMPILED_MODEL_PACK,
       environmentPackDigest: admittedEnvironment.pack.identity.digest,
       environmentPack: admittedEnvironment.pack,
+      fixedStepSeconds: engineScenario.fixedStepSeconds,
+      durationSeconds: engineScenario.durationSeconds,
     });
     if (
       verifiedMission.authoredDigest !== engineScenario.airMission.authoredDigest
       || verifiedMission.compiledDigest !== engineScenario.airMission.compiledDigest
+      || canonicalJson(verifiedMission) !== canonicalJson(engineScenario.airMission)
     ) {
       throw new Error("The Worker Air mission does not match the compiled runtime artifact.");
     }

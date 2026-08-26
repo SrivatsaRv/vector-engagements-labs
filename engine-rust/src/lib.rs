@@ -20,7 +20,10 @@ pub use public_aircraft_reference::{
     run_public_aircraft_reference, run_public_aircraft_reference_json,
     PublicAircraftReferenceInput, PublicAircraftReferenceRun,
 };
-use simulation_events::{SimulationEventDraft, SimulationEventJournal, SimulationEventReceipt};
+use simulation_events::{
+    AirborneStoreTransferOutcomeEvent, SimulationEventDraft, SimulationEventJournal,
+    SimulationEventReceipt,
+};
 pub use simulation_events::{SimulationEventStream, SimulationEventV2};
 pub use validation::{
     validate_scenario, MAX_ENTITIES, MAX_EVENTS, MAX_INPUT_BYTES, MAX_INTEGRATED_STEPS,
@@ -195,6 +198,48 @@ pub enum WeaponLaunchAuthorization {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum StoreTransferOperation {
+    #[serde(rename = "RELEASE")]
+    Release,
+    #[serde(rename = "JETTISON")]
+    Jettison,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AirborneStoreTransfer {
+    pub schema_version: String,
+    pub authority: String,
+    pub validity: serde_json::Value,
+    pub id: String,
+    pub launcher_entity_id: String,
+    pub launcher_source_object_id: String,
+    pub store_entity_id: String,
+    pub store_source_object_id: String,
+    pub store_model_id: String,
+    pub store_ordinal: u64,
+    pub station_id: String,
+    pub compatibility_rule_id: String,
+    pub operation: StoreTransferOperation,
+    pub requested_time_seconds: f64,
+    pub requested_tick: u64,
+    pub store_mass_kg: f64,
+    pub installed_drag_area_m2: f64,
+    pub value_state: String,
+    pub evidence_ref_ids: Vec<String>,
+    pub limitation_ids: Vec<String>,
+    pub digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AirborneStoreTransferBinding {
+    #[serde(flatten)]
+    pub transfer: AirborneStoreTransfer,
+    pub mission_digest: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Guidance {
     Direct,
@@ -287,6 +332,8 @@ pub struct WeaponModel {
     pub datalink_update_seconds: f64,
     pub commanded_cruise_altitude_m: f64,
     pub admission: WeaponAdmission,
+    #[serde(default)]
+    pub store_transfer: Option<AirborneStoreTransferBinding>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -762,6 +809,12 @@ pub struct EngineScenario {
     pub air_mission_authority: Option<AircraftGroundOperation>,
     #[serde(default, skip_serializing)]
     pub air_mission_aircraft_source_object_id: Option<String>,
+    #[serde(default, skip_serializing)]
+    pub air_mission_store_transfers: Vec<AirborneStoreTransfer>,
+    #[serde(default, skip_serializing)]
+    pub air_mission_compiled_digest: Option<String>,
+    #[serde(default, skip_serializing)]
+    pub air_mission_store_aircraft_source_object_id: Option<String>,
     #[serde(default)]
     pub air_mission_runtime: Option<AircraftGroundOperation>,
     pub model_pack: ModelPackBinding,
@@ -1602,6 +1655,8 @@ struct RuntimeState {
     available_g: f64,
     store_mass_kg: f64,
     installed_store_ids: Vec<String>,
+    installed_store_drag_area_m2: f64,
+    store_transfer_attempted: bool,
     drag_newtons: f64,
     thrust_newtons: f64,
     phase: String,
@@ -1636,6 +1691,8 @@ impl RuntimeState {
                 .unwrap_or(9.0),
             store_mass_kg: 0.0,
             installed_store_ids: Vec::new(),
+            installed_store_drag_area_m2: 0.0,
+            store_transfer_attempted: false,
             drag_newtons: 0.0,
             thrust_newtons: 0.0,
             phase: if definition.lifecycle == EntityLifecycle::Stowed {
@@ -1813,6 +1870,9 @@ fn environment_sample(
     };
     let grid = &runtime.atmosphere.grid;
     let (lon, lat) = local_to_geographic(Vec3 { z: 0.0, ..position }, &runtime.anchor);
+    // Terrain and atmosphere share the admitted regional boundary. Resolve
+    // terrain first to preserve the cross-runtime causal rejection order.
+    let terrain = terrain_sample_at_geographic(&runtime.terrain.grid, lon, lat)?;
     let (x, fx) = axis(lon, grid.west_deg, grid.longitude_step_deg, grid.columns)
         .ok_or_else(|| runtime_environment_error(ATMOSPHERE_COVERAGE_ERROR))?;
     let (y, fy) = axis(lat, grid.south_deg, grid.latitude_step_deg, grid.rows)
@@ -1840,7 +1900,6 @@ fn environment_sample(
     let surface_temperature_c = temporal(&grid.temperature_c)?;
     let surface_pressure_kpa = temporal(&grid.surface_pressure_kpa)?;
     let humidity = temporal(&grid.relative_humidity_percent)?;
-    let terrain = terrain_sample_at_geographic(&runtime.terrain.grid, lon, lat)?;
     let surface_temperature_k =
         surface_temperature_c + runtime.authored_modifiers.temperature_offset_c + 273.15;
     let temperature_k = surface_temperature_k - 0.0065 * (position.z - terrain);
@@ -1943,7 +2002,8 @@ fn update_ground_aircraft(
             + interpolate_table(&model.induced_drag_by_angle_of_attack_rad, 0.0)?
                 * operation.takeoff_lift_coefficient
                 * operation.takeoff_lift_coefficient;
-    let drag = dynamic_pressure * model.reference_area_m2 * drag_coefficient;
+    let installed_store_drag = dynamic_pressure * state.installed_store_drag_area_m2;
+    let drag = dynamic_pressure * model.reference_area_m2 * drag_coefficient + installed_store_drag;
     let thrust = interpolate_table(&model.thrust_by_throttle, 1.0)?;
     let fuel_coefficient = interpolate_table(&model.fuel_flow_by_throttle, 1.0)?;
     if thrust <= 0.0 || state.fuel_kg <= 0.0 {
@@ -2200,7 +2260,9 @@ fn update_aircraft(
             + interpolate_table(&model.induced_drag_by_angle_of_attack_rad, 0.0)?
                 * lift_coefficient
                 * lift_coefficient;
-        let drag = dynamic_pressure * model.reference_area_m2 * drag_coefficient;
+        let installed_store_drag = dynamic_pressure * state.installed_store_drag_area_m2;
+        let drag =
+            dynamic_pressure * model.reference_area_m2 * drag_coefficient + installed_store_drag;
         let maximum_thrust = interpolate_table(&model.thrust_by_throttle, 1.0)?;
         if maximum_thrust <= 0.0 {
             return Err(EngineError::InvalidScenario(format!(
@@ -2284,12 +2346,27 @@ fn route_transition(plan: &RoutePlan, index: usize) -> Result<&str, EngineError>
     }
 }
 
+struct StoreTransferOutcome {
+    transfer: AirborneStoreTransfer,
+    installed_drag_newtons: f64,
+    launcher_mass_before_kg: f64,
+    launcher_mass_after_kg: f64,
+    launcher_fuel_before_kg: f64,
+    launcher_fuel_after_kg: f64,
+    installed_drag_area_before_m2: f64,
+    installed_drag_area_after_m2: f64,
+    accepted: bool,
+    limiter: &'static str,
+    cause: &'static str,
+}
+
 fn activate_weapons(
     states: &mut [RuntimeState],
     tick: u64,
     terminal_tick: u64,
     scenario: &EngineScenario,
-) {
+) -> Result<Vec<StoreTransferOutcome>, EngineError> {
+    let mut committed = Vec::new();
     for index in 0..states.len() {
         let Some(weapon) = states[index].definition.weapon.clone() else {
             continue;
@@ -2307,15 +2384,74 @@ fn activate_weapons(
             continue;
         }
         let launcher_id = weapon.launch_platform_id;
-        if let Some(launcher_index) = states
+        let Some(launcher_index) = states
             .iter()
             .position(|state| state.definition.id == launcher_id)
+        else {
+            return Err(EngineError::InvalidScenario(format!(
+                "[STORE_TRANSFER_LAUNCHER_ABSENT] Store {} has no launcher.",
+                states[index].definition.id
+            )));
+        };
         {
             let position = states[launcher_index].position;
             let velocity = states[launcher_index].velocity;
             let heading = states[launcher_index].heading_rad;
             if states[launcher_index].definition.kind == EntityKind::Aircraft {
-                if states[launcher_index].definition.ground_operation.is_some() {
+                let Some(binding) = weapon.store_transfer.as_ref() else {
+                    if scenario.air_mission_compiled_digest.is_some()
+                        && states[launcher_index].definition.ground_operation.is_some()
+                    {
+                        continue;
+                    }
+                    let Some(store_index) = states[launcher_index]
+                        .installed_store_ids
+                        .iter()
+                        .position(|id| id == &states[index].definition.id)
+                    else {
+                        return Err(EngineError::InvalidScenario(format!(
+                            "[STORE_TRANSFER_STORE_ABSENT] Aircraft {} does not carry store {}.",
+                            states[launcher_index].definition.id, states[index].definition.id
+                        )));
+                    };
+                    states[launcher_index]
+                        .installed_store_ids
+                        .remove(store_index);
+                    states[launcher_index].store_mass_kg -= weapon.launch_mass_kg;
+                    states[launcher_index].mass_kg -= weapon.launch_mass_kg;
+                    states[index].position = position;
+                    states[index].velocity = velocity;
+                    states[index].heading_rad = heading;
+                    states[index].lifecycle = EntityLifecycle::Active;
+                    states[index].phase = "Launched".to_string();
+                    states[index].weapon_flight_state = Some(WeaponFlightState::Boost);
+                    continue;
+                };
+                if states[index].store_transfer_attempted {
+                    continue;
+                }
+                states[index].store_transfer_attempted = true;
+                let transfer = &binding.transfer;
+                let prior_drag_area_m2 = states[launcher_index].installed_store_drag_area_m2;
+                let launcher_mass_before_kg = states[launcher_index].mass_kg;
+                let launcher_fuel_before_kg = states[launcher_index].fuel_kg;
+                let rejected = |limiter, cause| StoreTransferOutcome {
+                    transfer: transfer.clone(),
+                    installed_drag_newtons: 0.0,
+                    launcher_mass_before_kg,
+                    launcher_mass_after_kg: launcher_mass_before_kg,
+                    launcher_fuel_before_kg,
+                    launcher_fuel_after_kg: launcher_fuel_before_kg,
+                    installed_drag_area_before_m2: prior_drag_area_m2,
+                    installed_drag_area_after_m2: prior_drag_area_m2,
+                    accepted: false,
+                    limiter,
+                    cause,
+                };
+                if states[launcher_index].aircraft_operational_state
+                    != Some(AircraftOperationalState::Enroute)
+                {
+                    committed.push(rejected("AIRCRAFT_STATE", "AIRCRAFT_NOT_ENROUTE"));
                     continue;
                 }
                 let Some(store_index) = states[launcher_index]
@@ -2323,22 +2459,67 @@ fn activate_weapons(
                     .iter()
                     .position(|id| id == &states[index].definition.id)
                 else {
+                    committed.push(rejected("STORE_INVENTORY", "STORE_NOT_INSTALLED"));
                     continue;
                 };
+                if prior_drag_area_m2 + 1e-12 < transfer.installed_drag_area_m2 {
+                    committed.push(rejected("DRAG_AUTHORITY", "INSTALLED_DRAG_EXCEEDED"));
+                    continue;
+                }
+                let (density, _, base_wind) = environment_sample(
+                    scenario,
+                    position,
+                    model_time_at_tick(tick, scenario.fixed_step_seconds),
+                )?;
+                let wind = active_wind(
+                    scenario,
+                    model_time_at_tick(tick, scenario.fixed_step_seconds),
+                    base_wind,
+                );
+                let airspeed = velocity.subtract(wind).magnitude();
+                let dynamic_pressure = 0.5 * density * airspeed * airspeed;
+                let transferred_drag_newtons = dynamic_pressure * transfer.installed_drag_area_m2;
                 states[launcher_index]
                     .installed_store_ids
                     .remove(store_index);
+                states[launcher_index].installed_store_drag_area_m2 =
+                    (prior_drag_area_m2 - transfer.installed_drag_area_m2).max(0.0);
+                states[launcher_index].drag_newtons =
+                    (states[launcher_index].drag_newtons - transferred_drag_newtons).max(0.0);
                 states[launcher_index].store_mass_kg -= weapon.launch_mass_kg;
                 states[launcher_index].mass_kg -= weapon.launch_mass_kg;
+                committed.push(StoreTransferOutcome {
+                    transfer: transfer.clone(),
+                    installed_drag_newtons: transferred_drag_newtons,
+                    launcher_mass_before_kg,
+                    launcher_mass_after_kg: states[launcher_index].mass_kg,
+                    launcher_fuel_before_kg,
+                    launcher_fuel_after_kg: states[launcher_index].fuel_kg,
+                    installed_drag_area_before_m2: prior_drag_area_m2,
+                    installed_drag_area_after_m2: states[launcher_index]
+                        .installed_store_drag_area_m2,
+                    accepted: true,
+                    limiter: "NONE",
+                    cause: "AIRBORNE_TRANSFER_ADMITTED",
+                });
             }
             states[index].position = position;
             states[index].velocity = velocity;
             states[index].heading_rad = heading;
         }
         states[index].lifecycle = EntityLifecycle::Active;
-        states[index].phase = "Launched".to_string();
-        states[index].weapon_flight_state = Some(WeaponFlightState::Boost);
+        let jettisoned = weapon
+            .store_transfer
+            .as_ref()
+            .is_some_and(|binding| binding.transfer.operation == StoreTransferOperation::Jettison);
+        states[index].phase = if jettisoned { "Jettisoned" } else { "Launched" }.to_string();
+        states[index].weapon_flight_state = Some(if jettisoned {
+            WeaponFlightState::Coast
+        } else {
+            WeaponFlightState::Boost
+        });
     }
+    Ok(committed)
 }
 
 fn update_weapon(
@@ -2352,6 +2533,35 @@ fn update_weapon(
         return Ok(());
     };
     if states[index].lifecycle != EntityLifecycle::Active {
+        return Ok(());
+    }
+    if weapon
+        .store_transfer
+        .as_ref()
+        .is_some_and(|binding| binding.transfer.operation == StoreTransferOperation::Jettison)
+    {
+        let state = &mut states[index];
+        let (density, _, base_wind) = environment_sample(scenario, state.position, time)?;
+        let wind = active_wind(scenario, time, base_wind);
+        let air_relative = state.velocity.subtract(wind);
+        let airspeed = air_relative.magnitude().max(1.0);
+        let dynamic_pressure = 0.5 * density * airspeed * airspeed;
+        let drag = dynamic_pressure * weapon.drag_coefficient * weapon.reference_area_m2;
+        let acceleration = air_relative
+            .normalize()
+            .scale(-drag / state.mass_kg)
+            .add(Vec3 {
+                x: 0.0,
+                y: 0.0,
+                z: -scenario.environment.gravity_mps2,
+            });
+        state.velocity = state.velocity.add(acceleration.scale(dt));
+        state.position = state.position.add(state.velocity.scale(dt));
+        state.drag_newtons = drag;
+        state.thrust_newtons = 0.0;
+        state.commanded_g = 0.0;
+        state.phase = "Jettisoned".to_string();
+        state.weapon_flight_state = Some(WeaponFlightState::Coast);
         return Ok(());
     }
     let Some(target) = states
@@ -2692,6 +2902,10 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             if launcher.definition.kind == EntityKind::Aircraft {
                 launcher.installed_store_ids.push(store.id.clone());
                 launcher.store_mass_kg += weapon.launch_mass_kg;
+                launcher.installed_store_drag_area_m2 += weapon
+                    .store_transfer
+                    .as_ref()
+                    .map_or(0.0, |binding| binding.transfer.installed_drag_area_m2);
             }
         }
     }
@@ -2762,7 +2976,7 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
         }
         let before_activation: Vec<EntityLifecycle> =
             states.iter().map(|state| state.lifecycle).collect();
-        activate_weapons(&mut states, tick, terminal_tick, &scenario);
+        let store_transfers = activate_weapons(&mut states, tick, terminal_tick, &scenario)?;
         for (index, state) in states.iter().enumerate() {
             if before_activation[index] != EntityLifecycle::Stowed
                 || state.lifecycle == EntityLifecycle::Stowed
@@ -2775,6 +2989,25 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                 &state.definition.id,
                 state.definition.kind,
                 state.lifecycle,
+            ))?;
+        }
+        for outcome in &store_transfers {
+            event_journal.emit(SimulationEventDraft::airborne_store_transfer_outcome(
+                tick,
+                event_time,
+                AirborneStoreTransferOutcomeEvent {
+                    transfer: &outcome.transfer,
+                    installed_drag_newtons: outcome.installed_drag_newtons,
+                    launcher_mass_before_kg: outcome.launcher_mass_before_kg,
+                    launcher_mass_after_kg: outcome.launcher_mass_after_kg,
+                    launcher_fuel_before_kg: outcome.launcher_fuel_before_kg,
+                    launcher_fuel_after_kg: outcome.launcher_fuel_after_kg,
+                    installed_drag_area_before_m2: outcome.installed_drag_area_before_m2,
+                    installed_drag_area_after_m2: outcome.installed_drag_area_after_m2,
+                    accepted: outcome.accepted,
+                    limiter: outcome.limiter,
+                    cause: outcome.cause,
+                },
             ))?;
         }
         if last_observer_tick != Some(tick) {
@@ -3109,11 +3342,19 @@ pub fn run_json(input: &str) -> Result<String, EngineError> {
     let payload: serde_json::Value =
         serde_json::from_str(input).map_err(|error| EngineError::InvalidJson(error.to_string()))?;
     let authority = validation::validate_air_mission_authority(payload.get("airMission"))?;
+    let store_authority =
+        validation::validate_air_mission_store_authority(payload.get("airMission"))?;
     let mut scenario: EngineScenario =
         serde_json::from_str(input).map_err(|error| EngineError::InvalidJson(error.to_string()))?;
     scenario.air_mission_authority = authority.as_ref().map(|item| item.binding.clone());
     scenario.air_mission_aircraft_source_object_id =
         authority.map(|item| item.aircraft_source_object_id);
+    if let Some(store_authority) = store_authority {
+        scenario.air_mission_store_aircraft_source_object_id =
+            Some(store_authority.aircraft_source_object_id);
+        scenario.air_mission_store_transfers = store_authority.transfers;
+        scenario.air_mission_compiled_digest = Some(store_authority.compiled_digest);
+    }
     let run = try_run_engine(scenario)?;
     serde_json::to_string(&run).map_err(|error| EngineError::Serialization(error.to_string()))
 }
@@ -3275,6 +3516,7 @@ mod tests {
                     support_requirement: WeaponSupportRequirement::Unavailable,
                     launch_authorization: WeaponLaunchAuthorization::ScheduledTestOnly,
                 },
+                store_transfer: None,
             }),
             sensor: None,
             observer_sensor: None,
@@ -3292,6 +3534,9 @@ mod tests {
             fixed_step_seconds: 0.05,
             air_mission_authority: None,
             air_mission_aircraft_source_object_id: None,
+            air_mission_store_transfers: Vec::new(),
+            air_mission_compiled_digest: None,
+            air_mission_store_aircraft_source_object_id: None,
             air_mission_runtime: None,
             model_pack: ModelPackBinding {
                 schema_version: "vector.compiled-model-pack.v1".to_string(),
@@ -3338,6 +3583,85 @@ mod tests {
             },
             events: Vec::new(),
         }
+    }
+
+    fn native_store_transfer() -> AirborneStoreTransfer {
+        AirborneStoreTransfer {
+            schema_version: "vector.compiled-airborne-store-transfer.v1".to_string(),
+            authority: "GENERIC_PUBLIC_EDUCATIONAL".to_string(),
+            validity: serde_json::json!({
+                "schemaVersion": "vector.airborne-store-transfer-validity.v1",
+                "intendedUse": "PUBLIC_EDUCATIONAL",
+                "mechanism": "AIRBORNE_STORE_RELEASE_OR_JETTISON",
+                "minimumInstalledDragAreaM2": 0.001,
+                "maximumInstalledDragAreaM2": 1.0,
+            }),
+            id: "native-transfer".to_string(),
+            launcher_entity_id: "blue-aircraft".to_string(),
+            launcher_source_object_id: "native-test".to_string(),
+            store_entity_id: "blue-weapon".to_string(),
+            store_source_object_id: "native-test".to_string(),
+            store_model_id: "native-test-model".to_string(),
+            store_ordinal: 1,
+            station_id: "fixture-station".to_string(),
+            compatibility_rule_id: "fixture-rule".to_string(),
+            operation: StoreTransferOperation::Release,
+            requested_time_seconds: 0.0,
+            requested_tick: 0,
+            store_mass_kg: 180.0,
+            installed_drag_area_m2: 0.08,
+            value_state: "MODEL_ASSUMPTION".to_string(),
+            evidence_ref_ids: vec!["native-evidence".to_string()],
+            limitation_ids: vec!["native-limitation".to_string()],
+            digest: "a".repeat(64),
+        }
+    }
+
+    #[test]
+    fn operational_store_rejection_is_retained_once_without_mutation() -> Result<(), EngineError> {
+        let mut scenario = scenario();
+        let transfer = native_store_transfer();
+        let weapon = scenario
+            .entities
+            .iter_mut()
+            .find(|entity| entity.id == transfer.store_entity_id)
+            .and_then(|entity| entity.weapon.as_mut())
+            .ok_or_else(|| EngineError::InvalidScenario("native store is absent".to_string()))?;
+        weapon.launch_time_seconds = Some(0.0);
+        weapon.store_transfer = Some(AirborneStoreTransferBinding {
+            transfer,
+            mission_digest: "b".repeat(64),
+        });
+        let mut states: Vec<_> = scenario.entities.iter().map(RuntimeState::new).collect();
+        let launcher_index = states
+            .iter()
+            .position(|state| state.definition.id == "blue-aircraft")
+            .ok_or_else(|| EngineError::InvalidScenario("native launcher is absent".to_string()))?;
+        let store_index = states
+            .iter()
+            .position(|state| state.definition.id == "blue-weapon")
+            .ok_or_else(|| EngineError::InvalidScenario("native store is absent".to_string()))?;
+        states[launcher_index]
+            .installed_store_ids
+            .push("blue-weapon".to_string());
+        states[launcher_index].store_mass_kg = 180.0;
+        states[launcher_index].installed_store_drag_area_m2 = 0.08;
+        states[launcher_index].aircraft_operational_state =
+            Some(AircraftOperationalState::HoldShort);
+
+        let before_mass = states[launcher_index].mass_kg;
+        let before_fuel = states[launcher_index].fuel_kg;
+        let outcomes = activate_weapons(&mut states, 0, 20, &scenario)?;
+        assert_eq!(outcomes.len(), 1);
+        assert!(!outcomes[0].accepted);
+        assert_eq!(outcomes[0].limiter, "AIRCRAFT_STATE");
+        assert_eq!(outcomes[0].cause, "AIRCRAFT_NOT_ENROUTE");
+        assert_eq!(states[store_index].lifecycle, EntityLifecycle::Stowed);
+        assert_eq!(states[launcher_index].mass_kg, before_mass);
+        assert_eq!(states[launcher_index].fuel_kg, before_fuel);
+        assert_eq!(states[launcher_index].installed_store_ids, ["blue-weapon"]);
+        assert!(activate_weapons(&mut states, 0, 20, &scenario)?.is_empty());
+        Ok(())
     }
 
     fn scenario_with_runtime_environment() -> Result<EngineScenario, Box<dyn std::error::Error>> {

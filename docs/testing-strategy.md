@@ -198,6 +198,24 @@ all-v4 result of migration `013_air_mission_contract.sql`; mixed versions fail.
 Browser completion evidence includes the governed viewport matrix and a real
 built Worker run from mission authoring through report provenance.
 
+Airborne-store verification additionally covers authored/full/compact joint
+resealing against the compiler-owned authority seal, seal/material mismatch,
+ordered transfer cardinality and duplicate identity, missing/wrong
+launcher/store/station/rule bindings, non-finite/nonphysical and terminal-time
+requests, ground-state and once-only rejection, and direct raw-WASM parity.
+Independent boundary checks use retained pre/post mass, fuel and installed-drag
+evidence plus the spawned store frame for mass, momentum and kinetic-energy
+balance. The matrix includes two successive stores, RELEASE/JETTISON, at least
+three installed-drag/wind/mass configurations, and 10/20/40 Hz convergence.
+VSR/map/frontend/browser checks prove that the same event and frame survive
+Worker completion, replay, cancellation/retry and report readback.
+The compiler/Rust hostile matrix also admits both exact installed-drag-area
+boundaries, rejects the immediately adjacent out-of-range values and rejects a
+resealed caller attempt to alter the versioned `[0.001, 1] m²` validity. The
+separate `performance:generic-airborne-store-transfer:verify` process uses three
+warmups and 20 measured samples per backend, reports maximum separately from
+nearest-rank p95, and leaves #182's takeoff fixture and benchmark unchanged.
+
 Aircraft-model verification additionally runs `reference-aircraft:verify`.
 The gate checks immutable NASA source identities, deterministic trim
 propagation, every declared external time-history tolerance, malformed and

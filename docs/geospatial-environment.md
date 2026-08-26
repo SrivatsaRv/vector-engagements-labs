@@ -46,6 +46,10 @@ final camera-relative Three.js adapter intentionally narrows to f32.
 MapLibre reads each frame's recorded WGS84 position. Three.js reads the same
 frame's recorded ENU position and model time. Camera state, basemap projection,
 screen coordinates and Three.js objects never feed back into engine state.
+An accepted airborne store transfer copies the launcher's canonical ENU
+position and velocity at its exact integer-tick boundary; the ordinary frame
+projection then derives WGS84 readback. Map/3D never recompute the transfer or
+provide its position, velocity, wind or datum authority.
 
 ## Vertical datums
 

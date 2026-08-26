@@ -866,6 +866,8 @@ export async function openVectorSimulationRecord(
         modelPack: CURRENT_COMPILED_MODEL_PACK,
         environmentPackDigest: environmentPack.identity.digest,
         environmentPack,
+        fixedStepSeconds: compiled.engineScenario.fixedStepSeconds,
+        durationSeconds: compiled.engineScenario.durationSeconds,
       });
     } catch (error) {
       throw new Error(
@@ -875,6 +877,7 @@ export async function openVectorSimulationRecord(
     if (
       recordedMission.authoredDigest !== verifiedMission.authoredDigest ||
       recordedMission.compiledDigest !== verifiedMission.compiledDigest ||
+      canonicalJson(recordedMission) !== canonicalJson(verifiedMission) ||
       manifest.airMission.schemaVersion !== recordedMission.schemaVersion ||
       manifest.airMission.id !== recordedMission.id ||
       manifest.airMission.version !== recordedMission.version ||

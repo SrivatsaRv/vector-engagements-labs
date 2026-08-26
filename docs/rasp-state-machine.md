@@ -22,6 +22,10 @@ sensor detection, decisions, or narrative state.
 Ground-held aircraft now expose achieved `PARKED`/`HOLD_SHORT` operational
 state and movement `UNAVAILABLE` with the stable ground-dynamics cause. This is
 canonical entity state, not a RASP observation or inferred intent.
+Airborne store transfer is also an engine-owned lifecycle boundary, not a RASP
+decision. Its canonical outcome records requested/accepted/achieved,
+limiter/cause and exact store identity; RASP consumers cannot turn a rejected
+request into an observation or an achieved world entity.
 
 Every A2A tick emits one state owned by `IAF` and one owned by `PAF`. Without a
 compiled admission, `vector.observer-state.v2` has
@@ -135,6 +139,9 @@ Air mission lineage extends record admission only; it does not permit replay to
 derive observer information from model truth or re-run mission behavior.
 Frame schema v6 replays ground operational/movement availability exactly; RASP
 consumers may not convert unavailable movement into an observation or track.
+Accepted or rejected store-transfer outcomes replay from the archived event and
+boundary frame. Replay never reruns release physics or reconstructs a missing
+store, and a rejected outcome leaves the store stowed.
 
 ## Air mission record storage
 
@@ -151,6 +158,12 @@ that authored artifact against the archived environment pack and model-pack
 binding, then requires exact equality across all four members before any replay
 is exposed. A current catalog lookup, UI default, or report label cannot repair
 or replace missing mission intent.
+
+An archived compiled-mission v1 assignment with no authored transfer plan keeps
+its historical key set and digest during that recompilation. Readback does not
+insert an empty `storeTransfers` array or an authority seal; non-empty transfer
+plans require both exact fields. This is backward compatibility for existing
+records, not a downgrade path for malformed new transfer authority.
 
 When the archived mission starts on a runway, its installation, runway geometry,
 MSL elevations, datum, source identity and evidence digest must equal the runway
@@ -207,6 +220,11 @@ and consistent all-member source forgery.
 `tests/air-mission.test.mjs` additionally covers deterministic mission identity,
 all classes/overlays/start postures, negative admission, server preservation,
 and exact VSR/report mission-lineage readback.
+It also pins the pre-transfer compiled-mission v1 digest and exact assignment
+key set for a mission without a transfer plan, proving that new compilation and
+VSR readback do not synthesize empty transfer authority into legacy records.
+`tests/airborne-store-transfer.test.mjs` proves a recorded rejected outcome
+cannot fall through to a legacy launch marker after VSR replay.
 Its ground-held regressions prove TS/Rust `PARKED`/`HOLD_SHORT` parity,
 unchanged position/fuel/mass/stores, rejected launch, and explicit unavailable
 movement; `tests/vector-record.test.mjs` proves v6 round-trip and v5/v4 plus

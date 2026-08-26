@@ -1615,6 +1615,13 @@
         },
         {
           "kind": "EXACT",
+          "value": "lib/validation/generic-airborne-store-transfer.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "lib/validation/track-store-capacity.ts",
           "facets": [
             "verification"
@@ -1637,6 +1644,13 @@
         {
           "kind": "EXACT",
           "value": "scripts/benchmark-generic-takeoff.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-generic-airborne-store-transfer.ts",
           "facets": [
             "verification"
           ]
@@ -1685,6 +1699,13 @@
         {
           "kind": "EXACT",
           "value": "tests/engine.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/airborne-store-transfer.test.mjs",
           "facets": [
             "verification"
           ]
@@ -5335,5 +5356,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "379568e57869fe180cd8651d77250ed80fb6f05a915c418397e2b74e20ead792"
+  "canonicalSha256": "95975c56370c375c46885887a012d2162842c2dcba781397a72208fae9c52409"
 }

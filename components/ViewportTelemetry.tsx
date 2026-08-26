@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import type { SimulationResult } from "@/lib/simulation";
 import { TelemetryChart } from "@/components/TelemetryChart";
 import type { SelectedDisplayFrame } from "@/lib/frontend/selectors";
+import { selectAirborneStoreTransferOutcomes } from "@/lib/frontend/selectors";
 
 type Props = {
   expanded: boolean;
@@ -22,6 +23,7 @@ export function ViewportTelemetry({ expanded, onExpandedChange, result, selected
   const summary = frame
     ? `${(frame.range / 1000).toFixed(1)} km separation`
     : "Telemetry unavailable";
+  const latestTransfer = selectAirborneStoreTransferOutcomes(result, selected).at(-1);
 
   return (
     <section className={`telemetry ${expanded ? "is-expanded" : "is-collapsed"}`} aria-label="Synchronized run telemetry">
@@ -31,6 +33,11 @@ export function ViewportTelemetry({ expanded, onExpandedChange, result, selected
           <span data-display-time={selected.displayTimeSeconds}>
             Computed at {selected.displayTimeSeconds.toFixed(1)} model seconds · {summary}
           </span>
+          {latestTransfer && (
+            <span data-testid="airborne-store-transfer-outcome">
+              {latestTransfer.operation} {latestTransfer.achieved ? "achieved" : "rejected"} · {latestTransfer.storeId} · {latestTransfer.stationId} · tick frame {latestTransfer.frameIndex} · {latestTransfer.limiter} · {latestTransfer.cause}
+            </span>
+          )}
         </div>
         <button
           type="button"

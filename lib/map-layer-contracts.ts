@@ -121,9 +121,53 @@ export function buildLaunchFeatures(
   result: SimulationResult,
   origin: MapOrigin,
 ) {
-  return result.engineRun.scenario.entities
+  const events = result.engineRun.events.state === "AVAILABLE"
+    ? result.engineRun.events.items
+    : [];
+  const governedStoreIds = new Set(events.flatMap((event) =>
+    event.payload.kind === "AIRBORNE_STORE_TRANSFER_OUTCOME"
+      ? [event.payload.storeId]
+      : []
+  ));
+  const transfers = events.flatMap((event) => {
+    if (event.payload.kind !== "AIRBORNE_STORE_TRANSFER_OUTCOME" || !event.payload.achieved) return [];
+    const payload = event.payload;
+    const frame = result.engineRun.frames[event.frameIndex];
+    const store = frame?.entities.find((candidate) => candidate.id === payload.storeId);
+    const launcher = frame?.entities.find((candidate) => candidate.id === payload.launcherId);
+    if (!frame || !store || !launcher) return [];
+    return [{
+      type: "Feature" as const,
+      properties: {
+        entityId: payload.storeId,
+        launcherId: payload.launcherId,
+        stationId: payload.stationId,
+        label: `${store.designation} ${payload.operation === "JETTISON" ? "jettison" : "release"}`,
+        affiliation: store.affiliation,
+        modelTime: event.modelTimeSeconds,
+        operation: payload.operation,
+        requested: payload.requested,
+        accepted: payload.accepted,
+        achieved: payload.achieved,
+        limiter: payload.limiter,
+        cause: payload.cause,
+        transferDigest: payload.transferDigest,
+      },
+      geometry: {
+        type: "Point" as const,
+        coordinates: recordedLngLat(
+          frame.geographicPositions,
+          store.id,
+          store.position,
+          origin,
+        ),
+      },
+    }];
+  });
+  const legacy = result.engineRun.scenario.entities
     .filter(
-      (entity) => Boolean(entity.weapon) && entity.weapon!.launchTimeSeconds !== null,
+      (entity) => Boolean(entity.weapon) && entity.weapon!.launchTimeSeconds !== null &&
+        !governedStoreIds.has(entity.id),
     )
     .map((entity) => {
       const launchTime = entity.weapon?.launchTimeSeconds ?? 0;
@@ -155,6 +199,7 @@ export function buildLaunchFeatures(
         },
       };
     });
+  return [...transfers, ...legacy];
 }
 
 export function buildTrackFeatures(

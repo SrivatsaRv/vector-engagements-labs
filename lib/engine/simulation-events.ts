@@ -47,6 +47,7 @@ const PAYLOAD_KINDS = [
   "ENTITY_ENTERED_WORLD",
   "ENTITY_LIFECYCLE_CHANGED",
   "AIRCRAFT_OPERATIONAL_STATE_CHANGED",
+  "AIRBORNE_STORE_TRANSFER_OUTCOME",
   "RUN_COMPLETED",
   "TRACK_STATE_CHANGED",
 ] as const;
@@ -209,11 +210,18 @@ function payloadSortKey(payload: SimulationEventPayload) {
       payload.movementValueState, payload.groundDynamicsDigest,
     ]);
   }
+  if (payload.kind === "AIRBORNE_STORE_TRANSFER_OUTCOME") {
+    return canonicalJson([
+      "4", payload.schemaVersion, payload.transferId, payload.launcherId,
+      payload.stationId, payload.storeId, payload.operation,
+      payload.requestedTimeSeconds, payload.requestedTick, payload.transferDigest,
+    ]);
+  }
   if (payload.kind === "RUN_COMPLETED") {
-    return canonicalJson(["4", payload.schemaVersion, payload.termination]);
+    return canonicalJson(["5", payload.schemaVersion, payload.termination]);
   }
   return canonicalJson([
-    "5", payload.schemaVersion, payload.perspective, payload.trackId,
+    "6", payload.schemaVersion, payload.perspective, payload.trackId,
     payload.from, payload.to, payload.cause, payload.sensorModelId,
     payload.sensorModelVersion, payload.modelPackDigest, payload.sourceSequence,
     payload.sourceTimeSeconds, payload.estimateValueState, payload.uncertaintyValueState,
@@ -289,6 +297,77 @@ function assertPayload(value: unknown, index: number): asserts value is Simulati
     member(value.movementValueState, ["VALID", "TERMINATED"], `Simulation event ${index} movement value state`);
     if (typeof value.groundDynamicsDigest !== "string" || !/^[a-f0-9]{64}$/.test(value.groundDynamicsDigest)) {
       throw new Error(`Simulation event ${index} ground-dynamics digest is invalid.`);
+    }
+  } else if (value.kind === "AIRBORNE_STORE_TRANSFER_OUTCOME") {
+    exactKeys(value, [
+      "kind", "schemaVersion", "transferId", "launcherId", "stationId",
+      "storeId", "operation", "requestedTimeSeconds", "requested",
+      "requestedTick",
+      "accepted", "achieved", "limiter", "cause", "storeMassKg",
+      "installedDragAreaM2", "installedDragNewtons", "launcherMassBeforeKg",
+      "launcherMassAfterKg", "launcherFuelBeforeKg", "launcherFuelAfterKg",
+      "installedDragAreaBeforeM2", "installedDragAreaAfterM2", "transferDigest",
+    ], [], `Simulation event ${index} payload`);
+    if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.AIRBORNE_STORE_TRANSFER_OUTCOME) {
+      throw new Error(`Simulation event ${index} payload schema is unsupported.`);
+    }
+    for (const [field, fieldValue] of [
+      ["transfer ID", value.transferId],
+      ["launcher ID", value.launcherId],
+      ["station ID", value.stationId],
+      ["store ID", value.storeId],
+    ] as const) nonEmptyString(fieldValue, `Simulation event ${index} ${field}`);
+    member(value.operation, ["RELEASE", "JETTISON"], `Simulation event ${index} store operation`);
+    if (!Number.isFinite(value.requestedTimeSeconds) || (value.requestedTimeSeconds as number) < 0) {
+      throw new Error(`Simulation event ${index} requested time is invalid.`);
+    }
+    if (!Number.isSafeInteger(value.requestedTick) || (value.requestedTick as number) < 0) {
+      throw new Error(`Simulation event ${index} requested tick is invalid.`);
+    }
+    if (value.requested !== true || typeof value.accepted !== "boolean" || typeof value.achieved !== "boolean") {
+      throw new Error(`Simulation event ${index} store-transfer result is invalid.`);
+    }
+    const outcomeIsValid = value.accepted === true && value.achieved === true
+      ? value.limiter === "NONE" && value.cause === "AIRBORNE_TRANSFER_ADMITTED"
+      : value.accepted === false && value.achieved === false && (
+          (value.limiter === "AIRCRAFT_STATE" && value.cause === "AIRCRAFT_NOT_ENROUTE") ||
+          (value.limiter === "STORE_INVENTORY" && value.cause === "STORE_NOT_INSTALLED") ||
+          (value.limiter === "DRAG_AUTHORITY" && value.cause === "INSTALLED_DRAG_EXCEEDED")
+        );
+    if (!outcomeIsValid) {
+      throw new Error(`Simulation event ${index} store-transfer limiter or cause is invalid.`);
+    }
+    if (!Number.isFinite(value.storeMassKg) || (value.storeMassKg as number) <= 0) {
+      throw new Error(`Simulation event ${index} store mass is invalid.`);
+    }
+    if (!Number.isFinite(value.installedDragAreaM2) || (value.installedDragAreaM2 as number) <= 0) {
+      throw new Error(`Simulation event ${index} installed drag area is invalid.`);
+    }
+    if (!Number.isFinite(value.installedDragNewtons) || (value.installedDragNewtons as number) < 0) {
+      throw new Error(`Simulation event ${index} installed drag force is invalid.`);
+    }
+    for (const [field, fieldValue] of [
+      ["launcher mass before", value.launcherMassBeforeKg],
+      ["launcher mass after", value.launcherMassAfterKg],
+      ["launcher fuel before", value.launcherFuelBeforeKg],
+      ["launcher fuel after", value.launcherFuelAfterKg],
+      ["installed drag area before", value.installedDragAreaBeforeM2],
+      ["installed drag area after", value.installedDragAreaAfterM2],
+    ] as const) {
+      if (!Number.isFinite(fieldValue) || (fieldValue as number) < 0) {
+        throw new Error(`Simulation event ${index} ${field} is invalid.`);
+      }
+    }
+    const massChangeKg = (value.launcherMassBeforeKg as number) - (value.launcherMassAfterKg as number);
+    const dragAreaChangeM2 = (value.installedDragAreaBeforeM2 as number) - (value.installedDragAreaAfterM2 as number);
+    if (
+      value.launcherFuelBeforeKg !== value.launcherFuelAfterKg ||
+      (value.achieved
+        ? Math.abs(massChangeKg - (value.storeMassKg as number)) > 1e-9 || Math.abs(dragAreaChangeM2 - (value.installedDragAreaM2 as number)) > 1e-12
+        : massChangeKg !== 0 || dragAreaChangeM2 !== 0 || value.installedDragNewtons !== 0)
+    ) throw new Error(`Simulation event ${index} transfer discontinuity is invalid.`);
+    if (typeof value.transferDigest !== "string" || !/^[a-f0-9]{64}$/.test(value.transferDigest)) {
+      throw new Error(`Simulation event ${index} transfer digest is invalid.`);
     }
   } else {
     exactKeys(value, [
@@ -701,6 +780,50 @@ export function assertSimulationEventStream(
         transition.to !== event.payload.to
       ) throw new Error(`Simulation event ${event.id} does not reference the first retained frame for its aircraft operational transition.`);
       consumedOperationalTransitionsByEntity.set(entityId!, transitionIndex + 1);
+    } else if (event.payload.kind === "AIRBORNE_STORE_TRANSFER_OUTCOME") {
+      const payload = event.payload;
+      const launcher = entityById.get(payload.launcherId);
+      const store = entityById.get(payload.storeId);
+      const launcherFrame = frame.entities.find((candidate) => candidate.id === payload.launcherId);
+      const storeFrame = frame.entities.find((candidate) => candidate.id === payload.storeId);
+      const transfer = store?.weapon?.storeTransfer;
+      const transferTick = firstFixedStepTickAtOrAfter(
+        payload.requestedTimeSeconds,
+        scenario.fixedStepSeconds,
+      );
+      if (
+        event.phase !== "WEAPON" || event.producer.subsystem !== "AIRCRAFT_DYNAMICS" ||
+        event.producer.entityId !== payload.launcherId ||
+        !launcher || launcher.kind !== "AIRCRAFT" || !store || store.kind !== "GUIDED_WEAPON" ||
+        !launcherFrame || !transfer ||
+        event.tick !== transferTick || payload.requestedTick !== transferTick ||
+        event.participants.length !== 2 ||
+        !event.participants.some((item) => item.entityId === payload.launcherId && item.role === "LAUNCHER") ||
+        !event.participants.some((item) => item.entityId === payload.storeId && item.role === "WEAPON") ||
+        transfer.id !== payload.transferId || transfer.digest !== payload.transferDigest ||
+        transfer.stationId !== payload.stationId || transfer.operation !== payload.operation ||
+        transfer.storeMassKg !== payload.storeMassKg ||
+        transfer.installedDragAreaM2 !== payload.installedDragAreaM2 ||
+        launcherFrame.massKg !== payload.launcherMassAfterKg ||
+        launcherFrame.fuelKg !== payload.launcherFuelAfterKg ||
+        (payload.achieved ? (
+          !storeFrame || storeFrame.lifecycle !== "ACTIVE" || launcherFrame.installedStoreIds.includes(payload.storeId) ||
+          storeFrame.position.x !== launcherFrame.position.x ||
+          storeFrame.position.y !== launcherFrame.position.y ||
+          storeFrame.position.z !== launcherFrame.position.z ||
+          storeFrame.velocity.x !== launcherFrame.velocity.x ||
+          storeFrame.velocity.y !== launcherFrame.velocity.y ||
+          storeFrame.velocity.z !== launcherFrame.velocity.z
+        ) : (
+          Boolean(storeFrame) || !launcherFrame.installedStoreIds.includes(payload.storeId) ||
+          payload.launcherMassBeforeKg !== payload.launcherMassAfterKg ||
+          payload.launcherFuelBeforeKg !== payload.launcherFuelAfterKg ||
+          payload.installedDragAreaBeforeM2 !== payload.installedDragAreaAfterM2 ||
+          payload.installedDragNewtons !== 0
+        ))
+      ) {
+        throw new Error(`Simulation store-transfer event ${event.id} has invalid authority, ownership, or achieved frame state.`);
+      }
     } else {
       const entityId = event.producer.entityId;
       const entity = entityId ? entityById.get(entityId) : undefined;

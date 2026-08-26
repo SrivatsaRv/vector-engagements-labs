@@ -10,6 +10,14 @@ projection to both compact runtime copies, and emits the same per-tick state,
 controller and transition-event fields as TypeScript. Compact-copy mutation or
 caller-visible digest resealing cannot promote an unavailable operation.
 
+Airborne store transfer uses the same independent-authority boundary. Rust
+reads the full compiled request and its `[0.001, 1] m²` installed-drag validity,
+recomputes ordered transfer identity against the compiler-owned seal, and then
+cross-checks the compact entity projection. Accepted and operationally rejected
+outcomes are schema-identical to TypeScript; malformed authority rejects before
+ticks. RELEASE and JETTISON select only the declared generic lifecycle, never a
+named branch.
+
 `EngineScenario.airMission` is an optional compiled lineage envelope. A ground
 run also carries a compact compiler-owned copy of the exact
 `vector.aircraft-ground-operation.v1` artifact. Before ticks, both backends
@@ -86,6 +94,9 @@ model-assumption authority rather than a deployment-capability selector.
 
 Air runs add authored and compiled mission digests to backend-independent
 provenance. Backend choice cannot create, migrate, or repair mission intent.
+Airborne transfer provenance is likewise backend-neutral: authored digest,
+aircraft source identity, ordered transfer digests and the independent
+authority seal are identical in both engines and retained in the VSR.
 Backend provenance now sits beside one content-addressed regional pack. A run
 is rejected when the runtime grid, source grids or compact pack binding do not
 match the archived EnvironmentPack digest.
@@ -102,6 +113,8 @@ Validating a Stage-B v2 pack in Rust does not alter that selection or provenance
 authority; no deployment manifest currently admits v2 execution.
 Likewise, a TP-1538 verification digest records only an offline evaluator run;
 it cannot select a deployment backend or become `EngineRun` provenance.
+The #187 benchmark is a separate 25-second composed workload; it does not alter
+or replace #182's governed takeoff benchmark.
 Ground-operation provenance is backend-neutral: both implementations require
 the same full mission, start posture, release time, runway/environment evidence
 and independently sealed ground-dynamics digest. They integrate the same
@@ -144,6 +157,11 @@ transition releases the aircraft from the ground-operation integrator to the
 existing airborne route controller. A timer, scenario ID, actor name or compact
 caller claim cannot cross this boundary, and installed stores remain stowed
 until after it.
+At the transfer tick, both engines record the same requested/accepted/achieved
+outcome. Acceptance removes one installed store mass/drag contribution and
+creates one store at the retained launcher boundary state; operational
+rejection leaves inventory unchanged. No backend swap or identifier branch can
+invent either result.
 
 The swap boundary consumes mission-authoritative start speed, fuel mass, and
 store count only after the compiler has reconciled them with the generic engine
