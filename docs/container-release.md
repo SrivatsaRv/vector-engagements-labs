@@ -77,7 +77,11 @@ EnvironmentPacks; rollback continues to require restoring the pre-migration
 backup rather than mutating immutable rows in place.
 Migration `016_high_energy_crossing_challenge.sql` then adds the independently
 generated ninth package and verifies its exact identity/hash. It does not
-rewrite migration 015 or any existing row.
+rewrite migration 015 or any existing row. Once migration 016 exists, the
+ground-dynamics generator admits migration 015 only at frozen SHA-256
+`ed5a04b32ae3f634c28394a17c98232474a737ce466fca58fc0bca21235fe35b`;
+both verification and generation reject any historical-byte drift while
+allowing only the forward migration to be regenerated.
 
 Scenario migration `013_air_mission_contract.sql` is forward-only. The preflight
 verifier accepts only a catalogue that is wholly v3 or wholly v4, the migration

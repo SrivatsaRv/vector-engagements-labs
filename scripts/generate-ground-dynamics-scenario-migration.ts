@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { canonicalJson } from "../lib/canonical-json.ts";
@@ -20,6 +21,9 @@ if (checkOnly === write) throw new Error("Pass exactly one of --write or --check
 
 const escapeSqlLiteral = (value: string) => value.replaceAll("'", "''");
 const sqlText = (value: string) => `'${escapeSqlLiteral(value)}'`;
+const historicalMigrationPath = resolve("db/migrations/015_generic_ground_dynamics.sql");
+const successorMigrationPath = resolve("db/migrations/016_high_energy_crossing_challenge.sql");
+const frozenHistoricalMigrationSha256 = "ed5a04b32ae3f634c28394a17c98232474a737ce466fca58fc0bca21235fe35b";
 
 function verifyOrWriteMigration(input: {
   migrationPath: string;
@@ -44,10 +48,19 @@ function verifyOrWriteMigration(input: {
 }
 
 function historicalMigration() {
+  const existing = readFileSync(historicalMigrationPath, "utf8");
+  if (existsSync(successorMigrationPath)) {
+    const actualSha256 = createHash("sha256").update(existing).digest("hex");
+    if (actualSha256 !== frozenHistoricalMigrationSha256) {
+      throw new Error(`Historical ground-dynamics migration 015 changed: expected ${frozenHistoricalMigrationSha256}, received ${actualSha256}.`);
+    }
+    process.stdout.write(`verified frozen ground-dynamics migration 015 ${actualSha256}\n`);
+    return;
+  }
+
   const definitions = SCENARIO_LIBRARY.filter(
     (definition) => definition.id !== HIGH_ENERGY_CROSSING_CHALLENGE_ID,
   );
-  const migrationPath = resolve("db/migrations/015_generic_ground_dynamics.sql");
   const startMarker = "-- BEGIN GENERATED GENERIC-GROUND-DYNAMICS SCENARIO PACKAGES";
   const endMarker = "-- END GENERATED GENERIC-GROUND-DYNAMICS SCENARIO PACKAGES";
   const scenarioStatements = definitions.map((definition) => {
@@ -82,7 +95,7 @@ BEGIN
 END $$;
 ${endMarker}`;
   verifyOrWriteMigration({
-    migrationPath,
+    migrationPath: historicalMigrationPath,
     startMarker,
     endMarker,
     generated,
@@ -99,7 +112,6 @@ function challengeMigration() {
     throw new Error("The high-energy crossing challenge must have one exact scenario definition.");
   }
   const [definition] = definitions;
-  const migrationPath = resolve("db/migrations/016_high_energy_crossing_challenge.sql");
   const startMarker = "-- BEGIN GENERATED HIGH-ENERGY CROSSING CHALLENGE";
   const endMarker = "-- END GENERATED HIGH-ENERGY CROSSING CHALLENGE";
   const tag = "vector_high_energy_crossing_challenge";
@@ -146,11 +158,11 @@ BEGIN
 END $$;
 ${endMarker}`;
   verifyOrWriteMigration({
-    migrationPath,
+    migrationPath: successorMigrationPath,
     startMarker,
     endMarker,
     generated,
-    staleMessage: "High-energy crossing challenge migration is stale; run npm run high-energy-crossing:migration:generate.",
+    staleMessage: "High-energy crossing challenge migration is stale; run npm run ground-dynamics:migration:generate.",
     successMessage: `${definition.id}@${definition.version} ${contentHash}`,
   });
 }

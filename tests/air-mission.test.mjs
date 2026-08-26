@@ -387,6 +387,11 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
     "c40e91b0fbbf2ee5110ae601dba676d2feec1957ebb440db81703c1696cbd227",
     "migration 014 remains the frozen historical EnvironmentPack/runway snapshot",
   );
+  assert.equal(
+    createHash("sha256").update(groundDynamicsMigration).digest("hex"),
+    "ed5a04b32ae3f634c28394a17c98232474a737ce466fca58fc0bca21235fe35b",
+    "migration 015 remains the frozen historical ground-dynamics snapshot",
+  );
   for (const definition of SCENARIO_LIBRARY) {
     const isChallenge = definition.id === HIGH_ENERGY_CROSSING_CHALLENGE_ID;
     const migration = isChallenge ? challengeMigration : groundDynamicsMigration;
