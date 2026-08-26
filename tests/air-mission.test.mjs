@@ -319,6 +319,20 @@ test("one flight-plan adapter controls compiled and runtime geometry, transition
   assert.ok(Math.abs(recordedRoutePoint.longitudeDeg - editedLongitude) < 1e-9);
 });
 
+test("spatial and Air-mission altitude authoring share the three-decimal contract", () => {
+  let scenario = fixture();
+  scenario.spatialPlan.blue.position.altitudeM = 8_500.123;
+  scenario.spatialPlan.blue.route[0].altitudeM = 8_500.123;
+  scenario.altitude = 8_500.123;
+  scenario = synchronizeScenarioAirMission(scenario, CURRENT_COMPILED_MODEL_PACK);
+
+  assert.equal(
+    scenario.airMission.flightPlans[0].routePoints[0].position.altitude.valueM,
+    8_500.123,
+  );
+  assert.doesNotThrow(() => prepareSimulation(scenario));
+});
+
 test("compiled model-pack admission rejects unknown stations, rules, and quantities above immutable capacity", () => {
   const cases = [
     [(store) => { store.stationId = "deleted-station"; }, "assignments[0].loadout.stores[0].stationId"],
@@ -1267,13 +1281,13 @@ test("runway identity, evidence, state, dimensions, surface, heading, and wind f
     [(scenario) => { editRunway(scenario, { headingDeg: 180 }); }, "MISSION_RUNWAY_INVALID", "start.runway.headingDeg"],
     [(scenario) => {
       const heading = scenario.airMission.start.runway.headingDeg * Math.PI / 180;
-      scenario.wind = 50 * Math.sin(heading);
-      scenario.windNorth = 50 * Math.cos(heading);
+      scenario.wind = Math.round(50 * Math.sin(heading) * 1_000) / 1_000;
+      scenario.windNorth = Math.round(50 * Math.cos(heading) * 1_000) / 1_000;
     }, "MISSION_RUNWAY_INVALID", "start.runway.headingDeg"],
     [(scenario) => {
       const heading = scenario.airMission.start.runway.headingDeg * Math.PI / 180;
-      scenario.wind = 50 * Math.cos(heading);
-      scenario.windNorth = -50 * Math.sin(heading);
+      scenario.wind = Math.round(50 * Math.cos(heading) * 1_000) / 1_000;
+      scenario.windNorth = Math.round(-50 * Math.sin(heading) * 1_000) / 1_000;
     }, "MISSION_RUNWAY_INVALID", "start.runway.headingDeg"],
   ];
   for (const [mutate, code, fieldPath] of cases) {
@@ -1371,6 +1385,26 @@ test("Worker and server admission return the same stable Air mission error", asy
   await assert.rejects(
     () => admitRuntimeModelPack(workerPack),
     (error) => error instanceof AirMissionAdmissionError && error.code === "MISSION_FUEL_INVALID" && error.fieldPath === "assignments[0].initialFuelPercent",
+  );
+});
+
+test("frontend-derived mission input and server/Worker admission share the three-decimal scalar ceiling", async () => {
+  const invalid = fixture();
+  invalid.airMission.fuel.reservePercent = 12.3456;
+  assert.throws(
+    () => validateSavedScenario(invalid, DEFAULT_SCENARIO_DEFINITION),
+    (error) => error.code === "MISSION_NUMERIC_PRECISION_INVALID"
+      && error.fieldPath === "fuel.reservePercent",
+  );
+
+  const prepared = prepareSimulation(fixture());
+  prepared.scenario.airMission.fuel.reservePercent = 12.3456;
+  const workerPack = await adaptPreparedSimulation(prepared);
+  await assert.rejects(
+    () => admitRuntimeModelPack(workerPack),
+    (error) => error instanceof AirMissionAdmissionError
+      && error.code === "MISSION_NUMERIC_PRECISION_INVALID"
+      && error.fieldPath === "fuel.reservePercent",
   );
 });
 

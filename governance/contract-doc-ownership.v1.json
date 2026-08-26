@@ -3174,6 +3174,13 @@
         },
         {
           "kind": "EXACT",
+          "value": "components/NumericAuthoringInput.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "components/ObjectPicker.tsx",
           "facets": [
             "ui"
@@ -3212,6 +3219,13 @@
         {
           "kind": "EXACT",
           "value": "tests/component/current-geometry.test.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/numeric-authoring-input.test.tsx",
           "facets": [
             "ui"
           ]
@@ -4203,6 +4217,14 @@
         },
         {
           "kind": "EXACT",
+          "value": "lib/scenario-control-authority.ts",
+          "facets": [
+            "admission",
+            "schema"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "lib/scenario-package.ts",
           "facets": [
             "admission",
@@ -4308,6 +4330,15 @@
         },
         {
           "kind": "EXACT",
+          "value": "tests/scenario-control-authority.test.mjs",
+          "facets": [
+            "admission",
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "tests/simulation.test.mjs",
           "facets": [
             "runtime",
@@ -4374,6 +4405,16 @@
           "path": "docs/rasp-state-machine.md",
           "heading": "## Regression evidence",
           "facets": [
+            "verification"
+          ]
+        },
+        {
+          "sectionId": "MISSION_CONTROL_ADMISSION_REGRESSION",
+          "path": "docs/testing-strategy.md",
+          "heading": "## Pre-engine control admission regression",
+          "facets": [
+            "admission",
+            "schema",
             "verification"
           ]
         }
@@ -5423,5 +5464,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "226470b07e59d6751ec9d80b90b707ed7a3a0e1d2166cc55fd27eeb29e1b84fa"
+  "canonicalSha256": "71b4c4507e091b56f39a999070ee932dac39c43af1b8fb67dfed5454fdacae96"
 }

@@ -585,6 +585,7 @@ export type VectorSelectOption<Value extends string> = {
 
 export function VectorSelect<Value extends string>({
   className = "",
+  controlId,
   emptyContent = "No options are available.",
   footer,
   header,
@@ -603,6 +604,7 @@ export function VectorSelect<Value extends string>({
   value,
 }: {
   className?: string;
+  controlId?: string;
   emptyContent?: ReactNode;
   footer?: ReactNode;
   header?: ReactNode;
@@ -718,6 +720,7 @@ export function VectorSelect<Value extends string>({
     <div className={`vector-select ${className}`}>
       {showLabel && <span className={labelClassName}>{label}</span>}
       <button
+        data-control-id={controlId}
         aria-activedescendant={open && options[boundedActiveIndex] ? `${surfaceId}-option-${boundedActiveIndex}` : undefined}
         aria-controls={surfaceId}
         aria-describedby={invalid ? errorId : undefined}

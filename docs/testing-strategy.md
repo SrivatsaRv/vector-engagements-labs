@@ -113,6 +113,44 @@ Testing is part of the implementation contract. An executable action is incomple
 
 Use the smallest complete set for a change. State why any applicable layer was omitted. A passing build is not a passing behavioral test.
 
+## Pre-engine control admission regression
+
+The #193 baseline makes the 40-field legacy `Scenario` authority inventory a
+compile-time complete `Record<keyof Scenario, ...>` with an immutable SHA-256
+identity. Its focused regression enumerates all 19 numeric legacy domains and
+tests malformed raw text, exact bounds, adjacent out-of-range values,
+integer-only constraints, declared precision, nullability and blank-versus-zero
+semantics. Structured tests then repeat type, finite, range, integer and
+precision checks after parsing and prove the frontend validator, saved-run
+server and final engine preparation reject the same stable code and field path.
+A hidden-field poison inventory requires an explicit remove,
+migrate, derive or show-read-only disposition for every non-visible authority.
+
+Component regressions exercise the actual raw numeric authoring control. They
+prove malformed atomic values remain visible and invalid without being
+committed to scenario state, while a valid replacement commits and restores
+the control's validity. Existing spatial component tests independently prove
+that invalid coordinates, heading, speed, route length and waypoint acceptance
+radius remain visible and block admission instead of being clamped.
+
+Air-mission tests independently prove the three-decimal ordinary-scalar ceiling
+at both server and production Worker admission, while existing relational
+regressions cover class-owned fields, route/start identity, ETA/TOT, fuel and
+reserve, loadout capacity, runway/wind, store transfer and environment binding.
+Computed legacy duplicate projections are not relabelled authored inputs; their
+compiler consistency checks remain authoritative until #154 removes them.
+Their computed precision is exempt, but structured type, nullability,
+finiteness, range and integer checks still run before compilation. A dedicated
+regression injects string, `NaN` and out-of-range duplicate values and proves
+final simulation preparation fails closed.
+
+This baseline does not satisfy #193 by itself. Completion additionally requires
+machine-readable registration for every nested Air-mission and presentation
+control, deterministic constrained cross-field combinations, Worker/server
+admission parity, latest-draft digest binding, persistence/VSR/report readback,
+runtime configuration contrasts and a CI artifact that reports uncovered
+matrix rows.
+
 ## Existing baseline
 
 The generic sensor Stage-0 generator, deny-network verifier, and adversarial
@@ -144,7 +182,9 @@ post-commit clean-clone run validates the exact immutable candidate and carries
 the declaration path forward. Registry regression also resolves each newly
 introduced family to its exact implementation and maintained section, and
 checks changelog-heading uniqueness against the live inventory rather than a
-fixed family count. It then verifies the machine-readable runtime stub
+fixed family count. The #193 admission section is part of that exact owner
+inventory, so mission implementation and test rules cannot gain admission or
+schema facets without selecting its regression contract. It then verifies the machine-readable runtime stub
 ledger. A new or removed production fallback, temporary adapter, model
 assumption, named-duel identifier, scripted guidance hold, or source-less public
 reference must update its owning ledger entry; an

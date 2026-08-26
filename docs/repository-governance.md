@@ -28,6 +28,12 @@ Repository administrators retain emergency recovery authority but should not use
 
 ## Continuous integration
 
+#193 registers the raw numeric authoring component and the legacy Scenario
+control-authority inventory as exact UI-authoring and mission-contract paths.
+Their focused parser/matrix and component regressions are part of `ci-local`;
+new contract-looking controls or tests must be assigned to the same owning
+families instead of bypassing documentation-impact selection.
+
 #182 adds the generic ground-dynamics migration generator to the existing
 mission-scenario owner. The declaration gate therefore covers its schema,
 digest and storage facets alongside the generated forward migration; it does

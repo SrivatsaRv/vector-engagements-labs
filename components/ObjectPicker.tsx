@@ -8,12 +8,14 @@ import {
 } from "@/components/ui/OverlayPrimitives";
 
 export function ObjectPicker({
+  controlId,
   label,
   value,
   options,
   team,
   onChange,
 }: {
+  controlId?: string;
   label: string;
   value: string;
   options: CatalogObject[];
@@ -31,6 +33,7 @@ export function ObjectPicker({
   return (
     <VectorSelect
       className={`object-picker ${team}`}
+      controlId={controlId}
       emptyContent="No compatible object is available. Review the engagement type and admitted catalogue."
       footer={(
         <footer>

@@ -32,6 +32,7 @@ import {
   assertRecordedSidePictures,
   projectObserverStates,
 } from "./information-state.ts";
+import { assertStructuredScenarioNumbers } from "./scenario-control-authority.ts";
 
 export { standardAtmosphere } from "./engine/atmosphere.ts";
 export type { AtmosphereState } from "./engine/atmosphere.ts";
@@ -481,6 +482,7 @@ export function prepareSimulation(
   profileId: ProfileId = input.profile,
   capabilityManifest = DEPLOYMENT_CAPABILITIES,
 ): PreparedSimulation {
+  assertStructuredScenarioNumbers(input);
   admitScenarioCapabilities(
     input as Scenario & Record<string, unknown>,
     capabilityManifest,

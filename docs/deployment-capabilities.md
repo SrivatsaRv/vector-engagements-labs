@@ -71,6 +71,12 @@ criteria remain open.
   shared application Select. That presentation preserves an unavailable
   authored identity for correction and never substitutes the first admitted
   option; it does not broaden or recompute deployment admission.
+- Live authoring controls expose stable semantic IDs. Editable numeric text
+  must pass raw syntax, range, integer and precision admission before it can
+  change scenario state or enable Run. Shared structured, relational,
+  server-recomputation and engine-preparation gates repeat that admission; an
+  ordinary scalar cannot exceed three fractional digits. This does not enable
+  a domain, subsystem, backend or model that the deployment manifest rejects.
 
 ## Change and rollback
 

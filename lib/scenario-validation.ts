@@ -21,6 +21,7 @@ import {
   ENGINE_FIXED_STEP_SECONDS,
   engineDurationSecondsForDomain,
 } from "./engine/compiler.ts";
+import { validateStructuredScenarioNumbers } from "./scenario-control-authority.ts";
 
 export type ValidationState = "pass" | "warning" | "error";
 export type ValidationItem = {
@@ -34,6 +35,23 @@ export function validateScenario(
   definition: ScenarioDefinition,
   scenario: Scenario,
 ): ValidationItem[] {
+  const structuredNumberErrors = validateStructuredScenarioNumbers(scenario);
+  const firstStructuredNumberError = structuredNumberErrors[0];
+  const structuredNumberValidation: ValidationItem | null = firstStructuredNumberError
+    ? {
+      id: "structured-number-admission",
+      label: "A numeric input failed structured admission",
+      detail: `${firstStructuredNumberError.code} at ${firstStructuredNumberError.fieldPath}${structuredNumberErrors.length > 1 ? ` · ${structuredNumberErrors.length - 1} additional numeric errors` : ""}`,
+      state: "error",
+    }
+    : null;
+  if (firstStructuredNumberError?.code === "CONTROL_NUMBER_TYPE"
+    || firstStructuredNumberError?.code === "CONTROL_NUMBER_NONFINITE"
+    || firstStructuredNumberError?.code === "CONTROL_NUMBER_EMPTY") {
+    return [{
+      ...structuredNumberValidation!,
+    }];
+  }
   const platform = findPlatform(scenario.bluePlatformId);
   const weapon = findWeapon(scenario.blueSystemId);
   const simulationModel = findWeaponSimulationModel(scenario.blueSystemId);
@@ -152,6 +170,7 @@ export function validateScenario(
   }
 
   return [
+    ...(structuredNumberValidation ? [structuredNumberValidation] : []),
     {
       id: "purpose",
       label: scenario.objective.trim()

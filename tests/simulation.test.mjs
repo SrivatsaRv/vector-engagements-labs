@@ -415,8 +415,8 @@ test("surface-strike validation blocks a zero cruise altitude", () => {
 test("extreme declared conditions remain finite and deterministic", () => {
   const scenario = {
     ...DEFAULT_SCENARIO,
-    wind: 60,
-    temperatureOffset: 25,
+    wind: 40,
+    temperatureOffset: 20,
     seed: 999,
   };
   const first = simulate(scenario);

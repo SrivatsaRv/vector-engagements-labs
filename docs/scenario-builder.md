@@ -76,6 +76,13 @@ The persisted scenario-template table is declared by
 Air packages use canonical `vector.scenario.v4`; non-Air packages share that
 package envelope without acquiring an Air mission object.
 
+Before an Air package can become runnable, `vector.scenario-control-authority.v1`
+classifies every legacy numeric projection and the Air-mission compiler repeats
+structured type, finite, range and precision admission. Ordinary authored
+scalars use at most three fractional digits. Whole-package relational checks
+then bind route/start, task, fuel, loadout, runway, environment and timing
+authority before the final engine scenario is constructed.
+
 ### Governed high-energy crossing challenge
 
 Issue #190 adds `a2a-high-energy-crossing-challenge@1.0.0` as an immutable
@@ -101,6 +108,18 @@ effectiveness. Observer pictures remain explicitly `UNSUPPORTED` with no
 inferred position because this deployment has no admitted sensor model.
 
 ## Air mission contract
+
+Every authored numeric value is admitted before mission compilation. Ordinary
+decision and scalar inputs accept decimal notation only and no more than three
+fractional digits; domains that require integers or fewer digits remain
+stricter. Exact WGS84 route and placement coordinates retain up to fifteen
+fractional digits so an existing content-addressed source geometry is not
+silently rounded. The compiler repeats type, finiteness, range, integer and
+precision checks and reports a stable code and field path rather than coercing,
+rounding or defaulting a value.
+Spatial altitude and its Air-mission route projection import the same shared
+three-fractional-digit authority; a value accepted by the map editor cannot be
+rejected later by a conflicting local precision rule.
 
 The #190 package carries its 44 km/105-degree geometry, MSL altitudes, TAS
 speeds, 70% fuel and two-store Blue assignment through the existing authored
@@ -342,6 +361,15 @@ layers remain with #155, #87, #60 and the runtime owners.
 
 ## Builder expansion boundary
 
+A new editable control is not complete when it merely renders. Its owning
+contract must declare raw lexical admission, the structured field type and
+precision, cross-field constraints, the compiled/runtime consumer or explicit
+non-causal disposition, and server/final-engine revalidation. Regression
+evidence must include malformed text, boundary and adjacent values, applicable
+cross-field combinations, and a proof that invalid raw state cannot enter the
+Worker. This is the required expansion rule for nested mission inputs as well
+as the legacy flat scenario controls.
+
 The high-energy crossing challenge is a governed configured template, not a
 scenario-name branch. Its fields remain the same visible range, aspect,
 altitude, speed, fuel, loadout, route, environment and seed inputs that the
@@ -489,6 +517,12 @@ Changing coordinates clears a runway origin. Changing area/weather resolves a
 new exact pack and invalidates an origin that does not survive its coverage and
 runway admission checks.
 
+Editable numeric controls retain their raw text separately from committed
+mission state. Only an admitted finite decimal value may update that state;
+invalid raw text remains visible and disables Run. Every authoring control uses
+one stable semantic ID so component, browser and matrix tests address the same
+control without treating a label or DOM position as authority.
+
 An optional `vector.airborne-store-transfer-plan.v1` is likewise authored
 mission intent, never compiler invention. Each request names the exact launcher,
 installed ordinal, station, store source object, RELEASE or JETTISON operation,
@@ -560,6 +594,53 @@ The system governs:
 - canonical package compilation, version, and content hash;
 - deployment-owned engine-backend selection and fail-closed dispatch;
 - blocking validation before simulation.
+
+### Pre-engine raw control admission
+
+Every live authoring control exposes a stable semantic `data-control-id`. Numeric
+text is retained as raw authoring state until it passes the declared finite
+decimal syntax, range, integer and precision rules. Empty text, whitespace,
+partial exponents, non-finite tokens, unit suffixes, comma decimals and Unicode
+digits do not become `0`, `NaN`, `Infinity` or a replacement default. Invalid
+raw state remains visible, marks the control invalid and blocks Run before the
+Worker or engine is called.
+
+Admission is repeated at four boundaries:
+
+1. the control-local raw gate validates syntax and preserves invalid text;
+2. the shared structured gate validates JSON number type, finiteness, range,
+   integer/nullability and representable fractional precision;
+3. the scenario and Air-mission compilers validate whole-block relationships,
+   including route/start identity, fuel/reserve, loadout capacity, ETA/TOT,
+   task-class fields, runway/weather compatibility and mission references;
+4. server recomputation and final engine preparation repeat the structured and
+   compiler gates, so bypassing React cannot admit a different value.
+
+Ordinary operator-authored scalar values permit no more than three fractional
+digits, and individual domains may be stricter. Count fields and the current
+readiness delay are integers; spatial and Air-mission altitude use the same
+shared three-digit ceiling. WGS84 positions are an explicit exception:
+the existing content-addressed regional/source geometry can retain up to 15
+fractional digits so validation does not rewrite its identity. That coordinate
+precision is not a general exemption for fuel, time, speed, mass, drag, wind or
+decision values.
+
+`vector.scenario-control-authority.v1` is the content-addressed transition
+inventory for all 40 fields in the legacy `Scenario` intake. Each row declares
+the field category, edit authority, causal state, draft and compiled paths,
+runtime consumer, record projection, validator and retirement disposition.
+Hidden radar, track-source, datalink, jammer, profile, preset-weather,
+verification-event and seed fields are explicitly prohibited from becoming
+unreviewed authoring controls. This is a migration authority, not a second
+scenario schema: `vector.air-mission.v1` and the cross-domain scenario kernel
+remain the canonical target contracts.
+
+The current #193 slice applies strict raw admission to the editable Air-mission
+number fields and to start/route coordinate editors. Range sliders retain their
+browser min/max interaction boundary but still require compiler admission.
+Exact draft-digest freshness, complete nested control-matrix registration,
+constrained cross-control coverage, complete control-to-runtime contrasts and
+retirement of the parallel legacy intake remain required before #193 can close.
 
 An authored area of interest is not a substitute for the study-area preset. If
 a later workflow needs a smaller AOI, it is a separate optional geometry inside

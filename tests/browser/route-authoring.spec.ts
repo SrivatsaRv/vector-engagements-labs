@@ -465,15 +465,15 @@ test("a current deployment manifest drives the real Worker run after route recov
   const transferEditor = missionStart.getByRole("region", { name: "Airborne store transfer" });
   await transferEditor.getByRole("button", { name: "Author store 1 transfer request" }).click();
   await transferEditor.getByRole("combobox", { name: "Store transfer operation" }).selectOption("JETTISON");
-  await transferEditor.getByRole("spinbutton", { name: "Store transfer requested time" }).fill("20");
-  await transferEditor.getByRole("spinbutton", { name: "Store installed drag area" }).fill("0.08");
+  await transferEditor.getByRole("textbox", { name: "Store transfer requested time" }).fill("20");
+  await transferEditor.getByRole("textbox", { name: "Store installed drag area" }).fill("0.08");
   await expect(transferEditor).toContainText(/blue-weapon-1 · su-30mki-study-station/i);
   await expect(transferEditor).toContainText(/no named-aircraft\/store, safe-separation, landing, or recovery fidelity/i);
 
   // The mission editor is the authority. Its single route adapter updates the
   // legacy spatial projection atomically; the Worker later consumes the
   // compiled mission route, never an independently edited copy.
-  const missionRouteLongitude = missionStart.getByRole("spinbutton", { name: "blue-route-2 longitude" });
+  const missionRouteLongitude = missionStart.getByRole("textbox", { name: "blue-route-2 longitude" });
   const editedMissionLongitude = Number(await missionRouteLongitude.inputValue()) + 0.005;
   await missionRouteLongitude.fill(String(editedMissionLongitude));
   await missionRouteLongitude.press("Enter");

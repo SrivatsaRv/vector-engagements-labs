@@ -31,6 +31,10 @@ import {
   ENGINE_FIXED_STEP_SECONDS,
   engineDurationSecondsForDomain,
 } from "../engine/compiler.ts";
+import {
+  assertStructuredScenarioNumbers,
+  ScenarioControlAdmissionError,
+} from "../scenario-control-authority.ts";
 
 const domains = new Set(["A2A", "A2G", "G2A", "G2G"]);
 const profiles = new Set(["short", "medium", "sustained"]);
@@ -200,6 +204,26 @@ function catalogObject(id: string, domain: Scenario["domain"], field: string) {
 export function validateSavedScenario(value: unknown, template: ScenarioDefinition): Scenario {
   if (!value || typeof value !== "object") throw new PublicApiError(400, "invalid_scenario");
   const input = value as Record<string, unknown>;
+  try {
+    assertStructuredScenarioNumbers(input);
+  } catch (error) {
+    if (error instanceof ScenarioControlAdmissionError) {
+      // Preserve the public v1 saved-run error contract for this legacy
+      // compiler-derived projection while still running the shared domain
+      // admission before any downstream compilation or persistence.
+      if (error.fieldPath === "$.range") {
+        throw new PublicApiError(400, "invalid_range");
+      }
+      throw new PublicApiError(
+        400,
+        error.code,
+        error.message,
+        undefined,
+        error.fieldPath,
+      );
+    }
+    throw error;
+  }
   if (Object.prototype.hasOwnProperty.call(input, "engineBackend")) {
     throw new PublicApiError(400, "scenario_engine_forbidden");
   }
