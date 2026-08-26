@@ -1,6 +1,7 @@
 import { standardAtmosphere } from "./atmosphere.ts";
 import type {
   CoverageEnvelope,
+  EngineFrame,
   EngineEntityDefinition,
   EngineEntityFrame,
   EngineObserverState,
@@ -79,6 +80,31 @@ type RuntimeState = {
   lastGuidanceAcceleration: Vec3;
   lastGuidanceUpdateSeconds: number;
 };
+
+function snapshotRuntimeState(state: RuntimeState): RuntimeState {
+  // Numerical updates replace vectors, controls, and inventory collections
+  // instead of mutating them in place, so a shallow snapshot preserves the
+  // exact pre-step object graph without cloning immutable model authority.
+  return { ...state };
+}
+
+function refreshRuntimeStateSnapshot(target: RuntimeState, source: RuntimeState) {
+  target.lifecycle = source.lifecycle;
+  target.position = source.position;
+  target.velocity = source.velocity;
+  target.massKg = source.massKg;
+  target.fuelKg = source.fuelKg;
+  target.headingRad = source.headingRad;
+  target.commandedG = source.commandedG;
+  target.availableG = source.availableG;
+  target.storeMassKg = source.storeMassKg;
+  target.dragNewtons = source.dragNewtons;
+  target.thrustNewtons = source.thrustNewtons;
+  target.phase = source.phase;
+  target.weaponFlightState = source.weaponFlightState;
+  target.aircraftControl = source.aircraftControl;
+  target.aircraftOperationalState = source.aircraftOperationalState;
+}
 
 const G0 = 9.80665;
 
@@ -1292,6 +1318,7 @@ export type EngineBatch = {
 export class EngineSession {
   private readonly scenario: EngineScenario;
   private readonly states: Map<string, RuntimeState>;
+  private readonly preStepStates: RuntimeState[];
   private readonly primaryWeapon?: RuntimeState;
   private readonly primaryTarget?: RuntimeState;
   private readonly frames: EngineRun["frames"] = [];
@@ -1802,6 +1829,7 @@ export class EngineSession {
       launcher.storeMassKg += store.weapon.launchMassKg;
       launcher.installedStoreDragAreaM2 += store.weapon.storeTransfer?.installedDragAreaM2 ?? 0;
     }
+    this.preStepStates = [...this.states.values()].map(snapshotRuntimeState);
     this.primaryWeapon = this.states.get(
       scenario.entities.find(
         (entity) =>
@@ -1870,9 +1898,16 @@ export class EngineSession {
     }
   }
 
-  private captureFrame(modelTimeSeconds: number) {
-    const primaryWeapon = this.primaryWeapon!;
-    const primaryTarget = this.primaryTarget!;
+  private projectFrame(
+    modelTimeSeconds: number,
+    frameStates = [...this.states.values()],
+  ): EngineFrame {
+    const primaryWeapon = frameStates.find(
+      (state) => state.definition.id === this.primaryWeapon!.definition.id,
+    )!;
+    const primaryTarget = frameStates.find(
+      (state) => state.definition.id === this.primaryTarget!.definition.id,
+    )!;
     const relativePosition = subtract(primaryTarget.position, primaryWeapon.position);
     const relativeVelocity = subtract(primaryTarget.velocity, primaryWeapon.velocity);
     const separationM = magnitude(relativePosition);
@@ -1881,14 +1916,10 @@ export class EngineSession {
     const lineOfSightRateRadS =
       magnitude(cross(relativePosition, relativeVelocity)) /
       Math.max(1, separationM * separationM);
-    const visibleStates = [...this.states.values()].filter(
+    const visibleStates = frameStates.filter(
       (state) => state.lifecycle !== "STOWED",
     );
-    if (this.recordedEntityStates + visibleStates.length > 1_000_000) {
-      throw new Error("Event-preserving frames exceed 1000000 recorded entity states.");
-    }
-    const frameIndex = this.frames.length;
-    this.frames.push({
+    return {
       t: modelTimeSeconds,
       entities: visibleStates.map((state) => toFrame(
         state,
@@ -1906,9 +1937,21 @@ export class EngineSession {
       closureRateMps,
       lineOfSightRateRadS,
       observerStates: structuredClone(this.currentObserverStates),
-    });
-    this.recordedEntityStates += visibleStates.length;
-    return { frameIndex, separationM };
+    };
+  }
+
+  private retainFrame(frame: EngineFrame) {
+    if (this.recordedEntityStates + frame.entities.length > 1_000_000) {
+      throw new Error("Event-preserving frames exceed 1000000 recorded entity states.");
+    }
+    const frameIndex = this.frames.length;
+    this.frames.push(frame);
+    this.recordedEntityStates += frame.entities.length;
+    return { frameIndex, separationM: frame.separationM };
+  }
+
+  private captureFrame(modelTimeSeconds: number) {
+    return this.retainFrame(this.projectFrame(modelTimeSeconds));
   }
 
   runTicks(maximumTicks: number): EngineBatch {
@@ -2087,8 +2130,19 @@ export class EngineSession {
         [...this.states.values()].map((state) => [state.definition.id, state.aircraftOperationalState]),
       );
       const priorWeaponFlightState = primaryWeapon.weaponFlightState;
-      for (const state of this.states.values())
+      const hasPreTerminationBoundary = Boolean(
+        primaryWeapon.definition.weapon && primaryWeapon.lifecycle !== "STOWED",
+      );
+      const needsPreTerminationSnapshot = hasPreTerminationBoundary &&
+        this.frames.at(-1)?.t !== eventTime;
+      let snapshotIndex = 0;
+      for (const state of this.states.values()) {
+        if (needsPreTerminationSnapshot) {
+          refreshRuntimeStateSnapshot(this.preStepStates[snapshotIndex]!, state);
+        }
+        snapshotIndex += 1;
         updateKinematicEntity(state, scenario, time, scenario.fixedStepSeconds, this.environmentSampler);
+      }
       for (const state of this.states.values())
         updateWeapon(state, this.states, scenario, time, scenario.fixedStepSeconds, this.environmentSampler);
       this.integratedSteps = nextTick;
@@ -2238,6 +2292,12 @@ export class EngineSession {
             scenario.fixedStepSeconds,
           ) === this.integratedSteps;
       });
+      if (
+        weaponTermination &&
+        needsPreTerminationSnapshot
+      ) {
+        this.retainFrame(this.projectFrame(eventTime, this.preStepStates));
+      }
       if (
         this.eventJournal.hasPending() ||
         this.integratedSteps === 1 ||

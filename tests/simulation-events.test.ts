@@ -11,6 +11,7 @@ import {
   assertSimulationEventStream,
   firstFixedStepTickAtOrAfter,
   modelTimeAtTick,
+  recordedModelTimeAtTick,
   SimulationEventJournal,
   type SimulationEventDraft,
 } from "../lib/engine/simulation-events.ts";
@@ -624,6 +625,60 @@ test("runtime decoding binds weapon terminal state, cause, and distance to the r
     ),
     /does not match the recorded run closest approach/,
   );
+});
+
+test("termination retains the exact prior tick and binds geometric occurrence in both engines", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const scenario = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY.find((entry) => entry.id === "a2a-defensive-break")!.scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const weapon = scenario.entities.find((entity) => entity.weapon);
+  assert.ok(weapon?.weapon);
+  weapon.weapon.seekerActivationRangeM = 43;
+
+  for (const backend of ["typescript", "rust-wasm"] as const) {
+    const run = runEngineBackend(structuredClone(scenario), backend);
+    assert.equal(run.events.state, "AVAILABLE", backend);
+    const terminal = run.events.items.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    );
+    assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED", backend);
+    assert.equal(terminal.payload.cause, "GEOMETRIC_INTERCEPT", backend);
+    const priorFrame = run.frames[terminal.frameIndex - 1];
+    assert.equal(
+      priorFrame?.t,
+      recordedModelTimeAtTick(terminal.tick - 1, scenario.fixedStepSeconds),
+      backend,
+    );
+    assert.equal(
+      priorFrame?.entities.find((entity) => entity.id === weapon.id)?.weaponFlightState,
+      terminal.payload.from,
+      backend,
+    );
+
+    const falsified = structuredClone(run.events.items);
+    const falsifiedTerminal = falsified.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    );
+    assert.ok(falsifiedTerminal?.payload.kind === "WEAPON_TERMINATED");
+    falsifiedTerminal.payload.occurrenceTimeSeconds = Number((
+      falsifiedTerminal.payload.occurrenceTimeSeconds - 0.04
+    ).toFixed(6));
+    assert.throws(
+      () => assertSimulationEventStream(
+        falsified,
+        run.frames,
+        run.scenario,
+        run.termination,
+        run.closestApproachM,
+      ),
+      /does not match its exact geometric intercept time/,
+      backend,
+    );
+  }
 });
 
 test("runtime decoding binds world entry and run completion to their true boundary frames", () => {

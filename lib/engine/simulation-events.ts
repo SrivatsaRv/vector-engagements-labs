@@ -13,6 +13,7 @@ import {
   SIMULATION_EVENT_PAYLOAD_SCHEMAS,
   SIMULATION_EVENT_SCHEMA,
 } from "./contracts.ts";
+import { closestApproachOnRelativeSegment } from "./weapon-termination.ts";
 
 export const MAX_SIMULATION_EVENTS = 100_000;
 
@@ -913,10 +914,44 @@ export function assertSimulationEventStream(
         if (payload.occurrenceTimeSeconds !== expectedExpiryTimeSeconds) {
           throw new Error(`Simulation weapon-termination event ${event.id} does not match the exact admitted expiry time.`);
         }
-      } else if (
-        payload.cause !== "GEOMETRIC_INTERCEPT" &&
-        payload.occurrenceTimeSeconds !== event.modelTimeSeconds
-      ) {
+      } else if (payload.cause === "GEOMETRIC_INTERCEPT") {
+        const priorFrame = frames[event.frameIndex - 1];
+        const priorWeapon = priorFrame?.entities.find((candidate) => candidate.id === payload.weaponId);
+        const priorTarget = priorFrame?.entities.find((candidate) => candidate.id === payload.targetId);
+        const frameTarget = frame.entities.find((candidate) => candidate.id === payload.targetId);
+        const expectedPriorTimeSeconds = recordedModelTimeAtTick(
+          event.tick - 1,
+          scenario.fixedStepSeconds,
+        );
+        if (!priorFrame || priorFrame.t !== expectedPriorTimeSeconds || !priorWeapon || !priorTarget || !frameTarget) {
+          throw new Error(
+            `Simulation weapon-termination event ${event.id} has no exact preceding boundary geometry ` +
+            `(expected ${expectedPriorTimeSeconds}, retained ${priorFrame?.t ?? "missing"}, ` +
+            `weapon ${Boolean(priorWeapon)}, prior target ${Boolean(priorTarget)}, terminal target ${Boolean(frameTarget)}).`,
+          );
+        }
+        const closest = closestApproachOnRelativeSegment(
+          {
+            x: priorTarget.position.x - priorWeapon.position.x,
+            y: priorTarget.position.y - priorWeapon.position.y,
+            z: priorTarget.position.z - priorWeapon.position.z,
+          },
+          {
+            x: frameTarget.position.x - frameWeapon.position.x,
+            y: frameTarget.position.y - frameWeapon.position.y,
+            z: frameTarget.position.z - frameWeapon.position.z,
+          },
+        );
+        const expectedOccurrenceTimeSeconds = Number((
+          expectedPriorTimeSeconds + closest.fraction * scenario.fixedStepSeconds
+        ).toFixed(6));
+        if (
+          closest.distanceM > admission.interceptRadiusM + 1e-9 ||
+          payload.occurrenceTimeSeconds !== expectedOccurrenceTimeSeconds
+        ) {
+          throw new Error(`Simulation weapon-termination event ${event.id} does not match its exact geometric intercept time.`);
+        }
+      } else if (payload.occurrenceTimeSeconds !== event.modelTimeSeconds) {
         throw new Error(`Simulation weapon-termination event ${event.id} does not match its exact terminal boundary time.`);
       }
     } else {

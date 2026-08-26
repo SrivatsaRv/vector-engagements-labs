@@ -1754,6 +1754,32 @@ impl RuntimeState {
     }
 }
 
+fn refresh_runtime_state_snapshot(target: &mut RuntimeState, source: &RuntimeState) {
+    target.lifecycle = source.lifecycle;
+    target.position = source.position;
+    target.velocity = source.velocity;
+    target.mass_kg = source.mass_kg;
+    target.fuel_kg = source.fuel_kg;
+    target.heading_rad = source.heading_rad;
+    target.commanded_g = source.commanded_g;
+    target.available_g = source.available_g;
+    target.store_mass_kg = source.store_mass_kg;
+    target
+        .installed_store_ids
+        .clone_from(&source.installed_store_ids);
+    target.installed_store_drag_area_m2 = source.installed_store_drag_area_m2;
+    target.store_transfer_attempted = source.store_transfer_attempted;
+    target.drag_newtons = source.drag_newtons;
+    target.thrust_newtons = source.thrust_newtons;
+    target.phase.clone_from(&source.phase);
+    target.weapon_flight_state = source.weapon_flight_state;
+    target.route_point_index = source.route_point_index;
+    target.aircraft_control.clone_from(&source.aircraft_control);
+    target.aircraft_operational_state = source.aircraft_operational_state;
+    target.last_guidance_acceleration = source.last_guidance_acceleration;
+    target.last_guidance_update_seconds = source.last_guidance_update_seconds;
+}
+
 fn atmosphere(altitude_m: f64, offset_c: f64) -> (f64, f64) {
     let altitude = altitude_m.clamp(0.0, 25000.0);
     let (mut temperature_c, pressure_kpa) = if altitude <= 11000.0 {
@@ -3153,6 +3179,7 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
     let mut current_observer_states = Vec::new();
     let mut last_observer_tick: Option<u64> = None;
     let mut recorded_entity_states = 0_u64;
+    let mut pre_step_states = states.clone();
     loop {
         let tick = steps;
         let time = model_time_at_tick(tick, scenario.fixed_step_seconds);
@@ -3321,7 +3348,14 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             .map(|state| state.aircraft_operational_state)
             .collect();
         let prior_weapon_flight_state = states[weapon_index].weapon_flight_state;
-        for state in states.iter_mut() {
+        let has_pre_termination_boundary = states[weapon_index].definition.weapon.is_some()
+            && states[weapon_index].lifecycle != EntityLifecycle::Stowed;
+        let needs_pre_termination_snapshot = has_pre_termination_boundary
+            && !frames.last().is_some_and(|frame| frame.t == event_time);
+        for (index, state) in states.iter_mut().enumerate() {
+            if needs_pre_termination_snapshot {
+                refresh_runtime_state_snapshot(&mut pre_step_states[index], state);
+            }
             update_aircraft(state, &scenario, time, scenario.fixed_step_seconds)?;
         }
         for index in 0..states.len() {
@@ -3485,6 +3519,27 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                         activation_tick < terminal_tick && activation_tick == steps
                     })
         });
+        if weapon_termination.is_some() && needs_pre_termination_snapshot {
+            let boundary_frame = sampled_engine_frame(
+                &pre_step_states,
+                &scenario,
+                event_time,
+                &weapon_id,
+                &target_id,
+                separation,
+                closure,
+                los_rate,
+                current_observer_states.clone(),
+            )?;
+            let visible_states = boundary_frame.entities.len() as u64;
+            if recorded_entity_states.saturating_add(visible_states) > MAX_RECORDED_ENTITY_STATES {
+                return Err(EngineError::InvalidScenario(format!(
+                        "event-preserving frames exceed {MAX_RECORDED_ENTITY_STATES} recorded entity states"
+                    )));
+            }
+            frames.push(boundary_frame);
+            recorded_entity_states += visible_states;
+        }
         if event_journal.has_pending()
             || steps == 1
             || (steps % sample_every == 0 && !activation_at_next_boundary)
