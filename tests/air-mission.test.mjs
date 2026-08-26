@@ -1196,6 +1196,17 @@ test("compilation is pure and does not accept a decorative UI-only mission objec
   );
 });
 
+test("missions without a transfer plan retain the exact legacy v1 digest shape", () => {
+  const prepared = prepareSimulation(structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario));
+  const compiled = prepared.engineScenario.airMission;
+  assert.equal(Object.hasOwn(compiled.assignment, "storeTransfers"), false);
+  assert.equal(Object.hasOwn(compiled.assignment, "storeTransferAuthorityDigest"), false);
+  assert.equal(
+    compiled.compiledDigest,
+    "00e6dec9b67697daea4c166348b1120cfc750537ec26d06eb2b81922108777ee",
+  );
+});
+
 test("saved-run admission preserves mission identity and never invents missing mission intent", () => {
   const scenario = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
   const admitted = validateSavedScenario(scenario, DEFAULT_SCENARIO_DEFINITION);

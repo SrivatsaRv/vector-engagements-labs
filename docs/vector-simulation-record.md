@@ -170,6 +170,12 @@ compiled identity, event tick/frame, launcher/store membership and exact
 before/after discontinuity. Missing, duplicated, reordered or digest-mutated
 transfer evidence fails closed rather than being reconstructed.
 
+Compiled Air-mission v1 records without an authored transfer plan retain their
+historical assignment shape and digest: neither an empty `storeTransfers` field
+nor an authority seal is synthesized during readback. This keeps pre-transfer
+VSRs byte-compatible while requiring both fields for newly authored non-empty
+transfer plans.
+
 Ground-operation replay verifies the mission and ground-dynamics lineage plus
 the canonical event/frame stream before exposing any phase or controller value.
 Tampered states, transition extrema, controller values or compact bindings fail

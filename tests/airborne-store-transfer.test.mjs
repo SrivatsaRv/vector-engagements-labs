@@ -522,6 +522,15 @@ test("operational ground rejection is TS/Rust identical and VSR replayable", asy
   assert.equal(replayed.payload.accepted, false);
   assert.equal(replayed.payload.achieved, false);
   assert.equal(replayed.payload.cause, "AIRCRAFT_NOT_ENROUTE");
+  const origin = recordPrepared.engineScenario.geospatial.origin.geographic;
+  assert.equal(
+    buildLaunchFeatures(opened.result, {
+      longitude: origin.longitudeDeg,
+      latitude: origin.latitudeDeg,
+    }).some((feature) => feature.properties.entityId === replayed.payload.storeId),
+    false,
+    "a rejected governed transfer cannot fall through to a legacy launch marker",
+  );
 });
 
 test("raw Rust rejects jointly resealed mass, station, store, and rule promotion", () => {

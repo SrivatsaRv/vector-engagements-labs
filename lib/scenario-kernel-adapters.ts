@@ -220,9 +220,10 @@ function validateCompiledAirMissionLineage(
     assignment,
     "storeTransferAuthorityDigest",
   );
+  const hasStoreTransfers = Object.hasOwn(assignment, "storeTransfers");
   airExactKeys(assignment, [
     "id", "flightPlanId", "aircraftId", "initialFuelPercent", "loadout", "groundEnvelope",
-    "storeTransfers",
+    ...(hasStoreTransfers ? ["storeTransfers"] : []),
     ...(hasStoreTransferAuthority ? ["storeTransferAuthorityDigest"] : []),
   ], "$.compiledAirMission.assignment");
   const authoredAssignment = mission.assignments.find(({ id }) => id === compiled.assignment.id);
@@ -238,7 +239,7 @@ function validateCompiledAirMissionLineage(
       "Compiled Air mission assignment disagrees with its authored assignment.",
     );
   }
-  if (!Array.isArray(compiled.assignment.storeTransfers)) {
+  if (hasStoreTransfers && !Array.isArray(compiled.assignment.storeTransfers)) {
     airFail(
       "KERNEL_AIR_MISSION_INVALID",
       "$.compiledAirMission.assignment.storeTransfers",
@@ -246,14 +247,15 @@ function validateCompiledAirMissionLineage(
     );
   }
   const authoredRequests = authoredAssignment.storeTransferPlan?.requests ?? [];
-  if (compiled.assignment.storeTransfers.length !== authoredRequests.length) {
+  const storeTransfers = compiled.assignment.storeTransfers ?? [];
+  if (storeTransfers.length !== authoredRequests.length) {
     airFail(
       "KERNEL_AIR_MISSION_INVALID",
       "$.compiledAirMission.assignment.storeTransfers",
       "Compiled store-transfer cardinality disagrees with authored mission intent.",
     );
   }
-  compiled.assignment.storeTransfers.forEach((transfer, index) => {
+  storeTransfers.forEach((transfer, index) => {
     const path = `$.compiledAirMission.assignment.storeTransfers[${index}]`;
     const transferRecord = airRecord(transfer, path);
     airExactKeys(transferRecord, [
@@ -311,12 +313,12 @@ function validateCompiledAirMissionLineage(
       );
     }
   });
-  const expectedTransferAuthority = compiled.assignment.storeTransfers.length > 0
+  const expectedTransferAuthority = storeTransfers.length > 0
     ? sha256HexSync({
         schemaVersion: "vector.airborne-store-transfer-authority.v1",
         aircraftSourceObjectId: authoredAssignment.aircraftId,
         authoredDigest: compiled.authoredDigest,
-        transferDigests: compiled.assignment.storeTransfers.map(({ digest }) => digest),
+        transferDigests: storeTransfers.map(({ digest }) => digest),
       })
     : undefined;
   if (compiled.assignment.storeTransferAuthorityDigest !== expectedTransferAuthority) {

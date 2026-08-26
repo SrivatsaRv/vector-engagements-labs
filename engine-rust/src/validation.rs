@@ -87,13 +87,20 @@ pub(crate) fn validate_air_mission_store_authority(
     if mission_string(mission, "/authored/assignments/0/aircraftId")? != aircraft_source_object_id {
         return Err(invalid(STORE_AUTHORITY_INVALID));
     }
-    let values = mission
-        .pointer("/assignment/storeTransfers")
-        .and_then(Value::as_array)
-        .ok_or_else(|| invalid(STORE_AUTHORITY_INVALID))?;
+    let values = mission.pointer("/assignment/storeTransfers");
     let requests = mission
         .pointer("/authored/assignments/0/storeTransferPlan/requests")
         .and_then(Value::as_array);
+    if values.is_none() && requests.is_none() {
+        return Ok(Some(StoreMissionAuthority {
+            transfers: Vec::new(),
+            aircraft_source_object_id: aircraft_source_object_id.to_string(),
+            compiled_digest: compiled_digest.to_string(),
+        }));
+    }
+    let values = values
+        .and_then(Value::as_array)
+        .ok_or_else(|| invalid(STORE_AUTHORITY_INVALID))?;
     if values.is_empty() && requests.is_none() {
         return Ok(Some(StoreMissionAuthority {
             transfers: Vec::new(),

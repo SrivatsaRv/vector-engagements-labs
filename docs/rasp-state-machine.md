@@ -159,6 +159,12 @@ binding, then requires exact equality across all four members before any replay
 is exposed. A current catalog lookup, UI default, or report label cannot repair
 or replace missing mission intent.
 
+An archived compiled-mission v1 assignment with no authored transfer plan keeps
+its historical key set and digest during that recompilation. Readback does not
+insert an empty `storeTransfers` array or an authority seal; non-empty transfer
+plans require both exact fields. This is backward compatibility for existing
+records, not a downgrade path for malformed new transfer authority.
+
 When the archived mission starts on a runway, its installation, runway geometry,
 MSL elevations, datum, source identity and evidence digest must equal the runway
 inside that archived pack. A later PostGIS row, catalogue revision or pack with
@@ -214,6 +220,11 @@ and consistent all-member source forgery.
 `tests/air-mission.test.mjs` additionally covers deterministic mission identity,
 all classes/overlays/start postures, negative admission, server preservation,
 and exact VSR/report mission-lineage readback.
+It also pins the pre-transfer compiled-mission v1 digest and exact assignment
+key set for a mission without a transfer plan, proving that new compilation and
+VSR readback do not synthesize empty transfer authority into legacy records.
+`tests/airborne-store-transfer.test.mjs` proves a recorded rejected outcome
+cannot fall through to a legacy launch marker after VSR replay.
 Its ground-held regressions prove TS/Rust `PARKED`/`HOLD_SHORT` parity,
 unchanged position/fuel/mass/stores, rejected launch, and explicit unavailable
 movement; `tests/vector-record.test.mjs` proves v6 round-trip and v5/v4 plus

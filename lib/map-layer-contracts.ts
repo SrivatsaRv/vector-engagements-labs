@@ -124,6 +124,11 @@ export function buildLaunchFeatures(
   const events = result.engineRun.events.state === "AVAILABLE"
     ? result.engineRun.events.items
     : [];
+  const governedStoreIds = new Set(events.flatMap((event) =>
+    event.payload.kind === "AIRBORNE_STORE_TRANSFER_OUTCOME"
+      ? [event.payload.storeId]
+      : []
+  ));
   const transfers = events.flatMap((event) => {
     if (event.payload.kind !== "AIRBORNE_STORE_TRANSFER_OUTCOME" || !event.payload.achieved) return [];
     const payload = event.payload;
@@ -159,11 +164,10 @@ export function buildLaunchFeatures(
       },
     }];
   });
-  const transferredStoreIds = new Set(transfers.map((feature) => feature.properties.entityId));
   const legacy = result.engineRun.scenario.entities
     .filter(
       (entity) => Boolean(entity.weapon) && entity.weapon!.launchTimeSeconds !== null &&
-        !transferredStoreIds.has(entity.id),
+        !governedStoreIds.has(entity.id),
     )
     .map((entity) => {
       const launchTime = entity.weapon?.launchTimeSeconds ?? 0;

@@ -430,7 +430,7 @@ export type CompiledAirMission = {
     initialFuelPercent: number;
     loadout: Array<{ stationId: string; weaponId: string; quantity: number; compatibilityRuleId: string }>;
     groundEnvelope: AircraftGroundEnvelope;
-    storeTransfers: CompiledAirborneStoreTransfer[];
+    storeTransfers?: CompiledAirborneStoreTransfer[];
     storeTransferAuthorityDigest?: string;
   };
   policies: AirMissionDefinition["policies"];
@@ -1372,9 +1372,9 @@ export function compileAirMissionDefinition(
         stationId: mission.assignments[0].loadout.stores[0].stationId,
         compatibilityRuleId: mission.assignments[0].loadout.stores[0].compatibilityRuleId,
       }).groundEnvelope,
-      storeTransfers,
       ...(storeTransfers.length > 0
         ? {
+            storeTransfers,
             storeTransferAuthorityDigest: sha256HexSync({
               schemaVersion: "vector.airborne-store-transfer-authority.v1",
               aircraftSourceObjectId: mission.assignments[0].aircraftId,

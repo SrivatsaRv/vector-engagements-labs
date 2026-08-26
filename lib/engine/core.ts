@@ -1352,7 +1352,7 @@ export class EngineSession {
       }
       const transfer = entity.weapon.storeTransfer;
       const launcher = scenario.entities.find((candidate) => candidate.id === entity.weapon!.launchPlatformId);
-      const fullTransferForStore = scenario.airMission?.assignment.storeTransfers.find(
+      const fullTransferForStore = scenario.airMission?.assignment.storeTransfers?.find(
         (candidate) => candidate.storeEntityId === entity.id,
       );
       const missionLauncher = launcher?.kind === "AIRCRAFT" && scenario.airMission &&
@@ -1428,7 +1428,7 @@ export class EngineSession {
     }
     if (
       scenario.airMission &&
-      admittedTransferIds.size !== scenario.airMission.assignment.storeTransfers.length
+      admittedTransferIds.size !== (scenario.airMission.assignment.storeTransfers?.length ?? 0)
     ) {
       throw new Error("[STORE_TRANSFER_AUTHORITY_INVALID] Air mission contains an absent or duplicate store-transfer authority.");
     }

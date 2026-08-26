@@ -245,6 +245,9 @@ and hashes; no production seed or fallback default performs the migration.
 - Add optional authored RELEASE/JETTISON requests with exact integer tick,
   store identity, operation, installed-drag validity, authority seal and
   requested/accepted/achieved runtime outcome.
+- Preserve the historical compiled-mission v1 digest when no transfer plan is
+  authored, and prevent rejected governed transfers from falling through to a
+  legacy launch marker.
 
 Scenario-template table declarations now live in `db/schema/scenarios.ts`
 behind the unchanged aggregate schema export.

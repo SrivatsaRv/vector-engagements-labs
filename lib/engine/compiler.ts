@@ -647,7 +647,7 @@ export function compileScenario(
 
   const blueWeapons = Array.from({ length: runtimeBlueWeaponQuantity }, (_, index) => {
     const storeEntityId = `blue-weapon-${index + 1}`;
-    const storeTransfer = compiledAirMission?.assignment.storeTransfers.find(
+    const storeTransfer = compiledAirMission?.assignment.storeTransfers?.find(
       (candidate) => candidate.storeEntityId === storeEntityId,
     );
     return withProvenance(
