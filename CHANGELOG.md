@@ -253,7 +253,8 @@ No pending family-specific entry.
 - Retain the exact airborne-transfer outcome and boundary frame so replay,
   map/3D, telemetry, timeline and report never reconstruct release physics.
 - Retain one typed `WEAPON_TERMINATED` event for every engine-owned weapon
-  terminal outcome, including the within-step closest approach and explicit
+  terminal outcome, including the cumulative admitted-lifetime closest
+  approach, exact terminal-state/cause to run-outcome binding and explicit
   `NOT_MODELLED` target effect.
 
 Saved-run record and admission tables now have separate domain-owned schema

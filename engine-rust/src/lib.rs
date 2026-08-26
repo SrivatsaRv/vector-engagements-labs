@@ -2949,6 +2949,7 @@ fn evaluate_weapon_termination(
     from: Option<WeaponFlightState>,
     relative_start_m: Vec3,
     relative_end_m: Vec3,
+    lifetime_closest_approach_m: f64,
     step_start_time_seconds: f64,
     fixed_step_seconds: f64,
     terrain_impact: bool,
@@ -3047,7 +3048,7 @@ fn evaluate_weapon_termination(
         from,
         to,
         cause,
-        closest_approach_m: (closest.distance_m * 1_000_000.0).round() / 1_000_000.0,
+        closest_approach_m: (lifetime_closest_approach_m * 1_000_000.0).round() / 1_000_000.0,
         occurrence_time_seconds: (occurrence_time_seconds * 1_000_000.0).round() / 1_000_000.0,
         intercept_radius_m,
         maximum_flight_time_seconds,
@@ -3341,6 +3342,7 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             prior_weapon_flight_state,
             relative_position,
             post_relative_position,
+            closest,
             time,
             scenario.fixed_step_seconds,
             terrain_impact,
@@ -4318,6 +4320,86 @@ mod tests {
             }
         });
         assert_eq!(occurrence, Some(0.075));
+        Ok(())
+    }
+
+    #[test]
+    fn non_intercept_event_records_lifetime_closest_approach(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut input = scenario();
+        let blue = input
+            .entities
+            .iter_mut()
+            .find(|entity| entity.id == "blue-aircraft")
+            .ok_or("scenario has no launcher")?;
+        blue.initial.position = Vec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 8_000.0,
+        };
+        blue.initial.velocity = Vec3 {
+            x: 250.0,
+            y: 0.0,
+            z: 0.0,
+        };
+        let red = input
+            .entities
+            .iter_mut()
+            .find(|entity| entity.id == "red-aircraft")
+            .ok_or("scenario has no target")?;
+        red.initial.position = Vec3 {
+            x: 200.0,
+            y: 100.0,
+            z: 8_000.0,
+        };
+        red.initial.velocity = Vec3 {
+            x: -300.0,
+            y: 300.0,
+            z: 0.0,
+        };
+        let weapon = input
+            .entities
+            .iter_mut()
+            .find(|entity| entity.id == "blue-weapon")
+            .and_then(|entity| entity.weapon.as_mut())
+            .ok_or("scenario has no weapon")?;
+        weapon.launch_time_seconds = Some(0.0);
+        weapon.termination.intercept_radius_m = 0.1;
+        weapon.termination.maximum_flight_time_seconds = 0.5;
+
+        let run = try_run_engine(input)?;
+        assert_eq!(run.termination, Termination::WeaponExpired);
+        let event_closest = run.events.items.iter().find_map(|event| {
+            if let simulation_events::SimulationEventPayload::WeaponTerminated {
+                closest_approach_m,
+                ..
+            } = &event.payload
+            {
+                Some(*closest_approach_m)
+            } else {
+                None
+            }
+        });
+        assert_eq!(
+            event_closest,
+            Some((run.closest_approach_m * 1_000_000.0).round() / 1_000_000.0)
+        );
+        let final_frame = run.frames.last().ok_or("run has no final frame")?;
+        let final_weapon = final_frame
+            .entities
+            .iter()
+            .find(|entity| entity.id == run.primary_weapon_id)
+            .ok_or("final frame has no weapon")?;
+        let final_target = final_frame
+            .entities
+            .iter()
+            .find(|entity| entity.id == run.primary_target_id)
+            .ok_or("final frame has no target")?;
+        let terminal_separation_m = final_target
+            .position
+            .subtract(final_weapon.position)
+            .magnitude();
+        assert!(run.closest_approach_m < terminal_separation_m);
         Ok(())
     }
 

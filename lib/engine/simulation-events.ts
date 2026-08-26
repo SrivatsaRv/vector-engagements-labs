@@ -664,6 +664,7 @@ export function assertSimulationEventStream(
   const lastEventIdByTrack = new Map<string, string>();
   let prior: SimulationEventV2 | undefined;
   let weaponTerminationEvents = 0;
+  let weaponTerminationPayload: Extract<SimulationEventPayload, { kind: "WEAPON_TERMINATED" }> | undefined;
   for (const [index, raw] of values.entries()) {
     if (!isRecord(raw)) throw new Error(`Simulation event ${index} must be an object.`);
     exactKeys(raw, ["schemaVersion", "id", "sequence", "localKey", "tick", "modelTimeSeconds", "frameIndex", "phase", "producer", "knowledgeScope", "participants", "causeEventIds", "payload"], ["ownerAffiliation", "correlationId"], `Simulation event ${index}`);
@@ -871,6 +872,7 @@ export function assertSimulationEventStream(
     } else if (event.payload.kind === "WEAPON_TERMINATED") {
       weaponTerminationEvents += 1;
       const payload = event.payload;
+      weaponTerminationPayload = payload;
       const weapon = entityById.get(payload.weaponId);
       const target = entityById.get(payload.targetId);
       const frameWeapon = frame.entities.find((candidate) => candidate.id === payload.weaponId);
@@ -955,6 +957,24 @@ export function assertSimulationEventStream(
     const weaponTerminalRun = ["weapon_intercept", "weapon_miss", "weapon_expired", "weapon_failed", "target_unavailable"].includes(termination);
     if (weaponTerminationEvents !== (weaponTerminalRun ? 1 : 0)) {
       throw new Error("Simulation event stream does not contain the exact weapon termination required by the run outcome.");
+    }
+    const weaponTerminationByRunOutcome: Partial<Record<EngineTermination, {
+      to: Extract<SimulationEventPayload, { kind: "WEAPON_TERMINATED" }>["to"];
+      cause: Extract<SimulationEventPayload, { kind: "WEAPON_TERMINATED" }>["cause"];
+    }>> = {
+      weapon_intercept: { to: "INTERCEPT", cause: "GEOMETRIC_INTERCEPT" },
+      weapon_miss: { to: "MISS", cause: "ENERGY_DEPLETED" },
+      weapon_expired: { to: "EXPIRED", cause: "FLIGHT_TIME_EXPIRED" },
+      weapon_failed: { to: "FAILED", cause: "TERRAIN_IMPACT" },
+      target_unavailable: { to: "TARGET_UNAVAILABLE", cause: "TARGET_UNAVAILABLE" },
+    };
+    const expectedWeaponTermination = weaponTerminationByRunOutcome[termination];
+    if (
+      expectedWeaponTermination &&
+      (weaponTerminationPayload?.to !== expectedWeaponTermination.to ||
+        weaponTerminationPayload.cause !== expectedWeaponTermination.cause)
+    ) {
+      throw new Error("Simulation weapon-termination event does not match the exact run outcome.");
     }
     for (const entity of scenario.entities) {
       if (

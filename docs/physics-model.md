@@ -100,7 +100,9 @@ miss. When expiry falls inside a fixed step, closest approach is evaluated only
 over the pre-expiry subsegment; later geometry cannot become an intercept or
 reduce the recorded closest approach. A terminal result ends the
 weapon lifecycle and emits one typed event at the exact retained boundary; the
-event may carry a within-step occurrence time. The old scenario
+event may carry a within-step occurrence time and always carries the cumulative
+minimum separation achieved over the admitted weapon lifetime, not merely the
+terminal step's separation. The old scenario
 `completion.distanceMeters` field remains a legacy profile boundary and cannot
 terminate a released weapon. Map/3D proximity is presentation-only.
 

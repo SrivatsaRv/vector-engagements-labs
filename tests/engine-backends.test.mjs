@@ -513,6 +513,52 @@ test("both engines exclude a geometric intercept occurring after an in-step expi
   }
 });
 
+test("both engines bind non-intercept events to the lifetime closest approach", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
+  const red = baseline.entities.find((entity) => entity.id === "red-object-1");
+  const weapon = baseline.entities.find((entity) => entity.weapon);
+  assert.ok(blue && red && weapon?.weapon);
+  blue.initial.position = { x: 0, y: 0, z: 8000 };
+  blue.initial.velocity = { x: 250, y: 0, z: 0 };
+  red.initial.position = { x: 200, y: 100, z: 8000 };
+  red.initial.velocity = { x: -500, y: 500, z: 0 };
+  delete blue.route;
+  delete blue.routePlan;
+  delete red.route;
+  delete red.routePlan;
+  weapon.weapon.termination.interceptRadiusM = 0.1;
+  weapon.weapon.termination.maximumFlightTimeSeconds = 0.5;
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const run = runEngineBackend(structuredClone(baseline), backend);
+    const terminal = run.events.items.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    );
+    const final = run.frames.at(-1);
+    const finalWeapon = final.entities.find((entity) => entity.id === run.primaryWeaponId);
+    const finalTarget = final.entities.find((entity) => entity.id === run.primaryTargetId);
+    const terminalSeparationM = Math.hypot(
+      finalTarget.position.x - finalWeapon.position.x,
+      finalTarget.position.y - finalWeapon.position.y,
+      finalTarget.position.z - finalWeapon.position.z,
+    );
+    assert.equal(run.termination, "weapon_expired", backend);
+    assert.equal(
+      terminal?.payload.closestApproachM,
+      Number(run.closestApproachM.toFixed(6)),
+      backend,
+    );
+    assert.ok(run.closestApproachM < terminalSeparationM, backend);
+  }
+});
+
 test("both engines reject malformed weapon termination authority before integration", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
   const baseline = simulateWithCapabilitiesForVerification(

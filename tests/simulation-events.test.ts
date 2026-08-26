@@ -562,6 +562,31 @@ test("runtime decoding rejects a valid enum that falsifies lifecycle history", (
   }
 });
 
+test("runtime decoding binds weapon terminal state and cause to the run outcome", () => {
+  const scenario = admittedScenario();
+  const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
+  weapon.weapon!.termination.maximumFlightTimeSeconds = 0.1;
+  const run = runEngineBackend(scenario, "typescript");
+  assert.equal(run.termination, "weapon_expired");
+  assert.equal(run.events.state, "AVAILABLE");
+
+  const events = structuredClone(run.events.items);
+  const frames = structuredClone(run.frames);
+  const terminal = events.find((event) => event.payload.kind === "WEAPON_TERMINATED")!;
+  assert.equal(terminal.payload.kind, "WEAPON_TERMINATED");
+  terminal.payload.to = "MISS";
+  terminal.payload.cause = "ENERGY_DEPLETED";
+  const terminalWeapon = frames[terminal.frameIndex]!.entities.find(
+    (entity) => entity.id === weapon.id,
+  )!;
+  terminalWeapon.weaponFlightState = "MISS";
+
+  assert.throws(
+    () => assertSimulationEventStream(events, frames, run.scenario, run.termination),
+    /does not match the exact run outcome/,
+  );
+});
+
 test("runtime decoding binds world entry and run completion to their true boundary frames", () => {
   const scenario = admittedScenario();
   scenario.durationSeconds = 3;

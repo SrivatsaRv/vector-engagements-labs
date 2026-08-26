@@ -297,6 +297,33 @@ test("an in-step expiry excludes later geometric closest approach", () => {
   );
 });
 
+test("a non-intercept termination event records the lifetime closest approach", () => {
+  const scenario = admitTestAircraft(testScenario());
+  const red = scenario.entities.find((entity) => entity.id === "aircraft-red");
+  red.initial.position = { x: 200, y: 100, z: 8000 };
+  red.initial.velocity = { x: -300, y: 300, z: 0 };
+  const termination = scenario.entities.find((entity) => entity.weapon).weapon.termination;
+  termination.interceptRadiusM = 0.1;
+  termination.maximumFlightTimeSeconds = 0.5;
+
+  const run = runEngine(scenario);
+  const terminal = run.events.items.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  const final = run.frames.at(-1);
+  const weapon = final.entities.find((entity) => entity.id === run.primaryWeaponId);
+  const target = final.entities.find((entity) => entity.id === run.primaryTargetId);
+  const terminalSeparationM = Math.hypot(
+    target.position.x - weapon.position.x,
+    target.position.y - weapon.position.y,
+    target.position.z - weapon.position.z,
+  );
+
+  assert.equal(run.termination, "weapon_expired");
+  assert.equal(terminal?.payload.closestApproachM, Number(run.closestApproachM.toFixed(6)));
+  assert.ok(run.closestApproachM < terminalSeparationM);
+});
+
 test("weapon termination admission fails closed before integration", () => {
   const cases = [
     ["schema", (value) => { value.schemaVersion = "vector.weapon-termination-model.v0"; }],

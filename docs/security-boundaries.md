@@ -30,6 +30,10 @@ request, ordered authority seal and compact entity binding. Caller mutation of
 identity, tick, station/rule, operation, mass, installed drag or validity cannot
 be repaired by resealing exposed compact digests. Operational airborne-state or
 inventory rejection is retained explicitly and never materializes a store.
+Weapon-terminal replay requires the event's achieved state and typed cause to
+map exactly to the saved run outcome. It also retains the cumulative minimum
+separation over the admitted weapon lifetime; a caller cannot substitute the
+terminal step's separation or reseal a contradictory event, frame and report.
 
 Saved-run snapshots and saved-run admission counters now have separate
 domain-owned declaration modules behind the unchanged aggregate Drizzle schema.

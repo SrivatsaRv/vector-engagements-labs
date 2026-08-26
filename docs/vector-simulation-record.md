@@ -239,7 +239,9 @@ weapon and target, prior and achieved weapon state, typed cause, the
 occurrence time, admitted 25 m radius, admitted 180 s maximum flight time and
 `targetEffect: NOT_MODELLED`. Exactly one such event is required for a weapon
 intercept, miss, expiry, terrain failure or target-unavailable run. The event
-frame must contain the terminated weapon in the matching achieved state;
+frame must contain the terminated weapon in the matching achieved state; its
+state and cause must map exactly to the `RUN_COMPLETED` outcome, and its closest
+approach is the cumulative minimum over the admitted weapon lifetime;
 geometric intercept leaves the target active. Launch-decision, guidance and
 support events remain unavailable until their owning contracts produce them;
 the record and browser may not infer them.

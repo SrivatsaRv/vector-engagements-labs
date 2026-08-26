@@ -759,8 +759,8 @@ The challenge now reaches an engine-owned 21.836104 m geometric intercept at
 131.9 s under the 25 m verification-only criterion; the 46 km control reaches
 the time limit with a 530.164926 m closest approach. Tests independently cover
 between-step closest approach, malformed termination authority, legacy-distance
-non-authority, terminal-event parity and the explicit `NOT_MODELLED` target
-effect.
+non-authority, cumulative-minimum terminal-event parity, exact event-cause to
+run-outcome binding and the explicit `NOT_MODELLED` target effect.
 
 `tests/air-mission.test.mjs` covers all class/overlay/start combinations,
 canonical digest repeatability, units/datums, closed route/task references,
