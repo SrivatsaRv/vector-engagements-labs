@@ -3,6 +3,8 @@ import postgres from "postgres";
 import {
   CURRENT_CREDIBILITY_MANIFEST_ID,
   CURRENT_CREDIBILITY_MANIFEST_VERSION,
+  CURRENT_INTENDED_USE_ID,
+  CURRENT_INTENDED_USE_VERSION,
   CURRENT_MODEL_PACK_DIGEST,
   CURRENT_MODEL_PACK_ID,
   CURRENT_MODEL_PACK_VERSION,
@@ -98,7 +100,15 @@ try {
   assert.equal(catalog.simulationModels.length, 8);
   assert.ok(catalog.compiledModelPacks.length >= 1);
   assert.ok(catalog.credibilityManifests.length >= 2);
-  assert.equal(catalog.intendedUses.length, 1);
+  assert.deepEqual(
+    catalog.intendedUses
+      .map((item) => ({ id: item.id, version: item.version }))
+      .sort((left, right) => left.version.localeCompare(right.version)),
+    [
+      { id: CURRENT_INTENDED_USE_ID, version: "1.0.0" },
+      { id: CURRENT_INTENDED_USE_ID, version: CURRENT_INTENDED_USE_VERSION },
+    ],
+  );
   assert.equal(catalog.credibilityAdmissions.length, 1);
   const currentPack = catalog.compiledModelPacks.find(
     (item) => item.id === CURRENT_MODEL_PACK_ID && item.version === CURRENT_MODEL_PACK_VERSION,
