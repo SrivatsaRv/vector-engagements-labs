@@ -880,11 +880,15 @@ export function assertSimulationEventStream(
       const weapon = entityById.get(payload.weaponId);
       const target = entityById.get(payload.targetId);
       const frameWeapon = frame.entities.find((candidate) => candidate.id === payload.weaponId);
+      const priorFrameWeapon = frames[event.frameIndex - 1]?.entities.find(
+        (candidate) => candidate.id === payload.weaponId,
+      );
       const admission = weapon?.weapon?.termination;
       if (
         event.phase !== "TERMINATION" || event.producer.subsystem !== "WEAPON_DYNAMICS" ||
         event.producer.entityId !== payload.weaponId || !weapon || weapon.kind !== "GUIDED_WEAPON" ||
         !target || !frameWeapon || frameWeapon.lifecycle !== "TERMINATED" ||
+        !priorFrameWeapon || priorFrameWeapon.weaponFlightState !== payload.from ||
         frameWeapon.weaponFlightState !== payload.to || weapon.weapon?.targetEntityId !== payload.targetId ||
         event.participants.length !== 2 ||
         !event.participants.some((item) => item.entityId === payload.weaponId && item.role === "WEAPON") ||

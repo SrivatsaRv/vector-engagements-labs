@@ -589,6 +589,25 @@ test("runtime decoding binds weapon terminal state, cause, and distance to the r
     /does not match the exact run outcome/,
   );
 
+  const priorStateEvents = structuredClone(run.events.items);
+  const priorStateTerminal = priorStateEvents.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  )!;
+  assert.equal(priorStateTerminal.payload.kind, "WEAPON_TERMINATED");
+  priorStateTerminal.payload.from = priorStateTerminal.payload.from === "BOOST"
+    ? "COAST"
+    : "BOOST";
+  assert.throws(
+    () => assertSimulationEventStream(
+      priorStateEvents,
+      run.frames,
+      run.scenario,
+      run.termination,
+      run.closestApproachM,
+    ),
+    /invalid authority, ownership, or achieved frame state/,
+  );
+
   const distanceEvents = structuredClone(run.events.items);
   const distanceTerminal = distanceEvents.find(
     (event) => event.payload.kind === "WEAPON_TERMINATED",

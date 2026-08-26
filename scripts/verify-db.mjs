@@ -106,7 +106,8 @@ try {
     (SELECT count(*)::int FROM installation_runways WHERE mission_start_eligibility='PUBLIC_EDUCATIONAL') AS eligible_runways,
     (SELECT count(*)::int FROM environment_packs) AS environment_packs,
     (SELECT count(*)::int FROM study_areas) AS study_areas,
-    (SELECT count(*)::int FROM scenario_templates WHERE status='VALIDATED') AS scenarios`;
+    (SELECT count(*)::int FROM scenario_templates WHERE status='VALIDATED') AS scenarios,
+    (SELECT count(*)::int FROM scenario_templates WHERE status='RETIRED') AS retired_scenarios`;
   assert.equal(counts.platforms, 4);
   assert.equal(counts.weapons, 8);
   assert.equal(counts.models, 8);
@@ -118,7 +119,8 @@ try {
   assert.equal(counts.eligible_runways, 12);
   assert.equal(counts.environment_packs, 12);
   assert.equal(counts.study_areas, 6);
-  assert.equal(counts.scenarios, SCENARIO_LIBRARY.length * 2);
+  assert.equal(counts.scenarios, SCENARIO_LIBRARY.length);
+  assert.equal(counts.retired_scenarios, SCENARIO_LIBRARY.length);
 
   const [geospatial] = await sql`SELECT
     ST_SRID(location)::int AS srid,
@@ -228,7 +230,8 @@ try {
   const invalidHistoricalPackages = await sql`SELECT id, version
     FROM scenario_templates
     WHERE version='1.0.0' AND (
-      schema_version <> 'vector.scenario.v4'
+      status <> 'RETIRED'
+      OR schema_version <> 'vector.scenario.v4'
       OR intended_use_id <> 'vector.intended-use.geometry-teaching'
       OR intended_use_version <> '1.0.0'
       OR model_pack_id <> 'vector-scalar-study-models'
@@ -245,7 +248,7 @@ try {
     count(*) FILTER (WHERE schema_version='vector.scenario.v4')::int AS v4
     FROM scenario_templates`;
   assert.equal(scenarioVersions.v3, 0);
-  assert.equal(scenarioVersions.v4, counts.scenarios);
+  assert.equal(scenarioVersions.v4, counts.scenarios + counts.retired_scenarios);
 
   const peaceDrive = await sql`SELECT id, variant, crew, data_status, engine_ids, radar_id, ew_id, datalink_id
     FROM platform_variants

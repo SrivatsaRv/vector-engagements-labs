@@ -675,6 +675,33 @@ test("VSR rejects a hash-resealed terminal-event distance that contradicts the r
   );
 });
 
+test("VSR rejects a hash-resealed terminal event with a false prior weapon state", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const result = simulate(scenario);
+  const record = await createVectorSimulationRecord(
+    prepareSimulation(scenario),
+    result,
+    createdAt,
+  );
+  const events = structuredClone(result.engineRun.events.items);
+  const terminal = events.find((event) => event.payload.kind === "WEAPON_TERMINATED");
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+  terminal.payload.from = terminal.payload.from === "BOOST" ? "COAST" : "BOOST";
+  const corrupt = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /invalid authority, ownership, or achieved frame state/,
+  );
+});
+
 test("VSR rejects a lifecycle event whose valid from-enum falsifies canonical history", async () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);

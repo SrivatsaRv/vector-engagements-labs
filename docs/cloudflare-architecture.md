@@ -50,6 +50,9 @@ PostGIS runway centrelines. Production seeding remains a controlled release
 action; runtime ticks never connect to this catalogue.
 Migration 017 independently publishes both the retained 0.8.0 authority chain
 for scenario `1.0.0` and the new 0.9.0 authority chain for scenario `1.1.0`.
+The immutable `1.0.0` packages are retained as `RETIRED`: their 0.8.0 pack has
+no weapon-termination authority, so catalog and saved-run admission cannot
+advertise them as executable under the current engine.
 Reference-data seeding uses insert-only conflict handling, so an existing
 content identity cannot be rewritten by a later deploy or administrative seed.
 

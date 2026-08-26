@@ -109,6 +109,19 @@ ON CONFLICT (id,version) DO NOTHING;
 
 ${scenarioStatements}
 
+-- Historical 1.0.0 packages remain immutable and independently resolvable for
+-- audit/replay, but their 0.8.0 pack has no weapon-termination authority and
+-- therefore cannot be offered as executable input to the current engine.
+UPDATE scenario_templates
+SET status='RETIRED'
+WHERE version='1.0.0'
+  AND id IN (${SCENARIO_LIBRARY.map((definition) => sqlText(definition.id)).join(",")})
+  AND intended_use_id=${sqlText(historicalIntendedUse.id)}
+  AND intended_use_version=${sqlText(historicalIntendedUse.version)}
+  AND model_pack_id=${sqlText(String(historicalFixture.pack.id))}
+  AND model_pack_version=${sqlText(String(historicalFixture.pack.version))}
+  AND model_pack_digest=${sqlText(String(historicalFixture.pack.digest))};
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -144,6 +157,7 @@ BEGIN
     SELECT count(*) FROM scenario_templates
     WHERE version='1.0.0'
       AND id IN (${SCENARIO_LIBRARY.map((definition) => sqlText(definition.id)).join(",")})
+      AND status='RETIRED'
       AND intended_use_id=${sqlText(historicalIntendedUse.id)}
       AND intended_use_version=${sqlText(historicalIntendedUse.version)}
       AND model_pack_id=${sqlText(String(historicalFixture.pack.id))}

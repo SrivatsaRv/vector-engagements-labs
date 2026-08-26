@@ -240,6 +240,8 @@ occurrence time, admitted 25 m radius, admitted 180 s maximum flight time and
 `targetEffect: NOT_MODELLED`. Exactly one such event is required for a weapon
 intercept, miss, expiry, terrain failure or target-unavailable run. The event
 frame must contain the terminated weapon in the matching achieved state; its
+prior state must equal the same weapon's state in the immediately preceding
+retained frame; its
 state and cause must map exactly to the `RUN_COMPLETED` outcome, and its closest
 approach must equal the canonical six-decimal projection of the frozen report's
 cumulative minimum from the admitted launch boundary through termination;

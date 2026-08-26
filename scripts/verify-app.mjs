@@ -109,7 +109,7 @@ try {
       { id: CURRENT_INTENDED_USE_ID, version: CURRENT_INTENDED_USE_VERSION },
     ],
   );
-  assert.equal(catalog.credibilityAdmissions.length, 2);
+  assert.equal(catalog.credibilityAdmissions.length, 1);
   const currentPack = catalog.compiledModelPacks.find(
     (item) => item.id === CURRENT_MODEL_PACK_ID && item.version === CURRENT_MODEL_PACK_VERSION,
   );
@@ -223,29 +223,43 @@ try {
   const pafInstallations = catalog.installations.filter((item) => item.service === "PAF");
   assert.equal(pafInstallations.length, 15);
   assert.ok(pafInstallations.every((item) => item.icao_code && item.source_id === "shield-paf-orbat-2026-05-19"));
-  assert.equal(catalog.scenarioTemplates.length, 18);
+  assert.equal(catalog.scenarioTemplates.length, 9);
   assert.equal(
     catalog.scenarioTemplates.filter((item) => item.version === "1.0.0").length,
-    9,
+    0,
   );
   assert.equal(
     catalog.scenarioTemplates.filter((item) => item.version === "1.1.0").length,
     9,
   );
-  const historicalTemplate = catalog.scenarioTemplates.find(
-    (item) => item.id === "a2a-crossing-intercept" && item.version === "1.0.0",
-  );
   const template = catalog.scenarioTemplates.find(
     (item) => item.id === "a2a-crossing-intercept" && item.version === "1.1.0",
   );
-  assert.ok(historicalTemplate);
   assert.ok(template);
-  assert.notEqual(historicalTemplate.content_hash, template.content_hash);
   assert.equal(template.schema_version, "vector.scenario.v4");
   assert.match(template.content_hash, /^[0-9a-f]{64}$/);
   assert.equal(template.engine_version, "browser-point-mass-v0.5");
   assert.equal(template.intended_use_id, template.package.intendedUse.id);
   assert.equal(template.model_pack_digest, template.package.modelPack.digest);
+
+  const [historicalTemplate] = await sql`SELECT schema_version, content_hash, package
+    FROM scenario_templates
+    WHERE id='a2a-crossing-intercept' AND version='1.0.0' AND status='RETIRED'`;
+  assert.ok(historicalTemplate);
+  assert.notEqual(historicalTemplate.content_hash, template.content_hash);
+  const retiredRun = await fetch(`${baseUrl}/api/runs`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      scenarioId: "a2a-crossing-intercept",
+      scenarioVersion: "1.0.0",
+      scenarioSchemaVersion: historicalTemplate.schema_version,
+      scenarioContentHash: historicalTemplate.content_hash,
+      draftRevision: 0,
+      initialState: historicalTemplate.package.scenario,
+    }),
+  });
+  assert.equal(retiredRun.status, 409);
 
   const mathPage = await fetch(`${baseUrl}/math`);
   assert.equal(mathPage.status, 200);

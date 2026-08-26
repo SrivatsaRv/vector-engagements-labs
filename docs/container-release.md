@@ -71,7 +71,9 @@ Migration `017_weapon_termination_model.sql` follows 016 and appends the 1.1.0
 intended use, 0.9.0 pack, 1.3.0 credibility manifest and nine exact `1.1.0`
 scenario bindings. It also publishes the frozen 0.8.0 source, compiled pack and
 1.2.0 manifest needed to keep all nine `1.0.0` scenario identities resolvable.
-Backup/restore verification must retain all 18 rows and both authority chains;
+Those nine historical packages are `RETIRED`, not executable; only the nine
+`1.1.0` packages are `VALIDATED`. Backup/restore verification must retain all
+18 rows and both authority chains;
 older migration bytes are checked before 017 generation is accepted. Fixture
 seeding is insert-only for `(id, version)` and cannot repair drift by overwrite.
 
