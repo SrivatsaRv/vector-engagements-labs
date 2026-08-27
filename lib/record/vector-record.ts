@@ -1,5 +1,5 @@
 import { canonicalJson } from "../canonical-json.ts";
-import { RUST_WASM_ENGINE_ARTIFACT } from "../engine/backend.ts";
+import { RUST_WASM_ENGINE_ARTIFACT, runEngineBackend } from "../engine/backend.ts";
 import type {
   EngineEntityFrame,
   EngineFrame,
@@ -36,7 +36,10 @@ import {
   findRetainedCompiledModelPack,
   resolveRetainedCompiledModelPack,
 } from "../engine/retained-model-packs.ts";
-import type { CompiledModelPack } from "../model-pack.ts";
+import {
+  type CompiledModelPack,
+  verifyCompiledModelPackDigest,
+} from "../model-pack.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v6" as const;
@@ -816,8 +819,27 @@ export async function openVectorSimulationRecord(
     PreparedSimulation,
     "scenario"
   >;
+  const recordedModelPack = compiled.engineScenario.modelPack as
+    typeof compiled.engineScenario.modelPack & {
+      weaponTerminations?: typeof compiled.engineScenario.modelPack.weaponTerminations;
+    };
+  const legacyRuntimeModelPackProjection = !Object.hasOwn(
+    recordedModelPack,
+    "weaponTerminations",
+  );
+  if (legacyRuntimeModelPackProjection) {
+    compiled.engineScenario.modelPack = {
+      ...recordedModelPack,
+      weaponTerminations: [],
+    };
+  }
   const retainedPack = findRetainedCompiledModelPack(compiled.engineScenario.modelPack);
   const suppliedPack = options.compiledModelPack;
+  if (suppliedPack && !await verifyCompiledModelPackDigest(suppliedPack as CompiledModelPack)) {
+    throw new Error(
+      "Supplied compiled model pack digest does not match its canonical content.",
+    );
+  }
   if (
     suppliedPack &&
     (
@@ -829,8 +851,44 @@ export async function openVectorSimulationRecord(
     throw new Error("Supplied compiled model pack does not match the exact recorded identity.");
   }
   const authorityPack = retainedPack ?? suppliedPack;
+  const entityCarriesWeaponTerminationAuthority = compiled.engineScenario.entities.some(
+    (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.termination !== undefined,
+  );
+  const carriesWeaponTerminationAuthority =
+    compiled.engineScenario.modelPack.weaponTerminations.length > 0 ||
+    entityCarriesWeaponTerminationAuthority;
+  const schedulesTerminationCapableGuidedRelease = compiled.engineScenario.entities.some(
+    (entity) => {
+      if (
+        entity.kind !== "GUIDED_WEAPON" ||
+        !entity.weapon?.termination ||
+        entity.weapon.launchTimeSeconds === null ||
+        entity.weapon.storeTransfer?.operation === "JETTISON"
+      ) return false;
+      const launcher = compiled.engineScenario.entities.find(
+        (candidate) => candidate.id === entity.weapon!.launchPlatformId,
+      );
+      // A legacy Air mission that starts on the ground does not execute the
+      // implicit scheduled-test launch. An explicit RELEASE remains executable.
+      return !(
+        compiled.engineScenario.airMission &&
+        launcher?.kind === "AIRCRAFT" &&
+        launcher.groundOperation &&
+        !entity.weapon.storeTransfer
+      );
+    },
+  );
+  if (
+    carriesWeaponTerminationAuthority &&
+    eventMember.schemaVersion !== VECTOR_EVENT_SCHEMA
+  ) {
+    throw new Error(
+      "VECTOR records with weapon-termination authority require the typed v2 simulation-event stream.",
+    );
+  }
   assertRuntimeModelPackAuthority(compiled.engineScenario.modelPack, authorityPack, {
-    requireCompiledWeaponTerminationAuthority: true,
+    requireCompiledWeaponTerminationAuthority: carriesWeaponTerminationAuthority,
+    runtimeDigestVersion: legacyRuntimeModelPackProjection ? "v2" : "v3",
   });
   const environmentPack = compiled.engineScenario.geospatial?.environmentPack;
   if (!environmentPack) {
@@ -883,6 +941,32 @@ export async function openVectorSimulationRecord(
         primaryTargetId: report.engine.primaryTargetId,
       },
     );
+    const recordedTermination = events.items.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    )?.payload;
+    if (schedulesTerminationCapableGuidedRelease) {
+      const replay = runEngineBackend(
+        structuredClone(compiled.engineScenario),
+        manifest.backend.selected,
+        options.compiledModelPack,
+      );
+      if (replay.events.state !== "AVAILABLE") {
+        throw new Error("VECTOR record deterministic termination replay has no event stream.");
+      }
+      const replayedTermination = replay.events.items.find(
+        (event) => event.payload.kind === "WEAPON_TERMINATED",
+      )?.payload;
+      if (
+        replay.termination !== report.engine.termination ||
+        replay.closestApproachM !== report.engine.closestApproachM ||
+        canonicalJson(replayedTermination ?? null) !==
+          canonicalJson(recordedTermination ?? null)
+      ) {
+        throw new Error(
+          "VECTOR record weapon termination claim does not match deterministic engine replay.",
+        );
+      }
+    }
   }
   if (scenario.airMission) {
     const recordedMission = compiled.engineScenario.airMission;

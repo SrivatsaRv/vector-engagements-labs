@@ -7,8 +7,15 @@ import {
 import type { EngineScenario } from "./contracts.ts";
 
 export type RuntimeModelPackProjection = EngineScenario["modelPack"];
+export type LegacyRuntimeModelPackProjection = Omit<
+  RuntimeModelPackProjection,
+  "weaponTerminations"
+>;
 
-function projectionIdentity(pack: RuntimeModelPackProjection) {
+function projectionIdentity(
+  pack: RuntimeModelPackProjection | LegacyRuntimeModelPackProjection,
+  version: "v2" | "v3",
+) {
   const fields: number[] = [];
   const taggedU64 = (tag: number, value: bigint) => {
     fields.push(tag);
@@ -35,7 +42,7 @@ function projectionIdentity(pack: RuntimeModelPackProjection) {
     values.forEach(string);
   };
 
-  string("vector.runtime-model-pack-digest.v3");
+  string(`vector.runtime-model-pack-digest.${version}`);
   string(pack.schemaVersion); string(pack.id); string(pack.version); string(pack.digest);
   string(pack.intendedUse.id); string(pack.intendedUse.version);
   integer(pack.observerSensors.length);
@@ -55,12 +62,17 @@ function projectionIdentity(pack: RuntimeModelPackProjection) {
       for (const window of model.observationWindowsSeconds) { number(window.start); number(window.end); }
     }
   }
-  integer(pack.weaponTerminations.length);
-  for (const weapon of pack.weaponTerminations) {
-    string(weapon.modelId); string(weapon.modelVersion);
-    string(weapon.termination.schemaVersion); string(weapon.termination.intendedUse);
-    string(weapon.termination.criterion); number(weapon.termination.interceptRadiusM);
-    number(weapon.termination.maximumFlightTimeSeconds);
+  if (version === "v3") {
+    if (!("weaponTerminations" in pack) || !Array.isArray(pack.weaponTerminations)) {
+      throw new Error("The runtime model-pack v3 projection has no weapon-termination inventory.");
+    }
+    integer(pack.weaponTerminations.length);
+    for (const weapon of pack.weaponTerminations) {
+      string(weapon.modelId); string(weapon.modelVersion);
+      string(weapon.termination.schemaVersion); string(weapon.termination.intendedUse);
+      string(weapon.termination.criterion); number(weapon.termination.interceptRadiusM);
+      number(weapon.termination.maximumFlightTimeSeconds);
+    }
   }
   integer(pack.scenarioPatches.length);
   for (const patch of pack.scenarioPatches) {
@@ -132,7 +144,11 @@ export function assertRuntimeWeaponTerminationAuthority(
 }
 
 export function runtimeModelPackDigest(pack: RuntimeModelPackProjection) {
-  return sha256HexBytesSync(projectionIdentity(pack));
+  return sha256HexBytesSync(projectionIdentity(pack, "v3"));
+}
+
+export function legacyRuntimeModelPackDigest(pack: LegacyRuntimeModelPackProjection) {
+  return sha256HexBytesSync(projectionIdentity(pack, "v2"));
 }
 
 export function bindRuntimeModelPackDigest(
@@ -147,31 +163,46 @@ export function assertRuntimeModelPackDigest(pack: RuntimeModelPackProjection) {
   }
 }
 
+export function assertLegacyRuntimeModelPackDigest(pack: LegacyRuntimeModelPackProjection) {
+  if (!pack.runtimeDigest || pack.runtimeDigest !== legacyRuntimeModelPackDigest(pack)) {
+    throw new Error("The legacy runtime model-pack projection digest does not match its v2 content.");
+  }
+}
+
 export function assertRuntimeModelPackAuthority(
   runtimePack: RuntimeModelPackProjection,
   compiledPack?: Readonly<CompiledModelPack>,
-  options: { requireCompiledWeaponTerminationAuthority?: boolean } = {},
+  options: {
+    requireCompiledWeaponTerminationAuthority?: boolean;
+    runtimeDigestVersion?: "v2" | "v3";
+  } = {},
 ) {
   const hasRuntimeTerminationAuthority =
     (runtimePack.weaponTerminations?.length ?? 0) > 0;
-  if (
-    options.requireCompiledWeaponTerminationAuthority &&
-    !compiledPack
-  ) {
+  const compiledTerminationAuthority = compiledPack?.weapons.some(
+    (weapon) => weapon.termination !== undefined,
+  ) ?? false;
+  if (options.requireCompiledWeaponTerminationAuthority && !compiledPack) {
     throw new Error(
       `No retained compiled model pack matches weapon-termination authority ${runtimePack.id}@${runtimePack.version} (${runtimePack.digest}).`,
     );
   }
-  const compiledTerminationAuthority = compiledPack?.weapons.some(
-    (weapon) => weapon.termination !== undefined,
-  ) ?? false;
+  if (options.requireCompiledWeaponTerminationAuthority && !compiledTerminationAuthority) {
+    throw new Error(
+      `The retained compiled model pack ${runtimePack.id}@${runtimePack.version} contains no weapon-termination authority.`,
+    );
+  }
   const requiresDigest = compiledTerminationAuthority ||
     hasRuntimeTerminationAuthority ||
     (runtimePack.observerSensors ?? []).some(
       (sensor) => sensor.verificationTrackModel !== undefined,
     );
   if (requiresDigest || runtimePack.runtimeDigest !== undefined) {
-    assertRuntimeModelPackDigest(runtimePack);
+    if (options.runtimeDigestVersion === "v2") {
+      assertLegacyRuntimeModelPackDigest(runtimePack);
+    } else {
+      assertRuntimeModelPackDigest(runtimePack);
+    }
   }
   if (compiledPack && runtimePack.runtimeDigest !== undefined) {
     assertRuntimeWeaponTerminationAuthority(runtimePack, compiledPack);

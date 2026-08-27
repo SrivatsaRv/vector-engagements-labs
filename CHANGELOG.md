@@ -27,6 +27,15 @@ one family must not imply changes to unrelated contracts.
   closest-approach and 180 s maximum-flight-time termination authority. The
   intended-use advances to 1.1.0 to prohibit target damage, destruction or kill
   inference from geometric intercept.
+- Authenticate complete engine-verification packs independently inside the raw
+  Rust/WASM run boundary and reject malformed termination patches before their
+  values can affect execution.
+- Require TypeScript and raw Rust/WASM to reject the same digest-valid supplied
+  packs when their compiled-v1 key inventory, intended-use identities or weapon
+  identities are malformed.
+- Keep deterministic terminal-record replay and uploaded-record verification
+  inside the dedicated browser simulation Worker; the rendering thread receives
+  only an already-admitted playback result.
 
 Model-pack persistence table declarations now live in the domain-owned
 `db/schema/model-pack.ts` module behind the unchanged aggregate Drizzle facade.
@@ -110,7 +119,7 @@ no exported simulation ABI, backend-selection rule or v2 runtime admission.
   controller requested/accepted/achieved values through Worker and VSR replay.
 - Add the independently sealed airborne-transfer projection and exact
   accepted/rejected event parity to the existing TypeScript/Rust ABI, retaining
-  the optimized module below the explicit 575,000-byte ceiling.
+  the optimized module below the explicit 585,000-byte ceiling.
 - Add exact TypeScript/Rust `vector.weapon-termination-model.v1` admission,
   between-step closest approach, closed terminal states and canonical
   `WEAPON_TERMINATED` event parity. Source discriminators are mandatory,
@@ -122,7 +131,7 @@ no exported simulation ABI, backend-selection rule or v2 runtime admission.
   mandatory, preserving fail-closed benchmark admission.
 - Pin the Rust/WASM post-link size policy to Binaryen 131.0.0 with an explicit
   admitted feature set; bind that policy into the generated module identity and
-  retain an explicit sub-575,000-byte browser artifact gate.
+  retain an explicit sub-585,000-byte browser artifact gate.
 - Admit the exact-key `vector.aircraft-ground-operation.v1` safety artifact in
   both backends and validate its mission/start/release/runway lineage before
   holding movement unavailable.
@@ -223,6 +232,9 @@ admission, or tick behavior.
   flight-time expiry and energy-miss precedence. A geometric intercept
   terminates the weapon but leaves the target active and records no target
   effect.
+- Require direct Rust/WASM callers to bind every entity termination model to
+  the authenticated runtime-pack projection; an empty projection can no longer
+  admit arbitrary radius or lifetime values.
 
 No pending family-specific entry.
 
@@ -268,6 +280,29 @@ No pending family-specific entry.
   and boundary-only miss, terrain and target-unavailable causes are bound to
   their exact terminal event time, so hash-resealed timestamp substitutions
   fail replay.
+- Advance the weapon-termination payload to v2 with the exact retained
+  closest-approach witness pair. VSR admission replays termination-capable
+  records through their recorded deterministic backend, so deleting the real
+  lifetime minimum and substituting another retained pair fails closed.
+- Bind VSR `time_limit` claims to the declared scenario terminal tick, rejecting
+  hash-resealed terminal archives truncated to an earlier nonterminal pair.
+- Bind direct Rust/WASM termination projections to the exact compiler-owned
+  retained pack identity, model ordering and admitted scenario patches. A
+  caller cannot promote jointly resealed entity, compact-pack and runtime-digest
+  copies into termination authority.
+- Force-retain the final fixed-step predecessor for every launched
+  termination-capable run. Replay rejects a nonterminal claim when that exact
+  pair is missing, preventing a hash-resealed record from deleting the boundary
+  that proves a geometric intercept or another terminal cause.
+- Deterministically rerun every termination-capable VSR, including records that
+  claim no terminal event. A hash-resealed intercept cannot delete its terminal
+  events, append duplicated earlier active frames at the nominal duration and
+  manufacture a `time_limit` result.
+- Validate the closed ground-dynamics validity fields semantically so canonical
+  archive key ordering cannot reject an otherwise exact release replay.
+- Keep an explicit unpowered `JETTISON` outside guided-weapon terminal
+  authority in TypeScript, Rust/WASM and VSR replay; its governed store-transfer
+  event remains replayable without a fabricated weapon-termination event.
 
 Saved-run record and admission tables now have separate domain-owned schema
 modules without changing their persisted representation.

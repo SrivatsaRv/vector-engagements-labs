@@ -156,7 +156,14 @@ export function runRustWasmEngine(
       throw new Error("Rust/WASM Air mission lineage digest is invalid.");
     }
   }
-  const input = new TextEncoder().encode(JSON.stringify(scenario));
+  const request = verificationPack
+    ? {
+        schemaVersion: "vector.engine-run-request.v1",
+        scenario,
+        verificationModelPack: verificationPack,
+      }
+    : scenario;
+  const input = new TextEncoder().encode(JSON.stringify(request));
   const maximumInputLength = engine.vector_max_input_len();
   if (input.byteLength > maximumInputLength) {
     throw new Error(

@@ -293,20 +293,20 @@ export function assertRecordedSidePictures(
   if (pictures.length !== expected.length) {
     throw new Error(`Recorded observer-picture count ${pictures.length} does not match the canonical tick boundary ${expected.length}.`);
   }
-  const seen = new Set<string>();
+  const actualByIdentity = new Map<string, RaspTrack>();
   for (const picture of pictures) {
     observerStateFromPicture(picture);
     const key = `${picture.perspective}:${picture.modelTimeSeconds}`;
-    if (seen.has(key)) throw new Error("Recorded observer picture has a duplicate side/frame identity.");
-    seen.add(key);
+    if (actualByIdentity.has(key)) {
+      throw new Error("Recorded observer picture has a duplicate side/frame identity.");
+    }
+    actualByIdentity.set(key, picture);
     if ("position" in picture || "observedEntityId" in picture || "truthPosition" in picture || "truthEntityId" in picture) {
       throw new Error("Recorded observer picture exposes prohibited track or truth data.");
     }
   }
   for (const picture of expected) {
-    const actual = pictures.find((candidate) =>
-      candidate.perspective === picture.perspective && candidate.modelTimeSeconds === picture.modelTimeSeconds,
-    );
+    const actual = actualByIdentity.get(`${picture.perspective}:${picture.modelTimeSeconds}`);
     if (!actual || canonicalJson(actual) !== canonicalJson(picture)) {
       throw new Error("Recorded observer picture does not match the canonical tick state.");
     }

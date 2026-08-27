@@ -733,7 +733,9 @@ fuze, warhead, damage, destruction, kill or probability of kill.
 `modelPack.weaponTerminations` is the compact, digest-bound runtime projection
 of those compiled values. It records exact model ID/version plus the effective
 termination object after validated scenario patches. Entity fields must equal
-that projection in both TypeScript and Rust/WASM; changing both the entity and
+that projection in both TypeScript and Rust/WASM, including direct native Rust
+and public WASM ABI entry points; an empty projection is never a legacy
+exception when an entity carries termination authority. Changing both the entity and
 the compact projection while retaining a known pack identity is rejected
 against the retained compiled pack. Live TypeScript and Rust/WASM entry points
 also require any scenario carrying entity-level weapon-termination authority to
@@ -741,8 +743,23 @@ resolve that exact retained pack before integration. Removing the compact
 projection or self-resealing an unknown pack cannot turn entity fields into
 standalone authority. Engine-verification tooling has one explicit exception:
 it may supply the complete compiler output only when its identity and governed
-engine-verification intended use exactly match the scenario. Product execution
-never supplies that test authority.
+engine-verification intended use exactly match the scenario. Before identity or
+runtime-projection comparison, the live boundary recomputes the supplied pack's
+canonical content digest with the compiler-owned algorithm; a caller cannot
+turn jointly resealed scenario and pack fields into content-addressed authority.
+The JavaScript adapter carries that complete pack in
+`vector.engine-run-request.v1`; Rust independently parses and authenticates it.
+A supplied pack must satisfy the same exact compiled-v1 top-level key inventory,
+array surface, non-empty evidence set, unique weapon identity and
+unique intended-use identity plus termination/evidence structure in TypeScript
+and raw Rust/WASM before either
+backend considers its content digest or uses it as execution authority.
+A direct native or raw WASM scenario without the complete pack cannot gain this
+authority merely by relabelling `intendedUse`. Product execution never supplies
+that test authority. Before either product or verification execution consumes a
+termination patch, the Rust boundary independently checks its unique governed
+field key, compiled old value, SI unit and evidence membership. A recomputed compact
+`runtimeDigest` cannot legitimize a malformed patch.
 
 Mission/capability consumers import the exported `AirMissionDefinition` and
 `CompiledAirMission` types from `lib/air-mission.ts`. They may attach downstream

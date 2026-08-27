@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use crate::simulation_events::MAX_SIMULATION_EVENTS;
 use crate::{
     first_fixed_step_tick_at_or_after, valid_verification_track_model, EngineError, EngineScenario,
-    EntityDefinition, Table1d, Vec3,
+    EntityDefinition, ScenarioModelPatch, Table1d, Vec3,
 };
 
 /// Maximum JSON payload accepted by the browser WASM ABI.
@@ -25,6 +25,39 @@ const MAX_IDENTIFIER_BYTES: usize = 128;
 const MAX_LABEL_BYTES: usize = 512;
 const MAX_DURATION_SECONDS: f64 = 3_600.0;
 const STORE_AUTHORITY_INVALID: &str = "[STORE_TRANSFER_AUTHORITY_INVALID]";
+const RETAINED_WEAPON_TERMINATION_MODELS: [(&str, &str); 8] = [
+    ("astra-mk1-study-v05", "0.5.0"),
+    ("aim-120c5-study-v05", "0.5.0"),
+    ("mica-ir-study-v05", "0.5.0"),
+    ("kh-31p-study-v05", "0.5.0"),
+    ("spice-2000-study-v05", "0.5.0"),
+    ("akash-study-v05", "0.5.0"),
+    ("s-200-study-v05", "0.5.0"),
+    ("brahmos-block-i-study-v05", "0.5.0"),
+];
+const RETAINED_MODEL_PACK_EVIDENCE_IDS: [&str; 2] = [
+    "current-scalar-model-assumptions",
+    "model-pack-contract-tests",
+];
+
+pub(crate) struct VerificationTerminationAuthority {
+    model_id: String,
+    model_version: String,
+    schema_version: String,
+    intended_use: String,
+    criterion: String,
+    intercept_radius_m: f64,
+    maximum_flight_time_seconds: f64,
+}
+
+pub(crate) struct AuthenticatedVerificationPack {
+    id: String,
+    version: String,
+    digest: String,
+    intended_uses: Vec<(String, String)>,
+    evidence_ids: HashSet<String>,
+    weapon_terminations: Vec<VerificationTerminationAuthority>,
+}
 
 pub(crate) struct GroundMissionAuthority {
     pub(crate) binding: crate::AircraftGroundOperation,
@@ -457,30 +490,230 @@ fn hash_strings(hash: &mut Sha256, values: &[String]) {
     }
 }
 
-fn verify_runtime_model_pack_digest(scenario: &EngineScenario) -> Result<(), EngineError> {
-    let has_verification = scenario
-        .model_pack
-        .observer_sensors
-        .iter()
-        .any(|sensor| sensor.verification_track_model.is_some());
-    let has_termination_authority = !scenario.model_pack.weapon_terminations.is_empty();
-    if scenario.model_pack.runtime_digest.is_none()
-        && !has_verification
-        && !has_termination_authority
-    {
-        return Ok(());
+fn canonicalize_compiled_pack_digest_value(value: Value) -> Value {
+    match value {
+        Value::Array(values) => Value::Array(
+            values
+                .into_iter()
+                .map(canonicalize_compiled_pack_digest_value)
+                .collect(),
+        ),
+        Value::Object(values) => {
+            let mut entries = values.into_iter().collect::<Vec<_>>();
+            entries.sort_by(|left, right| left.0.cmp(&right.0));
+            let mut sorted = serde_json::Map::new();
+            for (key, item) in entries {
+                sorted.insert(key, canonicalize_compiled_pack_digest_value(item));
+            }
+            Value::Object(sorted)
+        }
+        Value::Number(number) => Value::String(format!(
+            "#number:{:.12e}",
+            number.as_f64().unwrap_or(f64::NAN)
+        )),
+        scalar => scalar,
     }
-    let expected = scenario
-        .model_pack
-        .runtime_digest
-        .as_deref()
-        .ok_or_else(|| {
-            invalid(
-                "modelPack.runtimeDigest is required for verification-track or weapon-termination authority",
-            )
-        })?;
-    sha256_digest("modelPack.runtimeDigest", expected)?;
-    let pack = &scenario.model_pack;
+}
+
+fn compiled_pack_string<'a>(
+    value: &'a Value,
+    path: &str,
+    field: &str,
+) -> Result<&'a str, EngineError> {
+    value
+        .get(field)
+        .and_then(Value::as_str)
+        .ok_or_else(|| invalid(format!("{path}.{field} must be a string")))
+}
+
+fn compiled_pack_number(value: &Value, path: &str, field: &str) -> Result<f64, EngineError> {
+    value
+        .get(field)
+        .and_then(Value::as_f64)
+        .filter(|number| number.is_finite())
+        .ok_or_else(|| invalid(format!("{path}.{field} must be finite")))
+}
+
+pub(crate) fn authenticate_verification_model_pack(
+    value: &Value,
+) -> Result<AuthenticatedVerificationPack, EngineError> {
+    const REQUIRED_KEYS: [&str; 17] = [
+        "schemaVersion",
+        "id",
+        "version",
+        "digest",
+        "unitSystem",
+        "coordinateConventions",
+        "intendedUses",
+        "credibilityManifestRef",
+        "evidence",
+        "catalogIdentities",
+        "aerodynamics",
+        "propulsion",
+        "sensors",
+        "aircraft",
+        "weapons",
+        "loadouts",
+        "compatibility",
+    ];
+    let object = value
+        .as_object()
+        .ok_or_else(|| invalid("engine-verification compiled model pack must be an object"))?;
+    if object.len() != REQUIRED_KEYS.len()
+        || REQUIRED_KEYS.iter().any(|key| !object.contains_key(*key))
+    {
+        return Err(invalid(
+            "engine-verification authority requires the complete exact-key compiled model pack",
+        ));
+    }
+    if compiled_pack_string(value, "pack", "schemaVersion")? != "vector.compiled-model-pack.v1"
+        || compiled_pack_string(value, "pack", "unitSystem")? != "SI"
+    {
+        return Err(invalid(
+            "engine-verification compiled model pack schema or unit system is unsupported",
+        ));
+    }
+    for field in [
+        "catalogIdentities",
+        "aerodynamics",
+        "propulsion",
+        "sensors",
+        "aircraft",
+        "loadouts",
+        "compatibility",
+    ] {
+        if !value.get(field).is_some_and(Value::is_array) {
+            return Err(invalid(format!("pack.{field} must be an array")));
+        }
+    }
+    let digest = compiled_pack_string(value, "pack", "digest")?;
+    sha256_digest("verificationModelPack.digest", digest)?;
+    let mut digest_material = value.clone();
+    digest_material
+        .as_object_mut()
+        .ok_or_else(|| invalid("engine-verification compiled model pack must be an object"))?
+        .remove("digest");
+    let digest_bytes =
+        serde_json::to_vec(&canonicalize_compiled_pack_digest_value(digest_material))
+            .map_err(|error| EngineError::Serialization(error.to_string()))?;
+    let computed_digest = format!("{:x}", Sha256::digest(digest_bytes));
+    if computed_digest != digest {
+        return Err(invalid(
+            "engine-verification compiled model pack digest does not match its canonical content",
+        ));
+    }
+    let intended_uses = value
+        .get("intendedUses")
+        .and_then(Value::as_array)
+        .ok_or_else(|| invalid("pack.intendedUses must be an array"))?
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            Ok((
+                compiled_pack_string(item, &format!("pack.intendedUses[{index}]"), "id")?
+                    .to_string(),
+                compiled_pack_string(item, &format!("pack.intendedUses[{index}]"), "version")?
+                    .to_string(),
+            ))
+        })
+        .collect::<Result<Vec<_>, EngineError>>()?;
+    let mut intended_use_ids = HashSet::new();
+    for (index, (id, _)) in intended_uses.iter().enumerate() {
+        if !intended_use_ids.insert(id.as_str()) {
+            return Err(invalid(format!(
+                "pack.intendedUses[{index}].id duplicates an earlier intended use"
+            )));
+        }
+    }
+    if !intended_uses
+        .iter()
+        .any(|(id, _)| id == "vector.intended-use.engine-verification")
+    {
+        return Err(invalid(
+            "compiled model pack does not admit engine-verification intended use",
+        ));
+    }
+    let evidence_ids = value
+        .get("evidence")
+        .and_then(Value::as_array)
+        .ok_or_else(|| invalid("pack.evidence must be an array"))?
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            compiled_pack_string(item, &format!("pack.evidence[{index}]"), "id").map(str::to_string)
+        })
+        .collect::<Result<HashSet<_>, EngineError>>()?;
+    if evidence_ids.is_empty() {
+        return Err(invalid("pack.evidence must not be empty"));
+    }
+    let weapon_values = value
+        .get("weapons")
+        .and_then(Value::as_array)
+        .ok_or_else(|| invalid("pack.weapons must be an array"))?;
+    let mut weapon_terminations = Vec::new();
+    let mut weapon_ids = HashSet::new();
+    for (index, weapon) in weapon_values.iter().enumerate() {
+        let path = format!("pack.weapons[{index}]");
+        let model_id = compiled_pack_string(weapon, &path, "id")?;
+        if !weapon_ids.insert(model_id) {
+            return Err(invalid(format!("{path}.id duplicates an earlier weapon")));
+        }
+        let model_version = compiled_pack_string(weapon, &path, "version")?;
+        let Some(termination) = weapon.get("termination") else {
+            continue;
+        };
+        let termination_path = format!("{path}.termination");
+        let intercept_radius_m =
+            compiled_pack_number(termination, &termination_path, "interceptRadiusM")?;
+        let maximum_flight_time_seconds =
+            compiled_pack_number(termination, &termination_path, "maximumFlightTimeS")?;
+        if intercept_radius_m <= 0.0 || maximum_flight_time_seconds <= 0.0 {
+            return Err(invalid(format!(
+                "{termination_path} scalar values must be positive"
+            )));
+        }
+        let evidence = weapon
+            .get("evidenceRefIds")
+            .and_then(Value::as_array)
+            .ok_or_else(|| invalid(format!("{path}.evidenceRefIds must be an array")))?;
+        if evidence.is_empty()
+            || evidence
+                .iter()
+                .any(|item| item.as_str().is_none_or(|id| !evidence_ids.contains(id)))
+        {
+            return Err(invalid(format!(
+                "{path}.evidenceRefIds references evidence outside the compiled pack"
+            )));
+        }
+        weapon_terminations.push(VerificationTerminationAuthority {
+            model_id: model_id.to_string(),
+            model_version: model_version.to_string(),
+            schema_version: compiled_pack_string(termination, &termination_path, "schemaVersion")?
+                .to_string(),
+            intended_use: compiled_pack_string(termination, &termination_path, "intendedUse")?
+                .to_string(),
+            criterion: compiled_pack_string(termination, &termination_path, "criterion")?
+                .to_string(),
+            intercept_radius_m,
+            maximum_flight_time_seconds,
+        });
+    }
+    if weapon_terminations.is_empty() {
+        return Err(invalid(
+            "engine-verification compiled model pack contains no weapon-termination authority",
+        ));
+    }
+    Ok(AuthenticatedVerificationPack {
+        id: compiled_pack_string(value, "pack", "id")?.to_string(),
+        version: compiled_pack_string(value, "pack", "version")?.to_string(),
+        digest: digest.to_string(),
+        intended_uses,
+        evidence_ids,
+        weapon_terminations,
+    })
+}
+
+pub(crate) fn runtime_model_pack_digest(pack: &crate::ModelPackBinding) -> String {
     let mut hash = Sha256::new();
     hash_string(&mut hash, "vector.runtime-model-pack-digest.v3");
     hash_string(&mut hash, &pack.schema_version);
@@ -548,11 +781,259 @@ fn verify_runtime_model_pack_digest(scenario: &EngineScenario) -> Result<(), Eng
         hash_string(&mut hash, &patch.provenance.authored_at);
         hash_strings(&mut hash, &patch.provenance.evidence_ref_ids);
     }
-    let actual = format!("{:x}", hash.finalize());
+    format!("{:x}", hash.finalize())
+}
+
+fn verify_runtime_model_pack_digest(scenario: &EngineScenario) -> Result<(), EngineError> {
+    let has_verification = scenario
+        .model_pack
+        .observer_sensors
+        .iter()
+        .any(|sensor| sensor.verification_track_model.is_some());
+    let has_termination_authority = !scenario.model_pack.weapon_terminations.is_empty();
+    if scenario.model_pack.runtime_digest.is_none()
+        && !has_verification
+        && !has_termination_authority
+    {
+        return Ok(());
+    }
+    let expected = scenario
+        .model_pack
+        .runtime_digest
+        .as_deref()
+        .ok_or_else(|| {
+            invalid(
+                "modelPack.runtimeDigest is required for verification-track or weapon-termination authority",
+            )
+        })?;
+    sha256_digest("modelPack.runtimeDigest", expected)?;
+    let actual = runtime_model_pack_digest(&scenario.model_pack);
     if actual != expected {
         return Err(invalid(format!(
             "modelPack.runtimeDigest does not match its content: expected {expected}, computed {actual}"
         )));
+    }
+    Ok(())
+}
+
+fn validate_weapon_termination_patch(
+    patch: &ScenarioModelPatch,
+    compiled_value: f64,
+    unit: &str,
+    evidence_exists: impl Fn(&str) -> bool,
+) -> Result<(), EngineError> {
+    if patch.old_value != compiled_value {
+        return Err(invalid(format!(
+            "weapon termination patch {} oldValue must equal compiled value {compiled_value}",
+            patch.id
+        )));
+    }
+    if patch.unit != unit {
+        return Err(invalid(format!(
+            "weapon termination patch {} unit must be {unit}",
+            patch.id
+        )));
+    }
+    if patch.provenance.evidence_ref_ids.is_empty()
+        || patch
+            .provenance
+            .evidence_ref_ids
+            .iter()
+            .any(|id| !evidence_exists(id))
+    {
+        return Err(invalid(format!(
+            "weapon termination patch {} references evidence outside the compiled pack",
+            patch.id
+        )));
+    }
+    Ok(())
+}
+
+fn verify_compiled_weapon_termination_authority(
+    scenario: &EngineScenario,
+    verification_pack: Option<&AuthenticatedVerificationPack>,
+) -> Result<(), EngineError> {
+    if scenario.model_pack.weapon_terminations.is_empty() {
+        return Ok(());
+    }
+    if scenario.model_pack.intended_use.id == "vector.intended-use.engine-verification" {
+        let pack = verification_pack.ok_or_else(|| {
+            invalid(
+                "weapon-termination authority under engine verification requires the complete authenticated compiled model pack",
+            )
+        })?;
+        if pack.id != scenario.model_pack.id
+            || pack.version != scenario.model_pack.version
+            || pack.digest != scenario.model_pack.digest
+            || !pack.intended_uses.iter().any(|(id, version)| {
+                id == &scenario.model_pack.intended_use.id
+                    && version == &scenario.model_pack.intended_use.version
+            })
+        {
+            return Err(invalid(
+                "engine-verification compiled model pack does not match the exact scenario identity and intended use",
+            ));
+        }
+        let mut relevant_patch_keys = HashSet::new();
+        for patch in &scenario.model_pack.scenario_patches {
+            if !patch.field_path.starts_with("/termination/") {
+                continue;
+            }
+            if !relevant_patch_keys.insert((patch.model_id.as_str(), patch.field_path.as_str())) {
+                return Err(invalid(format!(
+                    "duplicate weapon termination patch {}{}",
+                    patch.model_id, patch.field_path
+                )));
+            }
+            let weapon = pack
+                .weapon_terminations
+                .iter()
+                .find(|weapon| weapon.model_id == patch.model_id)
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "weapon termination patch {} target is not patchable",
+                        patch.id
+                    ))
+                })?;
+            let (compiled_value, unit) = match patch.field_path.as_str() {
+                "/termination/interceptRadiusM" => (weapon.intercept_radius_m, "m"),
+                "/termination/maximumFlightTimeS" => (weapon.maximum_flight_time_seconds, "s"),
+                _ => {
+                    return Err(invalid(format!(
+                        "weapon termination patch {} target is not patchable",
+                        patch.id
+                    )))
+                }
+            };
+            validate_weapon_termination_patch(patch, compiled_value, unit, |id| {
+                pack.evidence_ids.contains(id)
+            })?;
+        }
+        if pack.weapon_terminations.len() != scenario.model_pack.weapon_terminations.len() {
+            return Err(invalid(
+                "runtime weapon-termination projection does not match the authenticated engine-verification pack",
+            ));
+        }
+        for (weapon, actual) in pack
+            .weapon_terminations
+            .iter()
+            .zip(&scenario.model_pack.weapon_terminations)
+        {
+            let intercept_radius_m = scenario
+                .model_pack
+                .scenario_patches
+                .iter()
+                .find(|patch| {
+                    patch.model_id == weapon.model_id
+                        && patch.field_path == "/termination/interceptRadiusM"
+                })
+                .map_or(weapon.intercept_radius_m, |patch| patch.new_value);
+            let maximum_flight_time_seconds = scenario
+                .model_pack
+                .scenario_patches
+                .iter()
+                .find(|patch| {
+                    patch.model_id == weapon.model_id
+                        && patch.field_path == "/termination/maximumFlightTimeS"
+                })
+                .map_or(weapon.maximum_flight_time_seconds, |patch| patch.new_value);
+            if actual.model_id != weapon.model_id
+                || actual.model_version != weapon.model_version
+                || actual.termination.schema_version != weapon.schema_version
+                || actual.termination.intended_use != weapon.intended_use
+                || actual.termination.criterion != weapon.criterion
+                || actual.termination.intercept_radius_m != intercept_radius_m
+                || actual.termination.maximum_flight_time_seconds != maximum_flight_time_seconds
+            {
+                return Err(invalid(
+                    "runtime weapon-termination projection does not match the authenticated engine-verification pack",
+                ));
+            }
+        }
+        return Ok(());
+    }
+    if scenario.model_pack.id != "vector-scalar-study-models"
+        || scenario.model_pack.version != "0.9.0"
+        || scenario.model_pack.digest
+            != "aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c"
+        || scenario.model_pack.intended_use.id != "vector.intended-use.geometry-teaching"
+        || scenario.model_pack.intended_use.version != "1.1.0"
+    {
+        return Err(invalid(
+            "weapon-termination authority is not bound to the retained compiler-owned pack identity",
+        ));
+    }
+    let mut relevant_patch_keys = HashSet::new();
+    for patch in &scenario.model_pack.scenario_patches {
+        if !patch.field_path.starts_with("/termination/") {
+            continue;
+        }
+        if !RETAINED_WEAPON_TERMINATION_MODELS
+            .iter()
+            .any(|(model_id, _)| *model_id == patch.model_id)
+        {
+            return Err(invalid(format!(
+                "weapon termination patch {} target is not patchable",
+                patch.id
+            )));
+        }
+        let (compiled_value, unit) = match patch.field_path.as_str() {
+            "/termination/interceptRadiusM" => (25.0, "m"),
+            "/termination/maximumFlightTimeS" => (180.0, "s"),
+            _ => {
+                return Err(invalid(format!(
+                    "weapon termination patch {} target is not patchable",
+                    patch.id
+                )))
+            }
+        };
+        validate_weapon_termination_patch(patch, compiled_value, unit, |id| {
+            RETAINED_MODEL_PACK_EVIDENCE_IDS.contains(&id)
+        })?;
+        if !relevant_patch_keys.insert((patch.model_id.as_str(), patch.field_path.as_str())) {
+            return Err(invalid(format!(
+                "duplicate weapon termination patch {}{}",
+                patch.model_id, patch.field_path
+            )));
+        }
+    }
+    if scenario.model_pack.weapon_terminations.len() != RETAINED_WEAPON_TERMINATION_MODELS.len() {
+        return Err(invalid(
+            "runtime weapon-termination projection does not match the retained compiler-owned pack",
+        ));
+    }
+    for ((model_id, model_version), actual) in RETAINED_WEAPON_TERMINATION_MODELS
+        .iter()
+        .zip(&scenario.model_pack.weapon_terminations)
+    {
+        let mut intercept_radius_m = 25.0;
+        let mut maximum_flight_time_seconds = 180.0;
+        for patch in scenario
+            .model_pack
+            .scenario_patches
+            .iter()
+            .filter(|patch| patch.model_id == *model_id)
+        {
+            match patch.field_path.as_str() {
+                "/termination/interceptRadiusM" => intercept_radius_m = patch.new_value,
+                "/termination/maximumFlightTimeS" => {
+                    maximum_flight_time_seconds = patch.new_value;
+                }
+                _ => {}
+            }
+        }
+        if actual.model_id != *model_id
+            || actual.model_version != *model_version
+            || actual.termination.schema_version != "vector.weapon-termination-model.v1"
+            || actual.termination.intended_use != "ENGINE_VERIFICATION_ONLY"
+            || actual.termination.criterion != "GEOMETRIC_CLOSEST_APPROACH"
+            || actual.termination.intercept_radius_m != intercept_radius_m
+            || actual.termination.maximum_flight_time_seconds != maximum_flight_time_seconds
+        {
+            return Err(invalid(
+                "runtime weapon-termination projection does not match the retained compiler-owned pack",
+            ));
+        }
     }
     Ok(())
 }
@@ -1003,7 +1484,10 @@ fn validate_entity(index: usize, entity: &EntityDefinition) -> Result<(), Engine
 }
 
 /// Validate semantic invariants and synchronous resource limits before integration.
-pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
+fn validate_scenario_with_compiled_pack(
+    scenario: &EngineScenario,
+    verification_pack: Option<&AuthenticatedVerificationPack>,
+) -> Result<(), EngineError> {
     identifier("id", &scenario.id)?;
     identifier("version", &scenario.version)?;
     label("name", &scenario.name)?;
@@ -1021,6 +1505,7 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
     identifier("modelPack.version", &scenario.model_pack.version)?;
     sha256_digest("modelPack.digest", &scenario.model_pack.digest)?;
     verify_runtime_model_pack_digest(scenario)?;
+    verify_compiled_weapon_termination_authority(scenario, verification_pack)?;
     identifier(
         "modelPack.intendedUse.id",
         &scenario.model_pack.intended_use.id,
@@ -1344,7 +1829,7 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
                     && candidate.termination.maximum_flight_time_seconds
                         == weapon.termination.maximum_flight_time_seconds
             });
-            if !scenario.model_pack.weapon_terminations.is_empty() && !exact_match {
+            if !exact_match {
                 return Err(invalid(format!(
                     "weapon {} termination is not bound to the admitted compiled model",
                     entity.id
@@ -1386,12 +1871,15 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         }
         if let Some(launch_time) = weapon.launch_time_seconds {
             launched_weapon_count += 1;
-            if entity.kind == crate::EntityKind::GuidedWeapon
-                && !weapon.store_transfer.as_ref().is_some_and(|binding| {
+            if entity.kind == crate::EntityKind::GuidedWeapon {
+                if entity.lifecycle != crate::EntityLifecycle::Stowed {
+                    return Err(invalid("scheduled guided weapon must begin STOWED"));
+                }
+                if !weapon.store_transfer.as_ref().is_some_and(|binding| {
                     binding.transfer.operation == crate::StoreTransferOperation::Jettison
-                })
-            {
-                scheduled_guided_release_count += 1;
+                }) {
+                    scheduled_guided_release_count += 1;
+                }
             }
             if launch_time > scenario.duration_seconds {
                 return Err(invalid(format!(
@@ -1568,4 +2056,16 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
     }
 
     Ok(())
+}
+
+/// Validate a product scenario without caller-supplied verification authority.
+pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
+    validate_scenario_with_compiled_pack(scenario, None)
+}
+
+pub(crate) fn validate_scenario_with_verification_pack(
+    scenario: &EngineScenario,
+    verification_pack: &AuthenticatedVerificationPack,
+) -> Result<(), EngineError> {
+    validate_scenario_with_compiled_pack(scenario, Some(verification_pack))
 }

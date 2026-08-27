@@ -14,8 +14,10 @@ import {
   SIMULATION_EVENT_SCHEMA,
 } from "./contracts.ts";
 import { closestApproachOnRelativeSegment } from "./weapon-termination.ts";
+import { createEnvironmentSampler } from "../geospatial/environment-pack.ts";
 
 export const MAX_SIMULATION_EVENTS = 100_000;
+const RETAINED_TERRAIN_CONTACT_TOLERANCE_M = 1e-8;
 
 export type SimulationEventReceipt = {
   tick: number;
@@ -33,6 +35,247 @@ export type SimulationEventDraft = Omit<
 > & {
   causes: SimulationEventCauseReference[];
 };
+
+function retainedWeaponLifetimeClosestApproach(
+  frames: readonly EngineFrame[],
+  terminalFrameIndex: number,
+  weaponId: string,
+  targetId: string,
+  launchTimeSeconds: number,
+  expiryTimeSeconds: number,
+  fixedStepSeconds: number,
+) {
+  let closestApproachM = Number.POSITIVE_INFINITY;
+  let retainedExactSegments = 0;
+  for (let frameIndex = 0; frameIndex < terminalFrameIndex; frameIndex += 1) {
+    const frame = frames[frameIndex]!;
+    const nextFrame = frames[frameIndex + 1];
+    if (
+      !nextFrame ||
+      Math.abs((nextFrame.t - frame.t) - fixedStepSeconds) > 1.1e-6 ||
+      frame.t < launchTimeSeconds - 1e-9 ||
+      frame.t >= expiryTimeSeconds
+    ) continue;
+    const weapon = frame.entities.find((entity) => entity.id === weaponId);
+    const target = frame.entities.find((entity) => entity.id === targetId);
+    const nextWeapon = nextFrame.entities.find((entity) => entity.id === weaponId);
+    const nextTarget = nextFrame.entities.find((entity) => entity.id === targetId);
+    if (!weapon || !target || !nextWeapon || !nextTarget) continue;
+    const relativeStart = {
+      x: target.position.x - weapon.position.x,
+      y: target.position.y - weapon.position.y,
+      z: target.position.z - weapon.position.z,
+    };
+    const relativeEnd = {
+      x: nextTarget.position.x - nextWeapon.position.x,
+      y: nextTarget.position.y - nextWeapon.position.y,
+      z: nextTarget.position.z - nextWeapon.position.z,
+    };
+    const activeFraction = Math.max(0, Math.min(
+      1,
+      (expiryTimeSeconds - frame.t) / fixedStepSeconds,
+    ));
+    const admittedEnd = {
+      x: relativeStart.x + (relativeEnd.x - relativeStart.x) * activeFraction,
+      y: relativeStart.y + (relativeEnd.y - relativeStart.y) * activeFraction,
+      z: relativeStart.z + (relativeEnd.z - relativeStart.z) * activeFraction,
+    };
+    closestApproachM = Math.min(
+      closestApproachM,
+      closestApproachOnRelativeSegment(relativeStart, admittedEnd).distanceM,
+    );
+    retainedExactSegments += 1;
+  }
+  if (!Number.isFinite(closestApproachM) || retainedExactSegments === 0) {
+    throw new Error("Simulation weapon-termination record has no retained exact lifetime geometry.");
+  }
+  return Number(closestApproachM.toFixed(6));
+}
+
+function retainedClosestApproachWitness(
+  frames: readonly EngineFrame[],
+  terminalFrameIndex: number,
+  weaponId: string,
+  targetId: string,
+  priorTimeSeconds: number,
+  nextTimeSeconds: number,
+  expiryTimeSeconds: number,
+  fixedStepSeconds: number,
+) {
+  let priorIndex = -1;
+  for (let index = 0; index < terminalFrameIndex; index += 1) {
+    if (Math.abs(frames[index]!.t - priorTimeSeconds) <= 1e-9) priorIndex = index;
+  }
+  const priorFrame = priorIndex >= 0 ? frames[priorIndex] : undefined;
+  const nextFrame = priorIndex >= 0 ? frames[priorIndex + 1] : undefined;
+  if (
+    !priorFrame || !nextFrame || Math.abs(nextFrame.t - nextTimeSeconds) > 1e-9 ||
+    Math.abs((nextTimeSeconds - priorTimeSeconds) - fixedStepSeconds) > 1.1e-6
+  ) {
+    throw new Error(
+      "Simulation weapon-termination record is missing its declared exact closest-approach witness pair.",
+    );
+  }
+  const weapon = priorFrame.entities.find((entity) => entity.id === weaponId);
+  const target = priorFrame.entities.find((entity) => entity.id === targetId);
+  const nextWeapon = nextFrame.entities.find((entity) => entity.id === weaponId);
+  const nextTarget = nextFrame.entities.find((entity) => entity.id === targetId);
+  if (!weapon || !target || !nextWeapon || !nextTarget) {
+    throw new Error(
+      "Simulation weapon-termination closest-approach witness omits its weapon or target geometry.",
+    );
+  }
+  const relativeStart = {
+    x: target.position.x - weapon.position.x,
+    y: target.position.y - weapon.position.y,
+    z: target.position.z - weapon.position.z,
+  };
+  const relativeEnd = {
+    x: nextTarget.position.x - nextWeapon.position.x,
+    y: nextTarget.position.y - nextWeapon.position.y,
+    z: nextTarget.position.z - nextWeapon.position.z,
+  };
+  const activeFraction = Math.max(0, Math.min(
+    1,
+    (expiryTimeSeconds - priorTimeSeconds) / fixedStepSeconds,
+  ));
+  const admittedEnd = {
+    x: relativeStart.x + (relativeEnd.x - relativeStart.x) * activeFraction,
+    y: relativeStart.y + (relativeEnd.y - relativeStart.y) * activeFraction,
+    z: relativeStart.z + (relativeEnd.z - relativeStart.z) * activeFraction,
+  };
+  return Number(closestApproachOnRelativeSegment(relativeStart, admittedEnd).distanceM.toFixed(6));
+}
+
+type WeaponTerminationCause = Extract<
+  SimulationEventPayload,
+  { kind: "WEAPON_TERMINATED" }
+>["cause"];
+
+function evaluateWeaponTerminationBoundary(
+  scenario: EngineScenario,
+  weapon: EngineScenario["entities"][number],
+  targetId: string,
+  priorFrame: EngineFrame,
+  frame: EngineFrame,
+) {
+  const admission = weapon.weapon?.termination;
+  const priorFrameWeapon = priorFrame.entities.find((candidate) => candidate.id === weapon.id);
+  const priorFrameTarget = priorFrame.entities.find((candidate) => candidate.id === targetId);
+  const frameWeapon = frame.entities.find((candidate) => candidate.id === weapon.id);
+  const frameTarget = frame.entities.find((candidate) => candidate.id === targetId);
+  if (
+    !weapon.weapon || !admission || !priorFrameWeapon || !priorFrameTarget ||
+    !frameWeapon || !frameTarget ||
+    Math.abs((frame.t - priorFrame.t) - scenario.fixedStepSeconds) > 1.1e-6
+  ) return undefined;
+  const relativeStart = {
+    x: priorFrameTarget.position.x - priorFrameWeapon.position.x,
+    y: priorFrameTarget.position.y - priorFrameWeapon.position.y,
+    z: priorFrameTarget.position.z - priorFrameWeapon.position.z,
+  };
+  const relativeEnd = {
+    x: frameTarget.position.x - frameWeapon.position.x,
+    y: frameTarget.position.y - frameWeapon.position.y,
+    z: frameTarget.position.z - frameWeapon.position.z,
+  };
+  const achievedLaunchTimeSeconds = modelTimeAtTick(
+    firstFixedStepTickAtOrAfter(
+      weapon.weapon.launchTimeSeconds ?? 0,
+      scenario.fixedStepSeconds,
+    ),
+    scenario.fixedStepSeconds,
+  );
+  const expiryTimeSeconds = achievedLaunchTimeSeconds + admission.maximumFlightTimeSeconds;
+  const activeStepFraction = Math.max(0, Math.min(
+    1,
+    (expiryTimeSeconds - priorFrame.t) / scenario.fixedStepSeconds,
+  ));
+  const activeRelativeEnd = {
+    x: relativeStart.x + (relativeEnd.x - relativeStart.x) * activeStepFraction,
+    y: relativeStart.y + (relativeEnd.y - relativeStart.y) * activeStepFraction,
+    z: relativeStart.z + (relativeEnd.z - relativeStart.z) * activeStepFraction,
+  };
+  const terminalClosest = closestApproachOnRelativeSegment(relativeStart, activeRelativeEnd);
+  const targetUnavailable = frameTarget.lifecycle === "TERMINATED";
+  const geometricIntercept = expiryTimeSeconds > priorFrame.t &&
+    terminalClosest.distanceM <= admission.interceptRadiusM;
+  const flightTimeExpired = expiryTimeSeconds <= frame.t;
+  const needsTerrainPrecedence = !targetUnavailable && !geometricIntercept && !flightTimeExpired;
+  const terrainElevationM = needsTerrainPrecedence
+    ? scenario.geospatial?.environmentPack
+      ? createEnvironmentSampler(scenario.geospatial.environmentPack).terrain.sample({
+          eastM: frameWeapon.position.x,
+          northM: frameWeapon.position.y,
+        }).elevation?.valueM ?? 0
+      : 0
+    : Number.NEGATIVE_INFINITY;
+  const terrainImpact = needsTerrainPrecedence &&
+    frameWeapon.position.z <= terrainElevationM + RETAINED_TERRAIN_CONTACT_TOLERANCE_M &&
+    frame.t > 1;
+  const energyDepleted = frame.t - achievedLaunchTimeSeconds > weapon.weapon.burnSeconds + 2 &&
+    Math.hypot(frameWeapon.velocity.x, frameWeapon.velocity.y, frameWeapon.velocity.z) < 80 &&
+    terminalClosest.distanceM > 1000;
+  const expectedCause: WeaponTerminationCause | undefined = targetUnavailable
+    ? "TARGET_UNAVAILABLE"
+    : geometricIntercept
+      ? "GEOMETRIC_INTERCEPT"
+      : flightTimeExpired
+        ? "FLIGHT_TIME_EXPIRED"
+        : terrainImpact
+          ? "TERRAIN_IMPACT"
+          : energyDepleted
+            ? "ENERGY_DEPLETED"
+            : undefined;
+  return {
+    activeStepFraction,
+    exactPriorTimeSeconds: priorFrame.t,
+    exactTerminalTimeSeconds: frame.t,
+    expectedCause,
+    expiryTimeSeconds,
+    terminalClosest,
+  };
+}
+
+export function mergeWeaponEvidenceFrames(
+  sourceFrames: readonly EngineFrame[],
+  sourceEvents: readonly SimulationEventV2[],
+  evidenceFrames: readonly EngineFrame[] = [],
+) {
+  const sourceTimes = new Set(sourceFrames.map((frame) => frame.t));
+  const uniqueEvidenceByTime = new Map<number, EngineFrame>();
+  for (const frame of evidenceFrames) {
+    if (!sourceTimes.has(frame.t) && !uniqueEvidenceByTime.has(frame.t)) {
+      uniqueEvidenceByTime.set(frame.t, frame);
+    }
+  }
+  const pendingEvidence = [...uniqueEvidenceByTime.values()]
+    .sort((left, right) => left.t - right.t);
+  const frames: EngineFrame[] = [];
+  const sourceFrameIndexes = new Array<number>(sourceFrames.length);
+  let sourceIndex = 0;
+  let evidenceIndex = 0;
+  while (sourceIndex < sourceFrames.length || evidenceIndex < pendingEvidence.length) {
+    const sourceFrame = sourceFrames[sourceIndex];
+    const evidenceFrame = pendingEvidence[evidenceIndex];
+    if (!evidenceFrame || (sourceFrame && sourceFrame.t <= evidenceFrame.t)) {
+      sourceFrameIndexes[sourceIndex] = frames.length;
+      frames.push(sourceFrame!);
+      sourceIndex += 1;
+    } else {
+      frames.push(evidenceFrame);
+      evidenceIndex += 1;
+    }
+  }
+  const events = sourceEvents.map((event) => {
+    const frameIndex = sourceFrameIndexes[event.frameIndex];
+    if (frameIndex === undefined) {
+      throw new Error(`Simulation event ${event.id} lost its source frame during evidence merge.`);
+    }
+    return { ...event, frameIndex };
+  });
+  return { frames, events };
+}
 
 const PHASES = [
   "LIFECYCLE",
@@ -230,6 +473,7 @@ function payloadSortKey(payload: SimulationEventPayload) {
     return canonicalJson([
       "5", payload.schemaVersion, payload.weaponId, payload.targetId,
       payload.from, payload.to, payload.cause, payload.occurrenceTimeSeconds,
+      payload.closestApproachPriorTimeSeconds, payload.closestApproachNextTimeSeconds,
     ]);
   }
   if (payload.kind === "RUN_COMPLETED") {
@@ -302,7 +546,8 @@ function assertPayload(value: unknown, index: number): asserts value is Simulati
   } else if (value.kind === "WEAPON_TERMINATED") {
     exactKeys(value, [
       "kind", "schemaVersion", "weaponId", "targetId", "from", "to", "cause",
-      "criterion", "closestApproachM", "occurrenceTimeSeconds", "interceptRadiusM",
+      "criterion", "closestApproachM", "closestApproachPriorTimeSeconds",
+      "closestApproachNextTimeSeconds", "occurrenceTimeSeconds", "interceptRadiusM",
       "maximumFlightTimeSeconds", "targetEffect",
     ], [], `Simulation event ${index} payload`);
     if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.WEAPON_TERMINATED) throw new Error(`Simulation event ${index} payload schema is unsupported.`);
@@ -314,6 +559,8 @@ function assertPayload(value: unknown, index: number): asserts value is Simulati
     if (value.criterion !== "GEOMETRIC_CLOSEST_APPROACH" || value.targetEffect !== "NOT_MODELLED") throw new Error(`Simulation event ${index} weapon termination authority is unsupported.`);
     for (const [field, fieldValue] of [
       ["closest approach", value.closestApproachM],
+      ["closest-approach prior time", value.closestApproachPriorTimeSeconds],
+      ["closest-approach next time", value.closestApproachNextTimeSeconds],
       ["occurrence time", value.occurrenceTimeSeconds],
       ["intercept radius", value.interceptRadiusM],
       ["maximum flight time", value.maximumFlightTimeSeconds],
@@ -321,6 +568,7 @@ function assertPayload(value: unknown, index: number): asserts value is Simulati
       if (!Number.isFinite(fieldValue) || (fieldValue as number) < 0) throw new Error(`Simulation event ${index} ${field} is invalid.`);
     }
     if ((value.interceptRadiusM as number) <= 0 || (value.maximumFlightTimeSeconds as number) <= 0) throw new Error(`Simulation event ${index} weapon termination limits are invalid.`);
+    if ((value.closestApproachNextTimeSeconds as number) <= (value.closestApproachPriorTimeSeconds as number)) throw new Error(`Simulation event ${index} closest-approach witness interval is invalid.`);
     const causeMatchesState =
       (value.to === "INTERCEPT" && value.cause === "GEOMETRIC_INTERCEPT" && (value.closestApproachM as number) <= (value.interceptRadiusM as number)) ||
       (value.to === "MISS" && value.cause === "ENERGY_DEPLETED") ||
@@ -578,6 +826,19 @@ export function assertSimulationEventStream(
   }
   if (values.length > MAX_SIMULATION_EVENTS) throw new Error(`Simulation event stream exceeds ${MAX_SIMULATION_EVENTS} events.`);
   const entityById = new Map(scenario.entities.map((entity) => [entity.id, entity]));
+  const observerSensorById = new Map(
+    scenario.modelPack.observerSensors.map((sensor) => [sensor.modelId, sensor]),
+  );
+  const admittedObserverProducerKeys = new Set<string>();
+  for (const entity of scenario.entities) {
+    if (entity.kind !== "AIRCRAFT" || !entity.observerSensor) continue;
+    admittedObserverProducerKeys.add([
+      entity.affiliation,
+      entity.observerSensor.modelId,
+      entity.observerSensor.modelVersion,
+      entity.observerSensor.modelPackDigest,
+    ].join("\u0000"));
+  }
   const lifecycleByEntity = new Map<string, EntityLifecycle>(
     scenario.entities.map((entity) => [entity.id, entity.lifecycle]),
   );
@@ -607,19 +868,21 @@ export function assertSimulationEventStream(
       assertEngineObserverState(state);
       const owner = state.perspective === "IAF" ? "BLUE" : "RED";
       const admitted = "sensorModelId" in state
-        ? scenario.modelPack.observerSensors.find((sensor) => sensor.modelId === state.sensorModelId)
+        ? observerSensorById.get(state.sensorModelId)
         : undefined;
       if ("sensorModelId" in state && !admitted) {
         throw new Error("Observer state source is not bound to the compiled scenario sensor projection.");
       }
       if (state.schemaVersion === "vector.observer-state.v3") {
-        const producer = scenario.entities.find((entity) =>
-          entity.kind === "AIRCRAFT" && entity.affiliation === owner &&
-          entity.observerSensor?.modelId === state.sensorModelId &&
-          entity.observerSensor.modelVersion === admitted?.modelVersion &&
-          entity.observerSensor.modelPackDigest === scenario.modelPack.digest,
-        );
-        if (!producer) throw new Error("Observer state source is not bound to an admitted scenario sensor.");
+        const producerKey = [
+          owner,
+          state.sensorModelId,
+          admitted?.modelVersion,
+          scenario.modelPack.digest,
+        ].join("\u0000");
+        if (!admittedObserverProducerKeys.has(producerKey)) {
+          throw new Error("Observer state source is not bound to an admitted scenario sensor.");
+        }
         for (const value of [...state.observations, ...state.tracks]) {
           if (
             value.source.modelPackDigest !== scenario.modelPack.digest ||
@@ -674,6 +937,7 @@ export function assertSimulationEventStream(
   let prior: SimulationEventV2 | undefined;
   let weaponTerminationEvents = 0;
   let weaponTerminationPayload: Extract<SimulationEventPayload, { kind: "WEAPON_TERMINATED" }> | undefined;
+  let weaponTerminationEvent: SimulationEventV2 | undefined;
   for (const [index, raw] of values.entries()) {
     if (!isRecord(raw)) throw new Error(`Simulation event ${index} must be an object.`);
     exactKeys(raw, ["schemaVersion", "id", "sequence", "localKey", "tick", "modelTimeSeconds", "frameIndex", "phase", "producer", "knowledgeScope", "participants", "causeEventIds", "payload"], ["ownerAffiliation", "correlationId"], `Simulation event ${index}`);
@@ -882,12 +1146,17 @@ export function assertSimulationEventStream(
       weaponTerminationEvents += 1;
       const payload = event.payload;
       weaponTerminationPayload = payload;
+      weaponTerminationEvent = event;
       const weapon = entityById.get(payload.weaponId);
       const target = entityById.get(payload.targetId);
       const frameWeapon = frame.entities.find((candidate) => candidate.id === payload.weaponId);
       const frameTarget = frame.entities.find((candidate) => candidate.id === payload.targetId);
-      const priorFrameWeapon = frames[event.frameIndex - 1]?.entities.find(
+      const priorFrame = frames[event.frameIndex - 1];
+      const priorFrameWeapon = priorFrame?.entities.find(
         (candidate) => candidate.id === payload.weaponId,
+      );
+      const priorFrameTarget = priorFrame?.entities.find(
+        (candidate) => candidate.id === payload.targetId,
       );
       const admission = weapon?.weapon?.termination;
       const targetLifecycleMatchesCause = payload.cause === "TARGET_UNAVAILABLE"
@@ -902,7 +1171,9 @@ export function assertSimulationEventStream(
           payload.targetId !== recordedPrimary.primaryTargetId
         )) ||
         !targetLifecycleMatchesCause ||
-        !priorFrameWeapon || priorFrameWeapon.weaponFlightState !== payload.from ||
+        !priorFrame || !priorFrameWeapon || !priorFrameTarget ||
+        priorFrame.t !== recordedModelTimeAtTick(event.tick - 1, scenario.fixedStepSeconds) ||
+        priorFrameWeapon.weaponFlightState !== payload.from ||
         frameWeapon.weaponFlightState !== payload.to || weapon.weapon?.targetEntityId !== payload.targetId ||
         event.participants.length !== 2 ||
         !event.participants.some((item) => item.entityId === payload.weaponId && item.role === "WEAPON") ||
@@ -913,75 +1184,56 @@ export function assertSimulationEventStream(
         payload.occurrenceTimeSeconds < event.modelTimeSeconds - scenario.fixedStepSeconds - 1e-9 ||
         payload.occurrenceTimeSeconds > event.modelTimeSeconds + 1e-9
       ) throw new Error(`Simulation weapon-termination event ${event.id} has invalid authority, ownership, or achieved frame state.`);
-      if (payload.cause === "FLIGHT_TIME_EXPIRED") {
-        const achievedLaunchTimeSeconds = modelTimeAtTick(
-          firstFixedStepTickAtOrAfter(
-            weapon.weapon.launchTimeSeconds ?? 0,
-            scenario.fixedStepSeconds,
-          ),
-          scenario.fixedStepSeconds,
+      const boundary = evaluateWeaponTerminationBoundary(
+        scenario,
+        weapon,
+        payload.targetId,
+        priorFrame,
+        frame,
+      );
+      if (!boundary) {
+        throw new Error(
+          `Simulation weapon-termination event ${event.id} has no exact retained boundary geometry.`,
         );
-        const expectedExpiryTimeSeconds = Number((
-          achievedLaunchTimeSeconds + admission.maximumFlightTimeSeconds
-        ).toFixed(6));
+      }
+      const {
+        activeStepFraction,
+        exactPriorTimeSeconds,
+        expectedCause,
+        expiryTimeSeconds,
+        terminalClosest,
+      } = boundary;
+      const expectedPhase = {
+        GEOMETRIC_INTERCEPT: "Geometric intercept",
+        ENERGY_DEPLETED: "Miss",
+        FLIGHT_TIME_EXPIRED: "Flight time expired",
+        TERRAIN_IMPACT: "Terrain impact",
+        TARGET_UNAVAILABLE: "Target unavailable",
+      }[payload.cause];
+      if (expectedCause !== payload.cause || frameWeapon.phase !== expectedPhase) {
+        throw new Error(
+          `Simulation weapon-termination event ${event.id} does not match terminal-frame cause precedence or phase ` +
+          `(expected ${expectedCause ?? "no terminal cause"}/${expectedPhase}, ` +
+          `recorded ${payload.cause}/${frameWeapon.phase}).`,
+        );
+      }
+      if (payload.cause === "FLIGHT_TIME_EXPIRED") {
+        const expectedExpiryTimeSeconds = Number(expiryTimeSeconds.toFixed(6));
         if (payload.occurrenceTimeSeconds !== expectedExpiryTimeSeconds) {
           throw new Error(`Simulation weapon-termination event ${event.id} does not match the exact admitted expiry time.`);
         }
       } else if (payload.cause === "GEOMETRIC_INTERCEPT") {
-        const priorFrame = frames[event.frameIndex - 1];
-        const priorWeapon = priorFrame?.entities.find((candidate) => candidate.id === payload.weaponId);
-        const priorTarget = priorFrame?.entities.find((candidate) => candidate.id === payload.targetId);
-        const expectedPriorTimeSeconds = recordedModelTimeAtTick(
-          event.tick - 1,
-          scenario.fixedStepSeconds,
-        );
-        if (!priorFrame || priorFrame.t !== expectedPriorTimeSeconds || !priorWeapon || !priorTarget || !frameTarget) {
-          throw new Error(
-            `Simulation weapon-termination event ${event.id} has no exact preceding boundary geometry ` +
-            `(expected ${expectedPriorTimeSeconds}, retained ${priorFrame?.t ?? "missing"}, ` +
-            `weapon ${Boolean(priorWeapon)}, prior target ${Boolean(priorTarget)}, terminal target ${Boolean(frameTarget)}).`,
-          );
-        }
-        const relativeStart = {
-          x: priorTarget.position.x - priorWeapon.position.x,
-          y: priorTarget.position.y - priorWeapon.position.y,
-          z: priorTarget.position.z - priorWeapon.position.z,
-        };
-        const relativeEnd = {
-          x: frameTarget.position.x - frameWeapon.position.x,
-          y: frameTarget.position.y - frameWeapon.position.y,
-          z: frameTarget.position.z - frameWeapon.position.z,
-        };
-        const achievedLaunchTimeSeconds = modelTimeAtTick(
-          firstFixedStepTickAtOrAfter(
-            weapon.weapon.launchTimeSeconds ?? 0,
-            scenario.fixedStepSeconds,
-          ),
-          scenario.fixedStepSeconds,
-        );
-        const expiryTimeSeconds =
-          achievedLaunchTimeSeconds + admission.maximumFlightTimeSeconds;
-        const activeStepFraction = Math.max(0, Math.min(
-          1,
-          (expiryTimeSeconds - expectedPriorTimeSeconds) / scenario.fixedStepSeconds,
-        ));
-        const activeRelativeEnd = {
-          x: relativeStart.x + (relativeEnd.x - relativeStart.x) * activeStepFraction,
-          y: relativeStart.y + (relativeEnd.y - relativeStart.y) * activeStepFraction,
-          z: relativeStart.z + (relativeEnd.z - relativeStart.z) * activeStepFraction,
-        };
-        const closest = closestApproachOnRelativeSegment(relativeStart, activeRelativeEnd);
         const expectedOccurrenceTimeSeconds = Number((
-          expectedPriorTimeSeconds +
-          closest.fraction * activeStepFraction * scenario.fixedStepSeconds
+          exactPriorTimeSeconds +
+          terminalClosest.fraction * activeStepFraction * scenario.fixedStepSeconds
         ).toFixed(6));
         if (
-          closest.distanceM > admission.interceptRadiusM + 1e-9 ||
+          terminalClosest.distanceM > admission.interceptRadiusM + 1e-9 ||
           payload.occurrenceTimeSeconds !== expectedOccurrenceTimeSeconds
         ) {
           throw new Error(`Simulation weapon-termination event ${event.id} does not match its exact geometric intercept time.`);
         }
-        const expectedClosestApproachM = Number(closest.distanceM.toFixed(6));
+        const expectedClosestApproachM = Number(terminalClosest.distanceM.toFixed(6));
         if (payload.closestApproachM !== expectedClosestApproachM) {
           throw new Error(`Simulation weapon-termination event ${event.id} does not match its exact geometric intercept distance.`);
         }
@@ -1055,6 +1307,47 @@ export function assertSimulationEventStream(
     if (weaponTerminationEvents !== (weaponTerminalRun ? 1 : 0)) {
       throw new Error("Simulation event stream does not contain the exact weapon termination required by the run outcome.");
     }
+    if (!weaponTerminalRun && weaponTerminationEvents === 0 && frames.length >= 2) {
+      const priorFrame = frames.at(-2)!;
+      const finalFrame = frames.at(-1)!;
+      for (const weapon of scenario.entities) {
+        if (
+          weapon.kind !== "GUIDED_WEAPON" ||
+          !weapon.weapon?.termination ||
+          weapon.weapon.launchTimeSeconds === null ||
+          weapon.weapon.storeTransfer?.operation === "JETTISON"
+        ) continue;
+        if (!enteredEntityIds.has(weapon.id)) continue;
+        const boundary = evaluateWeaponTerminationBoundary(
+          scenario,
+          weapon,
+          weapon.weapon.targetEntityId,
+          priorFrame,
+          finalFrame,
+        );
+        if (!boundary) {
+          throw new Error(
+            `Simulation event stream has no exact retained final fixed-step boundary geometry for launched weapon ${weapon.id}.`,
+          );
+        }
+        if (boundary?.expectedCause) {
+          throw new Error(
+            `Simulation event stream suppresses the ${boundary.expectedCause} weapon termination proven by the final retained segment.`,
+          );
+        }
+      }
+    }
+    if (
+      termination === "time_limit" &&
+      typed.at(-1)?.tick !== firstFixedStepTickAtOrAfter(
+        scenario.durationSeconds,
+        scenario.fixedStepSeconds,
+      )
+    ) {
+      throw new Error(
+        "RUN_COMPLETED time-limit event does not reference the declared scenario terminal tick.",
+      );
+    }
     const weaponTerminationByRunOutcome: Partial<Record<EngineTermination, {
       to: Extract<SimulationEventPayload, { kind: "WEAPON_TERMINATED" }>["to"];
       cause: Extract<SimulationEventPayload, { kind: "WEAPON_TERMINATED" }>["cause"];
@@ -1078,6 +1371,48 @@ export function assertSimulationEventStream(
       weaponTerminationPayload?.closestApproachM !== Number(closestApproachM.toFixed(6))
     ) {
       throw new Error("Simulation weapon-termination event does not match the recorded run closest approach.");
+    }
+    if (expectedWeaponTermination && weaponTerminationPayload && weaponTerminationEvent) {
+      const weapon = entityById.get(weaponTerminationPayload.weaponId);
+      const terminationAuthority = weapon?.weapon?.termination;
+      if (!weapon?.weapon || !terminationAuthority) {
+        throw new Error("Simulation weapon-termination event has no admitted lifetime authority.");
+      }
+      const launchTimeSeconds = modelTimeAtTick(
+        firstFixedStepTickAtOrAfter(
+          weapon.weapon.launchTimeSeconds ?? 0,
+          scenario.fixedStepSeconds,
+        ),
+        scenario.fixedStepSeconds,
+      );
+      const retainedClosestApproachM = retainedWeaponLifetimeClosestApproach(
+        frames,
+        weaponTerminationEvent.frameIndex,
+        weaponTerminationPayload.weaponId,
+        weaponTerminationPayload.targetId,
+        launchTimeSeconds,
+        launchTimeSeconds + terminationAuthority.maximumFlightTimeSeconds,
+        scenario.fixedStepSeconds,
+      );
+      const witnessedClosestApproachM = retainedClosestApproachWitness(
+        frames,
+        weaponTerminationEvent.frameIndex,
+        weaponTerminationPayload.weaponId,
+        weaponTerminationPayload.targetId,
+        weaponTerminationPayload.closestApproachPriorTimeSeconds,
+        weaponTerminationPayload.closestApproachNextTimeSeconds,
+        launchTimeSeconds + terminationAuthority.maximumFlightTimeSeconds,
+        scenario.fixedStepSeconds,
+      );
+      if (
+        weaponTerminationPayload.closestApproachM !== retainedClosestApproachM ||
+        weaponTerminationPayload.closestApproachM !== witnessedClosestApproachM ||
+        Number(closestApproachM.toFixed(6)) !== retainedClosestApproachM
+      ) {
+        throw new Error(
+          "Simulation weapon-termination event and run do not match retained lifetime closest-approach evidence.",
+        );
+      }
     }
     for (const entity of scenario.entities) {
       if (

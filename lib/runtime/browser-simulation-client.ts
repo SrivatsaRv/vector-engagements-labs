@@ -1,8 +1,6 @@
 import type { ProfileId } from "../engine/primitives.ts";
-import {
-  openVectorSimulationRecord,
-  type OpenedVectorRecord,
-} from "../record/vector-record.ts";
+import type { CompiledModelPack } from "../model-pack.ts";
+import type { OpenedVectorRecord } from "../record/vector-record.ts";
 import {
   prepareSimulation,
   type Scenario,
@@ -280,10 +278,13 @@ export class BrowserSimulationClient {
         throw new Error("Browser simulation completion provenance is invalid.");
       }
       try {
-        const record = await openVectorSimulationRecord(
-          response.recordBuffer,
-          response.byteLength,
-        );
+        const record = response.record;
+        if (
+          record.manifest.recordId !== response.recordId ||
+          record.manifest.contentDigest !== response.contentDigest
+        ) {
+          throw new Error("Browser simulation completion record identity is invalid.");
+        }
         return {
           result: record.result,
           record,
@@ -307,6 +308,49 @@ export class BrowserSimulationClient {
       this.activeRunId = null;
       this.activeProgressListener = null;
       this.activeStateListener = null;
+    }
+  }
+
+  async openRecord(
+    buffer: ArrayBuffer,
+    byteLength = buffer.byteLength,
+    options: {
+      compiledModelPack?: Readonly<CompiledModelPack>;
+      timeoutMs?: number;
+    } = {},
+  ): Promise<OpenedVectorRecord> {
+    if (this.activeRunId || this.preparing) {
+      throw new Error("A browser simulation run or record verification is already active.");
+    }
+    if (byteLength < 12 || byteLength > buffer.byteLength) {
+      throw new Error("VECTOR record length is out of bounds.");
+    }
+    this.preparing = true;
+    try {
+      await this.initialize();
+      const requestId = this.nextId("open-record");
+      const recordBuffer = buffer.slice(0, byteLength);
+      const response = await this.request(
+        {
+          protocol: BROWSER_RUNTIME_PROTOCOL,
+          requestId,
+          type: "open-record",
+          recordBuffer,
+          byteLength,
+          ...(options.compiledModelPack
+            ? { compiledModelPack: options.compiledModelPack }
+            : {}),
+        },
+        (message) => message.type === "record-opened",
+        options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        [recordBuffer],
+      );
+      if (response.type !== "record-opened") {
+        throw new Error("Browser record verification ended without an admitted record.");
+      }
+      return response.record;
+    } finally {
+      this.preparing = false;
     }
   }
 

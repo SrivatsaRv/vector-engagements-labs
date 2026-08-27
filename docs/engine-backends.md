@@ -87,10 +87,19 @@ authority must resolve an exact application-retained compiled pack; an unknown
 pack is rejected even when its compact projection is omitted or self-resealed.
 Compiler verification may supply the complete exact-identity pack only when the
 scenario and pack both declare the governed engine-verification intended use;
-the product execution path supplies no such pack.
+the product execution path supplies no such pack. Both live adapters recompute
+the full supplied pack's compiler-canonical digest before accepting that
+exception. Matching caller-authored identity strings and a resealed compact
+runtime projection are insufficient.
 Both minimize the same between-step relative-position segment, apply the
 same terminal precedence, update the achieved weapon state and emit the same
-`WEAPON_TERMINATED` payload. The legacy scenario completion distance and any
+`WEAPON_TERMINATED` payload. Whenever a segment establishes a new lifetime
+minimum, both backends retain its exact fixed-step boundaries while integrating;
+rolling engine snapshots replace superseded candidates and publication merges the
+exact minimizing pair, regular playback samples and every event frame. Record
+replay uses those frames to recompute the lifetime minimum and uses the terminal pair,
+immutable terrain pack, velocity, launch/lifetime authority and target
+lifecycle to re-evaluate the ordered terminal cause. The legacy scenario completion distance and any
 renderer distance are outside this authority.
 
 ## TypeScript reference

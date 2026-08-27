@@ -652,7 +652,7 @@ test("runtime decoding binds weapon terminal state, cause, and distance to the r
 
   assert.throws(
     () => assertSimulationEventStream(events, frames, run.scenario, run.termination, run.closestApproachM),
-    /does not match the exact run outcome/,
+    /does not match terminal-frame cause precedence or phase/,
   );
 
   const priorStateEvents = structuredClone(run.events.items);
@@ -689,6 +689,44 @@ test("runtime decoding binds weapon terminal state, cause, and distance to the r
       run.closestApproachM,
     ),
     /does not match the recorded run closest approach/,
+  );
+});
+
+test("runtime decoding rejects a jointly rebound non-geometric cause and terminal frame", () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2g-emitter-corridor",
+  )!.scenario;
+  const run = simulateWithCapabilitiesForVerification(
+    scenario,
+    createVerificationDeploymentCapabilities("typescript", ["A2G"]),
+  ).engineRun;
+  assert.equal(run.termination, "weapon_failed");
+  assert.equal(run.events.state, "AVAILABLE");
+
+  const events = structuredClone(run.events.items);
+  const frames = structuredClone(run.frames);
+  const terminal = events.find((event) => event.payload.kind === "WEAPON_TERMINATED");
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+  assert.equal(terminal.payload.cause, "TERRAIN_IMPACT");
+  terminal.payload.to = "MISS";
+  terminal.payload.cause = "ENERGY_DEPLETED";
+  const terminalWeaponId = terminal.payload.weaponId;
+  const terminalWeapon = frames[terminal.frameIndex]!.entities.find(
+    (entity) => entity.id === terminalWeaponId,
+  );
+  assert.ok(terminalWeapon);
+  terminalWeapon.weaponFlightState = "MISS";
+  terminalWeapon.phase = "Miss";
+
+  assert.throws(
+    () => assertSimulationEventStream(
+      events,
+      frames,
+      run.scenario,
+      "weapon_miss",
+      run.closestApproachM,
+    ),
+    /does not match terminal-frame cause precedence or phase/,
   );
 });
 

@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   RUST_WASM_ENGINE_ARTIFACT,
   runEngineBackend,
 } from "../lib/engine/backend.ts";
-import { VECTOR_ENGINE_WASM_OPTIMIZER } from "../lib/engine/generated/vector-engine-wasm.ts";
+import {
+  VECTOR_ENGINE_WASM_BASE64,
+  VECTOR_ENGINE_WASM_OPTIMIZER,
+} from "../lib/engine/generated/vector-engine-wasm.ts";
 import { compileScenario } from "../lib/engine/compiler.ts";
 import {
   getProfile,
@@ -22,6 +26,8 @@ import {
   runtimeWeaponTerminations,
 } from "../lib/engine/runtime-model-pack.ts";
 import { resolveRetainedCompiledModelPack } from "../lib/engine/retained-model-packs.ts";
+import { bindVerificationTrackModelPack } from "../lib/engine/verification-track-fixture.ts";
+import historicalModelPackBundle from "../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json" with { type: "json" };
 
 function governWeaponTermination(scenario, weapon, changes) {
   const pack = resolveRetainedCompiledModelPack(scenario.modelPack);
@@ -57,6 +63,46 @@ function governWeaponTermination(scenario, weapon, changes) {
     weaponTerminations: runtimeWeaponTerminations(pack, patches),
     scenarioPatches: patches,
   });
+}
+
+function runRawRustWasm(scenario) {
+  const instance = new WebAssembly.Instance(new WebAssembly.Module(
+    Buffer.from(VECTOR_ENGINE_WASM_BASE64, "base64"),
+  ));
+  const engine = instance.exports;
+  const input = new TextEncoder().encode(JSON.stringify(scenario));
+  const pointer = engine.vector_input_reserve(input.byteLength);
+  new Uint8Array(engine.memory.buffer, pointer, input.byteLength).set(input);
+  const accepted = engine.vector_run_json() === 1;
+  const output = new TextDecoder().decode(new Uint8Array(
+    engine.memory.buffer,
+    engine.vector_output_ptr(),
+    engine.vector_output_len(),
+  ));
+  return { accepted, output };
+}
+
+function resealCompiledPack(pack) {
+  const payload = structuredClone(pack);
+  delete payload.digest;
+  const normalize = (value) => {
+    if (typeof value === "number") {
+      return `#number:${value.toExponential(12).replace("e+", "e")}`;
+    }
+    if (Array.isArray(value)) return value.map(normalize);
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value)
+          .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+          .map(([key, item]) => [key, normalize(item)]),
+      );
+    }
+    return value;
+  };
+  pack.digest = createHash("sha256")
+    .update(JSON.stringify(normalize(payload)))
+    .digest("hex");
+  return pack;
 }
 
 const close = (actual, expected, tolerance, label) => {
@@ -134,7 +180,7 @@ test("TypeScript and Rust/WASM reject at the first regional sample after crossin
 test("committed Rust/WASM artifact has a stable integrity identity", () => {
   assert.match(RUST_WASM_ENGINE_ARTIFACT.sha256, /^[a-f0-9]{64}$/);
   assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes > 100_000);
-  assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 575_000);
+  assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 585_000);
   assert.equal(
     VECTOR_ENGINE_WASM_OPTIMIZER,
     "binaryen@131.0.0 -O3 -S2 rust-wasm-features-v1",
@@ -707,6 +753,65 @@ test("both engines exclude stowed geometry from the weapon-lifetime closest appr
   close(runs[0].closestApproachM, runs[1].closestApproachM, 1e-9, "post-launch closest approach parity");
 });
 
+test("both engines retain a launch-boundary minimum before a delayed expiry", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
+  const red = baseline.entities.find((entity) => entity.id === "red-object-1");
+  const weapon = baseline.entities.find((entity) => entity.weapon);
+  assert.ok(blue && red && weapon?.weapon);
+  blue.initial.position = { x: 0, y: 0, z: 8000 };
+  blue.initial.velocity = { x: 400, y: 0, z: 0 };
+  red.initial.position = { x: -1000, y: 0, z: 8000 };
+  red.initial.velocity = { x: -400, y: 0, z: 0 };
+  weapon.initial.position = { ...blue.initial.position };
+  weapon.initial.velocity = { ...blue.initial.velocity };
+  for (const entity of [blue, red]) {
+    delete entity.route;
+    delete entity.routePlan;
+  }
+  weapon.weapon.launchTimeSeconds = baseline.fixedStepSeconds;
+  governWeaponTermination(baseline, weapon, {
+    interceptRadiusM: 0.1,
+    maximumFlightTimeSeconds: baseline.fixedStepSeconds * 3,
+  });
+  baseline.durationSeconds = 1;
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const run = runEngineBackend(structuredClone(baseline), backend);
+    const launchTimeSeconds = weapon.weapon.launchTimeSeconds;
+    const launchFrame = run.frames.find(
+      (frame) => frame.t === launchTimeSeconds &&
+        frame.entities.some((entity) => entity.id === run.primaryWeaponId),
+    );
+    const evidenceFrame = run.frames.find(
+      (frame) => frame.t === launchTimeSeconds + baseline.fixedStepSeconds,
+    );
+    const terminalFrame = run.frames.at(-1);
+    assert.ok(launchFrame && evidenceFrame && terminalFrame, backend);
+    const separation = (frame) => {
+      const frameWeapon = frame.entities.find((entity) => entity.id === run.primaryWeaponId);
+      const frameTarget = frame.entities.find((entity) => entity.id === run.primaryTargetId);
+      assert.ok(frameWeapon && frameTarget, backend);
+      return Math.hypot(
+        frameTarget.position.x - frameWeapon.position.x,
+        frameTarget.position.y - frameWeapon.position.y,
+        frameTarget.position.z - frameWeapon.position.z,
+      );
+    };
+    const launchSeparationM = separation(launchFrame);
+    assert.equal(run.termination, "weapon_expired", backend);
+    close(run.closestApproachM, launchSeparationM, 1e-9, `${backend} launch-boundary minimum`);
+    assert.ok(separation(evidenceFrame) > launchSeparationM, backend);
+    assert.ok(separation(terminalFrame) > launchSeparationM, backend);
+  }
+});
+
 test("both engines reject malformed weapon termination authority before integration", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
   const baseline = simulateWithCapabilitiesForVerification(
@@ -758,6 +863,82 @@ test("both engines reject hash-rebound termination limits beside a retained pack
       /does not match the exact compiled model pack/,
       backend,
     );
+  }
+});
+
+test("direct Rust/WASM rejects a jointly resealed compact termination projection", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const scenario = structuredClone(simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario);
+  const weapon = scenario.entities.find((entity) => entity.weapon);
+  assert.ok(weapon?.weapon);
+  weapon.weapon.termination.interceptRadiusM += 100;
+  const projected = scenario.modelPack.weaponTerminations.find(
+    (candidate) => candidate.modelId === weapon.weapon.admission.weaponModelId,
+  );
+  assert.ok(projected);
+  projected.termination.interceptRadiusM = weapon.weapon.termination.interceptRadiusM;
+  const material = structuredClone(scenario.modelPack);
+  delete material.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest(material);
+
+  const result = runRawRustWasm(scenario);
+  assert.equal(result.accepted, false);
+  assert.match(result.output, /retained compiler-owned pack/);
+});
+
+test("direct Rust/WASM cannot relabel a resealed termination projection as engine verification", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const scenario = structuredClone(simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario);
+  const weapon = scenario.entities.find((entity) => entity.weapon);
+  assert.ok(weapon?.weapon);
+  weapon.weapon.termination.interceptRadiusM += 100;
+  const projected = scenario.modelPack.weaponTerminations.find(
+    (candidate) => candidate.modelId === weapon.weapon.admission.weaponModelId,
+  );
+  assert.ok(projected);
+  projected.termination.interceptRadiusM = weapon.weapon.termination.interceptRadiusM;
+  scenario.modelPack.intendedUse = {
+    id: "vector.intended-use.engine-verification",
+    version: "1.0.0",
+  };
+  const material = structuredClone(scenario.modelPack);
+  delete material.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest(material);
+
+  const result = runRawRustWasm(scenario);
+  assert.equal(result.accepted, false);
+  assert.match(result.output, /complete authenticated compiled model pack/);
+});
+
+test("direct Rust/WASM rejects malformed termination patches before consuming overrides", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  for (const mutation of ["target", "old-value", "unit", "evidence"]) {
+    const scenario = structuredClone(baseline);
+    const weapon = scenario.entities.find((entity) => entity.weapon);
+    assert.ok(weapon?.weapon);
+    governWeaponTermination(scenario, weapon, { interceptRadiusM: 50 });
+    const patch = scenario.modelPack.scenarioPatches[0];
+    if (mutation === "target") patch.fieldPath = "/termination/notGoverned";
+    if (mutation === "old-value") patch.oldValue = 24;
+    if (mutation === "unit") patch.unit = "s";
+    if (mutation === "evidence") patch.provenance.evidenceRefIds = ["outside-pack"];
+    const projection = structuredClone(scenario.modelPack);
+    delete projection.runtimeDigest;
+    scenario.modelPack = bindRuntimeModelPackDigest(projection);
+
+    const result = runRawRustWasm(scenario);
+    assert.equal(result.accepted, false, mutation);
+    assert.match(result.output, /weapon termination patch/, mutation);
   }
 });
 
@@ -820,6 +1001,197 @@ test("both live engines require a retained pack for entity weapon-termination au
   }
 });
 
+test("both live engines reject retained packs that predate weapon-termination authority", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const historicalPack = historicalModelPackBundle.pack;
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const scenario = structuredClone(baseline);
+    const projection = structuredClone(scenario.modelPack);
+    projection.id = historicalPack.id;
+    projection.version = historicalPack.version;
+    projection.digest = historicalPack.digest;
+    projection.intendedUse = { ...historicalPack.intendedUses[0] };
+    projection.weaponTerminations = [];
+    projection.scenarioPatches = [];
+    delete projection.runtimeDigest;
+    scenario.modelPack = bindRuntimeModelPackDigest(projection);
+    for (const entity of scenario.entities) {
+      entity.provenance.modelPackDigest = historicalPack.digest;
+      if (entity.weapon) entity.weapon.admission.modelPackDigest = historicalPack.digest;
+    }
+    assert.throws(
+      () => runEngineBackend(scenario, backend),
+      /retained compiled model pack .* contains no weapon-termination authority/,
+      backend,
+    );
+  }
+});
+
+test("both live engines authenticate supplied verification-pack content", async () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const binding = await bindVerificationTrackModelPack(baseline);
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.doesNotThrow(
+      () => runEngineBackend(structuredClone(binding.scenario), backend, binding.pack),
+      `${backend} must accept the complete digest-authenticated verification pack`,
+    );
+  }
+  const forgedPack = structuredClone(binding.pack);
+  const forgedWeapon = forgedPack.weapons.find((weapon) => weapon.termination);
+  assert.ok(forgedWeapon?.termination);
+  forgedWeapon.termination.interceptRadiusM += 100;
+
+  const forgedScenario = structuredClone(binding.scenario);
+  const projection = structuredClone(forgedScenario.modelPack);
+  delete projection.runtimeDigest;
+  forgedScenario.modelPack = bindRuntimeModelPackDigest({
+    ...projection,
+    weaponTerminations: runtimeWeaponTerminations(forgedPack, []),
+  });
+  for (const entity of forgedScenario.entities) {
+    if (entity.weapon?.admission.weaponModelId === forgedWeapon.id) {
+      entity.weapon.termination.interceptRadiusM = forgedWeapon.termination.interceptRadiusM;
+    }
+  }
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.throws(
+      () => runEngineBackend(structuredClone(forgedScenario), backend, forgedPack),
+      /verification compiled model pack digest does not match its canonical content/i,
+      backend,
+    );
+  }
+});
+
+test("both live engines reject duplicate verification termination patches", async () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const binding = await bindVerificationTrackModelPack(baseline);
+  const scenario = structuredClone(binding.scenario);
+  const weapon = scenario.entities.find((entity) => entity.weapon)?.weapon;
+  assert.ok(weapon);
+  const compiledWeapon = binding.pack.weapons.find(
+    (candidate) => candidate.id === weapon.admission.weaponModelId,
+  );
+  assert.ok(compiledWeapon?.termination);
+  const patch = {
+    schemaVersion: "vector.model-patch.v1",
+    id: "verification-intercept-radius-primary",
+    modelPackDigest: binding.pack.digest,
+    modelId: compiledWeapon.id,
+    fieldPath: "/termination/interceptRadiusM",
+    oldValue: compiledWeapon.termination.interceptRadiusM,
+    newValue: 50,
+    unit: "m",
+    reason: "Duplicate-key cross-backend rejection fixture",
+    provenance: {
+      authorId: "vector-test-suite",
+      authoredAt: "2026-08-28T00:00:00.000Z",
+      evidenceRefIds: [compiledWeapon.evidenceRefIds[0]],
+    },
+  };
+  const duplicate = {
+    ...structuredClone(patch),
+    id: "verification-intercept-radius-contradiction",
+    newValue: 60,
+  };
+  weapon.termination.interceptRadiusM = patch.newValue;
+  const projection = structuredClone(scenario.modelPack);
+  delete projection.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest({
+    ...projection,
+    weaponTerminations: runtimeWeaponTerminations(binding.pack, [patch]),
+    scenarioPatches: [patch, duplicate],
+  });
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.throws(
+      () => runEngineBackend(structuredClone(scenario), backend, binding.pack),
+      /duplicate weapon termination patch/i,
+      backend,
+    );
+  }
+});
+
+test("TypeScript and raw Rust/WASM reject digest-valid malformed verification-pack structure", async () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const binding = await bindVerificationTrackModelPack(baseline);
+
+  for (const {
+    id: mutation,
+    typescriptPattern,
+    rustPattern,
+  } of [
+    {
+      id: "extra-top-level-key",
+      typescriptPattern: /must use the exact compiled-v1 key set/i,
+      rustPattern: /complete exact-key compiled model pack/i,
+    },
+    {
+      id: "duplicate-weapon-id",
+      typescriptPattern: /has duplicate weapon ID/i,
+      rustPattern: /duplicates an earlier weapon/i,
+    },
+    {
+      id: "duplicate-intended-use-id",
+      typescriptPattern: /has duplicate intended-use ID/i,
+      rustPattern: /duplicates an earlier intended use/i,
+    },
+  ]) {
+    const pack = structuredClone(binding.pack);
+    if (mutation === "extra-top-level-key") pack.unadmittedAuthority = true;
+    if (mutation === "duplicate-weapon-id") {
+      pack.weapons.push(structuredClone(pack.weapons[0]));
+    }
+    if (mutation === "duplicate-intended-use-id") {
+      const intendedUse = pack.intendedUses.find(
+        (item) => item.id === "vector.intended-use.engine-verification",
+      );
+      assert.ok(intendedUse);
+      pack.intendedUses.unshift({ ...structuredClone(intendedUse), version: "0.0.0" });
+    }
+    resealCompiledPack(pack);
+    const scenario = structuredClone(binding.scenario);
+    const projection = structuredClone(scenario.modelPack);
+    projection.digest = pack.digest;
+    projection.weaponTerminations = runtimeWeaponTerminations(pack, []);
+    delete projection.runtimeDigest;
+    scenario.modelPack = bindRuntimeModelPackDigest(projection);
+    for (const entity of scenario.entities) {
+      entity.provenance.modelPackDigest = pack.digest;
+      if (entity.weapon) entity.weapon.admission.modelPackDigest = pack.digest;
+    }
+
+    assert.throws(
+      () => runEngineBackend(structuredClone(scenario), "typescript", pack),
+      typescriptPattern,
+      `typescript ${mutation}`,
+    );
+    const rust = runRawRustWasm({
+      schemaVersion: "vector.engine-run-request.v1",
+      scenario,
+      verificationModelPack: pack,
+    });
+    assert.equal(rust.accepted, false, `raw rust-wasm ${mutation}`);
+    assert.match(rust.output, rustPattern, `raw rust-wasm ${mutation}`);
+  }
+});
+
 test("both engines reject a second scheduled guided release before integration", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
   const baseline = simulateWithCapabilitiesForVerification(
@@ -836,6 +1208,29 @@ test("both engines reject a second scheduled guided release before integration",
     assert.throws(
       () => runEngineBackend(structuredClone(baseline), backend),
       /at most one scheduled guided release/i,
+      backend,
+    );
+  }
+});
+
+test("both engines require a scheduled guided weapon to begin stowed", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const scenario = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const scheduledWeapon = scenario.entities.find(
+    (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds !== null,
+  );
+  assert.ok(scheduledWeapon?.weapon, "fixture requires a scheduled guided weapon");
+  scheduledWeapon.lifecycle = "ACTIVE";
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.throws(
+      () => runEngineBackend(structuredClone(scenario), backend),
+      /scheduled guided weapon.*must begin STOWED/i,
       backend,
     );
   }

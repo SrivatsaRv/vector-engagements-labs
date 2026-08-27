@@ -21,6 +21,7 @@ import {
   validateScenarioModelPatch,
   validateCompiledModelPackV2,
   verifyCompiledModelPackDigest,
+  verifyCompiledModelPackDigestSync,
 } from "../lib/model-pack.ts";
 import {
   CURRENT_MODEL_PACK_DIGEST,
@@ -51,6 +52,11 @@ test("model source compiles deterministically to the committed immutable SI fixt
   assert.equal(first.pack.unitSystem, "SI");
   assert.equal(first.pack.digest, CURRENT_MODEL_PACK_DIGEST);
   assert.equal(await verifyCompiledModelPackDigest(first.pack), true);
+  assert.equal(verifyCompiledModelPackDigestSync(first.pack), true);
+  const digestTamper = structuredClone(first.pack);
+  digestTamper.evidence[0].title += " tampered";
+  assert.equal(await verifyCompiledModelPackDigest(digestTamper), false);
+  assert.equal(verifyCompiledModelPackDigestSync(digestTamper), false);
   assert.equal(Object.isFrozen(first), true);
   assert.equal(Object.isFrozen(first.pack.weapons[0]), true);
   assert.equal(first.pack.aerodynamics[0].coefficientTables[1].axes[0].unit, "rad");

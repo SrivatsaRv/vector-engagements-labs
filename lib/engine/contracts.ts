@@ -60,7 +60,7 @@ export const SIMULATION_EVENT_PAYLOAD_SCHEMAS = {
   ENTITY_LIFECYCLE_CHANGED: "vector.simulation-event-payload.entity-lifecycle-changed.v1",
   AIRCRAFT_OPERATIONAL_STATE_CHANGED: "vector.simulation-event-payload.aircraft-operational-state-changed.v1",
   AIRBORNE_STORE_TRANSFER_OUTCOME: "vector.simulation-event-payload.airborne-store-transfer-outcome.v1",
-  WEAPON_TERMINATED: "vector.simulation-event-payload.weapon-terminated.v1",
+  WEAPON_TERMINATED: "vector.simulation-event-payload.weapon-terminated.v2",
   RUN_COMPLETED: "vector.simulation-event-payload.run-completed.v1",
   TRACK_STATE_CHANGED: "vector.simulation-event-payload.track-state-changed.v3",
 } as const;
@@ -313,6 +313,8 @@ export type SimulationEventPayload =
         | "TARGET_UNAVAILABLE";
       criterion: "GEOMETRIC_CLOSEST_APPROACH";
       closestApproachM: number;
+      closestApproachPriorTimeSeconds: number;
+      closestApproachNextTimeSeconds: number;
       occurrenceTimeSeconds: number;
       interceptRadiusM: number;
       maximumFlightTimeSeconds: number;

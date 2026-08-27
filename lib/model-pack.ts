@@ -2,6 +2,7 @@ import { sha256Hex } from "./canonical-json.ts";
 import { assertGovernedAircraftEvidenceAdmission } from "./aircraft-evidence-registry.ts";
 import type { EntityLifecycle, ObserverTrackModel } from "./engine/contracts.ts";
 import type { Vec3 } from "./engine/primitives.ts";
+import { sha256HexBytesSync } from "./geospatial/digest.ts";
 
 export const MODEL_PACK_SOURCE_SCHEMA_VERSION = "vector.model-pack-source.v1";
 export const COMPILED_MODEL_PACK_SCHEMA_VERSION = "vector.compiled-model-pack.v1";
@@ -1150,7 +1151,7 @@ function normalizeDigestNumbers(value: unknown): unknown {
   return value;
 }
 
-function governedContentDigest(value: unknown) {
+function governedContentDigestBytes(value: unknown) {
   const normalized = normalizeDigestNumbers(value);
   const canonicalize = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(canonicalize);
@@ -1163,12 +1164,19 @@ function governedContentDigest(value: unknown) {
     }
     return value;
   };
-  const bytes = new TextEncoder().encode(JSON.stringify(canonicalize(normalized)));
-  return crypto.subtle.digest("SHA-256", bytes).then((digest) =>
+  return new TextEncoder().encode(JSON.stringify(canonicalize(normalized)));
+}
+
+function governedContentDigest(value: unknown) {
+  return crypto.subtle.digest("SHA-256", governedContentDigestBytes(value)).then((digest) =>
     [...new Uint8Array(digest)]
       .map((byte) => byte.toString(16).padStart(2, "0"))
       .join(""),
   );
+}
+
+function governedContentDigestSync(value: unknown) {
+  return sha256HexBytesSync(governedContentDigestBytes(value));
 }
 
 export function aircraftLineageValueDigest(input: {
@@ -1677,6 +1685,14 @@ export async function verifyCompiledModelPackDigest(pack: CompiledModelPack) {
     Object.entries(pack).filter(([key]) => key !== "digest"),
   ) as Omit<CompiledModelPack, "digest">;
   return (await modelPayloadDigest(payload)) === pack.digest;
+}
+
+export function verifyCompiledModelPackDigestSync(pack: Readonly<CompiledModelPack>) {
+  if (!DIGEST_PATTERN.test(pack.digest)) return false;
+  const payload = Object.fromEntries(
+    Object.entries(pack).filter(([key]) => key !== "digest"),
+  ) as Omit<CompiledModelPack, "digest">;
+  return governedContentDigestSync(digestPayload(payload)) === pack.digest;
 }
 
 const AIRCRAFT_DATA_FAMILIES: AircraftDataFamily[] = [

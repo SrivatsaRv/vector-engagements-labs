@@ -18,7 +18,7 @@ pub const AIRCRAFT_OPERATIONAL_CHANGED_PAYLOAD_SCHEMA: &str =
 pub const AIRBORNE_STORE_TRANSFER_OUTCOME_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.airborne-store-transfer-outcome.v1";
 pub const WEAPON_TERMINATED_PAYLOAD_SCHEMA: &str =
-    "vector.simulation-event-payload.weapon-terminated.v1";
+    "vector.simulation-event-payload.weapon-terminated.v2";
 pub const RUN_COMPLETED_PAYLOAD_SCHEMA: &str = "vector.simulation-event-payload.run-completed.v1";
 pub const TRACK_CHANGED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.track-state-changed.v3";
@@ -45,6 +45,8 @@ pub struct WeaponTerminationEvent<'a> {
     pub to: WeaponFlightState,
     pub cause: &'static str,
     pub closest_approach_m: f64,
+    pub closest_approach_prior_time_seconds: f64,
+    pub closest_approach_next_time_seconds: f64,
     pub occurrence_time_seconds: f64,
     pub intercept_radius_m: f64,
     pub maximum_flight_time_seconds: f64,
@@ -250,6 +252,10 @@ pub enum SimulationEventPayload {
         criterion: &'static str,
         #[serde(rename = "closestApproachM")]
         closest_approach_m: f64,
+        #[serde(rename = "closestApproachPriorTimeSeconds")]
+        closest_approach_prior_time_seconds: f64,
+        #[serde(rename = "closestApproachNextTimeSeconds")]
+        closest_approach_next_time_seconds: f64,
         #[serde(rename = "occurrenceTimeSeconds")]
         occurrence_time_seconds: f64,
         #[serde(rename = "interceptRadiusM")]
@@ -740,6 +746,8 @@ impl SimulationEventDraft {
                 cause: event.cause,
                 criterion: "GEOMETRIC_CLOSEST_APPROACH",
                 closest_approach_m: event.closest_approach_m,
+                closest_approach_prior_time_seconds: event.closest_approach_prior_time_seconds,
+                closest_approach_next_time_seconds: event.closest_approach_next_time_seconds,
                 occurrence_time_seconds: event.occurrence_time_seconds,
                 intercept_radius_m: event.intercept_radius_m,
                 maximum_flight_time_seconds: event.maximum_flight_time_seconds,

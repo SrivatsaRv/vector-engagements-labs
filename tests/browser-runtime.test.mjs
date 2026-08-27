@@ -26,6 +26,51 @@ test("browser runtime protocol identity and message admission are versioned", ()
     isRuntimeRequest({ protocol: "vector.browser-runtime.v2", requestId: "x", type: "run" }),
     false,
   );
+  assert.equal(
+    isRuntimeRequest({
+      protocol: BROWSER_RUNTIME_PROTOCOL,
+      requestId: "open-1",
+      type: "open-record",
+      recordBuffer: new ArrayBuffer(12),
+      byteLength: 12,
+    }),
+    true,
+  );
+});
+
+test("client delegates saved-record verification to the Worker", async () => {
+  const opened = {
+    manifest: { recordId: "worker-record", contentDigest: "a".repeat(64) },
+    scenario: { id: "worker-scenario" },
+    result: { outcome: "worker-verified" },
+    events: { state: "AVAILABLE", items: [] },
+    pictures: [],
+    report: { schemaVersion: "vector.report.v1" },
+  };
+  const requests = [];
+  class RecordWorker extends EventTarget {
+    postMessage(message) {
+      requests.push(message);
+      const response = message.type === "initialize"
+        ? { type: "initialized", state: "ready" }
+        : { type: "record-opened", state: "completed", record: opened };
+      queueMicrotask(() => this.dispatchEvent(new MessageEvent("message", {
+        data: {
+          protocol: BROWSER_RUNTIME_PROTOCOL,
+          requestId: message.requestId,
+          ...response,
+        },
+      })));
+    }
+    terminate() {}
+  }
+  const client = new BrowserSimulationClient(() => new RecordWorker());
+  const input = new ArrayBuffer(12);
+  const result = await client.openRecord(input);
+  assert.equal(result, opened);
+  assert.equal(requests.at(-1).type, "open-record");
+  assert.notEqual(requests.at(-1).recordBuffer, input, "the caller retains its uploaded buffer");
+  client.terminate();
 });
 
 test("digest adapter detects compiled-pack mutation", async () => {

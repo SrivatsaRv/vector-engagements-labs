@@ -10,6 +10,7 @@ mod wasm_abi;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::rc::Rc;
 
 pub use error::EngineError;
 pub use model_pack::{
@@ -22,7 +23,7 @@ pub use public_aircraft_reference::{
 };
 use simulation_events::{
     AirborneStoreTransferOutcomeEvent, SimulationEventDraft, SimulationEventJournal,
-    SimulationEventReceipt, WeaponTerminationEvent,
+    SimulationEventPayload, SimulationEventReceipt, WeaponTerminationEvent,
 };
 pub use simulation_events::{SimulationEventStream, SimulationEventV2};
 pub use validation::{
@@ -1790,6 +1791,19 @@ fn refresh_runtime_state_snapshot(target: &mut RuntimeState, source: &RuntimeSta
     target.last_guidance_update_seconds = source.last_guidance_update_seconds;
 }
 
+fn retain_runtime_state_snapshot(
+    snapshot: &mut Option<Vec<RuntimeState>>,
+    states: &[RuntimeState],
+) {
+    if let Some(snapshot) = snapshot {
+        for (target, source) in snapshot.iter_mut().zip(states) {
+            refresh_runtime_state_snapshot(target, source);
+        }
+    } else {
+        *snapshot = Some(states.to_vec());
+    }
+}
+
 fn atmosphere(altitude_m: f64, offset_c: f64) -> (f64, f64) {
     let altitude = altitude_m.clamp(0.0, 25000.0);
     let (mut temperature_c, pressure_kpa) = if altitude <= 11000.0 {
@@ -2849,6 +2863,42 @@ fn sampled_engine_frame(
     })
 }
 
+fn sampled_weapon_evidence_frame(
+    states: &[RuntimeState],
+    scenario: &EngineScenario,
+    time: f64,
+    weapon_id: &str,
+    target_id: &str,
+    observer_states: Vec<ObserverState>,
+) -> Result<EngineFrame, EngineError> {
+    let weapon = states
+        .iter()
+        .find(|state| state.definition.id == weapon_id)
+        .ok_or_else(|| EngineError::Serialization("weapon evidence lost its weapon".to_string()))?;
+    let target = states
+        .iter()
+        .find(|state| state.definition.id == target_id)
+        .ok_or_else(|| EngineError::Serialization("weapon evidence lost its target".to_string()))?;
+    let relative_position = target.position.subtract(weapon.position);
+    let relative_velocity = target.velocity.subtract(weapon.velocity);
+    let separation = relative_position.magnitude();
+    let line_of_sight = relative_position.normalize();
+    let closure = -relative_velocity.dot(line_of_sight);
+    let los_rate =
+        relative_position.cross(relative_velocity).magnitude() / (separation * separation).max(1.0);
+    sampled_engine_frame(
+        states,
+        scenario,
+        time,
+        weapon_id,
+        target_id,
+        separation,
+        closure,
+        los_rate,
+        observer_states,
+    )
+}
+
 fn envelopes(scenario: &EngineScenario) -> Vec<CoverageEnvelope> {
     scenario
         .entities
@@ -2948,6 +2998,39 @@ fn closest_approach_on_relative_segment(start: Vec3, end: Vec3) -> SegmentCloses
         distance_m: start.add(delta.scale(fraction)).magnitude(),
         fraction,
     }
+}
+
+fn merge_weapon_evidence_frames(
+    frames: Vec<EngineFrame>,
+    events: &mut [SimulationEventV2],
+    evidence_frames: Vec<EngineFrame>,
+) -> Result<Vec<EngineFrame>, EngineError> {
+    let mut indexed_frames = frames
+        .into_iter()
+        .enumerate()
+        .map(|(index, frame)| (Some(index), frame))
+        .collect::<Vec<_>>();
+    for evidence_frame in evidence_frames {
+        if !indexed_frames
+            .iter()
+            .any(|(_, frame)| frame.t == evidence_frame.t)
+        {
+            indexed_frames.push((None, evidence_frame));
+        }
+    }
+    indexed_frames.sort_by(|left, right| left.1.t.total_cmp(&right.1.t));
+    for event in events {
+        event.frame_index = indexed_frames
+            .iter()
+            .position(|(source_index, _)| *source_index == Some(event.frame_index))
+            .ok_or_else(|| {
+                EngineError::Serialization(format!(
+                    "simulation event {} lost its source frame during evidence merge",
+                    event.id
+                ))
+            })?;
+    }
+    Ok(indexed_frames.into_iter().map(|(_, frame)| frame).collect())
 }
 
 fn achieved_weapon_launch_time_seconds(weapon: &WeaponModel, fixed_step_seconds: f64) -> f64 {
@@ -3119,8 +3202,7 @@ pub(crate) fn first_fixed_step_tick_at_or_after(
 }
 
 /// Run a validated deterministic scenario and return a replayable engine record.
-pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineError> {
-    validate_scenario(&scenario)?;
+fn run_validated_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineError> {
     scenario
         .entities
         .sort_by(|left, right| left.id.cmp(&right.id));
@@ -3200,10 +3282,17 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
     let mut event_journal = SimulationEventJournal::default();
     let mut track_stores = HashMap::new();
     let mut prior_track_receipts = HashMap::new();
-    let mut current_observer_states = Vec::new();
+    let mut current_observer_states = Rc::new(Vec::new());
     let mut last_observer_tick: Option<u64> = None;
     let mut recorded_entity_states = 0_u64;
     let mut pre_step_states = states.clone();
+    let mut closest_evidence_prior_states: Option<Vec<RuntimeState>> = None;
+    let mut closest_evidence_post_states: Option<Vec<RuntimeState>> = None;
+    let mut closest_evidence_times: Option<(f64, f64)> = None;
+    let mut closest_evidence_observer_states: Option<Rc<Vec<ObserverState>>> = None;
+    let mut terminal_prior_states: Option<Vec<RuntimeState>> = None;
+    let mut terminal_prior_time: Option<f64> = None;
+    let mut terminal_prior_observer_states: Option<Rc<Vec<ObserverState>>> = None;
     loop {
         let tick = steps;
         let time = model_time_at_tick(tick, scenario.fixed_step_seconds);
@@ -3277,7 +3366,7 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                 &mut prior_track_receipts,
                 &mut event_journal,
             )? {
-                current_observer_states = observer_states;
+                current_observer_states = Rc::new(observer_states);
                 last_observer_tick = Some(tick);
             }
         }
@@ -3355,7 +3444,7 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                 separation,
                 closure,
                 los_rate,
-                current_observer_states.clone(),
+                current_observer_states.as_ref().clone(),
             )?);
             recorded_entity_states += visible_states;
             if event_journal.has_pending() {
@@ -3373,11 +3462,17 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             .collect();
         let prior_weapon_flight_state = states[weapon_index].weapon_flight_state;
         let has_pre_termination_boundary = states[weapon_index].definition.weapon.is_some()
+            && states[weapon_index]
+                .definition
+                .weapon
+                .as_ref()
+                .and_then(|weapon| weapon.store_transfer.as_ref())
+                .is_none_or(|transfer| {
+                    transfer.transfer.operation != StoreTransferOperation::Jettison
+                })
             && states[weapon_index].lifecycle != EntityLifecycle::Stowed;
-        let needs_pre_termination_snapshot = has_pre_termination_boundary
-            && !frames.last().is_some_and(|frame| frame.t == event_time);
         for (index, state) in states.iter_mut().enumerate() {
-            if needs_pre_termination_snapshot {
+            if has_pre_termination_boundary {
                 refresh_runtime_state_snapshot(&mut pre_step_states[index], state);
             }
             update_aircraft(state, &scenario, time, scenario.fixed_step_seconds)?;
@@ -3408,6 +3503,9 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             relative_position,
             admitted_post_relative_position,
         );
+        let establishes_closest_approach = states[weapon_index].lifecycle
+            != EntityLifecycle::Stowed
+            && (primary_weapon_activated_this_tick || step_closest.distance_m < closest);
         closest = closest.min(step_closest.distance_m);
         let target_lifecycle = states[target_index].lifecycle;
         let terrain_impact = states[weapon_index].position.z
@@ -3462,6 +3560,11 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             ))?;
         }
         if let Some(decision) = weapon_termination {
+            let closest_approach_witness = if establishes_closest_approach {
+                (event_time, next_event_time)
+            } else {
+                closest_evidence_times.unwrap_or((event_time, next_event_time))
+            };
             event_journal.emit(SimulationEventDraft::weapon_terminated(
                 steps,
                 next_event_time,
@@ -3472,6 +3575,8 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                     to: decision.to,
                     cause: decision.cause,
                     closest_approach_m: decision.closest_approach_m,
+                    closest_approach_prior_time_seconds: closest_approach_witness.0,
+                    closest_approach_next_time_seconds: closest_approach_witness.1,
                     occurrence_time_seconds: decision.occurrence_time_seconds,
                     intercept_radius_m: decision.intercept_radius_m,
                     maximum_flight_time_seconds: decision.maximum_flight_time_seconds,
@@ -3524,9 +3629,20 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                 &mut prior_track_receipts,
                 &mut event_journal,
             )? {
-                current_observer_states = observer_states;
+                current_observer_states = Rc::new(observer_states);
                 last_observer_tick = Some(steps);
             }
+        }
+        if establishes_closest_approach {
+            retain_runtime_state_snapshot(&mut closest_evidence_prior_states, &pre_step_states);
+            retain_runtime_state_snapshot(&mut closest_evidence_post_states, &states);
+            closest_evidence_times = Some((event_time, next_event_time));
+            closest_evidence_observer_states = Some(Rc::clone(&current_observer_states));
+        }
+        if completed_this_tick && has_pre_termination_boundary {
+            retain_runtime_state_snapshot(&mut terminal_prior_states, &pre_step_states);
+            terminal_prior_time = Some(event_time);
+            terminal_prior_observer_states = Some(Rc::clone(&current_observer_states));
         }
         let activation_at_next_boundary = states.iter().any(|state| {
             state.lifecycle == EntityLifecycle::Stowed
@@ -3543,27 +3659,6 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                         activation_tick < terminal_tick && activation_tick == steps
                     })
         });
-        if weapon_termination.is_some() && needs_pre_termination_snapshot {
-            let boundary_frame = sampled_engine_frame(
-                &pre_step_states,
-                &scenario,
-                event_time,
-                &weapon_id,
-                &target_id,
-                separation,
-                closure,
-                los_rate,
-                current_observer_states.clone(),
-            )?;
-            let visible_states = boundary_frame.entities.len() as u64;
-            if recorded_entity_states.saturating_add(visible_states) > MAX_RECORDED_ENTITY_STATES {
-                return Err(EngineError::InvalidScenario(format!(
-                        "event-preserving frames exceed {MAX_RECORDED_ENTITY_STATES} recorded entity states"
-                    )));
-            }
-            frames.push(boundary_frame);
-            recorded_entity_states += visible_states;
-        }
         if event_journal.has_pending()
             || steps == 1
             || (steps % sample_every == 0 && !activation_at_next_boundary)
@@ -3596,7 +3691,7 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
                 post_separation,
                 post_closure,
                 post_los_rate,
-                current_observer_states.clone(),
+                current_observer_states.as_ref().clone(),
             )?);
             recorded_entity_states += visible_states;
             if event_journal.has_pending() {
@@ -3607,7 +3702,60 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             break;
         }
     }
-    let events = SimulationEventStream::available(event_journal.into_items()?);
+    let mut event_items = event_journal.into_items()?;
+    let has_weapon_termination = event_items.iter().any(|event| {
+        matches!(
+            event.payload,
+            SimulationEventPayload::WeaponTerminated { .. }
+        )
+    });
+    let mut evidence_frames = Vec::new();
+    if has_weapon_termination {
+        if let (
+            Some((prior_time, post_time)),
+            Some(prior_states),
+            Some(post_states),
+            Some(observer_states),
+        ) = (
+            closest_evidence_times,
+            closest_evidence_prior_states.as_ref(),
+            closest_evidence_post_states.as_ref(),
+            closest_evidence_observer_states.as_ref(),
+        ) {
+            evidence_frames.push(sampled_weapon_evidence_frame(
+                prior_states,
+                &scenario,
+                prior_time,
+                &weapon_id,
+                &target_id,
+                observer_states.as_ref().clone(),
+            )?);
+            evidence_frames.push(sampled_weapon_evidence_frame(
+                post_states,
+                &scenario,
+                post_time,
+                &weapon_id,
+                &target_id,
+                observer_states.as_ref().clone(),
+            )?);
+        }
+    }
+    if let (Some(time), Some(states), Some(observer_states)) = (
+        terminal_prior_time,
+        terminal_prior_states.as_ref(),
+        terminal_prior_observer_states.as_ref(),
+    ) {
+        evidence_frames.push(sampled_weapon_evidence_frame(
+            states,
+            &scenario,
+            time,
+            &weapon_id,
+            &target_id,
+            observer_states.as_ref().clone(),
+        )?);
+    }
+    let frames = merge_weapon_evidence_frames(frames, &mut event_items, evidence_frames)?;
+    let events = SimulationEventStream::available(event_items);
     Ok(EngineRun {
         scenario: scenario.clone(),
         frames,
@@ -3632,6 +3780,20 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
     })
 }
 
+/// Run a product scenario after independent public-boundary validation.
+pub fn try_run_engine(scenario: EngineScenario) -> Result<EngineRun, EngineError> {
+    validate_scenario(&scenario)?;
+    run_validated_engine(scenario)
+}
+
+fn try_run_engine_with_verification_pack(
+    scenario: EngineScenario,
+    verification_pack: &validation::AuthenticatedVerificationPack,
+) -> Result<EngineRun, EngineError> {
+    validation::validate_scenario_with_verification_pack(&scenario, verification_pack)?;
+    run_validated_engine(scenario)
+}
+
 /// Run a scenario while preserving the legacy invalid-run return contract.
 pub fn run_engine(scenario: EngineScenario) -> EngineRun {
     let fallback = scenario.clone();
@@ -3648,11 +3810,36 @@ pub fn run_json(input: &str) -> Result<String, EngineError> {
     }
     let payload: serde_json::Value =
         serde_json::from_str(input).map_err(|error| EngineError::InvalidJson(error.to_string()))?;
-    let authority = validation::validate_air_mission_authority(payload.get("airMission"))?;
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase", deny_unknown_fields)]
+    struct EngineRunRequest {
+        schema_version: String,
+        scenario: serde_json::Value,
+        verification_model_pack: serde_json::Value,
+    }
+    let (scenario_payload, verification_pack) = if payload
+        .get("schemaVersion")
+        .and_then(serde_json::Value::as_str)
+        == Some("vector.engine-run-request.v1")
+    {
+        let request: EngineRunRequest = serde_json::from_value(payload)
+            .map_err(|error| EngineError::InvalidJson(error.to_string()))?;
+        if request.schema_version != "vector.engine-run-request.v1" {
+            return Err(EngineError::InvalidJson(
+                "unsupported engine run request schema".to_string(),
+            ));
+        }
+        let pack =
+            validation::authenticate_verification_model_pack(&request.verification_model_pack)?;
+        (request.scenario, Some(pack))
+    } else {
+        (payload, None)
+    };
+    let authority = validation::validate_air_mission_authority(scenario_payload.get("airMission"))?;
     let store_authority =
-        validation::validate_air_mission_store_authority(payload.get("airMission"))?;
-    let mut scenario: EngineScenario =
-        serde_json::from_str(input).map_err(|error| EngineError::InvalidJson(error.to_string()))?;
+        validation::validate_air_mission_store_authority(scenario_payload.get("airMission"))?;
+    let mut scenario: EngineScenario = serde_json::from_value(scenario_payload)
+        .map_err(|error| EngineError::InvalidJson(error.to_string()))?;
     scenario.air_mission_authority = authority.as_ref().map(|item| item.binding.clone());
     scenario.air_mission_aircraft_source_object_id =
         authority.map(|item| item.aircraft_source_object_id);
@@ -3662,7 +3849,10 @@ pub fn run_json(input: &str) -> Result<String, EngineError> {
         scenario.air_mission_store_transfers = store_authority.transfers;
         scenario.air_mission_compiled_digest = Some(store_authority.compiled_digest);
     }
-    let run = try_run_engine(scenario)?;
+    let run = match verification_pack.as_ref() {
+        Some(pack) => try_run_engine_with_verification_pack(scenario, pack)?,
+        None => try_run_engine(scenario)?,
+    };
     serde_json::to_string(&run).map_err(|error| EngineError::Serialization(error.to_string()))
 }
 
@@ -3675,10 +3865,47 @@ mod tests {
             source_object_id: "native-test".to_string(),
             model_id: "native-test-model".to_string(),
             model_version: "native-test-v1".to_string(),
-            model_pack_digest: "181379ad76df8cdbf08666788bf1aace54b05651ce1d2e852487d651c6fb0e1d"
+            model_pack_digest: "aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c"
                 .to_string(),
             value_state: ModelValueState::ModelAssumption,
         }
+    }
+
+    fn native_weapon_termination_projection(
+        intercept_radius_m: f64,
+        maximum_flight_time_seconds: f64,
+    ) -> Vec<WeaponTerminationBinding> {
+        [
+            "astra-mk1-study-v05",
+            "aim-120c5-study-v05",
+            "mica-ir-study-v05",
+            "kh-31p-study-v05",
+            "spice-2000-study-v05",
+            "akash-study-v05",
+            "s-200-study-v05",
+            "brahmos-block-i-study-v05",
+        ]
+        .into_iter()
+        .map(|model_id| WeaponTerminationBinding {
+            model_id: model_id.to_string(),
+            model_version: "0.5.0".to_string(),
+            termination: WeaponTerminationAdmission {
+                schema_version: "vector.weapon-termination-model.v1".to_string(),
+                intended_use: "ENGINE_VERIFICATION_ONLY".to_string(),
+                criterion: "GEOMETRIC_CLOSEST_APPROACH".to_string(),
+                intercept_radius_m: if model_id == "astra-mk1-study-v05" {
+                    intercept_radius_m
+                } else {
+                    25.0
+                },
+                maximum_flight_time_seconds: if model_id == "astra-mk1-study-v05" {
+                    maximum_flight_time_seconds
+                } else {
+                    180.0
+                },
+            },
+        })
+        .collect()
     }
 
     fn entity(
@@ -3769,6 +3996,13 @@ mod tests {
                 z: 0.0,
             },
         );
+        let termination = WeaponTerminationAdmission {
+            schema_version: "vector.weapon-termination-model.v1".to_string(),
+            intended_use: "ENGINE_VERIFICATION_ONLY".to_string(),
+            criterion: "GEOMETRIC_CLOSEST_APPROACH".to_string(),
+            intercept_radius_m: 25.0,
+            maximum_flight_time_seconds: 180.0,
+        };
         let weapon = EntityDefinition {
             id: "blue-weapon".to_string(),
             rddf_id: "rddf://test/blue-weapon".to_string(),
@@ -3814,22 +4048,16 @@ mod tests {
                 commanded_cruise_altitude_m: 8_000.0,
                 admission: WeaponAdmission {
                     model_pack_digest:
-                        "181379ad76df8cdbf08666788bf1aace54b05651ce1d2e852487d651c6fb0e1d"
+                        "aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c"
                             .to_string(),
-                    weapon_model_id: "native-test-model".to_string(),
+                    weapon_model_id: "astra-mk1-study-v05".to_string(),
                     station_id: "fixture-station".to_string(),
                     compatibility_rule_id: "fixture-rule".to_string(),
                     seeker_mode: WeaponSeekerMode::Unavailable,
                     support_requirement: WeaponSupportRequirement::Unavailable,
                     launch_authorization: WeaponLaunchAuthorization::ScheduledTestOnly,
                 },
-                termination: WeaponTerminationAdmission {
-                    schema_version: "vector.weapon-termination-model.v1".to_string(),
-                    intended_use: "ENGINE_VERIFICATION_ONLY".to_string(),
-                    criterion: "GEOMETRIC_CLOSEST_APPROACH".to_string(),
-                    intercept_radius_m: 25.0,
-                    maximum_flight_time_seconds: 10.0,
-                },
+                termination: termination.clone(),
                 store_transfer: None,
             }),
             sensor: None,
@@ -3838,7 +4066,11 @@ mod tests {
             ground_operation: None,
             provenance: provenance(),
         };
-        EngineScenario {
+        let weapon_terminations = native_weapon_termination_projection(25.0, 180.0);
+        let mut weapon = weapon;
+        weapon.provenance.model_id = "astra-mk1-study-v05".to_string();
+        weapon.provenance.model_version = "0.5.0".to_string();
+        let mut scenario = EngineScenario {
             id: "native-test".to_string(),
             version: "1.0.0".to_string(),
             domain: EngagementDomain::AirToAir,
@@ -3854,17 +4086,17 @@ mod tests {
             air_mission_runtime: None,
             model_pack: ModelPackBinding {
                 schema_version: "vector.compiled-model-pack.v1".to_string(),
-                id: "native-test-pack".to_string(),
-                version: "1.0.0".to_string(),
-                digest: "181379ad76df8cdbf08666788bf1aace54b05651ce1d2e852487d651c6fb0e1d"
+                id: "vector-scalar-study-models".to_string(),
+                version: "0.9.0".to_string(),
+                digest: "aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c"
                     .to_string(),
                 intended_use: IntendedUseRef {
                     id: "vector.intended-use.geometry-teaching".to_string(),
-                    version: "1.0.0".to_string(),
+                    version: "1.1.0".to_string(),
                 },
                 runtime_digest: None,
                 observer_sensors: Vec::new(),
-                weapon_terminations: Vec::new(),
+                weapon_terminations,
                 scenario_patches: Vec::new(),
             },
             entities: vec![blue, red, weapon],
@@ -3897,7 +4129,75 @@ mod tests {
                 distance_meters: 100.0,
             },
             events: Vec::new(),
+        };
+        scenario.model_pack.runtime_digest = Some(crate::validation::runtime_model_pack_digest(
+            &scenario.model_pack,
+        ));
+        scenario
+    }
+
+    fn rebind_native_weapon_termination(scenario: &mut EngineScenario) -> Result<(), &'static str> {
+        let entity = scenario
+            .entities
+            .iter()
+            .find(|entity| entity.weapon.is_some())
+            .ok_or("scenario fixture has no weapon")?;
+        let weapon = entity
+            .weapon
+            .as_ref()
+            .ok_or("scenario fixture has no weapon authority")?;
+        scenario.model_pack.scenario_patches.clear();
+        if weapon.termination.intercept_radius_m != 25.0 {
+            scenario
+                .model_pack
+                .scenario_patches
+                .push(ScenarioModelPatch {
+                    schema_version: "vector.model-patch.v1".to_string(),
+                    id: "native-intercept-radius-patch".to_string(),
+                    model_pack_digest: scenario.model_pack.digest.clone(),
+                    model_id: weapon.admission.weapon_model_id.clone(),
+                    field_path: "/termination/interceptRadiusM".to_string(),
+                    old_value: 25.0,
+                    new_value: weapon.termination.intercept_radius_m,
+                    unit: "m".to_string(),
+                    reason: "Native boundary verification".to_string(),
+                    provenance: PatchProvenance {
+                        author_id: "vector-native-tests".to_string(),
+                        authored_at: "2026-08-28T00:00:00.000Z".to_string(),
+                        evidence_ref_ids: vec!["current-scalar-model-assumptions".to_string()],
+                    },
+                });
         }
+        if weapon.termination.maximum_flight_time_seconds != 180.0 {
+            scenario
+                .model_pack
+                .scenario_patches
+                .push(ScenarioModelPatch {
+                    schema_version: "vector.model-patch.v1".to_string(),
+                    id: "native-flight-time-patch".to_string(),
+                    model_pack_digest: scenario.model_pack.digest.clone(),
+                    model_id: weapon.admission.weapon_model_id.clone(),
+                    field_path: "/termination/maximumFlightTimeS".to_string(),
+                    old_value: 180.0,
+                    new_value: weapon.termination.maximum_flight_time_seconds,
+                    unit: "s".to_string(),
+                    reason: "Native boundary verification".to_string(),
+                    provenance: PatchProvenance {
+                        author_id: "vector-native-tests".to_string(),
+                        authored_at: "2026-08-28T00:00:00.000Z".to_string(),
+                        evidence_ref_ids: vec!["current-scalar-model-assumptions".to_string()],
+                    },
+                });
+        }
+        scenario.model_pack.weapon_terminations = native_weapon_termination_projection(
+            weapon.termination.intercept_radius_m,
+            weapon.termination.maximum_flight_time_seconds,
+        );
+        scenario.model_pack.runtime_digest = None;
+        scenario.model_pack.runtime_digest = Some(crate::validation::runtime_model_pack_digest(
+            &scenario.model_pack,
+        ));
+        Ok(())
     }
 
     fn native_store_transfer() -> AirborneStoreTransfer {
@@ -4002,6 +4302,7 @@ mod tests {
             .ok_or("runtime environment fixture must have a weapon")?;
         weapon.launch_time_seconds = Some(0.0);
         weapon.termination.intercept_radius_m = 0.1;
+        rebind_native_weapon_termination(&mut input)?;
 
         let terrain_grid = RuntimeTerrainGrid {
             west_deg: 0.0,
@@ -4399,6 +4700,7 @@ mod tests {
                     .ok_or("scenario has no weapon")?;
                 weapon.launch_time_seconds = Some(0.0);
                 weapon.termination.maximum_flight_time_seconds = maximum_flight_time_seconds;
+                rebind_native_weapon_termination(&mut input)?;
                 Ok(input)
             };
 
@@ -4436,6 +4738,7 @@ mod tests {
         weapon.termination.intercept_radius_m = 0.1;
         weapon.termination.maximum_flight_time_seconds = 0.01;
         input.duration_seconds = 1.0;
+        rebind_native_weapon_termination(&mut input)?;
 
         let run = try_run_engine(input)?;
         let entry_time = run.events.items.iter().find_map(|event| {
@@ -4510,6 +4813,7 @@ mod tests {
         weapon.launch_time_seconds = Some(0.0);
         weapon.termination.intercept_radius_m = 0.1;
         weapon.termination.maximum_flight_time_seconds = 0.5;
+        rebind_native_weapon_termination(&mut input)?;
 
         let run = try_run_engine(input)?;
         assert_eq!(run.termination, Termination::WeaponExpired);
@@ -4576,6 +4880,7 @@ mod tests {
         weapon.termination.intercept_radius_m = 0.1;
         weapon.termination.maximum_flight_time_seconds = 0.1;
         input.duration_seconds = 2.0;
+        rebind_native_weapon_termination(&mut input)?;
 
         let run = try_run_engine(input)?;
         assert_eq!(run.termination, Termination::WeaponExpired);
@@ -4733,25 +5038,83 @@ mod tests {
     fn scenario_validation_requires_digest_for_weapon_termination_authority(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut input = scenario();
-        let weapon_entity = input
-            .entities
-            .iter()
-            .find(|entity| entity.weapon.is_some())
-            .ok_or("scenario fixture has no weapon")?;
-        let weapon = weapon_entity
-            .weapon
-            .as_ref()
-            .ok_or("scenario fixture has no weapon authority")?;
-        input.model_pack.weapon_terminations = vec![WeaponTerminationBinding {
-            model_id: weapon.admission.weapon_model_id.clone(),
-            model_version: weapon_entity.provenance.model_version.clone(),
-            termination: weapon.termination.clone(),
-        }];
+        input.model_pack.runtime_digest = None;
         assert!(matches!(
             validate_scenario(&input),
             Err(EngineError::InvalidScenario(message))
                 if message.contains("runtimeDigest is required")
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn scenario_validation_rejects_entity_termination_without_pack_projection(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut input = scenario();
+        input.model_pack.weapon_terminations.clear();
+        input.model_pack.runtime_digest = None;
+        assert!(matches!(
+            validate_scenario(&input),
+            Err(EngineError::InvalidScenario(message))
+                if message.contains("termination is not bound to the admitted compiled model")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn scenario_validation_rejects_unauthenticated_verification_termination(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut input = scenario();
+        input.model_pack.intended_use = IntendedUseRef {
+            id: "vector.intended-use.engine-verification".to_string(),
+            version: "1.0.0".to_string(),
+        };
+        input.model_pack.runtime_digest =
+            Some(validation::runtime_model_pack_digest(&input.model_pack));
+        assert!(matches!(
+            validate_scenario(&input),
+            Err(EngineError::InvalidScenario(message))
+                if message.contains("complete authenticated compiled model pack")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn scenario_validation_rejects_malformed_termination_patches_before_application(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for mutation in ["target", "old-value", "unit", "evidence"] {
+            let mut input = scenario();
+            input
+                .entities
+                .iter_mut()
+                .find_map(|entity| entity.weapon.as_mut())
+                .ok_or("scenario fixture has no weapon")?
+                .termination
+                .intercept_radius_m = 50.0;
+            rebind_native_weapon_termination(&mut input)?;
+            let patch = input
+                .model_pack
+                .scenario_patches
+                .first_mut()
+                .ok_or("scenario fixture has no termination patch")?;
+            match mutation {
+                "target" => patch.field_path = "/termination/notGoverned".to_string(),
+                "old-value" => patch.old_value = 24.0,
+                "unit" => patch.unit = "s".to_string(),
+                "evidence" => patch.provenance.evidence_ref_ids = vec!["outside-pack".to_string()],
+                _ => return Err("unknown mutation".into()),
+            }
+            input.model_pack.runtime_digest =
+                Some(validation::runtime_model_pack_digest(&input.model_pack));
+            assert!(
+                matches!(
+                    validate_scenario(&input),
+                    Err(EngineError::InvalidScenario(message))
+                        if message.contains("weapon termination patch")
+                ),
+                "mutation {mutation} must fail at the patch authority boundary"
+            );
+        }
         Ok(())
     }
 
@@ -4768,6 +5131,30 @@ mod tests {
         assert!(matches!(
             validate_scenario(&input),
             Err(EngineError::InvalidScenario(message)) if message.contains("missing target")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn scenario_validation_requires_scheduled_guided_weapons_to_begin_stowed(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut input = scenario();
+        let weapon = input
+            .entities
+            .iter_mut()
+            .find(|entity| {
+                entity.kind == EntityKind::GuidedWeapon
+                    && entity
+                        .weapon
+                        .as_ref()
+                        .is_some_and(|weapon| weapon.launch_time_seconds.is_some())
+            })
+            .ok_or("scenario fixture has no scheduled guided weapon")?;
+        weapon.lifecycle = EntityLifecycle::Active;
+        assert!(matches!(
+            validate_scenario(&input),
+            Err(EngineError::InvalidScenario(message))
+                if message.contains("must begin STOWED")
         ));
         Ok(())
     }

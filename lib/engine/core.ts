@@ -17,6 +17,7 @@ import { SIMULATION_EVENT_PAYLOAD_SCHEMAS } from "./contracts.ts";
 import { SIMULATION_EVENT_SCHEMA } from "./contracts.ts";
 import {
   assertSimulationEventStream,
+  mergeWeaponEvidenceFrames,
   compareCanonicalText,
   firstFixedStepTickAtOrAfter,
   MAX_SIMULATION_EVENTS,
@@ -85,6 +86,12 @@ type RuntimeState = {
   lastGuidanceUpdateSeconds: number;
 };
 
+type WeaponEvidenceSnapshot = {
+  modelTimeSeconds: number;
+  states: RuntimeState[];
+  observerStates: readonly EngineObserverState[];
+};
+
 function snapshotRuntimeState(state: RuntimeState): RuntimeState {
   // Numerical updates replace vectors, controls, and inventory collections
   // instead of mutating them in place, so a shallow snapshot preserves the
@@ -102,12 +109,18 @@ function refreshRuntimeStateSnapshot(target: RuntimeState, source: RuntimeState)
   target.commandedG = source.commandedG;
   target.availableG = source.availableG;
   target.storeMassKg = source.storeMassKg;
+  target.installedStoreIds = source.installedStoreIds;
+  target.installedStoreDragAreaM2 = source.installedStoreDragAreaM2;
+  target.storeTransferAttempted = source.storeTransferAttempted;
   target.dragNewtons = source.dragNewtons;
   target.thrustNewtons = source.thrustNewtons;
   target.phase = source.phase;
   target.weaponFlightState = source.weaponFlightState;
+  target.routePointIndex = source.routePointIndex;
   target.aircraftControl = source.aircraftControl;
   target.aircraftOperationalState = source.aircraftOperationalState;
+  target.lastGuidanceAcceleration = source.lastGuidanceAcceleration;
+  target.lastGuidanceUpdateSeconds = source.lastGuidanceUpdateSeconds;
 }
 
 const G0 = 9.80665;
@@ -1111,6 +1124,7 @@ function evaluateWeaponTermination(
   relativeStartM: Vec3,
   relativeEndM: Vec3,
   lifetimeClosestApproachM: number,
+  closestApproachWitness: readonly [number, number],
   stepStartTimeSeconds: number,
   fixedStepSeconds: number,
   environmentSampler?: RuntimeEnvironmentSampler,
@@ -1198,6 +1212,8 @@ function evaluateWeaponTermination(
       cause,
       criterion: weapon.termination.criterion,
       closestApproachM: Number(lifetimeClosestApproachM.toFixed(6)),
+      closestApproachPriorTimeSeconds: closestApproachWitness[0],
+      closestApproachNextTimeSeconds: closestApproachWitness[1],
       occurrenceTimeSeconds: Number(occurrenceTimeSeconds.toFixed(6)),
       interceptRadiusM: weapon.termination.interceptRadiusM,
       maximumFlightTimeSeconds: weapon.termination.maximumFlightTimeSeconds,
@@ -1343,6 +1359,8 @@ export class EngineSession {
   private recordedEntityStates = 0;
   private currentObserverStates: EngineObserverState[] = [];
   private lastObserverTick = -1;
+  private closestEvidenceSnapshots?: readonly [WeaponEvidenceSnapshot, WeaponEvidenceSnapshot];
+  private terminalPriorEvidenceSnapshot?: WeaponEvidenceSnapshot;
 
   constructor(scenario: EngineScenario, verificationPack?: Readonly<CompiledModelPack>) {
     scenario = {
@@ -1505,6 +1523,13 @@ export class EngineSession {
     for (const entity of scenario.entities) {
       if (!entity.weapon) continue;
       const launchTimeSeconds = entity.weapon.launchTimeSeconds;
+      if (
+        entity.kind === "GUIDED_WEAPON" &&
+        launchTimeSeconds !== null &&
+        entity.lifecycle !== "STOWED"
+      ) {
+        throw new Error(`Scheduled guided weapon ${entity.id} must begin STOWED.`);
+      }
       if (
         entity.kind === "GUIDED_WEAPON" &&
         launchTimeSeconds !== null &&
@@ -1786,11 +1811,11 @@ export class EngineSession {
           authoritativeGround.schemaVersion !== "vector.compiled-aircraft-ground-dynamics.v1" ||
           authoritativeGround.authority !== "GENERIC_PUBLIC_EDUCATIONAL" ||
           authoritativeGround.valueState !== "MODEL_ASSUMPTION" ||
-          JSON.stringify(authoritativeGround.validity) !== JSON.stringify({
-            schemaVersion: "vector.aircraft-ground-dynamics-validity.v1",
-            intendedUse: "PUBLIC_EDUCATIONAL",
-            mechanism: "RUNWAY_ROLL_ROTATION_CLIMBOUT",
-          }) ||
+          authoritativeGround.validity.schemaVersion !==
+            "vector.aircraft-ground-dynamics-validity.v1" ||
+          authoritativeGround.validity.intendedUse !== "PUBLIC_EDUCATIONAL" ||
+          authoritativeGround.validity.mechanism !==
+            "RUNWAY_ROLL_ROTATION_CLIMBOUT" ||
           !Array.isArray(authoritativeGround.evidenceRefIds) || !authoritativeGround.evidenceRefIds.length ||
           authoritativeGround.evidenceRefIds.some((value) => typeof value !== "string" || !value) ||
           !Array.isArray(authoritativeGround.limitationIds) || !authoritativeGround.limitationIds.length ||
@@ -1944,6 +1969,7 @@ export class EngineSession {
   private projectFrame(
     modelTimeSeconds: number,
     frameStates = [...this.states.values()],
+    observerStates: readonly EngineObserverState[] = this.currentObserverStates,
   ): EngineFrame {
     const primaryWeapon = frameStates.find(
       (state) => state.definition.id === this.primaryWeapon!.definition.id,
@@ -1979,8 +2005,28 @@ export class EngineSession {
       separationM,
       closureRateMps,
       lineOfSightRateRadS,
-      observerStates: structuredClone(this.currentObserverStates),
+      observerStates: structuredClone([...observerStates]),
     };
+  }
+
+  private weaponEvidenceSnapshot(
+    retained: WeaponEvidenceSnapshot | undefined,
+    modelTimeSeconds: number,
+    frameStates: readonly RuntimeState[],
+  ): WeaponEvidenceSnapshot {
+    if (!retained) {
+      return {
+        modelTimeSeconds,
+        states: frameStates.map(snapshotRuntimeState),
+        observerStates: this.currentObserverStates,
+      };
+    }
+    retained.modelTimeSeconds = modelTimeSeconds;
+    for (let index = 0; index < frameStates.length; index += 1) {
+      refreshRuntimeStateSnapshot(retained.states[index]!, frameStates[index]!);
+    }
+    retained.observerStates = this.currentObserverStates;
+    return retained;
   }
 
   private retainFrame(frame: EngineFrame) {
@@ -2176,11 +2222,9 @@ export class EngineSession {
       const hasPreTerminationBoundary = Boolean(
         primaryWeapon.definition.weapon && primaryWeapon.lifecycle !== "STOWED",
       );
-      const needsPreTerminationSnapshot = hasPreTerminationBoundary &&
-        this.frames.at(-1)?.t !== eventTime;
       let snapshotIndex = 0;
       for (const state of this.states.values()) {
-        if (needsPreTerminationSnapshot) {
+        if (hasPreTerminationBoundary) {
           refreshRuntimeStateSnapshot(this.preStepStates[snapshotIndex]!, state);
         }
         snapshotIndex += 1;
@@ -2207,7 +2251,18 @@ export class EngineSession {
         relativePosition,
         admittedPostRelativePosition,
       );
+      const establishesClosestApproach = primaryWeapon.lifecycle !== "STOWED" &&
+        (primaryWeaponActivatedThisTick ||
+          stepClosestApproach.distanceM < this.closestApproachM);
       this.closestApproachM = Math.min(this.closestApproachM, stepClosestApproach.distanceM);
+      const closestApproachWitness: readonly [number, number] = establishesClosestApproach
+        ? [eventTime, nextEventTime]
+        : this.closestEvidenceSnapshots
+          ? [
+              this.closestEvidenceSnapshots[0].modelTimeSeconds,
+              this.closestEvidenceSnapshots[1].modelTimeSeconds,
+            ]
+          : [eventTime, nextEventTime];
       const weaponTermination = evaluateWeaponTermination(
         primaryWeapon,
         primaryTarget,
@@ -2215,6 +2270,7 @@ export class EngineSession {
         relativePosition,
         postRelativePosition,
         this.closestApproachM,
+        closestApproachWitness,
         time,
         scenario.fixedStepSeconds,
         this.environmentSampler,
@@ -2321,6 +2377,34 @@ export class EngineSession {
       if (!this.completed) {
         this.updateObserverState(this.integratedSteps, nextEventTime);
       }
+      if (establishesClosestApproach) {
+        this.closestEvidenceSnapshots = [
+          this.weaponEvidenceSnapshot(
+            this.closestEvidenceSnapshots?.[0],
+            eventTime,
+            this.preStepStates,
+          ),
+          this.weaponEvidenceSnapshot(
+            this.closestEvidenceSnapshots?.[1],
+            nextEventTime,
+            [...this.states.values()],
+          ),
+        ];
+      }
+      if (
+        this.completed &&
+        primaryWeapon.definition.weapon?.termination &&
+        primaryWeapon.definition.weapon.storeTransfer?.operation !== "JETTISON" &&
+        primaryWeapon.lifecycle !== "STOWED"
+      ) {
+        this.terminalPriorEvidenceSnapshot = this.closestEvidenceSnapshots?.[0].modelTimeSeconds === eventTime
+          ? this.closestEvidenceSnapshots[0]
+          : this.weaponEvidenceSnapshot(
+              this.terminalPriorEvidenceSnapshot,
+              eventTime,
+              this.preStepStates,
+            );
+      }
       const activationAtNextBoundary = [...this.states.values()].some((state) => {
         const launchTimeSeconds = state.definition.weapon?.launchTimeSeconds;
         return state.lifecycle === "STOWED" &&
@@ -2335,12 +2419,6 @@ export class EngineSession {
             scenario.fixedStepSeconds,
           ) === this.integratedSteps;
       });
-      if (
-        weaponTermination &&
-        needsPreTerminationSnapshot
-      ) {
-        this.retainFrame(this.projectFrame(eventTime, this.preStepStates));
-      }
       if (
         this.eventJournal.hasPending() ||
         this.integratedSteps === 1 ||
@@ -2374,10 +2452,31 @@ export class EngineSession {
 
   result(): EngineRun {
     if (!this.completed) throw new Error("The engine session is not complete.");
-    const events = this.eventJournal.items();
+    const hasWeaponTermination = [
+      "weapon_intercept",
+      "weapon_miss",
+      "weapon_expired",
+      "weapon_failed",
+      "target_unavailable",
+    ].includes(this.termination);
+    const evidenceSnapshots = [
+      ...(hasWeaponTermination ? (this.closestEvidenceSnapshots ?? []) : []),
+      ...(this.terminalPriorEvidenceSnapshot ? [this.terminalPriorEvidenceSnapshot] : []),
+    ];
+    const evidenceFrames = evidenceSnapshots.map((snapshot) => this.projectFrame(
+      snapshot.modelTimeSeconds,
+      snapshot.states,
+      snapshot.observerStates,
+    ));
+    const compacted = mergeWeaponEvidenceFrames(
+      this.frames,
+      this.eventJournal.items(),
+      evidenceFrames,
+    );
+    const events = compacted.events;
     const run: EngineRun = {
       scenario: this.scenario,
-      frames: this.frames,
+      frames: compacted.frames,
       events: {
         state: "AVAILABLE",
         schemaVersion: SIMULATION_EVENT_SCHEMA,

@@ -283,8 +283,9 @@ Complete nonlinear aircraft coefficient-table and engine-map execution; store dr
 
 The gate now includes exact terminal-state/event parity, malformed termination-
 model rejection and between-step closest-approach agreement for all nine
-canonical scenarios. The optimized artifact remains below the explicit 575,000-
-byte regression ceiling.
+canonical scenarios. Raw Rust/WASM also binds weapon termination to the exact
+compiler-owned retained-pack identity and projection. The optimized artifact
+remains below the explicit 585,000-byte regression ceiling.
 
 The Rust integrator may replace the TypeScript numerical loop only after deterministic parity, numerical-tolerance, malformed-package, extreme-condition, lifecycle, and benchmark tests pass. JavaScript remains responsible for product state and rendering; batches will use a browser Worker.
 

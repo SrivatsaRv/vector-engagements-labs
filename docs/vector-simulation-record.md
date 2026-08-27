@@ -19,7 +19,9 @@ whole-scenario admission. This gate changes no VSR member or schema: it ensures
 that `scenario.json` and `compiled.json` can contain only the admitted authored
 values and their exact compiled consequence.
 A weapon-terminal archive contains the compiled termination authority, the
-terminal achieved frame and exactly one `WEAPON_TERMINATED` event. The event
+terminal achieved frame and exactly one `WEAPON_TERMINATED` event. Payload v2
+identifies the exact retained prior/next frame times that witness the lifetime
+minimum. The event
 records `targetEffect: NOT_MODELLED`; no archive consumer may promote geometric
 intercept to damage or kill.
 
@@ -214,7 +216,30 @@ closed; readback never substitutes the current pack.
 Non-Air records receive the same fail-closed rule whenever their runtime pack
 carries weapon-termination authority. Verification tooling may supply a full
 compiled pack explicitly, but its id, version and digest must exactly equal the
-recorded identity before that pack can serve as replay authority.
+recorded identity before that pack can serve as replay authority. Readback first
+recomputes the supplied pack's canonical compiler digest, so a fabricated pack
+bearing the recorded digest is rejected before any causal event, frame or report
+authority is evaluated.
+Pre-termination records are identified by the absence of the
+`weaponTerminations` member, not by an empty current member. Their historical
+runtime-digest v2 bytes are verified before readback normalizes that missing
+member to an empty in-memory projection. This compatibility path is permitted
+only when no entity carries termination authority and the exact retained pack
+also contains none; current terminal-capable records remain runtime-digest v3
+and cannot borrow an older retained pack identity. A record carrying any such
+authority must also retain the typed v2 event stream; relabeling or replacing it
+with legacy v1 events is rejected rather than skipping terminal-event checks.
+For a typed stream that claims a non-weapon result, readback also evaluates the
+last exact fixed-step segment for every released termination-capable guided
+weapon. An explicitly authored unpowered `JETTISON` remains a store-transfer
+run and is excluded from guided-weapon terminal authority.
+Geometry, target state, lifetime, terrain or post-burn energy that proves a
+terminal cause cannot be hidden by restoring a non-terminal weapon state,
+deleting its events and relabeling `RUN_COMPLETED` and the report as a time
+limit. Both engines therefore force-retain the exact predecessor of the final
+frame for every released termination-capable run, including a truthful
+nonterminal result. Missing entities or a gap larger than one fixed step is an
+invalid record rather than permission to skip this counterfactual check.
 Regional replay verifies the embedded pack content digest, runtime-grid parent
 binding and installation-catalogue digest before any archived frame is exposed.
 Ground replay also validates the exact compiled mission, posture, release time,
@@ -240,16 +265,39 @@ only for the source-authored generic engine-verification model and records an
 opaque side-owned track transition with exact source sequence/time and typed
 cause. Payload v3 retains the exact opaque observation ID for
 observation-driven transitions and `null` for coast/loss transitions.
-`WEAPON_TERMINATED` is produced by `WEAPON_DYNAMICS`. Its v1 payload binds the
+`WEAPON_TERMINATED` is produced by `WEAPON_DYNAMICS`. Its v2 payload binds the
 weapon and target, prior and achieved weapon state, typed cause, the
 `GEOMETRIC_CLOSEST_APPROACH` criterion, closest approach, within-step
 occurrence time, admitted 25 m radius, admitted 180 s maximum flight time and
-`targetEffect: NOT_MODELLED`. Exactly one such event is required for a weapon
+`targetEffect: NOT_MODELLED`, plus the exact prior/next model times of the
+retained minimizing pair. Exactly one such event is required for a weapon
 intercept, miss, expiry, terrain failure or target-unavailable run. The event
 frame must contain the terminated weapon in the matching achieved state; its
 prior state must equal the same weapon's state at the exact preceding fixed-step
 boundary, which the engine force-retains immediately before every weapon
-termination. For geometric intercept, replay independently recomputes the
+termination. At world entry both engines seed the evidence with the first exact
+active fixed-step pair even when its minimum equals the launch-boundary
+separation; later exact consecutive candidates replace it only when a segment
+establishes a lower weapon-lifetime minimum. Rolling engine snapshots replace
+superseded candidates, and publication
+merges the exact minimizing pair with normal 0.25-second playback
+samples and event frames. A time-limit run with a released termination-capable
+weapon additionally retains the exact final predecessor needed to prove that
+no terminal predicate occurred in its last step. Replay requires the declared
+witness pair, recomputes its exact segment minimum, and then reruns a terminal
+record's compiled scenario on its declared deterministic backend. The same full
+rerun is mandatory when a termination-capable archive claims no terminal event:
+the replayed run outcome, cumulative closest approach and optional terminal
+payload must match the archive. This prevents an earlier terminal boundary from
+being discarded and replaced by duplicated active frames at the declared run
+duration. For a terminal claim, the replayed payload, cause, cumulative closest
+approach and witness identity must match the archive, so deleting the true
+minimum and substituting another retained pair cannot be authorized by
+recomputing archive hashes. A record claiming
+`time_limit` must end at the first fixed-step tick at or after the compiled
+scenario duration; truncating a terminal archive to an earlier nonterminal pair
+and resealing it cannot manufacture a time-limit result. For geometric intercept,
+replay independently recomputes the
 closest-point fraction from those two boundary frames and requires the exact
 canonical six-decimal occurrence time. When admitted weapon lifetime ends
 inside the terminal integration step, replay truncates that relative-position
@@ -267,6 +315,17 @@ Replay also binds the terminal cause to the recorded target lifecycle.
 `ENGAGING`) in the event frame, while
 `TARGET_UNAVAILABLE` requires that target to be `TERMINATED`. Rehashing the
 frame/event members cannot substitute one cause for the other.
+
+Replay evaluates the producer's ordered terminal predicates against the exact
+prior and terminal frames: target unavailable, admitted geometric intercept,
+admitted lifetime expiry, terrain impact, then post-burn energy depletion. The
+terrain predicate is resampled from the retained immutable EnvironmentPack;
+replay admits only a `1e-8 m` serialization/parity tolerance at the contact
+boundary. The energy predicate recomputes terminal speed from the velocity vector and
+requires the admitted post-burn time and separation gates. The achieved frame
+must also carry the exact terminal phase for the winning cause. A caller cannot
+convert a terrain failure into an energy miss merely by changing the event,
+frame enum, run outcome and hashes together.
 
 For `FLIGHT_TIME_EXPIRED`, replay independently derives the achieved launch
 boundary from the authored schedule and fixed step, adds the admitted maximum
@@ -308,7 +367,9 @@ transition's `from` value must equal the prior canonical lifecycle. The replayed
 history must reach the lifecycle in the final retained frame. A syntactically
 valid enum cannot therefore falsify the recorded transition history.
 
-World entry for a scheduled stowed weapon is bound to the first fixed-step
+Every scheduled `GUIDED_WEAPON` must begin `STOWED`; TypeScript and Rust/WASM
+reject a contradictory active initial lifecycle before integration. World entry
+for an admitted scheduled weapon is bound to the first fixed-step
 integration boundary at or after its declared launch time and the first retained
 frame containing that entity. A later lifecycle event is
 bound to the first retained frame that changes from its prior canonical state,

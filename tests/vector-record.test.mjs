@@ -40,6 +40,8 @@ import {
 } from "../lib/engine/runtime-model-pack.ts";
 import { resolveRetainedCompiledModelPack } from "../lib/engine/retained-model-packs.ts";
 import historicalModelPackBundle from "../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json" with { type: "json" };
+import { closestApproachOnRelativeSegment } from "../lib/engine/weapon-termination.ts";
+import { projectObserverStates } from "../lib/information-state.ts";
 
 function governWeaponTermination(scenario, weapon, changes) {
   const pack = resolveRetainedCompiledModelPack(scenario.modelPack);
@@ -248,7 +250,7 @@ test("VSR recompiles an archived Air mission against its exact retained model pa
   });
   prepared.scenario = scenario;
   prepared.engineScenario.airMission = archivedMission;
-  prepared.engineScenario.modelPack = bindRuntimeModelPackDigest({
+  prepared.engineScenario.modelPack = {
     schemaVersion: historicalModelPack.schemaVersion,
     id: historicalModelPack.id,
     version: historicalModelPack.version,
@@ -268,12 +270,33 @@ test("VSR recompiles an archived Air mission against its exact retained model pa
         ? { verificationTrackModel: structuredClone(sensor.verificationTrackModel) }
         : {}),
     })),
-    weaponTerminations: runtimeWeaponTerminations(historicalModelPack, []),
     scenarioPatches: [],
-  });
+    runtimeDigest: "7bf22e26981fa0be7c28c755b8bffd1b6cc450461d4792a3db6d088a14f33dff",
+  };
+  for (const entity of prepared.engineScenario.entities) {
+    entity.provenance.modelPackDigest = historicalModelPack.digest;
+    if (entity.weapon) {
+      entity.weapon.admission.modelPackDigest = historicalModelPack.digest;
+      delete entity.weapon.termination;
+    }
+  }
 
   const result = simulate(currentScenario);
-  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  let record = await createVectorSimulationRecord(prepared, result, createdAt);
+  record = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    LEGACY_VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(canonicalJson({
+      schemaVersion: LEGACY_VECTOR_EVENT_SCHEMA,
+      id: "event-000000",
+      sequence: 0,
+      t: 0,
+      type: "ENTITY_ACTIVATED",
+      entityId: "blue-aircraft-1",
+      detail: "ACTIVE",
+    })),
+  );
   const serialized = serializeVectorRecord(record);
   const opened = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
 
@@ -517,6 +540,31 @@ test("VSR rejects tampered side-owned track state and track-event history", asyn
   );
 });
 
+test("VSR authenticates supplied replay-pack content before using its authority", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const base = prepareSimulation(scenario);
+  const binding = await bindVerificationTrackModelPack(base.engineScenario);
+  const capabilityManifest = createVerificationDeploymentCapabilities(
+    "typescript",
+    ["A2A"],
+    [binding.pack.digest],
+  );
+  const prepared = { ...base, engineScenario: binding.scenario, capabilityManifest };
+  const engineRun = runEngineBackend(binding.scenario, "typescript", binding.pack);
+  const result = buildSimulationResult(prepared, engineRun);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const serialized = serializeVectorRecord(record);
+  const forgedPack = structuredClone(binding.pack);
+  forgedPack.evidence[0].title += " tampered after compilation";
+
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength, {
+      compiledModelPack: forgedPack,
+    }),
+    /compiled model pack digest does not match its canonical content/i,
+  );
+});
+
 test("VSR rejects consistently forged track sources beside the admitted pack digest", async () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const base = prepareSimulation(scenario);
@@ -631,7 +679,7 @@ test("VSR admits only the governed frame/picture schema pairs", async () => {
   }
 });
 
-test("VSR opens legacy v1 events only as an explicit unavailable stream", async () => {
+test("VSR rejects legacy v1 events when the record carries termination authority", async () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const record = await createVectorSimulationRecord(
     prepareSimulation(scenario),
@@ -654,15 +702,148 @@ test("VSR opens legacy v1 events only as an explicit unavailable stream", async 
     legacyBytes,
   );
   const serialized = serializeVectorRecord(legacyRecord);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /weapon-termination authority require the typed v2 simulation-event stream/,
+  );
+});
+
+test("VSR opens an unretained legacy record only when termination authority is absent", async () => {
+  const scenario = SCENARIO_LIBRARY.find((entry) => entry.scenario.airMission === undefined).scenario;
+  const capabilities = createVerificationDeploymentCapabilities("typescript", [scenario.domain]);
+  const record = await createVectorSimulationRecord(
+    prepareSimulation(scenario, scenario.profile, capabilities),
+    simulateWithCapabilitiesForVerification(scenario, capabilities),
+    createdAt,
+  );
+  const compiledMember = record.members.find((member) => member.path === "compiled.json");
+  assert.ok(compiledMember);
+  const compiled = JSON.parse(new TextDecoder().decode(compiledMember.bytes));
+  const unretainedDigest = "8".repeat(64);
+  compiled.engineScenario.modelPack.id = "unretained-legacy-no-termination";
+  compiled.engineScenario.modelPack.version = "1.0.0";
+  compiled.engineScenario.modelPack.digest = unretainedDigest;
+  compiled.engineScenario.modelPack.weaponTerminations = [];
+  compiled.engineScenario.modelPack.scenarioPatches = [];
+  delete compiled.engineScenario.modelPack.runtimeDigest;
+  for (const entity of compiled.engineScenario.entities) {
+    entity.provenance.modelPackDigest = unretainedDigest;
+    if (entity.weapon) {
+      entity.weapon.admission.modelPackDigest = unretainedDigest;
+      delete entity.weapon.termination;
+    }
+  }
+  let legacyRecord = await replaceRecordMember(
+    record,
+    "compiled.json",
+    compiledMember.schemaVersion,
+    jsonBytes(compiled),
+  );
+  legacyRecord = await replaceRecordMember(
+    legacyRecord,
+    "events.jsonl",
+    LEGACY_VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(canonicalJson({
+      schemaVersion: LEGACY_VECTOR_EVENT_SCHEMA,
+      id: "event-000000",
+      sequence: 0,
+      t: 0,
+      type: "ENTITY_ACTIVATED",
+      entityId: "blue-aircraft-1",
+      detail: "ACTIVE",
+    })),
+  );
+  const serialized = serializeVectorRecord(legacyRecord);
   const opened = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
 
-  assert.deepEqual(opened.events, {
-    state: "UNAVAILABLE",
-    sourceSchemaVersion: LEGACY_VECTOR_EVENT_SCHEMA,
-    reason: "LEGACY_EVENT_SCHEMA",
-  });
-  assert.deepEqual(opened.result.engineRun.events, opened.events);
-  assert.ok(opened.result.frames.length > 0, "legacy replay remains read-only without invented v2 events");
+  assert.equal(opened.result.engineRun.scenario.modelPack.id, "unretained-legacy-no-termination");
+  assert.equal(opened.events.state, "UNAVAILABLE");
+});
+
+test("VSR verifies and opens the exact pre-termination v2 runtime projection", async () => {
+  const scenario = SCENARIO_LIBRARY.find((entry) => entry.scenario.airMission === undefined).scenario;
+  const capabilities = createVerificationDeploymentCapabilities("typescript", [scenario.domain]);
+  const record = await createVectorSimulationRecord(
+    prepareSimulation(scenario, scenario.profile, capabilities),
+    simulateWithCapabilitiesForVerification(scenario, capabilities),
+    createdAt,
+  );
+  const compiledMember = record.members.find((member) => member.path === "compiled.json");
+  assert.ok(compiledMember);
+  const compiled = JSON.parse(new TextDecoder().decode(compiledMember.bytes));
+  const historicalPack = historicalModelPackBundle.pack;
+  const runtimePack = compiled.engineScenario.modelPack;
+  runtimePack.id = historicalPack.id;
+  runtimePack.version = historicalPack.version;
+  runtimePack.digest = historicalPack.digest;
+  runtimePack.intendedUse = { ...historicalPack.intendedUses[0] };
+  runtimePack.observerSensors = historicalPack.sensors.map((sensor) => ({
+    modelId: sensor.id,
+    modelVersion: sensor.version,
+    evidenceRefIds: [...sensor.evidenceRefIds],
+    sensorKind: sensor.sensorKind,
+    detectionRangeM: sensor.detectionRangeM,
+    minimumRangeM: sensor.minimumRangeM,
+    scanPeriodS: sensor.scanPeriodS,
+    azimuthFieldOfViewRad: sensor.azimuthFieldOfViewRad,
+    elevationFieldOfViewRad: sensor.elevationFieldOfViewRad,
+    ...(sensor.verificationTrackModel
+      ? { verificationTrackModel: structuredClone(sensor.verificationTrackModel) }
+      : {}),
+  }));
+  runtimePack.scenarioPatches = [];
+  delete runtimePack.weaponTerminations;
+  runtimePack.runtimeDigest = "7bf22e26981fa0be7c28c755b8bffd1b6cc450461d4792a3db6d088a14f33dff";
+  for (const entity of compiled.engineScenario.entities) {
+    entity.provenance.modelPackDigest = historicalPack.digest;
+    if (entity.weapon) {
+      entity.weapon.admission.modelPackDigest = historicalPack.digest;
+      delete entity.weapon.termination;
+    }
+  }
+  let legacyRecord = await replaceRecordMember(
+    record,
+    "compiled.json",
+    compiledMember.schemaVersion,
+    jsonBytes(compiled),
+  );
+  legacyRecord = await replaceRecordMember(
+    legacyRecord,
+    "events.jsonl",
+    LEGACY_VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(canonicalJson({
+      schemaVersion: LEGACY_VECTOR_EVENT_SCHEMA,
+      id: "event-000000",
+      sequence: 0,
+      t: 0,
+      type: "ENTITY_ACTIVATED",
+      entityId: "blue-aircraft-1",
+      detail: "ACTIVE",
+    })),
+  );
+  const serialized = serializeVectorRecord(legacyRecord);
+  const opened = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+
+  assert.equal(opened.result.engineRun.scenario.modelPack.version, "0.8.0");
+  assert.equal(opened.result.engineRun.scenario.modelPack.runtimeDigest, runtimePack.runtimeDigest);
+  assert.deepEqual(opened.result.engineRun.scenario.modelPack.weaponTerminations, []);
+  assert.equal(opened.events.state, "UNAVAILABLE");
+
+  const reopenedCompiled = JSON.parse(new TextDecoder().decode(
+    legacyRecord.members.find((member) => member.path === "compiled.json").bytes,
+  ));
+  reopenedCompiled.engineScenario.modelPack.runtimeDigest = "0".repeat(64);
+  const corrupt = await replaceRecordMember(
+    legacyRecord,
+    "compiled.json",
+    compiledMember.schemaVersion,
+    jsonBytes(reopenedCompiled),
+  );
+  const corruptSerialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(corruptSerialized.buffer, corruptSerialized.byteLength),
+    /legacy runtime model-pack projection digest does not match its v2 content/,
+  );
 });
 
 test("VSR rejects unsupported, reordered, and causally corrupt v2 event streams", async () => {
@@ -981,6 +1162,388 @@ test("VSR rejects a hash-resealed terminal event with a false prior weapon state
   );
 });
 
+test("VSR rejects terminal geometry relabeled as a time-limit run", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  assert.equal(result.engineRun.termination, "weapon_intercept");
+  assert.equal(result.engineRun.events.state, "AVAILABLE");
+  let record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const terminal = result.engineRun.events.items.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+
+  const frameMember = record.members.find((member) => member.path === "frames.arrow");
+  assert.ok(frameMember);
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  const priorWeapon = frames[terminal.frameIndex - 1].entities.find(
+    (entity) => entity.id === terminal.payload.weaponId,
+  );
+  const finalWeapon = frames[terminal.frameIndex].entities.find(
+    (entity) => entity.id === terminal.payload.weaponId,
+  );
+  assert.ok(priorWeapon && finalWeapon);
+  finalWeapon.lifecycle = priorWeapon.lifecycle;
+  finalWeapon.weaponFlightState = priorWeapon.weaponFlightState;
+  finalWeapon.phase = priorWeapon.phase;
+  record = await replaceRecordMember(
+    record,
+    "frames.arrow",
+    VECTOR_FRAME_SCHEMA,
+    encodeColumnarFrames(frames),
+  );
+
+  const events = result.engineRun.events.items
+    .filter((event) =>
+      event.payload.kind !== "WEAPON_TERMINATED" &&
+      !(event.payload.kind === "ENTITY_LIFECYCLE_CHANGED" &&
+        event.producer.entityId === terminal.payload.weaponId)
+    )
+    .map((event, sequence) => ({
+      ...structuredClone(event),
+      id: `event-${sequence.toString().padStart(6, "0")}`,
+      sequence,
+    }));
+  const completed = events.at(-1);
+  assert.equal(completed?.payload.kind, "RUN_COMPLETED");
+  completed.payload.termination = "time_limit";
+  record = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const report = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+  report.engine.termination = "time_limit";
+  report.result.termination = "time_limit";
+  record = await replaceRecordMember(
+    record,
+    "report.json",
+    reportMember.schemaVersion,
+    jsonBytes(report),
+  );
+  const serialized = serializeVectorRecord(record);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /suppresses the GEOMETRIC_INTERCEPT weapon termination proven by the final retained segment/,
+  );
+});
+
+test("VSR rejects a relabeled terminal run with its exact final-step evidence removed", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  assert.equal(result.engineRun.termination, "weapon_intercept");
+  let record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const terminal = result.engineRun.events.items.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+
+  const frameMember = record.members.find((member) => member.path === "frames.arrow");
+  assert.ok(frameMember);
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  const removedFrameIndex = terminal.frameIndex - 1;
+  const removedFrame = frames[removedFrameIndex];
+  const priorWeapon = removedFrame.entities.find(
+    (entity) => entity.id === terminal.payload.weaponId,
+  );
+  const finalWeapon = frames[terminal.frameIndex].entities.find(
+    (entity) => entity.id === terminal.payload.weaponId,
+  );
+  assert.ok(priorWeapon && finalWeapon);
+  finalWeapon.lifecycle = priorWeapon.lifecycle;
+  finalWeapon.weaponFlightState = priorWeapon.weaponFlightState;
+  finalWeapon.phase = priorWeapon.phase;
+  frames.splice(removedFrameIndex, 1);
+  assert.ok(
+    frames.at(-1).t - frames.at(-2).t > prepared.engineScenario.fixedStepSeconds + 1e-6,
+    "falsifier must remove the exact final fixed-step predecessor",
+  );
+  record = await replaceRecordMember(
+    record,
+    "frames.arrow",
+    VECTOR_FRAME_SCHEMA,
+    encodeColumnarFrames(frames),
+  );
+
+  const events = result.engineRun.events.items
+    .filter((event) =>
+      event.payload.kind !== "WEAPON_TERMINATED" &&
+      !(event.payload.kind === "ENTITY_LIFECYCLE_CHANGED" &&
+        event.producer.entityId === terminal.payload.weaponId)
+    )
+    .map((event, sequence) => ({
+      ...structuredClone(event),
+      id: `event-${sequence.toString().padStart(6, "0")}`,
+      sequence,
+      frameIndex: event.frameIndex > removedFrameIndex
+        ? event.frameIndex - 1
+        : event.frameIndex,
+    }));
+  const completed = events.at(-1);
+  assert.equal(completed?.payload.kind, "RUN_COMPLETED");
+  completed.payload.termination = "time_limit";
+  record = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+
+  const pictureMember = record.members.find((member) => member.path === "pictures.jsonl");
+  assert.ok(pictureMember);
+  const pictures = new TextDecoder().decode(pictureMember.bytes).trim().split("\n")
+    .map(JSON.parse)
+    .filter((picture) => picture.modelTimeSeconds !== removedFrame.t);
+  record = await replaceRecordMember(
+    record,
+    "pictures.jsonl",
+    pictureMember.schemaVersion,
+    textEncoder.encode(pictures.map((picture) => canonicalJson(picture)).join("\n")),
+  );
+
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const report = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+  report.engine.termination = "time_limit";
+  report.result.termination = "time_limit";
+  record = await replaceRecordMember(
+    record,
+    "report.json",
+    reportMember.schemaVersion,
+    jsonBytes(report),
+  );
+
+  const serialized = serializeVectorRecord(record);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /no exact retained final fixed-step boundary geometry/,
+  );
+});
+
+test("VSR rejects a terminal run truncated to an earlier nonterminal time-limit boundary", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  assert.equal(result.engineRun.termination, "weapon_intercept");
+  let record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const terminal = result.engineRun.events.items.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+
+  const frameMember = record.members.find((member) => member.path === "frames.arrow");
+  assert.ok(frameMember);
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  let cutoffFrameIndex = -1;
+  for (let index = terminal.frameIndex - 2; index > 0; index -= 1) {
+    if (
+      Math.abs(
+        frames[index].t - frames[index - 1].t - prepared.engineScenario.fixedStepSeconds,
+      ) <= 1e-9
+    ) {
+      cutoffFrameIndex = index;
+      break;
+    }
+  }
+  assert.ok(cutoffFrameIndex > 0, "falsifier requires an earlier exact nonterminal pair");
+  const cutoffTimeSeconds = frames[cutoffFrameIndex].t;
+  const truncatedFrames = frames.slice(0, cutoffFrameIndex + 1);
+  assert.ok(
+    cutoffTimeSeconds < prepared.engineScenario.durationSeconds,
+    "falsifier must stop before the declared scenario duration",
+  );
+  record = await replaceRecordMember(
+    record,
+    "frames.arrow",
+    VECTOR_FRAME_SCHEMA,
+    encodeColumnarFrames(truncatedFrames),
+  );
+
+  const retainedEvents = result.engineRun.events.items
+    .filter((event) =>
+      event.payload.kind !== "RUN_COMPLETED" &&
+      event.payload.kind !== "WEAPON_TERMINATED" &&
+      event.frameIndex <= cutoffFrameIndex
+    )
+    .map((event) => structuredClone(event));
+  const originalCompleted = result.engineRun.events.items.at(-1);
+  assert.equal(originalCompleted?.payload.kind, "RUN_COMPLETED");
+  retainedEvents.push({
+    ...structuredClone(originalCompleted),
+    tick: Math.round(cutoffTimeSeconds / prepared.engineScenario.fixedStepSeconds),
+    modelTimeSeconds: cutoffTimeSeconds,
+    frameIndex: cutoffFrameIndex,
+    payload: {
+      ...structuredClone(originalCompleted.payload),
+      termination: "time_limit",
+    },
+  });
+  const events = retainedEvents.map((event, sequence) => ({
+    ...event,
+    id: `event-${sequence.toString().padStart(6, "0")}`,
+    sequence,
+  }));
+  record = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+
+  const pictureMember = record.members.find((member) => member.path === "pictures.jsonl");
+  assert.ok(pictureMember);
+  const pictures = new TextDecoder().decode(pictureMember.bytes).trim().split("\n")
+    .map(JSON.parse)
+    .filter((picture) => picture.modelTimeSeconds <= cutoffTimeSeconds);
+  record = await replaceRecordMember(
+    record,
+    "pictures.jsonl",
+    pictureMember.schemaVersion,
+    textEncoder.encode(pictures.map((picture) => canonicalJson(picture)).join("\n")),
+  );
+
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const report = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+  report.engine.termination = "time_limit";
+  report.result.termination = "time_limit";
+  record = await replaceRecordMember(
+    record,
+    "report.json",
+    reportMember.schemaVersion,
+    jsonBytes(report),
+  );
+
+  const serialized = serializeVectorRecord(record);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /does not reference the declared scenario terminal tick/,
+  );
+});
+
+test("VSR replays a full termination-capable run before admitting a nonterminal claim", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  assert.equal(result.engineRun.termination, "weapon_intercept");
+  assert.equal(result.engineRun.events.state, "AVAILABLE");
+  let record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const terminal = result.engineRun.events.items.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+
+  const frameMember = record.members.find((member) => member.path === "frames.arrow");
+  assert.ok(frameMember);
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  const sourceFrameIndex = terminal.frameIndex - 2;
+  const sourceFrame = frames[sourceFrameIndex];
+  const sourceWeapon = sourceFrame?.entities.find(
+    (entity) => entity.id === terminal.payload.weaponId,
+  );
+  assert.ok(sourceFrame && sourceWeapon?.lifecycle !== "TERMINATED");
+  const terminalTick = Math.ceil(
+    prepared.engineScenario.durationSeconds / prepared.engineScenario.fixedStepSeconds - 1e-12,
+  );
+  const terminalTimeSeconds = terminalTick * prepared.engineScenario.fixedStepSeconds;
+  const priorTerminalTimeSeconds = terminalTimeSeconds - prepared.engineScenario.fixedStepSeconds;
+  const forgedFrames = frames.slice(0, sourceFrameIndex + 1);
+  forgedFrames.push(
+    { ...structuredClone(sourceFrame), t: priorTerminalTimeSeconds },
+    { ...structuredClone(sourceFrame), t: terminalTimeSeconds },
+  );
+  record = await replaceRecordMember(
+    record,
+    "frames.arrow",
+    VECTOR_FRAME_SCHEMA,
+    encodeColumnarFrames(forgedFrames),
+  );
+
+  const retainedEvents = result.engineRun.events.items
+    .filter((event) =>
+      event.frameIndex <= sourceFrameIndex &&
+      event.payload.kind !== "RUN_COMPLETED" &&
+      event.payload.kind !== "WEAPON_TERMINATED" &&
+      !(event.payload.kind === "ENTITY_LIFECYCLE_CHANGED" &&
+        event.producer.entityId === terminal.payload.weaponId)
+    )
+    .map((event) => structuredClone(event));
+  const originalCompleted = result.engineRun.events.items.at(-1);
+  assert.equal(originalCompleted?.payload.kind, "RUN_COMPLETED");
+  retainedEvents.push({
+    ...structuredClone(originalCompleted),
+    tick: terminalTick,
+    modelTimeSeconds: terminalTimeSeconds,
+    frameIndex: forgedFrames.length - 1,
+    causeEventIds: [],
+    payload: {
+      ...structuredClone(originalCompleted.payload),
+      termination: "time_limit",
+    },
+  });
+  const eventIdMap = new Map(
+    retainedEvents.map((event, sequence) => [
+      event.id,
+      `event-${sequence.toString().padStart(6, "0")}`,
+    ]),
+  );
+  const events = retainedEvents.map((event, sequence) => ({
+    ...event,
+    id: eventIdMap.get(event.id),
+    sequence,
+    causeEventIds: event.causeEventIds.map((id) => eventIdMap.get(id) ?? id),
+  }));
+  record = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+
+  const pictureMember = record.members.find((member) => member.path === "pictures.jsonl");
+  assert.ok(pictureMember);
+  const forgedPictures = projectObserverStates(forgedFrames);
+  record = await replaceRecordMember(
+    record,
+    "pictures.jsonl",
+    pictureMember.schemaVersion,
+    textEncoder.encode(forgedPictures.map((picture) => canonicalJson(picture)).join("\n")),
+  );
+
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const report = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+  report.engine.termination = "time_limit";
+  report.result.termination = "time_limit";
+  report.result.timeOfFlight = terminalTimeSeconds;
+  record = await replaceRecordMember(
+    record,
+    "report.json",
+    reportMember.schemaVersion,
+    jsonBytes(report),
+  );
+
+  const serialized = serializeVectorRecord(record);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /does not match deterministic engine replay/,
+  );
+});
+
 test("VSR rejects a hash-resealed geometric intercept occurrence time", async () => {
   const scenario = SCENARIO_LIBRARY.find(
     (entry) => entry.id === "a2a-defensive-break",
@@ -1052,6 +1615,132 @@ test("VSR rejects hash-resealed geometric distance even when report and event ag
   await assert.rejects(
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
     /does not match its exact geometric intercept distance/,
+  );
+});
+
+test("VSR rejects hash-resealed non-intercept distance even when report and event agree", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2g-emitter-corridor",
+  ).scenario;
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2G"]);
+  const prepared = prepareSimulation(scenario, scenario.profile, capabilities);
+  const result = simulateWithCapabilitiesForVerification(scenario, capabilities);
+  assert.equal(result.engineRun.termination, "weapon_failed");
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const events = structuredClone(result.engineRun.events.items);
+  const terminal = events.find((event) => event.payload.kind === "WEAPON_TERMINATED");
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+  assert.equal(terminal.payload.cause, "TERRAIN_IMPACT");
+  const forgedDistanceM = Number((terminal.payload.closestApproachM + 123).toFixed(6));
+  terminal.payload.closestApproachM = forgedDistanceM;
+
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const report = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+  report.engine.closestApproachM = forgedDistanceM;
+  let corrupt = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+  corrupt = await replaceRecordMember(
+    corrupt,
+    "report.json",
+    reportMember.schemaVersion,
+    jsonBytes(report),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /do not match retained lifetime closest-approach evidence/,
+  );
+});
+
+test("VSR rejects removal and replacement of the declared lifetime-minimum witness", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "g2a-layered-screen",
+  ).scenario;
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["G2A"]);
+  const prepared = prepareSimulation(scenario, scenario.profile, capabilities);
+  const result = simulateWithCapabilitiesForVerification(scenario, capabilities);
+  let record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const events = structuredClone(result.engineRun.events.items);
+  const terminal = events.find((event) => event.payload.kind === "WEAPON_TERMINATED");
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+  assert.equal(terminal.payload.cause, "TERRAIN_IMPACT");
+
+  const frameMember = record.members.find((member) => member.path === "frames.arrow");
+  assert.ok(frameMember);
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  const removedIndex = frames.findIndex(
+    (frame) => frame.t === terminal.payload.closestApproachNextTimeSeconds,
+  );
+  assert.ok(removedIndex > 0 && removedIndex < terminal.frameIndex);
+  frames.splice(removedIndex, 1);
+
+  const replacementNext = frames[terminal.frameIndex - 1];
+  const replacementPrior = frames[terminal.frameIndex - 2];
+  assert.ok(replacementPrior && replacementNext);
+  const priorWeapon = replacementPrior.entities.find(
+    (entity) => entity.id === terminal.payload.weaponId,
+  );
+  const priorTarget = replacementPrior.entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  const nextWeapon = replacementNext.entities.find(
+    (entity) => entity.id === terminal.payload.weaponId,
+  );
+  const nextTarget = replacementNext.entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  assert.ok(priorWeapon && priorTarget && nextWeapon && nextTarget);
+  const forgedClosestApproachM = Number(closestApproachOnRelativeSegment(
+    {
+      x: priorTarget.position.x - priorWeapon.position.x,
+      y: priorTarget.position.y - priorWeapon.position.y,
+      z: priorTarget.position.z - priorWeapon.position.z,
+    },
+    {
+      x: nextTarget.position.x - nextWeapon.position.x,
+      y: nextTarget.position.y - nextWeapon.position.y,
+      z: nextTarget.position.z - nextWeapon.position.z,
+    },
+  ).distanceM.toFixed(6));
+  terminal.payload.closestApproachM = forgedClosestApproachM;
+  terminal.payload.closestApproachPriorTimeSeconds = replacementPrior.t;
+  terminal.payload.closestApproachNextTimeSeconds = replacementNext.t;
+  for (const event of events) {
+    if (event.frameIndex > removedIndex) event.frameIndex -= 1;
+  }
+  record = await replaceRecordMember(
+    record,
+    "frames.arrow",
+    VECTOR_FRAME_SCHEMA,
+    encodeColumnarFrames(frames),
+  );
+  record = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const report = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+  report.engine.closestApproachM = forgedClosestApproachM;
+  report.result.closestApproach = forgedClosestApproachM;
+  record = await replaceRecordMember(
+    record,
+    "report.json",
+    reportMember.schemaVersion,
+    jsonBytes(report),
+  );
+
+  const serialized = serializeVectorRecord(record);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /does not match deterministic engine replay/,
   );
 });
 

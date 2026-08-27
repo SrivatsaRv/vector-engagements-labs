@@ -99,11 +99,17 @@ that treats the current `EngineScenario` as a model pack. It will be replaced by
 the Simulation Data Foundation contract after that work lands; no competing
 entity or model schema is introduced here.
 
-Worker results are a content-addressed VSR transferred as an `ArrayBuffer`.
-Ownership moves Worker → main thread at completion and main thread → Worker after
-verification and decoding. The Worker retains at most two returned buffers, each
-no larger than 64 MiB, and uses a power-of-two capacity so subsequent records can
-reuse storage. No `SharedArrayBuffer` or cross-origin isolation is required.
+Worker results are a content-addressed VSR. The simulation Worker verifies and
+opens the archive—including any deterministic terminal-engine replay—before it
+posts the structured playback result and transfers the raw `ArrayBuffer` to the
+main thread. The main thread never reruns engine ticks while accepting a record.
+It returns the raw buffer to the Worker for bounded reuse after matching the
+opened manifest identity to the completion receipt. Saved or uploaded records
+use the same Worker's `open-record` request; the client transfers a bounded copy
+so the caller retains its source bytes. The Worker retains at most two returned
+buffers, each no larger than 64 MiB, and uses a power-of-two capacity so
+subsequent records can reuse storage. No `SharedArrayBuffer` or cross-origin
+isolation is required.
 
 ## Built Worker verification
 
@@ -142,6 +148,10 @@ requires a successful `weapon_intercept` termination at 131.9 s with a
 It also requires the typed `WEAPON_TERMINATED` event, the terminal weapon frame,
 an active target and `targetEffect: NOT_MODELLED`. A title, rendered path,
 renderer proximity or progress message cannot satisfy that assertion.
+Saved-record admission additionally recomputes the terminal predicate and the
+weapon-lifetime closest approach from exact engine-retained fixed-step evidence;
+jointly resealing an event and report value is therefore not accepted as new
+simulation truth.
 The #187 built-browser journey additionally proves the exact store identity is
 absent before and appears once at the transfer frame, with the same outcome in
 telemetry/report playback and successful cancellation/retry recovery.
