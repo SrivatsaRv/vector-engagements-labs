@@ -574,6 +574,12 @@ identities. The historical `1.0.0` rows remain addressable. It uses append-only
 `ON CONFLICT DO NOTHING` semantics and exact readback; migrations 015 and 016
 remain byte-frozen.
 
+The historical intended-use row is the exact definition and legacy
+identity-string hash first published by migration 007. Migration 017 reads that
+exact JSON value and hash back rather than reconstructing or normalizing it
+under the newer canonical-definition hash convention. The separately published 0.8.0
+source remains bound to its own frozen content hash.
+
 Air scenario packages persist the authored mission and exact model-pack digest
 inside canonical v4 JSON. Saved runs and VSRs additionally retain the compiled
 mission digests; readback resolves an exact retained `(id, version, digest)` and

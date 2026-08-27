@@ -58,7 +58,29 @@ if (
 ) {
   throw new Error("Historical model-pack 0.8.0 fixture identity drifted.");
 }
-const historicalIntendedUse = historicalSource.intendedUses[0]!;
+// Migration 007 published this row before intended-use content hashes were
+// canonical-definition hashes. Preserve that exact immutable legacy identity;
+// the reconstructed 0.8.0 source below is a separate governed record.
+const historicalIntendedUse = {
+  schemaVersion: "vector.intended-use.v1",
+  id: "vector.intended-use.geometry-teaching",
+  version: "1.0.0",
+  question:
+    "How do relative geometry, altitude, aspect, closure, and deterministic recorded state evolve in a bounded teaching scenario?",
+  requiredCapabilities: ["coordinate-transform", "fixed-step-integration", "immutable-recording"],
+  supportedInterpretations: ["geometry teaching", "controlled comparison of declared inputs"],
+  unsupportedInterpretations: [
+    "named-system performance",
+    "weapon effectiveness",
+    "operational sensor performance",
+  ],
+} as const;
+const historicalIntendedUseContentHash = createHash("sha256")
+  .update(`${historicalIntendedUse.id}@${historicalIntendedUse.version}`)
+  .digest("hex");
+if (historicalIntendedUseContentHash !== "18f377a0cc2465d49875d59c1a653d51f617da745d066d02de54161fee44a106") {
+  throw new Error(`Historical intended-use 1.0.0 identity drifted: ${historicalIntendedUseContentHash}.`);
+}
 const migrationPath = resolve("db/migrations/017_weapon_termination_model.sql");
 const startMarker = "-- BEGIN GENERATED WEAPON TERMINATION MODEL";
 const endMarker = "-- END GENERATED WEAPON TERMINATION MODEL";
@@ -76,7 +98,7 @@ const generated = `${startMarker}
 -- Immutable verification-only geometric weapon-termination authority owned by issue #28.
 -- Retain the complete 0.8.0 authority chain required by immutable scenario@1.0.0 rows.
 INSERT INTO intended_use_contracts (id,version,schema_version,definition,content_hash)
-VALUES (${sqlText(historicalIntendedUse.id)},${sqlText(historicalIntendedUse.version)},${sqlText(historicalIntendedUse.schemaVersion)},${dollarJson("vector_weapon_termination_historical_intended_use", historicalIntendedUse)},${sqlText(sha256HexSync(historicalIntendedUse))})
+VALUES (${sqlText(historicalIntendedUse.id)},${sqlText(historicalIntendedUse.version)},${sqlText(historicalIntendedUse.schemaVersion)},${dollarJson("vector_weapon_termination_historical_intended_use", historicalIntendedUse)},${sqlText(historicalIntendedUseContentHash)})
 ON CONFLICT (id,version) DO NOTHING;
 
 INSERT INTO model_pack_sources (id,version,schema_version,definition,content_hash,lifecycle_status)
@@ -129,7 +151,7 @@ BEGIN
     WHERE id=${sqlText(historicalIntendedUse.id)} AND version=${sqlText(historicalIntendedUse.version)}
       AND schema_version=${sqlText(historicalIntendedUse.schemaVersion)}
       AND definition=${dollarJson("vector_weapon_termination_historical_intended_use", historicalIntendedUse)}
-      AND content_hash=${sqlText(sha256HexSync(historicalIntendedUse))}
+      AND content_hash=${sqlText(historicalIntendedUseContentHash)}
   ) THEN
     RAISE EXCEPTION 'Historical intended-use exact identity readback failed';
   END IF;

@@ -79,7 +79,9 @@ seeding is insert-only for `(id, version)` and cannot repair drift by overwrite.
 Migration readback compares the full current and historical intended-use,
 source, credibility-manifest and compiled-pack rows with generated content; a
 partially deployed or administratively inserted conflicting identity aborts
-the transaction.
+the transaction. The historical intended-use comparison deliberately preserves
+migration 007's exact definition and legacy identity-string content hash; it
+does not reinterpret that immutable row using today's canonical-content hash.
 
 Migration `015_generic_ground_dynamics.sql` deterministically upserts only its
 eight historical canonical v4 scenario-package rows and hashes affected by ground-envelope

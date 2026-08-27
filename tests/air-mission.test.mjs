@@ -447,6 +447,16 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
   assert.match(terminationMigration, /Weapon termination credibility-manifest exact identity readback failed/);
   assert.match(terminationMigration, /Historical model-pack source exact identity readback failed/);
   assert.match(terminationMigration, /Historical intended-use exact identity readback failed/);
+  assert.match(
+    terminationMigration,
+    /18f377a0cc2465d49875d59c1a653d51f617da745d066d02de54161fee44a106/,
+    "migration 017 must preserve migration 007's legacy intended-use identity hash",
+  );
+  assert.match(
+    terminationMigration,
+    /\"unsupportedInterpretations\":\[\"named-system performance\",\"weapon effectiveness\",\"operational sensor performance\"\]/,
+    "migration 017 must read back migration 007's exact intended-use definition",
+  );
   assert.match(terminationMigration, /Historical credibility-manifest exact identity readback failed/);
   assert.match(terminationMigration, /Weapon termination scenario exact identity readback failed/);
   for (const tag of [

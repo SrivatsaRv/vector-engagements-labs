@@ -155,6 +155,9 @@ contains no update path for an existing `(id, version)`. Its post-insert
 readback binds every historical and current intended-use, source, credibility
 manifest and compiled-pack field to the generated immutable content, so a
 pre-existing conflicting identity aborts instead of being silently reused.
+The historical intended-use oracle is migration 007's exact JSON definition and
+legacy identity-string hash, preventing a newer reconstructed definition from
+being mistaken for the already-published immutable row.
 Engine regression
 contrasts a 75 ms lifetime with a 100 ms control in the same crossing geometry:
 the former expires at the exact in-step boundary while the latter intercepts,
