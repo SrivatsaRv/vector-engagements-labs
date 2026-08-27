@@ -735,7 +735,14 @@ of those compiled values. It records exact model ID/version plus the effective
 termination object after validated scenario patches. Entity fields must equal
 that projection in both TypeScript and Rust/WASM; changing both the entity and
 the compact projection while retaining a known pack identity is rejected
-against the retained compiled pack.
+against the retained compiled pack. Live TypeScript and Rust/WASM entry points
+also require any scenario carrying entity-level weapon-termination authority to
+resolve that exact retained pack before integration. Removing the compact
+projection or self-resealing an unknown pack cannot turn entity fields into
+standalone authority. Engine-verification tooling has one explicit exception:
+it may supply the complete compiler output only when its identity and governed
+engine-verification intended use exactly match the scenario. Product execution
+never supplies that test authority.
 
 Mission/capability consumers import the exported `AirMissionDefinition` and
 `CompiledAirMission` types from `lib/air-mission.ts`. They may attach downstream

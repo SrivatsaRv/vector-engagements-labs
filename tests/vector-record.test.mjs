@@ -458,7 +458,7 @@ test("VSR rejects tampered side-owned track state and track-event history", asyn
   const openOptions = { compiledModelPack: binding.pack };
   const capabilityManifest = createVerificationDeploymentCapabilities("typescript", ["A2A"], [binding.pack.digest]);
   const prepared = { ...base, engineScenario: binding.scenario, capabilityManifest };
-  const engineRun = runEngineBackend(binding.scenario, "typescript");
+  const engineRun = runEngineBackend(binding.scenario, "typescript", binding.pack);
   const result = buildSimulationResult(prepared, engineRun);
   const record = await createVectorSimulationRecord(prepared, result, createdAt);
 
@@ -524,7 +524,7 @@ test("VSR rejects consistently forged track sources beside the admitted pack dig
   const openOptions = { compiledModelPack: binding.pack };
   const capabilityManifest = createVerificationDeploymentCapabilities("typescript", ["A2A"], [binding.pack.digest]);
   const prepared = { ...base, engineScenario: binding.scenario, capabilityManifest };
-  const engineRun = runEngineBackend(binding.scenario, "typescript");
+  const engineRun = runEngineBackend(binding.scenario, "typescript", binding.pack);
   const result = buildSimulationResult(prepared, engineRun);
   const record = await createVectorSimulationRecord(prepared, result, createdAt);
   const forgedModelId = "forged-valid-digest-model";

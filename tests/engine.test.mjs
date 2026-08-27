@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { runEngine } from "../lib/engine/core.ts";
+import { runEngine as runGovernedEngine } from "../lib/engine/core.ts";
+import { bindVerificationTrackModelPack } from "../lib/engine/verification-track-fixture.ts";
+import {
+  bindRuntimeModelPackDigest,
+  runtimeWeaponTerminations,
+} from "../lib/engine/runtime-model-pack.ts";
 
 const baseEntity = {
   lifecycle: "ACTIVE",
@@ -141,6 +146,66 @@ function admitTestAircraft(scenario) {
   return scenario;
 }
 
+const testAuthority = await bindVerificationTrackModelPack(testScenario());
+const testWeaponModel = testAuthority.pack.weapons.find(
+  (weapon) => weapon.id === "astra-mk1-study-v05",
+);
+assert.ok(testWeaponModel?.termination);
+
+function bindEngineTestAuthority(input) {
+  const scenario = structuredClone(input);
+  const weapon = scenario.entities.find((entity) => entity.weapon);
+  assert.ok(weapon?.weapon?.termination);
+  weapon.provenance.modelId = testWeaponModel.id;
+  weapon.provenance.modelVersion = testWeaponModel.version;
+  weapon.provenance.modelPackDigest = testAuthority.pack.digest;
+  weapon.weapon.admission.modelPackDigest = testAuthority.pack.digest;
+  weapon.weapon.admission.weaponModelId = testWeaponModel.id;
+
+  const patches = [];
+  const addPatch = (fieldPath, oldValue, newValue, unit) => {
+    if (Object.is(oldValue, newValue) || !Number.isFinite(newValue)) return;
+    patches.push({
+      schemaVersion: "vector.model-patch.v1",
+      id: `engine-test-${patches.length + 1}`,
+      modelPackDigest: testAuthority.pack.digest,
+      modelId: testWeaponModel.id,
+      fieldPath,
+      oldValue,
+      newValue,
+      unit,
+      reason: "Bounded low-level engine verification fixture.",
+      provenance: {
+        authorId: "vector-engine-test",
+        authoredAt: "2026-08-27T00:00:00.000Z",
+        evidenceRefIds: ["current-scalar-model-assumptions"],
+      },
+    });
+  };
+  addPatch(
+    "/termination/interceptRadiusM",
+    testWeaponModel.termination.interceptRadiusM,
+    weapon.weapon.termination.interceptRadiusM,
+    "m",
+  );
+  addPatch(
+    "/termination/maximumFlightTimeS",
+    testWeaponModel.termination.maximumFlightTimeS,
+    weapon.weapon.termination.maximumFlightTimeSeconds,
+    "s",
+  );
+  const projection = structuredClone(testAuthority.scenario.modelPack);
+  projection.scenarioPatches = patches;
+  projection.weaponTerminations = runtimeWeaponTerminations(testAuthority.pack, patches);
+  delete projection.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest(projection);
+  return scenario;
+}
+
+function runTestEngine(scenario) {
+  return runGovernedEngine(bindEngineTestAuthority(scenario), testAuthority.pack);
+}
+
 // Deliberately local: this oracle must not import the production evaluator.
 function linearInterpolationOracle(axis, values, input) {
   if (input < axis[0] || input > axis.at(-1)) throw new RangeError("outside coverage");
@@ -154,8 +219,8 @@ function linearInterpolationOracle(axis, values, input) {
 }
 
 test("generic engine updates every spawned entity deterministically", () => {
-  const first = runEngine(admitTestAircraft(testScenario()));
-  const second = runEngine(admitTestAircraft(testScenario()));
+  const first = runTestEngine(admitTestAircraft(testScenario()));
+  const second = runTestEngine(admitTestAircraft(testScenario()));
   assert.deepEqual(first, second);
   assert.ok(first.frames.length > 10);
   assert.equal(first.frames[0].entities.length, 3);
@@ -173,7 +238,7 @@ test("generic engine updates every spawned entity deterministically", () => {
 });
 
 test("nonconstant admitted aircraft tables change achieved thrust, fuel, drag, and trajectory", () => {
-  const baseline = runEngine(admitTestAircraft(testScenario()));
+  const baseline = runTestEngine(admitTestAircraft(testScenario()));
   const contrastedScenario = admitTestAircraft(testScenario());
   const blue = contrastedScenario.entities.find((entity) => entity.id === "aircraft-blue");
   blue.aircraft = {
@@ -183,7 +248,7 @@ test("nonconstant admitted aircraft tables change achieved thrust, fuel, drag, a
     thrustByThrottle: { id: "contrast-thrust", axis: [0, 0.5, 1], values: [0, 60000, 180000] },
     fuelFlowByThrottle: { id: "contrast-fuel", axis: [0, 0.5, 1], values: [0.00001, 0.00002, 0.00004] },
   };
-  const contrasted = runEngine(contrastedScenario);
+  const contrasted = runTestEngine(contrastedScenario);
   const baselineBlue = baseline.frames.at(-1).entities.find((entity) => entity.id === "aircraft-blue");
   const contrastedBlue = contrasted.frames.at(-1).entities.find((entity) => entity.id === "aircraft-blue");
   assert.notEqual(contrastedBlue.thrustNewtons, baselineBlue.thrustNewtons);
@@ -200,19 +265,19 @@ test("aircraft execution rejects a state outside admitted table coverage instead
   const scenario = admitTestAircraft(testScenario());
   const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
   blue.aircraft.zeroLiftDragByMach = { id: "narrow-drag", axis: [0, 0.1], values: [0.02, 0.03] };
-  assert.throws(() => runEngine(scenario), /outside admitted table narrow-drag coverage/);
+  assert.throws(() => runTestEngine(scenario), /outside admitted table narrow-drag coverage/);
 });
 
 test("TypeScript engine rejects an unknown weapon support declaration", () => {
   const scenario = admitTestAircraft(testScenario());
   scenario.entities.find((entity) => entity.weapon).weapon.admission.supportRequirement = "TYPO_SUPPORT";
-  assert.throws(() => runEngine(scenario), /no valid compiled admission/);
+  assert.throws(() => runTestEngine(scenario), /no valid compiled admission/);
 });
 
 test("weapon flight state is a closed achieved-state contract", () => {
   const scenario = admitTestAircraft(testScenario());
   scenario.durationSeconds = 8;
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   const states = new Set(
     run.frames
       .flatMap((frame) => frame.entities)
@@ -238,8 +303,8 @@ test("engine owns geometric intercept termination and records no target-effect c
     red.initial.velocity = { ...blue.initial.velocity };
     return scenario;
   };
-  const run = runEngine(scenarioWithLegacyAllowance(1));
-  const permissiveLegacyRun = runEngine(scenarioWithLegacyAllowance(10_000));
+  const run = runTestEngine(scenarioWithLegacyAllowance(1));
+  const permissiveLegacyRun = runTestEngine(scenarioWithLegacyAllowance(10_000));
   assert.equal(run.termination, "weapon_intercept");
   assert.equal(permissiveLegacyRun.termination, "weapon_intercept");
   assert.equal(
@@ -264,7 +329,7 @@ test("engine owns geometric intercept termination and records no target-effect c
 test("maximum admitted flight time terminates the weapon as expired", () => {
   const scenario = admitTestAircraft(testScenario());
   scenario.entities.find((entity) => entity.weapon).weapon.termination.maximumFlightTimeSeconds = 0.1;
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   assert.equal(run.termination, "weapon_expired");
   const terminal = run.events.items.find((event) => event.payload.kind === "WEAPON_TERMINATED");
   assert.equal(terminal?.payload.to, "EXPIRED");
@@ -282,8 +347,8 @@ test("an in-step expiry excludes later geometric closest approach", () => {
     return scenario;
   };
 
-  const expired = runEngine(scenarioAtLifetime(0.075));
-  const longerLived = runEngine(scenarioAtLifetime(0.1));
+  const expired = runTestEngine(scenarioAtLifetime(0.075));
+  const longerLived = runTestEngine(scenarioAtLifetime(0.1));
   assert.equal(expired.termination, "weapon_expired");
   assert.equal(longerLived.termination, "weapon_intercept");
   const terminal = expired.events.items.find(
@@ -304,7 +369,7 @@ test("off-grid weapon lifetime starts at the achieved activation boundary", () =
   weapon.weapon.termination.interceptRadiusM = 0.1;
   weapon.weapon.termination.maximumFlightTimeSeconds = 0.01;
 
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   const entry = run.events.items.find(
     (event) => event.payload.kind === "ENTITY_ENTERED_WORLD" && event.producer.entityId === weapon.id,
   );
@@ -325,7 +390,7 @@ test("a non-intercept termination event records the lifetime closest approach", 
   termination.interceptRadiusM = 0.1;
   termination.maximumFlightTimeSeconds = 0.5;
 
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   const terminal = run.events.items.find(
     (event) => event.payload.kind === "WEAPON_TERMINATED",
   );
@@ -355,7 +420,7 @@ test("stowed pre-launch geometry cannot reduce the weapon-lifetime closest appro
   weapon.weapon.termination.interceptRadiusM = 0.1;
   weapon.weapon.termination.maximumFlightTimeSeconds = 0.1;
 
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   assert.equal(run.termination, "weapon_expired");
   assert.ok(
     run.closestApproachM > 100,
@@ -374,7 +439,7 @@ test("weapon termination admission fails closed before integration", () => {
   for (const [name, mutate] of cases) {
     const scenario = admitTestAircraft(testScenario());
     mutate(scenario.entities.find((entity) => entity.weapon).weapon.termination);
-    assert.throws(() => runEngine(scenario), /no valid termination admission/, name);
+    assert.throws(() => runTestEngine(scenario), /no valid termination admission/, name);
   }
 });
 
@@ -387,7 +452,7 @@ test("engine rejects removed and malformed runtime events", () => {
     durationSeconds: 8,
     vectorMps: { x: 0, y: 0, z: 0 },
   }];
-  assert.throws(() => runEngine(removed), /Unsupported engine event type/);
+  assert.throws(() => runTestEngine(removed), /Unsupported engine event type/);
 
   const malformed = admitTestAircraft(testScenario());
   malformed.events = [{
@@ -397,7 +462,7 @@ test("engine rejects removed and malformed runtime events", () => {
     durationSeconds: 0,
     vectorMps: { x: 8, y: 0, z: 0 },
   }];
-  assert.throws(() => runEngine(malformed), /positive duration/);
+  assert.throws(() => runTestEngine(malformed), /positive duration/);
 });
 
 test("engine entity count is supplied by the scenario, not fixed in code", () => {
@@ -419,7 +484,7 @@ test("engine entity count is supplied by the scenario, not fixed in code", () =>
       fuelKg: 0,
     },
   });
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   assert.equal(run.frames[0].entities.length, 4);
 });
 
@@ -427,7 +492,7 @@ test("stowed weapons become observable only when their launch event occurs", () 
   const scenario = admitTestAircraft(testScenario());
   const weapon = scenario.entities.find((entity) => entity.id === "weapon-blue");
   weapon.weapon.launchTimeSeconds = 2;
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   const beforeLaunch = run.frames.find((frame) => frame.t < 2);
   const launchFrame = run.frames.find((frame) => frame.t >= 2);
   assert.ok(beforeLaunch);
@@ -454,7 +519,7 @@ test("aircraft mass conserves empty mass, fuel, and installed stores across rele
   const scenario = admitTestAircraft(testScenario());
   const weapon = scenario.entities.find((entity) => entity.id === "weapon-blue");
   weapon.weapon.launchTimeSeconds = 2;
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   const before = run.frames.find((frame) => frame.t < 2 && frame.t > 1.5);
   const after = run.frames.find((frame) => frame.t >= 2);
   const later = run.frames.find((frame) => frame.t >= 3);
@@ -490,7 +555,7 @@ test("aircraft admission rejects an initial mass that omits installed stores", (
   const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
   blue.initial.massKg -= 180;
   assert.throws(
-    () => runEngine(scenario),
+    () => runTestEngine(scenario),
     /initial mass must equal empty mass, fuel, and installed stores/,
   );
 });
@@ -505,7 +570,7 @@ test("fuel exhaustion preserves empty mass and all installed store mass before r
   blue.initial.massKg = testAircraftModel.emptyMassKg + 1 + weapon.weapon.launchMassKg;
   blue.aircraft.fuelFlowByThrottle.values = [1, 1];
 
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   const finalAircraft = [...run.frames]
     .reverse()
     .find((frame) => frame.t < weapon.weapon.launchTimeSeconds)
@@ -524,7 +589,7 @@ test("an unlaunched carried weapon remains inventory, not a world entity", () =>
   const scenario = admitTestAircraft(testScenario());
   const weapon = scenario.entities.find((entity) => entity.id === "weapon-blue");
   weapon.weapon.launchTimeSeconds = null;
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   assert.ok(
     run.frames.every(
       (frame) => !frame.entities.some((entity) => entity.id === "weapon-blue"),
@@ -543,7 +608,7 @@ test("sensor entities publish separate detection, tracking, engagement, and mini
     minimumAltitudeM: 50,
     maximumAltitudeM: 18000,
   };
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   assert.deepEqual(
     run.envelopes.map((envelope) => envelope.kind),
     ["DETECTION", "TRACKING", "ENGAGEMENT", "MINIMUM_RANGE"],
@@ -563,7 +628,7 @@ test("aircraft dynamics consume fuel and expose thrust, drag, mass, and maneuver
     { x: 5000, y: 5000, z: 9000 },
   ];
   blue.routePlan = { schemaVersion: "vector.route-plan.v1", waypointAcceptanceRadiiM: [1, 25] };
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   const first = run.frames[0].entities.find((entity) => entity.id === "aircraft-blue");
   const last = run.frames.at(-1).entities.find((entity) => entity.id === "aircraft-blue");
 
@@ -583,7 +648,7 @@ test("aircraft dynamics consume fuel and expose thrust, drag, mass, and maneuver
 
 test("aircraft without an admitted model fail closed", () => {
   assert.throws(
-    () => runEngine(testScenario()),
+    () => runTestEngine(testScenario()),
     /Aircraft aircraft-blue has no admitted aircraft model/,
   );
 });
@@ -597,7 +662,7 @@ test("aircraft follow authored three-dimensional routes with bounded recorded co
   ];
   red.routePlan = { schemaVersion: "vector.route-plan.v1", waypointAcceptanceRadiiM: [1, 25] };
 
-  const run = runEngine(scenario);
+  const run = runTestEngine(scenario);
   const first = run.frames[0].entities.find((entity) => entity.id === red.id);
   const last = run.frames.at(-1).entities.find((entity) => entity.id === red.id);
 
@@ -629,7 +694,7 @@ test("aircraft records the guidance request separately from its load-factor-limi
   ];
   red.routePlan = { schemaVersion: "vector.route-plan.v1", waypointAcceptanceRadiiM: [1, 25] };
 
-  const frame = runEngine(scenario).frames
+  const frame = runTestEngine(scenario).frames
     .flatMap((sample) => sample.entities)
     .find((entity) => entity.id === red.id && entity.aircraftControl);
 
@@ -663,8 +728,8 @@ test("changing one authored route changes the recorded aircraft trail", () => {
   leftRed.routePlan = { schemaVersion: "vector.route-plan.v1", waypointAcceptanceRadiiM: [1, 25] };
   rightRed.routePlan = { schemaVersion: "vector.route-plan.v1", waypointAcceptanceRadiiM: [1, 25] };
 
-  const left = runEngine(leftScenario).frames.at(-1).entities.find((entity) => entity.id === "aircraft-red");
-  const right = runEngine(rightScenario).frames.at(-1).entities.find((entity) => entity.id === "aircraft-red");
+  const left = runTestEngine(leftScenario).frames.at(-1).entities.find((entity) => entity.id === "aircraft-red");
+  const right = runTestEngine(rightScenario).frames.at(-1).entities.find((entity) => entity.id === "aircraft-red");
 
   assert.ok(left.position.y > right.position.y + 100);
   assert.notDeepEqual(left.position, right.position);

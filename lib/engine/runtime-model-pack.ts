@@ -156,7 +156,6 @@ export function assertRuntimeModelPackAuthority(
     (runtimePack.weaponTerminations?.length ?? 0) > 0;
   if (
     options.requireCompiledWeaponTerminationAuthority &&
-    hasRuntimeTerminationAuthority &&
     !compiledPack
   ) {
     throw new Error(

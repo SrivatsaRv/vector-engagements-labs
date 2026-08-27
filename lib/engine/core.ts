@@ -46,7 +46,8 @@ import type { EnvironmentSample } from "../geospatial/environment-pack.ts";
 import {
   assertRuntimeModelPackAuthority,
 } from "./runtime-model-pack.ts";
-import { findRetainedCompiledModelPack } from "./retained-model-packs.ts";
+import { findEngineCompiledModelPackAuthority } from "./retained-model-packs.ts";
+import type { CompiledModelPack } from "../model-pack.ts";
 import {
   assertNoTruthIdentity,
   assertVerificationTrackModel,
@@ -1343,15 +1344,20 @@ export class EngineSession {
   private currentObserverStates: EngineObserverState[] = [];
   private lastObserverTick = -1;
 
-  constructor(scenario: EngineScenario) {
+  constructor(scenario: EngineScenario, verificationPack?: Readonly<CompiledModelPack>) {
     scenario = {
       ...scenario,
       entities: [...scenario.entities]
         .sort((left, right) => compareCanonicalText(left.id, right.id)),
     };
     this.scenario = scenario;
-    const retainedPack = findRetainedCompiledModelPack(scenario.modelPack);
-    assertRuntimeModelPackAuthority(scenario.modelPack, retainedPack);
+    const retainedPack = findEngineCompiledModelPackAuthority(scenario.modelPack, verificationPack);
+    const carriesWeaponTerminationAuthority = scenario.entities.some(
+      (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.termination !== undefined,
+    );
+    assertRuntimeModelPackAuthority(scenario.modelPack, retainedPack, {
+      requireCompiledWeaponTerminationAuthority: carriesWeaponTerminationAuthority,
+    });
     this.terminalTick = firstFixedStepTickAtOrAfter(
       scenario.durationSeconds,
       scenario.fixedStepSeconds,
@@ -2408,8 +2414,11 @@ export class EngineSession {
   }
 }
 
-export function runEngine(scenario: EngineScenario): EngineRun {
-  const session = new EngineSession(scenario);
+export function runEngine(
+  scenario: EngineScenario,
+  verificationPack?: Readonly<CompiledModelPack>,
+): EngineRun {
+  const session = new EngineSession(scenario, verificationPack);
   while (!session.isCompleted()) session.runTicks(2_048);
   return session.result();
 }

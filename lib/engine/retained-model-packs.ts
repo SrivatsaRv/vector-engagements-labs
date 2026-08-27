@@ -21,6 +21,40 @@ export function findRetainedCompiledModelPack(identity: {
 }
 
 /**
+ * Product execution resolves only the retained inventory. Explicit
+ * verification tooling may supply the complete compiled pack that owns a
+ * verification scenario, but its full identity must match exactly.
+ */
+export function findEngineCompiledModelPackAuthority(
+  identity: {
+    id: string;
+    version: string;
+    digest: string;
+    intendedUse: { id: string; version: string };
+  },
+  verificationPack?: Readonly<CompiledModelPack>,
+): Readonly<CompiledModelPack> | undefined {
+  const retained = findRetainedCompiledModelPack(identity);
+  if (!verificationPack) return retained;
+  const verificationUse = verificationPack.intendedUses.find(
+    (use) => use.id === "vector.intended-use.engine-verification",
+  );
+  if (
+    identity.intendedUse.id !== "vector.intended-use.engine-verification" ||
+    !verificationUse ||
+    verificationUse.version !== identity.intendedUse.version ||
+    verificationPack.id !== identity.id ||
+    verificationPack.version !== identity.version ||
+    verificationPack.digest !== identity.digest
+  ) {
+    throw new Error(
+      "Supplied engine-verification compiled model pack does not match the exact scenario identity and intended use.",
+    );
+  }
+  return retained ?? verificationPack;
+}
+
+/**
  * Resolve only an exact, application-retained pack identity. Saved-run replay
  * must never reinterpret archived authored inputs through the current pack.
  */

@@ -778,6 +778,48 @@ test("both engines require a runtime digest for retained weapon-termination auth
   }
 });
 
+test("both live engines require a retained pack for entity weapon-termination authority", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const unrelatedRetainedPack = resolveRetainedCompiledModelPack(baseline.modelPack);
+  for (const backend of ["typescript", "rust-wasm"]) {
+    for (const projectionState of ["RESEALED", "OMITTED"]) {
+      const scenario = structuredClone(baseline);
+      scenario.modelPack.id = "unretained-termination-pack";
+      scenario.modelPack.version = "99.0.0";
+      scenario.modelPack.digest = "7".repeat(64);
+      if (projectionState === "OMITTED") {
+        scenario.modelPack.weaponTerminations = [];
+        scenario.modelPack.scenarioPatches = [];
+        delete scenario.modelPack.runtimeDigest;
+      } else {
+        const material = structuredClone(scenario.modelPack);
+        delete material.runtimeDigest;
+        scenario.modelPack = bindRuntimeModelPackDigest(material);
+      }
+      assert.throws(
+        () => runEngineBackend(scenario, backend),
+        /No retained compiled model pack matches weapon-termination authority/,
+        `${backend} ${projectionState}`,
+      );
+    }
+    const mismatchedVerificationScenario = structuredClone(baseline);
+    mismatchedVerificationScenario.modelPack.id = "unretained-termination-pack";
+    mismatchedVerificationScenario.modelPack.intendedUse = {
+      id: "vector.intended-use.engine-verification",
+      version: "1.0.0",
+    };
+    assert.throws(
+      () => runEngineBackend(mismatchedVerificationScenario, backend, unrelatedRetainedPack),
+      /Supplied engine-verification compiled model pack does not match the exact scenario identity/,
+      `${backend} mismatched supplied pack`,
+    );
+  }
+});
+
 test("both engines reject a second scheduled guided release before integration", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
   const baseline = simulateWithCapabilitiesForVerification(

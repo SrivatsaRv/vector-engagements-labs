@@ -82,7 +82,13 @@ ABI above and cannot construct runtime state or select a backend.
 Weapon termination is backend-neutral. Each weapon carries one compiled
 `vector.weapon-termination-model.v1`; both implementations reject wrong schema,
 intended use, criterion, non-finite or non-positive radius/time before the first
-tick. Both minimize the same between-step relative-position segment, apply the
+tick. Before either live backend runs, any scenario carrying that entity-level
+authority must resolve an exact application-retained compiled pack; an unknown
+pack is rejected even when its compact projection is omitted or self-resealed.
+Compiler verification may supply the complete exact-identity pack only when the
+scenario and pack both declare the governed engine-verification intended use;
+the product execution path supplies no such pack.
+Both minimize the same between-step relative-position segment, apply the
 same terminal precedence, update the achieved weapon state and emit the same
 `WEAPON_TERMINATED` payload. The legacy scenario completion distance and any
 renderer distance are outside this authority.
