@@ -540,6 +540,10 @@ export async function createVectorSimulationRecord(
     result.engineRun.scenario,
     result.engineRun.termination,
     result.engineRun.closestApproachM,
+    {
+      primaryWeaponId: result.engineRun.primaryWeaponId,
+      primaryTargetId: result.engineRun.primaryTargetId,
+    },
   );
   const pictures = result.pictures;
   const canonicalEngineScenario = {
@@ -874,6 +878,10 @@ export async function openVectorSimulationRecord(
       compiled.engineScenario,
       report.engine.termination,
       report.engine.closestApproachM,
+      {
+        primaryWeaponId: report.engine.primaryWeaponId,
+        primaryTargetId: report.engine.primaryTargetId,
+      },
     );
   }
   if (scenario.airMission) {

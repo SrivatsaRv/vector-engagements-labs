@@ -2399,6 +2399,10 @@ export class EngineSession {
       run.scenario,
       run.termination,
       run.closestApproachM,
+      {
+        primaryWeaponId: run.primaryWeaponId,
+        primaryTargetId: run.primaryTargetId,
+      },
     );
     return run;
   }

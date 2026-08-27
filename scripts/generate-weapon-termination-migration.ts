@@ -91,7 +91,7 @@ const scenarioStatements = SCENARIO_LIBRARY.map((definition) => {
 }).join("\n");
 
 const expectedRows = SCENARIO_LIBRARY.map((definition) =>
-  `(${sqlText(definition.id)},${sqlText(definition.version)},${sqlText(sha256HexSync(definition))},${sqlText(definition.intendedUse.version)},${sqlText(definition.modelPack.version)},${sqlText(definition.modelPack.digest)})`,
+  `(${sqlText(definition.id)},${sqlText(definition.version)},${sqlText(definition.domain)},${sqlText(definition.title)},'VALIDATED',${dollarJson(`vector_weapon_termination_expected_${definition.id.replaceAll("-", "_")}`, definition)},${sqlText(SCENARIO_PACKAGE_SCHEMA_VERSION)},${sqlText(sha256HexSync(definition))},${sqlText(ENGINE_VERSION)},${sqlText(definition.scenario.studyAreaId)},${sqlText(definition.intendedUse.id)},${sqlText(definition.intendedUse.version)},${sqlText(definition.modelPack.id)},${sqlText(definition.modelPack.version)},${sqlText(definition.modelPack.digest)})`,
 ).join(",\n      ");
 
 const generated = `${startMarker}
@@ -235,12 +235,21 @@ BEGIN
     SELECT 1
     FROM (VALUES
       ${expectedRows}
-    ) AS expected(id,version,content_hash,intended_use_version,model_pack_version,model_pack_digest)
+    ) AS expected(id,version,domain,title,status,package,schema_version,content_hash,engine_version,study_area_id,intended_use_id,intended_use_version,model_pack_id,model_pack_version,model_pack_digest)
     LEFT JOIN scenario_templates current ON current.id=expected.id AND current.version=expected.version
-    WHERE current.id IS NULL OR current.content_hash<>expected.content_hash
-       OR current.intended_use_version<>expected.intended_use_version
-       OR current.model_pack_version<>expected.model_pack_version
-       OR current.model_pack_digest<>expected.model_pack_digest
+    WHERE current.id IS NULL OR current.domain IS DISTINCT FROM expected.domain
+       OR current.title IS DISTINCT FROM expected.title
+       OR current.status IS DISTINCT FROM expected.status
+       OR current.package IS DISTINCT FROM expected.package
+       OR current.schema_version IS DISTINCT FROM expected.schema_version
+       OR current.content_hash IS DISTINCT FROM expected.content_hash
+       OR current.engine_version IS DISTINCT FROM expected.engine_version
+       OR current.study_area_id IS DISTINCT FROM expected.study_area_id
+       OR current.intended_use_id IS DISTINCT FROM expected.intended_use_id
+       OR current.intended_use_version IS DISTINCT FROM expected.intended_use_version
+       OR current.model_pack_id IS DISTINCT FROM expected.model_pack_id
+       OR current.model_pack_version IS DISTINCT FROM expected.model_pack_version
+       OR current.model_pack_digest IS DISTINCT FROM expected.model_pack_digest
   ) THEN
     RAISE EXCEPTION 'Weapon termination scenario exact identity readback failed';
   END IF;

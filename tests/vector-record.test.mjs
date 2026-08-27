@@ -880,6 +880,80 @@ test("VSR rejects hash-resealed weapon-termination authority under an unretained
   );
 });
 
+test("VSR binds a terminal event to the report's exact primary weapon and target", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-defensive-break",
+  ).scenario;
+  const result = simulate(scenario);
+  const record = await createVectorSimulationRecord(
+    prepareSimulation(scenario),
+    result,
+    createdAt,
+  );
+  const carriedWeapon = result.engineRun.scenario.entities.find(
+    (entity) =>
+      entity.kind === "GUIDED_WEAPON" &&
+      entity.id !== result.engineRun.primaryWeaponId,
+  );
+  assert.ok(carriedWeapon);
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const report = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+  report.engine.primaryWeaponId = carriedWeapon.id;
+  const corrupt = await replaceRecordMember(
+    record,
+    "report.json",
+    reportMember.schemaVersion,
+    jsonBytes(report),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /invalid authority, ownership, or achieved frame state/,
+  );
+});
+
+test("VSR requires an active target for every terminal cause except target-unavailable", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const prepared = prepareSimulation(scenario);
+  const weapon = prepared.engineScenario.entities.find(
+    (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds !== null,
+  );
+  assert.ok(weapon?.weapon);
+  governWeaponTermination(prepared.engineScenario, weapon, {
+    maximumFlightTimeSeconds: 0.1,
+  });
+  const engineRun = runEngineBackend(prepared.engineScenario, "typescript");
+  assert.equal(engineRun.termination, "weapon_expired");
+  assert.equal(engineRun.events.state, "AVAILABLE");
+  const terminal = engineRun.events.items.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+  assert.equal(terminal.payload.cause, "FLIGHT_TIME_EXPIRED");
+  const result = buildSimulationResult(prepared, engineRun);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const frameMember = record.members.find((member) => member.path === "frames.arrow");
+  assert.ok(frameMember);
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  const target = frames[terminal.frameIndex].entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  assert.ok(target);
+  target.lifecycle = "TERMINATED";
+  const corrupt = await replaceRecordMember(
+    record,
+    "frames.arrow",
+    VECTOR_FRAME_SCHEMA,
+    encodeColumnarFrames(frames),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /invalid authority, ownership, or achieved frame state/,
+  );
+});
+
 test("VSR rejects a hash-resealed terminal event with a false prior weapon state", async () => {
   const scenario = SCENARIO_LIBRARY.find(
     (entry) => entry.id === "a2a-high-energy-crossing-challenge",

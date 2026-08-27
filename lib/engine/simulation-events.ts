@@ -568,6 +568,10 @@ export function assertSimulationEventStream(
   scenario: EngineScenario,
   termination: EngineTermination,
   closestApproachM: number,
+  recordedPrimary?: Readonly<{
+    primaryWeaponId: string;
+    primaryTargetId: string;
+  }>,
 ): asserts values is readonly SimulationEventV2[] {
   if (typeof closestApproachM !== "number" || Number.isNaN(closestApproachM) || closestApproachM < 0) {
     throw new Error("Simulation event stream has an invalid run closest approach.");
@@ -888,13 +892,15 @@ export function assertSimulationEventStream(
       const admission = weapon?.weapon?.termination;
       const targetLifecycleMatchesCause = payload.cause === "TARGET_UNAVAILABLE"
         ? frameTarget?.lifecycle === "TERMINATED"
-        : payload.cause === "GEOMETRIC_INTERCEPT"
-          ? frameTarget?.lifecycle === "ACTIVE"
-          : true;
+        : frameTarget?.lifecycle === "ACTIVE";
       if (
         event.phase !== "TERMINATION" || event.producer.subsystem !== "WEAPON_DYNAMICS" ||
         event.producer.entityId !== payload.weaponId || !weapon || weapon.kind !== "GUIDED_WEAPON" ||
         !target || !frameWeapon || !frameTarget || frameWeapon.lifecycle !== "TERMINATED" ||
+        (recordedPrimary !== undefined && (
+          payload.weaponId !== recordedPrimary.primaryWeaponId ||
+          payload.targetId !== recordedPrimary.primaryTargetId
+        )) ||
         !targetLifecycleMatchesCause ||
         !priorFrameWeapon || priorFrameWeapon.weaponFlightState !== payload.from ||
         frameWeapon.weaponFlightState !== payload.to || weapon.weapon?.targetEntityId !== payload.targetId ||

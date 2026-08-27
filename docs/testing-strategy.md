@@ -172,9 +172,12 @@ rejects it unless an independently supplied full compiled pack matches the
 recorded id, version and digest exactly. The backend admission matrix also
 proves that only `GUIDED_WEAPON` entities count toward the single scheduled
 guided-release limit in both TypeScript and Rust/WASM. VSR mutation regressions
-rehash complete records after contradicting geometric-intercept and
-target-unavailable causes with the target lifecycle; both records fail before
-replay exposure.
+rehash complete records after changing the report's primary weapon to a carried
+store or contradicting any terminal cause with the target lifecycle; those
+records fail before replay exposure. Migration 017 also exact-reads every
+explicitly inserted scenario column after conflict, including status and the
+complete package, so a partial deployment cannot leave a non-executable or
+otherwise divergent row behind a matching content hash.
 
 This baseline does not satisfy #193 by itself. Completion additionally requires
 machine-readable registration for every nested Air-mission and presentation

@@ -423,8 +423,8 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
     );
     assert.ok(migration.includes(`$${tag}$::jsonb,'vector.scenario.v4','${sha256HexSync(definition)}'`), definition.id);
     assert.ok(
-      migration.includes(`('${definition.id}','${definition.version}','${sha256HexSync(definition)}','${definition.intendedUse.version}','${definition.modelPack.version}','${definition.modelPack.digest}')`),
-      `${definition.id} exact readback identity`,
+      migration.includes(`('${definition.id}','${definition.version}','${definition.domain}','${definition.title}','VALIDATED'`),
+      `${definition.id} exact row readback identity`,
     );
   }
   assert.ok(
@@ -459,6 +459,17 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
   );
   assert.match(terminationMigration, /Historical credibility-manifest exact identity readback failed/);
   assert.match(terminationMigration, /Weapon termination scenario exact identity readback failed/);
+  for (const field of [
+    "domain", "title", "status", "package", "schema_version", "content_hash",
+    "engine_version", "study_area_id", "intended_use_id", "intended_use_version",
+    "model_pack_id", "model_pack_version", "model_pack_digest",
+  ]) {
+    assert.match(
+      terminationMigration,
+      new RegExp(`current\\.${field} IS DISTINCT FROM expected\\.${field}`),
+      `migration 017 must read back scenario ${field}`,
+    );
+  }
   for (const tag of [
     "vector_weapon_termination_historical_intended_use",
     "vector_weapon_termination_historical_source",

@@ -181,6 +181,10 @@ export function runRustWasmEngine(scenario: EngineScenario): EngineRun {
     scenario,
     run.termination,
     run.closestApproachM,
+    {
+      primaryWeaponId: run.primaryWeaponId,
+      primaryTargetId: run.primaryTargetId,
+    },
   );
   return withGeospatialRecord(scenario, run);
 }

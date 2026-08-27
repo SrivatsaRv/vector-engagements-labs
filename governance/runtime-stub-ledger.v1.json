@@ -65,7 +65,7 @@
       ,{ "path": "db/migrations/014_environment_pack_runways.sql", "indicator": "model-assumption", "expectedLines": 14, "entryIds": ["STUB-24", "STUB-25"] }
       ,{ "path": "db/migrations/015_generic_ground_dynamics.sql", "indicator": "model-assumption", "expectedLines": 2, "entryIds": ["STUB-24"] }
       ,{ "path": "db/migrations/016_high_energy_crossing_challenge.sql", "indicator": "model-assumption", "expectedLines": 2, "entryIds": ["STUB-01", "STUB-02"] }
-      ,{ "path": "db/migrations/017_weapon_termination_model.sql", "indicator": "model-assumption", "expectedLines": 3, "entryIds": ["STUB-27"] }
+      ,{ "path": "db/migrations/017_weapon_termination_model.sql", "indicator": "model-assumption", "expectedLines": 6, "entryIds": ["STUB-27"] }
       ,{ "path": "engine-rust/src/validation.rs", "indicator": "model-assumption", "expectedLines": 2, "entryIds": ["STUB-24", "STUB-26"] }
       ,{ "path": "lib/engine/core.ts", "indicator": "model-assumption", "expectedLines": 2, "entryIds": ["STUB-24", "STUB-26"] }
       ,{ "path": "lib/scenario-kernel-adapters.ts", "indicator": "model-assumption", "expectedLines": 1, "entryIds": ["STUB-24"] }
@@ -76,7 +76,7 @@
       ,{ "path": "db/migrations/014_environment_pack_runways.sql", "indicator": "named-duel-id", "expectedLines": 2, "entryIds": ["STUB-04"] }
       ,{ "path": "db/migrations/015_generic_ground_dynamics.sql", "indicator": "named-duel-id", "expectedLines": 2, "entryIds": ["STUB-04"] }
       ,{ "path": "db/migrations/016_high_energy_crossing_challenge.sql", "indicator": "named-duel-id", "expectedLines": 2, "entryIds": ["STUB-04"] }
-      ,{ "path": "db/migrations/017_weapon_termination_model.sql", "indicator": "named-duel-id", "expectedLines": 3, "entryIds": ["STUB-04"] }
+      ,{ "path": "db/migrations/017_weapon_termination_model.sql", "indicator": "named-duel-id", "expectedLines": 6, "entryIds": ["STUB-04"] }
     ],
     "exemptions": [
       { "path": "lib/engine/contracts.ts", "indicator": "model-assumption", "expectedLines": 1, "classification": "contract-vocabulary", "rationale": "The enum declares a value state and does not supply a model value.", "owners": ["#66"] },
