@@ -608,6 +608,29 @@ test("runtime decoding rejects a valid enum that falsifies lifecycle history", (
   }
 });
 
+test("every admitted active-world target lifecycle can produce a terminal weapon event", () => {
+  for (const lifecycle of ["ACTIVE", "TRACKING", "ENGAGING"] as const) {
+    const scenario = admittedScenario();
+    const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
+    const target = scenario.entities.find(
+      (entity) => entity.id === weapon.weapon?.targetEntityId,
+    )!;
+    target.lifecycle = lifecycle;
+    governWeaponTermination(scenario, weapon, 0.1);
+
+    for (const backend of ["typescript", "rust-wasm"] as const) {
+      const run = runEngineBackend(structuredClone(scenario), backend);
+      assert.equal(run.termination, "weapon_expired", `${backend} ${lifecycle}`);
+      assert.equal(run.events.state, "AVAILABLE");
+      const terminal = run.events.items.find(
+        (event) => event.payload.kind === "WEAPON_TERMINATED",
+      );
+      assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+      assert.equal(terminal.payload.cause, "FLIGHT_TIME_EXPIRED");
+    }
+  }
+});
+
 test("runtime decoding binds weapon terminal state, cause, and distance to the run", () => {
   const scenario = admittedScenario();
   const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;

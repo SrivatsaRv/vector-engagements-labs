@@ -892,7 +892,7 @@ export function assertSimulationEventStream(
       const admission = weapon?.weapon?.termination;
       const targetLifecycleMatchesCause = payload.cause === "TARGET_UNAVAILABLE"
         ? frameTarget?.lifecycle === "TERMINATED"
-        : frameTarget?.lifecycle === "ACTIVE";
+        : ACTIVE_LIFECYCLES.some((lifecycle) => lifecycle === frameTarget?.lifecycle);
       if (
         event.phase !== "TERMINATION" || event.producer.subsystem !== "WEAPON_DYNAMICS" ||
         event.producer.entityId !== payload.weaponId || !weapon || weapon.kind !== "GUIDED_WEAPON" ||
