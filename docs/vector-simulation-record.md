@@ -263,7 +263,8 @@ support events remain unavailable until their owning contracts produce them;
 the record and browser may not infer them.
 
 Replay also binds the terminal cause to the recorded target lifecycle.
-`GEOMETRIC_INTERCEPT` requires an `ACTIVE` target in the event frame, while
+`GEOMETRIC_INTERCEPT` requires an active-world target (`ACTIVE`, `TRACKING`, or
+`ENGAGING`) in the event frame, while
 `TARGET_UNAVAILABLE` requires that target to be `TERMINATED`. Rehashing the
 frame/event members cannot substitute one cause for the other.
 

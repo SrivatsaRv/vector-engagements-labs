@@ -981,6 +981,10 @@ export function assertSimulationEventStream(
         ) {
           throw new Error(`Simulation weapon-termination event ${event.id} does not match its exact geometric intercept time.`);
         }
+        const expectedClosestApproachM = Number(closest.distanceM.toFixed(6));
+        if (payload.closestApproachM !== expectedClosestApproachM) {
+          throw new Error(`Simulation weapon-termination event ${event.id} does not match its exact geometric intercept distance.`);
+        }
       } else if (payload.occurrenceTimeSeconds !== event.modelTimeSeconds) {
         throw new Error(`Simulation weapon-termination event ${event.id} does not match its exact terminal boundary time.`);
       }

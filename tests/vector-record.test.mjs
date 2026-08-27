@@ -788,7 +788,7 @@ test("VSR rejects a hash-resealed terminal-event distance that contradicts the r
   const serialized = serializeVectorRecord(corrupt);
   await assert.rejects(
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
-    /does not match the recorded run closest approach/,
+    /does not match its exact geometric intercept distance/,
   );
 });
 
@@ -1008,6 +1008,50 @@ test("VSR rejects a hash-resealed geometric intercept occurrence time", async ()
   await assert.rejects(
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
     /does not match its exact geometric intercept time/,
+  );
+});
+
+test("VSR rejects hash-resealed geometric distance even when report and event agree", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-defensive-break",
+  ).scenario;
+  const result = simulate(scenario);
+  const record = await createVectorSimulationRecord(
+    prepareSimulation(scenario),
+    result,
+    createdAt,
+  );
+  const events = structuredClone(result.engineRun.events.items);
+  const terminal = events.find((event) => event.payload.kind === "WEAPON_TERMINATED");
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+  assert.equal(terminal.payload.cause, "GEOMETRIC_INTERCEPT");
+  const forgedDistanceM = Math.min(
+    terminal.payload.interceptRadiusM,
+    terminal.payload.closestApproachM + 1,
+  );
+  assert.notEqual(forgedDistanceM, terminal.payload.closestApproachM);
+  terminal.payload.closestApproachM = forgedDistanceM;
+
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const report = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+  report.engine.closestApproachM = forgedDistanceM;
+  let corrupt = await replaceRecordMember(
+    record,
+    "events.jsonl",
+    VECTOR_EVENT_SCHEMA,
+    textEncoder.encode(events.map((event) => canonicalJson(event)).join("\n")),
+  );
+  corrupt = await replaceRecordMember(
+    corrupt,
+    "report.json",
+    reportMember.schemaVersion,
+    jsonBytes(report),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /does not match its exact geometric intercept distance/,
   );
 });
 
