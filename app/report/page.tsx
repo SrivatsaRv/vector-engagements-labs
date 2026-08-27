@@ -18,6 +18,7 @@ import { getGovernedAircraftEvidenceClaim } from "@/lib/aircraft-evidence-regist
 import { DEFAULT_SCENARIO_DEFINITION } from "@/lib/scenarios";
 import {
   buildReportExport,
+  reportResultClassName,
   reportExportFilename,
   type ReportData,
   type ReportLibraryScenario,
@@ -324,11 +325,7 @@ export default function ReportPage() {
           </section>
           <section className="report-summary">
             <div
-              className={
-                result.outcome === "Intercept"
-                  ? "report-result success"
-                  : "report-result caution"
-              }
+              className={reportResultClassName(result.successful)}
             >
               <span>Model outcome</span>
               <strong>{result.outcome}</strong>

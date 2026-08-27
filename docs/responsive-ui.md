@@ -122,6 +122,9 @@ digests without changing synchronized map/3D playback, telemetry, or timeline
 ownership.
 Observe presents the exact pack identity used by runtime and reports while
 terrain/environment loading remains Worker-owned and cancellable.
+The report result card derives success or caution styling from the canonical
+`SimulationResult.successful` flag. Human-readable outcome labels can evolve
+without contradicting the result state or its interpretation.
 For an admitted runway aircraft, Current Geometry consumes only the selected
 VSR frame and presents recorded operational and movement state. It distinguishes
 valid zero readiness hold from positive roll/rotate/climbout movement and from
@@ -173,6 +176,9 @@ The governed five-viewport journey edits CAP defaults, clears and restores an
 installation identity, authors a runway start, exercises keyboard route inputs,
 observes admission, and completes the production Worker. Focused record tests
 prove the same lineage survives report/VSR readback.
+Focused report presentation proof supplies both canonical success states and
+requires the corresponding success/caution classes without relying on an
+outcome label literal.
 After Worker completion, the same journey selects a recorded frame and proves
 Current Geometry renders the recorded `ENROUTE` and `VALID` state after the
 preserved hold/roll/rotate/climbout extrema while no launched store exists. The
