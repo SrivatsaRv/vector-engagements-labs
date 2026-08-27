@@ -151,13 +151,19 @@ missing pack, payload-digest mismatch, missing limitations and mismatched
 approval state before any scenario becomes runnable.
 Migration regression also proves that all nine new packages use `1.1.0`, that
 the nine historical `1.0.0` identities remain present, and that migration 017
-contains no update path for an existing `(id, version)`. Engine regression
+contains no update path for an existing `(id, version)`. Its post-insert
+readback binds every historical and current intended-use, source, credibility
+manifest and compiled-pack field to the generated immutable content, so a
+pre-existing conflicting identity aborts instead of being silently reused.
+Engine regression
 contrasts a 75 ms lifetime with a 100 ms control in the same crossing geometry:
 the former expires at the exact in-step boundary while the latter intercepts,
 with identical TypeScript and Rust/WASM results.
 The suite additionally changes an entity and its compact projection, recomputes
 the runtime digest, and proves the retained compiled pack still rejects the
-forgery. VSR mutation regressions rehash complete records after contradicting
+forgery. Separate TypeScript, Rust/WASM and VSR regressions delete the digest
+and prove that a retained pack with weapon-termination authority cannot fall
+back to an unbound legacy projection. VSR mutation regressions rehash complete records after contradicting
 geometric-intercept and target-unavailable causes with the target lifecycle;
 both records fail before replay exposure.
 

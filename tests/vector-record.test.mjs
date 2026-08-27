@@ -822,6 +822,28 @@ test("VSR rejects hash-rebound termination limits beside a retained pack identit
   );
 });
 
+test("VSR rejects missing runtime digest for retained weapon-termination authority", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const compiledMember = record.members.find((member) => member.path === "compiled.json");
+  assert.ok(compiledMember);
+  const compiled = JSON.parse(new TextDecoder().decode(compiledMember.bytes));
+  delete compiled.engineScenario.modelPack.runtimeDigest;
+  const corrupt = await replaceRecordMember(
+    record,
+    "compiled.json",
+    compiledMember.schemaVersion,
+    jsonBytes(compiled),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /runtime model-pack projection digest/,
+  );
+});
+
 test("VSR rejects a hash-resealed terminal event with a false prior weapon state", async () => {
   const scenario = SCENARIO_LIBRARY.find(
     (entry) => entry.id === "a2a-high-energy-crossing-challenge",

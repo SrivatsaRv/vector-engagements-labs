@@ -22,8 +22,7 @@ import {
 } from "../simulation.ts";
 import { assertRecordedSidePictures, attachRecordedObserverStates } from "../information-state.ts";
 import {
-  assertRuntimeModelPackDigest,
-  assertRuntimeWeaponTerminationAuthority,
+  assertRuntimeModelPackAuthority,
 } from "../engine/runtime-model-pack.ts";
 import {
   assertEnvironmentPack,
@@ -811,13 +810,8 @@ export async function openVectorSimulationRecord(
     PreparedSimulation,
     "scenario"
   >;
-  if (compiled.engineScenario.modelPack.runtimeDigest !== undefined) {
-    assertRuntimeModelPackDigest(compiled.engineScenario.modelPack);
-    const retainedPack = findRetainedCompiledModelPack(compiled.engineScenario.modelPack);
-    if (retainedPack) {
-      assertRuntimeWeaponTerminationAuthority(compiled.engineScenario.modelPack, retainedPack);
-    }
-  }
+  const retainedPack = findRetainedCompiledModelPack(compiled.engineScenario.modelPack);
+  assertRuntimeModelPackAuthority(compiled.engineScenario.modelPack, retainedPack);
   const environmentPack = compiled.engineScenario.geospatial?.environmentPack;
   if (!environmentPack) {
     throw new Error("VECTOR record has no admitted environment pack.");

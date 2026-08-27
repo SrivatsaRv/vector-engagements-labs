@@ -761,6 +761,23 @@ test("both engines reject hash-rebound termination limits beside a retained pack
   }
 });
 
+test("both engines require a runtime digest for retained weapon-termination authority", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const scenario = structuredClone(baseline);
+    delete scenario.modelPack.runtimeDigest;
+    assert.throws(
+      () => runEngineBackend(scenario, backend),
+      /runtime model-pack projection digest/,
+      backend,
+    );
+  }
+});
+
 test("both engines reject a second scheduled guided release before integration", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
   const baseline = simulateWithCapabilitiesForVerification(

@@ -146,3 +146,23 @@ export function assertRuntimeModelPackDigest(pack: RuntimeModelPackProjection) {
     throw new Error("The runtime model-pack projection digest does not match its content.");
   }
 }
+
+export function assertRuntimeModelPackAuthority(
+  runtimePack: RuntimeModelPackProjection,
+  compiledPack?: Readonly<CompiledModelPack>,
+) {
+  const compiledTerminationAuthority = compiledPack?.weapons.some(
+    (weapon) => weapon.termination !== undefined,
+  ) ?? false;
+  const requiresDigest = compiledTerminationAuthority ||
+    (runtimePack.weaponTerminations?.length ?? 0) > 0 ||
+    (runtimePack.observerSensors ?? []).some(
+      (sensor) => sensor.verificationTrackModel !== undefined,
+    );
+  if (requiresDigest || runtimePack.runtimeDigest !== undefined) {
+    assertRuntimeModelPackDigest(runtimePack);
+  }
+  if (compiledPack && runtimePack.runtimeDigest !== undefined) {
+    assertRuntimeWeaponTerminationAuthority(runtimePack, compiledPack);
+  }
+}

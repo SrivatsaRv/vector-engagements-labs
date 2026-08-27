@@ -122,6 +122,10 @@ Worker/runtime/VSR admission stages land. See the normative
 `WeaponTerminationModelSource` requires an explicit schema, intended use,
 criterion, positive SI radius and positive SI maximum flight time. The current
 25 m/180 s values are model assumptions and carry no named-system source claim.
+Any executable runtime projection resolved to a compiled pack containing this
+authority must carry the exact v3 runtime-projection digest. Omitting the digest
+does not select a legacy mode; TypeScript, Rust/WASM and VSR admission reject
+before integration or replay.
 
 ETOPO, NASA POWER and OurAirports citations belong to the EnvironmentPack
 source manifest. They are not aircraft, weapon, sensor or performance sources.

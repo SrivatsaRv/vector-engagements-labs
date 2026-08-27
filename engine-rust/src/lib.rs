@@ -4730,6 +4730,32 @@ mod tests {
     }
 
     #[test]
+    fn scenario_validation_requires_digest_for_weapon_termination_authority(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut input = scenario();
+        let weapon_entity = input
+            .entities
+            .iter()
+            .find(|entity| entity.weapon.is_some())
+            .ok_or("scenario fixture has no weapon")?;
+        let weapon = weapon_entity
+            .weapon
+            .as_ref()
+            .ok_or("scenario fixture has no weapon authority")?;
+        input.model_pack.weapon_terminations = vec![WeaponTerminationBinding {
+            model_id: weapon.admission.weapon_model_id.clone(),
+            model_version: weapon_entity.provenance.model_version.clone(),
+            termination: weapon.termination.clone(),
+        }];
+        assert!(matches!(
+            validate_scenario(&input),
+            Err(EngineError::InvalidScenario(message))
+                if message.contains("runtimeDigest is required")
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn scenario_validation_rejects_missing_weapon_reference(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut input = scenario();

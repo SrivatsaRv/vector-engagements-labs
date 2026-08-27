@@ -463,7 +463,11 @@ fn verify_runtime_model_pack_digest(scenario: &EngineScenario) -> Result<(), Eng
         .observer_sensors
         .iter()
         .any(|sensor| sensor.verification_track_model.is_some());
-    if scenario.model_pack.runtime_digest.is_none() && !has_verification {
+    let has_termination_authority = !scenario.model_pack.weapon_terminations.is_empty();
+    if scenario.model_pack.runtime_digest.is_none()
+        && !has_verification
+        && !has_termination_authority
+    {
         return Ok(());
     }
     let expected = scenario
@@ -471,7 +475,9 @@ fn verify_runtime_model_pack_digest(scenario: &EngineScenario) -> Result<(), Eng
         .runtime_digest
         .as_deref()
         .ok_or_else(|| {
-            invalid("modelPack.runtimeDigest is required for a verification track model")
+            invalid(
+                "modelPack.runtimeDigest is required for verification-track or weapon-termination authority",
+            )
         })?;
     sha256_digest("modelPack.runtimeDigest", expected)?;
     let pack = &scenario.model_pack;
@@ -1338,7 +1344,7 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
                     && candidate.termination.maximum_flight_time_seconds
                         == weapon.termination.maximum_flight_time_seconds
             });
-            if scenario.model_pack.runtime_digest.is_some() && !exact_match {
+            if !scenario.model_pack.weapon_terminations.is_empty() && !exact_match {
                 return Err(invalid(format!(
                     "weapon {} termination is not bound to the admitted compiled model",
                     entity.id

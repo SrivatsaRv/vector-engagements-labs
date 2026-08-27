@@ -44,8 +44,7 @@ import {
 } from "../geospatial/environment-pack.ts";
 import type { EnvironmentSample } from "../geospatial/environment-pack.ts";
 import {
-  assertRuntimeModelPackDigest,
-  assertRuntimeWeaponTerminationAuthority,
+  assertRuntimeModelPackAuthority,
 } from "./runtime-model-pack.ts";
 import { findRetainedCompiledModelPack } from "./retained-model-packs.ts";
 import {
@@ -1351,16 +1350,8 @@ export class EngineSession {
         .sort((left, right) => compareCanonicalText(left.id, right.id)),
     };
     this.scenario = scenario;
-    const hasVerificationTrackModel = (scenario.modelPack.observerSensors ?? []).some(
-      (sensor) => sensor.verificationTrackModel !== undefined,
-    );
-    if (scenario.modelPack.runtimeDigest !== undefined || hasVerificationTrackModel) {
-      assertRuntimeModelPackDigest(scenario.modelPack);
-      const retainedPack = findRetainedCompiledModelPack(scenario.modelPack);
-      if (retainedPack) {
-        assertRuntimeWeaponTerminationAuthority(scenario.modelPack, retainedPack);
-      }
-    }
+    const retainedPack = findRetainedCompiledModelPack(scenario.modelPack);
+    assertRuntimeModelPackAuthority(scenario.modelPack, retainedPack);
     this.terminalTick = firstFixedStepTickAtOrAfter(
       scenario.durationSeconds,
       scenario.fixedStepSeconds,
@@ -1556,7 +1547,7 @@ export class EngineSession {
         throw new Error(`Weapon ${entity.id} has no valid termination admission.`);
       }
       if (
-        scenario.modelPack.runtimeDigest !== undefined &&
+        (scenario.modelPack.weaponTerminations?.length ?? 0) > 0 &&
         (
           !projectedTermination ||
           projectedTermination.modelVersion !== entity.provenance.modelVersion ||

@@ -442,7 +442,27 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
   assert.match(groundDynamicsMigration, /Generic ground-dynamics migration exact scenario identity\/hash readback failed/);
   assert.match(challengeMigration, /High-energy crossing challenge exact identity\/hash readback failed/);
   assert.match(terminationMigration, /Weapon termination model-pack exact identity readback failed/);
+  assert.match(terminationMigration, /Weapon termination model-pack source exact identity readback failed/);
+  assert.match(terminationMigration, /Weapon termination intended-use exact identity readback failed/);
+  assert.match(terminationMigration, /Weapon termination credibility-manifest exact identity readback failed/);
+  assert.match(terminationMigration, /Historical model-pack source exact identity readback failed/);
+  assert.match(terminationMigration, /Historical intended-use exact identity readback failed/);
+  assert.match(terminationMigration, /Historical credibility-manifest exact identity readback failed/);
   assert.match(terminationMigration, /Weapon termination scenario exact identity readback failed/);
+  for (const tag of [
+    "vector_weapon_termination_historical_intended_use",
+    "vector_weapon_termination_historical_source",
+    "vector_weapon_termination_historical_manifest",
+    "vector_weapon_termination_intended_use",
+    "vector_weapon_termination_source",
+    "vector_weapon_termination_manifest",
+  ]) {
+    assert.equal(
+      terminationMigration.split(`$${tag}$`).length - 1,
+      4,
+      `${tag} must appear once in insert and once in exact readback`,
+    );
+  }
 });
 
 test("the governed high-energy crossing challenge owns exact non-default inputs and explicit nonclaims", () => {

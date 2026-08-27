@@ -125,18 +125,87 @@ WHERE version='1.0.0'
 DO $$
 BEGIN
   IF NOT EXISTS (
+    SELECT 1 FROM intended_use_contracts
+    WHERE id=${sqlText(historicalIntendedUse.id)} AND version=${sqlText(historicalIntendedUse.version)}
+      AND schema_version=${sqlText(historicalIntendedUse.schemaVersion)}
+      AND definition=${dollarJson("vector_weapon_termination_historical_intended_use", historicalIntendedUse)}
+      AND content_hash=${sqlText(sha256HexSync(historicalIntendedUse))}
+  ) THEN
+    RAISE EXCEPTION 'Historical intended-use exact identity readback failed';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM model_pack_sources
+    WHERE id=${sqlText(historicalSource.id)} AND version=${sqlText(historicalSource.version)}
+      AND schema_version=${sqlText(historicalSource.schemaVersion)}
+      AND definition=${dollarJson("vector_weapon_termination_historical_source", historicalSource)}
+      AND content_hash=${sqlText(historicalSourceHash)} AND lifecycle_status='PUBLISHED'
+  ) THEN
+    RAISE EXCEPTION 'Historical model-pack source exact identity readback failed';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM credibility_manifests
+    WHERE id=${sqlText(String(historicalFixture.credibilityManifest.id))}
+      AND version=${sqlText(String(historicalFixture.credibilityManifest.version))}
+      AND schema_version=${sqlText(String(historicalFixture.credibilityManifest.schemaVersion))}
+      AND subject_kind='MODEL_PACK'
+      AND subject_id=${sqlText(String(historicalFixture.pack.id))}
+      AND subject_digest=${sqlText(String(historicalFixture.pack.digest))}
+      AND manifest=${dollarJson("vector_weapon_termination_historical_manifest", historicalFixture.credibilityManifest)}
+      AND content_hash=${sqlText(String(historicalFixture.credibilityManifest.contentDigest))}
+      AND approval_state=${sqlText(String(historicalFixture.credibilityManifest.approvalState))}
+  ) THEN
+    RAISE EXCEPTION 'Historical credibility-manifest exact identity readback failed';
+  END IF;
+  IF NOT EXISTS (
     SELECT 1 FROM compiled_model_packs
     WHERE id=${sqlText(String(historicalFixture.pack.id))} AND version=${sqlText(String(historicalFixture.pack.version))}
-      AND source_hash=${sqlText(historicalSourceHash)}
-      AND digest=${sqlText(String(historicalFixture.pack.digest))}
+      AND schema_version=${sqlText(String(historicalFixture.pack.schemaVersion))}
+      AND source_id=${sqlText(historicalSource.id)} AND source_version=${sqlText(historicalSource.version)}
+      AND source_hash=${sqlText(historicalSourceHash)} AND digest=${sqlText(String(historicalFixture.pack.digest))}
       AND payload=${dollarJson("vector_weapon_termination_historical_pack", historicalFixture.pack)}
+      AND credibility_manifest_id=${sqlText(String(historicalFixture.credibilityManifest.id))}
+      AND credibility_manifest_version=${sqlText(String(historicalFixture.credibilityManifest.version))}
   ) THEN
     RAISE EXCEPTION 'Historical model-pack 0.8.0 exact identity readback failed';
   END IF;
   IF NOT EXISTS (
+    SELECT 1 FROM intended_use_contracts
+    WHERE id=${sqlText(intendedUse.id)} AND version=${sqlText(intendedUse.version)}
+      AND schema_version=${sqlText(intendedUse.schemaVersion)}
+      AND definition=${dollarJson("vector_weapon_termination_intended_use", intendedUse)}
+      AND content_hash=${sqlText(sha256HexSync(intendedUse))}
+  ) THEN
+    RAISE EXCEPTION 'Weapon termination intended-use exact identity readback failed';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM model_pack_sources
+    WHERE id=${sqlText(source.id)} AND version=${sqlText(source.version)}
+      AND schema_version=${sqlText(source.schemaVersion)}
+      AND definition=${dollarJson("vector_weapon_termination_source", source)}
+      AND content_hash=${sqlText(sourceHash)} AND lifecycle_status='PUBLISHED'
+  ) THEN
+    RAISE EXCEPTION 'Weapon termination model-pack source exact identity readback failed';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM credibility_manifests
+    WHERE id=${sqlText(manifest.id)} AND version=${sqlText(manifest.version)}
+      AND schema_version=${sqlText(manifest.schemaVersion)} AND subject_kind='MODEL_PACK'
+      AND subject_id=${sqlText(manifest.subject.id)} AND subject_digest=${sqlText(manifest.subject.digest)}
+      AND manifest=${dollarJson("vector_weapon_termination_manifest", manifest)}
+      AND content_hash=${sqlText(manifest.contentDigest)}
+      AND approval_state=${sqlText(manifest.approvalState)}
+  ) THEN
+    RAISE EXCEPTION 'Weapon termination credibility-manifest exact identity readback failed';
+  END IF;
+  IF NOT EXISTS (
     SELECT 1 FROM compiled_model_packs
     WHERE id=${sqlText(bundle.pack.id)} AND version=${sqlText(bundle.pack.version)}
-      AND digest=${sqlText(bundle.pack.digest)} AND payload=${dollarJson("vector_weapon_termination_pack", bundle.pack)}
+      AND schema_version=${sqlText(bundle.pack.schemaVersion)}
+      AND source_id=${sqlText(source.id)} AND source_version=${sqlText(source.version)}
+      AND source_hash=${sqlText(sourceHash)} AND digest=${sqlText(bundle.pack.digest)}
+      AND payload=${dollarJson("vector_weapon_termination_pack", bundle.pack)}
+      AND credibility_manifest_id=${sqlText(manifest.id)}
+      AND credibility_manifest_version=${sqlText(manifest.version)}
   ) THEN
     RAISE EXCEPTION 'Weapon termination model-pack exact identity readback failed';
   END IF;
