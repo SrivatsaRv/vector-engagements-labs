@@ -720,6 +720,13 @@ target-unavailable termination; the legacy scenario completion distance and
 all renderer distances have no weapon-terminal authority. It does not model a
 fuze, warhead, damage, destruction, kill or probability of kill.
 
+`modelPack.weaponTerminations` is the compact, digest-bound runtime projection
+of those compiled values. It records exact model ID/version plus the effective
+termination object after validated scenario patches. Entity fields must equal
+that projection in both TypeScript and Rust/WASM; changing both the entity and
+the compact projection while retaining a known pack identity is rejected
+against the retained compiled pack.
+
 Mission/capability consumers import the exported `AirMissionDefinition` and
 `CompiledAirMission` types from `lib/air-mission.ts`. They may attach downstream
 behavior to those stable IDs and references but must not create a parallel

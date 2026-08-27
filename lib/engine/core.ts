@@ -43,7 +43,11 @@ import {
   environmentRuntimeProjection,
 } from "../geospatial/environment-pack.ts";
 import type { EnvironmentSample } from "../geospatial/environment-pack.ts";
-import { assertRuntimeModelPackDigest } from "./runtime-model-pack.ts";
+import {
+  assertRuntimeModelPackDigest,
+  assertRuntimeWeaponTerminationAuthority,
+} from "./runtime-model-pack.ts";
+import { findRetainedCompiledModelPack } from "./retained-model-packs.ts";
 import {
   assertNoTruthIdentity,
   assertVerificationTrackModel,
@@ -1352,6 +1356,10 @@ export class EngineSession {
     );
     if (scenario.modelPack.runtimeDigest !== undefined || hasVerificationTrackModel) {
       assertRuntimeModelPackDigest(scenario.modelPack);
+      const retainedPack = findRetainedCompiledModelPack(scenario.modelPack);
+      if (retainedPack) {
+        assertRuntimeWeaponTerminationAuthority(scenario.modelPack, retainedPack);
+      }
     }
     this.terminalTick = firstFixedStepTickAtOrAfter(
       scenario.durationSeconds,
@@ -1519,6 +1527,9 @@ export class EngineSession {
       }
       const admission = entity.weapon.admission;
       const termination = entity.weapon.termination;
+      const projectedTermination = scenario.modelPack.weaponTerminations?.find(
+        (candidate) => candidate.modelId === admission?.weaponModelId,
+      );
       if (
         !admission ||
         admission.modelPackDigest !== scenario.modelPack.digest ||
@@ -1543,6 +1554,21 @@ export class EngineSession {
         termination.maximumFlightTimeSeconds <= 0
       ) {
         throw new Error(`Weapon ${entity.id} has no valid termination admission.`);
+      }
+      if (
+        scenario.modelPack.runtimeDigest !== undefined &&
+        (
+          !projectedTermination ||
+          projectedTermination.modelVersion !== entity.provenance.modelVersion ||
+          projectedTermination.termination.schemaVersion !== termination.schemaVersion ||
+          projectedTermination.termination.intendedUse !== termination.intendedUse ||
+          projectedTermination.termination.criterion !== termination.criterion ||
+          projectedTermination.termination.interceptRadiusM !== termination.interceptRadiusM ||
+          projectedTermination.termination.maximumFlightTimeSeconds !==
+            termination.maximumFlightTimeSeconds
+        )
+      ) {
+        throw new Error(`Weapon ${entity.id} termination is not bound to the admitted compiled model.`);
       }
       const transfer = entity.weapon.storeTransfer;
       const launcher = scenario.entities.find((candidate) => candidate.id === entity.weapon!.launchPlatformId);

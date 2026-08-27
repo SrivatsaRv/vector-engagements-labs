@@ -37,7 +37,10 @@ import {
   resolveInstallationOriginReference,
   type InstallationOriginReference,
 } from "../mission-admission.ts";
-import { bindRuntimeModelPackDigest } from "./runtime-model-pack.ts";
+import {
+  bindRuntimeModelPackDigest,
+  runtimeWeaponTerminations,
+} from "./runtime-model-pack.ts";
 import {
   compileAirMissionDefinition,
   type AirMissionDefinition,
@@ -830,6 +833,7 @@ export function compileScenario(
           ? { verificationTrackModel: structuredClone(sensor.verificationTrackModel) }
           : {}),
       })),
+      weaponTerminations: runtimeWeaponTerminations(CURRENT_COMPILED_MODEL_PACK, []),
       scenarioPatches: [],
     }),
     entities,

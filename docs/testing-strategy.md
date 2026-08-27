@@ -155,6 +155,11 @@ contains no update path for an existing `(id, version)`. Engine regression
 contrasts a 75 ms lifetime with a 100 ms control in the same crossing geometry:
 the former expires at the exact in-step boundary while the latter intercepts,
 with identical TypeScript and Rust/WASM results.
+The suite additionally changes an entity and its compact projection, recomputes
+the runtime digest, and proves the retained compiled pack still rejects the
+forgery. VSR mutation regressions rehash complete records after contradicting
+geometric-intercept and target-unavailable causes with the target lifecycle;
+both records fail before replay exposure.
 
 This baseline does not satisfy #193 by itself. Completion additionally requires
 machine-readable registration for every nested Air-mission and presentation

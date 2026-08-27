@@ -623,6 +623,12 @@ export type EngineScenario = {
       elevationFieldOfViewRad: number;
       verificationTrackModel?: ObserverTrackModel;
     }>;
+    /** Digest-bound effective termination authority for each compiled weapon. */
+    weaponTerminations: Array<{
+      modelId: string;
+      modelVersion: string;
+      termination: WeaponTerminationAdmission;
+    }>;
     scenarioPatches: ScenarioModelPatch[];
   };
   entities: EngineEntityDefinition[];

@@ -18,6 +18,48 @@ import {
 import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { simulateWithCapabilitiesForVerification } from "../lib/simulation.ts";
+import {
+  bindRuntimeModelPackDigest,
+  runtimeWeaponTerminations,
+} from "../lib/engine/runtime-model-pack.ts";
+import { resolveRetainedCompiledModelPack } from "../lib/engine/retained-model-packs.ts";
+
+function governWeaponTermination(
+  scenario: EngineScenario,
+  weapon: EngineScenario["entities"][number],
+  maximumFlightTimeSeconds: number,
+) {
+  assert.ok(weapon.weapon);
+  const pack = resolveRetainedCompiledModelPack(scenario.modelPack);
+  const compiledWeapon = pack.weapons.find(
+    (candidate) => candidate.id === weapon.weapon!.admission.weaponModelId,
+  );
+  assert.ok(compiledWeapon?.termination);
+  const patches = [{
+    schemaVersion: "vector.model-patch.v1" as const,
+    id: `test-${compiledWeapon.id}-maximum-flight-time-seconds`,
+    modelPackDigest: pack.digest,
+    modelId: compiledWeapon.id,
+    fieldPath: "/termination/maximumFlightTimeS",
+    oldValue: compiledWeapon.termination.maximumFlightTimeS,
+    newValue: maximumFlightTimeSeconds,
+    unit: "s" as const,
+    reason: "Deterministic boundary regression fixture",
+    provenance: {
+      authorId: "vector-test-suite",
+      authoredAt: "2026-08-27T00:00:00.000Z",
+      evidenceRefIds: [compiledWeapon.evidenceRefIds[0]!],
+    },
+  }];
+  weapon.weapon.termination.maximumFlightTimeSeconds = maximumFlightTimeSeconds;
+  const projection = structuredClone(scenario.modelPack);
+  delete projection.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest({
+    ...projection,
+    weaponTerminations: runtimeWeaponTerminations(pack, patches),
+    scenarioPatches: patches,
+  });
+}
 
 function admittedScenario(): EngineScenario {
   return structuredClone(
@@ -569,7 +611,7 @@ test("runtime decoding rejects a valid enum that falsifies lifecycle history", (
 test("runtime decoding binds weapon terminal state, cause, and distance to the run", () => {
   const scenario = admittedScenario();
   const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
-  weapon.weapon!.termination.maximumFlightTimeSeconds = 0.1;
+  governWeaponTermination(scenario, weapon, 0.1);
   const run = runEngineBackend(scenario, "typescript");
   assert.equal(run.termination, "weapon_expired");
   assert.equal(run.events.state, "AVAILABLE");

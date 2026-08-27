@@ -11,7 +11,10 @@ import type {
   ObserverSensorAdmission,
   ObserverTrackModel,
 } from "./contracts.ts";
-import { bindRuntimeModelPackDigest } from "./runtime-model-pack.ts";
+import {
+  bindRuntimeModelPackDigest,
+  runtimeWeaponTerminations,
+} from "./runtime-model-pack.ts";
 
 export const ENGINE_VERIFICATION_INTENDED_USE =
   "vector.intended-use.engine-verification" as const;
@@ -164,6 +167,7 @@ export async function bindVerificationTrackModelPack(
         ? { verificationTrackModel: structuredClone(item.verificationTrackModel) }
         : {}),
     })),
+    weaponTerminations: runtimeWeaponTerminations(pack, []),
     scenarioPatches: [],
   });
   for (const entity of scenario.entities) {

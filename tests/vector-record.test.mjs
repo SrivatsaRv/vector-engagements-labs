@@ -34,9 +34,48 @@ import {
   compileAirMissionDefinition,
   synchronizeScenarioAirMission,
 } from "../lib/air-mission.ts";
-import { bindRuntimeModelPackDigest } from "../lib/engine/runtime-model-pack.ts";
+import {
+  bindRuntimeModelPackDigest,
+  runtimeWeaponTerminations,
+} from "../lib/engine/runtime-model-pack.ts";
 import { resolveRetainedCompiledModelPack } from "../lib/engine/retained-model-packs.ts";
 import historicalModelPackBundle from "../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json" with { type: "json" };
+
+function governWeaponTermination(scenario, weapon, changes) {
+  const pack = resolveRetainedCompiledModelPack(scenario.modelPack);
+  const compiledWeapon = pack.weapons.find(
+    (candidate) => candidate.id === weapon.weapon.admission.weaponModelId,
+  );
+  assert.ok(compiledWeapon?.termination);
+  const fields = {
+    interceptRadiusM: ["/termination/interceptRadiusM", "m", "interceptRadiusM"],
+    maximumFlightTimeSeconds: ["/termination/maximumFlightTimeS", "s", "maximumFlightTimeS"],
+  };
+  const patches = Object.entries(changes).map(([field, newValue]) => ({
+    schemaVersion: "vector.model-patch.v1",
+    id: `test-${compiledWeapon.id}-${field.replace(/[A-Z]/g, (value) => `-${value.toLowerCase()}`)}`,
+    modelPackDigest: pack.digest,
+    modelId: compiledWeapon.id,
+    fieldPath: fields[field][0],
+    oldValue: compiledWeapon.termination[fields[field][2]],
+    newValue,
+    unit: fields[field][1],
+    reason: "Deterministic boundary regression fixture",
+    provenance: {
+      authorId: "vector-test-suite",
+      authoredAt: "2026-08-27T00:00:00.000Z",
+      evidenceRefIds: [compiledWeapon.evidenceRefIds[0]],
+    },
+  }));
+  Object.assign(weapon.weapon.termination, changes);
+  const projection = structuredClone(scenario.modelPack);
+  delete projection.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest({
+    ...projection,
+    weaponTerminations: runtimeWeaponTerminations(pack, patches),
+    scenarioPatches: patches,
+  });
+}
 
 const createdAt = "2026-08-06T00:00:00.000Z";
 const textEncoder = new TextEncoder();
@@ -229,6 +268,7 @@ test("VSR recompiles an archived Air mission against its exact retained model pa
         ? { verificationTrackModel: structuredClone(sensor.verificationTrackModel) }
         : {}),
     })),
+    weaponTerminations: runtimeWeaponTerminations(historicalModelPack, []),
     scenarioPatches: [],
   });
 
@@ -287,8 +327,10 @@ test("VSR rejects a hash-resealed expiry time that contradicts the achieved laun
     entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds === 0
   );
   assert.ok(weapon?.weapon);
-  weapon.weapon.termination.interceptRadiusM = 0.1;
-  weapon.weapon.termination.maximumFlightTimeSeconds = 0.075;
+  governWeaponTermination(prepared.engineScenario, weapon, {
+    interceptRadiusM: 0.1,
+    maximumFlightTimeSeconds: 0.075,
+  });
   prepared.engineScenario.durationSeconds = 1;
   const engineRun = runEngineBackend(prepared.engineScenario, "typescript");
   const result = buildSimulationResult(prepared, engineRun);
@@ -748,6 +790,38 @@ test("VSR rejects a hash-resealed terminal-event distance that contradicts the r
   );
 });
 
+test("VSR rejects hash-rebound termination limits beside a retained pack identity", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const compiledMember = record.members.find((member) => member.path === "compiled.json");
+  assert.ok(compiledMember);
+  const compiled = JSON.parse(new TextDecoder().decode(compiledMember.bytes));
+  const weapon = compiled.engineScenario.entities.find((entity) => entity.weapon);
+  assert.ok(weapon?.weapon);
+  weapon.weapon.termination.interceptRadiusM += 100;
+  const projected = compiled.engineScenario.modelPack.weaponTerminations.find(
+    (candidate) => candidate.modelId === weapon.weapon.admission.weaponModelId,
+  );
+  assert.ok(projected);
+  projected.termination.interceptRadiusM = weapon.weapon.termination.interceptRadiusM;
+  const runtimeProjection = structuredClone(compiled.engineScenario.modelPack);
+  delete runtimeProjection.runtimeDigest;
+  compiled.engineScenario.modelPack = bindRuntimeModelPackDigest(runtimeProjection);
+  const corrupt = await replaceRecordMember(
+    record,
+    "compiled.json",
+    compiledMember.schemaVersion,
+    jsonBytes(compiled),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /does not match the exact compiled model pack/,
+  );
+});
+
 test("VSR rejects a hash-resealed terminal event with a false prior weapon state", async () => {
   const scenario = SCENARIO_LIBRARY.find(
     (entry) => entry.id === "a2a-high-energy-crossing-challenge",
@@ -802,6 +876,82 @@ test("VSR rejects a hash-resealed geometric intercept occurrence time", async ()
   await assert.rejects(
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
     /does not match its exact geometric intercept time/,
+  );
+});
+
+test("VSR rejects a geometric intercept whose target is terminal in the event frame", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-defensive-break",
+  ).scenario;
+  const result = simulate(scenario);
+  assert.equal(result.engineRun.events.state, "AVAILABLE");
+  const terminal = result.engineRun.events.items.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+  assert.equal(terminal.payload.cause, "GEOMETRIC_INTERCEPT");
+  const record = await createVectorSimulationRecord(
+    prepareSimulation(scenario),
+    result,
+    createdAt,
+  );
+  const frameMember = record.members.find((member) => member.path === "frames.arrow");
+  assert.ok(frameMember);
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  const target = frames[terminal.frameIndex].entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  assert.ok(target);
+  target.lifecycle = "TERMINATED";
+  const corrupt = await replaceRecordMember(
+    record,
+    "frames.arrow",
+    VECTOR_FRAME_SCHEMA,
+    encodeColumnarFrames(frames),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /invalid authority, ownership, or achieved frame state/,
+  );
+});
+
+test("VSR rejects target-unavailable termination while the target remains active", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const prepared = prepareSimulation(scenario, scenario.profile, capabilities);
+  const targetDefinition = prepared.engineScenario.entities.find(
+    (entity) => entity.id === "red-object-1",
+  );
+  assert.ok(targetDefinition);
+  targetDefinition.lifecycle = "TERMINATED";
+  const engineRun = runEngineBackend(prepared.engineScenario, "typescript");
+  assert.equal(engineRun.events.state, "AVAILABLE");
+  const terminal = engineRun.events.items.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+  assert.equal(terminal.payload.cause, "TARGET_UNAVAILABLE");
+  const result = buildSimulationResult(prepared, engineRun);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const frameMember = record.members.find((member) => member.path === "frames.arrow");
+  assert.ok(frameMember);
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  const target = frames[terminal.frameIndex].entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  assert.ok(target);
+  target.lifecycle = "ACTIVE";
+  const corrupt = await replaceRecordMember(
+    record,
+    "frames.arrow",
+    VECTOR_FRAME_SCHEMA,
+    encodeColumnarFrames(frames),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /invalid authority, ownership, or achieved frame state/,
   );
 });
 

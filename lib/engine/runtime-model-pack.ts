@@ -1,4 +1,9 @@
 import { sha256HexBytesSync } from "../geospatial/digest.ts";
+import {
+  validateScenarioModelPatch,
+  type CompiledModelPack,
+  type ScenarioModelPatch,
+} from "../model-pack.ts";
 import type { EngineScenario } from "./contracts.ts";
 
 export type RuntimeModelPackProjection = EngineScenario["modelPack"];
@@ -30,7 +35,7 @@ function projectionIdentity(pack: RuntimeModelPackProjection) {
     values.forEach(string);
   };
 
-  string("vector.runtime-model-pack-digest.v2");
+  string("vector.runtime-model-pack-digest.v3");
   string(pack.schemaVersion); string(pack.id); string(pack.version); string(pack.digest);
   string(pack.intendedUse.id); string(pack.intendedUse.version);
   integer(pack.observerSensors.length);
@@ -50,6 +55,13 @@ function projectionIdentity(pack: RuntimeModelPackProjection) {
       for (const window of model.observationWindowsSeconds) { number(window.start); number(window.end); }
     }
   }
+  integer(pack.weaponTerminations.length);
+  for (const weapon of pack.weaponTerminations) {
+    string(weapon.modelId); string(weapon.modelVersion);
+    string(weapon.termination.schemaVersion); string(weapon.termination.intendedUse);
+    string(weapon.termination.criterion); number(weapon.termination.interceptRadiusM);
+    number(weapon.termination.maximumFlightTimeSeconds);
+  }
   integer(pack.scenarioPatches.length);
   for (const patch of pack.scenarioPatches) {
     string(patch.schemaVersion); string(patch.id); string(patch.modelPackDigest); string(patch.modelId);
@@ -57,6 +69,66 @@ function projectionIdentity(pack: RuntimeModelPackProjection) {
     string(patch.provenance.authorId); string(patch.provenance.authoredAt); strings(patch.provenance.evidenceRefIds);
   }
   return new Uint8Array(fields);
+}
+
+export function runtimeWeaponTerminations(
+  pack: Readonly<CompiledModelPack>,
+  patches: readonly ScenarioModelPatch[],
+): RuntimeModelPackProjection["weaponTerminations"] {
+  for (const patch of patches) validateScenarioModelPatch(pack, patch);
+  const relevantPatchKeys = new Set<string>();
+  for (const patch of patches) {
+    if (!patch.fieldPath.startsWith("/termination/")) continue;
+    const key = `${patch.modelId}${patch.fieldPath}`;
+    if (relevantPatchKeys.has(key)) {
+      throw new Error(`Runtime model pack has duplicate weapon termination patch ${key}.`);
+    }
+    relevantPatchKeys.add(key);
+  }
+  return pack.weapons.flatMap((weapon) => {
+    // Retained packs authored before vector.weapon-termination-model.v1 remain
+    // replayable, but cannot manufacture authority they never contained.
+    if (!weapon.termination) return [];
+    const interceptPatch = patches.find((patch) =>
+      patch.modelId === weapon.id && patch.fieldPath === "/termination/interceptRadiusM"
+    );
+    const lifetimePatch = patches.find((patch) =>
+      patch.modelId === weapon.id && patch.fieldPath === "/termination/maximumFlightTimeS"
+    );
+    return [{
+      modelId: weapon.id,
+      modelVersion: weapon.version,
+      termination: {
+        schemaVersion: weapon.termination.schemaVersion,
+        intendedUse: weapon.termination.intendedUse,
+        criterion: weapon.termination.criterion,
+        interceptRadiusM: interceptPatch?.newValue ?? weapon.termination.interceptRadiusM,
+        maximumFlightTimeSeconds: lifetimePatch?.newValue ?? weapon.termination.maximumFlightTimeS,
+      },
+    }];
+  });
+}
+
+export function assertRuntimeWeaponTerminationAuthority(
+  runtimePack: RuntimeModelPackProjection,
+  compiledPack: Readonly<CompiledModelPack>,
+) {
+  const expected = runtimeWeaponTerminations(compiledPack, runtimePack.scenarioPatches);
+  const exact = runtimePack.weaponTerminations.length === expected.length &&
+    runtimePack.weaponTerminations.every((actual, index) => {
+      const item = expected[index];
+      return item !== undefined && actual.modelId === item.modelId &&
+        actual.modelVersion === item.modelVersion &&
+        actual.termination.schemaVersion === item.termination.schemaVersion &&
+        actual.termination.intendedUse === item.termination.intendedUse &&
+        actual.termination.criterion === item.termination.criterion &&
+        actual.termination.interceptRadiusM === item.termination.interceptRadiusM &&
+        actual.termination.maximumFlightTimeSeconds ===
+          item.termination.maximumFlightTimeSeconds;
+    });
+  if (!exact) {
+    throw new Error("The runtime weapon-termination projection does not match the exact compiled model pack.");
+  }
 }
 
 export function runtimeModelPackDigest(pack: RuntimeModelPackProjection) {

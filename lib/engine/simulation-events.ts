@@ -881,14 +881,21 @@ export function assertSimulationEventStream(
       const weapon = entityById.get(payload.weaponId);
       const target = entityById.get(payload.targetId);
       const frameWeapon = frame.entities.find((candidate) => candidate.id === payload.weaponId);
+      const frameTarget = frame.entities.find((candidate) => candidate.id === payload.targetId);
       const priorFrameWeapon = frames[event.frameIndex - 1]?.entities.find(
         (candidate) => candidate.id === payload.weaponId,
       );
       const admission = weapon?.weapon?.termination;
+      const targetLifecycleMatchesCause = payload.cause === "TARGET_UNAVAILABLE"
+        ? frameTarget?.lifecycle === "TERMINATED"
+        : payload.cause === "GEOMETRIC_INTERCEPT"
+          ? frameTarget?.lifecycle === "ACTIVE"
+          : true;
       if (
         event.phase !== "TERMINATION" || event.producer.subsystem !== "WEAPON_DYNAMICS" ||
         event.producer.entityId !== payload.weaponId || !weapon || weapon.kind !== "GUIDED_WEAPON" ||
-        !target || !frameWeapon || frameWeapon.lifecycle !== "TERMINATED" ||
+        !target || !frameWeapon || !frameTarget || frameWeapon.lifecycle !== "TERMINATED" ||
+        !targetLifecycleMatchesCause ||
         !priorFrameWeapon || priorFrameWeapon.weaponFlightState !== payload.from ||
         frameWeapon.weaponFlightState !== payload.to || weapon.weapon?.targetEntityId !== payload.targetId ||
         event.participants.length !== 2 ||
@@ -918,7 +925,6 @@ export function assertSimulationEventStream(
         const priorFrame = frames[event.frameIndex - 1];
         const priorWeapon = priorFrame?.entities.find((candidate) => candidate.id === payload.weaponId);
         const priorTarget = priorFrame?.entities.find((candidate) => candidate.id === payload.targetId);
-        const frameTarget = frame.entities.find((candidate) => candidate.id === payload.targetId);
         const expectedPriorTimeSeconds = recordedModelTimeAtTick(
           event.tick - 1,
           scenario.fixedStepSeconds,

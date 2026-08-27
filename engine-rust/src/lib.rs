@@ -565,7 +565,17 @@ pub struct ModelPackBinding {
     pub runtime_digest: Option<String>,
     #[serde(default)]
     pub observer_sensors: Vec<ObserverSensorBinding>,
+    #[serde(default)]
+    pub weapon_terminations: Vec<WeaponTerminationBinding>,
     pub scenario_patches: Vec<ScenarioModelPatch>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WeaponTerminationBinding {
+    pub model_id: String,
+    pub model_version: String,
+    pub termination: WeaponTerminationAdmission,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -3854,6 +3864,7 @@ mod tests {
                 },
                 runtime_digest: None,
                 observer_sensors: Vec::new(),
+                weapon_terminations: Vec::new(),
                 scenario_patches: Vec::new(),
             },
             entities: vec![blue, red, weapon],

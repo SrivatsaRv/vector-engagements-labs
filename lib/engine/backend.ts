@@ -12,6 +12,11 @@ import {
 import { enginePositionToGeographic } from "../scenario-spatial.ts";
 import { assertSimulationEventStream } from "./simulation-events.ts";
 import { sha256HexSync } from "../geospatial/digest.ts";
+import {
+  assertRuntimeModelPackDigest,
+  assertRuntimeWeaponTerminationAuthority,
+} from "./runtime-model-pack.ts";
+import { findRetainedCompiledModelPack } from "./retained-model-packs.ts";
 import type {
   PublicAircraftReferenceInput,
   PublicAircraftReferenceRun,
@@ -131,6 +136,13 @@ export function runRustWasmPublicAircraftReference(
 
 export function runRustWasmEngine(scenario: EngineScenario): EngineRun {
   const engine = getRustEngine();
+  if (scenario.modelPack.runtimeDigest !== undefined) {
+    assertRuntimeModelPackDigest(scenario.modelPack);
+    const retainedPack = findRetainedCompiledModelPack(scenario.modelPack);
+    if (retainedPack) {
+      assertRuntimeWeaponTerminationAuthority(scenario.modelPack, retainedPack);
+    }
+  }
   if (scenario.airMission) {
     const compiledContent = structuredClone(scenario.airMission) as Record<string, unknown>;
     delete compiledContent.compiledDigest;

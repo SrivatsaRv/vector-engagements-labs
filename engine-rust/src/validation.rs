@@ -476,7 +476,7 @@ fn verify_runtime_model_pack_digest(scenario: &EngineScenario) -> Result<(), Eng
     sha256_digest("modelPack.runtimeDigest", expected)?;
     let pack = &scenario.model_pack;
     let mut hash = Sha256::new();
-    hash_string(&mut hash, "vector.runtime-model-pack-digest.v2");
+    hash_string(&mut hash, "vector.runtime-model-pack-digest.v3");
     hash_string(&mut hash, &pack.schema_version);
     hash_string(&mut hash, &pack.id);
     hash_string(&mut hash, &pack.version);
@@ -516,6 +516,16 @@ fn verify_runtime_model_pack_digest(scenario: &EngineScenario) -> Result<(), Eng
                 hash_number(&mut hash, window.end);
             }
         }
+    }
+    hash_integer(&mut hash, pack.weapon_terminations.len());
+    for weapon in &pack.weapon_terminations {
+        hash_string(&mut hash, &weapon.model_id);
+        hash_string(&mut hash, &weapon.model_version);
+        hash_string(&mut hash, &weapon.termination.schema_version);
+        hash_string(&mut hash, &weapon.termination.intended_use);
+        hash_string(&mut hash, &weapon.termination.criterion);
+        hash_number(&mut hash, weapon.termination.intercept_radius_m);
+        hash_number(&mut hash, weapon.termination.maximum_flight_time_seconds);
     }
     hash_integer(&mut hash, pack.scenario_patches.len());
     for patch in &pack.scenario_patches {
@@ -1013,6 +1023,35 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         "modelPack.intendedUse.version",
         &scenario.model_pack.intended_use.version,
     )?;
+    for (index, weapon) in scenario.model_pack.weapon_terminations.iter().enumerate() {
+        let root = format!("modelPack.weaponTerminations[{index}]");
+        identifier(&format!("{root}.modelId"), &weapon.model_id)?;
+        identifier(&format!("{root}.modelVersion"), &weapon.model_version)?;
+        if weapon.termination.schema_version != "vector.weapon-termination-model.v1"
+            || weapon.termination.intended_use != "ENGINE_VERIFICATION_ONLY"
+            || weapon.termination.criterion != "GEOMETRIC_CLOSEST_APPROACH"
+        {
+            return Err(invalid(format!(
+                "{root}.termination has unsupported authority"
+            )));
+        }
+        positive(
+            &format!("{root}.termination.interceptRadiusM"),
+            weapon.termination.intercept_radius_m,
+        )?;
+        positive(
+            &format!("{root}.termination.maximumFlightTimeSeconds"),
+            weapon.termination.maximum_flight_time_seconds,
+        )?;
+        if scenario.model_pack.weapon_terminations[..index]
+            .iter()
+            .any(|candidate| candidate.model_id == weapon.model_id)
+        {
+            return Err(invalid(format!(
+                "{root}.modelId duplicates an earlier weapon termination projection"
+            )));
+        }
+    }
     for (index, patch) in scenario.model_pack.scenario_patches.iter().enumerate() {
         let root = format!("modelPack.scenarioPatches[{index}]");
         if patch.schema_version != "vector.model-patch.v1" {
@@ -1279,6 +1318,29 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
             } else if admission.schema_version != "vector.observer-sensor-admission.v1" {
                 return Err(invalid(format!(
                     "observer sensor {} has an unsupported admission schema",
+                    entity.id
+                )));
+            }
+        }
+        if let Some(weapon) = &entity.weapon {
+            let projected = scenario
+                .model_pack
+                .weapon_terminations
+                .iter()
+                .find(|candidate| candidate.model_id == weapon.admission.weapon_model_id);
+            let exact_match = projected.is_some_and(|candidate| {
+                candidate.model_version == entity.provenance.model_version
+                    && candidate.termination.schema_version == weapon.termination.schema_version
+                    && candidate.termination.intended_use == weapon.termination.intended_use
+                    && candidate.termination.criterion == weapon.termination.criterion
+                    && candidate.termination.intercept_radius_m
+                        == weapon.termination.intercept_radius_m
+                    && candidate.termination.maximum_flight_time_seconds
+                        == weapon.termination.maximum_flight_time_seconds
+            });
+            if scenario.model_pack.runtime_digest.is_some() && !exact_match {
+                return Err(invalid(format!(
+                    "weapon {} termination is not bound to the admitted compiled model",
                     entity.id
                 )));
             }

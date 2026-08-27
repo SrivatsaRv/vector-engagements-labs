@@ -93,7 +93,11 @@ Every compiled weapon now binds `vector.weapon-termination-model.v1` with
 `GEOMETRIC_CLOSEST_APPROACH` criterion, positive SI intercept radius and
 positive SI maximum flight time. All three categorical discriminators must be
 present explicitly in source; compilation never supplies a missing authority
-value. The current run/result/event contract owns one primary weapon, so
+value. The compact runtime model-pack projection now carries every weapon's
+effective termination authority and includes it in `runtimeDigest`; governed
+scenario patches are applied to that projection before hashing. Both engines
+require each entity's model ID, model version, radius and lifetime to match the
+projection exactly before integration. The current run/result/event contract owns one primary weapon, so
 pre-engine admission allows at most one scheduled guided release. Additional
 stores may remain installed inventory, and an explicit `JETTISON` remains an
 unpowered store-transfer event, but a second guided release is rejected instead

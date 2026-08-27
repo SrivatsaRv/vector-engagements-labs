@@ -21,7 +21,10 @@ import {
   type SimulationResult,
 } from "../simulation.ts";
 import { assertRecordedSidePictures, attachRecordedObserverStates } from "../information-state.ts";
-import { assertRuntimeModelPackDigest } from "../engine/runtime-model-pack.ts";
+import {
+  assertRuntimeModelPackDigest,
+  assertRuntimeWeaponTerminationAuthority,
+} from "../engine/runtime-model-pack.ts";
 import {
   assertEnvironmentPack,
   environmentPackBinding,
@@ -30,7 +33,10 @@ import {
   COMPILED_AIR_MISSION_SCHEMA_VERSION,
   compileAirMissionDefinition,
 } from "../air-mission.ts";
-import { resolveRetainedCompiledModelPack } from "../engine/retained-model-packs.ts";
+import {
+  findRetainedCompiledModelPack,
+  resolveRetainedCompiledModelPack,
+} from "../engine/retained-model-packs.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v6" as const;
@@ -807,6 +813,10 @@ export async function openVectorSimulationRecord(
   >;
   if (compiled.engineScenario.modelPack.runtimeDigest !== undefined) {
     assertRuntimeModelPackDigest(compiled.engineScenario.modelPack);
+    const retainedPack = findRetainedCompiledModelPack(compiled.engineScenario.modelPack);
+    if (retainedPack) {
+      assertRuntimeWeaponTerminationAuthority(compiled.engineScenario.modelPack, retainedPack);
+    }
   }
   const environmentPack = compiled.engineScenario.geospatial?.environmentPack;
   if (!environmentPack) {

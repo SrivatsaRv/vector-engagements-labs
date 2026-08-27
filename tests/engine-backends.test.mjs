@@ -17,6 +17,47 @@ import {
   decodeColumnarFrames,
   encodeColumnarFrames,
 } from "../lib/record/vector-record.ts";
+import {
+  bindRuntimeModelPackDigest,
+  runtimeWeaponTerminations,
+} from "../lib/engine/runtime-model-pack.ts";
+import { resolveRetainedCompiledModelPack } from "../lib/engine/retained-model-packs.ts";
+
+function governWeaponTermination(scenario, weapon, changes) {
+  const pack = resolveRetainedCompiledModelPack(scenario.modelPack);
+  const compiledWeapon = pack.weapons.find(
+    (candidate) => candidate.id === weapon.weapon.admission.weaponModelId,
+  );
+  assert.ok(compiledWeapon?.termination);
+  const fields = {
+    interceptRadiusM: ["/termination/interceptRadiusM", "m", "interceptRadiusM"],
+    maximumFlightTimeSeconds: ["/termination/maximumFlightTimeS", "s", "maximumFlightTimeS"],
+  };
+  const patches = Object.entries(changes).map(([field, newValue]) => ({
+    schemaVersion: "vector.model-patch.v1",
+    id: `test-${compiledWeapon.id}-${field.replace(/[A-Z]/g, (value) => `-${value.toLowerCase()}`)}`,
+    modelPackDigest: pack.digest,
+    modelId: compiledWeapon.id,
+    fieldPath: fields[field][0],
+    oldValue: compiledWeapon.termination[fields[field][2]],
+    newValue,
+    unit: fields[field][1],
+    reason: "Deterministic boundary regression fixture",
+    provenance: {
+      authorId: "vector-test-suite",
+      authoredAt: "2026-08-27T00:00:00.000Z",
+      evidenceRefIds: [compiledWeapon.evidenceRefIds[0]],
+    },
+  }));
+  Object.assign(weapon.weapon.termination, changes);
+  const projection = structuredClone(scenario.modelPack);
+  delete projection.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest({
+    ...projection,
+    weaponTerminations: runtimeWeaponTerminations(pack, patches),
+    scenarioPatches: patches,
+  });
+}
 
 const close = (actual, expected, tolerance, label) => {
   assert.ok(
@@ -495,13 +536,15 @@ test("both engines exclude a geometric intercept occurring after an in-step expi
   delete blue.routePlan;
   delete red.route;
   delete red.routePlan;
-  weapon.weapon.termination.maximumFlightTimeSeconds = 0.075;
+  governWeaponTermination(baseline, weapon, { maximumFlightTimeSeconds: 0.075 });
 
   for (const backend of ["typescript", "rust-wasm"]) {
     const expired = runEngineBackend(structuredClone(baseline), backend);
     const longerLivedScenario = structuredClone(baseline);
-    longerLivedScenario.entities.find((entity) => entity.weapon)
-      .weapon.termination.maximumFlightTimeSeconds = 0.1;
+    const longerLivedWeapon = longerLivedScenario.entities.find((entity) => entity.weapon);
+    governWeaponTermination(longerLivedScenario, longerLivedWeapon, {
+      maximumFlightTimeSeconds: 0.1,
+    });
     const longerLived = runEngineBackend(longerLivedScenario, backend);
     assert.equal(expired.termination, "weapon_expired", backend);
     assert.equal(longerLived.termination, "weapon_intercept", backend);
@@ -533,7 +576,7 @@ test("both engines validate a geometric intercept admitted before an in-step exp
   delete blue.routePlan;
   delete red.route;
   delete red.routePlan;
-  weapon.weapon.termination.maximumFlightTimeSeconds = 0.075;
+  governWeaponTermination(baseline, weapon, { maximumFlightTimeSeconds: 0.075 });
 
   for (const backend of ["typescript", "rust-wasm"]) {
     const run = runEngineBackend(structuredClone(baseline), backend);
@@ -557,8 +600,10 @@ test("both engines start off-grid weapon lifetime at the achieved activation bou
   const weapon = baseline.entities.find((entity) => entity.weapon);
   assert.ok(weapon?.weapon);
   weapon.weapon.launchTimeSeconds = 0.025;
-  weapon.weapon.termination.interceptRadiusM = 0.1;
-  weapon.weapon.termination.maximumFlightTimeSeconds = 0.01;
+  governWeaponTermination(baseline, weapon, {
+    interceptRadiusM: 0.1,
+    maximumFlightTimeSeconds: 0.01,
+  });
   baseline.durationSeconds = 1;
 
   for (const backend of ["typescript", "rust-wasm"]) {
@@ -595,8 +640,10 @@ test("both engines bind non-intercept events to the lifetime closest approach", 
   delete blue.routePlan;
   delete red.route;
   delete red.routePlan;
-  weapon.weapon.termination.interceptRadiusM = 0.1;
-  weapon.weapon.termination.maximumFlightTimeSeconds = 0.5;
+  governWeaponTermination(baseline, weapon, {
+    interceptRadiusM: 0.1,
+    maximumFlightTimeSeconds: 0.5,
+  });
 
   for (const backend of ["typescript", "rust-wasm"]) {
     const run = runEngineBackend(structuredClone(baseline), backend);
@@ -644,8 +691,10 @@ test("both engines exclude stowed geometry from the weapon-lifetime closest appr
     delete entity.routePlan;
   }
   weapon.weapon.launchTimeSeconds = 1;
-  weapon.weapon.termination.interceptRadiusM = 0.1;
-  weapon.weapon.termination.maximumFlightTimeSeconds = 0.1;
+  governWeaponTermination(baseline, weapon, {
+    interceptRadiusM: 0.1,
+    maximumFlightTimeSeconds: 0.1,
+  });
   baseline.durationSeconds = 2;
 
   const runs = ["typescript", "rust-wasm"].map((backend) =>
@@ -682,6 +731,33 @@ test("both engines reject malformed weapon termination authority before integrat
         backend,
       );
     }
+  }
+});
+
+test("both engines reject hash-rebound termination limits beside a retained pack identity", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const scenario = structuredClone(baseline);
+    const weapon = scenario.entities.find((entity) => entity.weapon);
+    assert.ok(weapon?.weapon);
+    weapon.weapon.termination.interceptRadiusM += 100;
+    const projection = scenario.modelPack.weaponTerminations.find(
+      (candidate) => candidate.modelId === weapon.weapon.admission.weaponModelId,
+    );
+    assert.ok(projection);
+    projection.termination.interceptRadiusM = weapon.weapon.termination.interceptRadiusM;
+    const material = structuredClone(scenario.modelPack);
+    delete material.runtimeDigest;
+    scenario.modelPack = bindRuntimeModelPackDigest(material);
+    assert.throws(
+      () => runEngineBackend(scenario, backend),
+      /does not match the exact compiled model pack/,
+      backend,
+    );
   }
 });
 
