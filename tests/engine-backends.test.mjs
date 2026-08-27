@@ -513,6 +513,39 @@ test("both engines exclude a geometric intercept occurring after an in-step expi
   }
 });
 
+test("both engines validate a geometric intercept admitted before an in-step expiry", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
+  const red = baseline.entities.find((entity) => entity.id === "red-object-1");
+  const weapon = baseline.entities.find((entity) => entity.weapon);
+  assert.ok(blue && red && weapon?.weapon);
+  blue.initial.position = { x: 0, y: 0, z: 8000 };
+  blue.initial.velocity = { x: 250, y: 0, z: 0 };
+  red.initial.position = { x: 80, y: 0, z: 8000 };
+  red.initial.velocity = { x: -600, y: 0, z: 0 };
+  delete blue.route;
+  delete blue.routePlan;
+  delete red.route;
+  delete red.routePlan;
+  weapon.weapon.termination.maximumFlightTimeSeconds = 0.075;
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const run = runEngineBackend(structuredClone(baseline), backend);
+    const terminal = run.events.items.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    );
+    assert.equal(run.termination, "weapon_intercept", backend);
+    assert.equal(terminal?.payload.cause, "GEOMETRIC_INTERCEPT", backend);
+    assert.equal(terminal.payload.occurrenceTimeSeconds, 0.075, backend);
+  }
+});
+
 test("both engines start off-grid weapon lifetime at the achieved activation boundary", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
   const baseline = structuredClone(

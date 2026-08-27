@@ -244,7 +244,9 @@ prior state must equal the same weapon's state at the exact preceding fixed-step
 boundary, which the engine force-retains immediately before every weapon
 termination. For geometric intercept, replay independently recomputes the
 closest-point fraction from those two boundary frames and requires the exact
-canonical six-decimal occurrence time. Its
+canonical six-decimal occurrence time. When admitted weapon lifetime ends
+inside the terminal integration step, replay truncates that relative-position
+segment at the exact expiry fraction before recomputing closest approach. Its
 state and cause must map exactly to the `RUN_COMPLETED` outcome, and its closest
 approach must equal the canonical six-decimal projection of the frozen report's
 cumulative minimum from the admitted launch boundary through termination;

@@ -930,20 +930,38 @@ export function assertSimulationEventStream(
             `weapon ${Boolean(priorWeapon)}, prior target ${Boolean(priorTarget)}, terminal target ${Boolean(frameTarget)}).`,
           );
         }
-        const closest = closestApproachOnRelativeSegment(
-          {
-            x: priorTarget.position.x - priorWeapon.position.x,
-            y: priorTarget.position.y - priorWeapon.position.y,
-            z: priorTarget.position.z - priorWeapon.position.z,
-          },
-          {
-            x: frameTarget.position.x - frameWeapon.position.x,
-            y: frameTarget.position.y - frameWeapon.position.y,
-            z: frameTarget.position.z - frameWeapon.position.z,
-          },
+        const relativeStart = {
+          x: priorTarget.position.x - priorWeapon.position.x,
+          y: priorTarget.position.y - priorWeapon.position.y,
+          z: priorTarget.position.z - priorWeapon.position.z,
+        };
+        const relativeEnd = {
+          x: frameTarget.position.x - frameWeapon.position.x,
+          y: frameTarget.position.y - frameWeapon.position.y,
+          z: frameTarget.position.z - frameWeapon.position.z,
+        };
+        const achievedLaunchTimeSeconds = modelTimeAtTick(
+          firstFixedStepTickAtOrAfter(
+            weapon.weapon.launchTimeSeconds ?? 0,
+            scenario.fixedStepSeconds,
+          ),
+          scenario.fixedStepSeconds,
         );
+        const expiryTimeSeconds =
+          achievedLaunchTimeSeconds + admission.maximumFlightTimeSeconds;
+        const activeStepFraction = Math.max(0, Math.min(
+          1,
+          (expiryTimeSeconds - expectedPriorTimeSeconds) / scenario.fixedStepSeconds,
+        ));
+        const activeRelativeEnd = {
+          x: relativeStart.x + (relativeEnd.x - relativeStart.x) * activeStepFraction,
+          y: relativeStart.y + (relativeEnd.y - relativeStart.y) * activeStepFraction,
+          z: relativeStart.z + (relativeEnd.z - relativeStart.z) * activeStepFraction,
+        };
+        const closest = closestApproachOnRelativeSegment(relativeStart, activeRelativeEnd);
         const expectedOccurrenceTimeSeconds = Number((
-          expectedPriorTimeSeconds + closest.fraction * scenario.fixedStepSeconds
+          expectedPriorTimeSeconds +
+          closest.fraction * activeStepFraction * scenario.fixedStepSeconds
         ).toFixed(6));
         if (
           closest.distanceM > admission.interceptRadiusM + 1e-9 ||
