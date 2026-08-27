@@ -572,8 +572,9 @@ remain byte-frozen.
 
 Air scenario packages persist the authored mission and exact model-pack digest
 inside canonical v4 JSON. Saved runs and VSRs additionally retain the compiled
-mission digests; readback revalidates them against the archived pack rather than
-the current catalogue.
+mission digests; readback resolves an exact retained `(id, version, digest)` and
+revalidates against that archived pack rather than the current catalogue. A
+missing or partial identity match is a replay-admission failure.
 PostGIS stores immutable environment packs separately from compiled model packs,
 with an update-rejection trigger and content-addressed runway binding.
 

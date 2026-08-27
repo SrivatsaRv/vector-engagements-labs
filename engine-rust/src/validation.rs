@@ -1299,6 +1299,7 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         }
     }
     let mut launched_weapon_count = 0_usize;
+    let mut scheduled_guided_release_count = 0_usize;
     for entity in &scenario.entities {
         let Some(weapon) = &entity.weapon else {
             continue;
@@ -1317,6 +1318,11 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         }
         if let Some(launch_time) = weapon.launch_time_seconds {
             launched_weapon_count += 1;
+            if !weapon.store_transfer.as_ref().is_some_and(|binding| {
+                binding.transfer.operation == crate::StoreTransferOperation::Jettison
+            }) {
+                scheduled_guided_release_count += 1;
+            }
             if launch_time > scenario.duration_seconds {
                 return Err(invalid(format!(
                     "weapon {} launches after scenario duration",
@@ -1468,6 +1474,11 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
     if launched_weapon_count == 0 {
         return Err(invalid(
             "scenario must declare at least one launched weapon",
+        ));
+    }
+    if scheduled_guided_release_count > 1 {
+        return Err(invalid(
+            "engine termination admission allows at most one scheduled guided release",
         ));
     }
 

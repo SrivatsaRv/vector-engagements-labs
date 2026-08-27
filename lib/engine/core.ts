@@ -1496,9 +1496,17 @@ export class EngineSession {
     }
     const admittedTransferIds = new Set<string>();
     const admittedTransferStores = new Set<string>();
+    let scheduledGuidedReleaseCount = 0;
     for (const entity of scenario.entities) {
       if (!entity.weapon) continue;
       const launchTimeSeconds = entity.weapon.launchTimeSeconds;
+      if (
+        entity.kind === "GUIDED_WEAPON" &&
+        launchTimeSeconds !== null &&
+        entity.weapon.storeTransfer?.operation !== "JETTISON"
+      ) {
+        scheduledGuidedReleaseCount += 1;
+      }
       if (launchTimeSeconds !== null && launchTimeSeconds > scenario.durationSeconds) {
         throw new Error(`Weapon ${entity.id} launches after scenario duration.`);
       }
@@ -1806,6 +1814,11 @@ export class EngineSession {
         );
       }
     }
+    if (scheduledGuidedReleaseCount > 1) {
+      throw new Error(
+        "Engine termination admission allows at most one scheduled guided release.",
+      );
+    }
     const legacyStudyArea = scenario.environment.studyArea;
     this.recordingOrigin = scenario.geospatial?.origin ?? {
       schemaVersion: "vector.scenario-origin.v1" as const,
@@ -1830,12 +1843,19 @@ export class EngineSession {
       launcher.installedStoreDragAreaM2 += store.weapon.storeTransfer?.installedDragAreaM2 ?? 0;
     }
     this.preStepStates = [...this.states.values()].map(snapshotRuntimeState);
-    this.primaryWeapon = this.states.get(
-      scenario.entities.find(
+    const primaryWeaponDefinition = scenario.entities.find(
+      (entity) =>
+        entity.kind === "GUIDED_WEAPON" &&
+        entity.weapon !== undefined &&
+        entity.weapon.launchTimeSeconds !== null &&
+        entity.weapon.storeTransfer?.operation !== "JETTISON",
+    ) ?? scenario.entities.find(
         (entity) =>
-          entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds !== null,
-      )?.id ?? "",
-    );
+          entity.kind === "GUIDED_WEAPON" &&
+          entity.weapon !== undefined &&
+          entity.weapon.launchTimeSeconds !== null,
+      );
+    this.primaryWeapon = this.states.get(primaryWeaponDefinition?.id ?? "");
     this.primaryTarget = this.primaryWeapon?.definition.weapon
       ? this.states.get(this.primaryWeapon.definition.weapon.targetEntityId)
       : undefined;

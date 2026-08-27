@@ -685,6 +685,27 @@ test("both engines reject malformed weapon termination authority before integrat
   }
 });
 
+test("both engines reject a second scheduled guided release before integration", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const unlaunchedWeapon = baseline.entities.find(
+    (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds === null,
+  );
+  assert.ok(unlaunchedWeapon?.weapon, "fixture requires a carried second weapon");
+  unlaunchedWeapon.weapon.launchTimeSeconds = 0.1;
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.throws(
+      () => runEngineBackend(structuredClone(baseline), backend),
+      /at most one scheduled guided release/i,
+      backend,
+    );
+  }
+});
+
 test("Rust/WASM and TypeScript preserve aircraft store-mass transfer at release", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", [
     "A2A",

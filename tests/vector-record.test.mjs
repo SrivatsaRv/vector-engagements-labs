@@ -30,6 +30,13 @@ import {
   assertEnvironmentPack,
   environmentPackBinding,
 } from "../lib/geospatial/environment-pack.ts";
+import {
+  compileAirMissionDefinition,
+  synchronizeScenarioAirMission,
+} from "../lib/air-mission.ts";
+import { bindRuntimeModelPackDigest } from "../lib/engine/runtime-model-pack.ts";
+import { resolveRetainedCompiledModelPack } from "../lib/engine/retained-model-packs.ts";
+import historicalModelPackBundle from "../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json" with { type: "json" };
 
 const createdAt = "2026-08-06T00:00:00.000Z";
 const textEncoder = new TextEncoder();
@@ -183,11 +190,77 @@ for (const backend of ["typescript", "rust-wasm"]) {
   });
 }
 
+test("VSR recompiles an archived Air mission against its exact retained model pack", async () => {
+  const currentScenario = SCENARIO_LIBRARY[0].scenario;
+  const historicalModelPack = historicalModelPackBundle.pack;
+  const scenario = synchronizeScenarioAirMission(
+    structuredClone(currentScenario),
+    historicalModelPack,
+  );
+  const prepared = prepareSimulation(currentScenario);
+  const environmentPack = prepared.engineScenario.geospatial.environmentPack;
+  const archivedMission = compileAirMissionDefinition(scenario.airMission, {
+    scenario,
+    modelPack: historicalModelPack,
+    environmentPackDigest: environmentPack.identity.digest,
+    environmentPack,
+    fixedStepSeconds: prepared.engineScenario.fixedStepSeconds,
+    durationSeconds: prepared.engineScenario.durationSeconds,
+  });
+  prepared.scenario = scenario;
+  prepared.engineScenario.airMission = archivedMission;
+  prepared.engineScenario.modelPack = bindRuntimeModelPackDigest({
+    schemaVersion: historicalModelPack.schemaVersion,
+    id: historicalModelPack.id,
+    version: historicalModelPack.version,
+    digest: historicalModelPack.digest,
+    intendedUse: { ...historicalModelPack.intendedUses[0] },
+    observerSensors: historicalModelPack.sensors.map((sensor) => ({
+      modelId: sensor.id,
+      modelVersion: sensor.version,
+      evidenceRefIds: [...sensor.evidenceRefIds],
+      sensorKind: sensor.sensorKind,
+      detectionRangeM: sensor.detectionRangeM,
+      minimumRangeM: sensor.minimumRangeM,
+      scanPeriodS: sensor.scanPeriodS,
+      azimuthFieldOfViewRad: sensor.azimuthFieldOfViewRad,
+      elevationFieldOfViewRad: sensor.elevationFieldOfViewRad,
+      ...(sensor.verificationTrackModel
+        ? { verificationTrackModel: structuredClone(sensor.verificationTrackModel) }
+        : {}),
+    })),
+    scenarioPatches: [],
+  });
+
+  const result = simulate(currentScenario);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const serialized = serializeVectorRecord(record);
+  const opened = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+
+  assert.equal(opened.result.engineRun.scenario.modelPack.version, "0.8.0");
+  assert.equal(opened.result.engineRun.scenario.modelPack.digest, historicalModelPack.digest);
+  assert.deepEqual(opened.result.engineRun.scenario.airMission, archivedMission);
+});
+
+test("archived model-pack resolution rejects every partial identity match", () => {
+  const pack = historicalModelPackBundle.pack;
+  for (const identity of [
+    { id: `${pack.id}-other`, version: pack.version, digest: pack.digest },
+    { id: pack.id, version: "0.8.1", digest: pack.digest },
+    { id: pack.id, version: pack.version, digest: "0".repeat(64) },
+  ]) {
+    assert.throws(
+      () => resolveRetainedCompiledModelPack(identity),
+      /No retained compiled model pack matches/,
+    );
+  }
+});
+
 test("VSR admits an off-grid scheduled launch at its first fixed-step boundary", async () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const prepared = prepareSimulation(scenario);
   const weapon = prepared.engineScenario.entities.find((entity) =>
-    entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds === null
+    entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds === 0
   );
   assert.ok(weapon?.weapon);
   weapon.weapon.launchTimeSeconds = 2.03;

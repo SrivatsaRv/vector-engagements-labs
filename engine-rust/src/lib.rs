@@ -3138,14 +3138,28 @@ pub fn try_run_engine(mut scenario: EngineScenario) -> Result<EngineRun, EngineE
             }
         }
     }
-    let primary_weapon_index = scenario.entities.iter().position(|entity| {
-        entity.kind == EntityKind::GuidedWeapon
-            && entity
-                .weapon
-                .as_ref()
-                .and_then(|weapon| weapon.launch_time_seconds)
-                .is_some()
-    });
+    let primary_weapon_index = scenario
+        .entities
+        .iter()
+        .position(|entity| {
+            entity.kind == EntityKind::GuidedWeapon
+                && entity.weapon.as_ref().is_some_and(|weapon| {
+                    weapon.launch_time_seconds.is_some()
+                        && !weapon.store_transfer.as_ref().is_some_and(|binding| {
+                            binding.transfer.operation == StoreTransferOperation::Jettison
+                        })
+                })
+        })
+        .or_else(|| {
+            scenario.entities.iter().position(|entity| {
+                entity.kind == EntityKind::GuidedWeapon
+                    && entity
+                        .weapon
+                        .as_ref()
+                        .and_then(|weapon| weapon.launch_time_seconds)
+                        .is_some()
+            })
+        });
     let primary_target_index = primary_weapon_index.and_then(|index| {
         let target_id = states[index]
             .definition

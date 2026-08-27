@@ -93,7 +93,12 @@ Every compiled weapon now binds `vector.weapon-termination-model.v1` with
 `GEOMETRIC_CLOSEST_APPROACH` criterion, positive SI intercept radius and
 positive SI maximum flight time. All three categorical discriminators must be
 present explicitly in source; compilation never supplies a missing authority
-value. The current assumption values are 25 m and 180 s. Each fixed step
+value. The current run/result/event contract owns one primary weapon, so
+pre-engine admission allows at most one scheduled guided release. Additional
+stores may remain installed inventory, and an explicit `JETTISON` remains an
+unpowered store-transfer event, but a second guided release is rejected instead
+of being integrated without its own closest-approach and terminal-event
+authority. The current assumption values are 25 m and 180 s. Each fixed step
 minimizes the linearly interpolated relative-position segment, so a crossing
 between retained samples cannot be missed. The fixed
 precedence is target unavailable, geometric intercept during the admitted

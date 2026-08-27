@@ -205,9 +205,12 @@ VSR integrity continues to validate only the model-pack identity already bound
 by the compiled scenario and manifest. The new offline v2 validator neither
 weakens that check nor lets replay resolve or substitute a model pack.
 
-Readback recompiles the archived authored mission against the archived model
-and environment pack and requires exact equality across scenario, compiled,
-manifest, and report members before returning replay data.
+Readback resolves the archived model pack by exact `(id, version, digest)` from
+the application-retained pack set, recompiles the archived authored mission
+against that pack and the archived environment pack, and requires exact
+equality across scenario, compiled, manifest, and report members before
+returning replay data. An unretained or partially matching identity fails
+closed; readback never substitutes the current pack.
 Regional replay verifies the embedded pack content digest, runtime-grid parent
 binding and installation-catalogue digest before any archived frame is exposed.
 Ground replay also validates the exact compiled mission, posture, release time,
@@ -301,6 +304,13 @@ frame containing that entity. A later lifecycle event is
 bound to the first retained frame that changes from its prior canonical state,
 and `RUN_COMPLETED` is bound to the final retained frame. Referencing any other
 frame fails even when that frame contains the same lifecycle value.
+
+The current VSR run contract contains one `primaryWeaponId`, one cumulative
+closest-approach value, and one weapon-terminal outcome. Engine admission
+therefore allows at most one scheduled guided release. Carried stores with a
+null schedule remain immutable inventory, and an explicit `JETTISON` remains an
+unpowered store-transfer event; a second guided release fails before integration
+rather than producing an incomplete terminal record.
 
 The integer tick owns model time: each boundary is derived as `tick × fixed
 step`; neither engine accumulates a floating model clock. Scheduled activation
