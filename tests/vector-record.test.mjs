@@ -455,6 +455,7 @@ test("VSR rejects tampered side-owned track state and track-event history", asyn
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const base = prepareSimulation(scenario);
   const binding = await bindVerificationTrackModelPack(base.engineScenario);
+  const openOptions = { compiledModelPack: binding.pack };
   const capabilityManifest = createVerificationDeploymentCapabilities("typescript", ["A2A"], [binding.pack.digest]);
   const prepared = { ...base, engineScenario: binding.scenario, capabilityManifest };
   const engineRun = runEngineBackend(binding.scenario, "typescript");
@@ -475,7 +476,7 @@ test("VSR rejects tampered side-owned track state and track-event history", asyn
   );
   let serialized = serializeVectorRecord(corrupt);
   await assert.rejects(
-    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength, openOptions),
     /unsupported or missing|truth/i,
   );
 
@@ -493,7 +494,7 @@ test("VSR rejects tampered side-owned track state and track-event history", asyn
   );
   serialized = serializeVectorRecord(corrupt);
   await assert.rejects(
-    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength, openOptions),
     /ownership|frame state|transition/i,
   );
 
@@ -511,7 +512,7 @@ test("VSR rejects tampered side-owned track state and track-event history", asyn
   );
   serialized = serializeVectorRecord(corrupt);
   await assert.rejects(
-    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength, openOptions),
     /observation cause/i,
   );
 });
@@ -520,6 +521,7 @@ test("VSR rejects consistently forged track sources beside the admitted pack dig
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const base = prepareSimulation(scenario);
   const binding = await bindVerificationTrackModelPack(base.engineScenario);
+  const openOptions = { compiledModelPack: binding.pack };
   const capabilityManifest = createVerificationDeploymentCapabilities("typescript", ["A2A"], [binding.pack.digest]);
   const prepared = { ...base, engineScenario: binding.scenario, capabilityManifest };
   const engineRun = runEngineBackend(binding.scenario, "typescript");
@@ -562,7 +564,7 @@ test("VSR rejects consistently forged track sources beside the admitted pack dig
   );
   const serialized = serializeVectorRecord(corrupt);
   await assert.rejects(
-    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength, openOptions),
     /compiled scenario|admitted scenario|canonical tick state/i,
   );
 });
@@ -841,6 +843,40 @@ test("VSR rejects missing runtime digest for retained weapon-termination authori
   await assert.rejects(
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
     /runtime model-pack projection digest/,
+  );
+});
+
+test("VSR rejects hash-resealed weapon-termination authority under an unretained pack", async () => {
+  const scenario = SCENARIO_LIBRARY.find((entry) => entry.scenario.airMission === undefined).scenario;
+  const capabilities = createVerificationDeploymentCapabilities("typescript", [scenario.domain]);
+  const prepared = prepareSimulation(scenario, scenario.profile, capabilities);
+  const result = simulateWithCapabilitiesForVerification(scenario, capabilities);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const compiledMember = record.members.find((member) => member.path === "compiled.json");
+  assert.ok(compiledMember);
+  const compiled = JSON.parse(new TextDecoder().decode(compiledMember.bytes));
+  const runtimeProjection = structuredClone(compiled.engineScenario.modelPack);
+  runtimeProjection.id = "unretained-termination-authority";
+  runtimeProjection.version = "9.9.9";
+  runtimeProjection.digest = "9".repeat(64);
+  delete runtimeProjection.runtimeDigest;
+  compiled.engineScenario.modelPack = bindRuntimeModelPackDigest(runtimeProjection);
+  const corrupt = await replaceRecordMember(
+    record,
+    "compiled.json",
+    compiledMember.schemaVersion,
+    jsonBytes(compiled),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /No retained compiled model pack matches weapon-termination authority/,
+  );
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength, {
+      compiledModelPack: resolveRetainedCompiledModelPack(prepared.engineScenario.modelPack),
+    }),
+    /Supplied compiled model pack does not match the exact recorded identity/,
   );
 });
 

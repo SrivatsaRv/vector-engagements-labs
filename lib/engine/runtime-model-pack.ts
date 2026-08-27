@@ -150,12 +150,24 @@ export function assertRuntimeModelPackDigest(pack: RuntimeModelPackProjection) {
 export function assertRuntimeModelPackAuthority(
   runtimePack: RuntimeModelPackProjection,
   compiledPack?: Readonly<CompiledModelPack>,
+  options: { requireCompiledWeaponTerminationAuthority?: boolean } = {},
 ) {
+  const hasRuntimeTerminationAuthority =
+    (runtimePack.weaponTerminations?.length ?? 0) > 0;
+  if (
+    options.requireCompiledWeaponTerminationAuthority &&
+    hasRuntimeTerminationAuthority &&
+    !compiledPack
+  ) {
+    throw new Error(
+      `No retained compiled model pack matches weapon-termination authority ${runtimePack.id}@${runtimePack.version} (${runtimePack.digest}).`,
+    );
+  }
   const compiledTerminationAuthority = compiledPack?.weapons.some(
     (weapon) => weapon.termination !== undefined,
   ) ?? false;
   const requiresDigest = compiledTerminationAuthority ||
-    (runtimePack.weaponTerminations?.length ?? 0) > 0 ||
+    hasRuntimeTerminationAuthority ||
     (runtimePack.observerSensors ?? []).some(
       (sensor) => sensor.verificationTrackModel !== undefined,
     );

@@ -36,6 +36,7 @@ import {
   findRetainedCompiledModelPack,
   resolveRetainedCompiledModelPack,
 } from "../engine/retained-model-packs.ts";
+import type { CompiledModelPack } from "../model-pack.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v6" as const;
@@ -725,6 +726,7 @@ function jsonLines<T>(bytes: Uint8Array): T[] {
 export async function openVectorSimulationRecord(
   buffer: ArrayBuffer,
   byteLength = buffer.byteLength,
+  options: { compiledModelPack?: Readonly<CompiledModelPack> } = {},
 ): Promise<OpenedVectorRecord> {
   if (byteLength > buffer.byteLength || byteLength < 12) {
     throw new Error("VECTOR record length is out of bounds.");
@@ -811,7 +813,21 @@ export async function openVectorSimulationRecord(
     "scenario"
   >;
   const retainedPack = findRetainedCompiledModelPack(compiled.engineScenario.modelPack);
-  assertRuntimeModelPackAuthority(compiled.engineScenario.modelPack, retainedPack);
+  const suppliedPack = options.compiledModelPack;
+  if (
+    suppliedPack &&
+    (
+      suppliedPack.id !== compiled.engineScenario.modelPack.id ||
+      suppliedPack.version !== compiled.engineScenario.modelPack.version ||
+      suppliedPack.digest !== compiled.engineScenario.modelPack.digest
+    )
+  ) {
+    throw new Error("Supplied compiled model pack does not match the exact recorded identity.");
+  }
+  const authorityPack = retainedPack ?? suppliedPack;
+  assertRuntimeModelPackAuthority(compiled.engineScenario.modelPack, authorityPack, {
+    requireCompiledWeaponTerminationAuthority: true,
+  });
   const environmentPack = compiled.engineScenario.geospatial?.environmentPack;
   if (!environmentPack) {
     throw new Error("VECTOR record has no admitted environment pack.");

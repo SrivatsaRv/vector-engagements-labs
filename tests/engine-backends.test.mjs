@@ -799,6 +799,28 @@ test("both engines reject a second scheduled guided release before integration",
   }
 });
 
+test("both engines count only guided entities toward the scheduled-release limit", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const nonGuidedWeapon = baseline.entities.find(
+    (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds === null,
+  );
+  assert.ok(nonGuidedWeapon?.weapon, "fixture requires a carried second weapon");
+  nonGuidedWeapon.kind = "FIXED_OBJECTIVE";
+  nonGuidedWeapon.tacticalRole = "FIXED_OBJECTIVE";
+  nonGuidedWeapon.weapon.launchTimeSeconds = 0.1;
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.doesNotThrow(
+      () => runEngineBackend(structuredClone(baseline), backend),
+      backend,
+    );
+  }
+});
+
 test("Rust/WASM and TypeScript preserve aircraft store-mass transfer at release", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", [
     "A2A",

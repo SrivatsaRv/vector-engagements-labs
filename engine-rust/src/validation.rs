@@ -1386,9 +1386,11 @@ pub fn validate_scenario(scenario: &EngineScenario) -> Result<(), EngineError> {
         }
         if let Some(launch_time) = weapon.launch_time_seconds {
             launched_weapon_count += 1;
-            if !weapon.store_transfer.as_ref().is_some_and(|binding| {
-                binding.transfer.operation == crate::StoreTransferOperation::Jettison
-            }) {
+            if entity.kind == crate::EntityKind::GuidedWeapon
+                && !weapon.store_transfer.as_ref().is_some_and(|binding| {
+                    binding.transfer.operation == crate::StoreTransferOperation::Jettison
+                })
+            {
                 scheduled_guided_release_count += 1;
             }
             if launch_time > scenario.duration_seconds {

@@ -129,7 +129,9 @@ test("observer-state v3 preserves multiple mixed-lifecycle tracks without a scal
     const result = buildSimulationResult(recordedPrepared, runs[backend]);
     const record = await createVectorSimulationRecord(recordedPrepared, result, "2026-08-23T00:00:00.000Z");
     const serialized = serializeVectorRecord(record);
-    const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+    const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength, {
+      compiledModelPack: pack,
+    });
     const replayPicture = replay.pictures.find((picture) =>
       picture.schemaVersion === "vector.observer-state.v3" &&
       picture.perspective === "IAF" && picture.modelTimeSeconds === mixed.t
@@ -184,7 +186,9 @@ test("same-side observer selection is stable across definition order in both eng
       const result = buildSimulationResult(recordedPrepared, run);
       const record = await createVectorSimulationRecord(recordedPrepared, result, "2026-08-24T00:00:00.000Z");
       const serialized = serializeVectorRecord(record);
-      const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+      const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength, {
+        compiledModelPack: pack,
+      });
       results.push({
         backend,
         run,
@@ -347,7 +351,9 @@ test("a source-authored engine-verification pack drives exact side-owned TrackSt
     const result = buildSimulationResult(recordedPrepared, runs[backend]);
     const record = await createVectorSimulationRecord(recordedPrepared, result, "2026-08-23T00:00:00.000Z");
     const serialized = serializeVectorRecord(record);
-    const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+    const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength, {
+      compiledModelPack: pack,
+    });
     assert.deepEqual(replay.result.frames.map((frame) => frame.observerStates), runs[backend].frames.map((frame) => frame.observerStates));
     assert.deepEqual(
       replay.events.items.filter((event) => event.payload.kind === "TRACK_STATE_CHANGED"),

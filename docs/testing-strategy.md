@@ -166,9 +166,15 @@ The suite additionally changes an entity and its compact projection, recomputes
 the runtime digest, and proves the retained compiled pack still rejects the
 forgery. Separate TypeScript, Rust/WASM and VSR regressions delete the digest
 and prove that a retained pack with weapon-termination authority cannot fall
-back to an unbound legacy projection. VSR mutation regressions rehash complete records after contradicting
-geometric-intercept and target-unavailable causes with the target lifecycle;
-both records fail before replay exposure.
+back to an unbound legacy projection. A non-Air VSR regression replaces and
+reseals the complete runtime-pack identity and termination projection; replay
+rejects it unless an independently supplied full compiled pack matches the
+recorded id, version and digest exactly. The backend admission matrix also
+proves that only `GUIDED_WEAPON` entities count toward the single scheduled
+guided-release limit in both TypeScript and Rust/WASM. VSR mutation regressions
+rehash complete records after contradicting geometric-intercept and
+target-unavailable causes with the target lifecycle; both records fail before
+replay exposure.
 
 This baseline does not satisfy #193 by itself. Completion additionally requires
 machine-readable registration for every nested Air-mission and presentation

@@ -211,6 +211,10 @@ against that pack and the archived environment pack, and requires exact
 equality across scenario, compiled, manifest, and report members before
 returning replay data. An unretained or partially matching identity fails
 closed; readback never substitutes the current pack.
+Non-Air records receive the same fail-closed rule whenever their runtime pack
+carries weapon-termination authority. Verification tooling may supply a full
+compiled pack explicitly, but its id, version and digest must exactly equal the
+recorded identity before that pack can serve as replay authority.
 Regional replay verifies the embedded pack content digest, runtime-grid parent
 binding and installation-catalogue digest before any archived frame is exposed.
 Ground replay also validates the exact compiled mission, posture, release time,
