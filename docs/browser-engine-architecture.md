@@ -111,6 +111,13 @@ buffers, each no larger than 64 MiB, and uses a power-of-two capacity so
 subsequent records can reuse storage. No `SharedArrayBuffer` or cross-origin
 isolation is required.
 
+An `open-record` request carrying an unretained engine-verification pack reaches
+the same shared supplied-authority validator before either replay or Air-mission
+recompilation. A no-release ground-start record therefore cannot use skipped
+engine replay to expose partial evidence records or aircraft dependencies whose
+validity domains do not cover the aircraft. The Worker does not maintain a
+weaker model-pack validator.
+
 ## Built Worker verification
 
 The built-Worker journey includes CAP/BVR with an exact sourced Jodhpur runway start
@@ -152,6 +159,10 @@ Saved-record admission additionally recomputes the terminal predicate and the
 weapon-lifetime closest approach from exact engine-retained fixed-step evidence;
 jointly resealing an event and report value is therefore not accepted as new
 simulation truth.
+Focused VSR verification also opens no-release Air records with digest-valid
+supplied packs whose evidence row is incomplete or whose referenced aerodynamic
+domain is narrower than the aircraft domain. Both must fail before mission
+recompilation, using the same authority boundary exercised by the Worker.
 The #187 built-browser journey additionally proves the exact store identity is
 absent before and appears once at the transfer frame, with the same outcome in
 telemetry/report playback and successful cancellation/retry recovery.

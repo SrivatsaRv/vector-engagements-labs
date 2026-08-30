@@ -750,10 +750,18 @@ turn jointly resealed scenario and pack fields into content-addressed authority.
 The JavaScript adapter carries that complete pack in
 `vector.engine-run-request.v1`; Rust independently parses and authenticates it.
 A supplied pack must satisfy the same exact compiled-v1 top-level key inventory,
-array surface, non-empty evidence set, unique weapon identity and
-unique intended-use identity plus termination/evidence structure in TypeScript
-and raw Rust/WASM before either
-backend considers its content digest or uses it as execution authority.
+array surface, non-empty evidence set, unique weapon identity and unique
+intended-use identity plus executable termination structure in TypeScript and
+raw Rust/WASM. The shared TypeScript authority boundary runs before either
+backend and additionally admits every complete evidence record and every
+aircraft dependency domain. Evidence has one closed kind, exact
+required/optional fields, a stable unique ID, nonblank title, absolute URI,
+calendar access date, optional nonblank locator and optional lowercase SHA-256.
+Each referenced aerodynamic model and coefficient table, propulsion model and
+thrust/fuel table, sensor, and loadout must cover the aircraft's complete
+altitude, Mach, angle-of-attack, load-factor, configuration and environment
+domain through the compiler-owned coverage predicate. A content digest alone
+cannot promote a partial evidence row or narrowed dependency into authority.
 A direct native or raw WASM scenario without the complete pack cannot gain this
 authority merely by relabelling `intendedUse`. Product execution never supplies
 that test authority. Before either product or verification execution consumes a

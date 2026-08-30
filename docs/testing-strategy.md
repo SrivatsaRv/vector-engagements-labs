@@ -243,6 +243,16 @@ canonical coverage predicate, while a separately resealed unused station with
 an empty compatible-store list remains valid. The no-release VSR path repeats
 the narrowed-domain falsifier so skipped engine replay cannot bypass the
 loadout-to-aircraft relationship.
+The supplied-authority matrix also independently reseals partial, extra-field,
+unknown-kind, duplicate-ID, invalid-digest, relative-URI, impossible-date and
+blank-locator evidence records. Each must fail before evidence IDs can authorize
+aircraft, weapon, loadout or compatibility references. Six separate coverage
+falsifiers narrow the referenced aerodynamic domain, an aerodynamic coefficient
+table, propulsion domain, thrust table, fuel-flow table and sensor domain; all
+must fail through the compiler-owned aircraft coverage predicate. The
+no-release Air VSR regression repeats both a partial-evidence and narrowed-
+aerodynamic falsifier to prove skipped deterministic engine replay cannot expose
+either pack to mission recompilation.
 Table-driven native and
 raw-WASM falsifiers then corrupt the termination
 patch target, duplicate target key, compiled old value, SI unit and evidence

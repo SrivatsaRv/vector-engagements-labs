@@ -45,6 +45,12 @@ one family must not imply changes to unrelated contracts.
   capacities, bounded references, platform/station linkage and in-pack evidence.
   Loadout validity must cover the owning aircraft through the canonical compiler
   predicate, while unused stations may retain an empty compatible-store list.
+- Require complete, uniquely identified supplied evidence records with closed
+  kinds, absolute URIs, valid access dates and valid optional locators/digests;
+  a canonical pack digest no longer authenticates an `{ id }` placeholder.
+- Require every aircraft's referenced aerodynamic model/tables, propulsion
+  model/thrust/fuel tables, sensors and loadout to cover the aircraft's complete
+  validity domain before either backend or no-release Air-record recompilation.
 - Keep deterministic terminal-record replay and uploaded-record verification
   inside the dedicated browser simulation Worker; the rendering thread receives
   only an already-admitted playback result.
@@ -320,6 +326,9 @@ No pending family-specific entry.
   canonical digest and engine-verification intended-use boundary even when a
   ground-start Air record has no executable guided release and skips engine
   rerun before mission recompilation.
+- Route supplied-pack evidence completeness and aircraft dependency-domain
+  coverage through the same Worker `open-record` authority boundary, including
+  no-release Air records that legitimately skip deterministic engine replay.
 - Validate the closed ground-dynamics validity fields semantically so canonical
   archive key ordering cannot reject an otherwise exact release replay.
 - Keep an explicit unpowered `JETTISON` outside guided-weapon terminal

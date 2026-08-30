@@ -225,6 +225,14 @@ likewise checked for its exact field set, semantic identity, evidence and
 validity bindings, finite mass/fuel/load-factor domains, bounded component and
 loadout indexes, and a closed performance-admission shape. A digest-valid
 string-valued fuel capacity therefore fails before takeoff-mass arithmetic.
+Every supplied evidence row is admitted as a complete exact record with a
+closed evidence kind, stable unique identity, title, absolute URI, valid access
+date and optional valid locator/content digest. Every aerodynamic model and
+coefficient table, propulsion model and thrust/fuel table, sensor and loadout
+referenced by an aircraft must also cover that aircraft's full validity domain.
+These checks run even for a no-release ground-start archive that skips engine
+rerun, so mission recompilation cannot consume a digest-valid partial evidence
+row or narrowed component envelope.
 Every compiled loadout is also admitted as an exact base model plus exact
 station records with finite body-frame positions, positive integer capacities,
 unique identities and bounded weapon indexes; an unused station may truthfully

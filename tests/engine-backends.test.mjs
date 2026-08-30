@@ -1127,7 +1127,7 @@ test("both live engines reject duplicate verification termination patches", asyn
   }
 });
 
-test("TypeScript and raw Rust/WASM reject digest-valid malformed verification-pack structure", async () => {
+test("supplied authority rejects digest-valid malformed verification-pack structure at each consuming boundary", async () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
   const baseline = simulateWithCapabilitiesForVerification(
     SCENARIO_LIBRARY[0].scenario,
@@ -1165,6 +1165,46 @@ test("TypeScript and raw Rust/WASM reject digest-valid malformed verification-pa
       typescriptPattern: /weapons\[0\].version is structurally invalid/i,
       rustPattern: /pack\.weapons\[0\]\.version must be semantic version/i,
     },
+    {
+      id: "incomplete-evidence-record",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "unsupported-evidence-kind",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "invalid-evidence-digest",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "duplicate-evidence-id",
+      typescriptPattern: /has duplicate evidence ID/i,
+      rustPattern: null,
+    },
+    {
+      id: "extra-evidence-field",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "relative-evidence-uri",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "invalid-evidence-access-date",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "blank-evidence-locator",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
   ]) {
     const pack = structuredClone(binding.pack);
     if (mutation === "extra-top-level-key") pack.unadmittedAuthority = true;
@@ -1180,6 +1220,18 @@ test("TypeScript and raw Rust/WASM reject digest-valid malformed verification-pa
     }
     if (mutation === "string-launch-mass") pack.weapons[0].launchMassKg = "170";
     if (mutation === "non-semver-weapon-version") pack.weapons[0].version = "v1";
+    if (mutation === "incomplete-evidence-record") {
+      pack.evidence[0] = { id: pack.evidence[0].id };
+    }
+    if (mutation === "unsupported-evidence-kind") pack.evidence[0].kind = "CONTEXT";
+    if (mutation === "invalid-evidence-digest") pack.evidence[0].contentSha256 = "bad";
+    if (mutation === "duplicate-evidence-id") {
+      pack.evidence.push(structuredClone(pack.evidence[0]));
+    }
+    if (mutation === "extra-evidence-field") pack.evidence[0].unqualified = true;
+    if (mutation === "relative-evidence-uri") pack.evidence[0].uri = "relative/path";
+    if (mutation === "invalid-evidence-access-date") pack.evidence[0].accessedAt = "2026-02-31";
+    if (mutation === "blank-evidence-locator") pack.evidence[0].locator = " ";
     resealCompiledPack(pack);
     const scenario = structuredClone(binding.scenario);
     const projection = structuredClone(scenario.modelPack);
@@ -1204,13 +1256,15 @@ test("TypeScript and raw Rust/WASM reject digest-valid malformed verification-pa
       typescriptPattern,
       `typescript ${mutation}`,
     );
-    const rust = runRawRustWasm({
-      schemaVersion: "vector.engine-run-request.v1",
-      scenario,
-      verificationModelPack: pack,
-    });
-    assert.equal(rust.accepted, false, `raw rust-wasm ${mutation}`);
-    assert.match(rust.output, rustPattern, `raw rust-wasm ${mutation}`);
+    if (rustPattern) {
+      const rust = runRawRustWasm({
+        schemaVersion: "vector.engine-run-request.v1",
+        scenario,
+        verificationModelPack: pack,
+      });
+      assert.equal(rust.accepted, false, `raw rust-wasm ${mutation}`);
+      assert.match(rust.output, rustPattern, `raw rust-wasm ${mutation}`);
+    }
   }
 });
 
@@ -1283,6 +1337,64 @@ test("supplied-pack authority validates the complete loadout and compatibility g
           aircraft.validityDomain.altitudeM.minimum + 1;
       },
       pattern: /aircraft\[0\]\.loadoutModel\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "aerodynamic validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.validityDomain.mach.maximum = aircraft.validityDomain.mach.maximum - 0.01;
+      },
+      pattern: /aircraft\[0\]\.aerodynamicModel\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "aerodynamic table validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0].validityDomain.mach.maximum =
+          aircraft.validityDomain.mach.maximum - 0.01;
+      },
+      pattern: /aircraft\[0\]\.aerodynamicModel\.coefficientTables\[0\]\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "propulsion validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const propulsion = pack.propulsion[aircraft.propulsionModelIndexes[0]];
+        propulsion.validityDomain.altitudeM.maximum =
+          aircraft.validityDomain.altitudeM.maximum - 1;
+      },
+      pattern: /aircraft\[0\]\.propulsionModels\[0\]\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "thrust-table validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const propulsion = pack.propulsion[aircraft.propulsionModelIndexes[0]];
+        propulsion.thrustTable.validityDomain.altitudeM.maximum =
+          aircraft.validityDomain.altitudeM.maximum - 1;
+      },
+      pattern: /aircraft\[0\]\.propulsionModels\[0\]\.thrustTable\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "fuel-flow-table validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const propulsion = pack.propulsion[aircraft.propulsionModelIndexes[0]];
+        propulsion.fuelFlowTable.validityDomain.configurations = ["UNSUPPORTED_CONFIGURATION"];
+      },
+      pattern: /aircraft\[0\]\.propulsionModels\[0\]\.fuelFlowTable\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "sensor validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft.find((item) => item.sensorModelIndexes.length > 0);
+        assert.ok(aircraft, "the fixture requires an aircraft sensor dependency");
+        const sensor = pack.sensors[aircraft.sensorModelIndexes[0]];
+        sensor.validityDomain.environments = ["UNSUPPORTED_ENVIRONMENT"];
+      },
+      pattern: /aircraft\[\d+\]\.sensorModels\[0\]\.validityDomain does not cover its admitted aircraft validity domain/i,
     },
   ]) {
     const pack = structuredClone(binding.pack);

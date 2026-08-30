@@ -470,6 +470,25 @@ test("VSR rejects unqualified or malformed supplied packs before no-release Air 
     !engineRun.events.items.some((event) => event.payload.kind === "WEAPON_TERMINATED"),
     "the falsifier must avoid the replay path by retaining an implicit ground-start store",
   );
+  const serializeNoReleaseRecordForPack = async (pack) => {
+    const engineScenario = bindPack(pack);
+    const scenario = compileMission(currentScenario, engineScenario, pack);
+    const forgedEngineRun = structuredClone(engineRun);
+    forgedEngineRun.scenario = engineScenario;
+    const prepared = {
+      ...base,
+      scenario,
+      engineScenario,
+      capabilityManifest: createVerificationDeploymentCapabilities(
+        "typescript",
+        ["A2A"],
+        [pack.digest],
+      ),
+    };
+    const result = buildSimulationResult(prepared, forgedEngineRun);
+    const record = await createVectorSimulationRecord(prepared, result, createdAt);
+    return serializeVectorRecord(record);
+  };
 
   const unqualifiedEngineScenario = bindPack(unqualifiedPack);
   const unqualifiedScenario = compileMission(
@@ -684,6 +703,43 @@ test("VSR rejects unqualified or malformed supplied packs before no-release Air 
       { compiledModelPack: narrowedLoadoutPack },
     ),
     /aircraft\[\d+\]\.loadoutModel\.validityDomain does not cover its admitted aircraft validity domain/,
+  );
+
+  const incompleteEvidencePack = structuredClone(validPack);
+  incompleteEvidencePack.evidence[0] = { id: incompleteEvidencePack.evidence[0].id };
+  resealCompiledPack(incompleteEvidencePack);
+  const incompleteEvidenceSerialized = await serializeNoReleaseRecordForPack(
+    incompleteEvidencePack,
+  );
+  await assert.rejects(
+    openVectorSimulationRecord(
+      incompleteEvidenceSerialized.buffer,
+      incompleteEvidenceSerialized.byteLength,
+      { compiledModelPack: incompleteEvidencePack },
+    ),
+    /evidence\[0\] is structurally invalid/,
+  );
+
+  const narrowedDependencyPack = structuredClone(validPack);
+  const dependencyAircraft = narrowedDependencyPack.aircraft.find(
+    (aircraft) => aircraft.catalogObjectId === currentScenario.bluePlatformId,
+  );
+  assert.ok(dependencyAircraft, "the falsifier requires the selected aircraft model");
+  const dependencyAerodynamic =
+    narrowedDependencyPack.aerodynamics[dependencyAircraft.aerodynamicModelIndex];
+  dependencyAerodynamic.validityDomain.mach.maximum =
+    dependencyAircraft.validityDomain.mach.maximum - 0.01;
+  resealCompiledPack(narrowedDependencyPack);
+  const narrowedDependencySerialized = await serializeNoReleaseRecordForPack(
+    narrowedDependencyPack,
+  );
+  await assert.rejects(
+    openVectorSimulationRecord(
+      narrowedDependencySerialized.buffer,
+      narrowedDependencySerialized.byteLength,
+      { compiledModelPack: narrowedDependencyPack },
+    ),
+    /aircraft\[\d+\]\.aerodynamicModel\.validityDomain does not cover its admitted aircraft validity domain/,
   );
 });
 

@@ -113,6 +113,8 @@ const COMPILED_VALIDITY_DOMAIN_KEYS = [
 
 const COMPILED_RANGE_KEYS = ["minimum", "maximum"] as const;
 const COMPILED_VECTOR_KEYS = ["x", "y", "z"] as const;
+const COMPILED_EVIDENCE_REQUIRED_KEYS = ["id", "kind", "title", "uri", "accessedAt"] as const;
+const COMPILED_EVIDENCE_OPTIONAL_KEYS = ["locator", "contentSha256"] as const;
 const COMPILED_TERMINATION_KEYS = [
   "schemaVersion",
   "intendedUse",
@@ -122,6 +124,9 @@ const COMPILED_TERMINATION_KEYS = [
 ] as const;
 const STABLE_ID_PATTERN = /^[a-z0-9]+(?:[._:/-][a-z0-9]+)*$/;
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+const ACCESS_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const EVIDENCE_KINDS = new Set(["SOURCE", "REQUIREMENT", "VERIFICATION", "VALIDATION", "ASSUMPTION"]);
 const WEAPON_SEEKER_MODES = new Set(["UNAVAILABLE", "ACTIVE_RADAR", "INFRARED", "PASSIVE_RADIATION"]);
 const WEAPON_SUPPORT_REQUIREMENTS = new Set(["UNAVAILABLE", "NONE", "TRACK_UPDATE"]);
 const WEAPON_LAUNCH_AUTHORIZATIONS = new Set(["SCHEDULED_TEST_ONLY", "TRACK_REQUIRED"]);
@@ -143,6 +148,59 @@ function hasExactKeys(value: Record<string, unknown>, expected: readonly string[
   const expectedKeys = [...expected].sort();
   return actualKeys.length === expectedKeys.length &&
     actualKeys.every((key, index) => key === expectedKeys[index]);
+}
+
+function hasRequiredAndOptionalKeys(
+  value: Record<string, unknown>,
+  required: readonly string[],
+  optional: readonly string[],
+) {
+  const actualKeys = Object.keys(value);
+  const allowed = new Set([...required, ...optional]);
+  return required.every((key) => Object.hasOwn(value, key)) &&
+    actualKeys.every((key) => allowed.has(key));
+}
+
+function isAbsoluteUri(value: string) {
+  try {
+    return new URL(value).protocol.length > 1;
+  } catch {
+    return false;
+  }
+}
+
+function requireCompiledEvidenceStructure(
+  evidence: unknown,
+  index: number,
+): asserts evidence is Record<string, unknown> {
+  const invalid = (): never => {
+    throw new Error(
+      `Supplied engine-verification compiled model pack evidence[${index}] is structurally invalid.`,
+    );
+  };
+  if (!isRecord(evidence)) invalid();
+  const candidate = evidence as Record<string, unknown>;
+  if (!hasRequiredAndOptionalKeys(
+    candidate,
+    COMPILED_EVIDENCE_REQUIRED_KEYS,
+    COMPILED_EVIDENCE_OPTIONAL_KEYS,
+  )) invalid();
+  if (typeof candidate.id !== "string" || !STABLE_ID_PATTERN.test(candidate.id)) invalid();
+  if (typeof candidate.kind !== "string" || !EVIDENCE_KINDS.has(candidate.kind)) invalid();
+  if (typeof candidate.title !== "string" || candidate.title.trim().length === 0) invalid();
+  if (typeof candidate.uri !== "string" || !isAbsoluteUri(candidate.uri)) invalid();
+  const accessedAtTimestamp = typeof candidate.accessedAt === "string"
+    ? Date.parse(`${candidate.accessedAt}T00:00:00Z`)
+    : Number.NaN;
+  if (typeof candidate.accessedAt !== "string" ||
+      !ACCESS_DATE_PATTERN.test(candidate.accessedAt) ||
+      Number.isNaN(accessedAtTimestamp) ||
+      new Date(accessedAtTimestamp).toISOString().slice(0, 10) !== candidate.accessedAt) invalid();
+  if (candidate.locator !== undefined &&
+      (typeof candidate.locator !== "string" || candidate.locator.trim().length === 0)) invalid();
+  if (candidate.contentSha256 !== undefined &&
+      (typeof candidate.contentSha256 !== "string" ||
+       !SHA256_PATTERN.test(candidate.contentSha256))) invalid();
 }
 
 function isNonBlankStringArray(value: unknown, requireNonEmpty = false): value is string[] {
@@ -508,11 +566,7 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
     }
     intendedUseIds.add(intendedUse.id);
   }
-  if (
-    !Array.isArray(value.evidence) ||
-    value.evidence.length === 0 ||
-    value.evidence.some((item) => !isRecord(item) || typeof item.id !== "string")
-  ) {
+  if (!Array.isArray(value.evidence) || value.evidence.length === 0) {
     throw new Error(
       "Supplied engine-verification compiled model pack evidence is structurally invalid.",
     );
@@ -520,7 +574,17 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
   if (!Array.isArray(value.weapons)) {
     throw new Error("Supplied engine-verification compiled model pack weapons must be an array.");
   }
-  const evidenceIds = new Set(value.evidence.map((item) => item.id as string));
+  const evidenceIds = new Set<string>();
+  for (const [index, evidence] of value.evidence.entries()) {
+    requireCompiledEvidenceStructure(evidence, index);
+    const evidenceId = evidence.id as string;
+    if (evidenceIds.has(evidenceId)) {
+      throw new Error(
+        `Supplied engine-verification compiled model pack has duplicate evidence ID ${evidenceId}.`,
+      );
+    }
+    evidenceIds.add(evidenceId);
+  }
   const catalogObjectIds = new Set(
     (value.catalogIdentities as unknown[])
       .filter(isRecord)
@@ -590,6 +654,60 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
     )) {
       throw new Error(
         `Supplied engine-verification compiled model pack aircraft[${index}].loadoutModel.validityDomain does not cover its admitted aircraft validity domain.`,
+      );
+    }
+    const aircraftDomain = aircraft.validityDomain as SiValidityDomain;
+    const requireDependencyCoverage = (
+      dependency: unknown,
+      path: string,
+    ): Record<string, unknown> => {
+      if (!isRecord(dependency) || !isCompiledValidityDomain(dependency.validityDomain)) {
+        throw new Error(
+          `Supplied engine-verification compiled model pack aircraft[${index}].${path}.validityDomain is structurally invalid.`,
+        );
+      }
+      if (!validityDomainCovers(dependency.validityDomain, aircraftDomain)) {
+        throw new Error(
+          `Supplied engine-verification compiled model pack aircraft[${index}].${path}.validityDomain does not cover its admitted aircraft validity domain.`,
+        );
+      }
+      return dependency;
+    };
+    const aerodynamic = requireDependencyCoverage(
+      (value.aerodynamics as unknown[])[aircraft.aerodynamicModelIndex as number],
+      "aerodynamicModel",
+    );
+    if (!Array.isArray(aerodynamic.coefficientTables)) {
+      throw new Error(
+        `Supplied engine-verification compiled model pack aircraft[${index}].aerodynamicModel.coefficientTables is structurally invalid.`,
+      );
+    }
+    for (const [tableIndex, table] of aerodynamic.coefficientTables.entries()) {
+      requireDependencyCoverage(
+        table,
+        `aerodynamicModel.coefficientTables[${tableIndex}]`,
+      );
+    }
+    for (const [propulsionPosition, propulsionIndex] of
+      (aircraft.propulsionModelIndexes as number[]).entries()) {
+      const propulsion = requireDependencyCoverage(
+        (value.propulsion as unknown[])[propulsionIndex],
+        `propulsionModels[${propulsionPosition}]`,
+      );
+      requireDependencyCoverage(
+        propulsion.thrustTable,
+        `propulsionModels[${propulsionPosition}].thrustTable`,
+      );
+      requireDependencyCoverage(
+        propulsion.fuelFlowTable,
+        `propulsionModels[${propulsionPosition}].fuelFlowTable`,
+      );
+    }
+    for (const [sensorPosition, sensorIndex] of
+      (aircraft.sensorModelIndexes as number[]).entries()) {
+      requireDependencyCoverage(
+        (value.sensors as unknown[])[sensorIndex],
+        `sensorModels[${sensorPosition}]`,
       );
     }
   }
