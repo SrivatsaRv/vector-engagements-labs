@@ -212,10 +212,13 @@ digest)` from the application-retained pack set. Verification tooling may
 instead supply the complete unretained compiled pack explicitly, but its
 structure, canonical compiler digest, intended use, id, version and digest must
 authenticate against the exact recorded identity before it can serve as replay
-authority. That same authenticated authority pack is used for deterministic
-engine replay and for recompiling an archived authored Air mission against the
-archived environment pack. Exact equality across scenario, compiled, manifest,
-and report members is required before returning replay data. Without an
+authority. This complete validation runs when the supplied pack is selected as
+authority, even when a ground-start record has no executable guided release and
+therefore needs no deterministic engine rerun. That same authenticated
+authority pack is used for deterministic engine replay and for recompiling an
+archived authored Air mission against the archived environment pack. Exact
+equality across scenario, compiled, manifest, and report members is required
+before returning replay data. Without an
 explicit authenticated verification pack, an unretained identity fails closed;
 readback never substitutes the current pack. A fabricated pack bearing the
 recorded digest is rejected before any causal event, frame, mission or report

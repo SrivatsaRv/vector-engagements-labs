@@ -232,7 +232,12 @@ compiled mission to an unretained engine-verification pack, opens the record
 with that complete authenticated pack and requires exact mission and pack
 identity on readback. This proves supplied authority is reused for Air-mission
 recompilation rather than passing engine replay and then failing at a
-retained-only inventory lookup.
+retained-only inventory lookup. A separate ground-start falsifier supplies a
+digest-valid compiled pack with the recorded id/version/digest but without the
+claimed engine-verification intended use. Because the implicit guided release
+cannot execute, the record reaches Air-mission recompilation without an engine
+rerun; admission must still reject the pack through the same full structural
+and intended-use validator before the mission compiler can consume it.
 Browser runtime tests admit the `open-record` message and prove the client sends
 saved-record verification to the simulation Worker. The built browser journey
 opens the Worker-produced VSR inside that Worker, so deterministic terminal

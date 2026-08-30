@@ -33,6 +33,7 @@ import {
   compileAirMissionDefinition,
 } from "../air-mission.ts";
 import {
+  findEngineCompiledModelPackAuthority,
   findRetainedCompiledModelPack,
   resolveRetainedCompiledModelPack,
 } from "../engine/retained-model-packs.ts";
@@ -850,7 +851,14 @@ export async function openVectorSimulationRecord(
   ) {
     throw new Error("Supplied compiled model pack does not match the exact recorded identity.");
   }
-  const authorityPack = retainedPack ?? suppliedPack;
+  const authorityPack = retainedPack ?? (
+    suppliedPack
+      ? findEngineCompiledModelPackAuthority(
+          compiled.engineScenario.modelPack,
+          suppliedPack,
+        )
+      : undefined
+  );
   const entityCarriesWeaponTerminationAuthority = compiled.engineScenario.entities.some(
     (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.termination !== undefined,
   );

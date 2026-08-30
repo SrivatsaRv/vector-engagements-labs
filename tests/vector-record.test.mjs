@@ -25,7 +25,12 @@ import {
 import { runEngineBackend } from "../lib/engine/backend.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
-import { bindVerificationTrackModelPack } from "../lib/engine/verification-track-fixture.ts";
+import {
+  bindVerificationTrackModelPack,
+  createVerificationTrackModelPackSource,
+  ENGINE_VERIFICATION_INTENDED_USE,
+  GENERIC_VERIFICATION_SENSOR_ID,
+} from "../lib/engine/verification-track-fixture.ts";
 import {
   assertEnvironmentPack,
   environmentPackBinding,
@@ -38,10 +43,12 @@ import {
   bindRuntimeModelPackDigest,
   runtimeWeaponTerminations,
 } from "../lib/engine/runtime-model-pack.ts";
+import { compileModelPack } from "../lib/model-pack.ts";
 import { resolveRetainedCompiledModelPack } from "../lib/engine/retained-model-packs.ts";
 import historicalModelPackBundle from "../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json" with { type: "json" };
 import { closestApproachOnRelativeSegment } from "../lib/engine/weapon-termination.ts";
 import { projectObserverStates } from "../lib/information-state.ts";
+import { createGenericTakeoffPerformanceScenario } from "../lib/validation/generic-takeoff-performance.ts";
 
 function governWeaponTermination(scenario, weapon, changes) {
   const pack = resolveRetainedCompiledModelPack(scenario.modelPack);
@@ -348,6 +355,126 @@ test("VSR recompiles an archived Air mission against its authenticated supplied 
   assert.equal(opened.result.engineRun.scenario.modelPack.id, binding.pack.id);
   assert.equal(opened.result.engineRun.scenario.modelPack.digest, binding.pack.digest);
   assert.deepEqual(opened.result.engineRun.scenario.airMission, archivedMission);
+});
+
+test("VSR rejects an unqualified supplied pack before no-release Air mission recompilation", async () => {
+  const source = createVerificationTrackModelPackSource();
+  source.id = "vector-air-record-authority-verification";
+  source.sensors = source.sensors.filter(
+    (sensor) => sensor.id !== GENERIC_VERIFICATION_SENSOR_ID,
+  );
+  for (const aircraft of source.aircraft) {
+    aircraft.sensorModelIds = aircraft.sensorModelIds.filter(
+      (sensorId) => sensorId !== GENERIC_VERIFICATION_SENSOR_ID,
+    );
+  }
+  const validPack = (await compileModelPack(source)).pack;
+  const unqualifiedSource = structuredClone(source);
+  unqualifiedSource.intendedUses = unqualifiedSource.intendedUses.filter(
+    (use) => use.id !== ENGINE_VERIFICATION_INTENDED_USE,
+  );
+  unqualifiedSource.credibility.intendedUseRefs =
+    unqualifiedSource.credibility.intendedUseRefs.filter(
+      (use) => use.id !== ENGINE_VERIFICATION_INTENDED_USE,
+    );
+  const unqualifiedPack = (await compileModelPack(unqualifiedSource)).pack;
+  assert.ok(
+    !unqualifiedPack.intendedUses.some(
+      (use) => use.id === ENGINE_VERIFICATION_INTENDED_USE,
+    ),
+    "the falsifier must have a valid content digest but no engine-verification intended use",
+  );
+
+  const currentScenario = createGenericTakeoffPerformanceScenario();
+  const base = prepareSimulation(currentScenario);
+  const bindPack = (pack) => {
+    const scenario = structuredClone(base.engineScenario);
+    scenario.modelPack = bindRuntimeModelPackDigest({
+      schemaVersion: pack.schemaVersion,
+      id: pack.id,
+      version: pack.version,
+      digest: pack.digest,
+      intendedUse: { id: ENGINE_VERIFICATION_INTENDED_USE, version: "1.0.0" },
+      observerSensors: pack.sensors.map((sensor) => ({
+        modelId: sensor.id,
+        modelVersion: sensor.version,
+        evidenceRefIds: [...sensor.evidenceRefIds],
+        sensorKind: sensor.sensorKind,
+        detectionRangeM: sensor.detectionRangeM,
+        minimumRangeM: sensor.minimumRangeM,
+        scanPeriodS: sensor.scanPeriodS,
+        azimuthFieldOfViewRad: sensor.azimuthFieldOfViewRad,
+        elevationFieldOfViewRad: sensor.elevationFieldOfViewRad,
+      })),
+      weaponTerminations: runtimeWeaponTerminations(pack, []),
+      scenarioPatches: [],
+    });
+    for (const entity of scenario.entities) {
+      entity.provenance.modelPackDigest = pack.digest;
+      if (entity.observerSensor) entity.observerSensor.modelPackDigest = pack.digest;
+      if (entity.weapon) {
+        entity.weapon.admission.modelPackDigest = pack.digest;
+      }
+    }
+    return scenario;
+  };
+  const compileMission = (scenario, engineScenario, pack) => {
+    const authored = synchronizeScenarioAirMission(structuredClone(scenario), pack);
+    engineScenario.airMission = compileAirMissionDefinition(authored.airMission, {
+      scenario: authored,
+      modelPack: pack,
+      environmentPackDigest: engineScenario.geospatial.environmentPack.identity.digest,
+      environmentPack: engineScenario.geospatial.environmentPack,
+      fixedStepSeconds: engineScenario.fixedStepSeconds,
+      durationSeconds: engineScenario.durationSeconds,
+    });
+    const launcher = engineScenario.entities.find(
+      (entity) => entity.id === "blue-platform-1",
+    );
+    if (launcher?.groundOperation) {
+      launcher.groundOperation.missionDigest = engineScenario.airMission.compiledDigest;
+      engineScenario.airMissionRuntime = structuredClone(launcher.groundOperation);
+    }
+    return authored;
+  };
+
+  const validEngineScenario = bindPack(validPack);
+  compileMission(currentScenario, validEngineScenario, validPack);
+  const engineRun = runEngineBackend(validEngineScenario, "typescript", validPack);
+  assert.equal(engineRun.termination, "time_limit");
+  assert.ok(
+    !engineRun.events.items.some((event) => event.payload.kind === "WEAPON_TERMINATED"),
+    "the falsifier must avoid the replay path by retaining an implicit ground-start store",
+  );
+
+  const unqualifiedEngineScenario = bindPack(unqualifiedPack);
+  const unqualifiedScenario = compileMission(
+    currentScenario,
+    unqualifiedEngineScenario,
+    unqualifiedPack,
+  );
+  engineRun.scenario = unqualifiedEngineScenario;
+  const capabilityManifest = createVerificationDeploymentCapabilities(
+    "typescript",
+    ["A2A"],
+    [unqualifiedPack.digest],
+  );
+  const prepared = {
+    ...base,
+    scenario: unqualifiedScenario,
+    engineScenario: unqualifiedEngineScenario,
+    capabilityManifest,
+  };
+  const result = buildSimulationResult(prepared, engineRun);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const serialized = serializeVectorRecord(record);
+
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength, {
+      compiledModelPack: unqualifiedPack,
+    }),
+    /does not match the exact scenario identity and intended use/,
+  );
 });
 
 test("archived model-pack resolution rejects every partial identity match", () => {

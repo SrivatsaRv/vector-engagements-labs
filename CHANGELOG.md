@@ -304,6 +304,10 @@ No pending family-specific entry.
 - Reuse an authenticated supplied engine-verification pack when recompiling an
   archived Air mission, so an exact unretained verification record can complete
   readback without falling through to the product retained-pack inventory.
+- Authenticate that supplied pack through the complete compiled-v1 structure,
+  canonical digest and engine-verification intended-use boundary even when a
+  ground-start Air record has no executable guided release and skips engine
+  rerun before mission recompilation.
 - Validate the closed ground-dynamics validity fields semantically so canonical
   archive key ordering cannot reject an otherwise exact release replay.
 - Keep an explicit unpowered `JETTISON` outside guided-weapon terminal
