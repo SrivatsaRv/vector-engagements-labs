@@ -1,6 +1,8 @@
 import historicalBundle from "../../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json" with { type: "json" };
 import {
   type CompiledModelPack,
+  type SiValidityDomain,
+  validityDomainCovers,
   verifyCompiledModelPackDigestSync,
 } from "../model-pack.ts";
 import { CURRENT_COMPILED_MODEL_PACK } from "./weapon-admission.ts";
@@ -159,7 +161,7 @@ function isCompiledRange(value: unknown): value is { minimum: number; maximum: n
     value.minimum <= value.maximum;
 }
 
-function isCompiledValidityDomain(value: unknown): boolean {
+function isCompiledValidityDomain(value: unknown): value is SiValidityDomain {
   return isRecord(value) &&
     hasExactKeys(value, COMPILED_VALIDITY_DOMAIN_KEYS) &&
     isCompiledRange(value.altitudeM) &&
@@ -393,7 +395,6 @@ function requireCompiledLoadoutStructure(
         !Number.isSafeInteger(stationRecord.maximumQuantity) ||
         stationRecord.maximumQuantity < 1) invalid(`${stationPath}.maximumQuantity`);
     if (!Array.isArray(stationRecord.compatibleStoreModelIndexes) ||
-        stationRecord.compatibleStoreModelIndexes.length === 0 ||
         stationRecord.compatibleStoreModelIndexes.some((value) => !isModelIndex(value, weaponCount)) ||
         new Set(stationRecord.compatibleStoreModelIndexes).size !==
           stationRecord.compatibleStoreModelIndexes.length) {
@@ -581,6 +582,14 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
     if (loadout.platformCatalogObjectId !== aircraft.catalogObjectId) {
       throw new Error(
         `Supplied engine-verification compiled model pack aircraft[${index}].loadoutModelIndex does not reference the aircraft platform.`,
+      );
+    }
+    if (!validityDomainCovers(
+      loadout.validityDomain as SiValidityDomain,
+      aircraft.validityDomain as SiValidityDomain,
+    )) {
+      throw new Error(
+        `Supplied engine-verification compiled model pack aircraft[${index}].loadoutModel.validityDomain does not cover its admitted aircraft validity domain.`,
       );
     }
   }

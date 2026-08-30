@@ -227,7 +227,11 @@ loadout indexes, and a closed performance-admission shape. A digest-valid
 string-valued fuel capacity therefore fails before takeoff-mass arithmetic.
 Every compiled loadout is also admitted as an exact base model plus exact
 station records with finite body-frame positions, positive integer capacities,
-unique identities and bounded weapon indexes. Compatibility rules must carry
+unique identities and bounded weapon indexes; an unused station may truthfully
+carry an empty compatible-store list. The selected loadout validity domain must
+cover the owning aircraft altitude, Mach, angle-of-attack, load-factor,
+configuration and environment domain through the canonical model-pack coverage
+predicate. Compatibility rules must carry
 exact fields, in-pack evidence, bounded loadout/weapon references, a supported
 status, and a platform/station/capacity relation that the referenced loadout
 actually admits. A digest-valid string-valued station capacity therefore fails

@@ -237,7 +237,12 @@ aircraft shape, physical-domain, component-index and performance-admission
 checks before compilation. It also reseals the selected compiled station's
 integer capacity as a string and proves that complete loadout/compatibility
 shape, numeric-domain and reference validation rejects the pack before
-Air-mission loadout arithmetic.
+Air-mission loadout arithmetic. The same table proves a digest-valid loadout
+whose altitude domain no longer covers its aircraft is rejected by the shared
+canonical coverage predicate, while a separately resealed unused station with
+an empty compatible-store list remains valid. The no-release VSR path repeats
+the narrowed-domain falsifier so skipped engine replay cannot bypass the
+loadout-to-aircraft relationship.
 Table-driven native and
 raw-WASM falsifiers then corrupt the termination
 patch target, duplicate target key, compiled old value, SI unit and evidence
@@ -256,7 +261,8 @@ and intended-use validator before the mission compiler can consume it. The
 digest-valid string-mass and string-fuel variants are separately shown to fail
 before the mission compiler can create invalid takeoff-mass arithmetic; the
 string station-capacity variant must likewise fail before a coerced comparison
-can admit the loadout.
+can admit the loadout, and the narrowed loadout-domain variant must fail before
+archived mission recompilation.
 Browser runtime tests admit the `open-record` message and prove the client sends
 saved-record verification to the simulation Worker. The built browser journey
 opens the Worker-produced VSR inside that Worker, so deterministic terminal

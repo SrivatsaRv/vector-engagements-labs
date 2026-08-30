@@ -43,6 +43,8 @@ one family must not imply changes to unrelated contracts.
 - Validate complete compiled loadout stations and compatibility relations before
   supplied-pack Air-mission recompilation, including exact shapes, integer
   capacities, bounded references, platform/station linkage and in-pack evidence.
+  Loadout validity must cover the owning aircraft through the canonical compiler
+  predicate, while unused stations may retain an empty compatible-store list.
 - Keep deterministic terminal-record replay and uploaded-record verification
   inside the dedicated browser simulation Worker; the rendering thread receives
   only an already-admitted playback result.

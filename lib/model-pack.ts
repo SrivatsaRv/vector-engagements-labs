@@ -1024,7 +1024,7 @@ function normalizeValidityDomain(
   };
 }
 
-function validityDomainCovers(
+export function validityDomainCovers(
   provider: SiValidityDomain,
   required: SiValidityDomain,
 ) {

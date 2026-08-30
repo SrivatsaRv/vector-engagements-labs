@@ -640,6 +640,51 @@ test("VSR rejects unqualified or malformed supplied packs before no-release Air 
     ),
     /loadouts\[\d+\]\.stations\[0\]\.maximumQuantity is structurally invalid/,
   );
+
+  const narrowedLoadoutPack = structuredClone(validPack);
+  const narrowedAircraft = narrowedLoadoutPack.aircraft.find(
+    (aircraft) => aircraft.catalogObjectId === currentScenario.bluePlatformId,
+  );
+  assert.ok(narrowedAircraft, "the falsifier requires the selected aircraft model");
+  const narrowedLoadout = narrowedLoadoutPack.loadouts[narrowedAircraft.loadoutModelIndex];
+  assert.ok(narrowedLoadout, "the falsifier requires the selected aircraft loadout");
+  narrowedLoadout.validityDomain.altitudeM.minimum =
+    narrowedAircraft.validityDomain.altitudeM.minimum + 1;
+  resealCompiledPack(narrowedLoadoutPack);
+  const narrowedEngineScenario = bindPack(narrowedLoadoutPack);
+  const narrowedScenario = compileMission(
+    currentScenario,
+    narrowedEngineScenario,
+    narrowedLoadoutPack,
+  );
+  const narrowedEngineRun = structuredClone(engineRun);
+  narrowedEngineRun.scenario = narrowedEngineScenario;
+  const narrowedPrepared = {
+    ...base,
+    scenario: narrowedScenario,
+    engineScenario: narrowedEngineScenario,
+    capabilityManifest: createVerificationDeploymentCapabilities(
+      "typescript",
+      ["A2A"],
+      [narrowedLoadoutPack.digest],
+    ),
+  };
+  const narrowedResult = buildSimulationResult(narrowedPrepared, narrowedEngineRun);
+  const narrowedRecord = await createVectorSimulationRecord(
+    narrowedPrepared,
+    narrowedResult,
+    createdAt,
+  );
+  const narrowedSerialized = serializeVectorRecord(narrowedRecord);
+
+  await assert.rejects(
+    openVectorSimulationRecord(
+      narrowedSerialized.buffer,
+      narrowedSerialized.byteLength,
+      { compiledModelPack: narrowedLoadoutPack },
+    ),
+    /aircraft\[\d+\]\.loadoutModel\.validityDomain does not cover its admitted aircraft validity domain/,
+  );
 });
 
 test("archived model-pack resolution rejects every partial identity match", () => {

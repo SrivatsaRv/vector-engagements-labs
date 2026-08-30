@@ -1274,6 +1274,16 @@ test("supplied-pack authority validates the complete loadout and compatibility g
       },
       pattern: /compatibility\[0\]\.maximumQuantity is structurally invalid/i,
     },
+    {
+      label: "loadout validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const loadout = pack.loadouts[aircraft.loadoutModelIndex];
+        loadout.validityDomain.altitudeM.minimum =
+          aircraft.validityDomain.altitudeM.minimum + 1;
+      },
+      pattern: /aircraft\[0\]\.loadoutModel\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
   ]) {
     const pack = structuredClone(binding.pack);
     mutate(pack);
@@ -1292,6 +1302,29 @@ test("supplied-pack authority validates the complete loadout and compatibility g
       label,
     );
   }
+
+  const packWithUnusedStation = structuredClone(binding.pack);
+  const loadout = packWithUnusedStation.loadouts[0];
+  loadout.stations.push({
+    id: "unused-auxiliary-station",
+    stationGroup: "UNUSED_AUXILIARY",
+    positionBodyM: { x: 0, y: 0, z: 0 },
+    maximumQuantity: 1,
+    compatibleStoreModelIndexes: [],
+  });
+  resealCompiledPack(packWithUnusedStation);
+  assert.doesNotThrow(
+    () => findEngineCompiledModelPackAuthority({
+      id: packWithUnusedStation.id,
+      version: packWithUnusedStation.version,
+      digest: packWithUnusedStation.digest,
+      intendedUse: {
+        id: verificationUse.id,
+        version: verificationUse.version,
+      },
+    }, packWithUnusedStation),
+    "unused stations may declare no compatible stores",
+  );
 });
 
 test("both engines reject a second scheduled guided release before integration", () => {
