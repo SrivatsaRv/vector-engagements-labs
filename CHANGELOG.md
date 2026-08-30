@@ -298,6 +298,9 @@ No pending family-specific entry.
   claim no terminal event. A hash-resealed intercept cannot delete its terminal
   events, append duplicated earlier active frames at the nominal duration and
   manufacture a `time_limit` result.
+- Bind the report's primary weapon and target identities to that deterministic
+  replay for truthful nonterminal runs, rejecting a resealed report that
+  substitutes an unlaunched carried store for the released weapon.
 - Validate the closed ground-dynamics validity fields semantically so canonical
   archive key ordering cannot reject an otherwise exact release replay.
 - Keep an explicit unpowered `JETTISON` outside guided-weapon terminal

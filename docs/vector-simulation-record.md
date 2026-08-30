@@ -287,8 +287,10 @@ no terminal predicate occurred in its last step. Replay requires the declared
 witness pair, recomputes its exact segment minimum, and then reruns a terminal
 record's compiled scenario on its declared deterministic backend. The same full
 rerun is mandatory when a termination-capable archive claims no terminal event:
-the replayed run outcome, cumulative closest approach and optional terminal
-payload must match the archive. This prevents an earlier terminal boundary from
+the replayed run outcome, cumulative closest approach, primary weapon and
+target identities, and optional terminal payload must match the archive. A
+carried store therefore cannot replace the released weapon by resealing only
+the report. This also prevents an earlier terminal boundary from
 being discarded and replaced by duplicated active frames at the declared run
 duration. For a terminal claim, the replayed payload, cause, cumulative closest
 approach and witness identity must match the archive, so deleting the true

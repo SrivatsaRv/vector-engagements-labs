@@ -957,6 +957,14 @@ export async function openVectorSimulationRecord(
         (event) => event.payload.kind === "WEAPON_TERMINATED",
       )?.payload;
       if (
+        replay.primaryWeaponId !== report.engine.primaryWeaponId ||
+        replay.primaryTargetId !== report.engine.primaryTargetId
+      ) {
+        throw new Error(
+          "VECTOR record primary entity identity does not match deterministic engine replay.",
+        );
+      }
+      if (
         replay.termination !== report.engine.termination ||
         replay.closestApproachM !== report.engine.closestApproachM ||
         canonicalJson(replayedTermination ?? null) !==

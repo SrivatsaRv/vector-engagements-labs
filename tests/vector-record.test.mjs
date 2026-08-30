@@ -1094,6 +1094,40 @@ test("VSR binds a terminal event to the report's exact primary weapon and target
   );
 });
 
+test("VSR binds a nonterminal report's primary weapon and target to deterministic replay", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-crossing-intercept",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  assert.equal(result.engineRun.termination, "time_limit");
+  const carriedWeapon = result.engineRun.scenario.entities.find(
+    (entity) =>
+      entity.kind === "GUIDED_WEAPON" &&
+      entity.weapon?.launchTimeSeconds === null &&
+      entity.weapon.launchPlatformId === "blue-platform-1",
+  );
+  assert.ok(carriedWeapon);
+
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const report = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+  report.engine.primaryWeaponId = carriedWeapon.id;
+  const corrupt = await replaceRecordMember(
+    record,
+    "report.json",
+    reportMember.schemaVersion,
+    jsonBytes(report),
+  );
+  const serialized = serializeVectorRecord(corrupt);
+
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /primary entity identity does not match deterministic engine replay/,
+  );
+});
+
 test("VSR requires an active target for every terminal cause except target-unavailable", async () => {
   const scenario = SCENARIO_LIBRARY[0].scenario;
   const prepared = prepareSimulation(scenario);

@@ -206,9 +206,12 @@ that direct rlib/WASM callers reject it before integration, matching the
 TypeScript and wrapped-WASM boundaries. The backend admission matrix also
 proves that only `GUIDED_WEAPON` entities count toward the single scheduled
 guided-release limit in both TypeScript and Rust/WASM. VSR mutation regressions
-rehash complete records after changing the report's primary weapon to a carried
-store or contradicting any terminal cause with the target lifecycle; those
-records fail before replay exposure. Migration 017 also exact-reads every
+rehash complete terminal and truthful nonterminal records after changing the
+report's primary weapon to a carried store. Terminal event authority rejects
+the first form, while deterministic full-run replay rejects the nonterminal
+form by comparing the exact primary weapon and target identities. Contradicting
+any terminal cause with the target lifecycle also fails before replay exposure.
+Migration 017 additionally exact-reads every
 explicitly inserted scenario column after conflict, including status and the
 complete package, so a partial deployment cannot leave a non-executable or
 otherwise divergent row behind a matching content hash.
