@@ -588,6 +588,58 @@ test("VSR rejects unqualified or malformed supplied packs before no-release Air 
     ),
     /aircraft\[0\].fuelCapacityKg is structurally invalid/,
   );
+
+  const malformedLoadoutPack = structuredClone(validPack);
+  const selectedAircraft = malformedLoadoutPack.aircraft.find(
+    (aircraft) => aircraft.catalogObjectId === currentScenario.bluePlatformId,
+  );
+  assert.ok(selectedAircraft, "the falsifier requires the selected aircraft model");
+  const selectedLoadout = malformedLoadoutPack.loadouts[selectedAircraft.loadoutModelIndex];
+  assert.ok(selectedLoadout?.stations[0], "the falsifier requires the selected loadout station");
+  selectedLoadout.stations[0].maximumQuantity = "bad";
+  resealCompiledPack(malformedLoadoutPack);
+  assert.equal(
+    selectedLoadout.stations[0].maximumQuantity,
+    "bad",
+    "the falsifier must be digest-valid while violating the compiled station-capacity contract",
+  );
+  const malformedLoadoutEngineScenario = bindPack(malformedLoadoutPack);
+  const malformedLoadoutScenario = compileMission(
+    currentScenario,
+    malformedLoadoutEngineScenario,
+    malformedLoadoutPack,
+  );
+  const malformedLoadoutEngineRun = structuredClone(engineRun);
+  malformedLoadoutEngineRun.scenario = malformedLoadoutEngineScenario;
+  const malformedLoadoutPrepared = {
+    ...base,
+    scenario: malformedLoadoutScenario,
+    engineScenario: malformedLoadoutEngineScenario,
+    capabilityManifest: createVerificationDeploymentCapabilities(
+      "typescript",
+      ["A2A"],
+      [malformedLoadoutPack.digest],
+    ),
+  };
+  const malformedLoadoutResult = buildSimulationResult(
+    malformedLoadoutPrepared,
+    malformedLoadoutEngineRun,
+  );
+  const malformedLoadoutRecord = await createVectorSimulationRecord(
+    malformedLoadoutPrepared,
+    malformedLoadoutResult,
+    createdAt,
+  );
+  const malformedLoadoutSerialized = serializeVectorRecord(malformedLoadoutRecord);
+
+  await assert.rejects(
+    openVectorSimulationRecord(
+      malformedLoadoutSerialized.buffer,
+      malformedLoadoutSerialized.byteLength,
+      { compiledModelPack: malformedLoadoutPack },
+    ),
+    /loadouts\[\d+\]\.stations\[0\]\.maximumQuantity is structurally invalid/,
+  );
 });
 
 test("archived model-pack resolution rejects every partial identity match", () => {

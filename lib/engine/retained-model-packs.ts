@@ -70,6 +70,36 @@ const COMPILED_AIRCRAFT_KEYS = [
   "performanceAdmission",
 ] as const;
 
+const COMPILED_LOADOUT_KEYS = [
+  "id",
+  "version",
+  "evidenceRefIds",
+  "validityDomain",
+  "limitationIds",
+  "platformCatalogObjectId",
+  "stations",
+] as const;
+
+const COMPILED_LOADOUT_STATION_KEYS = [
+  "id",
+  "stationGroup",
+  "positionBodyM",
+  "maximumQuantity",
+  "compatibleStoreModelIndexes",
+] as const;
+
+const COMPILED_COMPATIBILITY_KEYS = [
+  "id",
+  "platformCatalogObjectId",
+  "loadoutModelIndex",
+  "storeModelIndex",
+  "stationGroup",
+  "status",
+  "maximumQuantity",
+  "rationale",
+  "evidenceRefIds",
+] as const;
+
 const COMPILED_VALIDITY_DOMAIN_KEYS = [
   "altitudeM",
   "mach",
@@ -80,6 +110,7 @@ const COMPILED_VALIDITY_DOMAIN_KEYS = [
 ] as const;
 
 const COMPILED_RANGE_KEYS = ["minimum", "maximum"] as const;
+const COMPILED_VECTOR_KEYS = ["x", "y", "z"] as const;
 const COMPILED_TERMINATION_KEYS = [
   "schemaVersion",
   "intendedUse",
@@ -99,6 +130,7 @@ const AIRCRAFT_PERFORMANCE_CAPABILITIES = new Set([
   "MASS_AND_STORES",
   "SENSORS",
 ]);
+const COMPATIBILITY_STATUSES = new Set(["SUPPORTED", "UNSUPPORTED"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -311,6 +343,115 @@ function requireCompiledWeaponStructure(
       termination.maximumFlightTimeS <= 0) invalid("termination");
 }
 
+function requireCompiledLoadoutStructure(
+  loadout: unknown,
+  index: number,
+  pack: Record<string, unknown>,
+  evidenceIds: ReadonlySet<string>,
+  catalogObjectIds: ReadonlySet<string>,
+): asserts loadout is Record<string, unknown> {
+  const path = `loadouts[${index}]`;
+  const invalid = (field: string): never => {
+    throw new Error(
+      `Supplied engine-verification compiled model pack ${path}.${field} is structurally invalid.`,
+    );
+  };
+  if (!isRecord(loadout)) invalid("record");
+  const candidate = loadout as Record<string, unknown>;
+  if (!hasExactKeys(candidate, COMPILED_LOADOUT_KEYS)) invalid("fields");
+  if (typeof candidate.id !== "string" || !STABLE_ID_PATTERN.test(candidate.id)) invalid("id");
+  if (typeof candidate.version !== "string" || !SEMVER_PATTERN.test(candidate.version)) invalid("version");
+  if (!isNonBlankStringArray(candidate.evidenceRefIds, true) ||
+      candidate.evidenceRefIds.some((id) => !evidenceIds.has(id))) invalid("evidenceRefIds");
+  if (!isCompiledValidityDomain(candidate.validityDomain)) invalid("validityDomain");
+  if (!isNonBlankStringArray(candidate.limitationIds)) invalid("limitationIds");
+  if (typeof candidate.platformCatalogObjectId !== "string" ||
+      !catalogObjectIds.has(candidate.platformCatalogObjectId)) invalid("platformCatalogObjectId");
+  if (!Array.isArray(candidate.stations)) invalid("stations");
+
+  const weaponCount = (pack.weapons as unknown[]).length;
+  const stationIds = new Set<string>();
+  const stations = candidate.stations as unknown[];
+  for (const [stationIndex, station] of stations.entries()) {
+    const stationPath = `stations[${stationIndex}]`;
+    if (!isRecord(station)) invalid(stationPath);
+    const stationRecord = station as Record<string, unknown>;
+    if (!hasExactKeys(stationRecord, COMPILED_LOADOUT_STATION_KEYS)) invalid(`${stationPath}.fields`);
+    if (typeof stationRecord.id !== "string" || !STABLE_ID_PATTERN.test(stationRecord.id) ||
+        stationIds.has(stationRecord.id)) invalid(`${stationPath}.id`);
+    stationIds.add(stationRecord.id as string);
+    if (typeof stationRecord.stationGroup !== "string" ||
+        stationRecord.stationGroup.trim().length === 0) invalid(`${stationPath}.stationGroup`);
+    if (!isRecord(stationRecord.positionBodyM)) invalid(`${stationPath}.positionBodyM`);
+    const positionBodyM = stationRecord.positionBodyM as Record<string, unknown>;
+    if (!hasExactKeys(positionBodyM, COMPILED_VECTOR_KEYS) ||
+        COMPILED_VECTOR_KEYS.some((axis) =>
+          typeof positionBodyM[axis] !== "number" ||
+          !Number.isFinite(positionBodyM[axis])
+        )) invalid(`${stationPath}.positionBodyM`);
+    if (typeof stationRecord.maximumQuantity !== "number" ||
+        !Number.isSafeInteger(stationRecord.maximumQuantity) ||
+        stationRecord.maximumQuantity < 1) invalid(`${stationPath}.maximumQuantity`);
+    if (!Array.isArray(stationRecord.compatibleStoreModelIndexes) ||
+        stationRecord.compatibleStoreModelIndexes.length === 0 ||
+        stationRecord.compatibleStoreModelIndexes.some((value) => !isModelIndex(value, weaponCount)) ||
+        new Set(stationRecord.compatibleStoreModelIndexes).size !==
+          stationRecord.compatibleStoreModelIndexes.length) {
+      invalid(`${stationPath}.compatibleStoreModelIndexes`);
+    }
+  }
+}
+
+function requireCompiledCompatibilityStructure(
+  compatibility: unknown,
+  index: number,
+  pack: Record<string, unknown>,
+  evidenceIds: ReadonlySet<string>,
+  catalogObjectIds: ReadonlySet<string>,
+): asserts compatibility is Record<string, unknown> {
+  const path = `compatibility[${index}]`;
+  const invalid = (field: string): never => {
+    throw new Error(
+      `Supplied engine-verification compiled model pack ${path}.${field} is structurally invalid.`,
+    );
+  };
+  if (!isRecord(compatibility)) invalid("record");
+  const candidate = compatibility as Record<string, unknown>;
+  if (!hasExactKeys(candidate, COMPILED_COMPATIBILITY_KEYS)) invalid("fields");
+  if (typeof candidate.id !== "string" || !STABLE_ID_PATTERN.test(candidate.id)) invalid("id");
+  if (typeof candidate.platformCatalogObjectId !== "string" ||
+      !catalogObjectIds.has(candidate.platformCatalogObjectId)) invalid("platformCatalogObjectId");
+  const loadouts = pack.loadouts as Array<Record<string, unknown>>;
+  const weapons = pack.weapons as Array<Record<string, unknown>>;
+  if (!isModelIndex(candidate.loadoutModelIndex, loadouts.length)) invalid("loadoutModelIndex");
+  if (!isModelIndex(candidate.storeModelIndex, weapons.length)) invalid("storeModelIndex");
+  if (typeof candidate.stationGroup !== "string" ||
+      candidate.stationGroup.trim().length === 0) invalid("stationGroup");
+  if (typeof candidate.status !== "string" ||
+      !COMPATIBILITY_STATUSES.has(candidate.status)) invalid("status");
+  if (typeof candidate.maximumQuantity !== "number" ||
+      !Number.isSafeInteger(candidate.maximumQuantity) ||
+      candidate.maximumQuantity < 1) invalid("maximumQuantity");
+  if (typeof candidate.rationale !== "string" ||
+      candidate.rationale.trim().length === 0) invalid("rationale");
+  if (!isNonBlankStringArray(candidate.evidenceRefIds, true) ||
+      candidate.evidenceRefIds.some((id) => !evidenceIds.has(id))) invalid("evidenceRefIds");
+
+  const loadout = loadouts[candidate.loadoutModelIndex as number];
+  if (loadout.platformCatalogObjectId !== candidate.platformCatalogObjectId) {
+    invalid("platformCatalogObjectId");
+  }
+  const matchingStation = (loadout.stations as Array<Record<string, unknown>>).find(
+    (station) =>
+      station.stationGroup === candidate.stationGroup &&
+      (station.compatibleStoreModelIndexes as number[]).includes(candidate.storeModelIndex as number),
+  );
+  const admittedStation = matchingStation ?? invalid("stationGroup");
+  if ((candidate.maximumQuantity as number) > (admittedStation.maximumQuantity as number)) {
+    invalid("maximumQuantity");
+  }
+}
+
 function requireCompiledV1Structure(value: unknown): asserts value is CompiledModelPack {
   if (!isRecord(value)) {
     throw new Error("Supplied engine-verification compiled model pack is structurally invalid.");
@@ -386,17 +527,9 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
       .filter((id): id is string => typeof id === "string"),
   );
   const weaponIds = new Set<string>();
+  const loadoutIds = new Set<string>();
+  const compatibilityIds = new Set<string>();
   const aircraftIds = new Set<string>();
-  for (const [index, aircraft] of (value.aircraft as unknown[]).entries()) {
-    requireCompiledAircraftStructure(aircraft, index, value, evidenceIds, catalogObjectIds);
-    const aircraftId = aircraft.id as string;
-    if (aircraftIds.has(aircraftId)) {
-      throw new Error(
-        `Supplied engine-verification compiled model pack has duplicate aircraft ID ${aircraftId}.`,
-      );
-    }
-    aircraftIds.add(aircraftId);
-  }
   for (const [index, weapon] of value.weapons.entries()) {
     requireCompiledWeaponStructure(weapon, index, value, evidenceIds, catalogObjectIds);
     const weaponId = weapon.id as string;
@@ -406,6 +539,50 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
       );
     }
     weaponIds.add(weaponId);
+  }
+  for (const [index, loadout] of (value.loadouts as unknown[]).entries()) {
+    requireCompiledLoadoutStructure(loadout, index, value, evidenceIds, catalogObjectIds);
+    const loadoutId = loadout.id as string;
+    if (loadoutIds.has(loadoutId)) {
+      throw new Error(
+        `Supplied engine-verification compiled model pack has duplicate loadout ID ${loadoutId}.`,
+      );
+    }
+    loadoutIds.add(loadoutId);
+  }
+  for (const [index, compatibility] of (value.compatibility as unknown[]).entries()) {
+    requireCompiledCompatibilityStructure(
+      compatibility,
+      index,
+      value,
+      evidenceIds,
+      catalogObjectIds,
+    );
+    const compatibilityId = compatibility.id as string;
+    if (compatibilityIds.has(compatibilityId)) {
+      throw new Error(
+        `Supplied engine-verification compiled model pack has duplicate compatibility ID ${compatibilityId}.`,
+      );
+    }
+    compatibilityIds.add(compatibilityId);
+  }
+  for (const [index, aircraft] of (value.aircraft as unknown[]).entries()) {
+    requireCompiledAircraftStructure(aircraft, index, value, evidenceIds, catalogObjectIds);
+    const aircraftId = aircraft.id as string;
+    if (aircraftIds.has(aircraftId)) {
+      throw new Error(
+        `Supplied engine-verification compiled model pack has duplicate aircraft ID ${aircraftId}.`,
+      );
+    }
+    aircraftIds.add(aircraftId);
+    const loadout = (value.loadouts as Array<Record<string, unknown>>)[
+      aircraft.loadoutModelIndex as number
+    ];
+    if (loadout.platformCatalogObjectId !== aircraft.catalogObjectId) {
+      throw new Error(
+        `Supplied engine-verification compiled model pack aircraft[${index}].loadoutModelIndex does not reference the aircraft platform.`,
+      );
+    }
   }
   if (value.weapons.length === 0) {
     throw new Error(

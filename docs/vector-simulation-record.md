@@ -225,6 +225,13 @@ likewise checked for its exact field set, semantic identity, evidence and
 validity bindings, finite mass/fuel/load-factor domains, bounded component and
 loadout indexes, and a closed performance-admission shape. A digest-valid
 string-valued fuel capacity therefore fails before takeoff-mass arithmetic.
+Every compiled loadout is also admitted as an exact base model plus exact
+station records with finite body-frame positions, positive integer capacities,
+unique identities and bounded weapon indexes. Compatibility rules must carry
+exact fields, in-pack evidence, bounded loadout/weapon references, a supported
+status, and a platform/station/capacity relation that the referenced loadout
+actually admits. A digest-valid string-valued station capacity therefore fails
+before JavaScript coercion can bypass mission-loadout admission.
 That same authenticated
 authority pack is used for deterministic engine replay and for recompiling an
 archived authored Air mission against the archived environment pack. Exact

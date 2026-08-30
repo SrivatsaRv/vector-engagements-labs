@@ -25,7 +25,10 @@ import {
   bindRuntimeModelPackDigest,
   runtimeWeaponTerminations,
 } from "../lib/engine/runtime-model-pack.ts";
-import { resolveRetainedCompiledModelPack } from "../lib/engine/retained-model-packs.ts";
+import {
+  findEngineCompiledModelPackAuthority,
+  resolveRetainedCompiledModelPack,
+} from "../lib/engine/retained-model-packs.ts";
 import { bindVerificationTrackModelPack } from "../lib/engine/verification-track-fixture.ts";
 import historicalModelPackBundle from "../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json" with { type: "json" };
 
@@ -1208,6 +1211,86 @@ test("TypeScript and raw Rust/WASM reject digest-valid malformed verification-pa
     });
     assert.equal(rust.accepted, false, `raw rust-wasm ${mutation}`);
     assert.match(rust.output, rustPattern, `raw rust-wasm ${mutation}`);
+  }
+});
+
+test("supplied-pack authority validates the complete loadout and compatibility graph", async () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const binding = await bindVerificationTrackModelPack(baseline);
+  const verificationUse = binding.pack.intendedUses.find(
+    (item) => item.id === "vector.intended-use.engine-verification",
+  );
+  assert.ok(verificationUse);
+  const firstStation = (pack) => {
+    const station = pack.loadouts.find((item) => item.stations.length)?.stations[0];
+    assert.ok(station);
+    return station;
+  };
+
+  for (const { label, mutate, pattern } of [
+    {
+      label: "station exact fields",
+      mutate: (pack) => { firstStation(pack).invented = true; },
+      pattern: /loadouts\[\d+\]\.stations\[0\]\.fields is structurally invalid/i,
+    },
+    {
+      label: "station finite position",
+      mutate: (pack) => { firstStation(pack).positionBodyM.x = "0"; },
+      pattern: /loadouts\[\d+\]\.stations\[0\]\.positionBodyM is structurally invalid/i,
+    },
+    {
+      label: "station integer capacity",
+      mutate: (pack) => { firstStation(pack).maximumQuantity = "bad"; },
+      pattern: /loadouts\[\d+\]\.stations\[0\]\.maximumQuantity is structurally invalid/i,
+    },
+    {
+      label: "station weapon reference",
+      mutate: (pack) => { firstStation(pack).compatibleStoreModelIndexes = [pack.weapons.length]; },
+      pattern: /loadouts\[\d+\]\.stations\[0\]\.compatibleStoreModelIndexes is structurally invalid/i,
+    },
+    {
+      label: "compatibility evidence reference",
+      mutate: (pack) => { pack.compatibility[0].evidenceRefIds = ["missing-evidence"]; },
+      pattern: /compatibility\[0\]\.evidenceRefIds is structurally invalid/i,
+    },
+    {
+      label: "compatibility loadout reference",
+      mutate: (pack) => { pack.compatibility[0].loadoutModelIndex = pack.loadouts.length; },
+      pattern: /compatibility\[0\]\.loadoutModelIndex is structurally invalid/i,
+    },
+    {
+      label: "compatibility capacity relation",
+      mutate: (pack) => {
+        const rule = pack.compatibility[0];
+        const station = pack.loadouts[rule.loadoutModelIndex].stations.find(
+          (item) => item.stationGroup === rule.stationGroup,
+        );
+        assert.ok(station);
+        rule.maximumQuantity = station.maximumQuantity + 1;
+      },
+      pattern: /compatibility\[0\]\.maximumQuantity is structurally invalid/i,
+    },
+  ]) {
+    const pack = structuredClone(binding.pack);
+    mutate(pack);
+    resealCompiledPack(pack);
+    assert.throws(
+      () => findEngineCompiledModelPackAuthority({
+        id: pack.id,
+        version: pack.version,
+        digest: pack.digest,
+        intendedUse: {
+          id: verificationUse.id,
+          version: verificationUse.version,
+        },
+      }, pack),
+      pattern,
+      label,
+    );
   }
 });
 

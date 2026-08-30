@@ -234,7 +234,10 @@ cover the complete compiled weapon key set, base identity/evidence/validity
 fields, physical scalars, referenced model indexes, enums and termination
 authority; the Air readback boundary applies the corresponding complete
 aircraft shape, physical-domain, component-index and performance-admission
-checks before compilation.
+checks before compilation. It also reseals the selected compiled station's
+integer capacity as a string and proves that complete loadout/compatibility
+shape, numeric-domain and reference validation rejects the pack before
+Air-mission loadout arithmetic.
 Table-driven native and
 raw-WASM falsifiers then corrupt the termination
 patch target, duplicate target key, compiled old value, SI unit and evidence
@@ -251,7 +254,9 @@ cannot execute, the record reaches Air-mission recompilation without an engine
 rerun; admission must still reject the pack through the same full structural
 and intended-use validator before the mission compiler can consume it. The
 digest-valid string-mass and string-fuel variants are separately shown to fail
-before the mission compiler can create invalid takeoff-mass arithmetic.
+before the mission compiler can create invalid takeoff-mass arithmetic; the
+string station-capacity variant must likewise fail before a coerced comparison
+can admit the loadout.
 Browser runtime tests admit the `open-record` message and prove the client sends
 saved-record verification to the simulation Worker. The built browser journey
 opens the Worker-produced VSR inside that Worker, so deterministic terminal
