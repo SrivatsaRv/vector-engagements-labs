@@ -1566,6 +1566,63 @@ test("supplied-pack authority validates the complete loadout and compatibility g
   );
 });
 
+test("both live engines reject positive sensor evidence authority drift", async () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const binding = await bindVerificationTrackModelPack(baseline);
+
+  for (const { label, mutate } of [
+    {
+      label: "source evidence relabelled as an assumption",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        const sourceId = sensor.evidenceAdmission.sourceEvidenceRefIds[0];
+        const evidence = pack.evidence.find((item) => item.id === sourceId);
+        assert.ok(evidence, "the fixture requires admitted source evidence");
+        evidence.kind = "ASSUMPTION";
+      },
+    },
+    {
+      label: "validation evidence loses its immutable digest",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        const validationId = sensor.evidenceAdmission.validationEvidenceRefIds[0];
+        const evidence = pack.evidence.find((item) => item.id === validationId);
+        assert.ok(evidence, "the fixture requires admitted validation evidence");
+        delete evidence.contentSha256;
+      },
+    },
+  ]) {
+    const pack = structuredClone(binding.pack);
+    mutate(pack);
+    resealCompiledPack(pack);
+    const scenario = structuredClone(binding.scenario);
+    const projection = structuredClone(scenario.modelPack);
+    projection.digest = pack.digest;
+    projection.weaponTerminations = runtimeWeaponTerminations(pack, []);
+    delete projection.runtimeDigest;
+    scenario.modelPack = bindRuntimeModelPackDigest(projection);
+    for (const entity of scenario.entities) {
+      entity.provenance.modelPackDigest = pack.digest;
+      if (entity.observerSensor) entity.observerSensor.modelPackDigest = pack.digest;
+      if (entity.weapon) entity.weapon.admission.modelPackDigest = pack.digest;
+    }
+
+    for (const backend of ["typescript", "rust-wasm"]) {
+      assert.throws(
+        () => runEngineBackend(structuredClone(scenario), backend, pack),
+        /sensors\[\d+\]\.evidenceAdmission is structurally invalid/i,
+        `${backend}: ${label}`,
+      );
+    }
+  }
+});
+
 test("both engines reject a second scheduled guided release before integration", () => {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
   const baseline = simulateWithCapabilitiesForVerification(
