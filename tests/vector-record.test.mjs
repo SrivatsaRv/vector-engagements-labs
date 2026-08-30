@@ -741,6 +741,27 @@ test("VSR rejects unqualified or malformed supplied packs before no-release Air 
     ),
     /aircraft\[\d+\]\.aerodynamicModel\.validityDomain does not cover its admitted aircraft validity domain/,
   );
+
+  const emptyAerodynamicTablesPack = structuredClone(validPack);
+  const emptyTablesAircraft = emptyAerodynamicTablesPack.aircraft.find(
+    (aircraft) => aircraft.catalogObjectId === currentScenario.bluePlatformId,
+  );
+  assert.ok(emptyTablesAircraft, "the falsifier requires the selected aircraft model");
+  emptyAerodynamicTablesPack.aerodynamics[
+    emptyTablesAircraft.aerodynamicModelIndex
+  ].coefficientTables = [];
+  resealCompiledPack(emptyAerodynamicTablesPack);
+  const emptyAerodynamicTablesSerialized = await serializeNoReleaseRecordForPack(
+    emptyAerodynamicTablesPack,
+  );
+  await assert.rejects(
+    openVectorSimulationRecord(
+      emptyAerodynamicTablesSerialized.buffer,
+      emptyAerodynamicTablesSerialized.byteLength,
+      { compiledModelPack: emptyAerodynamicTablesPack },
+    ),
+    /aircraft\[\d+\]\.aerodynamicModel\.coefficientTables is structurally invalid/,
+  );
 });
 
 test("archived model-pack resolution rejects every partial identity match", () => {

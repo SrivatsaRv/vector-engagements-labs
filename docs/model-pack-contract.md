@@ -757,7 +757,8 @@ backend and additionally admits every complete evidence record and every
 aircraft dependency domain. Evidence has one closed kind, exact
 required/optional fields, a stable unique ID, nonblank title, absolute URI,
 calendar access date, optional nonblank locator and optional lowercase SHA-256.
-Each referenced aerodynamic model and coefficient table, propulsion model and
+Each referenced aerodynamic model must retain at least one fully validated
+coefficient table. That model and every coefficient table, propulsion model,
 thrust/fuel table, sensor, and loadout must cover the aircraft's complete
 altitude, Mach, angle-of-attack, load-factor, configuration and environment
 domain through the compiler-owned coverage predicate. A content digest alone

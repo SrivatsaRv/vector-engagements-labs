@@ -1348,6 +1348,15 @@ test("supplied-pack authority validates the complete loadout and compatibility g
       pattern: /aircraft\[0\]\.aerodynamicModel\.validityDomain does not cover its admitted aircraft validity domain/i,
     },
     {
+      label: "aerodynamic model retains at least one coefficient table",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables = [];
+      },
+      pattern: /aircraft\[0\]\.aerodynamicModel\.coefficientTables is structurally invalid/i,
+    },
+    {
       label: "aerodynamic table validity covers aircraft domain",
       mutate: (pack) => {
         const aircraft = pack.aircraft[0];

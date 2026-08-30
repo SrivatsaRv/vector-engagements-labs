@@ -51,6 +51,8 @@ one family must not imply changes to unrelated contracts.
 - Require every aircraft's referenced aerodynamic model/tables, propulsion
   model/thrust/fuel tables, sensors and loadout to cover the aircraft's complete
   validity domain before either backend or no-release Air-record recompilation.
+- Reject supplied aircraft authority whose referenced aerodynamic model has no
+  coefficient tables, including no-release Air records that skip engine replay.
 - Keep deterministic terminal-record replay and uploaded-record verification
   inside the dedicated browser simulation Worker; the rendering thread receives
   only an already-admitted playback result.

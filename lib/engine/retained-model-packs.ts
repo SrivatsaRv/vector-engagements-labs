@@ -677,7 +677,8 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
       (value.aerodynamics as unknown[])[aircraft.aerodynamicModelIndex as number],
       "aerodynamicModel",
     );
-    if (!Array.isArray(aerodynamic.coefficientTables)) {
+    if (!Array.isArray(aerodynamic.coefficientTables) ||
+        aerodynamic.coefficientTables.length === 0) {
       throw new Error(
         `Supplied engine-verification compiled model pack aircraft[${index}].aerodynamicModel.coefficientTables is structurally invalid.`,
       );

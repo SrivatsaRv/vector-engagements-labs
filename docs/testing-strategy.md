@@ -249,10 +249,12 @@ blank-locator evidence records. Each must fail before evidence IDs can authorize
 aircraft, weapon, loadout or compatibility references. Six separate coverage
 falsifiers narrow the referenced aerodynamic domain, an aerodynamic coefficient
 table, propulsion domain, thrust table, fuel-flow table and sensor domain; all
-must fail through the compiler-owned aircraft coverage predicate. The
-no-release Air VSR regression repeats both a partial-evidence and narrowed-
-aerodynamic falsifier to prove skipped deterministic engine replay cannot expose
-either pack to mission recompilation.
+must fail through the compiler-owned aircraft coverage predicate. A separate
+digest-valid falsifier removes every coefficient table from the selected
+aerodynamic model. The no-release Air VSR regression repeats the partial-
+evidence, narrowed-aerodynamic and empty-table cases to prove skipped
+deterministic engine replay cannot expose any of those packs to mission
+recompilation.
 Table-driven native and
 raw-WASM falsifiers then corrupt the termination
 patch target, duplicate target key, compiled old value, SI unit and evidence

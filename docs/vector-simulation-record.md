@@ -227,9 +227,10 @@ loadout indexes, and a closed performance-admission shape. A digest-valid
 string-valued fuel capacity therefore fails before takeoff-mass arithmetic.
 Every supplied evidence row is admitted as a complete exact record with a
 closed evidence kind, stable unique identity, title, absolute URI, valid access
-date and optional valid locator/content digest. Every aerodynamic model and
-coefficient table, propulsion model and thrust/fuel table, sensor and loadout
-referenced by an aircraft must also cover that aircraft's full validity domain.
+date and optional valid locator/content digest. Every aerodynamic model
+referenced by an aircraft must retain at least one fully validated coefficient
+table. That model and every coefficient table, propulsion model and thrust/fuel
+table, sensor and loadout must also cover that aircraft's full validity domain.
 These checks run even for a no-release ground-start archive that skips engine
 rerun, so mission recompilation cannot consume a digest-valid partial evidence
 row or narrowed component envelope.
