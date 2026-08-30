@@ -619,6 +619,73 @@ fn compiled_pack_model_index(
     Ok(())
 }
 
+fn compiled_pack_semver(path: &str, value: &str) -> Result<(), EngineError> {
+    let mut dots = 0_u8;
+    let mut segment_has_digit = false;
+    let mut prerelease = false;
+    let mut prerelease_has_character = false;
+    let mut valid = !value.is_empty();
+    for byte in value.bytes() {
+        if prerelease {
+            if byte.is_ascii_alphanumeric() || byte == b'.' || byte == b'-' {
+                prerelease_has_character = true;
+            } else {
+                valid = false;
+            }
+        } else if byte.is_ascii_digit() {
+            segment_has_digit = true;
+        } else if byte == b'.' && segment_has_digit && dots < 2 {
+            dots += 1;
+            segment_has_digit = false;
+        } else if byte == b'-' && dots == 2 && segment_has_digit {
+            prerelease = true;
+        } else {
+            valid = false;
+        }
+    }
+    if !valid || dots != 2 || !segment_has_digit || (prerelease && !prerelease_has_character) {
+        return Err(invalid(format!("{path} must be semantic version")));
+    }
+    Ok(())
+}
+
+fn compiled_pack_model_base(
+    model: &Value,
+    path: &str,
+    evidence_ids: &HashSet<String>,
+    catalog_object_ids: &HashSet<String>,
+) -> Result<(), EngineError> {
+    identifier(
+        &format!("{path}.id"),
+        compiled_pack_string(model, path, "id")?,
+    )?;
+    compiled_pack_semver(
+        &format!("{path}.version"),
+        compiled_pack_string(model, path, "version")?,
+    )?;
+    let evidence = model["evidenceRefIds"]
+        .as_array()
+        .ok_or_else(|| invalid(format!("{path}.evidenceRefIds must be an array")))?;
+    if evidence.is_empty()
+        || evidence
+            .iter()
+            .any(|item| item.as_str().is_none_or(|id| !evidence_ids.contains(id)))
+    {
+        return Err(invalid(format!("{path}.evidenceRefIds is invalid")));
+    }
+    compiled_pack_validity_domain(&model["validityDomain"], &format!("{path}.validityDomain"))?;
+    compiled_pack_non_blank_string_array(
+        &model["limitationIds"],
+        &format!("{path}.limitationIds"),
+        false,
+    )?;
+    let catalog_object_id = compiled_pack_string(model, path, "catalogObjectId")?;
+    if !catalog_object_ids.contains(catalog_object_id) {
+        return Err(invalid(format!("{path}.catalogObjectId is invalid")));
+    }
+    Ok(())
+}
+
 pub(crate) fn authenticate_verification_model_pack(
     value: &Value,
 ) -> Result<AuthenticatedVerificationPack, EngineError> {
@@ -784,27 +851,11 @@ pub(crate) fn authenticate_verification_model_pack(
             ],
         )?;
         let model_id = compiled_pack_string(weapon, &path, "id")?;
-        identifier(&format!("{path}.id"), model_id)?;
+        compiled_pack_model_base(weapon, &path, &evidence_ids, &catalog_object_ids)?;
         if !weapon_ids.insert(model_id) {
             return Err(invalid(format!("{path}.id duplicates an earlier weapon")));
         }
         let model_version = compiled_pack_string(weapon, &path, "version")?;
-        identifier(&format!("{path}.version"), model_version)?;
-        compiled_pack_validity_domain(
-            &weapon["validityDomain"],
-            &format!("{path}.validityDomain"),
-        )?;
-        compiled_pack_non_blank_string_array(
-            &weapon["limitationIds"],
-            &format!("{path}.limitationIds"),
-            false,
-        )?;
-        let catalog_object_id = compiled_pack_string(weapon, &path, "catalogObjectId")?;
-        if !catalog_object_ids.contains(catalog_object_id) {
-            return Err(invalid(format!(
-                "{path}.catalogObjectId must reference an admitted catalog identity"
-            )));
-        }
         let launch_mass_kg = compiled_pack_number(weapon, &path, "launchMassKg")?;
         let dry_mass_kg = compiled_pack_number(weapon, &path, "dryMassKg")?;
         for field in [
@@ -887,18 +938,6 @@ pub(crate) fn authenticate_verification_model_pack(
         if intercept_radius_m <= 0.0 || maximum_flight_time_seconds <= 0.0 {
             return Err(invalid(format!(
                 "{termination_path} scalar values must be positive"
-            )));
-        }
-        let evidence = weapon["evidenceRefIds"]
-            .as_array()
-            .ok_or_else(|| invalid(format!("{path}.evidenceRefIds must be an array")))?;
-        if evidence.is_empty()
-            || evidence
-                .iter()
-                .any(|item| item.as_str().is_none_or(|id| !evidence_ids.contains(id)))
-        {
-            return Err(invalid(format!(
-                "{path}.evidenceRefIds references evidence outside the compiled pack"
             )));
         }
         let schema_version = compiled_pack_string(termination, &termination_path, "schemaVersion")?;

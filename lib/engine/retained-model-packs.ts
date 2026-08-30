@@ -53,6 +53,23 @@ const COMPILED_WEAPON_KEYS = [
   "termination",
 ] as const;
 
+const COMPILED_AIRCRAFT_KEYS = [
+  "id",
+  "version",
+  "evidenceRefIds",
+  "validityDomain",
+  "limitationIds",
+  "catalogObjectId",
+  "emptyMassKg",
+  "fuelCapacityKg",
+  "aerodynamicModelIndex",
+  "propulsionModelIndexes",
+  "sensorModelIndexes",
+  "loadoutModelIndex",
+  "maximumCommandLoadFactorG",
+  "performanceAdmission",
+] as const;
+
 const COMPILED_VALIDITY_DOMAIN_KEYS = [
   "altitudeM",
   "mach",
@@ -75,6 +92,13 @@ const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const WEAPON_SEEKER_MODES = new Set(["UNAVAILABLE", "ACTIVE_RADAR", "INFRARED", "PASSIVE_RADIATION"]);
 const WEAPON_SUPPORT_REQUIREMENTS = new Set(["UNAVAILABLE", "NONE", "TRACK_UPDATE"]);
 const WEAPON_LAUNCH_AUTHORIZATIONS = new Set(["SCHEDULED_TEST_ONLY", "TRACK_REQUIRED"]);
+const AIRCRAFT_PERFORMANCE_CAPABILITIES = new Set([
+  "AERODYNAMICS",
+  "PROPULSION",
+  "FLIGHT_CONTROLS",
+  "MASS_AND_STORES",
+  "SENSORS",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -119,6 +143,97 @@ function isModelIndex(value: unknown, length: number) {
     Number.isSafeInteger(value) &&
     value >= 0 &&
     value < length;
+}
+
+function requireCompiledAircraftStructure(
+  aircraft: unknown,
+  index: number,
+  pack: Record<string, unknown>,
+  evidenceIds: ReadonlySet<string>,
+  catalogObjectIds: ReadonlySet<string>,
+): asserts aircraft is Record<string, unknown> {
+  const path = `aircraft[${index}]`;
+  const invalid = (field: string): never => {
+    throw new Error(
+      `Supplied engine-verification compiled model pack ${path}.${field} is structurally invalid.`,
+    );
+  };
+  if (!isRecord(aircraft)) invalid("record");
+  const candidate = aircraft as Record<string, unknown>;
+  if (!hasExactKeys(candidate, COMPILED_AIRCRAFT_KEYS)) invalid("fields");
+  if (typeof candidate.id !== "string" || !STABLE_ID_PATTERN.test(candidate.id)) invalid("id");
+  if (typeof candidate.version !== "string" || !SEMVER_PATTERN.test(candidate.version)) invalid("version");
+  if (!isNonBlankStringArray(candidate.evidenceRefIds, true) ||
+      candidate.evidenceRefIds.some((id) => !evidenceIds.has(id))) invalid("evidenceRefIds");
+  if (!isCompiledValidityDomain(candidate.validityDomain)) invalid("validityDomain");
+  if (!isNonBlankStringArray(candidate.limitationIds)) invalid("limitationIds");
+  const limitationIds = candidate.limitationIds as string[];
+  if (typeof candidate.catalogObjectId !== "string" ||
+      !catalogObjectIds.has(candidate.catalogObjectId)) invalid("catalogObjectId");
+  if (typeof candidate.emptyMassKg !== "number" ||
+      !Number.isFinite(candidate.emptyMassKg) || candidate.emptyMassKg <= 0) invalid("emptyMassKg");
+  if (typeof candidate.fuelCapacityKg !== "number" ||
+      !Number.isFinite(candidate.fuelCapacityKg) || candidate.fuelCapacityKg < 0) invalid("fuelCapacityKg");
+  if (typeof candidate.maximumCommandLoadFactorG !== "number" ||
+      !Number.isFinite(candidate.maximumCommandLoadFactorG) ||
+      candidate.maximumCommandLoadFactorG <= 0) invalid("maximumCommandLoadFactorG");
+
+  const aerodynamics = pack.aerodynamics as unknown[];
+  const propulsion = pack.propulsion as unknown[];
+  const sensors = pack.sensors as unknown[];
+  const loadouts = pack.loadouts as unknown[];
+  if (!isModelIndex(candidate.aerodynamicModelIndex, aerodynamics.length)) invalid("aerodynamicModelIndex");
+  if (!Array.isArray(candidate.propulsionModelIndexes) ||
+      candidate.propulsionModelIndexes.length === 0 ||
+      candidate.propulsionModelIndexes.some((value) => !isModelIndex(value, propulsion.length))) {
+    invalid("propulsionModelIndexes");
+  }
+  if (!Array.isArray(candidate.sensorModelIndexes) ||
+      candidate.sensorModelIndexes.some((value) => !isModelIndex(value, sensors.length))) {
+    invalid("sensorModelIndexes");
+  }
+  if (!isModelIndex(candidate.loadoutModelIndex, loadouts.length)) invalid("loadoutModelIndex");
+
+  if (!isRecord(candidate.performanceAdmission)) invalid("performanceAdmission");
+  const admission = candidate.performanceAdmission as Record<string, unknown>;
+  if (admission.state === "UNSUPPORTED") {
+    if (!hasExactKeys(admission, ["state", "limitationId", "reason"]) ||
+        typeof admission.limitationId !== "string" ||
+        !limitationIds.includes(admission.limitationId) ||
+        typeof admission.reason !== "string" ||
+        admission.reason.trim().length === 0) invalid("performanceAdmission");
+    return;
+  }
+  if (admission.state !== "ADMITTED" ||
+      !hasExactKeys(admission, ["state", "capabilities"]) ||
+      !Array.isArray(admission.capabilities) ||
+      admission.capabilities.length !== AIRCRAFT_PERFORMANCE_CAPABILITIES.size) {
+    invalid("performanceAdmission");
+  }
+  const capabilityIds = new Set<string>();
+  const capabilities = admission.capabilities as unknown[];
+  for (const capability of capabilities) {
+    if (!isRecord(capability)) invalid("performanceAdmission");
+    const capabilityRecord = capability as Record<string, unknown>;
+    if (!hasExactKeys(capabilityRecord, ["capability", "sourceEvidenceRefIds", "validationEvidenceRefIds"]) ||
+        typeof capabilityRecord.capability !== "string" ||
+        !AIRCRAFT_PERFORMANCE_CAPABILITIES.has(capabilityRecord.capability) ||
+        capabilityIds.has(capabilityRecord.capability)) {
+      invalid("performanceAdmission");
+    }
+    if (!isNonBlankStringArray(capabilityRecord.sourceEvidenceRefIds, true) ||
+        !isNonBlankStringArray(capabilityRecord.validationEvidenceRefIds, true)) {
+      invalid("performanceAdmission");
+    }
+    const sourceEvidenceRefIds = capabilityRecord.sourceEvidenceRefIds as string[];
+    const validationEvidenceRefIds = capabilityRecord.validationEvidenceRefIds as string[];
+    if (sourceEvidenceRefIds.some((id) => !evidenceIds.has(id)) ||
+        validationEvidenceRefIds.some((id) => !evidenceIds.has(id)) ||
+        sourceEvidenceRefIds.some((id) => validationEvidenceRefIds.includes(id))) {
+      invalid("performanceAdmission");
+    }
+    capabilityIds.add(capabilityRecord.capability as string);
+  }
 }
 
 function requireCompiledWeaponStructure(
@@ -271,6 +386,17 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
       .filter((id): id is string => typeof id === "string"),
   );
   const weaponIds = new Set<string>();
+  const aircraftIds = new Set<string>();
+  for (const [index, aircraft] of (value.aircraft as unknown[]).entries()) {
+    requireCompiledAircraftStructure(aircraft, index, value, evidenceIds, catalogObjectIds);
+    const aircraftId = aircraft.id as string;
+    if (aircraftIds.has(aircraftId)) {
+      throw new Error(
+        `Supplied engine-verification compiled model pack has duplicate aircraft ID ${aircraftId}.`,
+      );
+    }
+    aircraftIds.add(aircraftId);
+  }
   for (const [index, weapon] of value.weapons.entries()) {
     requireCompiledWeaponStructure(weapon, index, value, evidenceIds, catalogObjectIds);
     const weaponId = weapon.id as string;

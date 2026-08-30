@@ -37,6 +37,9 @@ one family must not imply changes to unrelated contracts.
   verification pack can authorize execution or no-release Air-record
   recompilation; a resealed string-valued launch mass now fails identically at
   the TypeScript and raw Rust/WASM boundaries.
+- Validate the complete compiled aircraft shape and physical domains before an
+  unretained pack can authorize Air-mission recompilation, and enforce semantic
+  weapon versions at both TypeScript and direct Rust/WASM boundaries.
 - Keep deterministic terminal-record replay and uploaded-record verification
   inside the dedicated browser simulation Worker; the rendering thread receives
   only an already-admitted playback result.

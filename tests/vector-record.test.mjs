@@ -542,6 +542,52 @@ test("VSR rejects unqualified or malformed supplied packs before no-release Air 
     ),
     /weapons\[0\].launchMassKg is structurally invalid/,
   );
+
+  const malformedAircraftPack = structuredClone(validPack);
+  malformedAircraftPack.aircraft[0].fuelCapacityKg = "9400";
+  resealCompiledPack(malformedAircraftPack);
+  assert.equal(
+    malformedAircraftPack.aircraft[0].fuelCapacityKg,
+    "9400",
+    "the falsifier must be digest-valid while violating the compiled aircraft numeric contract",
+  );
+  const malformedAircraftEngineScenario = bindPack(malformedAircraftPack);
+  const malformedAircraftScenario = compileMission(
+    currentScenario,
+    malformedAircraftEngineScenario,
+    malformedAircraftPack,
+  );
+  const malformedAircraftEngineRun = structuredClone(engineRun);
+  malformedAircraftEngineRun.scenario = malformedAircraftEngineScenario;
+  const malformedAircraftPrepared = {
+    ...base,
+    scenario: malformedAircraftScenario,
+    engineScenario: malformedAircraftEngineScenario,
+    capabilityManifest: createVerificationDeploymentCapabilities(
+      "typescript",
+      ["A2A"],
+      [malformedAircraftPack.digest],
+    ),
+  };
+  const malformedAircraftResult = buildSimulationResult(
+    malformedAircraftPrepared,
+    malformedAircraftEngineRun,
+  );
+  const malformedAircraftRecord = await createVectorSimulationRecord(
+    malformedAircraftPrepared,
+    malformedAircraftResult,
+    createdAt,
+  );
+  const malformedAircraftSerialized = serializeVectorRecord(malformedAircraftRecord);
+
+  await assert.rejects(
+    openVectorSimulationRecord(
+      malformedAircraftSerialized.buffer,
+      malformedAircraftSerialized.byteLength,
+      { compiledModelPack: malformedAircraftPack },
+    ),
+    /aircraft\[0\].fuelCapacityKg is structurally invalid/,
+  );
 });
 
 test("archived model-pack resolution rejects every partial identity match", () => {

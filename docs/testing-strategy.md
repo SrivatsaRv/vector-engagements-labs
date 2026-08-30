@@ -225,11 +225,16 @@ field, a duplicate weapon identity or a duplicate intended-use identity fail in
 both TypeScript and the raw Rust/WASM ABI before the pack can authorize
 execution. The same cross-backend table reseals a string-valued weapon launch
 mass under a valid canonical digest; TypeScript and raw Rust/WASM must both
-reject it at the compiled-weapon boundary. The no-release Air-record regression
-then carries that malformed pack to VSR readback and proves it cannot exploit a
-skipped engine rerun to reach mission recompilation. The validators cover the
-complete compiled weapon key set, base identity/evidence/validity fields,
-physical scalars, referenced model indexes, enums and termination authority.
+reject it at the compiled-weapon boundary. The same table rebinds a weapon and
+its runtime/entity projection to a non-semantic version and proves that both
+backends reject it. The no-release Air-record regression then carries malformed
+weapon-mass and aircraft-fuel packs to VSR readback and proves neither can
+exploit a skipped engine rerun to reach mission recompilation. The validators
+cover the complete compiled weapon key set, base identity/evidence/validity
+fields, physical scalars, referenced model indexes, enums and termination
+authority; the Air readback boundary applies the corresponding complete
+aircraft shape, physical-domain, component-index and performance-admission
+checks before compilation.
 Table-driven native and
 raw-WASM falsifiers then corrupt the termination
 patch target, duplicate target key, compiled old value, SI unit and evidence
@@ -245,8 +250,8 @@ claimed engine-verification intended use. Because the implicit guided release
 cannot execute, the record reaches Air-mission recompilation without an engine
 rerun; admission must still reject the pack through the same full structural
 and intended-use validator before the mission compiler can consume it. The
-digest-valid string-mass variant is separately shown to fail before the mission
-compiler can create a non-finite takeoff mass.
+digest-valid string-mass and string-fuel variants are separately shown to fail
+before the mission compiler can create invalid takeoff-mass arithmetic.
 Browser runtime tests admit the `open-record` message and prove the client sends
 saved-record verification to the simulation Worker. The built browser journey
 opens the Worker-produced VSR inside that Worker, so deterministic terminal

@@ -1157,6 +1157,11 @@ test("TypeScript and raw Rust/WASM reject digest-valid malformed verification-pa
       typescriptPattern: /weapons\[0\].launchMassKg is structurally invalid/i,
       rustPattern: /pack\.weapons\[0\]\.launchMassKg must be finite/i,
     },
+    {
+      id: "non-semver-weapon-version",
+      typescriptPattern: /weapons\[0\].version is structurally invalid/i,
+      rustPattern: /pack\.weapons\[0\]\.version must be semantic version/i,
+    },
   ]) {
     const pack = structuredClone(binding.pack);
     if (mutation === "extra-top-level-key") pack.unadmittedAuthority = true;
@@ -1171,6 +1176,7 @@ test("TypeScript and raw Rust/WASM reject digest-valid malformed verification-pa
       pack.intendedUses.unshift({ ...structuredClone(intendedUse), version: "0.0.0" });
     }
     if (mutation === "string-launch-mass") pack.weapons[0].launchMassKg = "170";
+    if (mutation === "non-semver-weapon-version") pack.weapons[0].version = "v1";
     resealCompiledPack(pack);
     const scenario = structuredClone(binding.scenario);
     const projection = structuredClone(scenario.modelPack);
@@ -1180,6 +1186,12 @@ test("TypeScript and raw Rust/WASM reject digest-valid malformed verification-pa
     scenario.modelPack = bindRuntimeModelPackDigest(projection);
     for (const entity of scenario.entities) {
       entity.provenance.modelPackDigest = pack.digest;
+      if (
+        mutation === "non-semver-weapon-version" &&
+        entity.provenance.modelId === pack.weapons[0].id
+      ) {
+        entity.provenance.modelVersion = pack.weapons[0].version;
+      }
       if (entity.observerSensor) entity.observerSensor.modelPackDigest = pack.digest;
       if (entity.weapon) entity.weapon.admission.modelPackDigest = pack.digest;
     }

@@ -220,7 +220,12 @@ bounded model references, supported seeker/support/launch enums, complete
 validity ranges, catalog identity and in-pack evidence before mission
 recompilation can consume it. A canonical digest authenticates bytes; it does
 not convert a string-valued mass, non-finite scalar or dangling index into model
-authority. That same authenticated
+authority. Every compiled aircraft consumed by Air-mission recompilation is
+likewise checked for its exact field set, semantic identity, evidence and
+validity bindings, finite mass/fuel/load-factor domains, bounded component and
+loadout indexes, and a closed performance-admission shape. A digest-valid
+string-valued fuel capacity therefore fails before takeoff-mass arithmetic.
+That same authenticated
 authority pack is used for deterministic engine replay and for recompiling an
 archived authored Air mission against the archived environment pack. Exact
 equality across scenario, compiled, manifest, and report members is required
