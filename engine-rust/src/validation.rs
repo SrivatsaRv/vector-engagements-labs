@@ -517,13 +517,13 @@ fn canonicalize_compiled_pack_digest_value(value: Value) -> Value {
 
 fn compiled_pack_string<'a>(
     value: &'a Value,
-    path: &str,
+    _path: &str,
     field: &str,
 ) -> Result<&'a str, EngineError> {
     value
         .get(field)
         .and_then(Value::as_str)
-        .ok_or_else(|| invalid(format!("{path}.{field} must be a string")))
+        .ok_or_else(|| invalid("model pack string"))
 }
 
 fn compiled_pack_number(value: &Value, path: &str, field: &str) -> Result<f64, EngineError> {
@@ -686,6 +686,7 @@ fn compiled_pack_model_base(
     Ok(())
 }
 
+#[inline(always)]
 fn authenticate_positive_sensor_evidence(value: &Value) -> Result<(), EngineError> {
     let evidence = value["evidence"]
         .as_array()
@@ -697,6 +698,25 @@ fn authenticate_positive_sensor_evidence(value: &Value) -> Result<(), EngineErro
         if sensor["sensorKind"] == "DECLARED_ENVELOPE" {
             continue;
         }
+        let admission = &sensor["evidenceAdmission"];
+        let coverage = &admission["coverage"];
+        if admission.as_object().is_none_or(|item| item.len() != 4)
+            || admission["schemaVersion"] != "vector.sensor-evidence-admission.v1"
+            || coverage.as_object().is_none_or(|item| item.len() != 7)
+            || [
+                "detectionRange",
+                "minimumRange",
+                "scanPeriod",
+                "azimuthFieldOfView",
+                "elevationFieldOfView",
+                "measurementUncertainty",
+                "targetApplicability",
+            ]
+            .iter()
+            .any(|field| coverage[field] != "VALIDATED")
+        {
+            return Err(invalid("sensor evidence"));
+        }
         for (field, kind) in [
             ("sourceEvidenceRefIds", "SOURCE"),
             ("validationEvidenceRefIds", "VALIDATION"),
@@ -706,13 +726,17 @@ fn authenticate_positive_sensor_evidence(value: &Value) -> Result<(), EngineErro
                 .filter(|ids| !ids.is_empty())
                 .ok_or_else(|| invalid("sensor evidence"))?;
             for id in ids {
-                if !evidence.iter().any(|item| {
-                    item["id"] == *id
-                        && item["kind"] == kind
-                        && item["contentSha256"]
-                            .as_str()
-                            .is_some_and(|digest| sha256_digest("", digest).is_ok())
-                }) {
+                if sensor["evidenceRefIds"]
+                    .as_array()
+                    .is_none_or(|refs| !refs.contains(id))
+                    || !evidence.iter().any(|item| {
+                        item["id"] == *id
+                            && item["kind"] == kind
+                            && item["contentSha256"]
+                                .as_str()
+                                .is_some_and(|digest| sha256_digest("", digest).is_ok())
+                    })
+                {
                     return Err(invalid("sensor evidence"));
                 }
             }
@@ -743,9 +767,7 @@ pub(crate) fn authenticate_verification_model_pack(
         "loadouts",
         "compatibility",
     ];
-    let object = value
-        .as_object()
-        .ok_or_else(|| invalid("verification pack object"))?;
+    let object = value.as_object().ok_or_else(|| invalid("pack object"))?;
     if object.len() != REQUIRED_KEYS.len()
         || REQUIRED_KEYS.iter().any(|key| !object.contains_key(*key))
     {
@@ -754,7 +776,7 @@ pub(crate) fn authenticate_verification_model_pack(
     if compiled_pack_string(value, "pack", "schemaVersion")? != "vector.compiled-model-pack.v1"
         || compiled_pack_string(value, "pack", "unitSystem")? != "SI"
     {
-        return Err(invalid("verification pack schema"));
+        return Err(invalid("pack schema"));
     }
     for field in [
         "catalogIdentities",
@@ -774,7 +796,7 @@ pub(crate) fn authenticate_verification_model_pack(
     let mut digest_material = value.clone();
     digest_material
         .as_object_mut()
-        .ok_or_else(|| invalid("verification pack object"))?
+        .ok_or_else(|| invalid("pack object"))?
         .remove("digest");
     let digest_bytes =
         serde_json::to_vec(&canonicalize_compiled_pack_digest_value(digest_material))
@@ -788,7 +810,7 @@ pub(crate) fn authenticate_verification_model_pack(
     let intended_uses = value
         .get("intendedUses")
         .and_then(Value::as_array)
-        .ok_or_else(|| invalid("pack.intendedUses must be an array"))?
+        .ok_or_else(|| invalid("intended uses"))?
         .iter()
         .enumerate()
         .map(|(index, item)| {
@@ -817,7 +839,7 @@ pub(crate) fn authenticate_verification_model_pack(
     let evidence_ids = value
         .get("evidence")
         .and_then(Value::as_array)
-        .ok_or_else(|| invalid("pack.evidence must be an array"))?
+        .ok_or_else(|| invalid("evidence"))?
         .iter()
         .enumerate()
         .map(|(index, item)| {
@@ -830,7 +852,7 @@ pub(crate) fn authenticate_verification_model_pack(
     let catalog_object_ids = value
         .get("catalogIdentities")
         .and_then(Value::as_array)
-        .ok_or_else(|| invalid("pack.catalogIdentities must be an array"))?
+        .ok_or_else(|| invalid("catalogs"))?
         .iter()
         .enumerate()
         .map(|(index, item)| {
@@ -849,7 +871,7 @@ pub(crate) fn authenticate_verification_model_pack(
     let weapon_values = value
         .get("weapons")
         .and_then(Value::as_array)
-        .ok_or_else(|| invalid("pack.weapons must be an array"))?;
+        .ok_or_else(|| invalid("weapons"))?;
     let mut weapon_terminations = Vec::new();
     let mut weapon_ids = HashSet::new();
     for (index, weapon) in weapon_values.iter().enumerate() {

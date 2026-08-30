@@ -246,7 +246,10 @@ validation references must be `VALIDATION`, and both must carry lowercase
 SHA-256 artifact digests. Resealing a pack cannot relabel or de-address that
 evidence into valid replay authority. The raw `vector.engine-run-request.v1`
 Rust/WASM entry point repeats that role-and-digest admission before execution;
-it does not rely on the TypeScript wrapper to protect direct ABI callers.
+it also requires the exact admission/coverage shapes, every positive-sensor
+coverage state to be `VALIDATED`, and every admitted artifact to remain in the
+sensor's own provenance list. It does not rely on the TypeScript wrapper to
+protect direct ABI callers.
 Every compiled loadout is also admitted as an exact base model plus exact
 station records with finite body-frame positions, positive integer capacities,
 unique identities and bounded weapon indexes; an unused station may truthfully

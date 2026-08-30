@@ -1597,6 +1597,47 @@ test("both live engines reject positive sensor evidence authority drift", async 
         delete evidence.contentSha256;
       },
     },
+    {
+      label: "positive sensor coverage is unknown",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        sensor.evidenceAdmission.coverage.targetApplicability = "UNKNOWN";
+      },
+    },
+    {
+      label: "positive sensor admission schema is invalid",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        sensor.evidenceAdmission.schemaVersion = "vector.sensor-evidence-admission.invalid";
+      },
+    },
+    {
+      label: "positive sensor admission has an unknown field",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        sensor.evidenceAdmission.unqualified = true;
+      },
+    },
+    {
+      label: "positive sensor coverage has an unknown field",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        sensor.evidenceAdmission.coverage.unqualified = "VALIDATED";
+      },
+    },
+    {
+      label: "admitted source is absent from sensor provenance",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        const sourceId = sensor.evidenceAdmission.sourceEvidenceRefIds[0];
+        sensor.evidenceRefIds = sensor.evidenceRefIds.filter((id) => id !== sourceId);
+      },
+    },
   ]) {
     const pack = structuredClone(binding.pack);
     mutate(pack);
@@ -1616,7 +1657,7 @@ test("both live engines reject positive sensor evidence authority drift", async 
     for (const backend of ["typescript", "rust-wasm"]) {
       assert.throws(
         () => runEngineBackend(structuredClone(scenario), backend, pack),
-        /sensors\[\d+\]\.evidenceAdmission is structurally invalid/i,
+        /sensors\[\d+\]\.evidenceAdmission(?:\.coverage)? is structurally invalid/i,
         `${backend}: ${label}`,
       );
     }
