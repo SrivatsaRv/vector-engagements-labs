@@ -227,13 +227,19 @@ loadout indexes, and a closed performance-admission shape. A digest-valid
 string-valued fuel capacity therefore fails before takeoff-mass arithmetic.
 Every supplied evidence row is admitted as a complete exact record with a
 closed evidence kind, stable unique identity, title, absolute URI, valid access
-date and optional valid locator/content digest. Every aerodynamic model
-referenced by an aircraft must retain at least one fully validated coefficient
-table. That model and every coefficient table, propulsion model and thrust/fuel
-table, sensor and loadout must also cover that aircraft's full validity domain.
-These checks run even for a no-release ground-start archive that skips engine
-rerun, so mission recompilation cannot consume a digest-valid partial evidence
-row or narrowed component envelope.
+date and optional valid locator/content digest. Every aerodynamic, propulsion
+and sensor record is structurally admitted before recompilation, including exact
+compiled-v1 fields, semantic versions, evidence, finite physical values and
+complete validity domains. Every table requires an exact shape, stable identity,
+supported output unit, at least one typed axis in its canonical SI unit, finite
+strictly increasing axis coordinates, finite values and a value count equal to
+the product of its axis lengths. Aerodynamic models must retain at least one
+such coefficient table, while propulsion thrust and fuel-flow tables must use
+their declared SI outputs. Those components and the loadout must also cover the
+aircraft's full validity domain. These checks run even for a no-release
+ground-start archive that skips engine rerun, so mission recompilation cannot
+consume a digest-valid partial evidence row, malformed table tensor or narrowed
+component envelope.
 Every compiled loadout is also admitted as an exact base model plus exact
 station records with finite body-frame positions, positive integer capacities,
 unique identities and bounded weapon indexes; an unused station may truthfully

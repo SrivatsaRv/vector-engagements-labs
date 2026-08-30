@@ -1354,7 +1354,63 @@ test("supplied-pack authority validates the complete loadout and compatibility g
         const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
         aerodynamic.coefficientTables = [];
       },
-      pattern: /aircraft\[0\]\.aerodynamicModel\.coefficientTables is structurally invalid/i,
+      pattern: /aerodynamics\[0\]\.coefficientTables is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table exact fields",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0] = {
+          validityDomain: structuredClone(aerodynamic.coefficientTables[0].validityDomain),
+        };
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables\[0\]\.fields is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table axis unit",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0].axes[0].unit = "m";
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables\[0\]\.axes\[0\]\.unit is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table strictly increasing axis",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0].axes[0].values = [1, 1];
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables\[0\]\.axes\[0\]\.values is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table tensor shape",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0].values = [0.1];
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables\[0\]\.values is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table finite values",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0].values[0] = Number.NaN;
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables\[0\]\.values is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table evidence reference",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0].evidenceRefIds = ["missing-evidence"];
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables\[0\]\.evidenceRefIds is structurally invalid/i,
     },
     {
       label: "aerodynamic table validity covers aircraft domain",
@@ -1375,6 +1431,16 @@ test("supplied-pack authority validates the complete loadout and compatibility g
           aircraft.validityDomain.altitudeM.maximum - 1;
       },
       pattern: /aircraft\[0\]\.propulsionModels\[0\]\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "propulsion exact fields",
+      mutate: (pack) => { pack.propulsion[0].invented = true; },
+      pattern: /propulsion\[0\]\.fields is structurally invalid/i,
+    },
+    {
+      label: "propulsion thrust output unit",
+      mutate: (pack) => { pack.propulsion[0].thrustTable.outputUnit = "1"; },
+      pattern: /propulsion\[0\]\.thrustTable\.outputUnit is structurally invalid/i,
     },
     {
       label: "thrust-table validity covers aircraft domain",
@@ -1404,6 +1470,34 @@ test("supplied-pack authority validates the complete loadout and compatibility g
         sensor.validityDomain.environments = ["UNSUPPORTED_ENVIRONMENT"];
       },
       pattern: /aircraft\[\d+\]\.sensorModels\[0\]\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "sensor exact fields",
+      mutate: (pack) => { pack.sensors[0].invented = true; },
+      pattern: /sensors\[0\]\.fields is structurally invalid/i,
+    },
+    {
+      label: "sensor finite scan period",
+      mutate: (pack) => { pack.sensors[0].scanPeriodS = Number.NaN; },
+      pattern: /sensors\[0\]\.scanPeriodS is structurally invalid/i,
+    },
+    {
+      label: "verification track model numeric domain",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.verificationTrackModel);
+        assert.ok(sensor, "the fixture requires verification track authority");
+        sensor.verificationTrackModel.confirmationObservations = 1;
+      },
+      pattern: /sensors\[\d+\]\.verificationTrackModel is structurally invalid/i,
+    },
+    {
+      label: "positive sensor evidence coverage",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        sensor.evidenceAdmission.coverage.detectionRange = "UNKNOWN";
+      },
+      pattern: /sensors\[\d+\]\.evidenceAdmission\.coverage is structurally invalid/i,
     },
   ]) {
     const pack = structuredClone(binding.pack);

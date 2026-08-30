@@ -760,7 +760,31 @@ test("VSR rejects unqualified or malformed supplied packs before no-release Air 
       emptyAerodynamicTablesSerialized.byteLength,
       { compiledModelPack: emptyAerodynamicTablesPack },
     ),
-    /aircraft\[\d+\]\.aerodynamicModel\.coefficientTables is structurally invalid/,
+    /aerodynamics\[\d+\]\.coefficientTables is structurally invalid/,
+  );
+
+  const malformedAerodynamicTablePack = structuredClone(validPack);
+  const malformedTableAircraft = malformedAerodynamicTablePack.aircraft.find(
+    (aircraft) => aircraft.catalogObjectId === currentScenario.bluePlatformId,
+  );
+  assert.ok(malformedTableAircraft, "the falsifier requires the selected aircraft model");
+  const malformedTableAerodynamic = malformedAerodynamicTablePack.aerodynamics[
+    malformedTableAircraft.aerodynamicModelIndex
+  ];
+  malformedTableAerodynamic.coefficientTables[0] = {
+    validityDomain: structuredClone(malformedTableAerodynamic.coefficientTables[0].validityDomain),
+  };
+  resealCompiledPack(malformedAerodynamicTablePack);
+  const malformedAerodynamicTableSerialized = await serializeNoReleaseRecordForPack(
+    malformedAerodynamicTablePack,
+  );
+  await assert.rejects(
+    openVectorSimulationRecord(
+      malformedAerodynamicTableSerialized.buffer,
+      malformedAerodynamicTableSerialized.byteLength,
+      { compiledModelPack: malformedAerodynamicTablePack },
+    ),
+    /aerodynamics\[\d+\]\.coefficientTables\[0\]\.fields is structurally invalid/,
   );
 });
 

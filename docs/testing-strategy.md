@@ -251,8 +251,12 @@ falsifiers narrow the referenced aerodynamic domain, an aerodynamic coefficient
 table, propulsion domain, thrust table, fuel-flow table and sensor domain; all
 must fail through the compiler-owned aircraft coverage predicate. A separate
 digest-valid falsifier removes every coefficient table from the selected
-aerodynamic model. The no-release Air VSR regression repeats the partial-
-evidence, narrowed-aerodynamic and empty-table cases to prove skipped
+aerodynamic model. A table-driven structural matrix independently falsifies a
+table's exact field set, axis unit, strict coordinate order, tensor shape,
+finite values and evidence linkage; adjacent cases falsify propulsion and
+sensor exact shapes and numeric authority. The no-release Air VSR regression
+repeats the partial-evidence, narrowed-aerodynamic, empty-table and partial-table
+cases to prove skipped
 deterministic engine replay cannot expose any of those packs to mission
 recompilation.
 Table-driven native and

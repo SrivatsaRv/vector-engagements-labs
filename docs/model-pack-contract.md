@@ -757,12 +757,20 @@ backend and additionally admits every complete evidence record and every
 aircraft dependency domain. Evidence has one closed kind, exact
 required/optional fields, a stable unique ID, nonblank title, absolute URI,
 calendar access date, optional nonblank locator and optional lowercase SHA-256.
-Each referenced aerodynamic model must retain at least one fully validated
-coefficient table. That model and every coefficient table, propulsion model,
-thrust/fuel table, sensor, and loadout must cover the aircraft's complete
+Every aerodynamic, propulsion and sensor record in a supplied pack is admitted
+before graph traversal. Models and tables require their exact compiled-v1 field
+sets, stable semantic-versioned identities, in-pack evidence, complete validity
+domains and finite physical values. Tables additionally require supported SI
+output units, at least one typed axis in its canonical SI unit, non-empty
+strictly increasing finite coordinates, a finite value tensor whose length is
+the exact axis-cardinality product, and a stable table identity. Aerodynamic
+models must retain at least one such coefficient table; propulsion thrust and
+fuel-flow tables must respectively produce `N` and `kg/(N*s)`. Those components
+and the loadout must cover the aircraft's complete
 altitude, Mach, angle-of-attack, load-factor, configuration and environment
 domain through the compiler-owned coverage predicate. A content digest alone
-cannot promote a partial evidence row or narrowed dependency into authority.
+cannot promote a partial evidence row, malformed numeric table or narrowed
+dependency into authority.
 A direct native or raw WASM scenario without the complete pack cannot gain this
 authority merely by relabelling `intendedUse`. Product execution never supplies
 that test authority. Before either product or verification execution consumes a

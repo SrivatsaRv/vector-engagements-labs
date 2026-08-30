@@ -53,6 +53,11 @@ one family must not imply changes to unrelated contracts.
   validity domain before either backend or no-release Air-record recompilation.
 - Reject supplied aircraft authority whose referenced aerodynamic model has no
   coefficient tables, including no-release Air records that skip engine replay.
+- Admit every supplied aerodynamic, propulsion, sensor and coefficient-table
+  record through its complete compiled-v1 structure before use. Exact fields,
+  SI axis/output units, finite monotonic coordinates, tensor cardinality,
+  finite values and evidence links now fail closed even under a valid resealed
+  content digest and on no-release VSR readback.
 - Keep deterministic terminal-record replay and uploaded-record verification
   inside the dedicated browser simulation Worker; the rendering thread receives
   only an already-admitted playback result.
