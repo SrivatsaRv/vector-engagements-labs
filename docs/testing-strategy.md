@@ -227,7 +227,12 @@ execution. Table-driven native and
 raw-WASM falsifiers then corrupt the termination
 patch target, duplicate target key, compiled old value, SI unit and evidence
 reference while recomputing `runtimeDigest`; every case fails before the
-override is consumed.
+override is consumed. A positive Air VSR regression then binds its authored and
+compiled mission to an unretained engine-verification pack, opens the record
+with that complete authenticated pack and requires exact mission and pack
+identity on readback. This proves supplied authority is reused for Air-mission
+recompilation rather than passing engine replay and then failing at a
+retained-only inventory lookup.
 Browser runtime tests admit the `open-record` message and prove the client sends
 saved-record verification to the simulation Worker. The built browser journey
 opens the Worker-produced VSR inside that Worker, so deterministic terminal

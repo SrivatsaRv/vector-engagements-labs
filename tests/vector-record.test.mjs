@@ -305,6 +305,51 @@ test("VSR recompiles an archived Air mission against its exact retained model pa
   assert.deepEqual(opened.result.engineRun.scenario.airMission, archivedMission);
 });
 
+test("VSR recompiles an archived Air mission against its authenticated supplied verification pack", async () => {
+  const currentScenario = SCENARIO_LIBRARY[0].scenario;
+  const base = prepareSimulation(currentScenario);
+  const binding = await bindVerificationTrackModelPack(base.engineScenario);
+  const scenario = synchronizeScenarioAirMission(
+    structuredClone(currentScenario),
+    binding.pack,
+  );
+  const environmentPack = binding.scenario.geospatial.environmentPack;
+  const archivedMission = compileAirMissionDefinition(scenario.airMission, {
+    scenario,
+    modelPack: binding.pack,
+    environmentPackDigest: environmentPack.identity.digest,
+    environmentPack,
+    fixedStepSeconds: binding.scenario.fixedStepSeconds,
+    durationSeconds: binding.scenario.durationSeconds,
+  });
+  binding.scenario.airMission = archivedMission;
+  const capabilityManifest = createVerificationDeploymentCapabilities(
+    "typescript",
+    ["A2A"],
+    [binding.pack.digest],
+  );
+  const prepared = {
+    ...base,
+    scenario,
+    engineScenario: binding.scenario,
+    capabilityManifest,
+  };
+  const engineRun = runEngineBackend(binding.scenario, "typescript", binding.pack);
+  const result = buildSimulationResult(prepared, engineRun);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const serialized = serializeVectorRecord(record);
+
+  const opened = await openVectorSimulationRecord(
+    serialized.buffer,
+    serialized.byteLength,
+    { compiledModelPack: binding.pack },
+  );
+
+  assert.equal(opened.result.engineRun.scenario.modelPack.id, binding.pack.id);
+  assert.equal(opened.result.engineRun.scenario.modelPack.digest, binding.pack.digest);
+  assert.deepEqual(opened.result.engineRun.scenario.airMission, archivedMission);
+});
+
 test("archived model-pack resolution rejects every partial identity match", () => {
   const pack = historicalModelPackBundle.pack;
   for (const identity of [

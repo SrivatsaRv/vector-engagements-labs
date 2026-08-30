@@ -301,6 +301,9 @@ No pending family-specific entry.
 - Bind the report's primary weapon and target identities to that deterministic
   replay for truthful nonterminal runs, rejecting a resealed report that
   substitutes an unlaunched carried store for the released weapon.
+- Reuse an authenticated supplied engine-verification pack when recompiling an
+  archived Air mission, so an exact unretained verification record can complete
+  readback without falling through to the product retained-pack inventory.
 - Validate the closed ground-dynamics validity fields semantically so canonical
   archive key ordering cannot reject an otherwise exact release replay.
 - Keep an explicit unpowered `JETTISON` outside guided-weapon terminal

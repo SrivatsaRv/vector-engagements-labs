@@ -207,18 +207,18 @@ VSR integrity continues to validate only the model-pack identity already bound
 by the compiled scenario and manifest. The new offline v2 validator neither
 weakens that check nor lets replay resolve or substitute a model pack.
 
-Readback resolves the archived model pack by exact `(id, version, digest)` from
-the application-retained pack set, recompiles the archived authored mission
-against that pack and the archived environment pack, and requires exact
-equality across scenario, compiled, manifest, and report members before
-returning replay data. An unretained or partially matching identity fails
-closed; readback never substitutes the current pack.
-Non-Air records receive the same fail-closed rule whenever their runtime pack
-carries weapon-termination authority. Verification tooling may supply a full
-compiled pack explicitly, but its id, version and digest must exactly equal the
-recorded identity before that pack can serve as replay authority. Readback first
-recomputes the supplied pack's canonical compiler digest, so a fabricated pack
-bearing the recorded digest is rejected before any causal event, frame or report
+Product readback resolves the archived model pack by exact `(id, version,
+digest)` from the application-retained pack set. Verification tooling may
+instead supply the complete unretained compiled pack explicitly, but its
+structure, canonical compiler digest, intended use, id, version and digest must
+authenticate against the exact recorded identity before it can serve as replay
+authority. That same authenticated authority pack is used for deterministic
+engine replay and for recompiling an archived authored Air mission against the
+archived environment pack. Exact equality across scenario, compiled, manifest,
+and report members is required before returning replay data. Without an
+explicit authenticated verification pack, an unretained identity fails closed;
+readback never substitutes the current pack. A fabricated pack bearing the
+recorded digest is rejected before any causal event, frame, mission or report
 authority is evaluated.
 Pre-termination records are identified by the absence of the
 `weaponTerminations` member, not by an empty current member. Their historical

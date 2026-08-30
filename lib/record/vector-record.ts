@@ -983,7 +983,7 @@ export async function openVectorSimulationRecord(
     }
     let verifiedMission;
     try {
-      const archivedModelPack = resolveRetainedCompiledModelPack(
+      const archivedModelPack = authorityPack ?? resolveRetainedCompiledModelPack(
         compiled.engineScenario.modelPack,
       );
       verifiedMission = compileAirMissionDefinition(scenario.airMission, {
