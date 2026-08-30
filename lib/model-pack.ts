@@ -2,6 +2,7 @@ import { sha256Hex } from "./canonical-json.ts";
 import { assertGovernedAircraftEvidenceAdmission } from "./aircraft-evidence-registry.ts";
 import type { EntityLifecycle, ObserverTrackModel } from "./engine/contracts.ts";
 import type { Vec3 } from "./engine/primitives.ts";
+import { sha256HexBytesSync } from "./geospatial/digest.ts";
 
 export const MODEL_PACK_SOURCE_SCHEMA_VERSION = "vector.model-pack-source.v1";
 export const COMPILED_MODEL_PACK_SCHEMA_VERSION = "vector.compiled-model-pack.v1";
@@ -122,6 +123,42 @@ export type CoordinateConventions = {
   velocityUnit: "METER_PER_SECOND";
   verticalReference: "ELLIPSOID_HEIGHT" | "MEAN_SEA_LEVEL";
 };
+
+/**
+ * Single compiler-owned authority for coordinate conventions accepted by
+ * source compilation and supplied compiled-pack admission.
+ */
+export const SUPPORTED_COORDINATE_CONVENTION_VALUES = Object.freeze({
+  geodeticDatum: Object.freeze(["WGS84"]),
+  localFrame: Object.freeze(["EAST_NORTH_UP"]),
+  bodyAxes: Object.freeze(["X_FORWARD_Y_RIGHT_Z_DOWN"]),
+  aerodynamicAxes: Object.freeze(["X_FORWARD_Y_RIGHT_Z_DOWN"]),
+  angularUnit: Object.freeze(["RADIAN"]),
+  positionUnit: Object.freeze(["METER"]),
+  velocityUnit: Object.freeze(["METER_PER_SECOND"]),
+  verticalReference: Object.freeze(["ELLIPSOID_HEIGHT", "MEAN_SEA_LEVEL"]),
+} satisfies Readonly<Record<keyof CoordinateConventions, readonly string[]>>);
+
+export function hasSupportedCoordinateConventions(
+  value: unknown,
+): value is CoordinateConventions {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  const fields = Object.keys(SUPPORTED_COORDINATE_CONVENTION_VALUES) as Array<
+    keyof CoordinateConventions
+  >;
+  if (
+    Object.keys(candidate).length !== fields.length ||
+    fields.some((field) => !Object.hasOwn(candidate, field))
+  ) {
+    return false;
+  }
+  return fields.every((field) => {
+    const convention = candidate[field];
+    return typeof convention === "string" &&
+      SUPPORTED_COORDINATE_CONVENTION_VALUES[field].includes(convention);
+  });
+}
 
 export type ModelLimitation = {
   id: string;
@@ -316,6 +353,15 @@ export type WeaponModelSource = ModelSourceBase & {
   datalinkUpdatePeriod: Quantity;
   thrustTaperSpeed: Quantity;
   navigationConstant: Quantity;
+  termination: WeaponTerminationModelSource;
+};
+
+export type WeaponTerminationModelSource = {
+  schemaVersion: "vector.weapon-termination-model.v1";
+  intendedUse: "ENGINE_VERIFICATION_ONLY";
+  criterion: "GEOMETRIC_CLOSEST_APPROACH";
+  interceptRadius: Quantity;
+  maximumFlightTime: Quantity;
 };
 
 export type WeaponSeekerMode = "UNAVAILABLE" | "ACTIVE_RADAR" | "INFRARED" | "PASSIVE_RADIATION";
@@ -564,6 +610,15 @@ export type CompiledWeaponModel = CompiledModelBase & {
   datalinkUpdatePeriodS: number;
   thrustTaperSpeedMps: number;
   navigationConstant: number;
+  termination: CompiledWeaponTerminationModel;
+};
+
+export type CompiledWeaponTerminationModel = {
+  schemaVersion: "vector.weapon-termination-model.v1";
+  intendedUse: "ENGINE_VERIFICATION_ONLY";
+  criterion: "GEOMETRIC_CLOSEST_APPROACH";
+  interceptRadiusM: number;
+  maximumFlightTimeS: number;
 };
 
 export type CompiledLoadoutModel = CompiledModelBase & {
@@ -1005,7 +1060,7 @@ function normalizeValidityDomain(
   };
 }
 
-function validityDomainCovers(
+export function validityDomainCovers(
   provider: SiValidityDomain,
   required: SiValidityDomain,
 ) {
@@ -1132,7 +1187,7 @@ function normalizeDigestNumbers(value: unknown): unknown {
   return value;
 }
 
-function governedContentDigest(value: unknown) {
+function governedContentDigestBytes(value: unknown) {
   const normalized = normalizeDigestNumbers(value);
   const canonicalize = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(canonicalize);
@@ -1145,12 +1200,19 @@ function governedContentDigest(value: unknown) {
     }
     return value;
   };
-  const bytes = new TextEncoder().encode(JSON.stringify(canonicalize(normalized)));
-  return crypto.subtle.digest("SHA-256", bytes).then((digest) =>
+  return new TextEncoder().encode(JSON.stringify(canonicalize(normalized)));
+}
+
+function governedContentDigest(value: unknown) {
+  return crypto.subtle.digest("SHA-256", governedContentDigestBytes(value)).then((digest) =>
     [...new Uint8Array(digest)]
       .map((byte) => byte.toString(16).padStart(2, "0"))
       .join(""),
   );
+}
+
+function governedContentDigestSync(value: unknown) {
+  return sha256HexBytesSync(governedContentDigestBytes(value));
 }
 
 export function aircraftLineageValueDigest(input: {
@@ -1174,17 +1236,10 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
   }
   stableId(issues, "id", source.id);
   version(issues, "version", source.version);
-  const coordinateExpectations: Record<keyof CoordinateConventions, string[]> = {
-    geodeticDatum: ["WGS84"],
-    localFrame: ["EAST_NORTH_UP"],
-    bodyAxes: ["X_FORWARD_Y_RIGHT_Z_DOWN"],
-    aerodynamicAxes: ["X_FORWARD_Y_RIGHT_Z_DOWN"],
-    angularUnit: ["RADIAN"],
-    positionUnit: ["METER"],
-    velocityUnit: ["METER_PER_SECOND"],
-    verticalReference: ["ELLIPSOID_HEIGHT", "MEAN_SEA_LEVEL"],
-  };
-  for (const [field, allowed] of Object.entries(coordinateExpectations)) {
+  if (!hasSupportedCoordinateConventions(source.coordinateConventions)) {
+    issues.push("coordinateConventions must use the exact supported field set and values");
+  }
+  for (const [field, allowed] of Object.entries(SUPPORTED_COORDINATE_CONVENTION_VALUES)) {
     const value = source.coordinateConventions?.[field as keyof CoordinateConventions];
     if (typeof value !== "string" || !allowed.includes(value)) {
       issues.push(`coordinateConventions.${field} is unsupported`);
@@ -1434,6 +1489,19 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
     if (!WEAPON_LAUNCH_AUTHORIZATIONS.includes(item.launchAuthorization)) issues.push(`weapons[${index}].launchAuthorization is unsupported`);
     const launchMassKg = normalizeQuantity(issues, `weapons[${index}].launchMass`, item.launchMass, "kg", evidenceIds);
     const dryMassKg = normalizeQuantity(issues, `weapons[${index}].dryMass`, item.dryMass, "kg", evidenceIds);
+    const termination = item.termination as WeaponTerminationModelSource | undefined;
+    if (!termination || typeof termination !== "object") issues.push(`weapons[${index}].termination is required`);
+    if (termination?.schemaVersion !== "vector.weapon-termination-model.v1") {
+      issues.push(`weapons[${index}].termination.schemaVersion is required and unsupported`);
+    }
+    if (termination?.intendedUse !== "ENGINE_VERIFICATION_ONLY") {
+      issues.push(`weapons[${index}].termination.intendedUse is required and unsupported`);
+    }
+    if (termination?.criterion !== "GEOMETRIC_CLOSEST_APPROACH") {
+      issues.push(`weapons[${index}].termination.criterion is required and unsupported`);
+    }
+    const invalidRadius = { value: Number.NaN, unit: "m" as const, evidenceRefIds: [] };
+    const invalidTime = { value: Number.NaN, unit: "s" as const, evidenceRefIds: [] };
     if (dryMassKg > launchMassKg) issues.push(`weapons[${index}].dryMass must not exceed launchMass`);
     return {
       id: item.id,
@@ -1455,6 +1523,13 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
       datalinkUpdatePeriodS: normalizeQuantity(issues, `weapons[${index}].datalinkUpdatePeriod`, item.datalinkUpdatePeriod, "s", evidenceIds),
       thrustTaperSpeedMps: normalizeQuantity(issues, `weapons[${index}].thrustTaperSpeed`, item.thrustTaperSpeed, "m/s", evidenceIds),
       navigationConstant: normalizeQuantity(issues, `weapons[${index}].navigationConstant`, item.navigationConstant, "1", evidenceIds),
+      termination: {
+        schemaVersion: termination?.schemaVersion as CompiledWeaponModel["termination"]["schemaVersion"],
+        intendedUse: termination?.intendedUse as CompiledWeaponModel["termination"]["intendedUse"],
+        criterion: termination?.criterion as CompiledWeaponModel["termination"]["criterion"],
+        interceptRadiusM: normalizeQuantity(issues, `weapons[${index}].termination.interceptRadius`, termination?.interceptRadius ?? invalidRadius, "m", evidenceIds),
+        maximumFlightTimeS: normalizeQuantity(issues, `weapons[${index}].termination.maximumFlightTime`, termination?.maximumFlightTime ?? invalidTime, "s", evidenceIds),
+      },
     };
   });
   weapons.forEach((item, index) => {
@@ -1466,6 +1541,11 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
       item.datalinkUpdatePeriodS <= 0 ||
       item.thrustTaperSpeedMps <= 0 ||
       item.navigationConstant <= 0
+      || item.termination.schemaVersion !== "vector.weapon-termination-model.v1"
+      || item.termination.intendedUse !== "ENGINE_VERIFICATION_ONLY"
+      || item.termination.criterion !== "GEOMETRIC_CLOSEST_APPROACH"
+      || item.termination.interceptRadiusM <= 0
+      || item.termination.maximumFlightTimeS <= 0
     ) {
       issues.push(`weapons[${index}] contains values outside its physical domain`);
     }
@@ -1634,6 +1714,14 @@ export async function verifyCompiledModelPackDigest(pack: CompiledModelPack) {
     Object.entries(pack).filter(([key]) => key !== "digest"),
   ) as Omit<CompiledModelPack, "digest">;
   return (await modelPayloadDigest(payload)) === pack.digest;
+}
+
+export function verifyCompiledModelPackDigestSync(pack: Readonly<CompiledModelPack>) {
+  if (!DIGEST_PATTERN.test(pack.digest)) return false;
+  const payload = Object.fromEntries(
+    Object.entries(pack).filter(([key]) => key !== "digest"),
+  ) as Omit<CompiledModelPack, "digest">;
+  return governedContentDigestSync(digestPayload(payload)) === pack.digest;
 }
 
 const AIRCRAFT_DATA_FAMILIES: AircraftDataFamily[] = [
@@ -2059,11 +2147,17 @@ function validateGovernedExactKeys(source: ModelPackSourceV2, issues: string[]) 
       "catalogObjectId", "launchMass", "dryMass", "aerodynamicModelId", "propulsionModelId",
       "seekerMode", "supportRequirement", "launchAuthorization", "maximumCommandLoadFactor",
       "seekerActivationRange", "datalinkUpdatePeriod", "thrustTaperSpeed", "navigationConstant",
+      "termination",
     ], ["sensorModelId"]);
     for (const field of [
       "launchMass", "dryMass", "maximumCommandLoadFactor", "seekerActivationRange",
       "datalinkUpdatePeriod", "thrustTaperSpeed", "navigationConstant",
     ] as const) quantity(`${path}.${field}`, item[field]);
+    exactKeys(issues, `${path}.termination`, item.termination, [
+      "schemaVersion", "intendedUse", "criterion", "interceptRadius", "maximumFlightTime",
+    ]);
+    quantity(`${path}.termination.interceptRadius`, item.termination?.interceptRadius);
+    quantity(`${path}.termination.maximumFlightTime`, item.termination?.maximumFlightTime);
   });
   source.loadouts?.forEach((item, index) => {
     const path = `source.loadouts[${index}]`;
@@ -2852,8 +2946,14 @@ function validateCompiledModelPackV2ExactKeys(pack: CompiledModelPackV2, issues:
     "catalogObjectId", "launchMassKg", "dryMassKg", "aerodynamicModelIndex",
     "propulsionModelIndex", "sensorModelIndex", "seekerMode", "supportRequirement",
     "launchAuthorization", "maximumCommandLoadFactorG", "seekerActivationRangeM",
-    "datalinkUpdatePeriodS", "thrustTaperSpeedMps", "navigationConstant",
+    "datalinkUpdatePeriodS", "thrustTaperSpeedMps", "navigationConstant", "termination",
   ]));
+  pack.weapons?.forEach((item, index) => exactKeys(
+    issues,
+    `pack.weapons[${index}].termination`,
+    item.termination,
+    ["schemaVersion", "intendedUse", "criterion", "interceptRadiusM", "maximumFlightTimeS"],
+  ));
   pack.loadouts?.forEach((item, index) => {
     const path = `pack.loadouts[${index}]`;
     base(path, item, ["platformCatalogObjectId", "stations"]);
@@ -3301,6 +3401,8 @@ function resolvePatchTarget(pack: CompiledModelPack, modelId: string, fieldPath:
       "/maximumCommandLoadFactorG": { value: weapon.maximumCommandLoadFactorG, unit: "g0" },
       "/seekerActivationRangeM": { value: weapon.seekerActivationRangeM, unit: "m" },
       "/datalinkUpdatePeriodS": { value: weapon.datalinkUpdatePeriodS, unit: "s" },
+      "/termination/interceptRadiusM": { value: weapon.termination.interceptRadiusM, unit: "m" },
+      "/termination/maximumFlightTimeS": { value: weapon.termination.maximumFlightTimeS, unit: "s" },
     };
     return allowed[fieldPath];
   }

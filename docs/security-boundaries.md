@@ -30,6 +30,12 @@ request, ordered authority seal and compact entity binding. Caller mutation of
 identity, tick, station/rule, operation, mass, installed drag or validity cannot
 be repaired by resealing exposed compact digests. Operational airborne-state or
 inventory rejection is retained explicitly and never materializes a store.
+Weapon-terminal replay requires the event's achieved state and typed cause to
+map exactly to the saved run outcome. It also retains the cumulative minimum
+separation over the admitted weapon lifetime; a caller cannot substitute the
+terminal step's separation or reseal a contradictory event, frame and report.
+The read boundary compares the event value to the canonical six-decimal
+projection of `report.engine.closestApproachM` before exposing replay.
 
 Saved-run snapshots and saved-run admission counters now have separate
 domain-owned declaration modules behind the unchanged aggregate Drizzle schema.
@@ -139,7 +145,15 @@ retire named-model or generic-force-package debt merely because it completes.
 The Rust/WASM artifact now binds the exact Binaryen 131.0.0 optimization policy
 into its source identity and verifies optimized bytes, length and required ABI
 exports before embedding. The optimizer is build-time only and cannot be
-selected or supplied by a runtime scenario.
+selected or supplied by a runtime scenario. Direct engine-verification request
+callers are independently denied when a positive sensor's admitted source or
+validation evidence has the wrong role or lacks its immutable SHA-256 digest;
+the same raw boundary rejects an unknown admission/coverage field, unsupported
+schema, non-`VALIDATED` coverage, or an admitted artifact removed from sensor
+provenance. It also rejects duplicate evidence identities, overlapping source
+and validation roles, and any ordered runtime observer-sensor projection that
+does not exactly match the authenticated compiled pack. The browser wrapper is
+defense in depth, not the sole authority boundary.
 
 The contract ownership registry now maps the one Air mission implementation and
 regression suite to new material mission-contract and record-storage sections.
@@ -156,6 +170,18 @@ focused regression to the engine performance section, while STUB-26 keeps its
 generic operation/installed-drag assumptions release-blocking. The inclusive
 `[0.001, 1] m²` validity is documented and authority-sealed; changing that
 policy requires a new reviewed contract rather than caller data.
+
+Migration 017 and its generated model-pack fixture are accepted only when the
+registered generator reproduces their exact bytes, model-pack digest, intended
+use, and scenario-template readback identities. STUB-27 keeps the 25 m
+geometric closest-approach and 180 s expiry values release-blocking and binds
+their explicit `NOT_MODELLED` target effect; neither a caller nor a renderer
+may promote that verification-only termination into fuze, damage, kill, or
+named-weapon authority. VSR replay recomputes the achieved fixed-step launch
+boundary plus the admitted maximum lifetime and rejects any hash-resealed
+expiry event carrying a different occurrence time. Boundary-only miss, terrain
+and target-unavailable causes likewise require exact equality with the terminal
+event boundary.
 
 Issue #151's generic mission-policy source policy scans every production and
 runtime-fixture root for exact hashes and SHA-256-confirmed raw or

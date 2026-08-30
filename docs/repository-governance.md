@@ -33,6 +33,10 @@ control-authority inventory as exact UI-authoring and mission-contract paths.
 Their focused parser/matrix and component regressions are part of `ci-local`;
 new contract-looking controls or tests must be assigned to the same owning
 families instead of bypassing documentation-impact selection.
+The #28 gate verifies the forward-only weapon-termination migration, the
+between-step closest-approach oracle, model-pack admission, TypeScript/Rust
+event parity and the production Worker/VSR result. New termination contract
+paths must be registered in the contract-document ownership policy.
 
 #182 adds the generic ground-dynamics migration generator to the existing
 mission-scenario owner. The declaration gate therefore covers its schema,

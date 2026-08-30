@@ -79,6 +79,29 @@ SI projection, completeness and final digests, and returns only the exact pack
 identity. V2 remains non-promotable: the function is not part of the simulation
 ABI above and cannot construct runtime state or select a backend.
 
+Weapon termination is backend-neutral. Each weapon carries one compiled
+`vector.weapon-termination-model.v1`; both implementations reject wrong schema,
+intended use, criterion, non-finite or non-positive radius/time before the first
+tick. Before either live backend runs, any scenario carrying that entity-level
+authority must resolve an exact application-retained compiled pack; an unknown
+pack is rejected even when its compact projection is omitted or self-resealed.
+Compiler verification may supply the complete exact-identity pack only when the
+scenario and pack both declare the governed engine-verification intended use;
+the product execution path supplies no such pack. Both live adapters recompute
+the full supplied pack's compiler-canonical digest before accepting that
+exception. Matching caller-authored identity strings and a resealed compact
+runtime projection are insufficient.
+Both minimize the same between-step relative-position segment, apply the
+same terminal precedence, update the achieved weapon state and emit the same
+`WEAPON_TERMINATED` payload. Whenever a segment establishes a new lifetime
+minimum, both backends retain its exact fixed-step boundaries while integrating;
+rolling engine snapshots replace superseded candidates and publication merges the
+exact minimizing pair, regular playback samples and every event frame. Record
+replay uses those frames to recompute the lifetime minimum and uses the terminal pair,
+immutable terrain pack, velocity, launch/lifetime authority and target
+lifecycle to re-evaluate the ordered terminal cause. The legacy scenario completion distance and any
+renderer distance are outside this authority.
+
 ## TypeScript reference
 
 The TypeScript engine is retained as an independently executable reference implementation. It uses the same coordinate frames, atmosphere, entity lifecycle, identity-bearing aircraft table interpolation with fail-closed coverage, aircraft state update, proportional-navigation guidance, coverage-envelope generation, termination rules, and sampling cadence.
@@ -86,6 +109,10 @@ The TypeScript engine is retained as an independently executable reference imple
 It is not a separate product mode. Its purpose is controlled parity testing, diagnosis, and performance comparison while the Rust implementation matures.
 
 ## Selection and provenance
+
+Both backends retain the exact 0.9.0 model-pack digest and the same compiled
+termination-model fields in run provenance. Backend selection cannot replace
+that authority or change an intercept into a damage/kill claim.
 
 Generic runway execution does not select a backend or a named model. Both
 backends retain the same mission, model-pack, EnvironmentPack and optimized
@@ -126,7 +153,7 @@ promotion against the unchanged full Air-mission authority.
 
 Rebuilding the artifact requires Rust stable, Cargo on `PATH`, and the
 `wasm32-unknown-unknown` target. The build then applies the exact
-`binaryen@131.0.0 -O3 -S2 rust-wasm-features-v1` post-link policy before
+`binaryen@131.0.0 -O3 -S2 --reorder-functions rust-wasm-features-v1` post-link policy before
 content-addressing and embedding the module. The optimizer identity participates
 in the source digest and is recorded beside the artifact; verification rejects
 either source or optimizer drift. The feature policy admits only the Rust-emitted
@@ -151,6 +178,11 @@ runtime.
   verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
 
 ## Swap boundary
+
+Weapon terminal transitions sit inside the shared backend contract: either
+implementation must produce the same achieved state, cause, occurrence time
+and event payload. No TypeScript-only, WASM-only or browser-only branch may
+invent terminal state.
 
 The ground-to-air swap is achieved-state-driven: only the recorded `ENROUTE`
 transition releases the aircraft from the ground-operation integrator to the

@@ -36,6 +36,11 @@ The committed gates are:
 
 ## Current evidence
 
+Isolation verification follows the current compiled model-pack identity, now
+0.9.0, so a production-pack update cannot bypass the generic-reference guard.
+The new termination model remains separate assumption-backed runtime authority,
+not validation of named-aircraft or named-weapon performance.
+
 Measured locally on 2026-08-12 using Node.js v24.3.0 on Apple M5 arm64:
 
 - maximum geodesic error: 69.098 m;

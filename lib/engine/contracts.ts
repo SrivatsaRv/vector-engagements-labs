@@ -60,6 +60,7 @@ export const SIMULATION_EVENT_PAYLOAD_SCHEMAS = {
   ENTITY_LIFECYCLE_CHANGED: "vector.simulation-event-payload.entity-lifecycle-changed.v1",
   AIRCRAFT_OPERATIONAL_STATE_CHANGED: "vector.simulation-event-payload.aircraft-operational-state-changed.v1",
   AIRBORNE_STORE_TRANSFER_OUTCOME: "vector.simulation-event-payload.airborne-store-transfer-outcome.v1",
+  WEAPON_TERMINATED: "vector.simulation-event-payload.weapon-terminated.v2",
   RUN_COMPLETED: "vector.simulation-event-payload.run-completed.v1",
   TRACK_STATE_CHANGED: "vector.simulation-event-payload.track-state-changed.v3",
 } as const;
@@ -69,6 +70,7 @@ export type SimulationEventParticipantRole =
   | "SUBJECT"
   | "LAUNCHER"
   | "WEAPON"
+  | "TARGET"
   | "SENSOR";
 
 export type SimulationEventParticipant = {
@@ -261,6 +263,10 @@ export type EntityLifecycle =
 export type EngineTermination =
   | "threshold_reached"
   | "energy_depleted"
+  | "weapon_intercept"
+  | "weapon_miss"
+  | "weapon_expired"
+  | "weapon_failed"
   | "target_unavailable"
   | "time_limit"
   | "invalid_scenario";
@@ -291,6 +297,28 @@ export type SimulationEventPayload =
       entityKind: EntityKind;
       from: EntityLifecycle;
       to: EntityLifecycle;
+    }
+  | {
+      kind: "WEAPON_TERMINATED";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.WEAPON_TERMINATED;
+      weaponId: string;
+      targetId: string;
+      from: Exclude<WeaponFlightState, WeaponTerminalState>;
+      to: WeaponTerminalState;
+      cause:
+        | "GEOMETRIC_INTERCEPT"
+        | "ENERGY_DEPLETED"
+        | "FLIGHT_TIME_EXPIRED"
+        | "TERRAIN_IMPACT"
+        | "TARGET_UNAVAILABLE";
+      criterion: "GEOMETRIC_CLOSEST_APPROACH";
+      closestApproachM: number;
+      closestApproachPriorTimeSeconds: number;
+      closestApproachNextTimeSeconds: number;
+      occurrenceTimeSeconds: number;
+      interceptRadiusM: number;
+      maximumFlightTimeSeconds: number;
+      targetEffect: "NOT_MODELLED";
     }
   | {
       kind: "RUN_COMPLETED";
@@ -367,7 +395,7 @@ export type SimulationEventV2 = {
     | "WEAPON"
     | "TERMINATION";
   producer: {
-    subsystem: "RUN_COORDINATOR" | "ENTITY_LIFECYCLE" | "AIRCRAFT_DYNAMICS" | "SENSOR_TRACK";
+    subsystem: "RUN_COORDINATOR" | "ENTITY_LIFECYCLE" | "AIRCRAFT_DYNAMICS" | "WEAPON_DYNAMICS" | "SENSOR_TRACK";
     entityId?: string;
   };
   ownerAffiliation?: Affiliation;
@@ -396,6 +424,14 @@ export type WeaponFlightState =
   | "BOOST"
   | "COAST"
   | "TERMINAL_GUIDANCE"
+  | WeaponTerminalState;
+
+export type WeaponTerminalState =
+  | "INTERCEPT"
+  | "MISS"
+  | "EXPIRED"
+  | "FAILED"
+  | "SELF_DESTRUCT"
   | "TARGET_UNAVAILABLE";
 
 export type ModelValueState =
@@ -467,6 +503,14 @@ export type WeaponAdmission = {
   launchAuthorization: WeaponLaunchAuthorization;
 };
 
+export type WeaponTerminationAdmission = {
+  schemaVersion: "vector.weapon-termination-model.v1";
+  intendedUse: "ENGINE_VERIFICATION_ONLY";
+  criterion: "GEOMETRIC_CLOSEST_APPROACH";
+  interceptRadiusM: number;
+  maximumFlightTimeSeconds: number;
+};
+
 export type AirborneStoreTransferBinding = import("../air-mission.ts").CompiledAirborneStoreTransfer & {
   missionDigest: string;
 };
@@ -516,6 +560,7 @@ export type EngineEntityDefinition = {
     datalinkUpdateSeconds: number;
     commandedCruiseAltitudeM: number;
     admission: WeaponAdmission;
+    termination: WeaponTerminationAdmission;
     storeTransfer?: AirborneStoreTransferBinding;
   };
   sensor?: {
@@ -579,6 +624,12 @@ export type EngineScenario = {
       azimuthFieldOfViewRad: number;
       elevationFieldOfViewRad: number;
       verificationTrackModel?: ObserverTrackModel;
+    }>;
+    /** Digest-bound effective termination authority for each compiled weapon. */
+    weaponTerminations: Array<{
+      modelId: string;
+      modelVersion: string;
+      termination: WeaponTerminationAdmission;
     }>;
     scenarioPatches: ScenarioModelPatch[];
   };

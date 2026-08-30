@@ -106,19 +106,21 @@ try {
     (SELECT count(*)::int FROM installation_runways WHERE mission_start_eligibility='PUBLIC_EDUCATIONAL') AS eligible_runways,
     (SELECT count(*)::int FROM environment_packs) AS environment_packs,
     (SELECT count(*)::int FROM study_areas) AS study_areas,
-    (SELECT count(*)::int FROM scenario_templates WHERE status='VALIDATED') AS scenarios`;
+    (SELECT count(*)::int FROM scenario_templates WHERE status='VALIDATED') AS scenarios,
+    (SELECT count(*)::int FROM scenario_templates WHERE status='RETIRED') AS retired_scenarios`;
   assert.equal(counts.platforms, 4);
   assert.equal(counts.weapons, 8);
   assert.equal(counts.models, 8);
-  assert.ok(counts.compiled_model_packs >= 1, "current model pack is missing");
-  assert.ok(counts.credibility_manifests >= 2, "current credibility manifests are missing");
-  assert.ok(counts.intended_uses >= 1, "current intended use is missing");
+  assert.equal(counts.compiled_model_packs, 2);
+  assert.equal(counts.credibility_manifests, 3);
+  assert.equal(counts.intended_uses, 2);
   assert.equal(counts.installations, 21);
   assert.equal(counts.runways, 24);
   assert.equal(counts.eligible_runways, 12);
   assert.equal(counts.environment_packs, 12);
   assert.equal(counts.study_areas, 6);
   assert.equal(counts.scenarios, SCENARIO_LIBRARY.length);
+  assert.equal(counts.retired_scenarios, SCENARIO_LIBRARY.length);
 
   const [geospatial] = await sql`SELECT
     ST_SRID(location)::int AS srid,
@@ -210,7 +212,8 @@ try {
 
   const invalidPackages = await sql`SELECT id, version
     FROM scenario_templates
-    WHERE schema_version NOT IN ('vector.scenario.v3', 'vector.scenario.v4')
+    WHERE version='1.1.0' AND (
+      schema_version <> 'vector.scenario.v4'
       OR engine_version <> 'browser-point-mass-v0.5'
       OR content_hash !~ '^[0-9a-f]{64}$'
       OR intended_use_id <> ${CURRENT_INTENDED_USE_ID}
@@ -219,21 +222,33 @@ try {
       OR model_pack_version <> ${CURRENT_MODEL_PACK_VERSION}
       OR model_pack_digest <> ${CURRENT_MODEL_PACK_DIGEST}
       OR package IS NULL
-      OR (schema_version = 'vector.scenario.v4' AND package->'scenario'->'airMission'->>'schemaVersion' <> 'vector.air-mission.v1')`;
+      OR package->'scenario'->'airMission'->>'schemaVersion' <> 'vector.air-mission.v1'
+    )`;
   assert.equal(invalidPackages.length, 0);
+  const currentPackages = await sql`SELECT id FROM scenario_templates WHERE version='1.1.0'`;
+  assert.equal(currentPackages.length, SCENARIO_LIBRARY.length);
+  const invalidHistoricalPackages = await sql`SELECT id, version
+    FROM scenario_templates
+    WHERE version='1.0.0' AND (
+      status <> 'RETIRED'
+      OR schema_version <> 'vector.scenario.v4'
+      OR intended_use_id <> 'vector.intended-use.geometry-teaching'
+      OR intended_use_version <> '1.0.0'
+      OR model_pack_id <> 'vector-scalar-study-models'
+      OR model_pack_version <> '0.8.0'
+      OR model_pack_digest <> '199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73'
+      OR package IS NULL
+    )`;
+  assert.equal(invalidHistoricalPackages.length, 0);
+  const historicalPackages = await sql`SELECT id FROM scenario_templates WHERE version='1.0.0'`;
+  assert.equal(historicalPackages.length, SCENARIO_LIBRARY.length);
 
-  // Production verifies the currently deployed v3 rows before applying the
-  // forward-only migration. Migration 013 then fails closed unless every row
-  // is v4, and this verifier checks the v4 mission envelope on the second pass.
   const [scenarioVersions] = await sql`SELECT
     count(*) FILTER (WHERE schema_version='vector.scenario.v3')::int AS v3,
     count(*) FILTER (WHERE schema_version='vector.scenario.v4')::int AS v4
     FROM scenario_templates`;
-  assert.ok(
-    (scenarioVersions.v3 === counts.scenarios && scenarioVersions.v4 === 0)
-      || (scenarioVersions.v3 === 0 && scenarioVersions.v4 === counts.scenarios),
-    "scenario templates must be wholly pre-migration v3 or post-migration v4",
-  );
+  assert.equal(scenarioVersions.v3, 0);
+  assert.equal(scenarioVersions.v4, counts.scenarios + counts.retired_scenarios);
 
   const peaceDrive = await sql`SELECT id, variant, crew, data_status, engine_ids, radar_id, ew_id, datalink_id
     FROM platform_variants

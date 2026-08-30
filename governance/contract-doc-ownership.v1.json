@@ -519,6 +519,15 @@
             "storage",
             "verification"
           ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/generate-weapon-termination-migration.ts",
+          "facets": [
+            "digest",
+            "schema",
+            "storage"
+          ]
         }
       ],
       "testRules": [
@@ -2497,6 +2506,13 @@
         },
         {
           "kind": "EXACT",
+          "value": "tests/weapon-termination.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "tests/track-store.test.mjs",
           "facets": [
             "verification"
@@ -4276,6 +4292,15 @@
         },
         {
           "kind": "EXACT",
+          "value": "scripts/generate-weapon-termination-migration.ts",
+          "facets": [
+            "digest",
+            "schema",
+            "storage"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "app/api/catalog/route.ts",
           "facets": [
             "schema"
@@ -5331,6 +5356,7 @@
     "lib/security/saved-run-admission.ts",
     "lib/security/saved-run.ts",
     "lib/simulation.ts",
+    "scripts/generate-weapon-termination-migration.ts",
     "scripts/seed-db.ts",
     "scripts/verify-credibility-catalog.mjs",
     "scripts/verify-db.mjs",
@@ -5464,5 +5490,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "71b4c4507e091b56f39a999070ee932dac39c43af1b8fb67dfed5454fdacae96"
+  "canonicalSha256": "bca766b131b5d80027b4d5bec5791dec633fbebc5e6648dc97c9e6aca832a4c2"
 }

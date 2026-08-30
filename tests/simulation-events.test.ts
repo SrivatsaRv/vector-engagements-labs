@@ -11,12 +11,55 @@ import {
   assertSimulationEventStream,
   firstFixedStepTickAtOrAfter,
   modelTimeAtTick,
+  recordedModelTimeAtTick,
   SimulationEventJournal,
   type SimulationEventDraft,
 } from "../lib/engine/simulation-events.ts";
 import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { simulateWithCapabilitiesForVerification } from "../lib/simulation.ts";
+import {
+  bindRuntimeModelPackDigest,
+  runtimeWeaponTerminations,
+} from "../lib/engine/runtime-model-pack.ts";
+import { resolveRetainedCompiledModelPack } from "../lib/engine/retained-model-packs.ts";
+
+function governWeaponTermination(
+  scenario: EngineScenario,
+  weapon: EngineScenario["entities"][number],
+  maximumFlightTimeSeconds: number,
+) {
+  assert.ok(weapon.weapon);
+  const pack = resolveRetainedCompiledModelPack(scenario.modelPack);
+  const compiledWeapon = pack.weapons.find(
+    (candidate) => candidate.id === weapon.weapon!.admission.weaponModelId,
+  );
+  assert.ok(compiledWeapon?.termination);
+  const patches = [{
+    schemaVersion: "vector.model-patch.v1" as const,
+    id: `test-${compiledWeapon.id}-maximum-flight-time-seconds`,
+    modelPackDigest: pack.digest,
+    modelId: compiledWeapon.id,
+    fieldPath: "/termination/maximumFlightTimeS",
+    oldValue: compiledWeapon.termination.maximumFlightTimeS,
+    newValue: maximumFlightTimeSeconds,
+    unit: "s" as const,
+    reason: "Deterministic boundary regression fixture",
+    provenance: {
+      authorId: "vector-test-suite",
+      authoredAt: "2026-08-27T00:00:00.000Z",
+      evidenceRefIds: [compiledWeapon.evidenceRefIds[0]!],
+    },
+  }];
+  weapon.weapon.termination.maximumFlightTimeSeconds = maximumFlightTimeSeconds;
+  const projection = structuredClone(scenario.modelPack);
+  delete projection.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest({
+    ...projection,
+    weaponTerminations: runtimeWeaponTerminations(pack, patches),
+    scenarioPatches: patches,
+  });
+}
 
 function admittedScenario(): EngineScenario {
   return structuredClone(
@@ -268,6 +311,7 @@ test("an off-grid launch activates on its first fixed-step boundary in both engi
       run.frames,
       run.scenario,
       run.termination,
+      run.closestApproachM,
     );
   }
 });
@@ -295,6 +339,7 @@ test("a launch just after a grid boundary is not rounded back to the prior tick"
       run.frames,
       run.scenario,
       run.termination,
+      run.closestApproachM,
     );
   }
 });
@@ -317,7 +362,7 @@ test("the tick-owned clock admits the reported millisecond-grid launch in both e
     assert.ok(release, `${backend} must record the millisecond-grid store release`);
     assert.equal(release.tick, 1008);
     assert.equal(release.modelTimeSeconds, 1.008);
-    assertSimulationEventStream(run.events.items, run.frames, run.scenario, run.termination);
+    assertSimulationEventStream(run.events.items, run.frames, run.scenario, run.termination, run.closestApproachM);
   }
 
   const baseline = runEngineBackend(structuredClone(scenario), "typescript");
@@ -423,7 +468,7 @@ test("terminal fixed-step boundary is a half-open launch window in both engines"
     );
     assert.equal(entry?.tick, 4, `${backend} last executable pre-terminal launch`);
     assert.equal(entry?.modelTimeSeconds, 0.2);
-    assertSimulationEventStream(run.events.items, run.frames, run.scenario, run.termination);
+    assertSimulationEventStream(run.events.items, run.frames, run.scenario, run.termination, run.closestApproachM);
   }
 
   for (const batchSize of [1, 2, 128]) {
@@ -504,6 +549,7 @@ test("runtime decoding fails closed for unknown variants, payload versions, fiel
       run.frames,
       run.scenario,
       run.termination,
+      run.closestApproachM,
     ));
   }
 });
@@ -518,7 +564,7 @@ test("runtime decoding rejects duplicate producer-local keys within one tick", (
   assert.ok(sameTick.length > 1);
   sameTick[1]!.localKey = sameTick[0]!.localKey;
   assert.throws(
-    () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination),
+    () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination, run.closestApproachM),
     /repeats local key/,
   );
 });
@@ -533,7 +579,7 @@ test("delivered cause-free payload families reject invented backward causal edge
   assert.equal(completed.payload.kind, "RUN_COMPLETED");
   completed.causeEventIds = [events[0]!.id];
   assert.throws(
-    () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination),
+    () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination, run.closestApproachM),
     /payload family does not admit causal references/,
   );
 });
@@ -555,9 +601,185 @@ test("runtime decoding rejects a valid enum that falsifies lifecycle history", (
     assert.equal(transition.payload.to, "TERMINATED");
     transition.payload.from = "TRACKING";
     assert.throws(
-      () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination),
+      () => assertSimulationEventStream(events, run.frames, run.scenario, run.termination, run.closestApproachM),
       /prior canonical lifecycle/,
       `${backend} history corruption must fail closed`,
+    );
+  }
+});
+
+test("every admitted active-world target lifecycle can produce a terminal weapon event", () => {
+  for (const lifecycle of ["ACTIVE", "TRACKING", "ENGAGING"] as const) {
+    const scenario = admittedScenario();
+    const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
+    const target = scenario.entities.find(
+      (entity) => entity.id === weapon.weapon?.targetEntityId,
+    )!;
+    target.lifecycle = lifecycle;
+    governWeaponTermination(scenario, weapon, 0.1);
+
+    for (const backend of ["typescript", "rust-wasm"] as const) {
+      const run = runEngineBackend(structuredClone(scenario), backend);
+      assert.equal(run.termination, "weapon_expired", `${backend} ${lifecycle}`);
+      assert.equal(run.events.state, "AVAILABLE");
+      const terminal = run.events.items.find(
+        (event) => event.payload.kind === "WEAPON_TERMINATED",
+      );
+      assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+      assert.equal(terminal.payload.cause, "FLIGHT_TIME_EXPIRED");
+    }
+  }
+});
+
+test("runtime decoding binds weapon terminal state, cause, and distance to the run", () => {
+  const scenario = admittedScenario();
+  const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
+  governWeaponTermination(scenario, weapon, 0.1);
+  const run = runEngineBackend(scenario, "typescript");
+  assert.equal(run.termination, "weapon_expired");
+  assert.equal(run.events.state, "AVAILABLE");
+
+  const events = structuredClone(run.events.items);
+  const frames = structuredClone(run.frames);
+  const terminal = events.find((event) => event.payload.kind === "WEAPON_TERMINATED")!;
+  assert.equal(terminal.payload.kind, "WEAPON_TERMINATED");
+  terminal.payload.to = "MISS";
+  terminal.payload.cause = "ENERGY_DEPLETED";
+  const terminalWeapon = frames[terminal.frameIndex]!.entities.find(
+    (entity) => entity.id === weapon.id,
+  )!;
+  terminalWeapon.weaponFlightState = "MISS";
+
+  assert.throws(
+    () => assertSimulationEventStream(events, frames, run.scenario, run.termination, run.closestApproachM),
+    /does not match terminal-frame cause precedence or phase/,
+  );
+
+  const priorStateEvents = structuredClone(run.events.items);
+  const priorStateTerminal = priorStateEvents.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  )!;
+  assert.equal(priorStateTerminal.payload.kind, "WEAPON_TERMINATED");
+  priorStateTerminal.payload.from = priorStateTerminal.payload.from === "BOOST"
+    ? "COAST"
+    : "BOOST";
+  assert.throws(
+    () => assertSimulationEventStream(
+      priorStateEvents,
+      run.frames,
+      run.scenario,
+      run.termination,
+      run.closestApproachM,
+    ),
+    /invalid authority, ownership, or achieved frame state/,
+  );
+
+  const distanceEvents = structuredClone(run.events.items);
+  const distanceTerminal = distanceEvents.find(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  )!;
+  assert.equal(distanceTerminal.payload.kind, "WEAPON_TERMINATED");
+  distanceTerminal.payload.closestApproachM += 1;
+  assert.throws(
+    () => assertSimulationEventStream(
+      distanceEvents,
+      run.frames,
+      run.scenario,
+      run.termination,
+      run.closestApproachM,
+    ),
+    /does not match the recorded run closest approach/,
+  );
+});
+
+test("runtime decoding rejects a jointly rebound non-geometric cause and terminal frame", () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2g-emitter-corridor",
+  )!.scenario;
+  const run = simulateWithCapabilitiesForVerification(
+    scenario,
+    createVerificationDeploymentCapabilities("typescript", ["A2G"]),
+  ).engineRun;
+  assert.equal(run.termination, "weapon_failed");
+  assert.equal(run.events.state, "AVAILABLE");
+
+  const events = structuredClone(run.events.items);
+  const frames = structuredClone(run.frames);
+  const terminal = events.find((event) => event.payload.kind === "WEAPON_TERMINATED");
+  assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED");
+  assert.equal(terminal.payload.cause, "TERRAIN_IMPACT");
+  terminal.payload.to = "MISS";
+  terminal.payload.cause = "ENERGY_DEPLETED";
+  const terminalWeaponId = terminal.payload.weaponId;
+  const terminalWeapon = frames[terminal.frameIndex]!.entities.find(
+    (entity) => entity.id === terminalWeaponId,
+  );
+  assert.ok(terminalWeapon);
+  terminalWeapon.weaponFlightState = "MISS";
+  terminalWeapon.phase = "Miss";
+
+  assert.throws(
+    () => assertSimulationEventStream(
+      events,
+      frames,
+      run.scenario,
+      "weapon_miss",
+      run.closestApproachM,
+    ),
+    /does not match terminal-frame cause precedence or phase/,
+  );
+});
+
+test("termination retains the exact prior tick and binds geometric occurrence in both engines", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const scenario = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY.find((entry) => entry.id === "a2a-defensive-break")!.scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const weapon = scenario.entities.find((entity) => entity.weapon);
+  assert.ok(weapon?.weapon);
+  weapon.weapon.seekerActivationRangeM = 43;
+
+  for (const backend of ["typescript", "rust-wasm"] as const) {
+    const run = runEngineBackend(structuredClone(scenario), backend);
+    assert.equal(run.events.state, "AVAILABLE", backend);
+    const terminal = run.events.items.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    );
+    assert.ok(terminal?.payload.kind === "WEAPON_TERMINATED", backend);
+    assert.equal(terminal.payload.cause, "GEOMETRIC_INTERCEPT", backend);
+    const priorFrame = run.frames[terminal.frameIndex - 1];
+    assert.equal(
+      priorFrame?.t,
+      recordedModelTimeAtTick(terminal.tick - 1, scenario.fixedStepSeconds),
+      backend,
+    );
+    assert.equal(
+      priorFrame?.entities.find((entity) => entity.id === weapon.id)?.weaponFlightState,
+      terminal.payload.from,
+      backend,
+    );
+
+    const falsified = structuredClone(run.events.items);
+    const falsifiedTerminal = falsified.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    );
+    assert.ok(falsifiedTerminal?.payload.kind === "WEAPON_TERMINATED");
+    falsifiedTerminal.payload.occurrenceTimeSeconds = Number((
+      falsifiedTerminal.payload.occurrenceTimeSeconds - 0.04
+    ).toFixed(6));
+    assert.throws(
+      () => assertSimulationEventStream(
+        falsified,
+        run.frames,
+        run.scenario,
+        run.termination,
+        run.closestApproachM,
+      ),
+      /does not match its exact geometric intercept time/,
+      backend,
     );
   }
 });
@@ -582,7 +804,7 @@ test("runtime decoding binds world entry and run completion to their true bounda
   entry.modelTimeSeconds = 2.25;
   entry.frameIndex = laterActiveFrame;
   assert.throws(
-    () => assertSimulationEventStream(delayedEntry, run.frames, run.scenario, run.termination),
+    () => assertSimulationEventStream(delayedEntry, run.frames, run.scenario, run.termination, run.closestApproachM),
     /declared launch boundary/,
   );
 
@@ -595,7 +817,7 @@ test("runtime decoding binds world entry and run completion to their true bounda
   completed.modelTimeSeconds = 2.75;
   completed.frameIndex = earlierFrame;
   assert.throws(
-    () => assertSimulationEventStream(earlyCompletion, run.frames, run.scenario, run.termination),
+    () => assertSimulationEventStream(earlyCompletion, run.frames, run.scenario, run.termination, run.closestApproachM),
     /final retained frame/,
   );
 });

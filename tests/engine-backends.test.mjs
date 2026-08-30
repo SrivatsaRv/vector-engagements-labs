@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   RUST_WASM_ENGINE_ARTIFACT,
   runEngineBackend,
 } from "../lib/engine/backend.ts";
-import { VECTOR_ENGINE_WASM_OPTIMIZER } from "../lib/engine/generated/vector-engine-wasm.ts";
+import {
+  VECTOR_ENGINE_WASM_BASE64,
+  VECTOR_ENGINE_WASM_OPTIMIZER,
+} from "../lib/engine/generated/vector-engine-wasm.ts";
 import { compileScenario } from "../lib/engine/compiler.ts";
 import {
   getProfile,
@@ -17,6 +21,92 @@ import {
   decodeColumnarFrames,
   encodeColumnarFrames,
 } from "../lib/record/vector-record.ts";
+import {
+  bindRuntimeModelPackDigest,
+  runtimeWeaponTerminations,
+} from "../lib/engine/runtime-model-pack.ts";
+import {
+  findEngineCompiledModelPackAuthority,
+  resolveRetainedCompiledModelPack,
+} from "../lib/engine/retained-model-packs.ts";
+import { bindVerificationTrackModelPack } from "../lib/engine/verification-track-fixture.ts";
+import historicalModelPackBundle from "../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json" with { type: "json" };
+
+function governWeaponTermination(scenario, weapon, changes) {
+  const pack = resolveRetainedCompiledModelPack(scenario.modelPack);
+  const compiledWeapon = pack.weapons.find(
+    (candidate) => candidate.id === weapon.weapon.admission.weaponModelId,
+  );
+  assert.ok(compiledWeapon?.termination);
+  const fields = {
+    interceptRadiusM: ["/termination/interceptRadiusM", "m", "interceptRadiusM"],
+    maximumFlightTimeSeconds: ["/termination/maximumFlightTimeS", "s", "maximumFlightTimeS"],
+  };
+  const patches = Object.entries(changes).map(([field, newValue]) => ({
+    schemaVersion: "vector.model-patch.v1",
+    id: `test-${compiledWeapon.id}-${field.replace(/[A-Z]/g, (value) => `-${value.toLowerCase()}`)}`,
+    modelPackDigest: pack.digest,
+    modelId: compiledWeapon.id,
+    fieldPath: fields[field][0],
+    oldValue: compiledWeapon.termination[fields[field][2]],
+    newValue,
+    unit: fields[field][1],
+    reason: "Deterministic boundary regression fixture",
+    provenance: {
+      authorId: "vector-test-suite",
+      authoredAt: "2026-08-27T00:00:00.000Z",
+      evidenceRefIds: [compiledWeapon.evidenceRefIds[0]],
+    },
+  }));
+  Object.assign(weapon.weapon.termination, changes);
+  const projection = structuredClone(scenario.modelPack);
+  delete projection.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest({
+    ...projection,
+    weaponTerminations: runtimeWeaponTerminations(pack, patches),
+    scenarioPatches: patches,
+  });
+}
+
+function runRawRustWasm(scenario) {
+  const instance = new WebAssembly.Instance(new WebAssembly.Module(
+    Buffer.from(VECTOR_ENGINE_WASM_BASE64, "base64"),
+  ));
+  const engine = instance.exports;
+  const input = new TextEncoder().encode(JSON.stringify(scenario));
+  const pointer = engine.vector_input_reserve(input.byteLength);
+  new Uint8Array(engine.memory.buffer, pointer, input.byteLength).set(input);
+  const accepted = engine.vector_run_json() === 1;
+  const output = new TextDecoder().decode(new Uint8Array(
+    engine.memory.buffer,
+    engine.vector_output_ptr(),
+    engine.vector_output_len(),
+  ));
+  return { accepted, output };
+}
+
+function resealCompiledPack(pack) {
+  const payload = structuredClone(pack);
+  delete payload.digest;
+  const normalize = (value) => {
+    if (typeof value === "number") {
+      return `#number:${value.toExponential(12).replace("e+", "e")}`;
+    }
+    if (Array.isArray(value)) return value.map(normalize);
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value)
+          .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+          .map(([key, item]) => [key, normalize(item)]),
+      );
+    }
+    return value;
+  };
+  pack.digest = createHash("sha256")
+    .update(JSON.stringify(normalize(payload)))
+    .digest("hex");
+  return pack;
+}
 
 const close = (actual, expected, tolerance, label) => {
   assert.ok(
@@ -93,10 +183,10 @@ test("TypeScript and Rust/WASM reject at the first regional sample after crossin
 test("committed Rust/WASM artifact has a stable integrity identity", () => {
   assert.match(RUST_WASM_ENGINE_ARTIFACT.sha256, /^[a-f0-9]{64}$/);
   assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes > 100_000);
-  assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 550_000);
+  assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 585_000);
   assert.equal(
     VECTOR_ENGINE_WASM_OPTIMIZER,
-    "binaryen@131.0.0 -O3 -S2 rust-wasm-features-v1",
+    "binaryen@131.0.0 -O3 -S2 --reorder-functions rust-wasm-features-v1",
   );
 });
 
@@ -471,6 +561,1275 @@ test("both engines terminate an admitted weapon when its assigned target is unav
       replayWeapon?.weaponFlightState,
       "TARGET_UNAVAILABLE",
       `${name} VSR weapon state`,
+    );
+  }
+});
+
+test("both engines exclude a geometric intercept occurring after an in-step expiry", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
+  const red = baseline.entities.find((entity) => entity.id === "red-object-1");
+  const weapon = baseline.entities.find((entity) => entity.weapon);
+  assert.ok(blue && red && weapon?.weapon);
+  blue.initial.position = { x: 0, y: 0, z: 8000 };
+  blue.initial.velocity = { x: 250, y: 0, z: 0 };
+  red.initial.position = { x: 100, y: 0, z: 8000 };
+  red.initial.velocity = { x: -600, y: 0, z: 0 };
+  delete blue.route;
+  delete blue.routePlan;
+  delete red.route;
+  delete red.routePlan;
+  governWeaponTermination(baseline, weapon, { maximumFlightTimeSeconds: 0.075 });
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const expired = runEngineBackend(structuredClone(baseline), backend);
+    const longerLivedScenario = structuredClone(baseline);
+    const longerLivedWeapon = longerLivedScenario.entities.find((entity) => entity.weapon);
+    governWeaponTermination(longerLivedScenario, longerLivedWeapon, {
+      maximumFlightTimeSeconds: 0.1,
+    });
+    const longerLived = runEngineBackend(longerLivedScenario, backend);
+    assert.equal(expired.termination, "weapon_expired", backend);
+    assert.equal(longerLived.termination, "weapon_intercept", backend);
+    const terminal = expired.events.items.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    );
+    assert.equal(terminal?.payload.occurrenceTimeSeconds, 0.075, backend);
+    assert.ok(expired.closestApproachM > 25, backend);
+  }
+});
+
+test("both engines validate a geometric intercept admitted before an in-step expiry", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
+  const red = baseline.entities.find((entity) => entity.id === "red-object-1");
+  const weapon = baseline.entities.find((entity) => entity.weapon);
+  assert.ok(blue && red && weapon?.weapon);
+  blue.initial.position = { x: 0, y: 0, z: 8000 };
+  blue.initial.velocity = { x: 250, y: 0, z: 0 };
+  red.initial.position = { x: 80, y: 0, z: 8000 };
+  red.initial.velocity = { x: -600, y: 0, z: 0 };
+  delete blue.route;
+  delete blue.routePlan;
+  delete red.route;
+  delete red.routePlan;
+  governWeaponTermination(baseline, weapon, { maximumFlightTimeSeconds: 0.075 });
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const run = runEngineBackend(structuredClone(baseline), backend);
+    const terminal = run.events.items.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    );
+    assert.equal(run.termination, "weapon_intercept", backend);
+    assert.equal(terminal?.payload.cause, "GEOMETRIC_INTERCEPT", backend);
+    assert.equal(terminal.payload.occurrenceTimeSeconds, 0.075, backend);
+  }
+});
+
+test("both engines start off-grid weapon lifetime at the achieved activation boundary", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const weapon = baseline.entities.find((entity) => entity.weapon);
+  assert.ok(weapon?.weapon);
+  weapon.weapon.launchTimeSeconds = 0.025;
+  governWeaponTermination(baseline, weapon, {
+    interceptRadiusM: 0.1,
+    maximumFlightTimeSeconds: 0.01,
+  });
+  baseline.durationSeconds = 1;
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const run = runEngineBackend(structuredClone(baseline), backend);
+    const entry = run.events.items.find(
+      (event) => event.payload.kind === "ENTITY_ENTERED_WORLD" && event.producer.entityId === weapon.id,
+    );
+    const terminal = run.events.items.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    );
+    assert.equal(run.termination, "weapon_expired", backend);
+    assert.equal(entry?.modelTimeSeconds, 0.05, backend);
+    assert.equal(terminal?.payload.occurrenceTimeSeconds, 0.06, backend);
+  }
+});
+
+test("both engines bind non-intercept events to the lifetime closest approach", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
+  const red = baseline.entities.find((entity) => entity.id === "red-object-1");
+  const weapon = baseline.entities.find((entity) => entity.weapon);
+  assert.ok(blue && red && weapon?.weapon);
+  blue.initial.position = { x: 0, y: 0, z: 8000 };
+  blue.initial.velocity = { x: 250, y: 0, z: 0 };
+  red.initial.position = { x: 200, y: 100, z: 8000 };
+  red.initial.velocity = { x: -500, y: 500, z: 0 };
+  delete blue.route;
+  delete blue.routePlan;
+  delete red.route;
+  delete red.routePlan;
+  governWeaponTermination(baseline, weapon, {
+    interceptRadiusM: 0.1,
+    maximumFlightTimeSeconds: 0.5,
+  });
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const run = runEngineBackend(structuredClone(baseline), backend);
+    const terminal = run.events.items.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    );
+    const final = run.frames.at(-1);
+    const finalWeapon = final.entities.find((entity) => entity.id === run.primaryWeaponId);
+    const finalTarget = final.entities.find((entity) => entity.id === run.primaryTargetId);
+    const terminalSeparationM = Math.hypot(
+      finalTarget.position.x - finalWeapon.position.x,
+      finalTarget.position.y - finalWeapon.position.y,
+      finalTarget.position.z - finalWeapon.position.z,
+    );
+    assert.equal(run.termination, "weapon_expired", backend);
+    assert.equal(
+      terminal?.payload.closestApproachM,
+      Number(run.closestApproachM.toFixed(6)),
+      backend,
+    );
+    assert.ok(run.closestApproachM < terminalSeparationM, backend);
+  }
+});
+
+test("both engines exclude stowed geometry from the weapon-lifetime closest approach", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
+  const red = baseline.entities.find((entity) => entity.id === "red-object-1");
+  const weapon = baseline.entities.find((entity) => entity.weapon);
+  assert.ok(blue && red && weapon?.weapon);
+  blue.initial.position = { x: 0, y: 0, z: 8000 };
+  blue.initial.velocity = { x: 250, y: 0, z: 0 };
+  red.initial.position = { x: 250, y: 0, z: 8000 };
+  red.initial.velocity = { x: -250, y: 0, z: 0 };
+  weapon.initial.position = { ...blue.initial.position };
+  weapon.initial.velocity = { ...blue.initial.velocity };
+  for (const entity of [blue, red]) {
+    delete entity.route;
+    delete entity.routePlan;
+  }
+  weapon.weapon.launchTimeSeconds = 1;
+  governWeaponTermination(baseline, weapon, {
+    interceptRadiusM: 0.1,
+    maximumFlightTimeSeconds: 0.1,
+  });
+  baseline.durationSeconds = 2;
+
+  const runs = ["typescript", "rust-wasm"].map((backend) =>
+    runEngineBackend(structuredClone(baseline), backend));
+  for (const [index, run] of runs.entries()) {
+    const backend = index === 0 ? "typescript" : "rust-wasm";
+    assert.equal(run.termination, "weapon_expired", backend);
+    assert.ok(run.closestApproachM > 100, `${backend} included pre-launch geometry`);
+  }
+  close(runs[0].closestApproachM, runs[1].closestApproachM, 1e-9, "post-launch closest approach parity");
+});
+
+test("both engines retain a launch-boundary minimum before a delayed expiry", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
+  const red = baseline.entities.find((entity) => entity.id === "red-object-1");
+  const weapon = baseline.entities.find((entity) => entity.weapon);
+  assert.ok(blue && red && weapon?.weapon);
+  blue.initial.position = { x: 0, y: 0, z: 8000 };
+  blue.initial.velocity = { x: 400, y: 0, z: 0 };
+  red.initial.position = { x: -1000, y: 0, z: 8000 };
+  red.initial.velocity = { x: -400, y: 0, z: 0 };
+  weapon.initial.position = { ...blue.initial.position };
+  weapon.initial.velocity = { ...blue.initial.velocity };
+  for (const entity of [blue, red]) {
+    delete entity.route;
+    delete entity.routePlan;
+  }
+  weapon.weapon.launchTimeSeconds = baseline.fixedStepSeconds;
+  governWeaponTermination(baseline, weapon, {
+    interceptRadiusM: 0.1,
+    maximumFlightTimeSeconds: baseline.fixedStepSeconds * 3,
+  });
+  baseline.durationSeconds = 1;
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const run = runEngineBackend(structuredClone(baseline), backend);
+    const launchTimeSeconds = weapon.weapon.launchTimeSeconds;
+    const launchFrame = run.frames.find(
+      (frame) => frame.t === launchTimeSeconds &&
+        frame.entities.some((entity) => entity.id === run.primaryWeaponId),
+    );
+    const evidenceFrame = run.frames.find(
+      (frame) => frame.t === launchTimeSeconds + baseline.fixedStepSeconds,
+    );
+    const terminalFrame = run.frames.at(-1);
+    assert.ok(launchFrame && evidenceFrame && terminalFrame, backend);
+    const separation = (frame) => {
+      const frameWeapon = frame.entities.find((entity) => entity.id === run.primaryWeaponId);
+      const frameTarget = frame.entities.find((entity) => entity.id === run.primaryTargetId);
+      assert.ok(frameWeapon && frameTarget, backend);
+      return Math.hypot(
+        frameTarget.position.x - frameWeapon.position.x,
+        frameTarget.position.y - frameWeapon.position.y,
+        frameTarget.position.z - frameWeapon.position.z,
+      );
+    };
+    const launchSeparationM = separation(launchFrame);
+    assert.equal(run.termination, "weapon_expired", backend);
+    close(run.closestApproachM, launchSeparationM, 1e-9, `${backend} launch-boundary minimum`);
+    assert.ok(separation(evidenceFrame) > launchSeparationM, backend);
+    assert.ok(separation(terminalFrame) > launchSeparationM, backend);
+  }
+});
+
+test("both engines reject malformed weapon termination authority before integration", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const cases = [
+    (value) => { value.schemaVersion = "vector.weapon-termination-model.v0"; },
+    (value) => { value.intendedUse = "OPERATIONAL"; },
+    (value) => { value.criterion = "RENDERER_DISTANCE"; },
+    (value) => { value.interceptRadiusM = 0; },
+    (value) => { value.maximumFlightTimeSeconds = Number.NaN; },
+  ];
+  for (const mutate of cases) {
+    for (const backend of ["typescript", "rust-wasm"]) {
+      const scenario = structuredClone(baseline);
+      const termination = scenario.entities.find((entity) => entity.weapon).weapon.termination;
+      mutate(termination);
+      assert.throws(
+        () => runEngineBackend(scenario, backend),
+        /termination|finite number|finite positive number|invalid type: null, expected f64/i,
+        backend,
+      );
+    }
+  }
+});
+
+test("both engines reject hash-rebound termination limits beside a retained pack identity", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const scenario = structuredClone(baseline);
+    const weapon = scenario.entities.find((entity) => entity.weapon);
+    assert.ok(weapon?.weapon);
+    weapon.weapon.termination.interceptRadiusM += 100;
+    const projection = scenario.modelPack.weaponTerminations.find(
+      (candidate) => candidate.modelId === weapon.weapon.admission.weaponModelId,
+    );
+    assert.ok(projection);
+    projection.termination.interceptRadiusM = weapon.weapon.termination.interceptRadiusM;
+    const material = structuredClone(scenario.modelPack);
+    delete material.runtimeDigest;
+    scenario.modelPack = bindRuntimeModelPackDigest(material);
+    assert.throws(
+      () => runEngineBackend(scenario, backend),
+      /does not match the exact compiled model pack/,
+      backend,
+    );
+  }
+});
+
+test("direct Rust/WASM rejects a jointly resealed compact termination projection", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const scenario = structuredClone(simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario);
+  const weapon = scenario.entities.find((entity) => entity.weapon);
+  assert.ok(weapon?.weapon);
+  weapon.weapon.termination.interceptRadiusM += 100;
+  const projected = scenario.modelPack.weaponTerminations.find(
+    (candidate) => candidate.modelId === weapon.weapon.admission.weaponModelId,
+  );
+  assert.ok(projected);
+  projected.termination.interceptRadiusM = weapon.weapon.termination.interceptRadiusM;
+  const material = structuredClone(scenario.modelPack);
+  delete material.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest(material);
+
+  const result = runRawRustWasm(scenario);
+  assert.equal(result.accepted, false);
+  assert.match(result.output, /retained compiler-owned pack/);
+});
+
+test("direct Rust/WASM cannot relabel a resealed termination projection as engine verification", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const scenario = structuredClone(simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario);
+  const weapon = scenario.entities.find((entity) => entity.weapon);
+  assert.ok(weapon?.weapon);
+  weapon.weapon.termination.interceptRadiusM += 100;
+  const projected = scenario.modelPack.weaponTerminations.find(
+    (candidate) => candidate.modelId === weapon.weapon.admission.weaponModelId,
+  );
+  assert.ok(projected);
+  projected.termination.interceptRadiusM = weapon.weapon.termination.interceptRadiusM;
+  scenario.modelPack.intendedUse = {
+    id: "vector.intended-use.engine-verification",
+    version: "1.0.0",
+  };
+  const material = structuredClone(scenario.modelPack);
+  delete material.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest(material);
+
+  const result = runRawRustWasm(scenario);
+  assert.equal(result.accepted, false);
+  assert.match(result.output, /complete authenticated compiled model pack/);
+});
+
+test("direct Rust/WASM rejects malformed termination patches before consuming overrides", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  for (const mutation of ["target", "old-value", "unit", "evidence"]) {
+    const scenario = structuredClone(baseline);
+    const weapon = scenario.entities.find((entity) => entity.weapon);
+    assert.ok(weapon?.weapon);
+    governWeaponTermination(scenario, weapon, { interceptRadiusM: 50 });
+    const patch = scenario.modelPack.scenarioPatches[0];
+    if (mutation === "target") patch.fieldPath = "/termination/notGoverned";
+    if (mutation === "old-value") patch.oldValue = 24;
+    if (mutation === "unit") patch.unit = "s";
+    if (mutation === "evidence") patch.provenance.evidenceRefIds = ["outside-pack"];
+    const projection = structuredClone(scenario.modelPack);
+    delete projection.runtimeDigest;
+    scenario.modelPack = bindRuntimeModelPackDigest(projection);
+
+    const result = runRawRustWasm(scenario);
+    assert.equal(result.accepted, false, mutation);
+    assert.match(result.output, /weapon termination patch/, mutation);
+  }
+});
+
+test("both engines require a runtime digest for retained weapon-termination authority", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const scenario = structuredClone(baseline);
+    delete scenario.modelPack.runtimeDigest;
+    assert.throws(
+      () => runEngineBackend(scenario, backend),
+      /runtime model-pack projection digest/,
+      backend,
+    );
+  }
+});
+
+test("both live engines require a retained pack for entity weapon-termination authority", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const unrelatedRetainedPack = resolveRetainedCompiledModelPack(baseline.modelPack);
+  for (const backend of ["typescript", "rust-wasm"]) {
+    for (const projectionState of ["RESEALED", "OMITTED"]) {
+      const scenario = structuredClone(baseline);
+      scenario.modelPack.id = "unretained-termination-pack";
+      scenario.modelPack.version = "99.0.0";
+      scenario.modelPack.digest = "7".repeat(64);
+      if (projectionState === "OMITTED") {
+        scenario.modelPack.weaponTerminations = [];
+        scenario.modelPack.scenarioPatches = [];
+        delete scenario.modelPack.runtimeDigest;
+      } else {
+        const material = structuredClone(scenario.modelPack);
+        delete material.runtimeDigest;
+        scenario.modelPack = bindRuntimeModelPackDigest(material);
+      }
+      assert.throws(
+        () => runEngineBackend(scenario, backend),
+        /No retained compiled model pack matches weapon-termination authority/,
+        `${backend} ${projectionState}`,
+      );
+    }
+    const mismatchedVerificationScenario = structuredClone(baseline);
+    mismatchedVerificationScenario.modelPack.id = "unretained-termination-pack";
+    mismatchedVerificationScenario.modelPack.intendedUse = {
+      id: "vector.intended-use.engine-verification",
+      version: "1.0.0",
+    };
+    assert.throws(
+      () => runEngineBackend(mismatchedVerificationScenario, backend, unrelatedRetainedPack),
+      /Supplied engine-verification compiled model pack does not match the exact scenario identity/,
+      `${backend} mismatched supplied pack`,
+    );
+  }
+});
+
+test("both live engines reject retained packs that predate weapon-termination authority", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const historicalPack = historicalModelPackBundle.pack;
+  for (const backend of ["typescript", "rust-wasm"]) {
+    const scenario = structuredClone(baseline);
+    const projection = structuredClone(scenario.modelPack);
+    projection.id = historicalPack.id;
+    projection.version = historicalPack.version;
+    projection.digest = historicalPack.digest;
+    projection.intendedUse = { ...historicalPack.intendedUses[0] };
+    projection.weaponTerminations = [];
+    projection.scenarioPatches = [];
+    delete projection.runtimeDigest;
+    scenario.modelPack = bindRuntimeModelPackDigest(projection);
+    for (const entity of scenario.entities) {
+      entity.provenance.modelPackDigest = historicalPack.digest;
+      if (entity.weapon) entity.weapon.admission.modelPackDigest = historicalPack.digest;
+    }
+    assert.throws(
+      () => runEngineBackend(scenario, backend),
+      /retained compiled model pack .* contains no weapon-termination authority/,
+      backend,
+    );
+  }
+});
+
+test("both live engines authenticate supplied verification-pack content", async () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const binding = await bindVerificationTrackModelPack(baseline);
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.doesNotThrow(
+      () => runEngineBackend(structuredClone(binding.scenario), backend, binding.pack),
+      `${backend} must accept the complete digest-authenticated verification pack`,
+    );
+  }
+  const forgedPack = structuredClone(binding.pack);
+  const forgedWeapon = forgedPack.weapons.find((weapon) => weapon.termination);
+  assert.ok(forgedWeapon?.termination);
+  forgedWeapon.termination.interceptRadiusM += 100;
+
+  const forgedScenario = structuredClone(binding.scenario);
+  const projection = structuredClone(forgedScenario.modelPack);
+  delete projection.runtimeDigest;
+  forgedScenario.modelPack = bindRuntimeModelPackDigest({
+    ...projection,
+    weaponTerminations: runtimeWeaponTerminations(forgedPack, []),
+  });
+  for (const entity of forgedScenario.entities) {
+    if (entity.weapon?.admission.weaponModelId === forgedWeapon.id) {
+      entity.weapon.termination.interceptRadiusM = forgedWeapon.termination.interceptRadiusM;
+    }
+  }
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.throws(
+      () => runEngineBackend(structuredClone(forgedScenario), backend, forgedPack),
+      /verification compiled model pack digest does not match its canonical content/i,
+      backend,
+    );
+  }
+});
+
+test("both live engines reject duplicate verification termination patches", async () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const binding = await bindVerificationTrackModelPack(baseline);
+  const scenario = structuredClone(binding.scenario);
+  const weapon = scenario.entities.find((entity) => entity.weapon)?.weapon;
+  assert.ok(weapon);
+  const compiledWeapon = binding.pack.weapons.find(
+    (candidate) => candidate.id === weapon.admission.weaponModelId,
+  );
+  assert.ok(compiledWeapon?.termination);
+  const patch = {
+    schemaVersion: "vector.model-patch.v1",
+    id: "verification-intercept-radius-primary",
+    modelPackDigest: binding.pack.digest,
+    modelId: compiledWeapon.id,
+    fieldPath: "/termination/interceptRadiusM",
+    oldValue: compiledWeapon.termination.interceptRadiusM,
+    newValue: 50,
+    unit: "m",
+    reason: "Duplicate-key cross-backend rejection fixture",
+    provenance: {
+      authorId: "vector-test-suite",
+      authoredAt: "2026-08-28T00:00:00.000Z",
+      evidenceRefIds: [compiledWeapon.evidenceRefIds[0]],
+    },
+  };
+  const duplicate = {
+    ...structuredClone(patch),
+    id: "verification-intercept-radius-contradiction",
+    newValue: 60,
+  };
+  weapon.termination.interceptRadiusM = patch.newValue;
+  const projection = structuredClone(scenario.modelPack);
+  delete projection.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest({
+    ...projection,
+    weaponTerminations: runtimeWeaponTerminations(binding.pack, [patch]),
+    scenarioPatches: [patch, duplicate],
+  });
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.throws(
+      () => runEngineBackend(structuredClone(scenario), backend, binding.pack),
+      /duplicate weapon termination patch/i,
+      backend,
+    );
+  }
+});
+
+test("supplied authority rejects digest-valid malformed verification-pack structure at each consuming boundary", async () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const binding = await bindVerificationTrackModelPack(baseline);
+
+  for (const {
+    id: mutation,
+    typescriptPattern,
+    rustPattern,
+  } of [
+    {
+      id: "extra-top-level-key",
+      typescriptPattern: /must use the exact compiled-v1 key set/i,
+      rustPattern: /complete exact-key compiled model pack/i,
+    },
+    {
+      id: "duplicate-weapon-id",
+      typescriptPattern: /has duplicate weapon ID/i,
+      rustPattern: /duplicates an earlier weapon/i,
+    },
+    {
+      id: "duplicate-intended-use-id",
+      typescriptPattern: /has duplicate intended-use ID/i,
+      rustPattern: /duplicates an earlier intended use/i,
+    },
+    {
+      id: "string-launch-mass",
+      typescriptPattern: /weapons\[0\].launchMassKg is structurally invalid/i,
+      rustPattern: /pack\.weapons\[0\]\.launchMassKg must be finite/i,
+    },
+    {
+      id: "non-semver-weapon-version",
+      typescriptPattern: /weapons\[0\].version is structurally invalid/i,
+      rustPattern: /pack\.weapons\[0\]\.version must be semantic version/i,
+    },
+    {
+      id: "incomplete-evidence-record",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "unsupported-evidence-kind",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "invalid-evidence-digest",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "duplicate-evidence-id",
+      typescriptPattern: /has duplicate evidence ID/i,
+      rustPattern: /duplicate evidence identity/i,
+    },
+    {
+      id: "extra-evidence-field",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "relative-evidence-uri",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "invalid-evidence-access-date",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "blank-evidence-locator",
+      typescriptPattern: /evidence\[0\] is structurally invalid/i,
+      rustPattern: null,
+    },
+    {
+      id: "unsupported-coordinate-convention",
+      typescriptPattern: /coordinate conventions are unsupported/i,
+      rustPattern: null,
+    },
+    {
+      id: "extra-coordinate-convention",
+      typescriptPattern: /coordinate conventions are unsupported/i,
+      rustPattern: null,
+    },
+    {
+      id: "ungoverned-aircraft-performance-admission",
+      typescriptPattern: /performanceAdmission is not admitted by the governed evidence registry/i,
+      rustPattern: null,
+    },
+  ]) {
+    const pack = structuredClone(binding.pack);
+    if (mutation === "extra-top-level-key") pack.unadmittedAuthority = true;
+    if (mutation === "duplicate-weapon-id") {
+      pack.weapons.push(structuredClone(pack.weapons[0]));
+    }
+    if (mutation === "duplicate-intended-use-id") {
+      const intendedUse = pack.intendedUses.find(
+        (item) => item.id === "vector.intended-use.engine-verification",
+      );
+      assert.ok(intendedUse);
+      pack.intendedUses.unshift({ ...structuredClone(intendedUse), version: "0.0.0" });
+    }
+    if (mutation === "string-launch-mass") pack.weapons[0].launchMassKg = "170";
+    if (mutation === "non-semver-weapon-version") pack.weapons[0].version = "v1";
+    if (mutation === "incomplete-evidence-record") {
+      pack.evidence[0] = { id: pack.evidence[0].id };
+    }
+    if (mutation === "unsupported-evidence-kind") pack.evidence[0].kind = "CONTEXT";
+    if (mutation === "invalid-evidence-digest") pack.evidence[0].contentSha256 = "bad";
+    if (mutation === "duplicate-evidence-id") {
+      pack.evidence.push(structuredClone(pack.evidence[0]));
+    }
+    if (mutation === "extra-evidence-field") pack.evidence[0].unqualified = true;
+    if (mutation === "relative-evidence-uri") pack.evidence[0].uri = "relative/path";
+    if (mutation === "invalid-evidence-access-date") pack.evidence[0].accessedAt = "2026-02-31";
+    if (mutation === "blank-evidence-locator") pack.evidence[0].locator = " ";
+    if (mutation === "unsupported-coordinate-convention") {
+      pack.coordinateConventions.localFrame = "NORTH_EAST_DOWN";
+    }
+    if (mutation === "extra-coordinate-convention") {
+      pack.coordinateConventions.earthModel = "SPHERICAL";
+    }
+    if (mutation === "ungoverned-aircraft-performance-admission") {
+      const sourceEvidence = pack.evidence.find((evidence) => evidence.kind === "SOURCE");
+      const validationEvidence = pack.evidence.find((evidence) => evidence.kind === "VALIDATION");
+      assert.ok(sourceEvidence);
+      assert.ok(validationEvidence);
+      pack.aircraft[0].performanceAdmission = {
+        state: "ADMITTED",
+        capabilities: [
+          "AERODYNAMICS",
+          "PROPULSION",
+          "FLIGHT_CONTROLS",
+          "MASS_AND_STORES",
+          "SENSORS",
+        ].map((capability) => ({
+          capability,
+          sourceEvidenceRefIds: [sourceEvidence.id],
+          validationEvidenceRefIds: [validationEvidence.id],
+        })),
+      };
+    }
+    resealCompiledPack(pack);
+    const scenario = structuredClone(binding.scenario);
+    const projection = structuredClone(scenario.modelPack);
+    projection.digest = pack.digest;
+    projection.weaponTerminations = runtimeWeaponTerminations(pack, []);
+    delete projection.runtimeDigest;
+    scenario.modelPack = bindRuntimeModelPackDigest(projection);
+    for (const entity of scenario.entities) {
+      entity.provenance.modelPackDigest = pack.digest;
+      if (
+        mutation === "non-semver-weapon-version" &&
+        entity.provenance.modelId === pack.weapons[0].id
+      ) {
+        entity.provenance.modelVersion = pack.weapons[0].version;
+      }
+      if (entity.observerSensor) entity.observerSensor.modelPackDigest = pack.digest;
+      if (entity.weapon) entity.weapon.admission.modelPackDigest = pack.digest;
+    }
+
+    for (const backend of ["typescript", "rust-wasm"]) {
+      assert.throws(
+        () => runEngineBackend(structuredClone(scenario), backend, pack),
+        typescriptPattern,
+        `${backend} ${mutation}`,
+      );
+    }
+    if (rustPattern) {
+      const rust = runRawRustWasm({
+        schemaVersion: "vector.engine-run-request.v1",
+        scenario,
+        verificationModelPack: pack,
+      });
+      assert.equal(rust.accepted, false, `raw rust-wasm ${mutation}`);
+      assert.match(rust.output, rustPattern, `raw rust-wasm ${mutation}`);
+    }
+  }
+});
+
+test("supplied-pack authority validates the complete loadout and compatibility graph", async () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const binding = await bindVerificationTrackModelPack(baseline);
+  const verificationUse = binding.pack.intendedUses.find(
+    (item) => item.id === "vector.intended-use.engine-verification",
+  );
+  assert.ok(verificationUse);
+  const firstStation = (pack) => {
+    const station = pack.loadouts.find((item) => item.stations.length)?.stations[0];
+    assert.ok(station);
+    return station;
+  };
+
+  for (const { label, mutate, pattern } of [
+    {
+      label: "station exact fields",
+      mutate: (pack) => { firstStation(pack).invented = true; },
+      pattern: /loadouts\[\d+\]\.stations\[0\]\.fields is structurally invalid/i,
+    },
+    {
+      label: "station finite position",
+      mutate: (pack) => { firstStation(pack).positionBodyM.x = "0"; },
+      pattern: /loadouts\[\d+\]\.stations\[0\]\.positionBodyM is structurally invalid/i,
+    },
+    {
+      label: "station integer capacity",
+      mutate: (pack) => { firstStation(pack).maximumQuantity = "bad"; },
+      pattern: /loadouts\[\d+\]\.stations\[0\]\.maximumQuantity is structurally invalid/i,
+    },
+    {
+      label: "station weapon reference",
+      mutate: (pack) => { firstStation(pack).compatibleStoreModelIndexes = [pack.weapons.length]; },
+      pattern: /loadouts\[\d+\]\.stations\[0\]\.compatibleStoreModelIndexes is structurally invalid/i,
+    },
+    {
+      label: "compatibility evidence reference",
+      mutate: (pack) => { pack.compatibility[0].evidenceRefIds = ["missing-evidence"]; },
+      pattern: /compatibility\[0\]\.evidenceRefIds is structurally invalid/i,
+    },
+    {
+      label: "compatibility loadout reference",
+      mutate: (pack) => { pack.compatibility[0].loadoutModelIndex = pack.loadouts.length; },
+      pattern: /compatibility\[0\]\.loadoutModelIndex is structurally invalid/i,
+    },
+    {
+      label: "compatibility capacity relation",
+      mutate: (pack) => {
+        const rule = pack.compatibility[0];
+        const station = pack.loadouts[rule.loadoutModelIndex].stations.find(
+          (item) => item.stationGroup === rule.stationGroup,
+        );
+        assert.ok(station);
+        rule.maximumQuantity = station.maximumQuantity + 1;
+      },
+      pattern: /compatibility\[0\]\.maximumQuantity is structurally invalid/i,
+    },
+    {
+      label: "loadout validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const loadout = pack.loadouts[aircraft.loadoutModelIndex];
+        loadout.validityDomain.altitudeM.minimum =
+          aircraft.validityDomain.altitudeM.minimum + 1;
+      },
+      pattern: /aircraft\[0\]\.loadoutModel\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "aerodynamic validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.validityDomain.mach.maximum = aircraft.validityDomain.mach.maximum - 0.01;
+      },
+      pattern: /aircraft\[0\]\.aerodynamicModel\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "aerodynamic model retains at least one coefficient table",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables = [];
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table exact fields",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0] = {
+          validityDomain: structuredClone(aerodynamic.coefficientTables[0].validityDomain),
+        };
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables\[0\]\.fields is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table axis unit",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0].axes[0].unit = "m";
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables\[0\]\.axes\[0\]\.unit is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table strictly increasing axis",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0].axes[0].values = [1, 1];
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables\[0\]\.axes\[0\]\.values is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table tensor shape",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0].values = [0.1];
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables\[0\]\.values is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table finite values",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0].values[0] = Number.NaN;
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables\[0\]\.values is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table evidence reference",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0].evidenceRefIds = ["missing-evidence"];
+      },
+      pattern: /aerodynamics\[0\]\.coefficientTables\[0\]\.evidenceRefIds is structurally invalid/i,
+    },
+    {
+      label: "aerodynamic table validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const aerodynamic = pack.aerodynamics[aircraft.aerodynamicModelIndex];
+        aerodynamic.coefficientTables[0].validityDomain.mach.maximum =
+          aircraft.validityDomain.mach.maximum - 0.01;
+      },
+      pattern: /aircraft\[0\]\.aerodynamicModel\.coefficientTables\[0\]\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "propulsion validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const propulsion = pack.propulsion[aircraft.propulsionModelIndexes[0]];
+        propulsion.validityDomain.altitudeM.maximum =
+          aircraft.validityDomain.altitudeM.maximum - 1;
+      },
+      pattern: /aircraft\[0\]\.propulsionModels\[0\]\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "propulsion exact fields",
+      mutate: (pack) => { pack.propulsion[0].invented = true; },
+      pattern: /propulsion\[0\]\.fields is structurally invalid/i,
+    },
+    {
+      label: "propulsion thrust output unit",
+      mutate: (pack) => { pack.propulsion[0].thrustTable.outputUnit = "1"; },
+      pattern: /propulsion\[0\]\.thrustTable\.outputUnit is structurally invalid/i,
+    },
+    {
+      label: "thrust-table validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const propulsion = pack.propulsion[aircraft.propulsionModelIndexes[0]];
+        propulsion.thrustTable.validityDomain.altitudeM.maximum =
+          aircraft.validityDomain.altitudeM.maximum - 1;
+      },
+      pattern: /aircraft\[0\]\.propulsionModels\[0\]\.thrustTable\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "fuel-flow-table validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft[0];
+        const propulsion = pack.propulsion[aircraft.propulsionModelIndexes[0]];
+        propulsion.fuelFlowTable.validityDomain.configurations = ["UNSUPPORTED_CONFIGURATION"];
+      },
+      pattern: /aircraft\[0\]\.propulsionModels\[0\]\.fuelFlowTable\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "sensor validity covers aircraft domain",
+      mutate: (pack) => {
+        const aircraft = pack.aircraft.find((item) => item.sensorModelIndexes.length > 0);
+        assert.ok(aircraft, "the fixture requires an aircraft sensor dependency");
+        const sensor = pack.sensors[aircraft.sensorModelIndexes[0]];
+        sensor.validityDomain.environments = ["UNSUPPORTED_ENVIRONMENT"];
+      },
+      pattern: /aircraft\[\d+\]\.sensorModels\[0\]\.validityDomain does not cover its admitted aircraft validity domain/i,
+    },
+    {
+      label: "sensor exact fields",
+      mutate: (pack) => { pack.sensors[0].invented = true; },
+      pattern: /sensors\[0\]\.fields is structurally invalid/i,
+    },
+    {
+      label: "sensor finite scan period",
+      mutate: (pack) => { pack.sensors[0].scanPeriodS = Number.NaN; },
+      pattern: /sensors\[0\]\.scanPeriodS is structurally invalid/i,
+    },
+    {
+      label: "verification track model numeric domain",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.verificationTrackModel);
+        assert.ok(sensor, "the fixture requires verification track authority");
+        sensor.verificationTrackModel.confirmationObservations = 1;
+      },
+      pattern: /sensors\[\d+\]\.verificationTrackModel is structurally invalid/i,
+    },
+    {
+      label: "positive sensor evidence coverage",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        sensor.evidenceAdmission.coverage.detectionRange = "UNKNOWN";
+      },
+      pattern: /sensors\[\d+\]\.evidenceAdmission\.coverage is structurally invalid/i,
+    },
+    {
+      label: "positive sensor source evidence role",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        const sourceId = sensor.evidenceAdmission.sourceEvidenceRefIds[0];
+        const evidence = pack.evidence.find((item) => item.id === sourceId);
+        assert.ok(evidence, "the fixture requires admitted source evidence");
+        evidence.kind = "ASSUMPTION";
+      },
+      pattern: /sensors\[\d+\]\.evidenceAdmission is structurally invalid/i,
+    },
+    {
+      label: "positive sensor validation evidence digest",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        const validationId = sensor.evidenceAdmission.validationEvidenceRefIds[0];
+        const evidence = pack.evidence.find((item) => item.id === validationId);
+        assert.ok(evidence, "the fixture requires admitted validation evidence");
+        delete evidence.contentSha256;
+      },
+      pattern: /sensors\[\d+\]\.evidenceAdmission is structurally invalid/i,
+    },
+  ]) {
+    const pack = structuredClone(binding.pack);
+    mutate(pack);
+    resealCompiledPack(pack);
+    assert.throws(
+      () => findEngineCompiledModelPackAuthority({
+        id: pack.id,
+        version: pack.version,
+        digest: pack.digest,
+        intendedUse: {
+          id: verificationUse.id,
+          version: verificationUse.version,
+        },
+      }, pack),
+      pattern,
+      label,
+    );
+  }
+
+  const packWithUnusedStation = structuredClone(binding.pack);
+  const loadout = packWithUnusedStation.loadouts[0];
+  loadout.stations.push({
+    id: "unused-auxiliary-station",
+    stationGroup: "UNUSED_AUXILIARY",
+    positionBodyM: { x: 0, y: 0, z: 0 },
+    maximumQuantity: 1,
+    compatibleStoreModelIndexes: [],
+  });
+  resealCompiledPack(packWithUnusedStation);
+  assert.doesNotThrow(
+    () => findEngineCompiledModelPackAuthority({
+      id: packWithUnusedStation.id,
+      version: packWithUnusedStation.version,
+      digest: packWithUnusedStation.digest,
+      intendedUse: {
+        id: verificationUse.id,
+        version: verificationUse.version,
+      },
+    }, packWithUnusedStation),
+    "unused stations may declare no compatible stores",
+  );
+});
+
+test("both live engines reject positive sensor evidence authority drift", async () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const binding = await bindVerificationTrackModelPack(baseline);
+
+  for (const { label, mutate } of [
+    {
+      label: "source evidence relabelled as an assumption",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        const sourceId = sensor.evidenceAdmission.sourceEvidenceRefIds[0];
+        const evidence = pack.evidence.find((item) => item.id === sourceId);
+        assert.ok(evidence, "the fixture requires admitted source evidence");
+        evidence.kind = "ASSUMPTION";
+      },
+    },
+    {
+      label: "validation evidence loses its immutable digest",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        const validationId = sensor.evidenceAdmission.validationEvidenceRefIds[0];
+        const evidence = pack.evidence.find((item) => item.id === validationId);
+        assert.ok(evidence, "the fixture requires admitted validation evidence");
+        delete evidence.contentSha256;
+      },
+    },
+    {
+      label: "positive sensor coverage is unknown",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        sensor.evidenceAdmission.coverage.targetApplicability = "UNKNOWN";
+      },
+    },
+    {
+      label: "positive sensor admission schema is invalid",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        sensor.evidenceAdmission.schemaVersion = "vector.sensor-evidence-admission.invalid";
+      },
+    },
+    {
+      label: "positive sensor admission has an unknown field",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        sensor.evidenceAdmission.unqualified = true;
+      },
+    },
+    {
+      label: "positive sensor coverage has an unknown field",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        sensor.evidenceAdmission.coverage.unqualified = "VALIDATED";
+      },
+    },
+    {
+      label: "admitted source is absent from sensor provenance",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        const sourceId = sensor.evidenceAdmission.sourceEvidenceRefIds[0];
+        sensor.evidenceRefIds = sensor.evidenceRefIds.filter((id) => id !== sourceId);
+      },
+    },
+    {
+      label: "source and validation roles share one evidence identity",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        sensor.evidenceAdmission.validationEvidenceRefIds = [
+          sensor.evidenceAdmission.sourceEvidenceRefIds[0],
+        ];
+      },
+    },
+  ]) {
+    const pack = structuredClone(binding.pack);
+    mutate(pack);
+    resealCompiledPack(pack);
+    const scenario = structuredClone(binding.scenario);
+    const projection = structuredClone(scenario.modelPack);
+    projection.digest = pack.digest;
+    projection.weaponTerminations = runtimeWeaponTerminations(pack, []);
+    delete projection.runtimeDigest;
+    scenario.modelPack = bindRuntimeModelPackDigest(projection);
+    for (const entity of scenario.entities) {
+      entity.provenance.modelPackDigest = pack.digest;
+      if (entity.observerSensor) entity.observerSensor.modelPackDigest = pack.digest;
+      if (entity.weapon) entity.weapon.admission.modelPackDigest = pack.digest;
+    }
+
+    for (const backend of ["typescript", "rust-wasm"]) {
+      assert.throws(
+        () => runEngineBackend(structuredClone(scenario), backend, pack),
+        /sensors\[\d+\]\.evidenceAdmission(?:\.coverage)? is structurally invalid/i,
+        `${backend}: ${label}`,
+      );
+    }
+
+    const rust = runRawRustWasm({
+      schemaVersion: "vector.engine-run-request.v1",
+      scenario,
+      verificationModelPack: pack,
+    });
+    assert.equal(rust.accepted, false, `raw rust-wasm: ${label}`);
+    assert.match(
+      rust.output,
+      /sensor evidence/i,
+      `raw rust-wasm: ${label}`,
+    );
+  }
+});
+
+test("supplied authority binds runtime observer sensors to the compiled pack", async () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const binding = await bindVerificationTrackModelPack(baseline);
+  const scenario = structuredClone(binding.scenario);
+  const runtimeSensor = scenario.modelPack.observerSensors.find(
+    (sensor) => sensor.sensorKind !== "DECLARED_ENVELOPE",
+  );
+  assert.ok(runtimeSensor, "fixture requires a positive runtime observer sensor");
+  runtimeSensor.detectionRangeM = 1_000_000_000;
+  for (const entity of scenario.entities) {
+    if (entity.observerSensor?.modelId === runtimeSensor.modelId) {
+      entity.observerSensor.detectionRangeM = runtimeSensor.detectionRangeM;
+    }
+  }
+  const projection = structuredClone(scenario.modelPack);
+  delete projection.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest(projection);
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.throws(
+      () => runEngineBackend(structuredClone(scenario), backend, binding.pack),
+      /observer-sensor projection does not match the exact compiled model pack/i,
+      backend,
+    );
+  }
+
+  const rust = runRawRustWasm({
+    schemaVersion: "vector.engine-run-request.v1",
+    scenario,
+    verificationModelPack: binding.pack,
+  });
+  assert.equal(rust.accepted, false);
+  assert.match(rust.output, /authenticated observer sensor projection mismatch/i);
+});
+
+test("both engines reject a second scheduled guided release before integration", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const unlaunchedWeapon = baseline.entities.find(
+    (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds === null,
+  );
+  assert.ok(unlaunchedWeapon?.weapon, "fixture requires a carried second weapon");
+  unlaunchedWeapon.weapon.launchTimeSeconds = 0.1;
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.throws(
+      () => runEngineBackend(structuredClone(baseline), backend),
+      /at most one scheduled guided release/i,
+      backend,
+    );
+  }
+});
+
+test("both engines require a scheduled guided weapon to begin stowed", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const scenario = structuredClone(
+    simulateWithCapabilitiesForVerification(
+      SCENARIO_LIBRARY[0].scenario,
+      capabilities,
+    ).engineRun.scenario,
+  );
+  const scheduledWeapon = scenario.entities.find(
+    (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds !== null,
+  );
+  assert.ok(scheduledWeapon?.weapon, "fixture requires a scheduled guided weapon");
+  scheduledWeapon.lifecycle = "ACTIVE";
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.throws(
+      () => runEngineBackend(structuredClone(scenario), backend),
+      /scheduled guided weapon.*must begin STOWED/i,
+      backend,
+    );
+  }
+});
+
+test("both engines count only guided entities toward the scheduled-release limit", () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const nonGuidedWeapon = baseline.entities.find(
+    (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds === null,
+  );
+  assert.ok(nonGuidedWeapon?.weapon, "fixture requires a carried second weapon");
+  nonGuidedWeapon.kind = "FIXED_OBJECTIVE";
+  nonGuidedWeapon.tacticalRole = "FIXED_OBJECTIVE";
+  nonGuidedWeapon.weapon.launchTimeSeconds = 0.1;
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.doesNotThrow(
+      () => runEngineBackend(structuredClone(baseline), backend),
+      backend,
     );
   }
 });

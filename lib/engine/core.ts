@@ -1,6 +1,7 @@
 import { standardAtmosphere } from "./atmosphere.ts";
 import type {
   CoverageEnvelope,
+  EngineFrame,
   EngineEntityDefinition,
   EngineEntityFrame,
   EngineObserverState,
@@ -9,12 +10,14 @@ import type {
   EngineScenario,
   AircraftOperationalState,
   WeaponFlightState,
+  WeaponTerminalState,
   SimulationEventPayload,
 } from "./contracts.ts";
 import { SIMULATION_EVENT_PAYLOAD_SCHEMAS } from "./contracts.ts";
 import { SIMULATION_EVENT_SCHEMA } from "./contracts.ts";
 import {
   assertSimulationEventStream,
+  mergeWeaponEvidenceFrames,
   compareCanonicalText,
   firstFixedStepTickAtOrAfter,
   MAX_SIMULATION_EVENTS,
@@ -41,7 +44,11 @@ import {
   environmentRuntimeProjection,
 } from "../geospatial/environment-pack.ts";
 import type { EnvironmentSample } from "../geospatial/environment-pack.ts";
-import { assertRuntimeModelPackDigest } from "./runtime-model-pack.ts";
+import {
+  assertRuntimeModelPackAuthority,
+} from "./runtime-model-pack.ts";
+import { findEngineCompiledModelPackAuthority } from "./retained-model-packs.ts";
+import type { CompiledModelPack } from "../model-pack.ts";
 import {
   assertNoTruthIdentity,
   assertVerificationTrackModel,
@@ -52,6 +59,7 @@ import type { SimulationEventReceipt } from "./simulation-events.ts";
 import type { TrackTransitionCommit } from "./contracts.ts";
 import { sha256HexSync } from "../geospatial/digest.ts";
 import { AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2 } from "../air-mission.ts";
+import { closestApproachOnRelativeSegment } from "./weapon-termination.ts";
 
 type RuntimeState = {
   definition: EngineEntityDefinition;
@@ -77,6 +85,43 @@ type RuntimeState = {
   lastGuidanceAcceleration: Vec3;
   lastGuidanceUpdateSeconds: number;
 };
+
+type WeaponEvidenceSnapshot = {
+  modelTimeSeconds: number;
+  states: RuntimeState[];
+  observerStates: readonly EngineObserverState[];
+};
+
+function snapshotRuntimeState(state: RuntimeState): RuntimeState {
+  // Numerical updates replace vectors, controls, and inventory collections
+  // instead of mutating them in place, so a shallow snapshot preserves the
+  // exact pre-step object graph without cloning immutable model authority.
+  return { ...state };
+}
+
+function refreshRuntimeStateSnapshot(target: RuntimeState, source: RuntimeState) {
+  target.lifecycle = source.lifecycle;
+  target.position = source.position;
+  target.velocity = source.velocity;
+  target.massKg = source.massKg;
+  target.fuelKg = source.fuelKg;
+  target.headingRad = source.headingRad;
+  target.commandedG = source.commandedG;
+  target.availableG = source.availableG;
+  target.storeMassKg = source.storeMassKg;
+  target.installedStoreIds = source.installedStoreIds;
+  target.installedStoreDragAreaM2 = source.installedStoreDragAreaM2;
+  target.storeTransferAttempted = source.storeTransferAttempted;
+  target.dragNewtons = source.dragNewtons;
+  target.thrustNewtons = source.thrustNewtons;
+  target.phase = source.phase;
+  target.weaponFlightState = source.weaponFlightState;
+  target.routePointIndex = source.routePointIndex;
+  target.aircraftControl = source.aircraftControl;
+  target.aircraftOperationalState = source.aircraftOperationalState;
+  target.lastGuidanceAcceleration = source.lastGuidanceAcceleration;
+  target.lastGuidanceUpdateSeconds = source.lastGuidanceUpdateSeconds;
+}
 
 const G0 = 9.80665;
 
@@ -897,7 +942,10 @@ function updateWeapon(
     return;
   }
 
-  const sinceLaunch = time - (weapon.launchTimeSeconds ?? 0);
+  const sinceLaunch = time - achievedWeaponLaunchTimeSeconds(
+    weapon,
+    scenario.fixedStepSeconds,
+  );
   const relativePosition = subtract(target.position, state.position);
   const separation = Math.max(1, magnitude(relativePosition));
   const los = normalize(relativePosition);
@@ -1030,6 +1078,150 @@ function updateWeapon(
       : "COAST";
 }
 
+type WeaponTerminationEvaluation = {
+  payload: Extract<SimulationEventPayload, { kind: "WEAPON_TERMINATED" }>;
+  runTermination: Extract<EngineRun["termination"], "weapon_intercept" | "weapon_miss" | "weapon_expired" | "weapon_failed" | "target_unavailable">;
+};
+
+function achievedWeaponLaunchTimeSeconds(
+  weapon: NonNullable<EngineEntityDefinition["weapon"]>,
+  fixedStepSeconds: number,
+): number {
+  return modelTimeAtTick(
+    firstFixedStepTickAtOrAfter(weapon.launchTimeSeconds ?? 0, fixedStepSeconds),
+    fixedStepSeconds,
+  );
+}
+
+function weaponActiveStepFraction(
+  weaponState: RuntimeState,
+  stepStartTimeSeconds: number,
+  fixedStepSeconds: number,
+): number {
+  const weapon = weaponState.definition.weapon;
+  if (!weapon) return 1;
+  const expiryTimeSeconds =
+    achievedWeaponLaunchTimeSeconds(weapon, fixedStepSeconds) +
+    weapon.termination.maximumFlightTimeSeconds;
+  return Math.max(
+    0,
+    Math.min(1, (expiryTimeSeconds - stepStartTimeSeconds) / fixedStepSeconds),
+  );
+}
+
+function relativePositionAtFraction(start: Vec3, end: Vec3, fraction: number): Vec3 {
+  return {
+    x: start.x + (end.x - start.x) * fraction,
+    y: start.y + (end.y - start.y) * fraction,
+    z: start.z + (end.z - start.z) * fraction,
+  };
+}
+
+function evaluateWeaponTermination(
+  weaponState: RuntimeState,
+  targetState: RuntimeState,
+  from: WeaponFlightState | undefined,
+  relativeStartM: Vec3,
+  relativeEndM: Vec3,
+  lifetimeClosestApproachM: number,
+  closestApproachWitness: readonly [number, number],
+  stepStartTimeSeconds: number,
+  fixedStepSeconds: number,
+  environmentSampler?: RuntimeEnvironmentSampler,
+): WeaponTerminationEvaluation | null {
+  const weapon = weaponState.definition.weapon;
+  if (!weapon || weaponState.definition.weapon?.storeTransfer?.operation === "JETTISON" || from === undefined || from === "STOWED") return null;
+  if (["INTERCEPT", "MISS", "EXPIRED", "FAILED", "SELF_DESTRUCT", "TARGET_UNAVAILABLE"].includes(from)) return null;
+
+  const endTimeSeconds = stepStartTimeSeconds + fixedStepSeconds;
+  const launchTimeSeconds = achievedWeaponLaunchTimeSeconds(weapon, fixedStepSeconds);
+  const expiryTimeSeconds = launchTimeSeconds + weapon.termination.maximumFlightTimeSeconds;
+  const activeStepFraction = weaponActiveStepFraction(
+    weaponState,
+    stepStartTimeSeconds,
+    fixedStepSeconds,
+  );
+  const activeRelativeEndM = relativePositionAtFraction(
+    relativeStartM,
+    relativeEndM,
+    activeStepFraction,
+  );
+  const closest = closestApproachOnRelativeSegment(relativeStartM, activeRelativeEndM);
+  const sinceLaunchSeconds = endTimeSeconds - launchTimeSeconds;
+  let to: WeaponTerminalState | undefined;
+  let cause: WeaponTerminationEvaluation["payload"]["cause"] | undefined;
+  let occurrenceTimeSeconds = endTimeSeconds;
+  let runTermination: WeaponTerminationEvaluation["runTermination"] | undefined;
+
+  if (weaponState.weaponFlightState === "TARGET_UNAVAILABLE" || targetState.lifecycle === "TERMINATED") {
+    to = "TARGET_UNAVAILABLE";
+    cause = "TARGET_UNAVAILABLE";
+    runTermination = "target_unavailable";
+  } else if (
+    expiryTimeSeconds > stepStartTimeSeconds &&
+    closest.distanceM <= weapon.termination.interceptRadiusM
+  ) {
+    to = "INTERCEPT";
+    cause = "GEOMETRIC_INTERCEPT";
+    runTermination = "weapon_intercept";
+    occurrenceTimeSeconds =
+      stepStartTimeSeconds + closest.fraction * activeStepFraction * fixedStepSeconds;
+  } else if (expiryTimeSeconds <= endTimeSeconds) {
+    to = "EXPIRED";
+    cause = "FLIGHT_TIME_EXPIRED";
+    runTermination = "weapon_expired";
+    occurrenceTimeSeconds = expiryTimeSeconds;
+  } else if (
+    weaponState.position.z <= terrainElevation(environmentSampler, weaponState.position) &&
+    endTimeSeconds > 1
+  ) {
+    to = "FAILED";
+    cause = "TERRAIN_IMPACT";
+    runTermination = "weapon_failed";
+  } else if (
+    sinceLaunchSeconds > weapon.burnSeconds + 2 &&
+    magnitude(weaponState.velocity) < 80 &&
+    closest.distanceM > 1000
+  ) {
+    to = "MISS";
+    cause = "ENERGY_DEPLETED";
+    runTermination = "weapon_miss";
+  }
+  if (!to || !cause || !runTermination) return null;
+
+  weaponState.lifecycle = "TERMINATED";
+  weaponState.weaponFlightState = to;
+  weaponState.phase = to === "INTERCEPT"
+    ? "Geometric intercept"
+    : to === "TARGET_UNAVAILABLE"
+      ? "Target unavailable"
+      : to === "FAILED"
+        ? "Terrain impact"
+        : to === "EXPIRED"
+          ? "Flight time expired"
+          : "Miss";
+  return {
+    runTermination,
+    payload: {
+      kind: "WEAPON_TERMINATED",
+      schemaVersion: SIMULATION_EVENT_PAYLOAD_SCHEMAS.WEAPON_TERMINATED,
+      weaponId: weaponState.definition.id,
+      targetId: targetState.definition.id,
+      from: from as Exclude<WeaponFlightState, WeaponTerminalState>,
+      to,
+      cause,
+      criterion: weapon.termination.criterion,
+      closestApproachM: Number(lifetimeClosestApproachM.toFixed(6)),
+      closestApproachPriorTimeSeconds: closestApproachWitness[0],
+      closestApproachNextTimeSeconds: closestApproachWitness[1],
+      occurrenceTimeSeconds: Number(occurrenceTimeSeconds.toFixed(6)),
+      interceptRadiusM: weapon.termination.interceptRadiusM,
+      maximumFlightTimeSeconds: weapon.termination.maximumFlightTimeSeconds,
+      targetEffect: "NOT_MODELLED",
+    },
+  };
+}
+
 function toFrame(
   state: RuntimeState,
   scenario: EngineScenario,
@@ -1146,6 +1338,7 @@ export type EngineBatch = {
 export class EngineSession {
   private readonly scenario: EngineScenario;
   private readonly states: Map<string, RuntimeState>;
+  private readonly preStepStates: RuntimeState[];
   private readonly primaryWeapon?: RuntimeState;
   private readonly primaryTarget?: RuntimeState;
   private readonly frames: EngineRun["frames"] = [];
@@ -1166,20 +1359,23 @@ export class EngineSession {
   private recordedEntityStates = 0;
   private currentObserverStates: EngineObserverState[] = [];
   private lastObserverTick = -1;
+  private closestEvidenceSnapshots?: readonly [WeaponEvidenceSnapshot, WeaponEvidenceSnapshot];
+  private terminalPriorEvidenceSnapshot?: WeaponEvidenceSnapshot;
 
-  constructor(scenario: EngineScenario) {
+  constructor(scenario: EngineScenario, verificationPack?: Readonly<CompiledModelPack>) {
     scenario = {
       ...scenario,
       entities: [...scenario.entities]
         .sort((left, right) => compareCanonicalText(left.id, right.id)),
     };
     this.scenario = scenario;
-    const hasVerificationTrackModel = (scenario.modelPack.observerSensors ?? []).some(
-      (sensor) => sensor.verificationTrackModel !== undefined,
+    const retainedPack = findEngineCompiledModelPackAuthority(scenario.modelPack, verificationPack);
+    const carriesWeaponTerminationAuthority = scenario.entities.some(
+      (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.termination !== undefined,
     );
-    if (scenario.modelPack.runtimeDigest !== undefined || hasVerificationTrackModel) {
-      assertRuntimeModelPackDigest(scenario.modelPack);
-    }
+    assertRuntimeModelPackAuthority(scenario.modelPack, retainedPack, {
+      requireCompiledWeaponTerminationAuthority: carriesWeaponTerminationAuthority,
+    });
     this.terminalTick = firstFixedStepTickAtOrAfter(
       scenario.durationSeconds,
       scenario.fixedStepSeconds,
@@ -1323,9 +1519,24 @@ export class EngineSession {
     }
     const admittedTransferIds = new Set<string>();
     const admittedTransferStores = new Set<string>();
+    let scheduledGuidedReleaseCount = 0;
     for (const entity of scenario.entities) {
       if (!entity.weapon) continue;
       const launchTimeSeconds = entity.weapon.launchTimeSeconds;
+      if (
+        entity.kind === "GUIDED_WEAPON" &&
+        launchTimeSeconds !== null &&
+        entity.lifecycle !== "STOWED"
+      ) {
+        throw new Error(`Scheduled guided weapon ${entity.id} must begin STOWED.`);
+      }
+      if (
+        entity.kind === "GUIDED_WEAPON" &&
+        launchTimeSeconds !== null &&
+        entity.weapon.storeTransfer?.operation !== "JETTISON"
+      ) {
+        scheduledGuidedReleaseCount += 1;
+      }
       if (launchTimeSeconds !== null && launchTimeSeconds > scenario.durationSeconds) {
         throw new Error(`Weapon ${entity.id} launches after scenario duration.`);
       }
@@ -1337,6 +1548,10 @@ export class EngineSession {
         throw new Error(`Weapon ${entity.id} launches outside the executable run window.`);
       }
       const admission = entity.weapon.admission;
+      const termination = entity.weapon.termination;
+      const projectedTermination = scenario.modelPack.weaponTerminations?.find(
+        (candidate) => candidate.modelId === admission?.weaponModelId,
+      );
       if (
         !admission ||
         admission.modelPackDigest !== scenario.modelPack.digest ||
@@ -1349,6 +1564,33 @@ export class EngineSession {
         !admittedLaunchAuthorizations.has(admission.launchAuthorization)
       ) {
         throw new Error(`Weapon ${entity.id} has no valid compiled admission.`);
+      }
+      if (
+        !termination ||
+        termination.schemaVersion !== "vector.weapon-termination-model.v1" ||
+        termination.intendedUse !== "ENGINE_VERIFICATION_ONLY" ||
+        termination.criterion !== "GEOMETRIC_CLOSEST_APPROACH" ||
+        !Number.isFinite(termination.interceptRadiusM) ||
+        termination.interceptRadiusM <= 0 ||
+        !Number.isFinite(termination.maximumFlightTimeSeconds) ||
+        termination.maximumFlightTimeSeconds <= 0
+      ) {
+        throw new Error(`Weapon ${entity.id} has no valid termination admission.`);
+      }
+      if (
+        (scenario.modelPack.weaponTerminations?.length ?? 0) > 0 &&
+        (
+          !projectedTermination ||
+          projectedTermination.modelVersion !== entity.provenance.modelVersion ||
+          projectedTermination.termination.schemaVersion !== termination.schemaVersion ||
+          projectedTermination.termination.intendedUse !== termination.intendedUse ||
+          projectedTermination.termination.criterion !== termination.criterion ||
+          projectedTermination.termination.interceptRadiusM !== termination.interceptRadiusM ||
+          projectedTermination.termination.maximumFlightTimeSeconds !==
+            termination.maximumFlightTimeSeconds
+        )
+      ) {
+        throw new Error(`Weapon ${entity.id} termination is not bound to the admitted compiled model.`);
       }
       const transfer = entity.weapon.storeTransfer;
       const launcher = scenario.entities.find((candidate) => candidate.id === entity.weapon!.launchPlatformId);
@@ -1569,11 +1811,11 @@ export class EngineSession {
           authoritativeGround.schemaVersion !== "vector.compiled-aircraft-ground-dynamics.v1" ||
           authoritativeGround.authority !== "GENERIC_PUBLIC_EDUCATIONAL" ||
           authoritativeGround.valueState !== "MODEL_ASSUMPTION" ||
-          JSON.stringify(authoritativeGround.validity) !== JSON.stringify({
-            schemaVersion: "vector.aircraft-ground-dynamics-validity.v1",
-            intendedUse: "PUBLIC_EDUCATIONAL",
-            mechanism: "RUNWAY_ROLL_ROTATION_CLIMBOUT",
-          }) ||
+          authoritativeGround.validity.schemaVersion !==
+            "vector.aircraft-ground-dynamics-validity.v1" ||
+          authoritativeGround.validity.intendedUse !== "PUBLIC_EDUCATIONAL" ||
+          authoritativeGround.validity.mechanism !==
+            "RUNWAY_ROLL_ROTATION_CLIMBOUT" ||
           !Array.isArray(authoritativeGround.evidenceRefIds) || !authoritativeGround.evidenceRefIds.length ||
           authoritativeGround.evidenceRefIds.some((value) => typeof value !== "string" || !value) ||
           !Array.isArray(authoritativeGround.limitationIds) || !authoritativeGround.limitationIds.length ||
@@ -1620,6 +1862,11 @@ export class EngineSession {
         );
       }
     }
+    if (scheduledGuidedReleaseCount > 1) {
+      throw new Error(
+        "Engine termination admission allows at most one scheduled guided release.",
+      );
+    }
     const legacyStudyArea = scenario.environment.studyArea;
     this.recordingOrigin = scenario.geospatial?.origin ?? {
       schemaVersion: "vector.scenario-origin.v1" as const,
@@ -1643,12 +1890,20 @@ export class EngineSession {
       launcher.storeMassKg += store.weapon.launchMassKg;
       launcher.installedStoreDragAreaM2 += store.weapon.storeTransfer?.installedDragAreaM2 ?? 0;
     }
-    this.primaryWeapon = this.states.get(
-      scenario.entities.find(
+    this.preStepStates = [...this.states.values()].map(snapshotRuntimeState);
+    const primaryWeaponDefinition = scenario.entities.find(
+      (entity) =>
+        entity.kind === "GUIDED_WEAPON" &&
+        entity.weapon !== undefined &&
+        entity.weapon.launchTimeSeconds !== null &&
+        entity.weapon.storeTransfer?.operation !== "JETTISON",
+    ) ?? scenario.entities.find(
         (entity) =>
-          entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds !== null,
-      )?.id ?? "",
-    );
+          entity.kind === "GUIDED_WEAPON" &&
+          entity.weapon !== undefined &&
+          entity.weapon.launchTimeSeconds !== null,
+      );
+    this.primaryWeapon = this.states.get(primaryWeaponDefinition?.id ?? "");
     this.primaryTarget = this.primaryWeapon?.definition.weapon
       ? this.states.get(this.primaryWeapon.definition.weapon.targetEntityId)
       : undefined;
@@ -1711,9 +1966,17 @@ export class EngineSession {
     }
   }
 
-  private captureFrame(modelTimeSeconds: number) {
-    const primaryWeapon = this.primaryWeapon!;
-    const primaryTarget = this.primaryTarget!;
+  private projectFrame(
+    modelTimeSeconds: number,
+    frameStates = [...this.states.values()],
+    observerStates: readonly EngineObserverState[] = this.currentObserverStates,
+  ): EngineFrame {
+    const primaryWeapon = frameStates.find(
+      (state) => state.definition.id === this.primaryWeapon!.definition.id,
+    )!;
+    const primaryTarget = frameStates.find(
+      (state) => state.definition.id === this.primaryTarget!.definition.id,
+    )!;
     const relativePosition = subtract(primaryTarget.position, primaryWeapon.position);
     const relativeVelocity = subtract(primaryTarget.velocity, primaryWeapon.velocity);
     const separationM = magnitude(relativePosition);
@@ -1722,14 +1985,10 @@ export class EngineSession {
     const lineOfSightRateRadS =
       magnitude(cross(relativePosition, relativeVelocity)) /
       Math.max(1, separationM * separationM);
-    const visibleStates = [...this.states.values()].filter(
+    const visibleStates = frameStates.filter(
       (state) => state.lifecycle !== "STOWED",
     );
-    if (this.recordedEntityStates + visibleStates.length > 1_000_000) {
-      throw new Error("Event-preserving frames exceed 1000000 recorded entity states.");
-    }
-    const frameIndex = this.frames.length;
-    this.frames.push({
+    return {
       t: modelTimeSeconds,
       entities: visibleStates.map((state) => toFrame(
         state,
@@ -1746,10 +2005,42 @@ export class EngineSession {
       separationM,
       closureRateMps,
       lineOfSightRateRadS,
-      observerStates: structuredClone(this.currentObserverStates),
-    });
-    this.recordedEntityStates += visibleStates.length;
-    return { frameIndex, separationM };
+      observerStates: structuredClone([...observerStates]),
+    };
+  }
+
+  private weaponEvidenceSnapshot(
+    retained: WeaponEvidenceSnapshot | undefined,
+    modelTimeSeconds: number,
+    frameStates: readonly RuntimeState[],
+  ): WeaponEvidenceSnapshot {
+    if (!retained) {
+      return {
+        modelTimeSeconds,
+        states: frameStates.map(snapshotRuntimeState),
+        observerStates: this.currentObserverStates,
+      };
+    }
+    retained.modelTimeSeconds = modelTimeSeconds;
+    for (let index = 0; index < frameStates.length; index += 1) {
+      refreshRuntimeStateSnapshot(retained.states[index]!, frameStates[index]!);
+    }
+    retained.observerStates = this.currentObserverStates;
+    return retained;
+  }
+
+  private retainFrame(frame: EngineFrame) {
+    if (this.recordedEntityStates + frame.entities.length > 1_000_000) {
+      throw new Error("Event-preserving frames exceed 1000000 recorded entity states.");
+    }
+    const frameIndex = this.frames.length;
+    this.frames.push(frame);
+    this.recordedEntityStates += frame.entities.length;
+    return { frameIndex, separationM: frame.separationM };
+  }
+
+  private captureFrame(modelTimeSeconds: number) {
+    return this.retainFrame(this.projectFrame(modelTimeSeconds));
   }
 
   runTicks(maximumTicks: number): EngineBatch {
@@ -1819,6 +2110,9 @@ export class EngineSession {
         );
         if (transfer) storeTransferEvents.push(transfer);
       }
+      const primaryWeaponActivatedThisTick =
+        beforeActivation.get(primaryWeapon.definition.id) === "STOWED" &&
+        primaryWeapon.lifecycle !== "STOWED";
       for (const state of this.states.values()) {
         const prior = beforeActivation.get(state.definition.id)!;
         if (prior !== "STOWED" || state.lifecycle === "STOWED") continue;
@@ -1861,7 +2155,9 @@ export class EngineSession {
       this.updateObserverState(tick, eventTime);
       const relativePosition = subtract(primaryTarget.position, primaryWeapon.position);
       const separationM = magnitude(relativePosition);
-      this.closestApproachM = Math.min(this.closestApproachM, separationM);
+      this.closestApproachM = primaryWeaponActivatedThisTick
+        ? separationM
+        : Math.min(this.closestApproachM, separationM);
       this.peakCommandG = Math.max(this.peakCommandG, primaryWeapon.commandedG);
       const dryMass = primaryWeapon.definition.weapon?.dryMassKg ?? 0;
       this.minimumMassMarginKg = Math.min(
@@ -1882,28 +2178,9 @@ export class EngineSession {
           this.nonFiniteStateCount += 1;
       }
 
-      if (primaryWeapon.weaponFlightState === "TARGET_UNAVAILABLE") {
-        this.termination = "target_unavailable";
-        this.completed = true;
-      } else if (separationM <= scenario.completion.distanceMeters) {
-        this.termination = "threshold_reached";
-        this.completed = true;
-      } else if (tick >= this.terminalTick) {
+      if (tick >= this.terminalTick) {
         this.termination = "time_limit";
         this.completed = true;
-      } else {
-        const speed = magnitude(primaryWeapon.velocity);
-        const weapon = primaryWeapon.definition.weapon!;
-        const sinceLaunch = time - (weapon.launchTimeSeconds ?? 0);
-        if (primaryWeapon.lifecycle !== "STOWED" && (
-          (sinceLaunch > weapon.burnSeconds + 2 &&
-            speed < 80 &&
-            separationM > 1000) ||
-          (primaryWeapon.position.z <= terrainElevation(this.environmentSampler, primaryWeapon.position) && time > 1)
-        )) {
-          this.termination = "energy_depleted";
-          this.completed = true;
-        }
       }
       const nextTick = tick + 1;
       const nextTime = modelTimeAtTick(nextTick, scenario.fixedStepSeconds);
@@ -1941,13 +2218,67 @@ export class EngineSession {
       const beforeOperationalUpdates = new Map(
         [...this.states.values()].map((state) => [state.definition.id, state.aircraftOperationalState]),
       );
-      for (const state of this.states.values())
+      const priorWeaponFlightState = primaryWeapon.weaponFlightState;
+      const hasPreTerminationBoundary = Boolean(
+        primaryWeapon.definition.weapon && primaryWeapon.lifecycle !== "STOWED",
+      );
+      let snapshotIndex = 0;
+      for (const state of this.states.values()) {
+        if (hasPreTerminationBoundary) {
+          refreshRuntimeStateSnapshot(this.preStepStates[snapshotIndex]!, state);
+        }
+        snapshotIndex += 1;
         updateKinematicEntity(state, scenario, time, scenario.fixedStepSeconds, this.environmentSampler);
+      }
       for (const state of this.states.values())
         updateWeapon(state, this.states, scenario, time, scenario.fixedStepSeconds, this.environmentSampler);
       this.integratedSteps = nextTick;
       batchSteps += 1;
       const nextEventTime = recordedModelTimeAtTick(nextTick, scenario.fixedStepSeconds);
+      const postRelativePosition = subtract(primaryTarget.position, primaryWeapon.position);
+      const postSeparationM = magnitude(postRelativePosition);
+      const activeStepFraction = weaponActiveStepFraction(
+        primaryWeapon,
+        time,
+        scenario.fixedStepSeconds,
+      );
+      const admittedPostRelativePosition = relativePositionAtFraction(
+        relativePosition,
+        postRelativePosition,
+        activeStepFraction,
+      );
+      const stepClosestApproach = closestApproachOnRelativeSegment(
+        relativePosition,
+        admittedPostRelativePosition,
+      );
+      const establishesClosestApproach = primaryWeapon.lifecycle !== "STOWED" &&
+        (primaryWeaponActivatedThisTick ||
+          stepClosestApproach.distanceM < this.closestApproachM);
+      this.closestApproachM = Math.min(this.closestApproachM, stepClosestApproach.distanceM);
+      const closestApproachWitness: readonly [number, number] = establishesClosestApproach
+        ? [eventTime, nextEventTime]
+        : this.closestEvidenceSnapshots
+          ? [
+              this.closestEvidenceSnapshots[0].modelTimeSeconds,
+              this.closestEvidenceSnapshots[1].modelTimeSeconds,
+            ]
+          : [eventTime, nextEventTime];
+      const weaponTermination = evaluateWeaponTermination(
+        primaryWeapon,
+        primaryTarget,
+        priorWeaponFlightState,
+        relativePosition,
+        postRelativePosition,
+        this.closestApproachM,
+        closestApproachWitness,
+        time,
+        scenario.fixedStepSeconds,
+        this.environmentSampler,
+      );
+      if (weaponTermination) {
+        this.termination = weaponTermination.runTermination;
+        this.completed = true;
+      }
       for (const state of this.states.values()) {
         const prior = beforeUpdates.get(state.definition.id)!;
         if (prior === state.lifecycle) continue;
@@ -1992,20 +2323,30 @@ export class EngineSession {
           },
         });
       }
-      const postRelativePosition = subtract(primaryTarget.position, primaryWeapon.position);
-      const postSeparationM = magnitude(postRelativePosition);
-      this.closestApproachM = Math.min(this.closestApproachM, postSeparationM);
-      if (primaryWeapon.weaponFlightState === "TARGET_UNAVAILABLE") {
-        this.termination = "target_unavailable";
-        this.completed = true;
-      } else if (postSeparationM <= scenario.completion.distanceMeters) {
-        this.termination = "threshold_reached";
-        this.completed = true;
+      if (weaponTermination) {
+        const payload = weaponTermination.payload;
+        this.eventJournal.emit({
+          localKey: `weapon-terminated:${payload.weaponId}`,
+          tick: this.integratedSteps,
+          modelTimeSeconds: nextEventTime,
+          phase: "TERMINATION",
+          producer: { subsystem: "WEAPON_DYNAMICS", entityId: payload.weaponId },
+          knowledgeScope: "WORLD",
+          participants: [
+            { entityId: payload.weaponId, role: "WEAPON" },
+            { entityId: payload.targetId, role: "TARGET" },
+          ],
+          causes: [],
+          payload,
+        });
       } else {
         const speed = magnitude(primaryWeapon.velocity);
         const weapon = primaryWeapon.definition.weapon!;
-        const sinceLaunch = nextTime - (weapon.launchTimeSeconds ?? 0);
-        if (primaryWeapon.lifecycle !== "STOWED" && (
+        const sinceLaunch = nextTime - achievedWeaponLaunchTimeSeconds(
+          weapon,
+          scenario.fixedStepSeconds,
+        );
+        if (weapon.storeTransfer?.operation === "JETTISON" && primaryWeapon.lifecycle !== "STOWED" && (
           (sinceLaunch > weapon.burnSeconds + 2 && speed < 80 && postSeparationM > 1000) ||
           (primaryWeapon.position.z <= terrainElevation(this.environmentSampler, primaryWeapon.position) && nextTime > 1)
         )) {
@@ -2035,6 +2376,34 @@ export class EngineSession {
       }
       if (!this.completed) {
         this.updateObserverState(this.integratedSteps, nextEventTime);
+      }
+      if (establishesClosestApproach) {
+        this.closestEvidenceSnapshots = [
+          this.weaponEvidenceSnapshot(
+            this.closestEvidenceSnapshots?.[0],
+            eventTime,
+            this.preStepStates,
+          ),
+          this.weaponEvidenceSnapshot(
+            this.closestEvidenceSnapshots?.[1],
+            nextEventTime,
+            [...this.states.values()],
+          ),
+        ];
+      }
+      if (
+        this.completed &&
+        primaryWeapon.definition.weapon?.termination &&
+        primaryWeapon.definition.weapon.storeTransfer?.operation !== "JETTISON" &&
+        primaryWeapon.lifecycle !== "STOWED"
+      ) {
+        this.terminalPriorEvidenceSnapshot = this.closestEvidenceSnapshots?.[0].modelTimeSeconds === eventTime
+          ? this.closestEvidenceSnapshots[0]
+          : this.weaponEvidenceSnapshot(
+              this.terminalPriorEvidenceSnapshot,
+              eventTime,
+              this.preStepStates,
+            );
       }
       const activationAtNextBoundary = [...this.states.values()].some((state) => {
         const launchTimeSeconds = state.definition.weapon?.launchTimeSeconds;
@@ -2083,10 +2452,31 @@ export class EngineSession {
 
   result(): EngineRun {
     if (!this.completed) throw new Error("The engine session is not complete.");
-    const events = this.eventJournal.items();
+    const hasWeaponTermination = [
+      "weapon_intercept",
+      "weapon_miss",
+      "weapon_expired",
+      "weapon_failed",
+      "target_unavailable",
+    ].includes(this.termination);
+    const evidenceSnapshots = [
+      ...(hasWeaponTermination ? (this.closestEvidenceSnapshots ?? []) : []),
+      ...(this.terminalPriorEvidenceSnapshot ? [this.terminalPriorEvidenceSnapshot] : []),
+    ];
+    const evidenceFrames = evidenceSnapshots.map((snapshot) => this.projectFrame(
+      snapshot.modelTimeSeconds,
+      snapshot.states,
+      snapshot.observerStates,
+    ));
+    const compacted = mergeWeaponEvidenceFrames(
+      this.frames,
+      this.eventJournal.items(),
+      evidenceFrames,
+    );
+    const events = compacted.events;
     const run: EngineRun = {
       scenario: this.scenario,
-      frames: this.frames,
+      frames: compacted.frames,
       events: {
         state: "AVAILABLE",
         schemaVersion: SIMULATION_EVENT_SCHEMA,
@@ -2108,13 +2498,26 @@ export class EngineSession {
           : 0,
       },
     };
-    assertSimulationEventStream(events, run.frames, run.scenario, run.termination);
+    assertSimulationEventStream(
+      events,
+      run.frames,
+      run.scenario,
+      run.termination,
+      run.closestApproachM,
+      {
+        primaryWeaponId: run.primaryWeaponId,
+        primaryTargetId: run.primaryTargetId,
+      },
+    );
     return run;
   }
 }
 
-export function runEngine(scenario: EngineScenario): EngineRun {
-  const session = new EngineSession(scenario);
+export function runEngine(
+  scenario: EngineScenario,
+  verificationPack?: Readonly<CompiledModelPack>,
+): EngineRun {
+  const session = new EngineSession(scenario, verificationPack);
   while (!session.isCompleted()) session.runTicks(2_048);
   return session.result();
 }

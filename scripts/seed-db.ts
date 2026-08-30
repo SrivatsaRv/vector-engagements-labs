@@ -205,13 +205,7 @@ try {
          intended_use_id,intended_use_version,model_pack_id,model_pack_version,model_pack_digest)
         VALUES (${item.id},${item.version},${item.domain},${item.title},'VALIDATED',${json(item)},${SCENARIO_PACKAGE_SCHEMA_VERSION},${contentHash},${ENGINE_VERSION},${item.scenario.studyAreaId},
           ${item.intendedUse.id},${item.intendedUse.version},${item.modelPack.id},${item.modelPack.version},${item.modelPack.digest})
-        ON CONFLICT (id,version) DO UPDATE SET
-          domain=EXCLUDED.domain,title=EXCLUDED.title,status=EXCLUDED.status,
-          package=EXCLUDED.package,schema_version=EXCLUDED.schema_version,
-          content_hash=EXCLUDED.content_hash,engine_version=EXCLUDED.engine_version,
-          study_area_id=EXCLUDED.study_area_id,intended_use_id=EXCLUDED.intended_use_id,
-          intended_use_version=EXCLUDED.intended_use_version,model_pack_id=EXCLUDED.model_pack_id,
-          model_pack_version=EXCLUDED.model_pack_version,model_pack_digest=EXCLUDED.model_pack_digest`;
+        ON CONFLICT (id,version) DO NOTHING`;
     }
   });
   const weaponCount = new Set([

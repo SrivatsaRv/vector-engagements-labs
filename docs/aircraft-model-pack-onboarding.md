@@ -11,6 +11,10 @@ remain owned by #154, later #161 stages, and #155 in that causal order.
 
 ## Authority layers
 
+Weapon termination is a separate, exact-key model-pack authority layer. Its
+criterion, intended use, radius and maximum flight time must be compiled and
+validated before runtime; catalog designation never supplies those values.
+
 ```text
 requirement profile
         |
@@ -53,6 +57,11 @@ scenario/runtime boundary and never enter the Stage-B aircraft evidence chain.
 
 ## Schema and migration reference
 
+The current reference pack is 0.9.0 and adds
+`vector.weapon-termination-model.v1`. Forward migration 017 publishes that
+version and its intended-use/credibility identities while preserving prior
+compiled fixtures and migrations as immutable history.
+
 Stage B extends the existing model-pack family; it does not create a parallel
 aircraft schema.
 
@@ -80,9 +89,11 @@ promote a Stage-B identity.
 ## Closed requirements and evidence states
 
 The #190 scenario does not admit a new aircraft or weapon model pack. It binds
-the already published `vector-scalar-study-models@0.8.0` identity and retains
+the published `vector-scalar-study-models@0.9.0` identity and retains
 named Su-30MKI/F-16C performance as unsupported; scenario inputs remain
-`MODEL_ASSUMPTION` rather than new source evidence.
+`MODEL_ASSUMPTION` rather than new source evidence. The v0.9 change adds only a
+verification-only geometric weapon-termination projection; it is not aircraft
+or named-weapon onboarding evidence.
 
 The requirement profile uses stable requirement IDs and the closed data-family
 set: aerodynamics, propulsion, flight controls, mass properties,
@@ -135,6 +146,11 @@ satisfy an aircraft requirement or repair an aircraft evidence gap; each family
 must pass its own admission contract before later scenario composition.
 
 ## Step-by-step onboarding
+
+An onboarded weapon that can reach runtime must now declare one admissible
+termination model with positive finite SI radius and flight time, explicit
+intended use and provenance. Compilation fails rather than inheriting a global
+or named-weapon default.
 
 No onboarding publication step is performed for #190. The scenario migration
 may reference only the exact existing compiled-pack ID, version and digest, and
@@ -211,6 +227,10 @@ the repository policy.
 
 ## Anonymous worked example
 
+The anonymous fixtures were regenerated through the same compiler with exact
+termination authority and new content digests. Their different names and
+ordering still cannot create a special runtime branch.
+
 The #190 named presentation does not alter or supersede the anonymous onboarding
 proof. Its regression consumes the current compiled pack only after ordinary
 admission and makes no new named-data assertion.
@@ -241,10 +261,11 @@ separate scenario identity without changing the compiled aircraft-pack digest.
 
 ## Bounds, storage, and recovery
 
-The ninth scenario is a separate immutable template row; it does not copy,
-mutate or republish source, derivative, credibility or compiled-pack records.
-Recovery therefore restores migration 016 and the already referenced pack as
-independent content-addressed artifacts.
+The ninth scenario remains a separate immutable template row; it does not copy
+or mutate Stage-B source or derivative records. Recovery restores migration 017
+and its append-only intended-use 1.1.0, v0.9 compiled pack, credibility 1.3.0
+and scenario bindings as independent content-addressed artifacts while
+preserving migrations 015 and 016 byte-for-byte.
 
 Stage B rejects before publication when any artifact exceeds 32 MiB, either raw
 or derivative corpus exceeds 64 MiB total, the v2 source exceeds 8 MiB,
@@ -292,12 +313,12 @@ its aircraft research backup format.
 The #190 release evidence runs the nine-scenario engine benchmark with the same
 compiled-pack reuse path. The eight historical workloads retain their 75 ms p95
 budget and the new six-entity challenge has a separately reported 110 ms p95
-tier. Its late 131.2-second model time is a deterministic simulated duration,
-not 131.2 seconds of wall time or a new pack-capacity claim.
+tier. Its 131.9-second geometric-intercept model time is a deterministic
+simulated duration, not 131.9 seconds of wall time or a new pack-capacity claim.
 
 The immutable workload
 `fixtures/performance/model-pack-foundation-workload.v1.json` has digest
-`8a438546acdfc3d3bf49d8052e26865c275f2d3fa9b935763e1271438f706e5c`
+`80853b04efb2396524217edac7937db2be673b7bd5e9ccdea70f44ae161c0796`
 and measures compile, atomic publish, exact lookup, research export/import and
 1/10/100/500-instance compiled reuse. On 2026-08-25, Node v24.3.0 on an Apple M5
 arm64 with 10 logical cores and 16 GiB memory measured p99 values of 95.936,
@@ -326,8 +347,10 @@ measurements are not folded into Stage-B compile, publication or reuse timing.
 ## Nonclaims and deferred owners
 
 The #190 package does not promote generic coefficients into Su-30MKI, F-16C or
-Astra performance authority. Its 180 m terminal geometry is not detection,
-launch-zone, fuze, hit, damage, kill, probability-of-kill or tactical evidence.
+Astra performance authority. Its compiled 25 m geometric-intercept assumption
+and 21.836104 m achieved closest approach are not detection, launch-zone, fuze,
+hit, damage, kill, probability-of-kill or tactical evidence. The target effect
+remains explicitly not modelled.
 
 The #182 ground-dynamics projection is a separately bounded
 `MODEL_ASSUMPTION` for generic educational roll, rotation and climbout. It does

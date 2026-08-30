@@ -18,6 +18,12 @@ No archive is created from a draft that fails lexical, structured numeric or
 whole-scenario admission. This gate changes no VSR member or schema: it ensures
 that `scenario.json` and `compiled.json` can contain only the admitted authored
 values and their exact compiled consequence.
+A weapon-terminal archive contains the compiled termination authority, the
+terminal achieved frame and exactly one `WEAPON_TERMINATED` event. Payload v2
+identifies the exact retained prior/next frame times that witness the lifetime
+minimum. The event
+records `targetEffect: NOT_MODELLED`; no archive consumer may promote geometric
+intercept to damage or kill.
 
 An admitted takeoff archive includes canonical operational frames and transition
 events beside the unchanged compiled Air-mission/model/environment identities.
@@ -158,9 +164,11 @@ velocity and steering acceleration, controller-accepted steering acceleration,
 achieved velocity, limiter state,
 installed-store mass, and the sorted identities of installed stores.
 Weapon samples additionally record the closed achieved `weaponFlightState`
-(`BOOST`, `COAST`, `TERMINAL_GUIDANCE`, or `TARGET_UNAVAILABLE` after launch).
+(`BOOST`, `COAST`, `TERMINAL_GUIDANCE`, `INTERCEPT`, `MISS`, `EXPIRED`,
+`FAILED`, reserved `SELF_DESTRUCT`, or `TARGET_UNAVAILABLE` after launch).
 This is distinct from free-text presentation phase and does not imply seeker or
-support availability.
+support availability. An `INTERCEPT` sample is geometric evidence only; it
+does not change the target lifecycle or assert damage or kill.
 The columnar frame codec preserves these values so replay and live playback use
 the same control evidence without rerunning the engine.
 
@@ -199,9 +207,99 @@ VSR integrity continues to validate only the model-pack identity already bound
 by the compiled scenario and manifest. The new offline v2 validator neither
 weakens that check nor lets replay resolve or substitute a model pack.
 
-Readback recompiles the archived authored mission against the archived model
-and environment pack and requires exact equality across scenario, compiled,
-manifest, and report members before returning replay data.
+Product readback resolves the archived model pack by exact `(id, version,
+digest)` from the application-retained pack set. Verification tooling may
+instead supply the complete unretained compiled pack explicitly, but its
+structure, canonical compiler digest, intended use, id, version and digest must
+authenticate against the exact recorded identity before it can serve as replay
+authority. This complete validation runs when the supplied pack is selected as
+authority, even when a ground-start record has no executable guided release and
+therefore needs no deterministic engine rerun. Every compiled weapon must carry
+the exact v1 field set, finite physical scalars inside their admitted domains,
+bounded model references, supported seeker/support/launch enums, complete
+validity ranges, catalog identity and in-pack evidence before mission
+recompilation can consume it. A canonical digest authenticates bytes; it does
+not convert a string-valued mass, non-finite scalar or dangling index into model
+authority. Every compiled aircraft consumed by Air-mission recompilation is
+likewise checked for its exact field set, semantic identity, evidence and
+validity bindings, finite mass/fuel/load-factor domains, bounded component and
+loadout indexes, and a closed performance-admission shape. A digest-valid
+string-valued fuel capacity therefore fails before takeoff-mass arithmetic.
+The supplied pack must retain the compiler-owned exact coordinate convention
+keys and supported values, and every positive aircraft performance admission
+must match the separate governed evidence registry's subject, capabilities,
+role-separated artifacts and immutable digests. These checks run before the
+no-release path can recompile a mission, so a resealed frame change or arbitrary
+in-pack evidence pair cannot become replay authority.
+Every supplied evidence row is admitted as a complete exact record with a
+closed evidence kind, stable unique identity, title, absolute URI, valid access
+date and optional valid locator/content digest. Every aerodynamic, propulsion
+and sensor record is structurally admitted before recompilation, including exact
+compiled-v1 fields, semantic versions, evidence, finite physical values and
+complete validity domains. Every table requires an exact shape, stable identity,
+supported output unit, at least one typed axis in its canonical SI unit, finite
+strictly increasing axis coordinates, finite values and a value count equal to
+the product of its axis lengths. Aerodynamic models must retain at least one
+such coefficient table, while propulsion thrust and fuel-flow tables must use
+their declared SI outputs. Those components and the loadout must also cover the
+aircraft's full validity domain. These checks run even for a no-release
+ground-start archive that skips engine rerun, so mission recompilation cannot
+consume a digest-valid partial evidence row, malformed table tensor or narrowed
+component envelope.
+For a positive sensor, its admission references are resolved back to those
+complete evidence rows: source references must be `SOURCE`, independent
+validation references must be `VALIDATION`, and both must carry lowercase
+SHA-256 artifact digests. Resealing a pack cannot relabel or de-address that
+evidence into valid replay authority. The raw `vector.engine-run-request.v1`
+Rust/WASM entry point repeats that role-and-digest admission before execution;
+it also requires the exact admission/coverage shapes, every positive-sensor
+coverage state to be `VALIDATED`, and every admitted artifact to remain in the
+sensor's own provenance list. It does not rely on the TypeScript wrapper to
+protect direct ABI callers.
+Every compiled loadout is also admitted as an exact base model plus exact
+station records with finite body-frame positions, positive integer capacities,
+unique identities and bounded weapon indexes; an unused station may truthfully
+carry an empty compatible-store list. The selected loadout validity domain must
+cover the owning aircraft altitude, Mach, angle-of-attack, load-factor,
+configuration and environment domain through the canonical model-pack coverage
+predicate. Compatibility rules must carry
+exact fields, in-pack evidence, bounded loadout/weapon references, a supported
+status, and a platform/station/capacity relation that the referenced loadout
+actually admits. A digest-valid string-valued station capacity therefore fails
+before JavaScript coercion can bypass mission-loadout admission.
+The compact runtime observer-sensor inventory is likewise an exact projection
+of the authenticated compiled sensor rows: cardinality, order, identity,
+evidence references, kind, numeric envelope and optional verification-track
+model must match before execution or record recompilation.
+That same authenticated
+authority pack is used for deterministic engine replay and for recompiling an
+archived authored Air mission against the archived environment pack. Exact
+equality across scenario, compiled, manifest, and report members is required
+before returning replay data. Without an
+explicit authenticated verification pack, an unretained identity fails closed;
+readback never substitutes the current pack. A fabricated pack bearing the
+recorded digest is rejected before any causal event, frame, mission or report
+authority is evaluated.
+Pre-termination records are identified by the absence of the
+`weaponTerminations` member, not by an empty current member. Their historical
+runtime-digest v2 bytes are verified before readback normalizes that missing
+member to an empty in-memory projection. This compatibility path is permitted
+only when no entity carries termination authority and the exact retained pack
+also contains none; current terminal-capable records remain runtime-digest v3
+and cannot borrow an older retained pack identity. A record carrying any such
+authority must also retain the typed v2 event stream; relabeling or replacing it
+with legacy v1 events is rejected rather than skipping terminal-event checks.
+For a typed stream that claims a non-weapon result, readback also evaluates the
+last exact fixed-step segment for every released termination-capable guided
+weapon. An explicitly authored unpowered `JETTISON` remains a store-transfer
+run and is excluded from guided-weapon terminal authority.
+Geometry, target state, lifetime, terrain or post-burn energy that proves a
+terminal cause cannot be hidden by restoring a non-terminal weapon state,
+deleting its events and relabeling `RUN_COMPLETED` and the report as a time
+limit. Both engines therefore force-retain the exact predecessor of the final
+frame for every released termination-capable run, including a truthful
+nonterminal result. Missing entities or a gap larger than one fixed step is an
+invalid record rather than permission to skip this counterfactual check.
 Regional replay verifies the embedded pack content digest, runtime-grid parent
 binding and installation-catalogue digest before any archived frame is exposed.
 Ground replay also validates the exact compiled mission, posture, release time,
@@ -218,8 +316,8 @@ The manifest records SHA-256 hashes for the canonical scenario, compiled engine 
 `vector.simulation-event.v2` stream. It is not rebuilt from sampled frames and
 does not contain display-ready English. The current closed producer set is
 `RUN_STARTED`, `ENTITY_ENTERED_WORLD`, `ENTITY_LIFECYCLE_CHANGED`,
-`AIRCRAFT_OPERATIONAL_STATE_CHANGED`, `TRACK_STATE_CHANGED`, and
-`RUN_COMPLETED`. The aircraft event is produced by `AIRCRAFT_DYNAMICS` at the
+`AIRCRAFT_OPERATIONAL_STATE_CHANGED`, `WEAPON_TERMINATED`,
+`TRACK_STATE_CHANGED`, and `RUN_COMPLETED`. The aircraft event is produced by `AIRCRAFT_DYNAMICS` at the
 exact retained frame for every governed hold/roll/rotate/climbout/enroute
 transition and binds the ground-dynamics digest plus movement value state.
 `TRACK_STATE_CHANGED` is available
@@ -227,9 +325,77 @@ only for the source-authored generic engine-verification model and records an
 opaque side-owned track transition with exact source sequence/time and typed
 cause. Payload v3 retains the exact opaque observation ID for
 observation-driven transitions and `null` for coast/loss transitions.
-Launch-decision, guidance, support, and weapon-termination events remain
-unavailable until their owning contracts produce them; the record and browser
-may not infer them.
+`WEAPON_TERMINATED` is produced by `WEAPON_DYNAMICS`. Its v2 payload binds the
+weapon and target, prior and achieved weapon state, typed cause, the
+`GEOMETRIC_CLOSEST_APPROACH` criterion, closest approach, within-step
+occurrence time, admitted 25 m radius, admitted 180 s maximum flight time and
+`targetEffect: NOT_MODELLED`, plus the exact prior/next model times of the
+retained minimizing pair. Exactly one such event is required for a weapon
+intercept, miss, expiry, terrain failure or target-unavailable run. The event
+frame must contain the terminated weapon in the matching achieved state; its
+prior state must equal the same weapon's state at the exact preceding fixed-step
+boundary, which the engine force-retains immediately before every weapon
+termination. At world entry both engines seed the evidence with the first exact
+active fixed-step pair even when its minimum equals the launch-boundary
+separation; later exact consecutive candidates replace it only when a segment
+establishes a lower weapon-lifetime minimum. Rolling engine snapshots replace
+superseded candidates, and publication
+merges the exact minimizing pair with normal 0.25-second playback
+samples and event frames. A time-limit run with a released termination-capable
+weapon additionally retains the exact final predecessor needed to prove that
+no terminal predicate occurred in its last step. Replay requires the declared
+witness pair, recomputes its exact segment minimum, and then reruns a terminal
+record's compiled scenario on its declared deterministic backend. The same full
+rerun is mandatory when a termination-capable archive claims no terminal event:
+the replayed run outcome, cumulative closest approach, primary weapon and
+target identities, and optional terminal payload must match the archive. A
+carried store therefore cannot replace the released weapon by resealing only
+the report. This also prevents an earlier terminal boundary from
+being discarded and replaced by duplicated active frames at the declared run
+duration. For a terminal claim, the replayed payload, cause, cumulative closest
+approach and witness identity must match the archive, so deleting the true
+minimum and substituting another retained pair cannot be authorized by
+recomputing archive hashes. A record claiming
+`time_limit` must end at the first fixed-step tick at or after the compiled
+scenario duration; truncating a terminal archive to an earlier nonterminal pair
+and resealing it cannot manufacture a time-limit result. For geometric intercept,
+replay independently recomputes the
+closest-point fraction from those two boundary frames and requires the exact
+canonical six-decimal occurrence time. When admitted weapon lifetime ends
+inside the terminal integration step, replay truncates that relative-position
+segment at the exact expiry fraction before recomputing closest approach. Its
+state and cause must map exactly to the `RUN_COMPLETED` outcome, and its closest
+approach must equal the canonical six-decimal projection of the frozen report's
+cumulative minimum from the admitted launch boundary through termination;
+stowed/pre-launch geometry is excluded;
+geometric intercept leaves the target active. Launch-decision, guidance and
+support events remain unavailable until their owning contracts produce them;
+the record and browser may not infer them.
+
+Replay also binds the terminal cause to the recorded target lifecycle.
+`GEOMETRIC_INTERCEPT` requires an active-world target (`ACTIVE`, `TRACKING`, or
+`ENGAGING`) in the event frame, while
+`TARGET_UNAVAILABLE` requires that target to be `TERMINATED`. Rehashing the
+frame/event members cannot substitute one cause for the other.
+
+Replay evaluates the producer's ordered terminal predicates against the exact
+prior and terminal frames: target unavailable, admitted geometric intercept,
+admitted lifetime expiry, terrain impact, then post-burn energy depletion. The
+terrain predicate is resampled from the retained immutable EnvironmentPack;
+replay admits only a `1e-8 m` serialization/parity tolerance at the contact
+boundary. The energy predicate recomputes terminal speed from the velocity vector and
+requires the admitted post-burn time and separation gates. The achieved frame
+must also carry the exact terminal phase for the winning cause. A caller cannot
+convert a terrain failure into an energy miss merely by changing the event,
+frame enum, run outcome and hashes together.
+
+For `FLIGHT_TIME_EXPIRED`, replay independently derives the achieved launch
+boundary from the authored schedule and fixed step, adds the admitted maximum
+flight time, and requires the event's six-decimal occurrence time to equal that
+exact value. Rehashing a record after changing the timestamp cannot create a
+valid expiry event. Energy-depleted miss, terrain impact and target-unavailable
+are boundary-only causes and must equal their retained terminal event time;
+only geometric closest-approach intercept may retain another within-step time.
 
 The `vector.simulation-event.v2` envelope is immutable. Each payload variant
 carries a separate `vector.simulation-event-payload.<family>.vN` identity.
@@ -263,12 +429,21 @@ transition's `from` value must equal the prior canonical lifecycle. The replayed
 history must reach the lifecycle in the final retained frame. A syntactically
 valid enum cannot therefore falsify the recorded transition history.
 
-World entry for a scheduled stowed weapon is bound to the first fixed-step
+Every scheduled `GUIDED_WEAPON` must begin `STOWED`; TypeScript and Rust/WASM
+reject a contradictory active initial lifecycle before integration. World entry
+for an admitted scheduled weapon is bound to the first fixed-step
 integration boundary at or after its declared launch time and the first retained
 frame containing that entity. A later lifecycle event is
 bound to the first retained frame that changes from its prior canonical state,
 and `RUN_COMPLETED` is bound to the final retained frame. Referencing any other
 frame fails even when that frame contains the same lifecycle value.
+
+The current VSR run contract contains one `primaryWeaponId`, one cumulative
+closest-approach value, and one weapon-terminal outcome. Engine admission
+therefore allows at most one scheduled guided release. Carried stores with a
+null schedule remain immutable inventory, and an explicit `JETTISON` remains an
+unpowered store-transfer event; a second guided release fails before integration
+rather than producing an incomplete terminal record.
 
 The integer tick owns model time: each boundary is derived as `tick × fixed
 step`; neither engine accumulates a floating model clock. Scheduled activation
@@ -305,6 +480,9 @@ The browser owns raw lexical feedback, while the Worker and saved-run boundary
 repeat the shared structured and relational admission semantics. A transport
 adapter may serialize an admitted value but may not broaden its type, precision
 or cross-field validity.
+Browser consumers receive weapon terminal state and event evidence through the
+same VSR transfer as every other canonical frame/event. Map and 3D proximity,
+labels or playback sampling cannot replace or amend that evidence.
 
 The Worker transfers the recorded runway lifecycle and controller/value-state
 fields through the existing VSR boundary. Browser map, 3D, telemetry, timeline
@@ -338,6 +516,9 @@ VSR is designed for browser production and playback. Frames use a transferable c
 Replay remains read-only with respect to authored input. It exposes the exact
 validated scenario and compiled values stored in the VSR and has no repair,
 rounding or default path for rejected authoring data.
+Replay now covers engine-owned weapon intercept, miss, expiry, terrain failure
+and target-unavailable outcomes with exact payload validation. It remains
+read-only and does not compute a fuze, target effect, damage state or kill.
 
 The implemented ground-operation replay covers the admitted generic roll,
 rotation and climbout sequence through `ENROUTE`, with exact events and

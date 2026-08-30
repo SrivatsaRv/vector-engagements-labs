@@ -12,10 +12,15 @@ import {
 import { enginePositionToGeographic } from "../scenario-spatial.ts";
 import { assertSimulationEventStream } from "./simulation-events.ts";
 import { sha256HexSync } from "../geospatial/digest.ts";
+import {
+  assertRuntimeModelPackAuthority,
+} from "./runtime-model-pack.ts";
+import { findEngineCompiledModelPackAuthority } from "./retained-model-packs.ts";
 import type {
   PublicAircraftReferenceInput,
   PublicAircraftReferenceRun,
 } from "../validation/public-aircraft-reference.ts";
+import type { CompiledModelPack } from "../model-pack.ts";
 type RustEngineExports = WebAssembly.Exports & {
   memory: WebAssembly.Memory;
   vector_abi_version: () => number;
@@ -129,8 +134,18 @@ export function runRustWasmPublicAircraftReference(
   return JSON.parse(output) as PublicAircraftReferenceRun;
 }
 
-export function runRustWasmEngine(scenario: EngineScenario): EngineRun {
+export function runRustWasmEngine(
+  scenario: EngineScenario,
+  verificationPack?: Readonly<CompiledModelPack>,
+): EngineRun {
   const engine = getRustEngine();
+  const retainedPack = findEngineCompiledModelPackAuthority(scenario.modelPack, verificationPack);
+  const carriesWeaponTerminationAuthority = scenario.entities.some(
+    (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.termination !== undefined,
+  );
+  assertRuntimeModelPackAuthority(scenario.modelPack, retainedPack, {
+    requireCompiledWeaponTerminationAuthority: carriesWeaponTerminationAuthority,
+  });
   if (scenario.airMission) {
     const compiledContent = structuredClone(scenario.airMission) as Record<string, unknown>;
     delete compiledContent.compiledDigest;
@@ -141,7 +156,14 @@ export function runRustWasmEngine(scenario: EngineScenario): EngineRun {
       throw new Error("Rust/WASM Air mission lineage digest is invalid.");
     }
   }
-  const input = new TextEncoder().encode(JSON.stringify(scenario));
+  const request = verificationPack
+    ? {
+        schemaVersion: "vector.engine-run-request.v1",
+        scenario,
+        verificationModelPack: verificationPack,
+      }
+    : scenario;
+  const input = new TextEncoder().encode(JSON.stringify(request));
   const maximumInputLength = engine.vector_max_input_len();
   if (input.byteLength > maximumInputLength) {
     throw new Error(
@@ -174,6 +196,11 @@ export function runRustWasmEngine(scenario: EngineScenario): EngineRun {
     run.frames,
     scenario,
     run.termination,
+    run.closestApproachM,
+    {
+      primaryWeaponId: run.primaryWeaponId,
+      primaryTargetId: run.primaryTargetId,
+    },
   );
   return withGeospatialRecord(scenario, run);
 }
@@ -181,9 +208,10 @@ export function runRustWasmEngine(scenario: EngineScenario): EngineRun {
 export function runEngineBackend(
   scenario: EngineScenario,
   backend: EngineBackendId,
+  verificationPack?: Readonly<CompiledModelPack>,
 ): EngineRun {
-  if (backend === "rust-wasm") return runRustWasmEngine(scenario);
-  if (backend === "typescript") return withGeospatialRecord(scenario, runEngine(scenario));
+  if (backend === "rust-wasm") return runRustWasmEngine(scenario, verificationPack);
+  if (backend === "typescript") return withGeospatialRecord(scenario, runEngine(scenario, verificationPack));
   const exhaustive: never = backend;
   throw new Error(`Unknown VECTOR engine backend: ${exhaustive}`);
 }

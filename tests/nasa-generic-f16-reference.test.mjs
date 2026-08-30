@@ -26,7 +26,7 @@ const runtimeSurfaces = await Promise.all(
   [
     "../lib/reference-model-pack.ts",
     "../lib/object-catalog.ts",
-    "../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json",
+    "../fixtures/model-packs/vector-scalar-study-v0.9.compiled.json",
   ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
 );
 

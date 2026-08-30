@@ -120,6 +120,8 @@ ci-quality:
 	npm run environment:sources:verify
 	npm run generic-sensor:sources:verify
 	npm run environment:migration:verify
+	npm run ground-dynamics:migration:verify
+	npm run weapon-termination:migration:verify
 	npm run tp1538:sources:verify
 	npm run tp1538:aero:adjudication:verify
 	npm run tp1538:aero:workload:verify

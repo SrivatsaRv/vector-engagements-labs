@@ -1,5 +1,5 @@
 import { canonicalJson } from "../canonical-json.ts";
-import { RUST_WASM_ENGINE_ARTIFACT } from "../engine/backend.ts";
+import { RUST_WASM_ENGINE_ARTIFACT, runEngineBackend } from "../engine/backend.ts";
 import type {
   EngineEntityFrame,
   EngineFrame,
@@ -21,7 +21,9 @@ import {
   type SimulationResult,
 } from "../simulation.ts";
 import { assertRecordedSidePictures, attachRecordedObserverStates } from "../information-state.ts";
-import { assertRuntimeModelPackDigest } from "../engine/runtime-model-pack.ts";
+import {
+  assertRuntimeModelPackAuthority,
+} from "../engine/runtime-model-pack.ts";
 import {
   assertEnvironmentPack,
   environmentPackBinding,
@@ -30,7 +32,15 @@ import {
   COMPILED_AIR_MISSION_SCHEMA_VERSION,
   compileAirMissionDefinition,
 } from "../air-mission.ts";
-import { CURRENT_COMPILED_MODEL_PACK } from "../engine/weapon-admission.ts";
+import {
+  findEngineCompiledModelPackAuthority,
+  findRetainedCompiledModelPack,
+  resolveRetainedCompiledModelPack,
+} from "../engine/retained-model-packs.ts";
+import {
+  type CompiledModelPack,
+  verifyCompiledModelPackDigest,
+} from "../model-pack.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v6" as const;
@@ -533,6 +543,11 @@ export async function createVectorSimulationRecord(
     result.engineRun.frames,
     result.engineRun.scenario,
     result.engineRun.termination,
+    result.engineRun.closestApproachM,
+    {
+      primaryWeaponId: result.engineRun.primaryWeaponId,
+      primaryTargetId: result.engineRun.primaryTargetId,
+    },
   );
   const pictures = result.pictures;
   const canonicalEngineScenario = {
@@ -719,6 +734,7 @@ function jsonLines<T>(bytes: Uint8Array): T[] {
 export async function openVectorSimulationRecord(
   buffer: ArrayBuffer,
   byteLength = buffer.byteLength,
+  options: { compiledModelPack?: Readonly<CompiledModelPack> } = {},
 ): Promise<OpenedVectorRecord> {
   if (byteLength > buffer.byteLength || byteLength < 12) {
     throw new Error("VECTOR record length is out of bounds.");
@@ -804,9 +820,84 @@ export async function openVectorSimulationRecord(
     PreparedSimulation,
     "scenario"
   >;
-  if (compiled.engineScenario.modelPack.runtimeDigest !== undefined) {
-    assertRuntimeModelPackDigest(compiled.engineScenario.modelPack);
+  const recordedModelPack = compiled.engineScenario.modelPack as
+    typeof compiled.engineScenario.modelPack & {
+      weaponTerminations?: typeof compiled.engineScenario.modelPack.weaponTerminations;
+    };
+  const legacyRuntimeModelPackProjection = !Object.hasOwn(
+    recordedModelPack,
+    "weaponTerminations",
+  );
+  if (legacyRuntimeModelPackProjection) {
+    compiled.engineScenario.modelPack = {
+      ...recordedModelPack,
+      weaponTerminations: [],
+    };
   }
+  const retainedPack = findRetainedCompiledModelPack(compiled.engineScenario.modelPack);
+  const suppliedPack = options.compiledModelPack;
+  if (suppliedPack && !await verifyCompiledModelPackDigest(suppliedPack as CompiledModelPack)) {
+    throw new Error(
+      "Supplied compiled model pack digest does not match its canonical content.",
+    );
+  }
+  if (
+    suppliedPack &&
+    (
+      suppliedPack.id !== compiled.engineScenario.modelPack.id ||
+      suppliedPack.version !== compiled.engineScenario.modelPack.version ||
+      suppliedPack.digest !== compiled.engineScenario.modelPack.digest
+    )
+  ) {
+    throw new Error("Supplied compiled model pack does not match the exact recorded identity.");
+  }
+  const authorityPack = retainedPack ?? (
+    suppliedPack
+      ? findEngineCompiledModelPackAuthority(
+          compiled.engineScenario.modelPack,
+          suppliedPack,
+        )
+      : undefined
+  );
+  const entityCarriesWeaponTerminationAuthority = compiled.engineScenario.entities.some(
+    (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.termination !== undefined,
+  );
+  const carriesWeaponTerminationAuthority =
+    compiled.engineScenario.modelPack.weaponTerminations.length > 0 ||
+    entityCarriesWeaponTerminationAuthority;
+  const schedulesTerminationCapableGuidedRelease = compiled.engineScenario.entities.some(
+    (entity) => {
+      if (
+        entity.kind !== "GUIDED_WEAPON" ||
+        !entity.weapon?.termination ||
+        entity.weapon.launchTimeSeconds === null ||
+        entity.weapon.storeTransfer?.operation === "JETTISON"
+      ) return false;
+      const launcher = compiled.engineScenario.entities.find(
+        (candidate) => candidate.id === entity.weapon!.launchPlatformId,
+      );
+      // A legacy Air mission that starts on the ground does not execute the
+      // implicit scheduled-test launch. An explicit RELEASE remains executable.
+      return !(
+        compiled.engineScenario.airMission &&
+        launcher?.kind === "AIRCRAFT" &&
+        launcher.groundOperation &&
+        !entity.weapon.storeTransfer
+      );
+    },
+  );
+  if (
+    carriesWeaponTerminationAuthority &&
+    eventMember.schemaVersion !== VECTOR_EVENT_SCHEMA
+  ) {
+    throw new Error(
+      "VECTOR records with weapon-termination authority require the typed v2 simulation-event stream.",
+    );
+  }
+  assertRuntimeModelPackAuthority(compiled.engineScenario.modelPack, authorityPack, {
+    requireCompiledWeaponTerminationAuthority: carriesWeaponTerminationAuthority,
+    runtimeDigestVersion: legacyRuntimeModelPackProjection ? "v2" : "v3",
+  });
   const environmentPack = compiled.engineScenario.geospatial?.environmentPack;
   if (!environmentPack) {
     throw new Error("VECTOR record has no admitted environment pack.");
@@ -852,7 +943,46 @@ export async function openVectorSimulationRecord(
       decodedFrames,
       compiled.engineScenario,
       report.engine.termination,
+      report.engine.closestApproachM,
+      {
+        primaryWeaponId: report.engine.primaryWeaponId,
+        primaryTargetId: report.engine.primaryTargetId,
+      },
     );
+    const recordedTermination = events.items.find(
+      (event) => event.payload.kind === "WEAPON_TERMINATED",
+    )?.payload;
+    if (schedulesTerminationCapableGuidedRelease) {
+      const replay = runEngineBackend(
+        structuredClone(compiled.engineScenario),
+        manifest.backend.selected,
+        options.compiledModelPack,
+      );
+      if (replay.events.state !== "AVAILABLE") {
+        throw new Error("VECTOR record deterministic termination replay has no event stream.");
+      }
+      const replayedTermination = replay.events.items.find(
+        (event) => event.payload.kind === "WEAPON_TERMINATED",
+      )?.payload;
+      if (
+        replay.primaryWeaponId !== report.engine.primaryWeaponId ||
+        replay.primaryTargetId !== report.engine.primaryTargetId
+      ) {
+        throw new Error(
+          "VECTOR record primary entity identity does not match deterministic engine replay.",
+        );
+      }
+      if (
+        replay.termination !== report.engine.termination ||
+        replay.closestApproachM !== report.engine.closestApproachM ||
+        canonicalJson(replayedTermination ?? null) !==
+          canonicalJson(recordedTermination ?? null)
+      ) {
+        throw new Error(
+          "VECTOR record weapon termination claim does not match deterministic engine replay.",
+        );
+      }
+    }
   }
   if (scenario.airMission) {
     const recordedMission = compiled.engineScenario.airMission;
@@ -861,9 +991,12 @@ export async function openVectorSimulationRecord(
     }
     let verifiedMission;
     try {
+      const archivedModelPack = authorityPack ?? resolveRetainedCompiledModelPack(
+        compiled.engineScenario.modelPack,
+      );
       verifiedMission = compileAirMissionDefinition(scenario.airMission, {
         scenario,
-        modelPack: CURRENT_COMPILED_MODEL_PACK,
+        modelPack: archivedModelPack,
         environmentPackDigest: environmentPack.identity.digest,
         environmentPack,
         fixedStepSeconds: compiled.engineScenario.fixedStepSeconds,

@@ -51,6 +51,17 @@ type WorkerVerificationResult = {
   timeOfFlightSeconds: number;
   closestApproachM: number;
   finalSeparationM: number;
+  terminalEvent: {
+    kind: string;
+    weaponId?: string;
+    targetId?: string;
+    to?: string;
+    targetEffect?: string;
+    closestApproachM?: number;
+    interceptRadiusM?: number;
+  } | null;
+  terminalWeaponLifecycle: string | null;
+  terminalTargetLifecycle: string | null;
 };
 
 const {
@@ -273,6 +284,10 @@ try {
           (member) => member.path === "report.json",
         );
         if (!reportMember) throw new Error("Worker record omitted report.json.");
+        const eventsMember = archiveHeader.members.find(
+          (member) => member.path === "events.jsonl",
+        );
+        if (!eventsMember) throw new Error("Worker record omitted events.jsonl.");
         const reportStart = 12 + archiveHeaderLength + reportMember.offset;
         const report = JSON.parse(
           new TextDecoder().decode(
@@ -311,6 +326,27 @@ try {
           }>;
           entities: Array<{ id: string; lifecycle: string; phase: string }>;
         };
+        const eventsStart = 12 + archiveHeaderLength + eventsMember.offset;
+        const events = new TextDecoder().decode(
+          archive.subarray(eventsStart, eventsStart + eventsMember.byteLength),
+        ).trim().split("\n").map((line) => JSON.parse(line)) as Array<{
+          payload: {
+            kind: string;
+            weaponId?: string;
+            targetId?: string;
+            to?: string;
+            targetEffect?: string;
+            closestApproachM?: number;
+            interceptRadiusM?: number;
+          };
+        }>;
+        const terminalEvent = events.find((event) => event.payload.kind === "WEAPON_TERMINATED");
+        const finalFrame = frameHeader.frames.at(-1);
+        const finalEntities = finalFrame
+          ? frameHeader.entities.slice(finalFrame.entityOffset, finalFrame.entityOffset + finalFrame.entityCount)
+          : [];
+        const terminalTarget = finalEntities.find((entity) => entity.id === terminalEvent?.payload.targetId);
+        const terminalWeapon = finalEntities.find((entity) => entity.id === terminalEvent?.payload.weaponId);
         const transferredByteLength = completion.recordBuffer.byteLength;
         worker.postMessage(
           {
@@ -341,7 +377,10 @@ try {
           successful: report.result.successful,
           timeOfFlightSeconds: report.result.timeOfFlight,
           closestApproachM: report.result.closestApproach,
-          finalSeparationM: frameHeader.frames.at(-1)?.separationM ?? Number.NaN,
+          finalSeparationM: finalFrame?.separationM ?? Number.NaN,
+          terminalEvent: terminalEvent?.payload ?? null,
+          terminalWeaponLifecycle: terminalWeapon?.lifecycle ?? null,
+          terminalTargetLifecycle: terminalTarget?.lifecycle ?? null,
         };
       },
       { pack, stalePack, verificationPack, workerUrl: `${origin}/assets/${workerName}` },
@@ -361,11 +400,17 @@ try {
   assert.ok(result.states.includes("failed"));
   assert.match(result.staleAdmissionError, /capability-manifest-stale/);
   assert.match(result.verificationAdmissionError, /capability-manifest-stale/);
-  assert.equal(result.termination, "threshold_reached");
+  assert.equal(result.termination, "weapon_intercept");
   assert.equal(result.successful, true);
-  assert.ok(result.timeOfFlightSeconds > 120 && result.timeOfFlightSeconds < 140);
-  assert.ok(result.closestApproachM > 150 && result.closestApproachM <= 180);
-  assert.ok(result.finalSeparationM <= 180);
+  assert.equal(result.timeOfFlightSeconds, 131.9);
+  assert.ok(result.closestApproachM > 21 && result.closestApproachM < 22);
+  assert.ok(result.finalSeparationM > 21 && result.finalSeparationM < 22);
+  assert.equal(result.terminalEvent?.to, "INTERCEPT");
+  assert.equal(result.terminalEvent?.targetEffect, "NOT_MODELLED");
+  assert.equal(result.terminalEvent?.closestApproachM, 21.836104);
+  assert.equal(result.terminalEvent?.interceptRadiusM, 25);
+  assert.equal(result.terminalWeaponLifecycle, "TERMINATED");
+  assert.equal(result.terminalTargetLifecycle, "ACTIVE");
 
   const cancellation = await page.evaluate(
     async ({ pack, workerUrl }) => {

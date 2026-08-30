@@ -11,7 +11,11 @@ import type {
   ObserverSensorAdmission,
   ObserverTrackModel,
 } from "./contracts.ts";
-import { bindRuntimeModelPackDigest } from "./runtime-model-pack.ts";
+import {
+  bindRuntimeModelPackDigest,
+  runtimeObserverSensors,
+  runtimeWeaponTerminations,
+} from "./runtime-model-pack.ts";
 
 export const ENGINE_VERIFICATION_INTENDED_USE =
   "vector.intended-use.engine-verification" as const;
@@ -150,20 +154,8 @@ export async function bindVerificationTrackModelPack(
     version: pack.version,
     digest: pack.digest,
     intendedUse: { id: ENGINE_VERIFICATION_INTENDED_USE, version: "1.0.0" },
-    observerSensors: pack.sensors.map((item) => ({
-      modelId: item.id,
-      modelVersion: item.version,
-      evidenceRefIds: [...item.evidenceRefIds],
-      sensorKind: item.sensorKind,
-      detectionRangeM: item.detectionRangeM,
-      minimumRangeM: item.minimumRangeM,
-      scanPeriodS: item.scanPeriodS,
-      azimuthFieldOfViewRad: item.azimuthFieldOfViewRad,
-      elevationFieldOfViewRad: item.elevationFieldOfViewRad,
-      ...(item.verificationTrackModel
-        ? { verificationTrackModel: structuredClone(item.verificationTrackModel) }
-        : {}),
-    })),
+    observerSensors: runtimeObserverSensors(pack),
+    weaponTerminations: runtimeWeaponTerminations(pack, []),
     scenarioPatches: [],
   });
   for (const entity of scenario.entities) {

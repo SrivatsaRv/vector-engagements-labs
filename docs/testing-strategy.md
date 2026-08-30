@@ -144,6 +144,146 @@ finiteness, range and integer checks still run before compilation. A dedicated
 regression injects string, `NaN` and out-of-range duplicate values and proves
 final simulation preparation fails closed.
 
+The catalog-admission regression resolves the same current immutable model-pack
+fixture used by every scenario package. When migration 017 advances that
+identity to 0.9.0, the regression must advance with it and still falsify a
+missing pack, payload-digest mismatch, missing limitations and mismatched
+approval state before any scenario becomes runnable.
+Migration regression also proves that all nine new packages use `1.1.0`, that
+the nine historical `1.0.0` identities remain present, and that migration 017
+contains no update path for an existing `(id, version)`. Its post-insert
+readback binds every historical and current intended-use, source, credibility
+manifest and compiled-pack field to the generated immutable content, so a
+pre-existing conflicting identity aborts instead of being silently reused.
+The historical intended-use oracle is migration 007's exact JSON definition and
+legacy identity-string hash, preventing a newer reconstructed definition from
+being mistaken for the already-published immutable row.
+Engine regression
+contrasts a 75 ms lifetime with a 100 ms control in the same crossing geometry:
+the former expires at the exact in-step boundary while the latter intercepts,
+with identical TypeScript and Rust/WASM results.
+The suite additionally changes an entity and its compact projection, recomputes
+the runtime digest, and proves the retained compiled pack still rejects the
+forgery. Separate TypeScript, Rust/WASM and VSR regressions delete the digest
+and prove that a retained pack with weapon-termination authority cannot fall
+back to an unbound legacy projection. A non-Air VSR regression replaces and
+reseals the complete runtime-pack identity and termination projection; replay
+rejects it unless an independently supplied full compiled pack matches the
+recorded id, version and digest exactly. Live-engine and VSR falsifiers then
+mutate the supplied full pack while retaining its claimed digest; both reject
+before using its termination or replay authority. The synchronous live verifier
+and asynchronous replay verifier are checked against the same valid and
+tampered canonical pack bytes. A legacy-event VSR with an unretained pack and
+no runtime or entity termination authority remains readable without an external
+pack, proving the fail-closed requirement is authority-scoped rather than an
+unconditional retention dependency. Exact pre-termination records that omit
+`weaponTerminations` retain their historical runtime-digest v2 verification and
+are normalized to an empty projection only after that digest passes; a changed
+v2 digest fails closed. Conversely, an entity termination cannot borrow the
+identity of a retained pre-termination pack: both live backends require the
+resolved pack itself to contain the exact termination authority. A hash-resealed
+current record whose typed terminal events are replaced by legacy v1 events is
+rejected before replay, while the historical no-termination records retain
+explicit unavailable-event playback. A second hash-resealed falsifier restores
+the final weapon to its preceding active state, deletes both terminal events and
+relabels the report and completion as a time limit; independent final-segment
+predicate evaluation still detects and rejects the geometric intercept. A
+stronger hash-resealed falsifier also removes that exact predecessor frame and
+its observer picture, then reindexes the remaining events; replay rejects the
+record because every released termination-capable nonterminal claim must retain
+an exact final fixed-step pair. A third falsifier discards an earlier intercept,
+appends two copies of an earlier active frame at the nominal final fixed-step
+times, removes terminal events and relabels the archive as `time_limit`; full
+deterministic rerun of every termination-capable record rejects the forged
+nonterminal outcome even though its final retained pair is locally consistent.
+A VSR round-trip separately proves that an
+explicit unpowered `JETTISON` remains outside guided-weapon terminal authority
+instead of being rejected as a suppressed terminal event. The governed airborne
+`RELEASE` round-trip remains inside full replay and proves that canonical member
+key ordering does not change closed ground-dynamics validity. Native Rust validation separately removes the
+runtime termination projection from an otherwise executable entity and proves
+that direct rlib/WASM callers reject it before integration, matching the
+TypeScript and wrapped-WASM boundaries. The backend admission matrix also
+proves that only `GUIDED_WEAPON` entities count toward the single scheduled
+guided-release limit in both TypeScript and Rust/WASM. VSR mutation regressions
+rehash complete terminal and truthful nonterminal records after changing the
+report's primary weapon to a carried store. Terminal event authority rejects
+the first form, while deterministic full-run replay rejects the nonterminal
+form by comparing the exact primary weapon and target identities. Contradicting
+any terminal cause with the target lifecycle also fails before replay exposure.
+Migration 017 additionally exact-reads every
+explicitly inserted scenario column after conflict, including status and the
+complete package, so a partial deployment cannot leave a non-executable or
+otherwise divergent row behind a matching content hash.
+
+Raw-boundary regression additionally relabels a jointly resealed product
+projection as `engine-verification` and requires rejection unless the complete
+canonical compiled pack travels in `vector.engine-run-request.v1`. The positive
+case proves both live backends execute that exact authenticated verification
+pack. Separately digest-valid supplied packs with an extra top-level authority
+field, a duplicate weapon identity or a duplicate intended-use identity fail in
+both TypeScript and the raw Rust/WASM ABI before the pack can authorize
+execution. The same cross-backend table reseals a string-valued weapon launch
+mass under a valid canonical digest; TypeScript and raw Rust/WASM must both
+reject it at the compiled-weapon boundary. The same table rebinds a weapon and
+its runtime/entity projection to a non-semantic version and proves that both
+backends reject it. The no-release Air-record regression then carries malformed
+weapon-mass and aircraft-fuel packs to VSR readback and proves neither can
+exploit a skipped engine rerun to reach mission recompilation. The validators
+cover the complete compiled weapon key set, base identity/evidence/validity
+fields, physical scalars, referenced model indexes, enums and termination
+authority; the Air readback boundary applies the corresponding complete
+aircraft shape, physical-domain, component-index and performance-admission
+checks before compilation. It also reseals the selected compiled station's
+integer capacity as a string and proves that complete loadout/compatibility
+shape, numeric-domain and reference validation rejects the pack before
+Air-mission loadout arithmetic. The same table proves a digest-valid loadout
+whose altitude domain no longer covers its aircraft is rejected by the shared
+canonical coverage predicate, while a separately resealed unused station with
+an empty compatible-store list remains valid. The no-release VSR path repeats
+the narrowed-domain falsifier so skipped engine replay cannot bypass the
+loadout-to-aircraft relationship.
+The supplied-authority matrix also independently reseals partial, extra-field,
+unknown-kind, duplicate-ID, invalid-digest, relative-URI, impossible-date and
+blank-locator evidence records. Each must fail before evidence IDs can authorize
+aircraft, weapon, loadout or compatibility references. Six separate coverage
+falsifiers narrow the referenced aerodynamic domain, an aerodynamic coefficient
+table, propulsion domain, thrust table, fuel-flow table and sensor domain; all
+must fail through the compiler-owned aircraft coverage predicate. A separate
+digest-valid falsifier removes every coefficient table from the selected
+aerodynamic model. A table-driven structural matrix independently falsifies a
+table's exact field set, axis unit, strict coordinate order, tensor shape,
+finite values and evidence linkage; adjacent cases falsify propulsion and
+sensor exact shapes and numeric authority. The no-release Air VSR regression
+repeats the partial-evidence, narrowed-aerodynamic, empty-table and partial-table
+cases to prove skipped
+deterministic engine replay cannot expose any of those packs to mission
+recompilation.
+Table-driven native and
+raw-WASM falsifiers then corrupt the termination
+patch target, duplicate target key, compiled old value, SI unit and evidence
+reference while recomputing `runtimeDigest`; every case fails before the
+override is consumed. A positive Air VSR regression then binds its authored and
+compiled mission to an unretained engine-verification pack, opens the record
+with that complete authenticated pack and requires exact mission and pack
+identity on readback. This proves supplied authority is reused for Air-mission
+recompilation rather than passing engine replay and then failing at a
+retained-only inventory lookup. A separate ground-start falsifier supplies a
+digest-valid compiled pack with the recorded id/version/digest but without the
+claimed engine-verification intended use. Because the implicit guided release
+cannot execute, the record reaches Air-mission recompilation without an engine
+rerun; admission must still reject the pack through the same full structural
+and intended-use validator before the mission compiler can consume it. The
+digest-valid string-mass and string-fuel variants are separately shown to fail
+before the mission compiler can create invalid takeoff-mass arithmetic; the
+string station-capacity variant must likewise fail before a coerced comparison
+can admit the loadout, and the narrowed loadout-domain variant must fail before
+archived mission recompilation.
+Browser runtime tests admit the `open-record` message and prove the client sends
+saved-record verification to the simulation Worker. The built browser journey
+opens the Worker-produced VSR inside that Worker, so deterministic terminal
+replay cannot block the rendering thread.
+
 This baseline does not satisfy #193 by itself. Completion additionally requires
 machine-readable registration for every nested Air-mission and presentation
 control, deterministic constrained cross-field combinations, Worker/server
@@ -152,6 +292,13 @@ runtime configuration contrasts and a CI artifact that reports uncovered
 matrix rows.
 
 ## Existing baseline
+
+Weapon-termination regression now includes independent relative-segment
+closest-approach cases, malformed admission, maximum-flight expiry, legacy-
+distance non-authority, a delayed release whose launch boundary remains the
+lifetime minimum, nine-scenario TypeScript/Rust parity and built-Worker event/
+lifecycle readback. Every geometric-intercept assertion also verifies
+that target effect is not modelled.
 
 The generic sensor Stage-0 generator, deny-network verifier, and adversarial
 suite are mandatory quality checks. `worker-local` and hosted integration rerun

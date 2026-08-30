@@ -199,7 +199,7 @@ test("ordinary scenario synchronization preserves authored store-transfer intent
     percentile: 0.95,
     maximumP95Ms: 100,
     maximumFramesPerRun: 150,
-    maximumOptimizedWasmBytes: 550_000,
+    maximumOptimizedWasmBytes: 585_000,
     backends: ["typescript", "rust-wasm"],
   });
   const scenario = createGenericAirborneStoreTransferScenario();
@@ -710,6 +710,38 @@ test("VSR replay and map projection retain the exact transfer event and boundary
     result.engineRun.frames[event.frameIndex].geographicPositions
       .find((position) => position.entityId === event.payload.storeId).position.latitudeDeg,
   ]);
+});
+
+test("VSR replay keeps an explicit jettison outside guided-weapon termination authority", async () => {
+  const scenario = createGenericTakeoffPerformanceScenario();
+  scenario.airMission = authorGenericAirborneStoreTransfer({
+    mission: scenario.airMission,
+    modelPack: CURRENT_COMPILED_MODEL_PACK,
+    storeOrdinal: 1,
+    operation: "JETTISON",
+    requestedTimeSeconds: 20,
+    installedDragAreaM2: 0.08,
+  });
+  const capabilities = createVerificationDeploymentCapabilities("typescript");
+  const prepared = prepareSimulation(scenario, scenario.profile, capabilities);
+  prepared.engineScenario.durationSeconds = 21;
+  const engineRun = runEngineBackend(structuredClone(prepared.engineScenario), "typescript");
+  assert.equal(engineRun.termination, "time_limit");
+  assert.equal(
+    engineRun.events.items.some((event) => event.payload.kind === "WEAPON_TERMINATED"),
+    false,
+  );
+  const result = buildSimulationResult(prepared, engineRun);
+  const record = await createVectorSimulationRecord(
+    prepared,
+    result,
+    "2026-08-26T00:00:00.000Z",
+  );
+  const serialized = serializeVectorRecord(record);
+  const opened = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+  const replayed = transferEvent(opened.result.engineRun);
+  assert.equal(replayed.payload.operation, "JETTISON");
+  assert.equal(opened.result.engineRun.termination, "time_limit");
 });
 
 test("Worker admission preserves the full authority seal and rejects caller mutation", async () => {

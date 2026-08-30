@@ -1,4 +1,6 @@
 import type { EngineBackendId } from "../engine/contracts.ts";
+import type { CompiledModelPack } from "../model-pack.ts";
+import type { OpenedVectorRecord } from "../record/vector-record.ts";
 import type { PreparedSimulation } from "../simulation.ts";
 
 export const BROWSER_RUNTIME_PROTOCOL = "vector.browser-runtime.v1" as const;
@@ -45,6 +47,12 @@ export type BrowserRuntimeRequest =
       batchTicks: number;
       progressIntervalMs: number;
     })
+  | (RuntimeRequestBase & {
+      type: "open-record";
+      recordBuffer: ArrayBuffer;
+      byteLength: number;
+      compiledModelPack?: Readonly<CompiledModelPack>;
+    })
   | (RuntimeRequestBase & { type: "pause"; runId: string })
   | (RuntimeRequestBase & { type: "resume"; runId: string })
   | (RuntimeRequestBase & { type: "cancel"; runId: string })
@@ -88,6 +96,11 @@ export type BrowserRuntimeResponse =
       byteLength: number;
       boundaryCalls: number;
       recordBuffer: ArrayBuffer;
+      record: OpenedVectorRecord;
+    })
+  | (RuntimeResponseBase & {
+      type: "record-opened";
+      record: OpenedVectorRecord;
     })
   | (RuntimeResponseBase & {
       type: "cancelled";
@@ -115,6 +128,7 @@ export function isRuntimeRequest(value: unknown): value is BrowserRuntimeRequest
     "initialize",
     "load-model-pack",
     "run",
+    "open-record",
     "pause",
     "resume",
     "cancel",

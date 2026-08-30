@@ -142,6 +142,10 @@ registry version and review.
 
 ## Generic NASA F-16 verification corpus
 
+The production-isolation check now scans the current 0.9.0 compiled model-pack
+fixture. That fixture's termination assumptions do not convert this generic
+NASA corpus into named F-16 weapon-effectiveness, damage or kill evidence.
+
 The separately owned, versioned
 [`governance/nasa-generic-f16-verification-corpus.v1.json`](../governance/nasa-generic-f16-verification-corpus.v1.json)
 records one non-catalog verification corpus with the exact subject

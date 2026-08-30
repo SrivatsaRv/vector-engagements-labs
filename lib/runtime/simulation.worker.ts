@@ -5,6 +5,7 @@ import { EngineSession } from "../engine/core.ts";
 import type { EngineRun } from "../engine/contracts.ts";
 import {
   createVectorSimulationRecord,
+  openVectorSimulationRecord,
   serializeVectorRecord,
 } from "../record/vector-record.ts";
 import { buildSimulationResult } from "../simulation.ts";
@@ -36,6 +37,7 @@ type ActiveRun = {
 
 let state: BrowserRuntimeState = "initialization";
 let active: ActiveRun | null = null;
+let verifyingRecord = false;
 
 function respond(message: BrowserRuntimeResponse, transfer: Transferable[] = []) {
   workerScope.postMessage(message, transfer);
@@ -175,6 +177,10 @@ async function executeRun(request: Extract<BrowserRuntimeRequest, { type: "run" 
     const result = buildSimulationResult(pack.prepared, engineRun);
     const record = await createVectorSimulationRecord(pack.prepared, result);
     const serialized = serializeVectorRecord(record, takeReusableBuffer());
+    const openedRecord = await openVectorSimulationRecord(
+      serialized.buffer,
+      serialized.byteLength,
+    );
     state = "completed";
     respond(
       {
@@ -189,6 +195,7 @@ async function executeRun(request: Extract<BrowserRuntimeRequest, { type: "run" 
         byteLength: serialized.byteLength,
         boundaryCalls,
         recordBuffer: serialized.buffer,
+        record: openedRecord,
       },
       [serialized.buffer],
     );
@@ -206,6 +213,43 @@ async function executeRun(request: Extract<BrowserRuntimeRequest, { type: "run" 
       message: error instanceof Error ? error.message : "Unknown simulation Worker failure.",
       recoverable: true,
     });
+  }
+}
+
+async function executeOpenRecord(
+  request: Extract<BrowserRuntimeRequest, { type: "open-record" }>,
+) {
+  verifyingRecord = true;
+  stateMessage(request.requestId, "running");
+  try {
+    const record = await openVectorSimulationRecord(
+      request.recordBuffer,
+      request.byteLength,
+      request.compiledModelPack
+        ? { compiledModelPack: request.compiledModelPack }
+        : undefined,
+    );
+    state = "completed";
+    respond({
+      protocol: BROWSER_RUNTIME_PROTOCOL,
+      requestId: request.requestId,
+      type: "record-opened",
+      state,
+      record,
+    });
+  } catch (error) {
+    state = "failed";
+    respond({
+      protocol: BROWSER_RUNTIME_PROTOCOL,
+      requestId: request.requestId,
+      type: "failed",
+      state,
+      code: "record",
+      message: error instanceof Error ? error.message : "Unknown record verification failure.",
+      recoverable: true,
+    });
+  } finally {
+    verifyingRecord = false;
   }
 }
 
@@ -274,7 +318,7 @@ workerScope.addEventListener("message", (event: MessageEvent<unknown>) => {
     return;
   }
   if (request.type === "run") {
-    if (active) {
+    if (active || verifyingRecord) {
       respond({
         protocol: BROWSER_RUNTIME_PROTOCOL,
         requestId: request.requestId,
@@ -288,6 +332,22 @@ workerScope.addEventListener("message", (event: MessageEvent<unknown>) => {
       return;
     }
     void executeRun(request);
+    return;
+  }
+  if (request.type === "open-record") {
+    if (active || verifyingRecord) {
+      respond({
+        protocol: BROWSER_RUNTIME_PROTOCOL,
+        requestId: request.requestId,
+        type: "failed",
+        state,
+        code: "record",
+        message: "This simulation Worker already owns an active run.",
+        recoverable: true,
+      });
+      return;
+    }
+    void executeOpenRecord(request);
     return;
   }
   if (request.type === "pause" && active?.runId === request.runId) {

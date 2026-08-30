@@ -4,7 +4,7 @@
     "path": "fixtures/model-packs/anonymous-pack-alpha.governed.v2.json",
     "id": "anonymous-pack-alpha",
     "version": "2.0.0",
-    "digest": "2a6ba318448b85fa2231da4e48d5d21dacdfe2407d453ac527a39b35e2c0de82"
+    "digest": "78649ed148367df57c5a810fdea4ccb474a4e384184df8e33e05d46f9084c1a5"
   },
   "warmupRuns": 2,
   "sampleRuns": 12,
@@ -19,5 +19,5 @@
     { "id": "compiledReuse100", "p50BudgetMs": 10, "p95BudgetMs": 20, "p99BudgetMs": 25, "maxBudgetMs": 75 },
     { "id": "compiledReuse500", "p50BudgetMs": 30, "p95BudgetMs": 60, "p99BudgetMs": 75, "maxBudgetMs": 200 }
   ],
-  "workloadDigest": "8a438546acdfc3d3bf49d8052e26865c275f2d3fa9b935763e1271438f706e5c"
+  "workloadDigest": "80853b04efb2396524217edac7937db2be673b7bd5e9ccdea70f44ae161c0796"
 }

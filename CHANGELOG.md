@@ -23,6 +23,59 @@ one family must not imply changes to unrelated contracts.
 - Bind generic airborne-transfer store mass/station/rule identity to the admitted
   model pack while preserving the authored `[0.001, 1] m²` installed-drag
   assumption and all named-fidelity nonclaims.
+- Publish model-pack 0.9.0 with exact verification-only 25 m geometric
+  closest-approach and 180 s maximum-flight-time termination authority. The
+  intended-use advances to 1.1.0 to prohibit target damage, destruction or kill
+  inference from geometric intercept.
+- Authenticate complete engine-verification packs independently inside the raw
+  Rust/WASM run boundary and reject malformed termination patches before their
+  values can affect execution.
+- Require TypeScript and raw Rust/WASM to reject the same digest-valid supplied
+  packs when their compiled-v1 key inventory, intended-use identities or weapon
+  identities are malformed.
+- Bind the complete ordered runtime observer-sensor projection back to its
+  authenticated compiled pack, reject duplicate evidence identities and keep
+  source/validation evidence roles disjoint at the direct Rust/WASM boundary.
+- Require supplied verification packs and no-release record recompilation to
+  retain the compiler-owned exact coordinate conventions and to qualify every
+  positive named-aircraft performance admission through the separate governed
+  evidence registry; a resealed pack cannot promote unsupported performance
+  with arbitrary in-pack artifacts or an alternate frame.
+- Validate every compiled weapon field and physical domain before a supplied
+  verification pack can authorize execution or no-release Air-record
+  recompilation; a resealed string-valued launch mass now fails identically at
+  the TypeScript and raw Rust/WASM boundaries.
+- Validate the complete compiled aircraft shape and physical domains before an
+  unretained pack can authorize Air-mission recompilation, and enforce semantic
+  weapon versions at both TypeScript and direct Rust/WASM boundaries.
+- Validate complete compiled loadout stations and compatibility relations before
+  supplied-pack Air-mission recompilation, including exact shapes, integer
+  capacities, bounded references, platform/station linkage and in-pack evidence.
+  Loadout validity must cover the owning aircraft through the canonical compiler
+  predicate, while unused stations may retain an empty compatible-store list.
+- Require complete, uniquely identified supplied evidence records with closed
+  kinds, absolute URIs, valid access dates and valid optional locators/digests;
+  a canonical pack digest no longer authenticates an `{ id }` placeholder.
+- Require every aircraft's referenced aerodynamic model/tables, propulsion
+  model/thrust/fuel tables, sensors and loadout to cover the aircraft's complete
+  validity domain before either backend or no-release Air-record recompilation.
+- Reject supplied aircraft authority whose referenced aerodynamic model has no
+  coefficient tables, including no-release Air records that skip engine replay.
+- Admit every supplied aerodynamic, propulsion, sensor and coefficient-table
+  record through its complete compiled-v1 structure before use. Exact fields,
+  SI axis/output units, finite monotonic coordinates, tensor cardinality,
+  finite values and evidence links now fail closed even under a valid resealed
+  content digest and on no-release VSR readback.
+- Enforce the canonical positive-sensor evidence boundary on supplied packs:
+  admitted source and independent-validation references retain their required
+  roles and immutable lowercase SHA-256 artifact digests after resealing. The
+  raw Rust/WASM request envelope now repeats the complete admission schema,
+  exact coverage inventory, `VALIDATED` coverage states and sensor-provenance
+  binding, with direct ABI falsifiers proving the TypeScript wrapper is not the
+  only enforcement point.
+- Keep deterministic terminal-record replay and uploaded-record verification
+  inside the dedicated browser simulation Worker; the rendering thread receives
+  only an already-admitted playback result.
 
 Model-pack persistence table declarations now live in the domain-owned
 `db/schema/model-pack.ts` module behind the unchanged aggregate Drizzle facade.
@@ -55,6 +108,10 @@ promotion remain downstream under #154, later #161 stages and #155.
 
 #### Database schema
 
+- Add forward-only migration 017 for intended-use 1.1.0, model-pack 0.9.0,
+  credibility 1.3.0 and new `1.1.0` versions of all nine exact scenario
+  bindings while retaining every `1.0.0` row and freezing migrations 015 and
+  016 by SHA-256.
 - Add forward-only migration 016 for the exact governed high-energy
   Su-30MKI/F-16C crossing-challenge package. The migration is independently
   generated and verified, self-upserts the ninth immutable scenario, and reads
@@ -102,10 +159,19 @@ no exported simulation ABI, backend-selection rule or v2 runtime admission.
   controller requested/accepted/achieved values through Worker and VSR replay.
 - Add the independently sealed airborne-transfer projection and exact
   accepted/rejected event parity to the existing TypeScript/Rust ABI, retaining
-  the optimized module below 550,000 bytes.
+  the optimized module below the explicit 585,000-byte ceiling.
+- Add exact TypeScript/Rust `vector.weapon-termination-model.v1` admission,
+  between-step closest approach, closed terminal states and canonical
+  `WEAPON_TERMINATED` event parity. Source discriminators are mandatory,
+  pre-launch geometry is excluded, off-grid lifetime begins at achieved world
+  entry, replay recomputes exact expiry authority, and the optimized artifact
+  is 556,940 bytes.
+- Rebind the immutable model-pack foundation performance workload to the
+  compiler-produced anonymous-pack identity after termination authority became
+  mandatory, preserving fail-closed benchmark admission.
 - Pin the Rust/WASM post-link size policy to Binaryen 131.0.0 with an explicit
   admitted feature set; bind that policy into the generated module identity and
-  keep the existing sub-550,000-byte browser artifact gate without relaxing it.
+  retain an explicit sub-585,000-byte browser artifact gate.
 - Admit the exact-key `vector.aircraft-ground-operation.v1` safety artifact in
   both backends and validate its mission/start/release/runway lineage before
   holding movement unavailable.
@@ -201,6 +267,14 @@ admission, or tick behavior.
   installed-drag-area validity is the inclusive `[0.001, 1] m²` interval, and
   #187 owns a separate 25-second takeoff-plus-transfer performance workload so
   the governed #182 takeoff workload remains unchanged.
+- Replace the released-weapon use of the legacy scenario distance allowance
+  with engine-owned target-unavailable, geometric intercept, terrain failure,
+  flight-time expiry and energy-miss precedence. A geometric intercept
+  terminates the weapon but leaves the target active and records no target
+  effect.
+- Require direct Rust/WASM callers to bind every entity termination model to
+  the authenticated runtime-pack projection; an empty projection can no longer
+  admit arbitrary radius or lifetime values.
 
 No pending family-specific entry.
 
@@ -208,7 +282,8 @@ No pending family-specific entry.
 
 The production-built Worker verifier now conducts the governed #190
 high-energy crossing package and opens its transferred VSR to assert the
-terminal `report.json` result and `frames.arrow` separation. The Worker
+terminal `report.json`, `events.jsonl` and `frames.arrow` evidence, including a
+terminated weapon, active target and `NOT_MODELLED` target effect. The Worker
 protocol and deployment-selected backend remain unchanged.
 
 The Worker independently recompiles and verifies Air mission/model/environment
@@ -235,6 +310,52 @@ No pending family-specific entry.
   frame/picture compatibility. Replay rejects tampered or synthesized movement.
 - Retain the exact airborne-transfer outcome and boundary frame so replay,
   map/3D, telemetry, timeline and report never reconstruct release physics.
+- Retain one typed `WEAPON_TERMINATED` event for every engine-owned weapon
+  terminal outcome, including the cumulative admitted-lifetime closest
+  approach, exact event-distance to frozen-report binding, exact
+  terminal-state/cause to run-outcome binding and explicit `NOT_MODELLED`
+  target effect. Miss, expiry and failure reports retain their exact causal
+  result reason instead of falling through to a time-limit explanation. Expiry
+  occurrence time is bound to achieved launch plus admitted maximum lifetime,
+  and boundary-only miss, terrain and target-unavailable causes are bound to
+  their exact terminal event time, so hash-resealed timestamp substitutions
+  fail replay.
+- Advance the weapon-termination payload to v2 with the exact retained
+  closest-approach witness pair. VSR admission replays termination-capable
+  records through their recorded deterministic backend, so deleting the real
+  lifetime minimum and substituting another retained pair fails closed.
+- Bind VSR `time_limit` claims to the declared scenario terminal tick, rejecting
+  hash-resealed terminal archives truncated to an earlier nonterminal pair.
+- Bind direct Rust/WASM termination projections to the exact compiler-owned
+  retained pack identity, model ordering and admitted scenario patches. A
+  caller cannot promote jointly resealed entity, compact-pack and runtime-digest
+  copies into termination authority.
+- Force-retain the final fixed-step predecessor for every launched
+  termination-capable run. Replay rejects a nonterminal claim when that exact
+  pair is missing, preventing a hash-resealed record from deleting the boundary
+  that proves a geometric intercept or another terminal cause.
+- Deterministically rerun every termination-capable VSR, including records that
+  claim no terminal event. A hash-resealed intercept cannot delete its terminal
+  events, append duplicated earlier active frames at the nominal duration and
+  manufacture a `time_limit` result.
+- Bind the report's primary weapon and target identities to that deterministic
+  replay for truthful nonterminal runs, rejecting a resealed report that
+  substitutes an unlaunched carried store for the released weapon.
+- Reuse an authenticated supplied engine-verification pack when recompiling an
+  archived Air mission, so an exact unretained verification record can complete
+  readback without falling through to the product retained-pack inventory.
+- Authenticate that supplied pack through the complete compiled-v1 structure,
+  canonical digest and engine-verification intended-use boundary even when a
+  ground-start Air record has no executable guided release and skips engine
+  rerun before mission recompilation.
+- Route supplied-pack evidence completeness and aircraft dependency-domain
+  coverage through the same Worker `open-record` authority boundary, including
+  no-release Air records that legitimately skip deterministic engine replay.
+- Validate the closed ground-dynamics validity fields semantically so canonical
+  archive key ordering cannot reject an otherwise exact release replay.
+- Keep an explicit unpowered `JETTISON` outside guided-weapon terminal
+  authority in TypeScript, Rust/WASM and VSR replay; its governed store-transfer
+  event remains replayable without a fabricated weapon-termination event.
 
 Saved-run record and admission tables now have separate domain-owned schema
 modules without changing their persisted representation.
@@ -251,6 +372,9 @@ writer/reader, Worker, or replay behavior.
   whole-mission relational, server and final-engine admission; ordinary
   authored scalars have a three-fractional-digit ceiling. This does not broaden
   deployment capability.
+- Advance the deployment-admitted model-pack digest to 0.9.0 so the compiled
+  verification-only termination projection is available to the engine. This
+  adds no editable fuze, damage, kill or named-effectiveness capability.
 - Aircraft and weapon capability choices now consume the shared root-owned
   Select while preserving stale authored identities as unavailable. This is a
   presentation-only migration; deployment admission and catalog authority are
@@ -272,8 +396,9 @@ writer/reader, Worker, or replay behavior.
 - Add the immutable `a2a-high-energy-crossing-challenge@1.0.0` package with
   explicit 44 km/105-degree geometry, airborne state, fuel, loadout, route,
   environment and generic-model nonclaims. TypeScript, Rust/WASM and the built
-  browser Worker reach the 180 m geometry threshold after 120 seconds, while an
-  otherwise-identical 46 km control reaches the 140 second time limit.
+  browser Worker reach an engine-owned 21.836104 m geometric intercept at
+  131.9 s inside the compiled 25 m verification radius, while an otherwise-
+  identical 46 km control reaches the 140 s time limit at 530.164926 m.
 
 Air templates advance to `vector.scenario.v4` with one authored
 `vector.air-mission.v1` and content-addressed `vector.compiled-air-mission.v1`.

@@ -15,12 +15,12 @@ import {
 } from "./model-pack.ts";
 
 export const CURRENT_MODEL_PACK_ID = "vector-scalar-study-models";
-export const CURRENT_MODEL_PACK_VERSION = "0.8.0";
-export const CURRENT_MODEL_PACK_DIGEST = "199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73";
+export const CURRENT_MODEL_PACK_VERSION = "0.9.0";
+export const CURRENT_MODEL_PACK_DIGEST = "aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c";
 export const CURRENT_INTENDED_USE_ID = "vector.intended-use.geometry-teaching";
-export const CURRENT_INTENDED_USE_VERSION = "1.0.0";
+export const CURRENT_INTENDED_USE_VERSION = "1.1.0";
 export const CURRENT_CREDIBILITY_MANIFEST_ID = "vector-scalar-study-credibility";
-export const CURRENT_CREDIBILITY_MANIFEST_VERSION = "1.2.0";
+export const CURRENT_CREDIBILITY_MANIFEST_VERSION = "1.3.0";
 
 const ASSUMPTION_EVIDENCE_ID = "current-scalar-model-assumptions";
 const CONTRACT_EVIDENCE_ID = "model-pack-contract-tests";
@@ -284,6 +284,13 @@ export function createCurrentModelPackSource(): ModelPackSource {
     datalinkUpdatePeriod: quantity(item.datalinkUpdateSeconds, "s"),
     thrustTaperSpeed: quantity(item.thrustTaperSpeedMps, "m/s"),
     navigationConstant: quantity(item.navigationConstant, "1"),
+    termination: {
+      schemaVersion: "vector.weapon-termination-model.v1" as const,
+      intendedUse: "ENGINE_VERIFICATION_ONLY" as const,
+      criterion: "GEOMETRIC_CLOSEST_APPROACH" as const,
+      interceptRadius: quantity(25, "m"),
+      maximumFlightTime: quantity(180, "s"),
+    },
   }));
 
   return {
@@ -311,6 +318,7 @@ export function createCurrentModelPackSource(): ModelPackSource {
         unsupportedInterpretations: [
           "named-aircraft handling or performance",
           "named-weapon effectiveness or probability of kill",
+          "target damage, destruction, or kill from a geometric weapon intercept",
           "operational sensor, electronic-warfare, or launch-zone performance",
         ],
       },

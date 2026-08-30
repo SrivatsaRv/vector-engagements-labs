@@ -54,4 +54,10 @@ test("saved picture admission rejects fabricated tracks and accepts only the tic
     () => assertRecordedSidePictures(result.engineRun.frames, fabricated),
     /prohibited track or truth data/,
   );
+  const duplicateIdentity = [...result.pictures];
+  duplicateIdentity[1] = structuredClone(duplicateIdentity[0]);
+  assert.throws(
+    () => assertRecordedSidePictures(result.engineRun.frames, duplicateIdentity),
+    /duplicate side\/frame identity/,
+  );
 });

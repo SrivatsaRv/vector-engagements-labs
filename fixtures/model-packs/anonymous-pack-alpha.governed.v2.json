@@ -20,7 +20,7 @@
           {
             "schemaVersion": "vector.intended-use.v1",
             "id": "vector.intended-use.geometry-teaching",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "question": "How do relative geometry, altitude, aspect, closure, and deterministic recorded state evolve in a bounded teaching scenario?",
             "requiredCapabilities": [
               "coordinate-transform",
@@ -34,6 +34,7 @@
             "unsupportedInterpretations": [
               "named-aircraft handling or performance",
               "named-weapon effectiveness or probability of kill",
+              "target damage, destruction, or kill from a geometric weapon intercept",
               "operational sensor, electronic-warfare, or launch-zone performance"
             ]
           },
@@ -934,6 +935,25 @@
               "evidenceRefIds": [
                 "anonymous-evidence-1"
               ]
+            },
+            "termination": {
+              "schemaVersion": "vector.weapon-termination-model.v1",
+              "intendedUse": "ENGINE_VERIFICATION_ONLY",
+              "criterion": "GEOMETRIC_CLOSEST_APPROACH",
+              "interceptRadius": {
+                "value": 25,
+                "unit": "m",
+                "evidenceRefIds": [
+                  "anonymous-evidence-1"
+                ]
+              },
+              "maximumFlightTime": {
+                "value": 180,
+                "unit": "s",
+                "evidenceRefIds": [
+                  "anonymous-evidence-1"
+                ]
+              }
             }
           }
         ],
@@ -1038,7 +1058,7 @@
           "intendedUseRefs": [
             {
               "id": "vector.intended-use.geometry-teaching",
-              "version": "1.0.0"
+              "version": "1.1.0"
             }
           ],
           "validityDomain": {
@@ -108009,7 +108029,7 @@
             },
             {
               "id": "vector.intended-use.geometry-teaching",
-              "version": "1.0.0"
+              "version": "1.1.0"
             }
           ],
           "credibilityManifestRef": {
@@ -108683,7 +108703,14 @@
               "seekerActivationRangeM": 14300,
               "datalinkUpdatePeriodS": 0.2,
               "thrustTaperSpeedMps": 1120,
-              "navigationConstant": 3.5
+              "navigationConstant": 3.5,
+              "termination": {
+                "schemaVersion": "vector.weapon-termination-model.v1",
+                "intendedUse": "ENGINE_VERIFICATION_ONLY",
+                "criterion": "GEOMETRIC_CLOSEST_APPROACH",
+                "interceptRadiusM": 25,
+                "maximumFlightTimeS": 180
+              }
             }
           ],
           "loadouts": [
@@ -108755,8 +108782,8 @@
             }
           ],
           "schemaVersion": "vector.compiled-model-pack.v2",
-          "legacyProjectionDigest": "40caaab70ea5b719337a1c675fede9c0c37d01a86669e269e5bc80dfae8c252d",
-          "sourceDigest": "221335a30cf8828f48b0fa7286eeed31066ffc4ff110ad7c09f16054b943e630",
+          "legacyProjectionDigest": "1fdfa51b93110b6d0097ce24368f1c1ea1d0bfcbb85efa0e6f1baf6c4450c245",
+          "sourceDigest": "fa562c39c7daa05bb23e1058c3110de1999300dfcb6e50254dc58733c3bf3b5b",
           "lineageDigest": "a84ba282c9f85bd55e77fd3f2558a900200f53f0e26e5bfacb15b1dd5c281399",
           "admissionState": "COMPLETE_FOUNDATION_NON_PROMOTABLE",
           "requirementCompleteness": {
@@ -123102,23 +123129,23 @@
               }
             }
           ],
-          "digest": "2a6ba318448b85fa2231da4e48d5d21dacdfe2407d453ac527a39b35e2c0de82"
+          "digest": "78649ed148367df57c5a810fdea4ccb474a4e384184df8e33e05d46f9084c1a5"
         },
         "credibilityManifest": {
           "schemaVersion": "vector.credibility-manifest.v1",
           "subject": {
             "kind": "MODEL_PACK",
             "id": "anonymous-pack-alpha",
-            "digest": "2a6ba318448b85fa2231da4e48d5d21dacdfe2407d453ac527a39b35e2c0de82"
+            "digest": "78649ed148367df57c5a810fdea4ccb474a4e384184df8e33e05d46f9084c1a5"
           },
           "id": "anonymous-pack-alpha-credibility",
           "version": "2.0.0",
-          "modelPackDigest": "2a6ba318448b85fa2231da4e48d5d21dacdfe2407d453ac527a39b35e2c0de82",
+          "modelPackDigest": "78649ed148367df57c5a810fdea4ccb474a4e384184df8e33e05d46f9084c1a5",
           "engineDigest": "c59104464d75fa910f8ba79114d50a9ffae31c92875ab9ac6e65f62679ddc4aa",
           "intendedUseRefs": [
             {
               "id": "vector.intended-use.geometry-teaching",
-              "version": "1.0.0"
+              "version": "1.1.0"
             }
           ],
           "validityDomain": {
@@ -123196,7 +123223,7 @@
             }
           ],
           "approvalState": "DRAFT",
-          "contentDigest": "937dda4a4a2835b85fd463e21d179f6ed14403a3c69be756d4e4f7c78d1fb663"
+          "contentDigest": "2a7dbcc027a0d983607e5604233e33c05eb341e45aedbeec50478a8bb2d75796"
         }
       }
     }

@@ -99,7 +99,7 @@ async function sameSideObserverPermutationScenarios() {
 test("observer-state v3 preserves multiple mixed-lifecycle tracks without a scalar summary", async () => {
   const { scenario, pack, prepared } = await twoTargetVerificationScenario();
   const runs = Object.fromEntries(
-    ["typescript", "rust-wasm"].map((backend) => [backend, runEngineBackend(scenario, backend)]),
+    ["typescript", "rust-wasm"].map((backend) => [backend, runEngineBackend(scenario, backend, pack)]),
   );
   const run = runs.typescript;
   const mixed = run.frames.find((frame) => {
@@ -129,7 +129,9 @@ test("observer-state v3 preserves multiple mixed-lifecycle tracks without a scal
     const result = buildSimulationResult(recordedPrepared, runs[backend]);
     const record = await createVectorSimulationRecord(recordedPrepared, result, "2026-08-23T00:00:00.000Z");
     const serialized = serializeVectorRecord(record);
-    const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+    const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength, {
+      compiledModelPack: pack,
+    });
     const replayPicture = replay.pictures.find((picture) =>
       picture.schemaVersion === "vector.observer-state.v3" &&
       picture.perspective === "IAF" && picture.modelTimeSeconds === mixed.t
@@ -156,7 +158,7 @@ test("opaque source associations remain bound to the compiled opposing-aircraft 
   scenario.entities.push(inactivePredecessor);
 
   for (const backend of ["typescript", "rust-wasm"]) {
-    const run = runEngineBackend(scenario, backend);
+    const run = runEngineBackend(scenario, backend, binding.pack);
     const observation = run.frames
       .flatMap((frame) => frame.observerStates)
       .find((state) => state.schemaVersion === "vector.observer-state.v3" && state.perspective === "IAF")
@@ -170,7 +172,7 @@ test("same-side observer selection is stable across definition order in both eng
   const results = [];
   for (const backend of ["typescript", "rust-wasm"]) {
     for (const scenario of [originalFirst, stableFirst]) {
-      const run = runEngineBackend(structuredClone(scenario), backend);
+      const run = runEngineBackend(structuredClone(scenario), backend, pack);
       const trackEvents = run.events.items.filter((event) =>
         event.payload.kind === "TRACK_STATE_CHANGED" && event.payload.perspective === "IAF",
       );
@@ -184,7 +186,9 @@ test("same-side observer selection is stable across definition order in both eng
       const result = buildSimulationResult(recordedPrepared, run);
       const record = await createVectorSimulationRecord(recordedPrepared, result, "2026-08-24T00:00:00.000Z");
       const serialized = serializeVectorRecord(record);
-      const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+      const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength, {
+        compiledModelPack: pack,
+      });
       results.push({
         backend,
         run,
@@ -286,7 +290,7 @@ test("a source-authored engine-verification pack drives exact side-owned TrackSt
   const { scenario, pack } = await bindVerificationTrackModelPack(prepared.engineScenario);
   assert.equal(pack.digest, first.pack.digest);
   const runs = Object.fromEntries(
-    ["typescript", "rust-wasm"].map((backend) => [backend, runEngineBackend(scenario, backend)]),
+    ["typescript", "rust-wasm"].map((backend) => [backend, runEngineBackend(scenario, backend, pack)]),
   );
   const run = runs.typescript;
   const trackEvents = run.events.items.filter((event) => event.payload.kind === "TRACK_STATE_CHANGED");
@@ -330,7 +334,7 @@ test("a source-authored engine-verification pack drives exact side-owned TrackSt
     "track events, receipts, causes, and exact frame references must be identical across engines",
   );
 
-  const batched = new EngineSession(scenario);
+  const batched = new EngineSession(scenario, pack);
   for (const size of [1, 7, 3, 29]) {
     if (!batched.isCompleted()) batched.runTicks(size);
   }
@@ -347,7 +351,9 @@ test("a source-authored engine-verification pack drives exact side-owned TrackSt
     const result = buildSimulationResult(recordedPrepared, runs[backend]);
     const record = await createVectorSimulationRecord(recordedPrepared, result, "2026-08-23T00:00:00.000Z");
     const serialized = serializeVectorRecord(record);
-    const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+    const replay = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength, {
+      compiledModelPack: pack,
+    });
     assert.deepEqual(replay.result.frames.map((frame) => frame.observerStates), runs[backend].frames.map((frame) => frame.observerStates));
     assert.deepEqual(
       replay.events.items.filter((event) => event.payload.kind === "TRACK_STATE_CHANGED"),
@@ -376,8 +382,8 @@ test("observer-state v2/v3 admission rejects contradictory, extra-field, and tru
   assert.throws(() => assertEngineObserverState({ ...unsupported, nested: { truthEntityId: "red-object-1" } }), /truth/i);
 
   const prepared = prepareSimulation(DEFAULT_SCENARIO);
-  return bindVerificationTrackModelPack(prepared.engineScenario).then(({ scenario }) => {
-    const state = structuredClone(runEngine(scenario).frames[1].observerStates[0]);
+  return bindVerificationTrackModelPack(prepared.engineScenario).then(({ scenario, pack }) => {
+    const state = structuredClone(runEngine(scenario, pack).frames[1].observerStates[0]);
     assert.doesNotThrow(() => assertEngineObserverState(state));
     state.tracks[0].truthEntityId = "red-object-1";
     assert.throws(() => assertEngineObserverState(state), /unsupported or missing|truth/i);
@@ -399,7 +405,7 @@ test("source-authored TrackStore configuration changes pack identity and causal 
     confirmationObservations: 3,
   });
   assert.notEqual(changed.pack.digest, baseline.pack.digest);
-  const events = (binding) => runEngine(binding.scenario).events.items
+  const events = (binding) => runEngine(binding.scenario, binding.pack).events.items
     .filter((event) => event.payload.kind === "TRACK_STATE_CHANGED" && event.payload.perspective === "IAF")
     .map((event) => [event.modelTimeSeconds, event.payload.from, event.payload.to, event.payload.cause]);
   assert.notDeepEqual(events(changed), events(baseline));
@@ -425,12 +431,12 @@ test("production Worker admission rejects verification packs and changed runtime
 
 test("both engines reject mutated and unknown-field verification projections", async () => {
   const prepared = prepareSimulation(DEFAULT_SCENARIO);
-  const { scenario } = await bindVerificationTrackModelPack(prepared.engineScenario);
+  const { scenario, pack } = await bindVerificationTrackModelPack(prepared.engineScenario);
   const mutated = structuredClone(scenario);
   mutated.modelPack.observerSensors.find((sensor) => sensor.verificationTrackModel)
     .verificationTrackModel.confirmationObservations += 1;
   for (const backend of ["typescript", "rust-wasm"]) {
-    assert.throws(() => runEngineBackend(mutated, backend), /runtimeDigest|runtime model-pack projection digest/i);
+    assert.throws(() => runEngineBackend(mutated, backend, pack), /runtimeDigest|runtime model-pack projection digest/i);
   }
 
   const unknown = structuredClone(scenario);
@@ -444,14 +450,17 @@ test("both engines reject mutated and unknown-field verification projections", a
   delete projection.runtimeDigest;
   unknown.modelPack = bindRuntimeModelPackDigest(projection);
   for (const backend of ["typescript", "rust-wasm"]) {
-    assert.throws(() => runEngineBackend(unknown, backend), /unsupported or missing field|unknown field/i);
+    assert.throws(
+      () => runEngineBackend(unknown, backend, pack),
+      /authenticated observer sensor projection mismatch|unsupported or missing field|unknown field/i,
+    );
   }
 });
 
 test("both engines reject observation, track, and event sources forged beside a valid digest", async () => {
   const prepared = prepareSimulation(DEFAULT_SCENARIO);
-  const { scenario } = await bindVerificationTrackModelPack(prepared.engineScenario);
-  const forged = structuredClone(runEngine(scenario));
+  const { scenario, pack } = await bindVerificationTrackModelPack(prepared.engineScenario);
+  const forged = structuredClone(runEngine(scenario, pack));
   const frame = forged.frames.find((item) => item.observerStates.some((state) => state.schemaVersion === "vector.observer-state.v3" && state.tracks.length));
   const state = frame.observerStates.find((item) => item.schemaVersion === "vector.observer-state.v3" && item.tracks.length);
   state.sensorModelId = "forged-valid-digest-model";
@@ -464,5 +473,6 @@ test("both engines reject observation, track, and event sources forged beside a 
     forged.frames,
     scenario,
     forged.termination,
+    forged.closestApproachM,
   ), /compiled scenario|admitted scenario/i);
 });

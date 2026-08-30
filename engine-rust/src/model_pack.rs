@@ -1245,6 +1245,19 @@ fn validate_compiled_v2_exact_shape(value: &Value) -> Result<(), EngineError> {
                 "datalinkUpdatePeriodS",
                 "thrustTaperSpeedMps",
                 "navigationConstant",
+                "termination",
+            ],
+            &[],
+        )?;
+        exact_keys_at(
+            &item["termination"],
+            &format!("pack.weapons[{index}].termination"),
+            &[
+                "schemaVersion",
+                "intendedUse",
+                "criterion",
+                "interceptRadiusM",
+                "maximumFlightTimeS",
             ],
             &[],
         )?;
@@ -1944,7 +1957,7 @@ mod tests {
 
     fn fixture_pack_json() -> Result<String, Box<dyn std::error::Error>> {
         let bundle: Value = serde_json::from_str(include_str!(
-            "../../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json"
+            "../../fixtures/model-packs/vector-scalar-study-v0.9.compiled.json"
         ))?;
         Ok(serde_json::to_string(&bundle["pack"])?)
     }
@@ -2108,7 +2121,7 @@ mod tests {
         let identity = validate_compiled_model_pack_v2_json(&serde_json::to_string(&pack)?)?;
         assert_eq!(
             identity.digest,
-            "2a6ba318448b85fa2231da4e48d5d21dacdfe2407d453ac527a39b35e2c0de82"
+            "78649ed148367df57c5a810fdea4ccb474a4e384184df8e33e05d46f9084c1a5"
         );
         assert_eq!(identity.id, "anonymous-pack-alpha");
 

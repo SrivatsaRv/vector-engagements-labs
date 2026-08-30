@@ -46,6 +46,11 @@ and neither backend changes scenario or frame schemas.
 
 ## Dedicated simulation Worker
 
+The Worker transports the compiler-admitted weapon-termination model unchanged
+and returns the engine-owned terminal state and event in the VSR. It cannot use
+renderer distance, progress state or a legacy profile threshold to terminate a
+weapon.
+
 Air-domain adapters now carry the exact authored and compiled
 `vector.air-mission.v1` lineage. Before caching a structured-cloned adapter, the
 Worker independently recompiles mission, flight-plan, start, loadout, fuel,
@@ -94,11 +99,24 @@ that treats the current `EngineScenario` as a model pack. It will be replaced by
 the Simulation Data Foundation contract after that work lands; no competing
 entity or model schema is introduced here.
 
-Worker results are a content-addressed VSR transferred as an `ArrayBuffer`.
-Ownership moves Worker → main thread at completion and main thread → Worker after
-verification and decoding. The Worker retains at most two returned buffers, each
-no larger than 64 MiB, and uses a power-of-two capacity so subsequent records can
-reuse storage. No `SharedArrayBuffer` or cross-origin isolation is required.
+Worker results are a content-addressed VSR. The simulation Worker verifies and
+opens the archive—including any deterministic terminal-engine replay—before it
+posts the structured playback result and transfers the raw `ArrayBuffer` to the
+main thread. The main thread never reruns engine ticks while accepting a record.
+It returns the raw buffer to the Worker for bounded reuse after matching the
+opened manifest identity to the completion receipt. Saved or uploaded records
+use the same Worker's `open-record` request; the client transfers a bounded copy
+so the caller retains its source bytes. The Worker retains at most two returned
+buffers, each no larger than 64 MiB, and uses a power-of-two capacity so
+subsequent records can reuse storage. No `SharedArrayBuffer` or cross-origin
+isolation is required.
+
+An `open-record` request carrying an unretained engine-verification pack reaches
+the same shared supplied-authority validator before either replay or Air-mission
+recompilation. A no-release ground-start record therefore cannot use skipped
+engine replay to expose partial evidence records or aircraft dependencies whose
+validity domains do not cover the aircraft. The Worker does not maintain a
+weaker model-pack validator.
 
 ## Built Worker verification
 
@@ -132,9 +150,19 @@ parity remains owned by `tests/engine-backends.test.mjs` outside the deployed
 browser admission path.
 For #190, this built gate selects the governed 44 km/105-degree crossing
 challenge, opens `report.json` and `frames.arrow` from the transferred VSR, and
-requires a successful `threshold_reached` termination after 120 seconds but
-before 140 seconds with terminal separation at or below 180 m. A title, rendered
-path or progress message cannot satisfy that assertion.
+requires a successful `weapon_intercept` termination at 131.9 s with a
+21.836104 m closest approach inside the compiled 25 m verification-only radius.
+It also requires the typed `WEAPON_TERMINATED` event, the terminal weapon frame,
+an active target and `targetEffect: NOT_MODELLED`. A title, rendered path,
+renderer proximity or progress message cannot satisfy that assertion.
+Saved-record admission additionally recomputes the terminal predicate and the
+weapon-lifetime closest approach from exact engine-retained fixed-step evidence;
+jointly resealing an event and report value is therefore not accepted as new
+simulation truth.
+Focused VSR verification also opens no-release Air records with digest-valid
+supplied packs whose evidence row is incomplete or whose referenced aerodynamic
+domain is narrower than the aircraft domain. Both must fail before mission
+recompilation, using the same authority boundary exercised by the Worker.
 The #187 built-browser journey additionally proves the exact store identity is
 absent before and appears once at the transfer frame, with the same outcome in
 telemetry/report playback and successful cancellation/retry recovery.

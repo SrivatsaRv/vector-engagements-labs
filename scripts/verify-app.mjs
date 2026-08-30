@@ -3,6 +3,8 @@ import postgres from "postgres";
 import {
   CURRENT_CREDIBILITY_MANIFEST_ID,
   CURRENT_CREDIBILITY_MANIFEST_VERSION,
+  CURRENT_INTENDED_USE_ID,
+  CURRENT_INTENDED_USE_VERSION,
   CURRENT_MODEL_PACK_DIGEST,
   CURRENT_MODEL_PACK_ID,
   CURRENT_MODEL_PACK_VERSION,
@@ -98,7 +100,15 @@ try {
   assert.equal(catalog.simulationModels.length, 8);
   assert.ok(catalog.compiledModelPacks.length >= 1);
   assert.ok(catalog.credibilityManifests.length >= 2);
-  assert.equal(catalog.intendedUses.length, 1);
+  assert.deepEqual(
+    catalog.intendedUses
+      .map((item) => ({ id: item.id, version: item.version }))
+      .sort((left, right) => left.version.localeCompare(right.version)),
+    [
+      { id: CURRENT_INTENDED_USE_ID, version: "1.0.0" },
+      { id: CURRENT_INTENDED_USE_ID, version: CURRENT_INTENDED_USE_VERSION },
+    ],
+  );
   assert.equal(catalog.credibilityAdmissions.length, 1);
   const currentPack = catalog.compiledModelPacks.find(
     (item) => item.id === CURRENT_MODEL_PACK_ID && item.version === CURRENT_MODEL_PACK_VERSION,
@@ -115,13 +125,17 @@ try {
     currentPack.digest,
   );
   assert.ok(catalog.credibilityManifests.some((item) => item.subject_kind === "ENGINE"));
-  assert.equal(catalog.credibilityAdmissions[0].state, "ADMITTED_WITH_LIMITATIONS");
+  const currentAdmission = catalog.credibilityAdmissions.find(
+    (item) => item.modelPack.digest === CURRENT_MODEL_PACK_DIGEST,
+  );
+  assert.ok(currentAdmission);
+  assert.equal(currentAdmission.state, "ADMITTED_WITH_LIMITATIONS");
   assert.equal(
-    catalog.credibilityAdmissions[0].modelPack.digest,
+    currentAdmission.modelPack.digest,
     CURRENT_MODEL_PACK_DIGEST,
   );
   assert.ok(
-    catalog.credibilityAdmissions[0].credibilityManifest.limitations.some(
+    currentAdmission.credibilityManifest.limitations.some(
       (item) => item.severity === "BLOCKING",
     ),
   );
@@ -210,8 +224,16 @@ try {
   assert.equal(pafInstallations.length, 15);
   assert.ok(pafInstallations.every((item) => item.icao_code && item.source_id === "shield-paf-orbat-2026-05-19"));
   assert.equal(catalog.scenarioTemplates.length, 9);
+  assert.equal(
+    catalog.scenarioTemplates.filter((item) => item.version === "1.0.0").length,
+    0,
+  );
+  assert.equal(
+    catalog.scenarioTemplates.filter((item) => item.version === "1.1.0").length,
+    9,
+  );
   const template = catalog.scenarioTemplates.find(
-    (item) => item.id === "a2a-crossing-intercept" && item.version === "1.0.0",
+    (item) => item.id === "a2a-crossing-intercept" && item.version === "1.1.0",
   );
   assert.ok(template);
   assert.equal(template.schema_version, "vector.scenario.v4");
@@ -219,6 +241,25 @@ try {
   assert.equal(template.engine_version, "browser-point-mass-v0.5");
   assert.equal(template.intended_use_id, template.package.intendedUse.id);
   assert.equal(template.model_pack_digest, template.package.modelPack.digest);
+
+  const [historicalTemplate] = await sql`SELECT schema_version, content_hash, package
+    FROM scenario_templates
+    WHERE id='a2a-crossing-intercept' AND version='1.0.0' AND status='RETIRED'`;
+  assert.ok(historicalTemplate);
+  assert.notEqual(historicalTemplate.content_hash, template.content_hash);
+  const retiredRun = await fetch(`${baseUrl}/api/runs`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      scenarioId: "a2a-crossing-intercept",
+      scenarioVersion: "1.0.0",
+      scenarioSchemaVersion: historicalTemplate.schema_version,
+      scenarioContentHash: historicalTemplate.content_hash,
+      draftRevision: 0,
+      initialState: historicalTemplate.package.scenario,
+    }),
+  });
+  assert.equal(retiredRun.status, 409);
 
   const mathPage = await fetch(`${baseUrl}/math`);
   assert.equal(mathPage.status, 200);
@@ -233,7 +274,7 @@ try {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       scenarioId: "a2a-crossing-intercept",
-      scenarioVersion: "1.0.0",
+      scenarioVersion: "1.1.0",
       scenarioSchemaVersion: template.schema_version,
       scenarioContentHash: "0".repeat(64),
       draftRevision: 0,
@@ -247,7 +288,7 @@ try {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       scenarioId: "a2a-crossing-intercept",
-      scenarioVersion: "1.0.0",
+      scenarioVersion: "1.1.0",
       scenarioSchemaVersion: template.schema_version,
       scenarioContentHash: template.content_hash,
       draftRevision: 0,

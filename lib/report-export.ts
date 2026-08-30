@@ -52,6 +52,10 @@ export type ReportData = {
   libraryScenario?: ReportLibraryScenario;
 };
 
+export function reportResultClassName(successful: boolean): string {
+  return successful ? "report-result success" : "report-result caution";
+}
+
 export function buildReportExport(
   data: ReportData,
   library: ReportLibraryScenario,

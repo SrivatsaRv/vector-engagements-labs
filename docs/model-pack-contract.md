@@ -10,6 +10,10 @@ recording, reports, and both engine backends.
 
 ## Artifact boundaries
 
+Weapon-termination authority is a model-pack component compiled into each
+runtime store; it is not scenario presentation state, renderer state or an
+environment value. Its content participates in the immutable pack digest.
+
 The object/model pack and EnvironmentPack remain separate immutable artifacts.
 The compiler binds both digests; neither may absorb or silently override the
 other's source authority.
@@ -97,12 +101,13 @@ column, constraint, and JSON payload contracts are unchanged.
 | scenario patch | `vector.model-patch.v1` | `ScenarioModelPatch` |
 | scenario package | `vector.scenario.v4` | `ScenarioDefinition` / `StoredScenarioPackage` |
 | scenario draft | `vector.scenario-draft.v1` | `ScenarioDraft` |
+| weapon termination model | `vector.weapon-termination-model.v1` | `WeaponTerminationModelSource` / `CompiledWeaponTerminationModel` |
 
 The source of truth is [`lib/model-pack.ts`](../lib/model-pack.ts). Rust consumes
 the same compiled JSON contract in
 [`engine-rust/src/model_pack.rs`](../engine-rust/src/model_pack.rs). The committed
 cross-language fixture is
-[`fixtures/model-packs/vector-scalar-study-v0.8.compiled.json`](../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json).
+[`fixtures/model-packs/vector-scalar-study-v0.9.compiled.json`](../fixtures/model-packs/vector-scalar-study-v0.9.compiled.json).
 
 The v2 contracts extend this family for generic aircraft onboarding. V1 remains
 digest-verifiable and readable for its existing declared uses, but it cannot be
@@ -113,6 +118,14 @@ Worker/runtime/VSR admission stages land. See the normative
 [`aircraft onboarding guide`](aircraft-model-pack-onboarding.md).
 
 ## Source definition
+
+`WeaponTerminationModelSource` requires an explicit schema, intended use,
+criterion, positive SI radius and positive SI maximum flight time. The current
+25 m/180 s values are model assumptions and carry no named-system source claim.
+Any executable runtime projection resolved to a compiled pack containing this
+authority must carry the exact v3 runtime-projection digest. Omitting the digest
+does not select a legacy mode; TypeScript, Rust/WASM and VSR admission reject
+before integration or replay.
 
 ETOPO, NASA POWER and OurAirports citations belong to the EnvironmentPack
 source manifest. They are not aircraft, weapon, sensor or performance sources.
@@ -224,6 +237,10 @@ TrackStore mechanics only; no named aircraft sensor is thereby available.
 
 ## Compilation and digest
 
+Compilation exact-key validates the termination source and includes its frozen
+projection in the compiled-pack digest. Changing radius, time, criterion or
+intended use necessarily creates a different immutable pack identity.
+
 Compilation verifies model-pack and environment-pack digests independently,
 then freezes their exact runtime projections without mutable catalog lookups.
 
@@ -289,7 +306,7 @@ database.
 ## Intended use and credibility
 
 The #190 crossing package remains bound to
-`vector.intended-use.geometry-teaching@1.0.0`, the current generic model pack,
+`vector.intended-use.geometry-teaching@1.1.0`, the current generic model pack,
 and `MODEL_ASSUMPTION` scenario provenance. Familiar platform/weapon labels do
 not raise its credibility or admit named performance.
 
@@ -300,10 +317,11 @@ Both artifacts remain `PUBLIC_EDUCATIONAL`; environment source provenance does
 not raise named-system credibility or remove model-pack limitations.
 
 The current intended-use identity is
-`vector.intended-use.geometry-teaching@1.0.0`. It supports geometry teaching and
+`vector.intended-use.geometry-teaching@1.1.0`. It supports geometry teaching and
 controlled comparison of declared inputs. It explicitly does not support named
-aircraft handling, named weapon effectiveness, probability of kill, or
-operational sensor/EW/launch-zone claims.
+aircraft handling, named weapon effectiveness, probability of kill, target
+damage/destruction/kill inferred from a geometric intercept, or operational
+sensor/EW/launch-zone claims.
 
 `CredibilityManifest` records its subject kind, subject identity and digest;
 model-pack and engine digests; intended-use references; validity domain;
@@ -438,6 +456,10 @@ compiler. Production admission cannot consume or relabel this adapter.
 
 ## Scenario binding and patches
 
+Scenario patches may change a termination scalar only through its declared
+component-relative path with old/new value, SI unit, reason and provenance.
+They cannot introduce a second threshold or a renderer-owned override.
+
 The ninth governed template records the exact current model-pack ID, version
 and digest in both its package and relational columns. Its non-default geometry,
 fuel and loadout are scenario inputs, not patches to compiled coefficients or
@@ -492,6 +514,10 @@ Draft patch addition creates a new revision.
 
 ## Loadout compatibility
 
+Station/store compatibility resolves the store that owns the compiled
+termination model; compatibility itself does not authorize launch, intercept,
+damage or kill. Every instantiated store retains the exact model-pack authority.
+
 The #190 template selects two Astra stores for Blue and two AIM-120C-5 stores
 for Red only through existing station/store compatibility and quantity limits.
 It adds no station, compatibility rule, store property or release authority.
@@ -541,14 +567,24 @@ authoring list or a weapon-name heuristic.
 
 ## Persistence
 
-Migration 016 persists one canonical scenario row referencing the existing
-compiled model-pack digest; it does not duplicate or mutate the pack. A
-conflicting row is left untouched and then rejected by exact full-row readback.
+Migration 017 publishes the immutable intended-use 1.1.0, model-pack 0.9.0,
+credibility-manifest 1.3.0 and compiled-pack records, then publishes `1.1.0`
+versions of all nine canonical scenario packages against those exact
+identities. The historical `1.0.0` rows remain addressable. It uses append-only
+`ON CONFLICT DO NOTHING` semantics and exact readback; migrations 015 and 016
+remain byte-frozen.
+
+The historical intended-use row is the exact definition and legacy
+identity-string hash first published by migration 007. Migration 017 reads that
+exact JSON value and hash back rather than reconstructing or normalizing it
+under the newer canonical-definition hash convention. The separately published 0.8.0
+source remains bound to its own frozen content hash.
 
 Air scenario packages persist the authored mission and exact model-pack digest
 inside canonical v4 JSON. Saved runs and VSRs additionally retain the compiled
-mission digests; readback revalidates them against the archived pack rather than
-the current catalogue.
+mission digests; readback resolves an exact retained `(id, version, digest)` and
+revalidates against that archived pack rather than the current catalogue. A
+missing or partial identity match is a replay-admission failure.
 PostGIS stores immutable environment packs separately from compiled model packs,
 with an update-rejection trigger and content-addressed runway binding.
 
@@ -629,8 +665,8 @@ deployments continue to apply the forward-only numbered migrations in
 
 ```text
 id:      vector-scalar-study-models
-version: 0.8.0
-digest:  199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73
+version: 0.9.0
+digest:  aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c
 state:   DRAFT
 ```
 
@@ -647,8 +683,9 @@ matching the existing two-store teaching templates; this is bounded regression
 continuity, not a named-aircraft carriage claim. This is a
 contract migration and regression-continuity fixture, not a fidelity upgrade.
 Every aircraft in this pack has `performanceAdmission: UNSUPPORTED`; requests
-for named aircraft performance fail closed. The preserved v0.7 fixture remains
-an immutable historical artifact; v0.8 publishes this new admission boundary.
+for named aircraft performance fail closed. Preserved v0.7 and v0.8 fixtures
+remain immutable historical artifacts. V0.9 adds the exact verification-only
+weapon-termination authority described below.
 
 ## Consumption rules for dependent workstreams
 
@@ -680,6 +717,71 @@ position and velocity. RELEASE enables only the existing generic guided path;
 JETTISON is an unpowered generic ballistic coast. Neither operation claims
 ejection transients, safe separation, named carriage/aerodynamics, named weapon
 fidelity, TP-1538 authority, landing or recovery.
+
+Each compiled weapon now also carries one exact-key
+`vector.weapon-termination-model.v1`: `ENGINE_VERIFICATION_ONLY`,
+`GEOMETRIC_CLOSEST_APPROACH`, a positive SI intercept radius, and a positive SI
+maximum flight time. The current pack uses 25 m and 180 s as visible model
+assumptions. Source must explicitly carry the schema, intended-use and criterion
+discriminators; absent fields reject instead of inheriting compiler defaults.
+Both engines validate that projection before integration. It owns
+only geometric intercept, flight-time expiry, energy miss, terrain failure and
+target-unavailable termination; the legacy scenario completion distance and
+all renderer distances have no weapon-terminal authority. It does not model a
+fuze, warhead, damage, destruction, kill or probability of kill.
+
+`modelPack.weaponTerminations` is the compact, digest-bound runtime projection
+of those compiled values. It records exact model ID/version plus the effective
+termination object after validated scenario patches. Entity fields must equal
+that projection in both TypeScript and Rust/WASM, including direct native Rust
+and public WASM ABI entry points; an empty projection is never a legacy
+exception when an entity carries termination authority. Changing both the entity and
+the compact projection while retaining a known pack identity is rejected
+against the retained compiled pack. Live TypeScript and Rust/WASM entry points
+also require any scenario carrying entity-level weapon-termination authority to
+resolve that exact retained pack before integration. Removing the compact
+projection or self-resealing an unknown pack cannot turn entity fields into
+standalone authority. Engine-verification tooling has one explicit exception:
+it may supply the complete compiler output only when its identity and governed
+engine-verification intended use exactly match the scenario. Before identity or
+runtime-projection comparison, the live boundary recomputes the supplied pack's
+canonical content digest with the compiler-owned algorithm; a caller cannot
+turn jointly resealed scenario and pack fields into content-addressed authority.
+The JavaScript adapter carries that complete pack in
+`vector.engine-run-request.v1`; Rust independently parses and authenticates it.
+A supplied pack must satisfy the same exact compiled-v1 top-level key inventory,
+array surface, non-empty evidence set, unique weapon identity and unique
+intended-use identity plus executable termination structure in TypeScript and
+raw Rust/WASM. The shared TypeScript authority boundary runs before either
+backend and additionally requires the compiler-owned exact coordinate key set
+and supported WGS84/ENU/body/aerodynamic/unit/vertical-reference values. It
+admits every complete evidence record and every aircraft dependency domain.
+An `ADMITTED` aircraft performance projection must also match the separate
+governed aircraft-evidence registry exactly for subject, capability, evidence
+role and immutable artifact digest; arbitrary in-pack source and validation IDs
+cannot promote an unsupported named aircraft. Evidence has one closed kind, exact
+required/optional fields, a stable unique ID, nonblank title, absolute URI,
+calendar access date, optional nonblank locator and optional lowercase SHA-256.
+Every aerodynamic, propulsion and sensor record in a supplied pack is admitted
+before graph traversal. Models and tables require their exact compiled-v1 field
+sets, stable semantic-versioned identities, in-pack evidence, complete validity
+domains and finite physical values. Tables additionally require supported SI
+output units, at least one typed axis in its canonical SI unit, non-empty
+strictly increasing finite coordinates, a finite value tensor whose length is
+the exact axis-cardinality product, and a stable table identity. Aerodynamic
+models must retain at least one such coefficient table; propulsion thrust and
+fuel-flow tables must respectively produce `N` and `kg/(N*s)`. Those components
+and the loadout must cover the aircraft's complete
+altitude, Mach, angle-of-attack, load-factor, configuration and environment
+domain through the compiler-owned coverage predicate. A content digest alone
+cannot promote a partial evidence row, malformed numeric table or narrowed
+dependency into authority.
+A direct native or raw WASM scenario without the complete pack cannot gain this
+authority merely by relabelling `intendedUse`. Product execution never supplies
+that test authority. Before either product or verification execution consumes a
+termination patch, the Rust boundary independently checks its unique governed
+field key, compiled old value, SI unit and evidence membership. A recomputed compact
+`runtimeDigest` cannot legitimize a malformed patch.
 
 Mission/capability consumers import the exported `AirMissionDefinition` and
 `CompiledAirMission` types from `lib/air-mission.ts`. They may attach downstream
@@ -718,6 +820,13 @@ The #190 regression admits the same pack independently through TypeScript and
 Rust/WASM, compares the complete terminal frame and event stream, and runs a
 nearby failing control. Database verification separately requires the ninth
 row's exact intended-use and model-pack bindings.
+
+The challenge now reaches an engine-owned 21.836104 m geometric intercept at
+131.9 s under the 25 m verification-only criterion; the 46 km control reaches
+the time limit with a 530.164926 m closest approach. Tests independently cover
+between-step closest approach, malformed termination authority, legacy-distance
+non-authority, cumulative-minimum terminal-event parity, exact event-cause to
+run-outcome binding and the explicit `NOT_MODELLED` target effect.
 
 `tests/air-mission.test.mjs` covers all class/overlay/start combinations,
 canonical digest repeatability, units/datums, closed route/task references,

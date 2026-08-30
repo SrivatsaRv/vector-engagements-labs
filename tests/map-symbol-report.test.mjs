@@ -19,7 +19,10 @@ import {
 } from "../lib/tactical-symbol-library.ts";
 import { OBJECT_CATALOG } from "../lib/object-catalog.ts";
 import { PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
-import { buildReportExport } from "../lib/report-export.ts";
+import {
+  buildReportExport,
+  reportResultClassName,
+} from "../lib/report-export.ts";
 import { getScenarioDefinition } from "../lib/scenarios.ts";
 import {
   getFrameAt,
@@ -243,4 +246,9 @@ test("report export binds the exact run configuration, frames and source state",
   assert.equal(report.scenario.configuration.information.blueTrackSource, definition.scenario.blueTrackSource);
   assert.equal(report.scenario.configuration.environment.visibility.value, definition.scenario.visibilityKm);
   assert.equal(report.result.outcome, result.outcome);
+});
+
+test("report result styling follows the causal success flag, not an outcome label", () => {
+  assert.equal(reportResultClassName(true), "report-result success");
+  assert.equal(reportResultClassName(false), "report-result caution");
 });

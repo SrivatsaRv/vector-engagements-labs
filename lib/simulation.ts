@@ -185,6 +185,10 @@ export type RaspTrack = LegacyRaspPicture | (EngineObserverStateV3 & {
 export type TerminationCode =
   | "threshold_reached"
   | "energy_depleted"
+  | "weapon_intercept"
+  | "weapon_miss"
+  | "weapon_expired"
+  | "weapon_failed"
   | "target_unavailable"
   | "time_limit"
   | "invalid_scenario";
@@ -193,6 +197,10 @@ export type SimulationResult = {
   frames: Frame[];
   outcome:
     | "Intercept"
+    | "Geometric intercept"
+    | "Miss"
+    | "Flight time expired"
+    | "Weapon failed"
     | "Objective reached"
     | "Energy depleted"
     | "Target unavailable"
@@ -667,23 +675,39 @@ export function buildSimulationResult(
       observerStates: engineFrame.observerStates,
     };
   });
-  const successful = engineRun.termination === "threshold_reached";
+  const successful = engineRun.termination === "threshold_reached" || engineRun.termination === "weapon_intercept";
   const fixedObjective = input.domain === "A2G" || input.domain === "G2G";
-  const outcome = successful
+  const outcome = engineRun.termination === "weapon_intercept"
+    ? "Geometric intercept"
+    : successful
     ? fixedObjective
       ? "Objective reached"
       : "Intercept"
+    : engineRun.termination === "weapon_miss"
+      ? "Miss"
+      : engineRun.termination === "weapon_expired"
+        ? "Flight time expired"
+        : engineRun.termination === "weapon_failed"
+          ? "Weapon failed"
     : engineRun.termination === "energy_depleted"
       ? "Energy depleted"
       : engineRun.termination === "target_unavailable"
         ? "Target unavailable"
       : "Time limit reached";
-  const reason = successful
+  const reason = engineRun.termination === "weapon_intercept"
+    ? "The engine-owned between-step closest approach entered the admitted geometric intercept radius. Target damage and kill are not modelled."
+    : successful
     ? fixedObjective
       ? "The guided vehicle reached the configured objective-completion distance."
       : "The guided vehicle reached the configured intercept-completion distance."
-    : engineRun.termination === "energy_depleted"
-      ? "The vehicle reached the reference surface or fell below the continuation-speed condition after powered flight."
+    : engineRun.termination === "weapon_miss"
+      ? "The weapon terminated as a miss after its admitted energy continuation condition failed."
+      : engineRun.termination === "weapon_expired"
+        ? "The weapon reached its admitted verification-only maximum flight time."
+        : engineRun.termination === "weapon_failed"
+          ? "The weapon terminated after terrain impact."
+          : engineRun.termination === "energy_depleted"
+            ? "The vehicle reached the reference surface or fell below the continuation-speed condition after powered flight."
       : engineRun.termination === "target_unavailable"
         ? "The assigned target became unavailable. The engine terminated the guided vehicle without using a substitute target state."
       : engineRun.termination === "invalid_scenario"
@@ -750,6 +774,18 @@ export function explainResult(scenario: Scenario, result: SimulationResult) {
   );
   if (result.termination === "threshold_reached") {
     return `The simulated ${weapon?.designation ?? "guided vehicle"} reached the configured 180 m completion threshold from a ${scenario.range / 1000} km start in ${result.timeOfFlight.toFixed(1)} seconds.`;
+  }
+  if (result.termination === "weapon_intercept") {
+    return `The engine-owned between-step closest approach reached ${result.closestApproach.toFixed(1)} m. This is a geometric intercept under the admitted verification-only termination model; target damage and kill are not modelled.`;
+  }
+  if (result.termination === "weapon_miss") {
+    return `The weapon terminated as a miss after its admitted energy continuation condition failed; closest approach was ${result.closestApproach.toFixed(1)} m.`;
+  }
+  if (result.termination === "weapon_expired") {
+    return `The weapon reached its admitted verification-only maximum flight time; closest approach was ${result.closestApproach.toFixed(1)} m.`;
+  }
+  if (result.termination === "weapon_failed") {
+    return `The weapon terminated after terrain impact; closest approach was ${result.closestApproach.toFixed(1)} m.`;
   }
   if (result.termination === "energy_depleted") {
     return `After ${weapon?.weapon?.burnSeconds ?? 0} seconds of powered flight, modeled speed fell below the continuation threshold with ${Math.round(result.closestApproach / 1000)} km still separating the vehicle and objective.`;

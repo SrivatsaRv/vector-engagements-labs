@@ -37,7 +37,11 @@ import {
   resolveInstallationOriginReference,
   type InstallationOriginReference,
 } from "../mission-admission.ts";
-import { bindRuntimeModelPackDigest } from "./runtime-model-pack.ts";
+import {
+  bindRuntimeModelPackDigest,
+  runtimeObserverSensors,
+  runtimeWeaponTerminations,
+} from "./runtime-model-pack.ts";
 import {
   compileAirMissionDefinition,
   type AirMissionDefinition,
@@ -156,6 +160,13 @@ function compiledWeaponRuntime(weapon: (typeof CURRENT_COMPILED_MODEL_PACK.weapo
     maximumCommandG: weapon.maximumCommandLoadFactorG,
     seekerActivationRangeM: weapon.seekerActivationRangeM,
     datalinkUpdateSeconds: weapon.datalinkUpdatePeriodS,
+    termination: {
+      schemaVersion: weapon.termination.schemaVersion,
+      intendedUse: weapon.termination.intendedUse,
+      criterion: weapon.termination.criterion,
+      interceptRadiusM: weapon.termination.interceptRadiusM,
+      maximumFlightTimeSeconds: weapon.termination.maximumFlightTimeS,
+    },
   };
 }
 
@@ -809,20 +820,8 @@ export function compileScenario(
         id: CURRENT_INTENDED_USE_ID,
         version: CURRENT_INTENDED_USE_VERSION,
       },
-      observerSensors: CURRENT_COMPILED_MODEL_PACK.sensors.map((sensor) => ({
-        modelId: sensor.id,
-        modelVersion: sensor.version,
-        evidenceRefIds: [...sensor.evidenceRefIds],
-        sensorKind: sensor.sensorKind,
-        detectionRangeM: sensor.detectionRangeM,
-        minimumRangeM: sensor.minimumRangeM,
-        scanPeriodS: sensor.scanPeriodS,
-        azimuthFieldOfViewRad: sensor.azimuthFieldOfViewRad,
-        elevationFieldOfViewRad: sensor.elevationFieldOfViewRad,
-        ...(sensor.verificationTrackModel
-          ? { verificationTrackModel: structuredClone(sensor.verificationTrackModel) }
-          : {}),
-      })),
+      observerSensors: runtimeObserverSensors(CURRENT_COMPILED_MODEL_PACK),
+      weaponTerminations: runtimeWeaponTerminations(CURRENT_COMPILED_MODEL_PACK, []),
       scenarioPatches: [],
     }),
     entities,

@@ -23,7 +23,9 @@ const escapeSqlLiteral = (value: string) => value.replaceAll("'", "''");
 const sqlText = (value: string) => `'${escapeSqlLiteral(value)}'`;
 const historicalMigrationPath = resolve("db/migrations/015_generic_ground_dynamics.sql");
 const successorMigrationPath = resolve("db/migrations/016_high_energy_crossing_challenge.sql");
+const terminationMigrationPath = resolve("db/migrations/017_weapon_termination_model.sql");
 const frozenHistoricalMigrationSha256 = "ed5a04b32ae3f634c28394a17c98232474a737ce466fca58fc0bca21235fe35b";
+const frozenChallengeMigrationSha256 = "c7105993b3e56b9bee8bac5f71d2133e40bf998b36b99d7066caec50c6f72553";
 
 function verifyOrWriteMigration(input: {
   migrationPath: string;
@@ -105,6 +107,15 @@ ${endMarker}`;
 }
 
 function challengeMigration() {
+  if (existsSync(terminationMigrationPath)) {
+    const existing = readFileSync(successorMigrationPath, "utf8");
+    const actualSha256 = createHash("sha256").update(existing).digest("hex");
+    if (actualSha256 !== frozenChallengeMigrationSha256) {
+      throw new Error(`Historical challenge migration 016 changed: expected ${frozenChallengeMigrationSha256}, received ${actualSha256}.`);
+    }
+    process.stdout.write(`verified frozen challenge migration 016 ${actualSha256}\n`);
+    return;
+  }
   const definitions = SCENARIO_LIBRARY.filter(
     (definition) => definition.id === HIGH_ENERGY_CROSSING_CHALLENGE_ID,
   );

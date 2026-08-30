@@ -70,6 +70,8 @@
     "environment:migration:verify": "tsx scripts/generate-environment-scenario-migration.ts --check",
     "ground-dynamics:migration:generate": "tsx scripts/generate-ground-dynamics-scenario-migration.ts --write",
     "ground-dynamics:migration:verify": "tsx scripts/generate-ground-dynamics-scenario-migration.ts --check",
+    "weapon-termination:migration:generate": "tsx scripts/generate-weapon-termination-migration.ts --write",
+    "weapon-termination:migration:verify": "tsx scripts/generate-weapon-termination-migration.ts --check",
     "tp1538:sources:generate": "node scripts/generate-tp1538-source-manifest.mjs",
     "tp1538:sources:verify": "node scripts/verify-tp1538-source-manifest.mjs",
     "tp1538:aero:adjudication:verify": "node --test tests/tp1538-adjudication-cli.test.mjs",

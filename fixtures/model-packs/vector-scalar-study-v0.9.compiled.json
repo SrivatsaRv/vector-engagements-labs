@@ -1,0 +1,4104 @@
+{
+  "pack": {
+    "schemaVersion": "vector.compiled-model-pack.v1",
+    "id": "vector-scalar-study-models",
+    "version": "0.9.0",
+    "unitSystem": "SI",
+    "coordinateConventions": {
+      "geodeticDatum": "WGS84",
+      "localFrame": "EAST_NORTH_UP",
+      "bodyAxes": "X_FORWARD_Y_RIGHT_Z_DOWN",
+      "aerodynamicAxes": "X_FORWARD_Y_RIGHT_Z_DOWN",
+      "angularUnit": "RADIAN",
+      "positionUnit": "METER",
+      "velocityUnit": "METER_PER_SECOND",
+      "verticalReference": "MEAN_SEA_LEVEL"
+    },
+    "intendedUses": [
+      {
+        "id": "vector.intended-use.geometry-teaching",
+        "version": "1.1.0"
+      }
+    ],
+    "credibilityManifestRef": {
+      "id": "vector-scalar-study-credibility",
+      "version": "1.3.0"
+    },
+    "evidence": [
+      {
+        "id": "current-scalar-model-assumptions",
+        "kind": "ASSUMPTION",
+        "title": "VECTOR 0.5 scalar regression assumptions",
+        "uri": "urn:vector:model-assumption:scalar-v0.5",
+        "accessedAt": "2026-08-06"
+      },
+      {
+        "id": "model-pack-contract-tests",
+        "kind": "VERIFICATION",
+        "title": "Model-pack contract and deterministic digest test suite",
+        "uri": "urn:vector:test:model-pack-contract-v1",
+        "accessedAt": "2026-08-06"
+      }
+    ],
+    "catalogIdentities": [
+      {
+        "catalogObjectId": "su-30mki",
+        "kind": "AIRCRAFT",
+        "definitionModelIds": [
+          "su-30mki-aircraft-study-v05"
+        ]
+      },
+      {
+        "catalogObjectId": "mirage-2000h",
+        "kind": "AIRCRAFT",
+        "definitionModelIds": [
+          "mirage-2000h-aircraft-study-v05"
+        ]
+      },
+      {
+        "catalogObjectId": "f-16c-block52-paf",
+        "kind": "AIRCRAFT",
+        "definitionModelIds": [
+          "f-16c-block52-aircraft-study-v05"
+        ]
+      },
+      {
+        "catalogObjectId": "jf-17",
+        "kind": "AIRCRAFT",
+        "definitionModelIds": [
+          "jf-17-aircraft-study-v05"
+        ]
+      },
+      {
+        "catalogObjectId": "astra-mk1",
+        "kind": "GUIDED_WEAPON",
+        "definitionModelIds": [
+          "astra-mk1-study-v05"
+        ]
+      },
+      {
+        "catalogObjectId": "aim-120c5",
+        "kind": "GUIDED_WEAPON",
+        "definitionModelIds": [
+          "aim-120c5-study-v05"
+        ]
+      },
+      {
+        "catalogObjectId": "mica-ir",
+        "kind": "GUIDED_WEAPON",
+        "definitionModelIds": [
+          "mica-ir-study-v05"
+        ]
+      },
+      {
+        "catalogObjectId": "meteor",
+        "kind": "GUIDED_WEAPON",
+        "definitionModelIds": []
+      },
+      {
+        "catalogObjectId": "kh-31p",
+        "kind": "GUIDED_WEAPON",
+        "definitionModelIds": [
+          "kh-31p-study-v05"
+        ]
+      },
+      {
+        "catalogObjectId": "spice-2000",
+        "kind": "GUIDED_WEAPON",
+        "definitionModelIds": [
+          "spice-2000-study-v05"
+        ]
+      },
+      {
+        "catalogObjectId": "storm-shadow",
+        "kind": "GUIDED_WEAPON",
+        "definitionModelIds": []
+      },
+      {
+        "catalogObjectId": "spyder",
+        "kind": "AIR_DEFENCE_SYSTEM",
+        "definitionModelIds": []
+      },
+      {
+        "catalogObjectId": "akash",
+        "kind": "AIR_DEFENCE_SYSTEM",
+        "definitionModelIds": [
+          "akash-study-v05"
+        ]
+      },
+      {
+        "catalogObjectId": "s-200",
+        "kind": "AIR_DEFENCE_SYSTEM",
+        "definitionModelIds": [
+          "s-200-study-v05"
+        ]
+      },
+      {
+        "catalogObjectId": "brahmos-mal",
+        "kind": "SURFACE_LAUNCHER",
+        "definitionModelIds": []
+      },
+      {
+        "catalogObjectId": "brahmos-block-i",
+        "kind": "GUIDED_WEAPON",
+        "definitionModelIds": [
+          "brahmos-block-i-study-v05"
+        ]
+      },
+      {
+        "catalogObjectId": "pralay",
+        "kind": "GUIDED_WEAPON",
+        "definitionModelIds": []
+      },
+      {
+        "catalogObjectId": "p-18-radar",
+        "kind": "RADAR",
+        "definitionModelIds": []
+      },
+      {
+        "catalogObjectId": "aircraft-shelter-site",
+        "kind": "FIXED_SITE",
+        "definitionModelIds": []
+      },
+      {
+        "catalogObjectId": "command-site",
+        "kind": "FIXED_SITE",
+        "definitionModelIds": []
+      }
+    ],
+    "aerodynamics": [
+      {
+        "id": "su-30mki-aerodynamic-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "referenceAreaM2": 62,
+        "referenceChordM": 1,
+        "referenceSpanM": 1,
+        "coefficientTables": [
+          {
+            "id": "su-30mki-zero-lift-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "MACH",
+                "unit": "1",
+                "values": [
+                  0,
+                  5
+                ]
+              }
+            ],
+            "values": [
+              0.026,
+              0.026
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          },
+          {
+            "id": "su-30mki-induced-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "ANGLE_OF_ATTACK",
+                "unit": "rad",
+                "values": [
+                  -0.17453292519943295,
+                  0.3490658503988659
+                ]
+              }
+            ],
+            "values": [
+              0.085,
+              0.085
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "mirage-2000h-aerodynamic-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "referenceAreaM2": 41,
+        "referenceChordM": 1,
+        "referenceSpanM": 1,
+        "coefficientTables": [
+          {
+            "id": "mirage-2000h-zero-lift-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "MACH",
+                "unit": "1",
+                "values": [
+                  0,
+                  5
+                ]
+              }
+            ],
+            "values": [
+              0.024,
+              0.024
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          },
+          {
+            "id": "mirage-2000h-induced-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "ANGLE_OF_ATTACK",
+                "unit": "rad",
+                "values": [
+                  -0.17453292519943295,
+                  0.3490658503988659
+                ]
+              }
+            ],
+            "values": [
+              0.09,
+              0.09
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "f-16c-block52-paf-aerodynamic-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "referenceAreaM2": 28,
+        "referenceChordM": 1,
+        "referenceSpanM": 1,
+        "coefficientTables": [
+          {
+            "id": "f-16c-block52-paf-zero-lift-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "MACH",
+                "unit": "1",
+                "values": [
+                  0,
+                  5
+                ]
+              }
+            ],
+            "values": [
+              0.025,
+              0.025
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          },
+          {
+            "id": "f-16c-block52-paf-induced-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "ANGLE_OF_ATTACK",
+                "unit": "rad",
+                "values": [
+                  -0.17453292519943295,
+                  0.3490658503988659
+                ]
+              }
+            ],
+            "values": [
+              0.095,
+              0.095
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "jf-17-aerodynamic-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "referenceAreaM2": 28,
+        "referenceChordM": 1,
+        "referenceSpanM": 1,
+        "coefficientTables": [
+          {
+            "id": "jf-17-zero-lift-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "MACH",
+                "unit": "1",
+                "values": [
+                  0,
+                  5
+                ]
+              }
+            ],
+            "values": [
+              0.025,
+              0.025
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          },
+          {
+            "id": "jf-17-induced-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "ANGLE_OF_ATTACK",
+                "unit": "rad",
+                "values": [
+                  -0.17453292519943295,
+                  0.3490658503988659
+                ]
+              }
+            ],
+            "values": [
+              0.095,
+              0.095
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "astra-mk1-aerodynamic-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "referenceAreaM2": 0.055,
+        "referenceChordM": 1,
+        "referenceSpanM": 1,
+        "coefficientTables": [
+          {
+            "id": "astra-mk1-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "MACH",
+                "unit": "1",
+                "values": [
+                  0,
+                  5
+                ]
+              }
+            ],
+            "values": [
+              0.28,
+              0.28
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "aim-120c5-aerodynamic-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "referenceAreaM2": 0.052,
+        "referenceChordM": 1,
+        "referenceSpanM": 1,
+        "coefficientTables": [
+          {
+            "id": "aim-120c5-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "MACH",
+                "unit": "1",
+                "values": [
+                  0,
+                  5
+                ]
+              }
+            ],
+            "values": [
+              0.28,
+              0.28
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "mica-ir-aerodynamic-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "referenceAreaM2": 0.045,
+        "referenceChordM": 1,
+        "referenceSpanM": 1,
+        "coefficientTables": [
+          {
+            "id": "mica-ir-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "MACH",
+                "unit": "1",
+                "values": [
+                  0,
+                  5
+                ]
+              }
+            ],
+            "values": [
+              0.3,
+              0.3
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "kh-31p-aerodynamic-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "referenceAreaM2": 0.16,
+        "referenceChordM": 1,
+        "referenceSpanM": 1,
+        "coefficientTables": [
+          {
+            "id": "kh-31p-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "MACH",
+                "unit": "1",
+                "values": [
+                  0,
+                  5
+                ]
+              }
+            ],
+            "values": [
+              0.28,
+              0.28
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "spice-2000-aerodynamic-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "referenceAreaM2": 0.16,
+        "referenceChordM": 1,
+        "referenceSpanM": 1,
+        "coefficientTables": [
+          {
+            "id": "spice-2000-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "MACH",
+                "unit": "1",
+                "values": [
+                  0,
+                  5
+                ]
+              }
+            ],
+            "values": [
+              0.28,
+              0.28
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "akash-aerodynamic-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "referenceAreaM2": 0.11,
+        "referenceChordM": 1,
+        "referenceSpanM": 1,
+        "coefficientTables": [
+          {
+            "id": "akash-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "MACH",
+                "unit": "1",
+                "values": [
+                  0,
+                  5
+                ]
+              }
+            ],
+            "values": [
+              0.28,
+              0.28
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "s-200-aerodynamic-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "referenceAreaM2": 0.11,
+        "referenceChordM": 1,
+        "referenceSpanM": 1,
+        "coefficientTables": [
+          {
+            "id": "s-200-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "MACH",
+                "unit": "1",
+                "values": [
+                  0,
+                  5
+                ]
+              }
+            ],
+            "values": [
+              0.28,
+              0.28
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "brahmos-block-i-aerodynamic-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "referenceAreaM2": 0.42,
+        "referenceChordM": 1,
+        "referenceSpanM": 1,
+        "coefficientTables": [
+          {
+            "id": "brahmos-block-i-drag-table-v05",
+            "outputUnit": "1",
+            "axes": [
+              {
+                "semantic": "MACH",
+                "unit": "1",
+                "values": [
+                  0,
+                  5
+                ]
+              }
+            ],
+            "values": [
+              0.31,
+              0.31
+            ],
+            "evidenceRefIds": [
+              "current-scalar-model-assumptions"
+            ],
+            "validityDomain": {
+              "altitudeM": {
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "mach": {
+                "minimum": 0,
+                "maximum": 5
+              },
+              "angleOfAttackRad": {
+                "minimum": -0.17453292519943295,
+                "maximum": 0.3490658503988659
+              },
+              "loadFactorG": {
+                "minimum": -4,
+                "maximum": 40
+              },
+              "configurations": [
+                "DECLARED_SCENARIO_CONFIGURATION"
+              ],
+              "environments": [
+                "NASA_EDUCATIONAL_STANDARD"
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "propulsion": [
+      {
+        "id": "su-30mki-propulsion-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "engineCount": 1,
+        "thrustTable": {
+          "id": "su-30mki-thrust-table-v05",
+          "outputUnit": "N",
+          "axes": [
+            {
+              "semantic": "THROTTLE",
+              "unit": "1",
+              "values": [
+                0,
+                1
+              ]
+            }
+          ],
+          "values": [
+            0,
+            245000
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "fuelFlowTable": {
+          "id": "su-30mki-fuel-flow-table-v05",
+          "outputUnit": "kg/(N*s)",
+          "axes": [
+            {
+              "semantic": "THROTTLE",
+              "unit": "1",
+              "values": [
+                0,
+                1
+              ]
+            }
+          ],
+          "values": [
+            0.000024,
+            0.000024
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "spoolTimeS": 0
+      },
+      {
+        "id": "mirage-2000h-propulsion-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "engineCount": 1,
+        "thrustTable": {
+          "id": "mirage-2000h-thrust-table-v05",
+          "outputUnit": "N",
+          "axes": [
+            {
+              "semantic": "THROTTLE",
+              "unit": "1",
+              "values": [
+                0,
+                1
+              ]
+            }
+          ],
+          "values": [
+            0,
+            95000
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "fuelFlowTable": {
+          "id": "mirage-2000h-fuel-flow-table-v05",
+          "outputUnit": "kg/(N*s)",
+          "axes": [
+            {
+              "semantic": "THROTTLE",
+              "unit": "1",
+              "values": [
+                0,
+                1
+              ]
+            }
+          ],
+          "values": [
+            0.000026,
+            0.000026
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "spoolTimeS": 0
+      },
+      {
+        "id": "f-16c-block52-paf-propulsion-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "engineCount": 1,
+        "thrustTable": {
+          "id": "f-16c-block52-paf-thrust-table-v05",
+          "outputUnit": "N",
+          "axes": [
+            {
+              "semantic": "THROTTLE",
+              "unit": "1",
+              "values": [
+                0,
+                1
+              ]
+            }
+          ],
+          "values": [
+            0,
+            125000
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "fuelFlowTable": {
+          "id": "f-16c-block52-paf-fuel-flow-table-v05",
+          "outputUnit": "kg/(N*s)",
+          "axes": [
+            {
+              "semantic": "THROTTLE",
+              "unit": "1",
+              "values": [
+                0,
+                1
+              ]
+            }
+          ],
+          "values": [
+            0.000025,
+            0.000025
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "spoolTimeS": 0
+      },
+      {
+        "id": "jf-17-propulsion-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "engineCount": 1,
+        "thrustTable": {
+          "id": "jf-17-thrust-table-v05",
+          "outputUnit": "N",
+          "axes": [
+            {
+              "semantic": "THROTTLE",
+              "unit": "1",
+              "values": [
+                0,
+                1
+              ]
+            }
+          ],
+          "values": [
+            0,
+            125000
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "fuelFlowTable": {
+          "id": "jf-17-fuel-flow-table-v05",
+          "outputUnit": "kg/(N*s)",
+          "axes": [
+            {
+              "semantic": "THROTTLE",
+              "unit": "1",
+              "values": [
+                0,
+                1
+              ]
+            }
+          ],
+          "values": [
+            0.000025,
+            0.000025
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "spoolTimeS": 0
+      },
+      {
+        "id": "astra-mk1-propulsion-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "engineCount": 1,
+        "thrustTable": {
+          "id": "astra-mk1-thrust-table-v05",
+          "outputUnit": "N",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                10
+              ]
+            }
+          ],
+          "values": [
+            19040,
+            19040
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "fuelFlowTable": {
+          "id": "astra-mk1-fuel-flow-table-v05",
+          "outputUnit": "kg/(N*s)",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                10
+              ]
+            }
+          ],
+          "values": [
+            0.000375,
+            0.000375
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "spoolTimeS": 0
+      },
+      {
+        "id": "aim-120c5-propulsion-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "engineCount": 1,
+        "thrustTable": {
+          "id": "aim-120c5-thrust-table-v05",
+          "outputUnit": "N",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                9
+              ]
+            }
+          ],
+          "values": [
+            18800,
+            18800
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "fuelFlowTable": {
+          "id": "aim-120c5-fuel-flow-table-v05",
+          "outputUnit": "kg/(N*s)",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                9
+              ]
+            }
+          ],
+          "values": [
+            0.00038416075650118205,
+            0.00038416075650118205
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "spoolTimeS": 0
+      },
+      {
+        "id": "mica-ir-propulsion-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "engineCount": 1,
+        "thrustTable": {
+          "id": "mica-ir-thrust-table-v05",
+          "outputUnit": "N",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                5
+              ]
+            }
+          ],
+          "values": [
+            19000,
+            19000
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "fuelFlowTable": {
+          "id": "mica-ir-fuel-flow-table-v05",
+          "outputUnit": "kg/(N*s)",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                5
+              ]
+            }
+          ],
+          "values": [
+            0.0004947368421052632,
+            0.0004947368421052632
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "spoolTimeS": 0
+      },
+      {
+        "id": "kh-31p-propulsion-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "engineCount": 1,
+        "thrustTable": {
+          "id": "kh-31p-thrust-table-v05",
+          "outputUnit": "N",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                18
+              ]
+            }
+          ],
+          "values": [
+            32700,
+            32700
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "fuelFlowTable": {
+          "id": "kh-31p-fuel-flow-table-v05",
+          "outputUnit": "kg/(N*s)",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                18
+              ]
+            }
+          ],
+          "values": [
+            0.00045667686034658514,
+            0.00045667686034658514
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "spoolTimeS": 0
+      },
+      {
+        "id": "spice-2000-propulsion-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "engineCount": 1,
+        "thrustTable": {
+          "id": "spice-2000-thrust-table-v05",
+          "outputUnit": "N",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                18
+              ]
+            }
+          ],
+          "values": [
+            32700,
+            32700
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "fuelFlowTable": {
+          "id": "spice-2000-fuel-flow-table-v05",
+          "outputUnit": "kg/(N*s)",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                18
+              ]
+            }
+          ],
+          "values": [
+            0.00045667686034658514,
+            0.00045667686034658514
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "spoolTimeS": 0
+      },
+      {
+        "id": "akash-propulsion-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "engineCount": 1,
+        "thrustTable": {
+          "id": "akash-thrust-table-v05",
+          "outputUnit": "N",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                22.5
+              ]
+            }
+          ],
+          "values": [
+            42300,
+            42300
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "fuelFlowTable": {
+          "id": "akash-fuel-flow-table-v05",
+          "outputUnit": "kg/(N*s)",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                22.5
+              ]
+            }
+          ],
+          "values": [
+            0.00022947202521670604,
+            0.00022947202521670604
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "spoolTimeS": 0
+      },
+      {
+        "id": "s-200-propulsion-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "engineCount": 1,
+        "thrustTable": {
+          "id": "s-200-thrust-table-v05",
+          "outputUnit": "N",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                65
+              ]
+            }
+          ],
+          "values": [
+            35000,
+            35000
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "fuelFlowTable": {
+          "id": "s-200-fuel-flow-table-v05",
+          "outputUnit": "kg/(N*s)",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                65
+              ]
+            }
+          ],
+          "values": [
+            0.00009599999999999999,
+            0.00009599999999999999
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "spoolTimeS": 0
+      },
+      {
+        "id": "brahmos-block-i-propulsion-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "engineCount": 1,
+        "thrustTable": {
+          "id": "brahmos-block-i-thrust-table-v05",
+          "outputUnit": "N",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                160
+              ]
+            }
+          ],
+          "values": [
+            65000,
+            65000
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "fuelFlowTable": {
+          "id": "brahmos-block-i-fuel-flow-table-v05",
+          "outputUnit": "kg/(N*s)",
+          "axes": [
+            {
+              "semantic": "TIME",
+              "unit": "s",
+              "values": [
+                0,
+                160
+              ]
+            }
+          ],
+          "values": [
+            0.00005769230769230769,
+            0.00005769230769230769
+          ],
+          "evidenceRefIds": [
+            "current-scalar-model-assumptions"
+          ],
+          "validityDomain": {
+            "altitudeM": {
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "mach": {
+              "minimum": 0,
+              "maximum": 5
+            },
+            "angleOfAttackRad": {
+              "minimum": -0.17453292519943295,
+              "maximum": 0.3490658503988659
+            },
+            "loadFactorG": {
+              "minimum": -4,
+              "maximum": 40
+            },
+            "configurations": [
+              "DECLARED_SCENARIO_CONFIGURATION"
+            ],
+            "environments": [
+              "NASA_EDUCATIONAL_STANDARD"
+            ]
+          }
+        },
+        "spoolTimeS": 0
+      }
+    ],
+    "sensors": [
+      {
+        "id": "declared-envelope-sensor-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "sensorKind": "DECLARED_ENVELOPE",
+        "detectionRangeM": 0,
+        "minimumRangeM": 0,
+        "scanPeriodS": 1,
+        "azimuthFieldOfViewRad": 6.283185307179586,
+        "elevationFieldOfViewRad": 3.141592653589793
+      }
+    ],
+    "aircraft": [
+      {
+        "id": "su-30mki-aircraft-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "catalogObjectId": "su-30mki",
+        "emptyMassKg": 18400,
+        "fuelCapacityKg": 9400,
+        "aerodynamicModelIndex": 0,
+        "propulsionModelIndexes": [
+          0
+        ],
+        "sensorModelIndexes": [
+          0
+        ],
+        "loadoutModelIndex": 0,
+        "maximumCommandLoadFactorG": 9,
+        "performanceAdmission": {
+          "state": "UNSUPPORTED",
+          "limitationId": "not-named-system-performance",
+          "reason": "The current compiled tables are scalar regression assumptions. They have no independently validated, source-bound named-platform performance evidence."
+        }
+      },
+      {
+        "id": "mirage-2000h-aircraft-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "catalogObjectId": "mirage-2000h",
+        "emptyMassKg": 7600,
+        "fuelCapacityKg": 3200,
+        "aerodynamicModelIndex": 1,
+        "propulsionModelIndexes": [
+          1
+        ],
+        "sensorModelIndexes": [
+          0
+        ],
+        "loadoutModelIndex": 1,
+        "maximumCommandLoadFactorG": 9,
+        "performanceAdmission": {
+          "state": "UNSUPPORTED",
+          "limitationId": "not-named-system-performance",
+          "reason": "The current compiled tables are scalar regression assumptions. They have no independently validated, source-bound named-platform performance evidence."
+        }
+      },
+      {
+        "id": "f-16c-block52-aircraft-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "catalogObjectId": "f-16c-block52-paf",
+        "emptyMassKg": 9000,
+        "fuelCapacityKg": 3200,
+        "aerodynamicModelIndex": 2,
+        "propulsionModelIndexes": [
+          2
+        ],
+        "sensorModelIndexes": [
+          0
+        ],
+        "loadoutModelIndex": 2,
+        "maximumCommandLoadFactorG": 9,
+        "performanceAdmission": {
+          "state": "UNSUPPORTED",
+          "limitationId": "not-named-system-performance",
+          "reason": "The current compiled tables are scalar regression assumptions. They have no independently validated, source-bound named-platform performance evidence."
+        }
+      },
+      {
+        "id": "jf-17-aircraft-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "catalogObjectId": "jf-17",
+        "emptyMassKg": 9000,
+        "fuelCapacityKg": 3200,
+        "aerodynamicModelIndex": 3,
+        "propulsionModelIndexes": [
+          3
+        ],
+        "sensorModelIndexes": [
+          0
+        ],
+        "loadoutModelIndex": 6,
+        "maximumCommandLoadFactorG": 9,
+        "performanceAdmission": {
+          "state": "UNSUPPORTED",
+          "limitationId": "not-named-system-performance",
+          "reason": "The current compiled tables are scalar regression assumptions. They have no independently validated, source-bound named-platform performance evidence."
+        }
+      }
+    ],
+    "weapons": [
+      {
+        "id": "astra-mk1-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "catalogObjectId": "astra-mk1",
+        "launchMassKg": 170,
+        "dryMassKg": 98.6,
+        "aerodynamicModelIndex": 4,
+        "propulsionModelIndex": 4,
+        "sensorModelIndex": 0,
+        "seekerMode": "UNAVAILABLE",
+        "supportRequirement": "UNAVAILABLE",
+        "launchAuthorization": "SCHEDULED_TEST_ONLY",
+        "maximumCommandLoadFactorG": 28,
+        "seekerActivationRangeM": 14300,
+        "datalinkUpdatePeriodS": 0.2,
+        "thrustTaperSpeedMps": 1120,
+        "navigationConstant": 3.5,
+        "termination": {
+          "schemaVersion": "vector.weapon-termination-model.v1",
+          "intendedUse": "ENGINE_VERIFICATION_ONLY",
+          "criterion": "GEOMETRIC_CLOSEST_APPROACH",
+          "interceptRadiusM": 25,
+          "maximumFlightTimeS": 180
+        }
+      },
+      {
+        "id": "aim-120c5-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "catalogObjectId": "aim-120c5",
+        "launchMassKg": 157,
+        "dryMassKg": 92,
+        "aerodynamicModelIndex": 5,
+        "propulsionModelIndex": 5,
+        "sensorModelIndex": 0,
+        "seekerMode": "UNAVAILABLE",
+        "supportRequirement": "UNAVAILABLE",
+        "launchAuthorization": "SCHEDULED_TEST_ONLY",
+        "maximumCommandLoadFactorG": 27,
+        "seekerActivationRangeM": 13200,
+        "datalinkUpdatePeriodS": 0.2,
+        "thrustTaperSpeedMps": 1080,
+        "navigationConstant": 3.5,
+        "termination": {
+          "schemaVersion": "vector.weapon-termination-model.v1",
+          "intendedUse": "ENGINE_VERIFICATION_ONLY",
+          "criterion": "GEOMETRIC_CLOSEST_APPROACH",
+          "interceptRadiusM": 25,
+          "maximumFlightTimeS": 180
+        }
+      },
+      {
+        "id": "mica-ir-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "catalogObjectId": "mica-ir",
+        "launchMassKg": 112,
+        "dryMassKg": 65,
+        "aerodynamicModelIndex": 6,
+        "propulsionModelIndex": 6,
+        "sensorModelIndex": 0,
+        "seekerMode": "UNAVAILABLE",
+        "supportRequirement": "UNAVAILABLE",
+        "launchAuthorization": "SCHEDULED_TEST_ONLY",
+        "maximumCommandLoadFactorG": 34,
+        "seekerActivationRangeM": 4500,
+        "datalinkUpdatePeriodS": 0.25,
+        "thrustTaperSpeedMps": 850,
+        "navigationConstant": 3.8,
+        "termination": {
+          "schemaVersion": "vector.weapon-termination-model.v1",
+          "intendedUse": "ENGINE_VERIFICATION_ONLY",
+          "criterion": "GEOMETRIC_CLOSEST_APPROACH",
+          "interceptRadiusM": 25,
+          "maximumFlightTimeS": 180
+        }
+      },
+      {
+        "id": "kh-31p-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "catalogObjectId": "kh-31p",
+        "launchMassKg": 640,
+        "dryMassKg": 371.2,
+        "aerodynamicModelIndex": 7,
+        "propulsionModelIndex": 7,
+        "sensorModelIndex": 0,
+        "seekerMode": "UNAVAILABLE",
+        "supportRequirement": "UNAVAILABLE",
+        "launchAuthorization": "SCHEDULED_TEST_ONLY",
+        "maximumCommandLoadFactorG": 10,
+        "seekerActivationRangeM": 17600,
+        "datalinkUpdatePeriodS": 0.25,
+        "thrustTaperSpeedMps": 920,
+        "navigationConstant": 3.5,
+        "termination": {
+          "schemaVersion": "vector.weapon-termination-model.v1",
+          "intendedUse": "ENGINE_VERIFICATION_ONLY",
+          "criterion": "GEOMETRIC_CLOSEST_APPROACH",
+          "interceptRadiusM": 25,
+          "maximumFlightTimeS": 180
+        }
+      },
+      {
+        "id": "spice-2000-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "catalogObjectId": "spice-2000",
+        "launchMassKg": 640,
+        "dryMassKg": 371.2,
+        "aerodynamicModelIndex": 8,
+        "propulsionModelIndex": 8,
+        "sensorModelIndex": 0,
+        "seekerMode": "UNAVAILABLE",
+        "supportRequirement": "UNAVAILABLE",
+        "launchAuthorization": "SCHEDULED_TEST_ONLY",
+        "maximumCommandLoadFactorG": 10,
+        "seekerActivationRangeM": 17600,
+        "datalinkUpdatePeriodS": 0.25,
+        "thrustTaperSpeedMps": 920,
+        "navigationConstant": 3.2,
+        "termination": {
+          "schemaVersion": "vector.weapon-termination-model.v1",
+          "intendedUse": "ENGINE_VERIFICATION_ONLY",
+          "criterion": "GEOMETRIC_CLOSEST_APPROACH",
+          "interceptRadiusM": 25,
+          "maximumFlightTimeS": 180
+        }
+      },
+      {
+        "id": "akash-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "catalogObjectId": "akash",
+        "launchMassKg": 520,
+        "dryMassKg": 301.6,
+        "aerodynamicModelIndex": 9,
+        "propulsionModelIndex": 9,
+        "sensorModelIndex": 0,
+        "seekerMode": "UNAVAILABLE",
+        "supportRequirement": "UNAVAILABLE",
+        "launchAuthorization": "SCHEDULED_TEST_ONLY",
+        "maximumCommandLoadFactorG": 27,
+        "seekerActivationRangeM": 18000,
+        "datalinkUpdatePeriodS": 0.2,
+        "thrustTaperSpeedMps": 1220,
+        "navigationConstant": 3.5,
+        "termination": {
+          "schemaVersion": "vector.weapon-termination-model.v1",
+          "intendedUse": "ENGINE_VERIFICATION_ONLY",
+          "criterion": "GEOMETRIC_CLOSEST_APPROACH",
+          "interceptRadiusM": 25,
+          "maximumFlightTimeS": 180
+        }
+      },
+      {
+        "id": "s-200-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "catalogObjectId": "s-200",
+        "launchMassKg": 520,
+        "dryMassKg": 301.6,
+        "aerodynamicModelIndex": 10,
+        "propulsionModelIndex": 10,
+        "sensorModelIndex": 0,
+        "seekerMode": "UNAVAILABLE",
+        "supportRequirement": "UNAVAILABLE",
+        "launchAuthorization": "SCHEDULED_TEST_ONLY",
+        "maximumCommandLoadFactorG": 22,
+        "seekerActivationRangeM": 18000,
+        "datalinkUpdatePeriodS": 0.2,
+        "thrustTaperSpeedMps": 1480,
+        "navigationConstant": 3.5,
+        "termination": {
+          "schemaVersion": "vector.weapon-termination-model.v1",
+          "intendedUse": "ENGINE_VERIFICATION_ONLY",
+          "criterion": "GEOMETRIC_CLOSEST_APPROACH",
+          "interceptRadiusM": 25,
+          "maximumFlightTimeS": 180
+        }
+      },
+      {
+        "id": "brahmos-block-i-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "catalogObjectId": "brahmos-block-i",
+        "launchMassKg": 2500,
+        "dryMassKg": 1900,
+        "aerodynamicModelIndex": 11,
+        "propulsionModelIndex": 11,
+        "sensorModelIndex": 0,
+        "seekerMode": "UNAVAILABLE",
+        "supportRequirement": "UNAVAILABLE",
+        "launchAuthorization": "SCHEDULED_TEST_ONLY",
+        "maximumCommandLoadFactorG": 6,
+        "seekerActivationRangeM": 18000,
+        "datalinkUpdatePeriodS": 0.5,
+        "thrustTaperSpeedMps": 1380,
+        "navigationConstant": 2.5,
+        "termination": {
+          "schemaVersion": "vector.weapon-termination-model.v1",
+          "intendedUse": "ENGINE_VERIFICATION_ONLY",
+          "criterion": "GEOMETRIC_CLOSEST_APPROACH",
+          "interceptRadiusM": 25,
+          "maximumFlightTimeS": 180
+        }
+      }
+    ],
+    "loadouts": [
+      {
+        "id": "su-30mki-loadout-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "platformCatalogObjectId": "su-30mki",
+        "stations": [
+          {
+            "id": "su-30mki-study-station",
+            "stationGroup": "DECLARED_STUDY_STATION",
+            "positionBodyM": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "maximumQuantity": 2,
+            "compatibleStoreModelIndexes": [
+              0,
+              3
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mirage-2000h-loadout-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "platformCatalogObjectId": "mirage-2000h",
+        "stations": [
+          {
+            "id": "mirage-2000h-study-station",
+            "stationGroup": "DECLARED_STUDY_STATION",
+            "positionBodyM": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "maximumQuantity": 2,
+            "compatibleStoreModelIndexes": [
+              2,
+              4
+            ]
+          }
+        ]
+      },
+      {
+        "id": "f-16c-block52-paf-loadout-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "platformCatalogObjectId": "f-16c-block52-paf",
+        "stations": [
+          {
+            "id": "f-16c-block52-paf-study-station",
+            "stationGroup": "DECLARED_STUDY_STATION",
+            "positionBodyM": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "maximumQuantity": 2,
+            "compatibleStoreModelIndexes": [
+              1
+            ]
+          }
+        ]
+      },
+      {
+        "id": "akash-loadout-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "platformCatalogObjectId": "akash",
+        "stations": [
+          {
+            "id": "akash-study-station",
+            "stationGroup": "DECLARED_STUDY_STATION",
+            "positionBodyM": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "maximumQuantity": 2,
+            "compatibleStoreModelIndexes": [
+              5
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s-200-loadout-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "platformCatalogObjectId": "s-200",
+        "stations": [
+          {
+            "id": "s-200-study-station",
+            "stationGroup": "DECLARED_STUDY_STATION",
+            "positionBodyM": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "maximumQuantity": 2,
+            "compatibleStoreModelIndexes": [
+              6
+            ]
+          }
+        ]
+      },
+      {
+        "id": "brahmos-mal-loadout-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "platformCatalogObjectId": "brahmos-mal",
+        "stations": [
+          {
+            "id": "brahmos-mal-study-station",
+            "stationGroup": "DECLARED_STUDY_STATION",
+            "positionBodyM": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "maximumQuantity": 2,
+            "compatibleStoreModelIndexes": [
+              7
+            ]
+          }
+        ]
+      },
+      {
+        "id": "jf-17-loadout-study-v05",
+        "version": "0.5.0",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ],
+        "validityDomain": {
+          "altitudeM": {
+            "minimum": 0,
+            "maximum": 20000
+          },
+          "mach": {
+            "minimum": 0,
+            "maximum": 5
+          },
+          "angleOfAttackRad": {
+            "minimum": -0.17453292519943295,
+            "maximum": 0.3490658503988659
+          },
+          "loadFactorG": {
+            "minimum": -4,
+            "maximum": 40
+          },
+          "configurations": [
+            "DECLARED_SCENARIO_CONFIGURATION"
+          ],
+          "environments": [
+            "NASA_EDUCATIONAL_STANDARD"
+          ]
+        },
+        "limitationIds": [
+          "not-named-system-performance"
+        ],
+        "platformCatalogObjectId": "jf-17",
+        "stations": []
+      }
+    ],
+    "compatibility": [
+      {
+        "id": "su-30mki-astra-mk1-compatibility-v05",
+        "platformCatalogObjectId": "su-30mki",
+        "loadoutModelIndex": 0,
+        "storeModelIndex": 0,
+        "stationGroup": "DECLARED_STUDY_STATION",
+        "status": "SUPPORTED",
+        "maximumQuantity": 2,
+        "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ]
+      },
+      {
+        "id": "su-30mki-kh-31p-compatibility-v05",
+        "platformCatalogObjectId": "su-30mki",
+        "loadoutModelIndex": 0,
+        "storeModelIndex": 3,
+        "stationGroup": "DECLARED_STUDY_STATION",
+        "status": "SUPPORTED",
+        "maximumQuantity": 2,
+        "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ]
+      },
+      {
+        "id": "mirage-2000h-mica-ir-compatibility-v05",
+        "platformCatalogObjectId": "mirage-2000h",
+        "loadoutModelIndex": 1,
+        "storeModelIndex": 2,
+        "stationGroup": "DECLARED_STUDY_STATION",
+        "status": "SUPPORTED",
+        "maximumQuantity": 2,
+        "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ]
+      },
+      {
+        "id": "mirage-2000h-spice-2000-compatibility-v05",
+        "platformCatalogObjectId": "mirage-2000h",
+        "loadoutModelIndex": 1,
+        "storeModelIndex": 4,
+        "stationGroup": "DECLARED_STUDY_STATION",
+        "status": "SUPPORTED",
+        "maximumQuantity": 2,
+        "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ]
+      },
+      {
+        "id": "f-16c-block52-paf-aim-120c5-compatibility-v05",
+        "platformCatalogObjectId": "f-16c-block52-paf",
+        "loadoutModelIndex": 2,
+        "storeModelIndex": 1,
+        "stationGroup": "DECLARED_STUDY_STATION",
+        "status": "SUPPORTED",
+        "maximumQuantity": 2,
+        "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ]
+      },
+      {
+        "id": "akash-akash-compatibility-v05",
+        "platformCatalogObjectId": "akash",
+        "loadoutModelIndex": 3,
+        "storeModelIndex": 5,
+        "stationGroup": "DECLARED_STUDY_STATION",
+        "status": "SUPPORTED",
+        "maximumQuantity": 2,
+        "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ]
+      },
+      {
+        "id": "s-200-s-200-compatibility-v05",
+        "platformCatalogObjectId": "s-200",
+        "loadoutModelIndex": 4,
+        "storeModelIndex": 6,
+        "stationGroup": "DECLARED_STUDY_STATION",
+        "status": "SUPPORTED",
+        "maximumQuantity": 2,
+        "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ]
+      },
+      {
+        "id": "brahmos-mal-brahmos-block-i-compatibility-v05",
+        "platformCatalogObjectId": "brahmos-mal",
+        "loadoutModelIndex": 5,
+        "storeModelIndex": 7,
+        "stationGroup": "DECLARED_STUDY_STATION",
+        "status": "SUPPORTED",
+        "maximumQuantity": 2,
+        "rationale": "Existing scenario compatibility retained for regression continuity; named-system integration evidence remains catalog provenance, not model-performance evidence.",
+        "evidenceRefIds": [
+          "current-scalar-model-assumptions"
+        ]
+      }
+    ],
+    "digest": "aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c"
+  },
+  "credibilityManifest": {
+    "schemaVersion": "vector.credibility-manifest.v1",
+    "subject": {
+      "kind": "MODEL_PACK",
+      "id": "vector-scalar-study-models",
+      "digest": "aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c"
+    },
+    "id": "vector-scalar-study-credibility",
+    "version": "1.3.0",
+    "modelPackDigest": "aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c",
+    "engineDigest": "c59104464d75fa910f8ba79114d50a9ffae31c92875ab9ac6e65f62679ddc4aa",
+    "intendedUseRefs": [
+      {
+        "id": "vector.intended-use.geometry-teaching",
+        "version": "1.1.0"
+      }
+    ],
+    "validityDomain": {
+      "altitudeM": {
+        "minimum": 0,
+        "maximum": 20000
+      },
+      "mach": {
+        "minimum": 0,
+        "maximum": 5
+      },
+      "angleOfAttackRad": {
+        "minimum": -0.17453292519943295,
+        "maximum": 0.3490658503988659
+      },
+      "loadFactorG": {
+        "minimum": -4,
+        "maximum": 40
+      },
+      "configurations": [
+        "DECLARED_SCENARIO_CONFIGURATION"
+      ],
+      "environments": [
+        "NASA_EDUCATIONAL_STANDARD"
+      ]
+    },
+    "requirements": [
+      {
+        "id": "deterministic-pack-compile",
+        "statement": "Identical source definitions compile to one canonical digest."
+      },
+      {
+        "id": "fail-closed-references",
+        "statement": "Missing model and compatibility references block compilation."
+      }
+    ],
+    "cases": [
+      {
+        "id": "model-pack-contract-case",
+        "requirementId": "deterministic-pack-compile",
+        "kind": "VERIFICATION",
+        "result": "NOT_RUN",
+        "tolerance": "exact SHA-256 identity",
+        "evidenceRefId": "model-pack-contract-tests"
+      },
+      {
+        "id": "model-pack-reference-case",
+        "requirementId": "fail-closed-references",
+        "kind": "VERIFICATION",
+        "result": "NOT_RUN",
+        "tolerance": "zero unresolved references",
+        "evidenceRefId": "model-pack-contract-tests"
+      }
+    ],
+    "numericalTolerances": [
+      {
+        "metric": "canonical digest mismatch",
+        "tolerance": 0,
+        "unit": "1"
+      }
+    ],
+    "uncertaintyCharacterization": "The current scalar coefficients are unvalidated model assumptions retained to preserve regression behavior while executable model-pack infrastructure is introduced.",
+    "limitations": [
+      {
+        "id": "not-named-system-performance",
+        "severity": "BLOCKING",
+        "statement": "This pack must not be interpreted as named-aircraft, named-weapon, sensor, or operational effectiveness performance.",
+        "affectedCapabilities": [
+          "aircraft-performance",
+          "weapon-effectiveness",
+          "sensor-performance",
+          "operational-analysis"
+        ]
+      }
+    ],
+    "approvalState": "DRAFT",
+    "contentDigest": "c57aa54fc4765c4cf8d2ce30c32b67476395914df14cacd5e55a28d2b2719795"
+  }
+}

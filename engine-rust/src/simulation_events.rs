@@ -4,7 +4,7 @@ use serde::Serialize;
 
 use crate::{
     Affiliation, AirborneStoreTransfer, AircraftOperationalState, EngineError, EntityKind,
-    EntityLifecycle, StoreTransferOperation, Termination,
+    EntityLifecycle, StoreTransferOperation, Termination, WeaponFlightState,
 };
 
 pub const SIMULATION_EVENT_SCHEMA: &str = "vector.simulation-event.v2";
@@ -17,6 +17,8 @@ pub const AIRCRAFT_OPERATIONAL_CHANGED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.aircraft-operational-state-changed.v1";
 pub const AIRBORNE_STORE_TRANSFER_OUTCOME_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.airborne-store-transfer-outcome.v1";
+pub const WEAPON_TERMINATED_PAYLOAD_SCHEMA: &str =
+    "vector.simulation-event-payload.weapon-terminated.v2";
 pub const RUN_COMPLETED_PAYLOAD_SCHEMA: &str = "vector.simulation-event-payload.run-completed.v1";
 pub const TRACK_CHANGED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.track-state-changed.v3";
@@ -34,6 +36,20 @@ pub struct AirborneStoreTransferOutcomeEvent<'a> {
     pub accepted: bool,
     pub limiter: &'static str,
     pub cause: &'static str,
+}
+
+pub struct WeaponTerminationEvent<'a> {
+    pub weapon_id: &'a str,
+    pub target_id: &'a str,
+    pub from: WeaponFlightState,
+    pub to: WeaponFlightState,
+    pub cause: &'static str,
+    pub closest_approach_m: f64,
+    pub closest_approach_prior_time_seconds: f64,
+    pub closest_approach_next_time_seconds: f64,
+    pub occurrence_time_seconds: f64,
+    pub intercept_radius_m: f64,
+    pub maximum_flight_time_seconds: f64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -62,6 +78,8 @@ pub enum SimulationEventSubsystem {
     SensorTrack,
     #[serde(rename = "AIRCRAFT_DYNAMICS")]
     AircraftDynamics,
+    #[serde(rename = "WEAPON_DYNAMICS")]
+    WeaponDynamics,
 }
 
 impl SimulationEventSubsystem {
@@ -71,6 +89,7 @@ impl SimulationEventSubsystem {
             Self::EntityLifecycle => "ENTITY_LIFECYCLE",
             Self::SensorTrack => "SENSOR_TRACK",
             Self::AircraftDynamics => "AIRCRAFT_DYNAMICS",
+            Self::WeaponDynamics => "WEAPON_DYNAMICS",
         }
     }
 }
@@ -93,6 +112,8 @@ pub enum SimulationEventParticipantRole {
     Launcher,
     #[serde(rename = "WEAPON")]
     Weapon,
+    #[serde(rename = "TARGET")]
+    Target,
     #[serde(rename = "SENSOR")]
     Sensor,
 }
@@ -104,6 +125,7 @@ impl SimulationEventParticipantRole {
             Self::Subject => "SUBJECT",
             Self::Launcher => "LAUNCHER",
             Self::Weapon => "WEAPON",
+            Self::Target => "TARGET",
             Self::Sensor => "SENSOR",
         }
     }
@@ -216,6 +238,33 @@ pub enum SimulationEventPayload {
         #[serde(rename = "transferDigest")]
         transfer_digest: String,
     },
+    #[serde(rename = "WEAPON_TERMINATED")]
+    WeaponTerminated {
+        #[serde(rename = "schemaVersion")]
+        schema_version: &'static str,
+        #[serde(rename = "weaponId")]
+        weapon_id: String,
+        #[serde(rename = "targetId")]
+        target_id: String,
+        from: WeaponFlightState,
+        to: WeaponFlightState,
+        cause: &'static str,
+        criterion: &'static str,
+        #[serde(rename = "closestApproachM")]
+        closest_approach_m: f64,
+        #[serde(rename = "closestApproachPriorTimeSeconds")]
+        closest_approach_prior_time_seconds: f64,
+        #[serde(rename = "closestApproachNextTimeSeconds")]
+        closest_approach_next_time_seconds: f64,
+        #[serde(rename = "occurrenceTimeSeconds")]
+        occurrence_time_seconds: f64,
+        #[serde(rename = "interceptRadiusM")]
+        intercept_radius_m: f64,
+        #[serde(rename = "maximumFlightTimeSeconds")]
+        maximum_flight_time_seconds: f64,
+        #[serde(rename = "targetEffect")]
+        target_effect: &'static str,
+    },
     #[serde(rename = "RUN_COMPLETED")]
     RunCompleted {
         #[serde(rename = "schemaVersion")]
@@ -279,10 +328,29 @@ fn aircraft_operational_state_key(value: AircraftOperationalState) -> &'static s
     value.key()
 }
 
+fn weapon_flight_state_key(value: WeaponFlightState) -> &'static str {
+    match value {
+        WeaponFlightState::Stowed => "STOWED",
+        WeaponFlightState::Boost => "BOOST",
+        WeaponFlightState::Coast => "COAST",
+        WeaponFlightState::TerminalGuidance => "TERMINAL_GUIDANCE",
+        WeaponFlightState::Intercept => "INTERCEPT",
+        WeaponFlightState::Miss => "MISS",
+        WeaponFlightState::Expired => "EXPIRED",
+        WeaponFlightState::Failed => "FAILED",
+        WeaponFlightState::SelfDestruct => "SELF_DESTRUCT",
+        WeaponFlightState::TargetUnavailable => "TARGET_UNAVAILABLE",
+    }
+}
+
 fn termination_key(value: Termination) -> &'static str {
     match value {
         Termination::ThresholdReached => "threshold_reached",
         Termination::EnergyDepleted => "energy_depleted",
+        Termination::WeaponIntercept => "weapon_intercept",
+        Termination::WeaponMiss => "weapon_miss",
+        Termination::WeaponExpired => "weapon_expired",
+        Termination::WeaponFailed => "weapon_failed",
         Termination::TargetUnavailable => "target_unavailable",
         Termination::TimeLimit => "time_limit",
         Termination::InvalidScenario => "invalid_scenario",
@@ -297,8 +365,9 @@ impl SimulationEventPayload {
             Self::EntityLifecycleChanged { .. } => 2,
             Self::AircraftOperationalStateChanged { .. } => 3,
             Self::AirborneStoreTransferOutcome { .. } => 4,
-            Self::RunCompleted { .. } => 5,
-            Self::TrackStateChanged { .. } => 6,
+            Self::WeaponTerminated { .. } => 5,
+            Self::RunCompleted { .. } => 6,
+            Self::TrackStateChanged { .. } => 7,
         }
     }
 
@@ -375,10 +444,36 @@ impl SimulationEventPayload {
                     ))
                 });
             }
+            Self::WeaponTerminated {
+                schema_version,
+                weapon_id,
+                target_id,
+                from,
+                to,
+                cause,
+                occurrence_time_seconds,
+                ..
+            } => {
+                return serde_json::to_string(&serde_json::json!([
+                    "5",
+                    schema_version,
+                    weapon_id,
+                    target_id,
+                    weapon_flight_state_key(*from),
+                    weapon_flight_state_key(*to),
+                    cause,
+                    occurrence_time_seconds,
+                ]))
+                .map_err(|error| {
+                    EngineError::Serialization(format!(
+                        "could not encode simulation event payload key: {error}"
+                    ))
+                });
+            }
             Self::RunCompleted {
                 schema_version,
                 termination,
-            } => vec!["5", schema_version, termination_key(*termination)],
+            } => vec!["6", schema_version, termination_key(*termination)],
             Self::TrackStateChanged {
                 schema_version,
                 perspective,
@@ -397,7 +492,7 @@ impl SimulationEventPayload {
                 uncertainty_value_state,
             } => {
                 return serde_json::to_string(&serde_json::json!([
-                    "6",
+                    "7",
                     schema_version,
                     perspective,
                     track_id,
@@ -614,6 +709,49 @@ impl SimulationEventDraft {
             payload: SimulationEventPayload::RunCompleted {
                 schema_version: RUN_COMPLETED_PAYLOAD_SCHEMA,
                 termination,
+            },
+        }
+    }
+
+    pub fn weapon_terminated(tick: u64, time: f64, event: WeaponTerminationEvent<'_>) -> Self {
+        Self {
+            local_key: format!("weapon-terminated:{}", event.weapon_id),
+            tick,
+            model_time_seconds: time,
+            phase: SimulationEventPhase::Termination,
+            producer: SimulationEventProducer {
+                subsystem: SimulationEventSubsystem::WeaponDynamics,
+                entity_id: Some(event.weapon_id.to_string()),
+            },
+            owner_affiliation: None,
+            knowledge_scope: SimulationEventKnowledgeScope::World,
+            participants: vec![
+                SimulationEventParticipant {
+                    entity_id: event.weapon_id.to_string(),
+                    role: SimulationEventParticipantRole::Weapon,
+                },
+                SimulationEventParticipant {
+                    entity_id: event.target_id.to_string(),
+                    role: SimulationEventParticipantRole::Target,
+                },
+            ],
+            causes: Vec::new(),
+            correlation_id: None,
+            payload: SimulationEventPayload::WeaponTerminated {
+                schema_version: WEAPON_TERMINATED_PAYLOAD_SCHEMA,
+                weapon_id: event.weapon_id.to_string(),
+                target_id: event.target_id.to_string(),
+                from: event.from,
+                to: event.to,
+                cause: event.cause,
+                criterion: "GEOMETRIC_CLOSEST_APPROACH",
+                closest_approach_m: event.closest_approach_m,
+                closest_approach_prior_time_seconds: event.closest_approach_prior_time_seconds,
+                closest_approach_next_time_seconds: event.closest_approach_next_time_seconds,
+                occurrence_time_seconds: event.occurrence_time_seconds,
+                intercept_radius_m: event.intercept_radius_m,
+                maximum_flight_time_seconds: event.maximum_flight_time_seconds,
+                target_effect: "NOT_MODELLED",
             },
         }
     }

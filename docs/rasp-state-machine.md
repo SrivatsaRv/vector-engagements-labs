@@ -15,8 +15,8 @@ repair an invalid authoring value into a picture, track, event or explanation.
 
 The #190 crossing run does not promote model truth into an observation: both
 side pictures remain `sensorState=UNSUPPORTED`, `trackState=UNSUPPORTED`,
-invisible and position-free at every recorded tick, including the 180 m
-geometry-completion boundary.
+invisible and position-free at every recorded tick, including the engine-owned
+25 m geometric-intercept boundary.
 
 The ground-operation state sequence is fixed and one-way for the admitted
 mechanism: `PARKED`/`HOLD_SHORT` → `TAKEOFF_ROLL` → `ROTATE` → `CLIMBOUT` →
@@ -137,9 +137,11 @@ the archived admitted identities and bytes and never reinterprets malformed
 text, rounds a value, or supplies a missing default.
 
 For #190 the Worker writes the same canonical frames, events, unsupported
-pictures and `threshold_reached` report into one content-addressed VSR. The
-built verifier reads `report.json` and `frames.arrow` from that record; replay
-does not rerun physics or infer a successful engagement from a title or path.
+pictures and `weapon_intercept` report into one content-addressed VSR. The
+built verifier reads `report.json`, `events.jsonl` and `frames.arrow` from that
+record, then requires the typed geometric-intercept event, terminated weapon,
+active target and `targetEffect: NOT_MODELLED`; replay does not rerun physics or
+infer a successful engagement from a title or path.
 
 Ground-operation frames and `AIRCRAFT_OPERATIONAL_STATE_CHANGED` events replay
 as recorded, including tick/frame identity, movement value state, controller
@@ -170,6 +172,11 @@ compiler checks before recomputation or persistence. An invalid type,
 non-finite value, out-of-range value or excess precision returns the same stable
 code and field path used by browser/Worker admission and creates no database
 row or record member.
+Migration 017 publishes the immutable 0.9.0 model pack and new `1.1.0`
+versions of all nine canonical scenario packages without rewriting either the
+existing `1.0.0` rows or migrations 015 and 016.
+Saved-run identity therefore retains the exact termination authority that
+produced its terminal event.
 
 Migration 016 stores the exact canonical #190 v4 package, content hash, current
 model-pack digest and North Punjab study-area identity as a ninth immutable
@@ -261,8 +268,9 @@ and exact VSR/report mission-lineage readback.
 For #190 it also fixes one demanding non-default A2A package and one nearby
 harder control. It requires exact authored inputs and governance, repeated-run
 determinism, completion after 120 seconds but before the 140 second ceiling, a
-closest approach inside the 180 m geometry threshold, and failure of the
-otherwise-identical 46 km control. The same regression compares the complete
+21.836104 m closest approach inside the compiled 25 m verification-only radius,
+and time-limit failure of the otherwise-identical 46 km control at 530.164926 m.
+The same regression compares the complete
 TypeScript/Rust terminal frame and causal-event stream and keeps every observer
 picture fail-closed as `UNSUPPORTED`.
 It also pins the pre-transfer compiled-mission v1 digest and exact assignment
