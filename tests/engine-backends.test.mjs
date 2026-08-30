@@ -1152,6 +1152,11 @@ test("TypeScript and raw Rust/WASM reject digest-valid malformed verification-pa
       typescriptPattern: /has duplicate intended-use ID/i,
       rustPattern: /duplicates an earlier intended use/i,
     },
+    {
+      id: "string-launch-mass",
+      typescriptPattern: /weapons\[0\].launchMassKg is structurally invalid/i,
+      rustPattern: /pack\.weapons\[0\]\.launchMassKg must be finite/i,
+    },
   ]) {
     const pack = structuredClone(binding.pack);
     if (mutation === "extra-top-level-key") pack.unadmittedAuthority = true;
@@ -1165,6 +1170,7 @@ test("TypeScript and raw Rust/WASM reject digest-valid malformed verification-pa
       assert.ok(intendedUse);
       pack.intendedUses.unshift({ ...structuredClone(intendedUse), version: "0.0.0" });
     }
+    if (mutation === "string-launch-mass") pack.weapons[0].launchMassKg = "170";
     resealCompiledPack(pack);
     const scenario = structuredClone(binding.scenario);
     const projection = structuredClone(scenario.modelPack);
@@ -1174,6 +1180,7 @@ test("TypeScript and raw Rust/WASM reject digest-valid malformed verification-pa
     scenario.modelPack = bindRuntimeModelPackDigest(projection);
     for (const entity of scenario.entities) {
       entity.provenance.modelPackDigest = pack.digest;
+      if (entity.observerSensor) entity.observerSensor.modelPackDigest = pack.digest;
       if (entity.weapon) entity.weapon.admission.modelPackDigest = pack.digest;
     }
 

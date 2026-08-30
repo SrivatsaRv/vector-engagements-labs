@@ -33,6 +33,10 @@ one family must not imply changes to unrelated contracts.
 - Require TypeScript and raw Rust/WASM to reject the same digest-valid supplied
   packs when their compiled-v1 key inventory, intended-use identities or weapon
   identities are malformed.
+- Validate every compiled weapon field and physical domain before a supplied
+  verification pack can authorize execution or no-release Air-record
+  recompilation; a resealed string-valued launch mass now fails identically at
+  the TypeScript and raw Rust/WASM boundaries.
 - Keep deterministic terminal-record replay and uploaded-record verification
   inside the dedicated browser simulation Worker; the rendering thread receives
   only an already-admitted playback result.

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   createVectorSimulationRecord,
@@ -89,6 +90,29 @@ function governWeaponTermination(scenario, weapon, changes) {
 const createdAt = "2026-08-06T00:00:00.000Z";
 const textEncoder = new TextEncoder();
 const jsonBytes = (value) => textEncoder.encode(canonicalJson(value));
+
+function resealCompiledPack(pack) {
+  const payload = structuredClone(pack);
+  delete payload.digest;
+  const normalize = (value) => {
+    if (typeof value === "number") {
+      return `#number:${value.toExponential(12).replace("e+", "e")}`;
+    }
+    if (Array.isArray(value)) return value.map(normalize);
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value)
+          .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+          .map(([key, item]) => [key, normalize(item)]),
+      );
+    }
+    return value;
+  };
+  pack.digest = createHash("sha256")
+    .update(JSON.stringify(normalize(payload)))
+    .digest("hex");
+  return pack;
+}
 
 async function replaceRecordMember(record, path, schemaVersion, bytes) {
   const replacedSchemaVersion = record.members.find((member) => member.path === path)?.schemaVersion;
@@ -357,7 +381,7 @@ test("VSR recompiles an archived Air mission against its authenticated supplied 
   assert.deepEqual(opened.result.engineRun.scenario.airMission, archivedMission);
 });
 
-test("VSR rejects an unqualified supplied pack before no-release Air mission recompilation", async () => {
+test("VSR rejects unqualified or malformed supplied packs before no-release Air mission recompilation", async () => {
   const source = createVerificationTrackModelPackSource();
   source.id = "vector-air-record-authority-verification";
   source.sensors = source.sensors.filter(
@@ -474,6 +498,49 @@ test("VSR rejects an unqualified supplied pack before no-release Air mission rec
       compiledModelPack: unqualifiedPack,
     }),
     /does not match the exact scenario identity and intended use/,
+  );
+
+  const malformedPack = structuredClone(validPack);
+  malformedPack.weapons[0].launchMassKg = "170";
+  resealCompiledPack(malformedPack);
+  assert.equal(
+    malformedPack.weapons[0].launchMassKg,
+    "170",
+    "the falsifier must be digest-valid while violating the compiled weapon numeric contract",
+  );
+  const malformedEngineScenario = bindPack(malformedPack);
+  const malformedScenario = compileMission(
+    currentScenario,
+    malformedEngineScenario,
+    malformedPack,
+  );
+  const malformedEngineRun = structuredClone(engineRun);
+  malformedEngineRun.scenario = malformedEngineScenario;
+  const malformedPrepared = {
+    ...base,
+    scenario: malformedScenario,
+    engineScenario: malformedEngineScenario,
+    capabilityManifest: createVerificationDeploymentCapabilities(
+      "typescript",
+      ["A2A"],
+      [malformedPack.digest],
+    ),
+  };
+  const malformedResult = buildSimulationResult(malformedPrepared, malformedEngineRun);
+  const malformedRecord = await createVectorSimulationRecord(
+    malformedPrepared,
+    malformedResult,
+    createdAt,
+  );
+  const malformedSerialized = serializeVectorRecord(malformedRecord);
+
+  await assert.rejects(
+    openVectorSimulationRecord(
+      malformedSerialized.buffer,
+      malformedSerialized.byteLength,
+      { compiledModelPack: malformedPack },
+    ),
+    /weapons\[0\].launchMassKg is structurally invalid/,
   );
 });
 

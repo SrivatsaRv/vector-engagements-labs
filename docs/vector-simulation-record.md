@@ -214,7 +214,13 @@ structure, canonical compiler digest, intended use, id, version and digest must
 authenticate against the exact recorded identity before it can serve as replay
 authority. This complete validation runs when the supplied pack is selected as
 authority, even when a ground-start record has no executable guided release and
-therefore needs no deterministic engine rerun. That same authenticated
+therefore needs no deterministic engine rerun. Every compiled weapon must carry
+the exact v1 field set, finite physical scalars inside their admitted domains,
+bounded model references, supported seeker/support/launch enums, complete
+validity ranges, catalog identity and in-pack evidence before mission
+recompilation can consume it. A canonical digest authenticates bytes; it does
+not convert a string-valued mass, non-finite scalar or dangling index into model
+authority. That same authenticated
 authority pack is used for deterministic engine replay and for recompiling an
 archived authored Air mission against the archived environment pack. Exact
 equality across scenario, compiled, manifest, and report members is required

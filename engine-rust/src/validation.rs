@@ -534,6 +534,91 @@ fn compiled_pack_number(value: &Value, path: &str, field: &str) -> Result<f64, E
         .ok_or_else(|| invalid(format!("{path}.{field} must be finite")))
 }
 
+fn compiled_pack_exact_keys(
+    value: &Value,
+    path: &str,
+    expected: &[&str],
+) -> Result<(), EngineError> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| invalid(format!("{path} must be an object")))?;
+    if object.len() != expected.len() || expected.iter().any(|key| !object.contains_key(*key)) {
+        return Err(invalid(format!(
+            "{path} must use its exact compiled-v1 key set"
+        )));
+    }
+    Ok(())
+}
+
+fn compiled_pack_non_blank_string_array(
+    value: &Value,
+    path: &str,
+    require_non_empty: bool,
+) -> Result<(), EngineError> {
+    let values = value
+        .as_array()
+        .ok_or_else(|| invalid(format!("{path} must be an array")))?;
+    if (require_non_empty && values.is_empty())
+        || values
+            .iter()
+            .any(|item| item.as_str().is_none_or(|text| text.trim().is_empty()))
+    {
+        return Err(invalid(format!("{path} must contain non-blank strings")));
+    }
+    Ok(())
+}
+
+fn compiled_pack_validity_domain(value: &Value, path: &str) -> Result<(), EngineError> {
+    compiled_pack_exact_keys(
+        value,
+        path,
+        &[
+            "altitudeM",
+            "mach",
+            "angleOfAttackRad",
+            "loadFactorG",
+            "configurations",
+            "environments",
+        ],
+    )?;
+    for field in ["altitudeM", "mach", "angleOfAttackRad", "loadFactorG"] {
+        let range_path = format!("{path}.{field}");
+        let range = &value[field];
+        compiled_pack_exact_keys(range, &range_path, &["minimum", "maximum"])?;
+        let minimum = compiled_pack_number(range, &range_path, "minimum")?;
+        let maximum = compiled_pack_number(range, &range_path, "maximum")?;
+        if minimum > maximum {
+            return Err(invalid(format!(
+                "{range_path}.minimum must not exceed maximum"
+            )));
+        }
+    }
+    compiled_pack_non_blank_string_array(
+        &value["configurations"],
+        &format!("{path}.configurations"),
+        true,
+    )?;
+    compiled_pack_non_blank_string_array(
+        &value["environments"],
+        &format!("{path}.environments"),
+        true,
+    )?;
+    Ok(())
+}
+
+fn compiled_pack_model_index(
+    value: &Value,
+    path: &str,
+    model_count: usize,
+) -> Result<(), EngineError> {
+    value
+        .as_u64()
+        .and_then(|index| usize::try_from(index).ok())
+        .filter(|index| *index < model_count)
+        .ok_or_else(|| invalid(format!("{path} must reference an admitted compiled model")))?;
+    Ok(())
+}
+
 pub(crate) fn authenticate_verification_model_pack(
     value: &Value,
 ) -> Result<AuthenticatedVerificationPack, EngineError> {
@@ -646,6 +731,24 @@ pub(crate) fn authenticate_verification_model_pack(
     if evidence_ids.is_empty() {
         return Err(invalid("pack.evidence must not be empty"));
     }
+    let catalog_object_ids = value
+        .get("catalogIdentities")
+        .and_then(Value::as_array)
+        .ok_or_else(|| invalid("pack.catalogIdentities must be an array"))?
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            compiled_pack_string(
+                item,
+                &format!("pack.catalogIdentities[{index}]"),
+                "catalogObjectId",
+            )
+            .map(str::to_string)
+        })
+        .collect::<Result<HashSet<_>, EngineError>>()?;
+    let aerodynamic_count = value["aerodynamics"].as_array().map_or(0, Vec::len);
+    let propulsion_count = value["propulsion"].as_array().map_or(0, Vec::len);
+    let sensor_count = value["sensors"].as_array().map_or(0, Vec::len);
     let weapon_values = value
         .get("weapons")
         .and_then(Value::as_array)
@@ -654,15 +757,129 @@ pub(crate) fn authenticate_verification_model_pack(
     let mut weapon_ids = HashSet::new();
     for (index, weapon) in weapon_values.iter().enumerate() {
         let path = format!("pack.weapons[{index}]");
+        compiled_pack_exact_keys(
+            weapon,
+            &path,
+            &[
+                "id",
+                "version",
+                "evidenceRefIds",
+                "validityDomain",
+                "limitationIds",
+                "catalogObjectId",
+                "launchMassKg",
+                "dryMassKg",
+                "aerodynamicModelIndex",
+                "propulsionModelIndex",
+                "sensorModelIndex",
+                "seekerMode",
+                "supportRequirement",
+                "launchAuthorization",
+                "maximumCommandLoadFactorG",
+                "seekerActivationRangeM",
+                "datalinkUpdatePeriodS",
+                "thrustTaperSpeedMps",
+                "navigationConstant",
+                "termination",
+            ],
+        )?;
         let model_id = compiled_pack_string(weapon, &path, "id")?;
+        identifier(&format!("{path}.id"), model_id)?;
         if !weapon_ids.insert(model_id) {
             return Err(invalid(format!("{path}.id duplicates an earlier weapon")));
         }
         let model_version = compiled_pack_string(weapon, &path, "version")?;
-        let Some(termination) = weapon.get("termination") else {
-            continue;
-        };
+        identifier(&format!("{path}.version"), model_version)?;
+        compiled_pack_validity_domain(
+            &weapon["validityDomain"],
+            &format!("{path}.validityDomain"),
+        )?;
+        compiled_pack_non_blank_string_array(
+            &weapon["limitationIds"],
+            &format!("{path}.limitationIds"),
+            false,
+        )?;
+        let catalog_object_id = compiled_pack_string(weapon, &path, "catalogObjectId")?;
+        if !catalog_object_ids.contains(catalog_object_id) {
+            return Err(invalid(format!(
+                "{path}.catalogObjectId must reference an admitted catalog identity"
+            )));
+        }
+        let launch_mass_kg = compiled_pack_number(weapon, &path, "launchMassKg")?;
+        let dry_mass_kg = compiled_pack_number(weapon, &path, "dryMassKg")?;
+        for field in [
+            "launchMassKg",
+            "dryMassKg",
+            "maximumCommandLoadFactorG",
+            "datalinkUpdatePeriodS",
+            "thrustTaperSpeedMps",
+            "navigationConstant",
+        ] {
+            if compiled_pack_number(weapon, &path, field)? <= 0.0 {
+                return Err(invalid(format!("{path}.{field} must be positive")));
+            }
+        }
+        if dry_mass_kg > launch_mass_kg {
+            return Err(invalid(format!(
+                "{path}.dryMassKg must not exceed launchMassKg"
+            )));
+        }
+        if compiled_pack_number(weapon, &path, "seekerActivationRangeM")? < 0.0 {
+            return Err(invalid(format!(
+                "{path}.seekerActivationRangeM must be non-negative"
+            )));
+        }
+        compiled_pack_model_index(
+            &weapon["aerodynamicModelIndex"],
+            &format!("{path}.aerodynamicModelIndex"),
+            aerodynamic_count,
+        )?;
+        compiled_pack_model_index(
+            &weapon["propulsionModelIndex"],
+            &format!("{path}.propulsionModelIndex"),
+            propulsion_count,
+        )?;
+        if !weapon["sensorModelIndex"].is_null() {
+            compiled_pack_model_index(
+                &weapon["sensorModelIndex"],
+                &format!("{path}.sensorModelIndex"),
+                sensor_count,
+            )?;
+        }
+        let seeker_mode = compiled_pack_string(weapon, &path, "seekerMode")?;
+        if ![
+            "UNAVAILABLE",
+            "ACTIVE_RADAR",
+            "INFRARED",
+            "PASSIVE_RADIATION",
+        ]
+        .contains(&seeker_mode)
+        {
+            return Err(invalid(format!("{path}.seekerMode is unsupported")));
+        }
+        let support_requirement = compiled_pack_string(weapon, &path, "supportRequirement")?;
+        if !["UNAVAILABLE", "NONE", "TRACK_UPDATE"].contains(&support_requirement) {
+            return Err(invalid(format!("{path}.supportRequirement is unsupported")));
+        }
+        let launch_authorization = compiled_pack_string(weapon, &path, "launchAuthorization")?;
+        if !["SCHEDULED_TEST_ONLY", "TRACK_REQUIRED"].contains(&launch_authorization) {
+            return Err(invalid(format!(
+                "{path}.launchAuthorization is unsupported"
+            )));
+        }
+        let termination = &weapon["termination"];
         let termination_path = format!("{path}.termination");
+        compiled_pack_exact_keys(
+            termination,
+            &termination_path,
+            &[
+                "schemaVersion",
+                "intendedUse",
+                "criterion",
+                "interceptRadiusM",
+                "maximumFlightTimeS",
+            ],
+        )?;
         let intercept_radius_m =
             compiled_pack_number(termination, &termination_path, "interceptRadiusM")?;
         let maximum_flight_time_seconds =
@@ -672,9 +889,8 @@ pub(crate) fn authenticate_verification_model_pack(
                 "{termination_path} scalar values must be positive"
             )));
         }
-        let evidence = weapon
-            .get("evidenceRefIds")
-            .and_then(Value::as_array)
+        let evidence = weapon["evidenceRefIds"]
+            .as_array()
             .ok_or_else(|| invalid(format!("{path}.evidenceRefIds must be an array")))?;
         if evidence.is_empty()
             || evidence
@@ -685,15 +901,23 @@ pub(crate) fn authenticate_verification_model_pack(
                 "{path}.evidenceRefIds references evidence outside the compiled pack"
             )));
         }
+        let schema_version = compiled_pack_string(termination, &termination_path, "schemaVersion")?;
+        let intended_use = compiled_pack_string(termination, &termination_path, "intendedUse")?;
+        let criterion = compiled_pack_string(termination, &termination_path, "criterion")?;
+        if schema_version != "vector.weapon-termination-model.v1"
+            || intended_use != "ENGINE_VERIFICATION_ONLY"
+            || criterion != "GEOMETRIC_CLOSEST_APPROACH"
+        {
+            return Err(invalid(format!(
+                "{termination_path} authority is unsupported"
+            )));
+        }
         weapon_terminations.push(VerificationTerminationAuthority {
             model_id: model_id.to_string(),
             model_version: model_version.to_string(),
-            schema_version: compiled_pack_string(termination, &termination_path, "schemaVersion")?
-                .to_string(),
-            intended_use: compiled_pack_string(termination, &termination_path, "intendedUse")?
-                .to_string(),
-            criterion: compiled_pack_string(termination, &termination_path, "criterion")?
-                .to_string(),
+            schema_version: schema_version.to_string(),
+            intended_use: intended_use.to_string(),
+            criterion: criterion.to_string(),
             intercept_radius_m,
             maximum_flight_time_seconds,
         });
