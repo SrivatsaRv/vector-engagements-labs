@@ -274,11 +274,11 @@ between-step closest-approach contract increases the optimized artifact to
 556,940 bytes. The later compiler-owned termination trust root and exact
 closest-approach witness contract raise the optimized module to 577,787 bytes;
 the independently authenticated verification-pack request and patch validator
-set the current optimized module to 577,544 bytes while closing the raw boundary
-and duplicate-patch gap. Its explicit regression ceiling remains 585,000 bytes.
-The remaining 7,456-byte
-headroom is bounded release capacity, not evidence of faster execution or
-greater physics fidelity.
+set the earlier optimized module to 577,544 bytes while closing the raw boundary
+and duplicate-patch gap. Direct raw-ABI positive-sensor role/digest admission
+sets the exact candidate artifact to 584,916 bytes. Its explicit regression
+ceiling remains 585,000 bytes; the remaining 84-byte headroom is bounded release
+capacity, not evidence of faster execution or greater physics fidelity.
 
 #187 leaves that governed #182 fixture and benchmark unchanged. Its separate
 `performance:generic-airborne-store-transfer:verify` process composes an

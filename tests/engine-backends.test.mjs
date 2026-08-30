@@ -1620,6 +1620,18 @@ test("both live engines reject positive sensor evidence authority drift", async 
         `${backend}: ${label}`,
       );
     }
+
+    const rust = runRawRustWasm({
+      schemaVersion: "vector.engine-run-request.v1",
+      scenario,
+      verificationModelPack: pack,
+    });
+    assert.equal(rust.accepted, false, `raw rust-wasm: ${label}`);
+    assert.match(
+      rust.output,
+      /sensor evidence/i,
+      `raw rust-wasm: ${label}`,
+    );
   }
 });
 

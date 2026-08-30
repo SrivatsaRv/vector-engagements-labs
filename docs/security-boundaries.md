@@ -145,7 +145,10 @@ retire named-model or generic-force-package debt merely because it completes.
 The Rust/WASM artifact now binds the exact Binaryen 131.0.0 optimization policy
 into its source identity and verifies optimized bytes, length and required ABI
 exports before embedding. The optimizer is build-time only and cannot be
-selected or supplied by a runtime scenario.
+selected or supplied by a runtime scenario. Direct engine-verification request
+callers are independently denied when a positive sensor's admitted source or
+validation evidence has the wrong role or lacks its immutable SHA-256 digest;
+the browser wrapper is defense in depth, not the sole authority boundary.
 
 The contract ownership registry now maps the one Air mission implementation and
 regression suite to new material mission-contract and record-storage sections.

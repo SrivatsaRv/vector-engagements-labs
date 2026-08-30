@@ -60,7 +60,9 @@ one family must not imply changes to unrelated contracts.
   content digest and on no-release VSR readback.
 - Enforce the canonical positive-sensor evidence boundary on supplied packs:
   admitted source and independent-validation references retain their required
-  roles and immutable lowercase SHA-256 artifact digests after resealing.
+  roles and immutable lowercase SHA-256 artifact digests after resealing. The
+  raw Rust/WASM request envelope now repeats this admission, with direct ABI
+  falsifiers proving the TypeScript wrapper is not the only enforcement point.
 - Keep deterministic terminal-record replay and uploaded-record verification
   inside the dedicated browser simulation Worker; the rendering thread receives
   only an already-admitted playback result.
