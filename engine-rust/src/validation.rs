@@ -56,6 +56,7 @@ pub(crate) struct AuthenticatedVerificationPack {
     digest: String,
     intended_uses: Vec<(String, String)>,
     evidence_ids: HashSet<String>,
+    observer_sensors: Value,
     weapon_terminations: Vec<VerificationTerminationAuthority>,
 }
 
@@ -717,14 +718,18 @@ fn authenticate_positive_sensor_evidence(value: &Value) -> Result<(), EngineErro
         {
             return Err(invalid("sensor evidence"));
         }
-        for (field, kind) in [
-            ("sourceEvidenceRefIds", "SOURCE"),
-            ("validationEvidenceRefIds", "VALIDATION"),
-        ] {
-            let ids = sensor["evidenceAdmission"][field]
-                .as_array()
-                .filter(|ids| !ids.is_empty())
-                .ok_or_else(|| invalid("sensor evidence"))?;
+        let source_ids = admission["sourceEvidenceRefIds"]
+            .as_array()
+            .filter(|ids| !ids.is_empty())
+            .ok_or_else(|| invalid("sensor evidence"))?;
+        let validation_ids = admission["validationEvidenceRefIds"]
+            .as_array()
+            .filter(|ids| !ids.is_empty())
+            .ok_or_else(|| invalid("sensor evidence"))?;
+        if source_ids.iter().any(|id| validation_ids.contains(id)) {
+            return Err(invalid("sensor evidence roles overlap"));
+        }
+        for (ids, kind) in [(source_ids, "SOURCE"), (validation_ids, "VALIDATION")] {
             for id in ids {
                 if sensor["evidenceRefIds"]
                     .as_array()
@@ -741,6 +746,44 @@ fn authenticate_positive_sensor_evidence(value: &Value) -> Result<(), EngineErro
                 }
             }
         }
+    }
+    Ok(())
+}
+
+fn compiled_observer_sensors(value: &Value) -> Result<Value, EngineError> {
+    let mut sensors = value["sensors"].clone();
+    for sensor in sensors
+        .as_array_mut()
+        .ok_or_else(|| invalid("sensor projection"))?
+    {
+        let object = sensor
+            .as_object_mut()
+            .ok_or_else(|| invalid("sensor projection"))?;
+        let id = object
+            .remove("id")
+            .ok_or_else(|| invalid("sensor projection"))?;
+        let version = object
+            .remove("version")
+            .ok_or_else(|| invalid("sensor projection"))?;
+        object.insert("modelId".to_string(), id);
+        object.insert("modelVersion".to_string(), version);
+        for field in ["validityDomain", "limitationIds", "evidenceAdmission"] {
+            object.remove(field);
+        }
+    }
+    Ok(canonicalize_compiled_pack_digest_value(sensors))
+}
+
+pub(crate) fn validate_runtime_observer_sensor_projection(
+    scenario: &Value,
+    pack: &AuthenticatedVerificationPack,
+) -> Result<(), EngineError> {
+    let actual = scenario
+        .pointer("/modelPack/observerSensors")
+        .cloned()
+        .ok_or_else(|| invalid("sensor projection"))?;
+    if canonicalize_compiled_pack_digest_value(actual) != pack.observer_sensors {
+        return Err(invalid("authenticated observer sensor projection mismatch"));
     }
     Ok(())
 }
@@ -836,17 +879,18 @@ pub(crate) fn authenticate_verification_model_pack(
     {
         return Err(invalid("intended use"));
     }
-    let evidence_ids = value
+    let evidence = value
         .get("evidence")
         .and_then(Value::as_array)
-        .ok_or_else(|| invalid("evidence"))?
-        .iter()
-        .enumerate()
-        .map(|(index, item)| {
-            compiled_pack_string(item, &format!("pack.evidence[{index}]"), "id").map(str::to_string)
-        })
-        .collect::<Result<HashSet<_>, EngineError>>()?;
-    if evidence_ids.is_empty() {
+        .ok_or_else(|| invalid("evidence"))?;
+    let mut evidence_ids = HashSet::with_capacity(evidence.len());
+    for (index, item) in evidence.iter().enumerate() {
+        let id = compiled_pack_string(item, &format!("pack.evidence[{index}]"), "id")?;
+        if !evidence_ids.insert(id.to_string()) {
+            return Err(invalid("duplicate evidence identity"));
+        }
+    }
+    if evidence.is_empty() {
         return Err(invalid("empty evidence"));
     }
     let catalog_object_ids = value
@@ -868,6 +912,7 @@ pub(crate) fn authenticate_verification_model_pack(
     let propulsion_count = value["propulsion"].as_array().map_or(0, Vec::len);
     let sensor_count = value["sensors"].as_array().map_or(0, Vec::len);
     authenticate_positive_sensor_evidence(value)?;
+    let observer_sensors = compiled_observer_sensors(value)?;
     let weapon_values = value
         .get("weapons")
         .and_then(Value::as_array)
@@ -1012,8 +1057,43 @@ pub(crate) fn authenticate_verification_model_pack(
         digest: digest.to_string(),
         intended_uses,
         evidence_ids,
+        observer_sensors,
         weapon_terminations,
     })
+}
+
+fn hash_runtime_observer_sensors(hash: &mut Sha256, sensors: &[crate::ObserverSensorBinding]) {
+    hash_integer(hash, sensors.len());
+    for sensor in sensors {
+        hash_string(hash, &sensor.model_id);
+        hash_string(hash, &sensor.model_version);
+        hash_strings(hash, &sensor.evidence_ref_ids);
+        hash_string(hash, &sensor.sensor_kind);
+        hash_number(hash, sensor.detection_range_m);
+        hash_number(hash, sensor.minimum_range_m);
+        hash_number(hash, sensor.scan_period_s);
+        hash_number(hash, sensor.azimuth_field_of_view_rad);
+        hash_number(hash, sensor.elevation_field_of_view_rad);
+        hash_integer(hash, usize::from(sensor.verification_track_model.is_some()));
+        if let Some(model) = &sensor.verification_track_model {
+            hash_string(hash, &model.schema_version);
+            hash_string(hash, &model.value_state);
+            hash_string(hash, &model.intended_use);
+            hash_vector(hash, model.position_bias_m);
+            hash_vector(hash, model.velocity_bias_mps);
+            hash_vector(hash, model.position_standard_deviation_m);
+            hash_vector(hash, model.velocity_standard_deviation_mps);
+            hash_integer(hash, model.confirmation_observations as usize);
+            hash_number(hash, model.maximum_observation_age_seconds);
+            hash_number(hash, model.coast_after_seconds);
+            hash_number(hash, model.lost_after_seconds);
+            hash_integer(hash, model.observation_windows_seconds.len());
+            for window in &model.observation_windows_seconds {
+                hash_number(hash, window.start);
+                hash_number(hash, window.end);
+            }
+        }
+    }
 }
 
 pub(crate) fn runtime_model_pack_digest(pack: &crate::ModelPackBinding) -> String {
@@ -1025,40 +1105,7 @@ pub(crate) fn runtime_model_pack_digest(pack: &crate::ModelPackBinding) -> Strin
     hash_string(&mut hash, &pack.digest);
     hash_string(&mut hash, &pack.intended_use.id);
     hash_string(&mut hash, &pack.intended_use.version);
-    hash_integer(&mut hash, pack.observer_sensors.len());
-    for sensor in &pack.observer_sensors {
-        hash_string(&mut hash, &sensor.model_id);
-        hash_string(&mut hash, &sensor.model_version);
-        hash_strings(&mut hash, &sensor.evidence_ref_ids);
-        hash_string(&mut hash, &sensor.sensor_kind);
-        hash_number(&mut hash, sensor.detection_range_m);
-        hash_number(&mut hash, sensor.minimum_range_m);
-        hash_number(&mut hash, sensor.scan_period_s);
-        hash_number(&mut hash, sensor.azimuth_field_of_view_rad);
-        hash_number(&mut hash, sensor.elevation_field_of_view_rad);
-        hash_integer(
-            &mut hash,
-            usize::from(sensor.verification_track_model.is_some()),
-        );
-        if let Some(model) = &sensor.verification_track_model {
-            hash_string(&mut hash, &model.schema_version);
-            hash_string(&mut hash, &model.value_state);
-            hash_string(&mut hash, &model.intended_use);
-            hash_vector(&mut hash, model.position_bias_m);
-            hash_vector(&mut hash, model.velocity_bias_mps);
-            hash_vector(&mut hash, model.position_standard_deviation_m);
-            hash_vector(&mut hash, model.velocity_standard_deviation_mps);
-            hash_integer(&mut hash, model.confirmation_observations as usize);
-            hash_number(&mut hash, model.maximum_observation_age_seconds);
-            hash_number(&mut hash, model.coast_after_seconds);
-            hash_number(&mut hash, model.lost_after_seconds);
-            hash_integer(&mut hash, model.observation_windows_seconds.len());
-            for window in &model.observation_windows_seconds {
-                hash_number(&mut hash, window.start);
-                hash_number(&mut hash, window.end);
-            }
-        }
-    }
+    hash_runtime_observer_sensors(&mut hash, &pack.observer_sensors);
     hash_integer(&mut hash, pack.weapon_terminations.len());
     for weapon in &pack.weapon_terminations {
         hash_string(&mut hash, &weapon.model_id);
@@ -1152,9 +1199,6 @@ fn verify_compiled_weapon_termination_authority(
     scenario: &EngineScenario,
     verification_pack: Option<&AuthenticatedVerificationPack>,
 ) -> Result<(), EngineError> {
-    if scenario.model_pack.weapon_terminations.is_empty() {
-        return Ok(());
-    }
     if scenario.model_pack.intended_use.id == "vector.intended-use.engine-verification" {
         let pack = verification_pack
             .ok_or_else(|| invalid("complete authenticated compiled model pack required"))?;
@@ -1169,6 +1213,9 @@ fn verify_compiled_weapon_termination_authority(
             return Err(invalid(
                 "pack does not match the exact scenario identity and intended use",
             ));
+        }
+        if scenario.model_pack.weapon_terminations.is_empty() {
+            return Ok(());
         }
         let mut relevant_patch_keys = HashSet::new();
         for patch in &scenario.model_pack.scenario_patches {
@@ -1242,6 +1289,9 @@ fn verify_compiled_weapon_termination_authority(
                 return Err(invalid("authenticated termination projection mismatch"));
             }
         }
+        return Ok(());
+    }
+    if scenario.model_pack.weapon_terminations.is_empty() {
         return Ok(());
     }
     if scenario.model_pack.id != "vector-scalar-study-models"

@@ -261,6 +261,10 @@ exact fields, in-pack evidence, bounded loadout/weapon references, a supported
 status, and a platform/station/capacity relation that the referenced loadout
 actually admits. A digest-valid string-valued station capacity therefore fails
 before JavaScript coercion can bypass mission-loadout admission.
+The compact runtime observer-sensor inventory is likewise an exact projection
+of the authenticated compiled sensor rows: cardinality, order, identity,
+evidence references, kind, numeric envelope and optional verification-track
+model must match before execution or record recompilation.
 That same authenticated
 authority pack is used for deterministic engine replay and for recompiling an
 archived authored Air mission against the archived environment pack. Exact

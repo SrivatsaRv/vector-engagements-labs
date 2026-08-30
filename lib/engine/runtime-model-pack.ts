@@ -121,6 +121,38 @@ export function runtimeWeaponTerminations(
   });
 }
 
+export function runtimeObserverSensors(
+  pack: Readonly<CompiledModelPack>,
+): RuntimeModelPackProjection["observerSensors"] {
+  return pack.sensors.map((sensor) => ({
+    modelId: sensor.id,
+    modelVersion: sensor.version,
+    evidenceRefIds: [...sensor.evidenceRefIds],
+    sensorKind: sensor.sensorKind,
+    detectionRangeM: sensor.detectionRangeM,
+    minimumRangeM: sensor.minimumRangeM,
+    scanPeriodS: sensor.scanPeriodS,
+    azimuthFieldOfViewRad: sensor.azimuthFieldOfViewRad,
+    elevationFieldOfViewRad: sensor.elevationFieldOfViewRad,
+    ...(sensor.verificationTrackModel
+      ? { verificationTrackModel: structuredClone(sensor.verificationTrackModel) }
+      : {}),
+  }));
+}
+
+export function assertRuntimeObserverSensorAuthority(
+  runtimePack: RuntimeModelPackProjection,
+  compiledPack: Readonly<CompiledModelPack>,
+) {
+  const expected = runtimeObserverSensors(compiledPack);
+  if (runtimeModelPackDigest({ ...runtimePack, observerSensors: expected }) !==
+      runtimeModelPackDigest(runtimePack)) {
+    throw new Error(
+      "The runtime observer-sensor projection does not match the exact compiled model pack.",
+    );
+  }
+}
+
 export function assertRuntimeWeaponTerminationAuthority(
   runtimePack: RuntimeModelPackProjection,
   compiledPack: Readonly<CompiledModelPack>,
@@ -205,6 +237,7 @@ export function assertRuntimeModelPackAuthority(
     }
   }
   if (compiledPack && runtimePack.runtimeDigest !== undefined) {
+    assertRuntimeObserverSensorAuthority(runtimePack, compiledPack);
     assertRuntimeWeaponTerminationAuthority(runtimePack, compiledPack);
   }
 }

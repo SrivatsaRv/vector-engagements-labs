@@ -186,7 +186,7 @@ test("committed Rust/WASM artifact has a stable integrity identity", () => {
   assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 585_000);
   assert.equal(
     VECTOR_ENGINE_WASM_OPTIMIZER,
-    "binaryen@131.0.0 -O3 -S2 rust-wasm-features-v1",
+    "binaryen@131.0.0 -O3 -S2 --reorder-functions rust-wasm-features-v1",
   );
 });
 
@@ -1183,7 +1183,7 @@ test("supplied authority rejects digest-valid malformed verification-pack struct
     {
       id: "duplicate-evidence-id",
       typescriptPattern: /has duplicate evidence ID/i,
-      rustPattern: null,
+      rustPattern: /duplicate evidence identity/i,
     },
     {
       id: "extra-evidence-field",
@@ -1638,6 +1638,16 @@ test("both live engines reject positive sensor evidence authority drift", async 
         sensor.evidenceRefIds = sensor.evidenceRefIds.filter((id) => id !== sourceId);
       },
     },
+    {
+      label: "source and validation roles share one evidence identity",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        sensor.evidenceAdmission.validationEvidenceRefIds = [
+          sensor.evidenceAdmission.sourceEvidenceRefIds[0],
+        ];
+      },
+    },
   ]) {
     const pack = structuredClone(binding.pack);
     mutate(pack);
@@ -1674,6 +1684,45 @@ test("both live engines reject positive sensor evidence authority drift", async 
       `raw rust-wasm: ${label}`,
     );
   }
+});
+
+test("supplied authority binds runtime observer sensors to the compiled pack", async () => {
+  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
+  const baseline = simulateWithCapabilitiesForVerification(
+    SCENARIO_LIBRARY[0].scenario,
+    capabilities,
+  ).engineRun.scenario;
+  const binding = await bindVerificationTrackModelPack(baseline);
+  const scenario = structuredClone(binding.scenario);
+  const runtimeSensor = scenario.modelPack.observerSensors.find(
+    (sensor) => sensor.sensorKind !== "DECLARED_ENVELOPE",
+  );
+  assert.ok(runtimeSensor, "fixture requires a positive runtime observer sensor");
+  runtimeSensor.detectionRangeM = 1_000_000_000;
+  for (const entity of scenario.entities) {
+    if (entity.observerSensor?.modelId === runtimeSensor.modelId) {
+      entity.observerSensor.detectionRangeM = runtimeSensor.detectionRangeM;
+    }
+  }
+  const projection = structuredClone(scenario.modelPack);
+  delete projection.runtimeDigest;
+  scenario.modelPack = bindRuntimeModelPackDigest(projection);
+
+  for (const backend of ["typescript", "rust-wasm"]) {
+    assert.throws(
+      () => runEngineBackend(structuredClone(scenario), backend, binding.pack),
+      /observer-sensor projection does not match the exact compiled model pack/i,
+      backend,
+    );
+  }
+
+  const rust = runRawRustWasm({
+    schemaVersion: "vector.engine-run-request.v1",
+    scenario,
+    verificationModelPack: binding.pack,
+  });
+  assert.equal(rust.accepted, false);
+  assert.match(rust.output, /authenticated observer sensor projection mismatch/i);
 });
 
 test("both engines reject a second scheduled guided release before integration", () => {

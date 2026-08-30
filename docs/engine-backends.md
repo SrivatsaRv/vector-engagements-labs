@@ -153,7 +153,7 @@ promotion against the unchanged full Air-mission authority.
 
 Rebuilding the artifact requires Rust stable, Cargo on `PATH`, and the
 `wasm32-unknown-unknown` target. The build then applies the exact
-`binaryen@131.0.0 -O3 -S2 rust-wasm-features-v1` post-link policy before
+`binaryen@131.0.0 -O3 -S2 --reorder-functions rust-wasm-features-v1` post-link policy before
 content-addressing and embedding the module. The optimizer identity participates
 in the source digest and is recorded beside the artifact; verification rejects
 either source or optimizer drift. The feature policy admits only the Rust-emitted

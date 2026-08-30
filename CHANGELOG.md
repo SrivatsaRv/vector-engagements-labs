@@ -33,6 +33,9 @@ one family must not imply changes to unrelated contracts.
 - Require TypeScript and raw Rust/WASM to reject the same digest-valid supplied
   packs when their compiled-v1 key inventory, intended-use identities or weapon
   identities are malformed.
+- Bind the complete ordered runtime observer-sensor projection back to its
+  authenticated compiled pack, reject duplicate evidence identities and keep
+  source/validation evidence roles disjoint at the direct Rust/WASM boundary.
 - Validate every compiled weapon field and physical domain before a supplied
   verification pack can authorize execution or no-release Air-record
   recompilation; a resealed string-valued launch mass now fails identically at

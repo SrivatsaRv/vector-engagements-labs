@@ -21,7 +21,7 @@ const wasmPath = resolve(
 const generatedPath = resolve(root, "lib/engine/generated/vector-engine-wasm.ts");
 const cargo = process.env.CARGO ?? "cargo";
 const check = process.argv.includes("--check");
-const optimizer = "binaryen@131.0.0 -O3 -S2 rust-wasm-features-v1";
+const optimizer = "binaryen@131.0.0 -O3 -S2 --reorder-functions rust-wasm-features-v1";
 const optimizerFeatures =
   binaryen.Features.MutableGlobals |
   binaryen.Features.NontrappingFPToInt |
@@ -99,6 +99,7 @@ binaryen.setShrinkLevel(2);
 const binaryenModule = binaryen.readBinary(rawWasm);
 binaryenModule.setFeatures(optimizerFeatures);
 binaryenModule.optimize();
+binaryenModule.runPasses(["reorder-functions"]);
 if (!binaryenModule.validate()) {
   binaryenModule.dispose();
   throw new Error("Binaryen rejected the optimized Rust/WASM module.");

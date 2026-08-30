@@ -450,7 +450,10 @@ test("both engines reject mutated and unknown-field verification projections", a
   delete projection.runtimeDigest;
   unknown.modelPack = bindRuntimeModelPackDigest(projection);
   for (const backend of ["typescript", "rust-wasm"]) {
-    assert.throws(() => runEngineBackend(unknown, backend, pack), /unsupported or missing field|unknown field/i);
+    assert.throws(
+      () => runEngineBackend(unknown, backend, pack),
+      /authenticated observer sensor projection mismatch|unsupported or missing field|unknown field/i,
+    );
   }
 });
 

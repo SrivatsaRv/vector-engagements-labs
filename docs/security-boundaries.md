@@ -150,8 +150,10 @@ callers are independently denied when a positive sensor's admitted source or
 validation evidence has the wrong role or lacks its immutable SHA-256 digest;
 the same raw boundary rejects an unknown admission/coverage field, unsupported
 schema, non-`VALIDATED` coverage, or an admitted artifact removed from sensor
-provenance. The browser wrapper is defense in depth, not the sole authority
-boundary.
+provenance. It also rejects duplicate evidence identities, overlapping source
+and validation roles, and any ordered runtime observer-sensor projection that
+does not exactly match the authenticated compiled pack. The browser wrapper is
+defense in depth, not the sole authority boundary.
 
 The contract ownership registry now maps the one Air mission implementation and
 regression suite to new material mission-contract and record-storage sections.

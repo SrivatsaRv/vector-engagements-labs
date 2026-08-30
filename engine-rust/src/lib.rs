@@ -3835,6 +3835,9 @@ pub fn run_json(input: &str) -> Result<String, EngineError> {
     } else {
         (payload, None)
     };
+    if let Some(pack) = verification_pack.as_ref() {
+        validation::validate_runtime_observer_sensor_projection(&scenario_payload, pack)?;
+    }
     let authority = validation::validate_air_mission_authority(scenario_payload.get("airMission"))?;
     let store_authority =
         validation::validate_air_mission_store_authority(scenario_payload.get("airMission"))?;

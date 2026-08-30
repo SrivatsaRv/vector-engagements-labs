@@ -278,9 +278,19 @@ set the earlier optimized module to 577,544 bytes while closing the raw boundary
 and duplicate-patch gap. Complete direct raw-ABI positive-sensor admission,
 including exact schema/coverage shape, validated coverage and provenance
 binding, sets the exact candidate artifact to 584,978 bytes. Its explicit
-regression ceiling remains 585,000 bytes; the remaining 22-byte headroom is
-bounded release capacity, not evidence of faster execution or greater physics
-fidelity.
+regression ceiling remains 585,000 bytes. The complete observer-sensor
+projection binding then pins Binaryen's deterministic `reorder-functions` pass
+after the unchanged `-O3 -S2` optimization, producing a 581,120-byte artifact
+with 3,880 bytes of headroom. Function layout changes binary size only; it is
+not evidence of faster execution or greater physics fidelity.
+
+On 2026-08-30, Node v24.3.0 on an Apple M5 arm64 measured the final candidate's
+high-energy crossing challenge at 55.037 ms TypeScript p95 and 36.774 ms
+Rust/WASM p95. The governed takeoff workload measured 30.062 / 11.547 ms p95,
+the airborne store-transfer workload measured 28.007 / 12.411 ms p95, and the
+five-second 100-entity baseline measured 66.431 / 36.483 ms p95 respectively.
+Every declared threshold passed. These are local regression measurements, not
+named-platform fidelity, browser frame-time, or production capacity claims.
 
 #187 leaves that governed #182 fixture and benchmark unchanged. Its separate
 `performance:generic-airborne-store-transfer:verify` process composes an
