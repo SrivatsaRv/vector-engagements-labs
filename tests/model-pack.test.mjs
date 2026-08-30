@@ -147,6 +147,9 @@ test("source validation rejects missing units, coefficients, evidence, reference
     (source) => {
       source.weapons[0].supportRequirement = "TYPO_SUPPORT";
     },
+    (source) => {
+      source.coordinateConventions.earthModel = "SPHERICAL";
+    },
   ];
   for (const mutate of mutations) {
     const source = cloneSource();

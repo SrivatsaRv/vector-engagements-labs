@@ -1,10 +1,14 @@
 import historicalBundle from "../../fixtures/model-packs/vector-scalar-study-v0.8.compiled.json" with { type: "json" };
 import {
+  type AircraftPerformanceAdmissionSource,
   type CompiledModelPack,
+  type EvidenceReference,
+  hasSupportedCoordinateConventions,
   type SiValidityDomain,
   validityDomainCovers,
   verifyCompiledModelPackDigestSync,
 } from "../model-pack.ts";
+import { assertGovernedAircraftEvidenceAdmission } from "../aircraft-evidence-registry.ts";
 import { CURRENT_COMPILED_MODEL_PACK } from "./weapon-admission.ts";
 
 const RETAINED_COMPILED_MODEL_PACKS = [
@@ -265,7 +269,7 @@ function isAbsoluteUri(value: string) {
 function requireCompiledEvidenceStructure(
   evidence: unknown,
   index: number,
-): asserts evidence is Record<string, unknown> {
+): asserts evidence is EvidenceReference {
   const invalid = (): never => {
     throw new Error(
       `Supplied engine-verification compiled model pack evidence[${index}] is structurally invalid.`,
@@ -869,6 +873,11 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
       "Supplied engine-verification compiled model pack schema or unit system is unsupported.",
     );
   }
+  if (!hasSupportedCoordinateConventions(value.coordinateConventions)) {
+    throw new Error(
+      "Supplied engine-verification compiled model pack coordinate conventions are unsupported.",
+    );
+  }
   if (
     typeof value.id !== "string" ||
     typeof value.version !== "string" ||
@@ -919,7 +928,7 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
     throw new Error("Supplied engine-verification compiled model pack weapons must be an array.");
   }
   const evidenceIds = new Set<string>();
-  const evidenceById = new Map<string, Readonly<Record<string, unknown>>>();
+  const evidenceById = new Map<string, EvidenceReference>();
   for (const [index, evidence] of value.evidence.entries()) {
     requireCompiledEvidenceStructure(evidence, index);
     const evidenceId = evidence.id as string;
@@ -999,6 +1008,17 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
   }
   for (const [index, aircraft] of (value.aircraft as unknown[]).entries()) {
     requireCompiledAircraftStructure(aircraft, index, value, evidenceIds, catalogObjectIds);
+    try {
+      assertGovernedAircraftEvidenceAdmission(
+        aircraft.catalogObjectId as string,
+        aircraft.performanceAdmission as AircraftPerformanceAdmissionSource,
+        evidenceById,
+      );
+    } catch (error) {
+      throw new Error(
+        `Supplied engine-verification compiled model pack aircraft[${index}].performanceAdmission is not admitted by the governed evidence registry: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     const aircraftId = aircraft.id as string;
     if (aircraftIds.has(aircraftId)) {
       throw new Error(

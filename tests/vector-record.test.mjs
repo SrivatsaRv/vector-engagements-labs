@@ -608,6 +608,72 @@ test("VSR rejects unqualified or malformed supplied packs before no-release Air 
     /aircraft\[0\].fuelCapacityKg is structurally invalid/,
   );
 
+  const unsupportedCoordinatesPack = structuredClone(validPack);
+  unsupportedCoordinatesPack.coordinateConventions.localFrame = "NORTH_EAST_DOWN";
+  resealCompiledPack(unsupportedCoordinatesPack);
+  const unsupportedCoordinatesSerialized = await serializeNoReleaseRecordForPack(
+    unsupportedCoordinatesPack,
+  );
+  await assert.rejects(
+    openVectorSimulationRecord(
+      unsupportedCoordinatesSerialized.buffer,
+      unsupportedCoordinatesSerialized.byteLength,
+      { compiledModelPack: unsupportedCoordinatesPack },
+    ),
+    /coordinate conventions are unsupported/,
+  );
+
+  const extraCoordinatesPack = structuredClone(validPack);
+  extraCoordinatesPack.coordinateConventions.earthModel = "SPHERICAL";
+  resealCompiledPack(extraCoordinatesPack);
+  const extraCoordinatesSerialized = await serializeNoReleaseRecordForPack(
+    extraCoordinatesPack,
+  );
+  await assert.rejects(
+    openVectorSimulationRecord(
+      extraCoordinatesSerialized.buffer,
+      extraCoordinatesSerialized.byteLength,
+      { compiledModelPack: extraCoordinatesPack },
+    ),
+    /coordinate conventions are unsupported/,
+  );
+
+  const ungovernedAircraftPack = structuredClone(validPack);
+  const governedSourceEvidence = ungovernedAircraftPack.evidence.find(
+    (evidence) => evidence.kind === "SOURCE",
+  );
+  const governedValidationEvidence = ungovernedAircraftPack.evidence.find(
+    (evidence) => evidence.kind === "VALIDATION",
+  );
+  assert.ok(governedSourceEvidence, "the falsifier requires an in-pack source artifact");
+  assert.ok(governedValidationEvidence, "the falsifier requires an in-pack validation artifact");
+  ungovernedAircraftPack.aircraft[0].performanceAdmission = {
+    state: "ADMITTED",
+    capabilities: [
+      "AERODYNAMICS",
+      "PROPULSION",
+      "FLIGHT_CONTROLS",
+      "MASS_AND_STORES",
+      "SENSORS",
+    ].map((capability) => ({
+      capability,
+      sourceEvidenceRefIds: [governedSourceEvidence.id],
+      validationEvidenceRefIds: [governedValidationEvidence.id],
+    })),
+  };
+  resealCompiledPack(ungovernedAircraftPack);
+  const ungovernedAircraftSerialized = await serializeNoReleaseRecordForPack(
+    ungovernedAircraftPack,
+  );
+  await assert.rejects(
+    openVectorSimulationRecord(
+      ungovernedAircraftSerialized.buffer,
+      ungovernedAircraftSerialized.byteLength,
+      { compiledModelPack: ungovernedAircraftPack },
+    ),
+    /performanceAdmission is not admitted by the governed evidence registry/,
+  );
+
   const malformedLoadoutPack = structuredClone(validPack);
   const selectedAircraft = malformedLoadoutPack.aircraft.find(
     (aircraft) => aircraft.catalogObjectId === currentScenario.bluePlatformId,

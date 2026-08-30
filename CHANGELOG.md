@@ -36,6 +36,11 @@ one family must not imply changes to unrelated contracts.
 - Bind the complete ordered runtime observer-sensor projection back to its
   authenticated compiled pack, reject duplicate evidence identities and keep
   source/validation evidence roles disjoint at the direct Rust/WASM boundary.
+- Require supplied verification packs and no-release record recompilation to
+  retain the compiler-owned exact coordinate conventions and to qualify every
+  positive named-aircraft performance admission through the separate governed
+  evidence registry; a resealed pack cannot promote unsupported performance
+  with arbitrary in-pack artifacts or an alternate frame.
 - Validate every compiled weapon field and physical domain before a supplied
   verification pack can authorize execution or no-release Air-record
   recompilation; a resealed string-valued launch mass now fails identically at

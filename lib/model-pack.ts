@@ -124,6 +124,42 @@ export type CoordinateConventions = {
   verticalReference: "ELLIPSOID_HEIGHT" | "MEAN_SEA_LEVEL";
 };
 
+/**
+ * Single compiler-owned authority for coordinate conventions accepted by
+ * source compilation and supplied compiled-pack admission.
+ */
+export const SUPPORTED_COORDINATE_CONVENTION_VALUES = Object.freeze({
+  geodeticDatum: Object.freeze(["WGS84"]),
+  localFrame: Object.freeze(["EAST_NORTH_UP"]),
+  bodyAxes: Object.freeze(["X_FORWARD_Y_RIGHT_Z_DOWN"]),
+  aerodynamicAxes: Object.freeze(["X_FORWARD_Y_RIGHT_Z_DOWN"]),
+  angularUnit: Object.freeze(["RADIAN"]),
+  positionUnit: Object.freeze(["METER"]),
+  velocityUnit: Object.freeze(["METER_PER_SECOND"]),
+  verticalReference: Object.freeze(["ELLIPSOID_HEIGHT", "MEAN_SEA_LEVEL"]),
+} satisfies Readonly<Record<keyof CoordinateConventions, readonly string[]>>);
+
+export function hasSupportedCoordinateConventions(
+  value: unknown,
+): value is CoordinateConventions {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  const fields = Object.keys(SUPPORTED_COORDINATE_CONVENTION_VALUES) as Array<
+    keyof CoordinateConventions
+  >;
+  if (
+    Object.keys(candidate).length !== fields.length ||
+    fields.some((field) => !Object.hasOwn(candidate, field))
+  ) {
+    return false;
+  }
+  return fields.every((field) => {
+    const convention = candidate[field];
+    return typeof convention === "string" &&
+      SUPPORTED_COORDINATE_CONVENTION_VALUES[field].includes(convention);
+  });
+}
+
 export type ModelLimitation = {
   id: string;
   severity: "INFORMATION" | "CAUTION" | "BLOCKING";
@@ -1200,17 +1236,10 @@ export async function compileModelPack(source: ModelPackSource): Promise<Compile
   }
   stableId(issues, "id", source.id);
   version(issues, "version", source.version);
-  const coordinateExpectations: Record<keyof CoordinateConventions, string[]> = {
-    geodeticDatum: ["WGS84"],
-    localFrame: ["EAST_NORTH_UP"],
-    bodyAxes: ["X_FORWARD_Y_RIGHT_Z_DOWN"],
-    aerodynamicAxes: ["X_FORWARD_Y_RIGHT_Z_DOWN"],
-    angularUnit: ["RADIAN"],
-    positionUnit: ["METER"],
-    velocityUnit: ["METER_PER_SECOND"],
-    verticalReference: ["ELLIPSOID_HEIGHT", "MEAN_SEA_LEVEL"],
-  };
-  for (const [field, allowed] of Object.entries(coordinateExpectations)) {
+  if (!hasSupportedCoordinateConventions(source.coordinateConventions)) {
+    issues.push("coordinateConventions must use the exact supported field set and values");
+  }
+  for (const [field, allowed] of Object.entries(SUPPORTED_COORDINATE_CONVENTION_VALUES)) {
     const value = source.coordinateConventions?.[field as keyof CoordinateConventions];
     if (typeof value !== "string" || !allowed.includes(value)) {
       issues.push(`coordinateConventions.${field} is unsupported`);

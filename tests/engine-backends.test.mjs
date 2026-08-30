@@ -1205,6 +1205,21 @@ test("supplied authority rejects digest-valid malformed verification-pack struct
       typescriptPattern: /evidence\[0\] is structurally invalid/i,
       rustPattern: null,
     },
+    {
+      id: "unsupported-coordinate-convention",
+      typescriptPattern: /coordinate conventions are unsupported/i,
+      rustPattern: null,
+    },
+    {
+      id: "extra-coordinate-convention",
+      typescriptPattern: /coordinate conventions are unsupported/i,
+      rustPattern: null,
+    },
+    {
+      id: "ungoverned-aircraft-performance-admission",
+      typescriptPattern: /performanceAdmission is not admitted by the governed evidence registry/i,
+      rustPattern: null,
+    },
   ]) {
     const pack = structuredClone(binding.pack);
     if (mutation === "extra-top-level-key") pack.unadmittedAuthority = true;
@@ -1232,6 +1247,32 @@ test("supplied authority rejects digest-valid malformed verification-pack struct
     if (mutation === "relative-evidence-uri") pack.evidence[0].uri = "relative/path";
     if (mutation === "invalid-evidence-access-date") pack.evidence[0].accessedAt = "2026-02-31";
     if (mutation === "blank-evidence-locator") pack.evidence[0].locator = " ";
+    if (mutation === "unsupported-coordinate-convention") {
+      pack.coordinateConventions.localFrame = "NORTH_EAST_DOWN";
+    }
+    if (mutation === "extra-coordinate-convention") {
+      pack.coordinateConventions.earthModel = "SPHERICAL";
+    }
+    if (mutation === "ungoverned-aircraft-performance-admission") {
+      const sourceEvidence = pack.evidence.find((evidence) => evidence.kind === "SOURCE");
+      const validationEvidence = pack.evidence.find((evidence) => evidence.kind === "VALIDATION");
+      assert.ok(sourceEvidence);
+      assert.ok(validationEvidence);
+      pack.aircraft[0].performanceAdmission = {
+        state: "ADMITTED",
+        capabilities: [
+          "AERODYNAMICS",
+          "PROPULSION",
+          "FLIGHT_CONTROLS",
+          "MASS_AND_STORES",
+          "SENSORS",
+        ].map((capability) => ({
+          capability,
+          sourceEvidenceRefIds: [sourceEvidence.id],
+          validationEvidenceRefIds: [validationEvidence.id],
+        })),
+      };
+    }
     resealCompiledPack(pack);
     const scenario = structuredClone(binding.scenario);
     const projection = structuredClone(scenario.modelPack);
@@ -1251,11 +1292,13 @@ test("supplied authority rejects digest-valid malformed verification-pack struct
       if (entity.weapon) entity.weapon.admission.modelPackDigest = pack.digest;
     }
 
-    assert.throws(
-      () => runEngineBackend(structuredClone(scenario), "typescript", pack),
-      typescriptPattern,
-      `typescript ${mutation}`,
-    );
+    for (const backend of ["typescript", "rust-wasm"]) {
+      assert.throws(
+        () => runEngineBackend(structuredClone(scenario), backend, pack),
+        typescriptPattern,
+        `${backend} ${mutation}`,
+      );
+    }
     if (rustPattern) {
       const rust = runRawRustWasm({
         schemaVersion: "vector.engine-run-request.v1",

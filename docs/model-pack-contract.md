@@ -753,8 +753,13 @@ A supplied pack must satisfy the same exact compiled-v1 top-level key inventory,
 array surface, non-empty evidence set, unique weapon identity and unique
 intended-use identity plus executable termination structure in TypeScript and
 raw Rust/WASM. The shared TypeScript authority boundary runs before either
-backend and additionally admits every complete evidence record and every
-aircraft dependency domain. Evidence has one closed kind, exact
+backend and additionally requires the compiler-owned exact coordinate key set
+and supported WGS84/ENU/body/aerodynamic/unit/vertical-reference values. It
+admits every complete evidence record and every aircraft dependency domain.
+An `ADMITTED` aircraft performance projection must also match the separate
+governed aircraft-evidence registry exactly for subject, capability, evidence
+role and immutable artifact digest; arbitrary in-pack source and validation IDs
+cannot promote an unsupported named aircraft. Evidence has one closed kind, exact
 required/optional fields, a stable unique ID, nonblank title, absolute URI,
 calendar access date, optional nonblank locator and optional lowercase SHA-256.
 Every aerodynamic, propulsion and sensor record in a supplied pack is admitted

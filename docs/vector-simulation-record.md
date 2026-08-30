@@ -225,6 +225,12 @@ likewise checked for its exact field set, semantic identity, evidence and
 validity bindings, finite mass/fuel/load-factor domains, bounded component and
 loadout indexes, and a closed performance-admission shape. A digest-valid
 string-valued fuel capacity therefore fails before takeoff-mass arithmetic.
+The supplied pack must retain the compiler-owned exact coordinate convention
+keys and supported values, and every positive aircraft performance admission
+must match the separate governed evidence registry's subject, capabilities,
+role-separated artifacts and immutable digests. These checks run before the
+no-release path can recompile a mission, so a resealed frame change or arbitrary
+in-pack evidence pair cannot become replay authority.
 Every supplied evidence row is admitted as a complete exact record with a
 closed evidence kind, stable unique identity, title, absolute URI, valid access
 date and optional valid locator/content digest. Every aerodynamic, propulsion
