@@ -458,6 +458,7 @@ function requireCompiledSensorStructure(
   sensor: unknown,
   index: number,
   evidenceIds: ReadonlySet<string>,
+  evidenceById: ReadonlyMap<string, Readonly<Record<string, unknown>>>,
 ): asserts sensor is Record<string, unknown> {
   const path = `sensors[${index}]`;
   const invalid = (field: string): never => {
@@ -512,6 +513,18 @@ function requireCompiledSensorStructure(
       !(candidate.evidenceRefIds as string[]).includes(id)) ||
       (admission.sourceEvidenceRefIds as string[]).some((id) =>
         (admission.validationEvidenceRefIds as string[]).includes(id))) {
+      invalid("evidenceAdmission");
+    }
+    const hasAdmittedEvidence = (id: string, expectedKind: "SOURCE" | "VALIDATION") => {
+      const evidence = evidenceById.get(id);
+      return evidence?.kind === expectedKind &&
+        typeof evidence.contentSha256 === "string" &&
+        SHA256_PATTERN.test(evidence.contentSha256);
+    };
+    if ((admission.sourceEvidenceRefIds as string[]).some((id) =>
+      !hasAdmittedEvidence(id, "SOURCE")) ||
+      (admission.validationEvidenceRefIds as string[]).some((id) =>
+        !hasAdmittedEvidence(id, "VALIDATION"))) {
       invalid("evidenceAdmission");
     }
     if (!isRecord(admission.coverage) ||
@@ -906,6 +919,7 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
     throw new Error("Supplied engine-verification compiled model pack weapons must be an array.");
   }
   const evidenceIds = new Set<string>();
+  const evidenceById = new Map<string, Readonly<Record<string, unknown>>>();
   for (const [index, evidence] of value.evidence.entries()) {
     requireCompiledEvidenceStructure(evidence, index);
     const evidenceId = evidence.id as string;
@@ -915,6 +929,7 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
       );
     }
     evidenceIds.add(evidenceId);
+    evidenceById.set(evidenceId, evidence);
   }
   const requireUniqueComponentIds = (
     field: "aerodynamics" | "propulsion" | "sensors",
@@ -934,7 +949,8 @@ function requireCompiledV1Structure(value: unknown): asserts value is CompiledMo
   };
   requireUniqueComponentIds("aerodynamics", requireCompiledAerodynamicStructure);
   requireUniqueComponentIds("propulsion", requireCompiledPropulsionStructure);
-  requireUniqueComponentIds("sensors", requireCompiledSensorStructure);
+  requireUniqueComponentIds("sensors", (item, index, ids) =>
+    requireCompiledSensorStructure(item, index, ids, evidenceById));
   const catalogObjectIds = new Set(
     (value.catalogIdentities as unknown[])
       .filter(isRecord)

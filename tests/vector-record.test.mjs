@@ -786,6 +786,55 @@ test("VSR rejects unqualified or malformed supplied packs before no-release Air 
     ),
     /aerodynamics\[\d+\]\.coefficientTables\[0\]\.fields is structurally invalid/,
   );
+
+  const positiveSensorPack = (await compileModelPack(
+    createVerificationTrackModelPackSource(),
+  )).pack;
+  const relabelledSensorEvidencePack = structuredClone(positiveSensorPack);
+  const positiveSensor = relabelledSensorEvidencePack.sensors.find(
+    (sensor) => sensor.evidenceAdmission,
+  );
+  assert.ok(positiveSensor, "the falsifier requires positive sensor evidence admission");
+  const sourceEvidence = relabelledSensorEvidencePack.evidence.find(
+    (evidence) => evidence.id === positiveSensor.evidenceAdmission.sourceEvidenceRefIds[0],
+  );
+  assert.ok(sourceEvidence, "the falsifier requires admitted source evidence");
+  sourceEvidence.kind = "ASSUMPTION";
+  resealCompiledPack(relabelledSensorEvidencePack);
+  const relabelledSensorEvidenceSerialized = await serializeNoReleaseRecordForPack(
+    relabelledSensorEvidencePack,
+  );
+  await assert.rejects(
+    openVectorSimulationRecord(
+      relabelledSensorEvidenceSerialized.buffer,
+      relabelledSensorEvidenceSerialized.byteLength,
+      { compiledModelPack: relabelledSensorEvidencePack },
+    ),
+    /sensors\[\d+\]\.evidenceAdmission is structurally invalid/,
+  );
+
+  const deaddressedSensorEvidencePack = structuredClone(positiveSensorPack);
+  const sensorWithValidation = deaddressedSensorEvidencePack.sensors.find(
+    (sensor) => sensor.evidenceAdmission,
+  );
+  assert.ok(sensorWithValidation, "the falsifier requires positive sensor evidence admission");
+  const validationEvidence = deaddressedSensorEvidencePack.evidence.find(
+    (evidence) => evidence.id === sensorWithValidation.evidenceAdmission.validationEvidenceRefIds[0],
+  );
+  assert.ok(validationEvidence, "the falsifier requires admitted validation evidence");
+  delete validationEvidence.contentSha256;
+  resealCompiledPack(deaddressedSensorEvidencePack);
+  const deaddressedSensorEvidenceSerialized = await serializeNoReleaseRecordForPack(
+    deaddressedSensorEvidencePack,
+  );
+  await assert.rejects(
+    openVectorSimulationRecord(
+      deaddressedSensorEvidenceSerialized.buffer,
+      deaddressedSensorEvidenceSerialized.byteLength,
+      { compiledModelPack: deaddressedSensorEvidencePack },
+    ),
+    /sensors\[\d+\]\.evidenceAdmission is structurally invalid/,
+  );
 });
 
 test("archived model-pack resolution rejects every partial identity match", () => {

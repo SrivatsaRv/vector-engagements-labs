@@ -1499,6 +1499,30 @@ test("supplied-pack authority validates the complete loadout and compatibility g
       },
       pattern: /sensors\[\d+\]\.evidenceAdmission\.coverage is structurally invalid/i,
     },
+    {
+      label: "positive sensor source evidence role",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        const sourceId = sensor.evidenceAdmission.sourceEvidenceRefIds[0];
+        const evidence = pack.evidence.find((item) => item.id === sourceId);
+        assert.ok(evidence, "the fixture requires admitted source evidence");
+        evidence.kind = "ASSUMPTION";
+      },
+      pattern: /sensors\[\d+\]\.evidenceAdmission is structurally invalid/i,
+    },
+    {
+      label: "positive sensor validation evidence digest",
+      mutate: (pack) => {
+        const sensor = pack.sensors.find((item) => item.evidenceAdmission);
+        assert.ok(sensor, "the fixture requires positive sensor evidence admission");
+        const validationId = sensor.evidenceAdmission.validationEvidenceRefIds[0];
+        const evidence = pack.evidence.find((item) => item.id === validationId);
+        assert.ok(evidence, "the fixture requires admitted validation evidence");
+        delete evidence.contentSha256;
+      },
+      pattern: /sensors\[\d+\]\.evidenceAdmission is structurally invalid/i,
+    },
   ]) {
     const pack = structuredClone(binding.pack);
     mutate(pack);

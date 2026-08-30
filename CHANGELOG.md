@@ -58,6 +58,9 @@ one family must not imply changes to unrelated contracts.
   SI axis/output units, finite monotonic coordinates, tensor cardinality,
   finite values and evidence links now fail closed even under a valid resealed
   content digest and on no-release VSR readback.
+- Enforce the canonical positive-sensor evidence boundary on supplied packs:
+  admitted source and independent-validation references retain their required
+  roles and immutable lowercase SHA-256 artifact digests after resealing.
 - Keep deterministic terminal-record replay and uploaded-record verification
   inside the dedicated browser simulation Worker; the rendering thread receives
   only an already-admitted playback result.

@@ -240,6 +240,11 @@ aircraft's full validity domain. These checks run even for a no-release
 ground-start archive that skips engine rerun, so mission recompilation cannot
 consume a digest-valid partial evidence row, malformed table tensor or narrowed
 component envelope.
+For a positive sensor, its admission references are resolved back to those
+complete evidence rows: source references must be `SOURCE`, independent
+validation references must be `VALIDATION`, and both must carry lowercase
+SHA-256 artifact digests. Resealing a pack cannot relabel or de-address that
+evidence into valid replay authority.
 Every compiled loadout is also admitted as an exact base model plus exact
 station records with finite body-frame positions, positive integer capacities,
 unique identities and bounded weapon indexes; an unused station may truthfully
