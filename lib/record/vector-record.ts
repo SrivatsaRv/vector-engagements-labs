@@ -143,6 +143,31 @@ type RecordReport = {
   limitations: string[];
 };
 
+function recordReportResult(result: SimulationResult): RecordReport["result"] {
+  return {
+    outcome: result.outcome,
+    successful: result.successful,
+    termination: result.termination,
+    closestApproach: result.closestApproach,
+    timeOfFlight: result.timeOfFlight,
+    endSpeed: result.endSpeed,
+    peakDemand: result.peakDemand,
+    reason: result.reason,
+  };
+}
+
+function recordReportEngine(engineRun: EngineRun): RecordReport["engine"] {
+  return {
+    envelopes: engineRun.envelopes,
+    primaryWeaponId: engineRun.primaryWeaponId,
+    primaryTargetId: engineRun.primaryTargetId,
+    termination: engineRun.termination,
+    closestApproachM: engineRun.closestApproachM,
+    peakCommandG: engineRun.peakCommandG,
+    diagnostics: engineRun.diagnostics,
+  };
+}
+
 type MemberBytes = {
   path: string;
   schemaVersion: string;
@@ -584,25 +609,8 @@ export async function createVectorSimulationRecord(
   const recordedTargetEffect = targetEffectRecordIdentity(prepared.engineScenario, events);
   const report: RecordReport = {
     schemaVersion: "vector.report.v1",
-    result: {
-      outcome: result.outcome,
-      successful: result.successful,
-      termination: result.termination,
-      closestApproach: result.closestApproach,
-      timeOfFlight: result.timeOfFlight,
-      endSpeed: result.endSpeed,
-      peakDemand: result.peakDemand,
-      reason: result.reason,
-    },
-    engine: {
-      envelopes: result.engineRun.envelopes,
-      primaryWeaponId: result.engineRun.primaryWeaponId,
-      primaryTargetId: result.engineRun.primaryTargetId,
-      termination: result.engineRun.termination,
-      closestApproachM: result.engineRun.closestApproachM,
-      peakCommandG: result.engineRun.peakCommandG,
-      diagnostics: result.engineRun.diagnostics,
-    },
+    result: recordReportResult(result),
+    engine: recordReportEngine(result.engineRun),
     ...(prepared.engineScenario.airMission
       ? {
           airMission: {
@@ -1079,6 +1087,14 @@ export async function openVectorSimulationRecord(
           "VECTOR record weapon termination claim does not match deterministic engine replay.",
         );
       }
+      if (
+        canonicalJson(report.engine) !==
+        canonicalJson(recordReportEngine(replay))
+      ) {
+        throw new Error(
+          "VECTOR frozen report engine projection does not match deterministic engine replay.",
+        );
+      }
     }
   }
   const openedTargetEffect = events.state === "AVAILABLE"
@@ -1153,10 +1169,12 @@ export async function openVectorSimulationRecord(
   const prepared: PreparedSimulation = { scenario, ...compiled };
   const result = buildSimulationResult(prepared, engineRun, pictures);
   if (
-    result.termination !== report.result.termination ||
-    result.timeOfFlight !== report.result.timeOfFlight
+    canonicalJson(report.result) !==
+    canonicalJson(recordReportResult(result))
   ) {
-    throw new Error("VECTOR frozen report does not match its recorded frames.");
+    throw new Error(
+      "VECTOR frozen report result does not match its reconstructed canonical result.",
+    );
   }
   return {
     manifest,

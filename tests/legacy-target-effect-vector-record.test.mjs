@@ -61,4 +61,14 @@ test("pre-target-effect VSR bytes remain readable without promoting geometric in
   );
   assert.equal(target?.lifecycle, "ACTIVE");
   assert.match(opened.report.result.reason, /target damage and kill are not modelled/i);
+  assert.deepEqual(opened.report.result, {
+    outcome: opened.result.outcome,
+    successful: opened.result.successful,
+    termination: opened.result.termination,
+    closestApproach: opened.result.closestApproach,
+    timeOfFlight: opened.result.timeOfFlight,
+    endSpeed: opened.result.endSpeed,
+    peakDemand: opened.result.peakDemand,
+    reason: opened.result.reason,
+  });
 });

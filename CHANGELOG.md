@@ -336,6 +336,12 @@ No pending family-specific entry.
 
 #### Vector simulation records
 
+- Require the frozen report's exact eight-field result projection, including
+  governed reason text, to equal the reconstructed canonical result and bind
+  its report-facing engine projection to deterministic replay where replay is
+  already required. Coherently resealed false kill/no-effect language,
+  missing/additional result fields and coordinated peak-demand rewrites now fail
+  open-record admission.
 - Add frame schema v7 target-effect projection plus manifest/report authority,
   event, frame, commit, result and lifecycle binding. VSR open rejects mutation
   or causal disagreement without rerunning the effect, while the frozen v6

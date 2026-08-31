@@ -96,6 +96,19 @@ const createdAt = "2026-08-06T00:00:00.000Z";
 const textEncoder = new TextEncoder();
 const jsonBytes = (value) => textEncoder.encode(canonicalJson(value));
 
+function expectedRecordReportResult(result) {
+  return {
+    outcome: result.outcome,
+    successful: result.successful,
+    termination: result.termination,
+    closestApproach: result.closestApproach,
+    timeOfFlight: result.timeOfFlight,
+    endSpeed: result.endSpeed,
+    peakDemand: result.peakDemand,
+    reason: result.reason,
+  };
+}
+
 function resealCompiledPack(pack) {
   const payload = structuredClone(pack);
   delete payload.digest;
@@ -242,6 +255,7 @@ for (const backend of ["typescript", "rust-wasm"]) {
     assert.deepEqual(opened.result.frames, result.frames);
     assert.deepEqual(opened.result.envelopes, result.envelopes);
     assert.equal(opened.result.reason, result.reason);
+    assert.deepEqual(opened.report.result, expectedRecordReportResult(opened.result));
     assert.equal(opened.events.state, "AVAILABLE");
     assert.ok(opened.events.items.length > 0);
     assert.deepEqual(opened.events, result.engineRun.events);
@@ -1082,6 +1096,129 @@ test("VSR preserves one canonical target-effect identity across event, frame, ma
     openVectorSimulationRecord(mutatedSerialized.buffer, mutatedSerialized.byteLength),
     /projection does not persist on target/,
   );
+});
+
+test("VSR rejects any coherently resealed non-canonical frozen report result", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const canonicalReport = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+
+  const positiveSerialized = serializeVectorRecord(record);
+  const opened = await openVectorSimulationRecord(
+    positiveSerialized.buffer,
+    positiveSerialized.byteLength,
+  );
+  assert.deepEqual(opened.report.result, expectedRecordReportResult(opened.result));
+
+  const mutations = [
+    ["outcome", (report) => { report.result.outcome = "Target destroyed"; }],
+    ["successful", (report) => { report.result.successful = !report.result.successful; }],
+    ["termination", (report) => { report.result.termination = "time_limit"; }],
+    ["closestApproach", (report) => { report.result.closestApproach += 1; }],
+    ["timeOfFlight", (report) => { report.result.timeOfFlight -= 0.05; }],
+    ["endSpeed", (report) => { report.result.endSpeed += 1; }],
+    ["peakDemand", (report) => { report.result.peakDemand += 1; }],
+    ["false kill reason", (report) => { report.result.reason = "The target was killed."; }],
+    ["missing key", (report) => { delete report.result.reason; }],
+    ["additional key", (report) => { report.result.effect = "KILL"; }],
+  ];
+  for (const [label, mutate] of mutations) {
+    const report = structuredClone(canonicalReport);
+    mutate(report);
+    const corrupt = await replaceRecordMember(
+      record,
+      "report.json",
+      reportMember.schemaVersion,
+      jsonBytes(report),
+    );
+    const serialized = serializeVectorRecord(corrupt);
+    await assert.rejects(
+      openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+      /frozen report result does not match its reconstructed canonical result/,
+      label,
+    );
+  }
+
+  const unavailableScenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-defensive-break",
+  ).scenario;
+  const unavailableResult = simulate(unavailableScenario);
+  const unavailableEffect = unavailableResult.engineRun.events.items.find(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  assert.equal(unavailableEffect?.payload.commit.result, "EFFECT_UNAVAILABLE");
+  const unavailableRecord = await createVectorSimulationRecord(
+    prepareSimulation(unavailableScenario),
+    unavailableResult,
+    createdAt,
+  );
+  const unavailableReportMember = unavailableRecord.members.find(
+    (member) => member.path === "report.json",
+  );
+  assert.ok(unavailableReportMember);
+  const falseNoEffectReport = JSON.parse(
+    new TextDecoder().decode(unavailableReportMember.bytes),
+  );
+  falseNoEffectReport.result.reason = "No target effect occurred.";
+  const falseNoEffectRecord = await replaceRecordMember(
+    unavailableRecord,
+    "report.json",
+    unavailableReportMember.schemaVersion,
+    jsonBytes(falseNoEffectReport),
+  );
+  const falseNoEffectSerialized = serializeVectorRecord(falseNoEffectRecord);
+  await assert.rejects(
+    openVectorSimulationRecord(
+      falseNoEffectSerialized.buffer,
+      falseNoEffectSerialized.byteLength,
+    ),
+    /frozen report result does not match its reconstructed canonical result/,
+  );
+});
+
+test("VSR binds the full report-facing engine projection to deterministic replay", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const result = simulate(scenario);
+  const record = await createVectorSimulationRecord(
+    prepareSimulation(scenario),
+    result,
+    createdAt,
+  );
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const canonicalReport = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+  const mutations = [
+    ["coordinated peak demand", (report) => {
+      report.engine.peakCommandG += 1;
+      report.result.peakDemand = report.engine.peakCommandG;
+    }],
+    ["diagnostics", (report) => { report.engine.diagnostics.integratedSteps += 1; }],
+    ["additional engine key", (report) => { report.engine.effectAuthority = "invented"; }],
+  ];
+  for (const [label, mutate] of mutations) {
+    const report = structuredClone(canonicalReport);
+    mutate(report);
+    const corrupt = await replaceRecordMember(
+      record,
+      "report.json",
+      reportMember.schemaVersion,
+      jsonBytes(report),
+    );
+    const serialized = serializeVectorRecord(corrupt);
+    await assert.rejects(
+      openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+      /frozen report engine projection does not match deterministic engine replay/,
+      label,
+    );
+  }
 });
 
 test("VSR rejects a resealed target-effect projection before its exact causal frame", async () => {

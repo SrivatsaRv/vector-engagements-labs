@@ -204,6 +204,13 @@ For a governed target effect, integrity is one conjunction across authority,
 termination receipt, effect event, target frame, manifest and report. Opening
 rejects a missing, duplicate, reordered or hash-resealed disagreement before
 returning playback; it never accepts a matching label or distance as repair.
+The frozen report result is an exact-key projection of the reconstructed
+canonical result, including its governed reason text. Opening rejects missing,
+additional or changed result fields even when `report.json`, its member hash and
+the manifest have been coherently resealed. When deterministic engine replay is
+already required, the report-facing engine projection must also equal that
+replay exactly, so coordinated result/engine rewrites cannot authorize a false
+outcome or peak-demand claim.
 An internally consistent content-addressed authority is not sufficient for
 replay: the archived authority ID, version and digest must resolve to the exact
 retained target-effect authority before the engine is invoked. Jointly changing
