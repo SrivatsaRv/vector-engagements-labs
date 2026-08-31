@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "vector.air-combat-study-evidence.v1",
+  "artifacts": [
+    {
+      "filename": "a2a-crossing-intercept.vector",
+      "scenarioId": "a2a-crossing-intercept",
+      "control": false,
+      "recordId": "1d4a9250954e5bbeedbbadcc5b66f724150d1052422707cc054e720efc149eaa",
+      "byteLength": 1439434,
+      "packageReference": {
+        "contentHash": "680bc9267b5c067e6d56560e112de5d2941380d04bfc59aa8743ba8dc5e2c090",
+        "id": "a2a-crossing-intercept",
+        "schemaVersion": "vector.scenario-package-reference.v1",
+        "version": "1.2.0"
+      },
+      "compiledDurationSeconds": 100,
+      "termination": "weapon_intercept",
+      "targetEffectResult": "DEGRADED",
+      "timeOfFlightSeconds": 72.95,
+      "closestApproachM": 19.900251,
+      "terminalWeaponLifecycle": "TERMINATED",
+      "terminalTargetLifecycle": "ACTIVE"
+    },
+    {
+      "filename": "a2a-defensive-break.vector",
+      "scenarioId": "a2a-defensive-break",
+      "control": false,
+      "recordId": "311440a69ec955a6b3c263f15544cae7b02dfbfbfc1fcc16367ce0a6273c8f5e",
+      "byteLength": 599394,
+      "packageReference": {
+        "contentHash": "83e6657dea3f9b246a19125a5d62a616c477a4d364d5fb6823aa608ec53534c5",
+        "id": "a2a-defensive-break",
+        "schemaVersion": "vector.scenario-package-reference.v1",
+        "version": "1.2.0"
+      },
+      "compiledDurationSeconds": 45,
+      "termination": "weapon_intercept",
+      "targetEffectResult": "KILL",
+      "timeOfFlightSeconds": 28.4,
+      "closestApproachM": 3.745229,
+      "terminalWeaponLifecycle": "TERMINATED",
+      "terminalTargetLifecycle": "TERMINATED"
+    },
+    {
+      "filename": "a2a-high-energy-crossing-challenge.vector",
+      "scenarioId": "a2a-high-energy-crossing-challenge",
+      "control": false,
+      "recordId": "3aaf03283a0094c3f59f812ccc3ca8ad8825139cc146ca770a8ce53e3f271307",
+      "byteLength": 2049471,
+      "packageReference": {
+        "contentHash": "2bb894f31d0457926fc4b52a8680785d870a76831e73b8112aa9b6212cb42743",
+        "id": "a2a-high-energy-crossing-challenge",
+        "schemaVersion": "vector.scenario-package-reference.v1",
+        "version": "1.2.0"
+      },
+      "compiledDurationSeconds": 140,
+      "termination": "weapon_intercept",
+      "targetEffectResult": "NO_EFFECT",
+      "timeOfFlightSeconds": 114.7,
+      "closestApproachM": 24.947303,
+      "terminalWeaponLifecycle": "TERMINATED",
+      "terminalTargetLifecycle": "ACTIVE"
+    },
+    {
+      "filename": "a2a-defensive-break-release-20.65-control.vector",
+      "scenarioId": "a2a-defensive-break",
+      "control": true,
+      "recordId": "5cf2d8e0cf7c84236619d17f058606c7d5a7cd3745737e452e38a46ed422fb87",
+      "byteLength": 606148,
+      "packageReference": {
+        "contentHash": "83e6657dea3f9b246a19125a5d62a616c477a4d364d5fb6823aa608ec53534c5",
+        "id": "a2a-defensive-break",
+        "schemaVersion": "vector.scenario-package-reference.v1",
+        "version": "1.2.0"
+      },
+      "compiledDurationSeconds": 45,
+      "termination": "weapon_intercept",
+      "targetEffectResult": "NO_EFFECT",
+      "timeOfFlightSeconds": 28.8,
+      "closestApproachM": 23.746881,
+      "terminalWeaponLifecycle": "TERMINATED",
+      "terminalTargetLifecycle": "ACTIVE"
+    }
+  ]
+}

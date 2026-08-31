@@ -83,6 +83,26 @@ the transaction. The historical intended-use comparison deliberately preserves
 migration 007's exact definition and legacy identity-string content hash; it
 does not reinterpret that immutable row using today's canonical-content hash.
 
+Migration `018_three_air_combat_studies.sql` follows 017 and forward-publishes
+exact immutable `1.2.0` packages for `a2a-crossing-intercept`,
+`a2a-defensive-break`, and `a2a-high-energy-crossing-challenge`. It marks only
+those three `1.1.0` identities `RETIRED`; it does not delete, overwrite, or
+reinterpret their package bytes, hashes, intended-use identity, model-pack
+identity, or provenance. The three new `1.2.0` rows are the only current
+`VALIDATED` versions for those IDs. Generation and migration readback compare
+all three complete packages and reject a conflicting pre-existing `(id,
+version)` identity rather than repairing it in place.
+
+For a release containing 018, take and verify the backup before the migration
+job, apply migrations through 018 in numeric order, then run migration readback
+and application verification before promotion. A post-018 backup/restore drill
+must preserve the prior `1.0.0`/`1.1.0` rows and the new `1.2.0` rows with their
+original status and content hashes. A pre-018 recovery drill instead restores
+the verified pre-migration backup into a new database, reapplies migrations
+through 018, and then verifies that same complete version history before any
+connection is switched. Image rollback does not reverse 018 or remove the new
+packages; restore is the recovery path for a failed or incompatible migration.
+
 Migration `015_generic_ground_dynamics.sql` deterministically upserts only its
 eight historical canonical v4 scenario-package rows and hashes affected by ground-envelope
 v2, so migrate-before-seed fresh installs and upgrades share one result.

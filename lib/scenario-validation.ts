@@ -21,7 +21,11 @@ import {
   ENGINE_FIXED_STEP_SECONDS,
   engineDurationSecondsForDomain,
 } from "./engine/compiler.ts";
-import { validateStructuredScenarioNumbers } from "./scenario-control-authority.ts";
+import {
+  AUTHORED_AIRCRAFT_TAS_AUTHORITY,
+  AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY,
+  validateStructuredScenarioNumbers,
+} from "./scenario-control-authority.ts";
 
 export type ValidationState = "pass" | "warning" | "error";
 export type ValidationItem = {
@@ -97,7 +101,8 @@ export function validateScenario(
           Number.isFinite(point.longitude) &&
           Number.isFinite(point.latitude) &&
           Number.isFinite(point.altitudeM) &&
-          point.altitudeM >= 0 &&
+          point.altitudeM >= AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY.minimum &&
+          point.altitudeM <= AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY.maximum &&
           isPointInsideStudyArea(point, studyArea),
       ) &&
       spatialEntities.every(
@@ -106,7 +111,8 @@ export function validateScenario(
           entity.headingDeg >= 0 &&
           entity.headingDeg < 360 &&
           Number.isFinite(entity.speedMps) &&
-          entity.speedMps >= 0 &&
+          entity.speedMps >= AUTHORED_AIRCRAFT_TAS_AUTHORITY.minimum &&
+          entity.speedMps <= AUTHORED_AIRCRAFT_TAS_AUTHORITY.maximum &&
           entity.route.length >= 1 &&
           hasNonZeroRouteLegs(entity, studyArea) &&
           hasValidRouteAcceptanceRadii(entity) &&

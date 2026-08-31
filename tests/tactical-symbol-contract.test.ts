@@ -105,3 +105,23 @@ test("projected-label collisions hide lower priority detail while a selected ent
   assert.equal(byId.get("blue-2")?.label.visibility, "HIDDEN");
   assert.deepEqual(symbols.map((symbol) => symbol.label.visibility), ["VISIBLE", "VISIBLE", "VISIBLE"]);
 });
+
+test("coincident close-merge labels preserve both aircraft identities before the weapon", () => {
+  const symbols = [
+    fighter({ id: "blue-aircraft", designation: "Blue aircraft" }),
+    fighter({ id: "red-aircraft", designation: "Red aircraft", affiliation: "RED", lifecycle: "TERMINATED" }),
+    fighter({
+      id: "blue-weapon",
+      designation: "Blue weapon",
+      kind: "GUIDED_WEAPON",
+      symbolRole: "GUIDED_MISSILE",
+      lifecycle: "TERMINATED",
+    }),
+  ];
+  const anchors = symbols.map((symbol) => ({ id: symbol.id, x: 100, y: 100 }));
+  const rendered = applyTacticalLabelCollisionPolicy(symbols, anchors);
+  const byId = new Map(rendered.map((symbol) => [symbol.id, symbol]));
+  assert.equal(byId.get("blue-aircraft")?.label.visibility, "VISIBLE");
+  assert.equal(byId.get("red-aircraft")?.label.visibility, "COMPACT");
+  assert.equal(byId.get("blue-weapon")?.label.visibility, "HIDDEN");
+});

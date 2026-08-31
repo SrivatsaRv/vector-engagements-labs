@@ -21,6 +21,13 @@ rendering sharpness; viewport width and height govern task geometry.
 
 ## Behavioral rules
 
+At every supported viewport the selected Air-combat profile, current leg intent,
+designation/affiliation/altitude label and recorded effect boundary remain
+legible. Generated engine callsigns, including weapon callsigns, are not
+operator-facing labels.
+Responsive composition cannot convert authored tactic metadata or renderer
+proximity into causal truth.
+
 Canonical target-effect state remains visible at every viewport and uses the
 same selected frame as Map, 3D and telemetry. Compact layouts may shorten the
 limitation copy but cannot hide `MODEL_ASSUMPTION`, authorize kill wording, or
@@ -55,6 +62,11 @@ overflow; unsupported installation markers remain visible but disabled.
   available for full-resolution inspection.
 
 ## Shared control and overlay contract
+
+The #197 route overlay uses one admitted compiled route and selected recorded
+frame: dashed declared legs, one solid active leg and the achieved trail. Map,
+3D, telemetry and report may style those shared facts but cannot independently
+select a leg, infer a manoeuvre or commit an effect.
 
 Map and 3D share one read-only target-effect summary derived from canonical
 event/frame identity. The overlay carries result, event/frame/time and target
@@ -135,6 +147,25 @@ as the result of the invalid draft.
 Saved report provenance now includes the compiled Air mission identity and both
 digests without changing synchronized map/3D playback, telemetry, or timeline
 ownership.
+When a configured study preserves `vector.authored-route-profile.v1`, the saved
+report and JSON export retain its exact descriptive identity, side-owned leg
+intents and limitations only while its exact causal-input binding remains
+`MATCHED`. An edited route, start, speed, transition/radius, guidance, regime,
+release, leg role or duration becomes `MODIFIED_FROM`; the report retains source
+identity but suppresses the source leg intents. The canonical debrief keeps that non-causal metadata
+separate from recorded facts: route-index changes, world-entry and store-transfer
+receipts, weapon termination and target-effect events, aircraft fuel/mass/store
+state, and final aircraft separation. A governed `KILL` explanation names the
+exact content-addressed generic model and authority and states that the authored
+route was not selected by an autonomous pilot and is not named-system
+effectiveness. Reports without an authored profile remain readable and do not
+invent one from geometry.
+The same section renders exact current starts/routes and duration authority,
+recorded primary-weapon flight-state changes, and final typed observer/track
+availability. At 320 and 390 CSS pixels, report definitions collapse to one
+column and long digests/event identities wrap without horizontal overflow.
+Print keeps the debrief, causal-input blocks, side routes and individual route
+points together where a page boundary permits.
 Observe presents the exact pack identity used by runtime and reports while
 terrain/environment loading remains Worker-owned and cancellable.
 The report result card derives success or caution styling from the canonical
@@ -170,6 +201,12 @@ then aircraft, with stable ID order as the tie-breaker. The highest-priority
 labels use bounded leader offsets; lower-priority labels compact while their
 symbols, affiliation frame and browser title remain available. The renderer
 does not infer tactical relevance beyond canonical lifecycle and kind.
+Map and 3D share that policy. The 3D projection clamps retained label boxes to
+the surface safe edge and keeps compact phone text at ten pixels. It exposes
+machine-readable visibility, collision and edge state so five-viewport proof is
+state-based rather than screenshot-only. Current authored-leg intent appears
+only for an exact retained Air-mission digest match and is explicitly described
+as authored intent with no autonomous selection; modified runs suppress it.
 
 MapLibre and Three.js observe committed container dimensions. A telemetry
 transition therefore reallocates the canvas row while preserving camera/extent
@@ -183,10 +220,31 @@ Disclosure's state.
 
 ## Automated proof
 
+The five-viewport journey confirms the selected governed Air-combat profile's
+visible non-autonomy/non-effectiveness limitations, projected aircraft labels
+and declared/active/achieved route semantics. Focused scenario and report tests
+cover all three profiles and the record-backed debrief; the matched WVR control
+remains a numerical oracle rather than a screenshot-only assertion.
+The #197 visual proof keeps pixel comparison deliberately narrow: a cropped
+1366×768 laptop Map surface records the unedited matched BVR launch/effect, and
+cropped 3D surfaces record the WVR close merge/altitude stems and transition
+recommit label decluttering. Every image assertion is preceded by exact
+canonical selected-frame, model-time, target-effect, authored-profile
+applicability, declared-route, achieved-trail, launched-store and lifecycle
+assertions. Aircraft designation and affiliation are asserted through semantic
+labels and marker shape as well as colour. A tile failure remains a visible
+basemap-availability state and cannot erase or validate the canonical overlays.
+These laptop baselines supplement, rather than replace, the functional
+five-viewport matrix.
+The report-specific browser regression adds explicit 320/390 containment,
+single-column definition layout, long-token wrapping and print break checks; it
+also reads the exact duration authority, weapon phase sequence and observer
+availability rather than relying on prose presence alone.
+
 The built five-viewport Chromium journey runs the high-energy package through
-each layout's real navigation path, proves the summary is
-`BEFORE_EFFECT_BOUNDARY` one frame early, and admits governed `NO_EFFECT` only
-at frame 530 / 131.9 s. Skips are not admitted. Component and selector tests
+each layout's real navigation path and admits governed `NO_EFFECT` at frame 461
+/ 114.7 s with its exact recorded termination evidence. Skips are not admitted.
+Component and selector tests
 cover all five results, unavailable authority, causal corruption and legacy
 records.
 

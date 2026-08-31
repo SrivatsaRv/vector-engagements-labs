@@ -14,7 +14,12 @@ import {
 import type { RouteWaypointTransition } from "@/lib/scenario-spatial";
 import type { StudyArea } from "@/lib/study-areas";
 import {
-  MAX_AUTHORED_SCALAR_FRACTION_DIGITS,
+  AUTHORED_AIRCRAFT_TAS_AUTHORITY,
+  AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY,
+  AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY,
+  AUTHORED_TRUE_HEADING_AUTHORITY,
+  AUTHORED_WGS84_LATITUDE_AUTHORITY,
+  AUTHORED_WGS84_LONGITUDE_AUTHORITY,
   admitRawNumber,
   type NumericAuthority,
 } from "@/lib/scenario-control-authority";
@@ -41,26 +46,12 @@ type WaypointDraft = PointDraft & {
 
 const formatCoordinate = (value: number) => String(Number(value.toFixed(6)));
 const formatScalar = (value: number) => String(Number(value.toFixed(3)));
-const numeric = (
-  minimum: number,
-  maximum: number,
-  precision: number,
-  unit: string,
-): NumericAuthority => ({
-  kind: "NUMBER",
-  minimum,
-  maximum,
-  integer: false,
-  nullable: false,
-  precision,
-  unit,
-});
-const LONGITUDE = numeric(-180, 180, 15, "deg_WGS84");
-const LATITUDE = numeric(-90, 90, 15, "deg_WGS84");
-const ALTITUDE = numeric(0, 25_000, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "m_MSL");
-const HEADING = numeric(0, 359.999, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "deg_true");
-const SPEED = numeric(0, 1_500, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "m/s");
-const ACCEPTANCE_RADIUS = numeric(1, 25_000, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "m");
+const LONGITUDE = AUTHORED_WGS84_LONGITUDE_AUTHORITY;
+const LATITUDE = AUTHORED_WGS84_LATITUDE_AUTHORITY;
+const ALTITUDE = AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY;
+const HEADING = AUTHORED_TRUE_HEADING_AUTHORITY;
+const SPEED = AUTHORED_AIRCRAFT_TAS_AUTHORITY;
+const ACCEPTANCE_RADIUS = AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY;
 const parseStrict = (value: string, authority: NumericAuthority) => {
   const admitted = admitRawNumber(value, authority);
   return admitted.ok ? admitted.value : null;
@@ -148,8 +139,8 @@ export function SpatialEntityEditor({
       : null;
   const speedValue = parseStrict(speed, SPEED);
   const speedError =
-    speedValue === null || speedValue < 0 || speedValue > 1_500
-      ? "Speed must be from 0 to 1,500 m/s."
+    speedValue === null
+      ? "Speed must be from 0 to 450 m/s."
       : null;
   const waypointErrors = useMemo(
     () => waypoints.map((draft) =>

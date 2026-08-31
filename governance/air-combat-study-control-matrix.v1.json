@@ -1,0 +1,226 @@
+{
+  "schemaVersion": "vector.air-combat-study-control-matrix.v1",
+  "scope": "ISSUE_197_THREE_GOVERNED_STUDIES_ONLY",
+  "ownerIssue": 197,
+  "gapOwnerIssue": 193,
+  "rows": [
+    {
+      "id": "I197-CTRL-ENVIRONMENT",
+      "controls": ["scenario.studyAreaId", "scenario.weatherPresetId"],
+      "kind": "ENUM_IDENTITY",
+      "admission": "PROVED",
+      "causality": "RUNTIME_EFFECT",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-ENV-UNKNOWN", "runner": "NODE_TEST", "file": "tests/simulation.test.mjs", "testName": "simulation fails closed for unknown environment identities", "layers": ["STRUCTURED", "COMPILER"]},
+        {"caseId": "I197-ENV-CONTRAST", "runner": "NODE_TEST", "file": "tests/geospatial-environment.test.mjs", "testName": "different Phase A packs differ through declared pack values, not a region-name branch", "layers": ["COMPILER", "RUNTIME"]},
+        {"caseId": "I197-ENV-REPORT", "runner": "NODE_TEST", "file": "tests/geospatial-environment.test.mjs", "testName": "report export carries the exact synthetic environment and recorded geographic positions", "layers": ["REPORT"]},
+        {"caseId": "I197-ENV-SAVED-RUN", "runner": "NODE_TEST", "file": "tests/security-boundaries.test.ts", "testName": "saved-run admission does not invent missing environment identity", "layers": ["SAVED_RUN"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-START-POSITION-ALTITUDE",
+      "controls": ["spatial.blue.start.longitude", "spatial.blue.start.latitude", "spatial.blue.start.altitude", "spatial.red.start.longitude", "spatial.red.start.latitude", "spatial.red.start.altitude"],
+      "kind": "NUMERIC",
+      "admission": "PROVED",
+      "causality": "RUNTIME_EFFECT",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-START-NUMERIC", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 shared numeric authorities reject malformed, nonfinite, precision, range, and structured bypasses", "layers": ["RAW", "STRUCTURED"]},
+        {"caseId": "I197-START-BINDING", "runner": "VITEST", "file": "tests/component/spatial-entity-editor.test.tsx", "testName": "binds every #197 spatial text control to malformed, nonfinite, precision, and range admission", "layers": ["COMPONENT"]},
+        {"caseId": "I197-START-SAVED-RUN", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 saved-run repeats spatial precision and guidance admission before recomputation", "layers": ["SAVED_RUN"]},
+        {"caseId": "I197-START-COMPILE", "runner": "NODE_TEST", "file": "tests/simulation.test.mjs", "testName": "map-authored start positions, headings, speeds and routes compile into engine state", "layers": ["COMPILER", "RUNTIME"]},
+        {"caseId": "I197-START-REPORT", "runner": "NODE_TEST", "file": "tests/report-debrief.test.mjs", "testName": "all three report profiles retain exact causal starts, routes, duration, release, and observer evidence", "layers": ["REPORT"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-HEADING-CROSSING",
+      "controls": ["spatial.blue.start.heading", "spatial.red.start.heading", "scenario.aspect"],
+      "kind": "NUMERIC",
+      "admission": "PROVED",
+      "causality": "MIXED_CAUSALITY",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-HEADING-NUMERIC", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 shared numeric authorities reject malformed, nonfinite, precision, range, and structured bypasses", "layers": ["RAW", "STRUCTURED"]},
+        {"caseId": "I197-HEADING-CROSSING-CONTRAST", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 direct start heading is projection-only while the crossing control changes runtime geometry", "layers": ["COMPILER", "RUNTIME", "REPORT"]},
+        {"caseId": "I197-HEADING-SAVED-RUN", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 saved-run repeats spatial precision and guidance admission before recomputation", "layers": ["SAVED_RUN"]},
+        {"caseId": "I197-HEADING-UI-BOUNDARY", "runner": "VITEST", "file": "tests/component/spatial-entity-editor.test.tsx", "testName": "rejects 360 degrees instead of normalizing it to north", "layers": ["COMPONENT"]},
+        {"caseId": "I197-HEADING-STRUCTURED", "runner": "NODE_TEST", "file": "tests/simulation.test.mjs", "testName": "validation blocks malformed authored headings, speeds and route origins", "layers": ["STRUCTURED", "COMPILER"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-TAS",
+      "controls": ["scenario.launcherSpeed", "scenario.targetSpeed", "spatial.blue.start.speed", "spatial.red.start.speed"],
+      "kind": "NUMERIC",
+      "admission": "PROVED",
+      "causality": "RUNTIME_EFFECT",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-TAS-RAW", "runner": "NODE_TEST", "file": "tests/scenario-control-authority.test.mjs", "testName": "numeric-authoring-malformed-corpus: every numeric authority rejects malformed raw text before Number coercion", "layers": ["RAW"]},
+        {"caseId": "I197-TAS-DOMAIN", "runner": "NODE_TEST", "file": "tests/scenario-control-authority.test.mjs", "testName": "spatial and mission editors share exact altitude, TAS, and route-radius domains", "layers": ["STRUCTURED", "COMPILER"]},
+        {"caseId": "I197-TAS-UI", "runner": "VITEST", "file": "tests/component/spatial-entity-editor.test.tsx", "testName": "preserves an invalid speed instead of silently clamping it", "layers": ["COMPONENT"]},
+        {"caseId": "I197-TAS-RUNTIME", "runner": "NODE_TEST", "file": "tests/simulation.test.mjs", "testName": "map-authored start positions, headings, speeds and routes compile into engine state", "layers": ["COMPILER", "RUNTIME"]},
+        {"caseId": "I197-TAS-REPORT", "runner": "NODE_TEST", "file": "tests/report-debrief.test.mjs", "testName": "all three report profiles retain exact causal starts, routes, duration, release, and observer evidence", "layers": ["REPORT"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-FUEL",
+      "controls": ["scenario.blueFuelPercent", "scenario.redFuelPercent"],
+      "kind": "NUMERIC",
+      "admission": "PROVED",
+      "causality": "RUNTIME_EFFECT",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-FUEL-RAW", "runner": "NODE_TEST", "file": "tests/scenario-control-authority.test.mjs", "testName": "numeric-authoring-boundaries: every numeric authority admits exact bounds and rejects adjacent values", "layers": ["RAW"]},
+        {"caseId": "I197-FUEL-STRUCTURED", "runner": "NODE_TEST", "file": "tests/scenario-control-authority.test.mjs", "testName": "structured-number-admission: type, finite, precision and range checks repeat after UI parsing", "layers": ["STRUCTURED"]},
+        {"caseId": "I197-FUEL-RUNTIME", "runner": "NODE_TEST", "file": "tests/air-mission.test.mjs", "testName": "admitted fuel and loadout edits change compiled fuel, mass, store state, and recorded fuel history", "layers": ["COMPILER", "RUNTIME"]},
+        {"caseId": "I197-FUEL-REPORT", "runner": "NODE_TEST", "file": "tests/report-debrief.test.mjs", "testName": "canonical debrief joins authored profile metadata only to exact recorded causal facts", "layers": ["REPORT"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-STORE-QUANTITY",
+      "controls": ["scenario.blueWeaponQuantity", "scenario.redWeaponQuantity"],
+      "kind": "NUMERIC",
+      "admission": "PROVED",
+      "causality": "RUNTIME_EFFECT",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-STORES-RAW", "runner": "NODE_TEST", "file": "tests/scenario-control-authority.test.mjs", "testName": "numeric-authoring-precision: authored precision is enforced independently of range", "layers": ["RAW"]},
+        {"caseId": "I197-STORES-CAPACITY", "runner": "NODE_TEST", "file": "tests/air-mission.test.mjs", "testName": "compiled model-pack admission rejects unknown stations, rules, and quantities above immutable capacity", "layers": ["STRUCTURED", "COMPILER"]},
+        {"caseId": "I197-STORES-RUNTIME", "runner": "NODE_TEST", "file": "tests/air-mission.test.mjs", "testName": "admitted fuel and loadout edits change compiled fuel, mass, store state, and recorded fuel history", "layers": ["RUNTIME"]},
+        {"caseId": "I197-STORES-REPORT", "runner": "NODE_TEST", "file": "tests/report-debrief.test.mjs", "testName": "canonical debrief joins authored profile metadata only to exact recorded causal facts", "layers": ["REPORT"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-LOADOUT-IDENTITY",
+      "controls": ["scenario.blueSystemId", "scenario.redSystemId", "airMission.assignments[0].loadout"],
+      "kind": "ENUM_IDENTITY",
+      "admission": "PROVED",
+      "causality": "RUNTIME_EFFECT",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-LOADOUT-REJECT", "runner": "NODE_TEST", "file": "tests/air-mission.test.mjs", "testName": "route, fuel, loadout and model identities must agree with the authored mission", "layers": ["STRUCTURED", "COMPILER"]},
+        {"caseId": "I197-LOADOUT-RUNTIME", "runner": "NODE_TEST", "file": "tests/air-mission.test.mjs", "testName": "admitted fuel and loadout edits change compiled fuel, mass, store state, and recorded fuel history", "layers": ["RUNTIME"]},
+        {"caseId": "I197-LOADOUT-VSR", "runner": "NODE_TEST", "file": "tests/air-mission.test.mjs", "testName": "VSR and report bind exact authored and compiled mission lineage on readback", "layers": ["VSR", "REPORT"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-ENGAGEMENT-REGIME",
+      "controls": ["airMission.regime"],
+      "kind": "ENUM_IDENTITY",
+      "admission": "PROVED",
+      "causality": "PROJECTION_ONLY",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-REGIME-REJECT", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 enum authorities reject unknown, stale, and unsupported guidance, regime, turn, and leg values", "layers": ["STRUCTURED", "COMPILER"]},
+        {"caseId": "I197-REGIME-NONCAUSAL", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 regime is projection-only: mutation changes mission identity but not canonical dynamics", "layers": ["RUNTIME", "PACKAGE"]},
+        {"caseId": "I197-REGIME-PRESENTATION", "runner": "NODE_TEST", "file": "tests/authored-profile-presentation.test.mjs", "testName": "every canonical profile input mutation suppresses current authored-leg claims", "layers": ["REPORT"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-ROUTE-POSITION-ALTITUDE",
+      "controls": ["spatial.blue.route[*].longitude", "spatial.blue.route[*].latitude", "spatial.blue.route[*].altitudeM", "spatial.red.route[*].longitude", "spatial.red.route[*].latitude", "spatial.red.route[*].altitudeM"],
+      "kind": "NUMERIC",
+      "admission": "PROVED",
+      "causality": "RUNTIME_EFFECT",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-ROUTE-NUMERIC", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 shared numeric authorities reject malformed, nonfinite, precision, range, and structured bypasses", "layers": ["RAW", "STRUCTURED"]},
+        {"caseId": "I197-ROUTE-BINDING", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 live raw text control IDs resolve to their exact shared numeric authority", "layers": ["COMPONENT", "STRUCTURED"]},
+        {"caseId": "I197-ROUTE-REJECT", "runner": "NODE_TEST", "file": "tests/air-mission.test.mjs", "testName": "strict schema and geographic boundaries reject nested authority, duplicate/zero legs, and invalid coordinates", "layers": ["STRUCTURED", "COMPILER"]},
+        {"caseId": "I197-ROUTE-RUNTIME", "runner": "NODE_TEST", "file": "tests/air-mission.test.mjs", "testName": "one flight-plan adapter controls compiled and runtime geometry, transitions, and radii", "layers": ["RUNTIME"]},
+        {"caseId": "I197-ROUTE-REPORT", "runner": "NODE_TEST", "file": "tests/report-debrief.test.mjs", "testName": "all three report profiles retain exact causal starts, routes, duration, release, and observer evidence", "layers": ["REPORT"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-LEG-ROLE-TRANSITION",
+      "controls": ["airMission.flightPlans[0].legs[*].role", "airMission.flightPlans[0].routePoints[*].turnMethod", "spatial.blue.route[*].transition", "spatial.red.route[*].transition"],
+      "kind": "ENUM_IDENTITY",
+      "admission": "PROVED",
+      "causality": "MIXED_CAUSALITY",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-LEG-TURN-REJECT", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 enum authorities reject unknown, stale, and unsupported guidance, regime, turn, and leg values", "layers": ["STRUCTURED", "COMPILER"]},
+        {"caseId": "I197-TURN-COMPONENT", "runner": "VITEST", "file": "tests/component/spatial-entity-editor.test.tsx", "testName": "commits an explicit fly-over transition into the compiled route plan", "layers": ["COMPONENT"]},
+        {"caseId": "I197-TURN-SAVED-RUN", "runner": "NODE_TEST", "file": "tests/security-boundaries.test.ts", "testName": "saved-run admission rejects a malformed authored fly-over transition", "layers": ["SAVED_RUN"]},
+        {"caseId": "I197-LEG-PRESENTATION", "runner": "NODE_TEST", "file": "tests/authored-profile-presentation.test.mjs", "testName": "every canonical profile input mutation suppresses current authored-leg claims", "layers": ["REPORT"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-ROUTE-RADIUS",
+      "controls": ["spatial.blue.route[*].acceptanceRadiusM", "spatial.red.route[*].acceptanceRadiusM", "airMission.flightPlans[0].routePoints[*].acceptanceRadiusM"],
+      "kind": "NUMERIC",
+      "admission": "PROVED",
+      "causality": "RUNTIME_EFFECT",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-RADIUS-NUMERIC", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 shared numeric authorities reject malformed, nonfinite, precision, range, and structured bypasses", "layers": ["RAW", "STRUCTURED"]},
+        {"caseId": "I197-RADIUS-BINDING", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 live raw text control IDs resolve to their exact shared numeric authority", "layers": ["COMPONENT"]},
+        {"caseId": "I197-RADIUS-SAVED-RUN", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 saved-run repeats spatial precision and guidance admission before recomputation", "layers": ["SAVED_RUN"]},
+        {"caseId": "I197-RADIUS-DOMAIN", "runner": "NODE_TEST", "file": "tests/scenario-control-authority.test.mjs", "testName": "spatial and mission editors share exact altitude, TAS, and route-radius domains", "layers": ["STRUCTURED"]},
+        {"caseId": "I197-RADIUS-COMPONENT", "runner": "VITEST", "file": "tests/component/spatial-entity-editor.test.tsx", "testName": "does not admit a waypoint acceptance radius outside the compiled contract", "layers": ["COMPONENT"]},
+        {"caseId": "I197-RADIUS-RUNTIME", "runner": "NODE_TEST", "file": "tests/simulation.test.mjs", "testName": "an authored waypoint acceptance radius is compiled and changes the flown route", "layers": ["COMPILER", "RUNTIME"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-RELEASE-SUPPORT-EFFECT",
+      "controls": ["airMission.assignments[0].storeTransfer.requests[0].requestedTimeSeconds", "airMission.assignments[0].storeTransfer.requests[0].installedDragAreaM2", "scenario.guidance"],
+      "kind": "MIXED",
+      "admission": "PROVED",
+      "causality": "RUNTIME_EFFECT",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-RELEASE-NUMERIC", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 shared numeric authorities reject malformed, nonfinite, precision, range, and structured bypasses", "layers": ["RAW", "STRUCTURED"]},
+        {"caseId": "I197-RELEASE-BINDING", "runner": "VITEST", "file": "tests/component/numeric-authoring-input.test.tsx", "testName": "fails closed when a #197 live control is wired to a different authority", "layers": ["COMPONENT"]},
+        {"caseId": "I197-GUIDANCE-REJECT", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 enum authorities reject unknown, stale, and unsupported guidance, regime, turn, and leg values", "layers": ["STRUCTURED", "COMPILER"]},
+        {"caseId": "I197-GUIDANCE-SAVED-RUN", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 saved-run repeats spatial precision and guidance admission before recomputation", "layers": ["SAVED_RUN"]},
+        {"caseId": "I197-RELEASE-PRECISION", "runner": "NODE_TEST", "file": "tests/air-mission.test.mjs", "testName": "frontend-derived mission input and server/Worker admission share the three-decimal scalar ceiling", "layers": ["STRUCTURED", "WORKER", "SAVED_RUN"]},
+        {"caseId": "I197-RELEASE-RUNTIME", "runner": "NODE_TEST", "file": "tests/air-combat-study-scenarios.test.mjs", "testName": "the WVR study records a canonical KILL and a release-time-only control does not", "layers": ["RUNTIME"]},
+        {"caseId": "I197-RELEASE-VSR", "runner": "NODE_TEST", "file": "tests/vector-record.test.mjs", "testName": "VSR admits an off-grid scheduled launch at its first fixed-step boundary", "layers": ["VSR"]},
+        {"caseId": "I197-RELEASE-REPORT", "runner": "NODE_TEST", "file": "tests/report-debrief.test.mjs", "testName": "all three report profiles retain exact causal starts, routes, duration, release, and observer evidence", "layers": ["REPORT"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-RUN-DURATION",
+      "controls": ["scenario.runDurationSeconds"],
+      "kind": "NUMERIC",
+      "admission": "PROVED",
+      "causality": "RUNTIME_EFFECT",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-DURATION-RAW", "runner": "NODE_TEST", "file": "tests/scenario-control-authority.test.mjs", "testName": "numeric-authoring-precision: authored precision is enforced independently of range", "layers": ["RAW"]},
+        {"caseId": "I197-DURATION-SAVED-RUN", "runner": "NODE_TEST", "file": "tests/security-boundaries.test.ts", "testName": "saved-run duration admission matches browser/compiler precision and legacy omission", "layers": ["STRUCTURED", "SAVED_RUN"]},
+        {"caseId": "I197-DURATION-RUNTIME", "runner": "NODE_TEST", "file": "tests/air-combat-study-scenarios.test.mjs", "testName": "authored duration is causal, precision-bounded, and legacy omission keeps the domain default", "layers": ["COMPILER", "RUNTIME"]},
+        {"caseId": "I197-DURATION-REPORT", "runner": "NODE_TEST", "file": "tests/report-debrief.test.mjs", "testName": "historical duration omission is explicit and uses the versioned domain default", "layers": ["REPORT"]}
+      ]
+    },
+    {
+      "id": "I197-CTRL-REPLAY-SEED",
+      "controls": ["scenario.seed"],
+      "kind": "NUMERIC",
+      "admission": "PROVED",
+      "causality": "NO_RUNTIME_EFFECT",
+      "projection": "PROVED",
+      "status": "COVERED",
+      "evidence": [
+        {"caseId": "I197-SEED-RAW", "runner": "NODE_TEST", "file": "tests/scenario-control-authority.test.mjs", "testName": "numeric-authoring-precision: authored precision is enforced independently of range", "layers": ["RAW", "STRUCTURED"]},
+        {"caseId": "I197-SEED-DETERMINISM", "runner": "NODE_TEST", "file": "tests/air-combat-study-control-admission.test.mjs", "testName": "#197 seed changes replay/VSR identity while canonical dynamics remain identical", "layers": ["RUNTIME", "VSR"]},
+        {"caseId": "I197-SEED-PACKAGE", "runner": "NODE_TEST", "file": "tests/browser-runtime.test.mjs", "testName": "digest adapter detects compiled-pack mutation", "layers": ["PACKAGE", "WORKER"]},
+        {"caseId": "I197-SEED-VSR", "runner": "NODE_TEST", "file": "tests/vector-record.test.mjs", "testName": "VSR binds the exact governed scenario-package reference across every replay artifact", "layers": ["VSR"]}
+      ]
+    }
+  ]
+}

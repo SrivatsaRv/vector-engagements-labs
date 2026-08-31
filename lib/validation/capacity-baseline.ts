@@ -3,14 +3,15 @@ import { performance } from "node:perf_hooks";
 import type { EngineBackendId, EngineEntityDefinition, EngineRun, EngineScenario } from "../engine/contracts.ts";
 import { runEngineBackend } from "../engine/backend.ts";
 import { enginePositionToGeographic } from "../scenario-spatial.ts";
-import { simulateWithCapabilitiesForVerification } from "../simulation.ts";
-import { SCENARIO_LIBRARY } from "../scenarios.ts";
+import { DEFAULT_SCENARIO, simulateWithCapabilitiesForVerification } from "../simulation.ts";
 import { createVerificationDeploymentCapabilities } from "../runtime/deployment-capabilities.ts";
 
 export const CAPACITY_BASELINE_WORKLOAD_ID = "vector.air-capacity-baseline.v1";
 export const CAPACITY_BASELINE_ENTITY_COUNT = 100;
 export const CAPACITY_BASELINE_DURATION_SECONDS = 5;
 export const CAPACITY_BASELINE_FIXED_STEP_SECONDS = 0.05;
+const CAPACITY_BASELINE_LAUNCHED_VEHICLE_ID = "blue-weapon-1";
+const CAPACITY_BASELINE_STOWED_VEHICLE_ID = "blue-weapon-2";
 
 export type CapacityBaselineUnsupportedCapability = {
   state: "UNAVAILABLE";
@@ -118,9 +119,15 @@ function movingAircraft(
  * sensor tracks, weapon support, or tactical decisions.
  */
 export function createCapacityBaselineScenario(): EngineScenario {
+  const authoredBlueprint = structuredClone(DEFAULT_SCENARIO);
+  // Capacity owns a synthetic launched/stowed workload, not a governed study
+  // package. Keep this blueprint on the generic scheduled-release contract even
+  // if catalog studies later add new mission or transfer authority.
+  delete authoredBlueprint.airMission;
+  delete authoredBlueprint.runDurationSeconds;
   const base = structuredClone(
     simulateWithCapabilitiesForVerification(
-      SCENARIO_LIBRARY[0].scenario,
+      authoredBlueprint,
       createVerificationDeploymentCapabilities("typescript", ["A2A"]),
     ).engineRun.scenario,
   );
@@ -133,12 +140,19 @@ export function createCapacityBaselineScenario(): EngineScenario {
   if (!blue?.aircraft || !red?.aircraft) {
     throw new Error("Capacity baseline requires the admitted A2A aircraft blueprints.");
   }
-  const guidedVehicles = base.entities.filter((entity) => entity.kind === "GUIDED_WEAPON");
-  const launched = guidedVehicles.find((entity) => entity.weapon?.launchTimeSeconds === 0);
-  const stowed = guidedVehicles.find((entity) => entity.weapon?.launchTimeSeconds === null);
+  const launched = base.entities.find(
+    (entity) => entity.id === CAPACITY_BASELINE_LAUNCHED_VEHICLE_ID,
+  );
+  const stowed = base.entities.find(
+    (entity) => entity.id === CAPACITY_BASELINE_STOWED_VEHICLE_ID,
+  );
   if (!launched?.weapon || !stowed?.weapon) {
     throw new Error("Capacity baseline requires one launched and one stowed guided-vehicle blueprint.");
   }
+  launched.weapon.launchTimeSeconds = 0;
+  launched.lifecycle = "STOWED";
+  stowed.weapon.launchTimeSeconds = null;
+  stowed.lifecycle = "STOWED";
   const added = [
     ...Array.from({ length: 48 }, (_, index) => movingAircraft(blue, "BLUE", index)),
     ...Array.from({ length: 48 }, (_, index) => movingAircraft(red, "RED", index)),

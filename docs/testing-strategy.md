@@ -115,15 +115,34 @@ Use the smallest complete set for a change. State why any applicable layer was o
 
 ## Pre-engine control admission regression
 
+The #197 matrix adds scenario-owned run duration plus the BVR/WVR/transition
+route, release and guidance combinations. It proves identical frontend,
+compiler and Worker domains, malformed-draft persistence across step unmount,
+and that profile labels cannot change compiled bytes while a causal input does.
+
+The machine-readable inventory is
+`governance/air-combat-study-control-matrix.v1.json`. Its fourteen rows are
+strictly limited to controls required by #197 and exercised by the three
+governed studies; it is not evidence that #193's workspace-wide inventory is
+complete. Every evidence reference carries an exact executable case ID, test
+file and test name. `node scripts/verify-air-combat-control-matrix.mjs
+--allow-gaps` runs those exact cases and validates the inventory in audit
+mode; omitting it is the completion gate and fails
+while any row is `GAP`. Compiled target-effect authority is not an editable
+control and is therefore explicitly outside this editable-control inventory;
+its separate canonical authority/commit matrix remains mandatory.
+Projection-only regime/leg semantics and the deterministic replay seed's
+explicit `NO_RUNTIME_EFFECT` state are not promoted to causal engine inputs.
+
 Target-effect authority is not editable scenario-builder input. Its compiler
 boundary still applies the same fail-closed layering: exact schema/digests and
 weapon/target bindings before ticks, then a canonical six-decimal projection of
 termination distance/time and target mass/speed/altitude before domain checks
 and commit hashing. Independently resealed noncanonical values are rejected.
 
-The #193 baseline makes the 40-field legacy `Scenario` authority inventory a
+The #193 baseline makes the 41-field legacy `Scenario` authority inventory a
 compile-time complete `Record<keyof Scenario, ...>` with an immutable SHA-256
-identity. Its focused regression enumerates all 19 numeric legacy domains and
+identity. Its focused regression enumerates all 20 numeric legacy domains and
 tests malformed raw text, exact bounds, adjacent out-of-range values,
 integer-only constraints, declared precision, nullability and blank-versus-zero
 semantics. Structured tests then repeat type, finite, range, integer and
@@ -164,6 +183,11 @@ pre-existing conflicting identity aborts instead of being silently reused.
 The historical intended-use oracle is migration 007's exact JSON definition and
 legacy identity-string hash, preventing a newer reconstructed definition from
 being mistaken for the already-published immutable row.
+Migration 018 is a separate forward-only generator/readback gate. It publishes
+only the three Air-combat packages at `1.2.0`, retains their prior immutable
+rows as `RETIRED`, proves every stored field and canonical content hash, and
+aborts on a conflicting existing identity. Migration 017 is checked by frozen
+SHA-256 rather than regenerated from the newer library.
 Engine regression
 contrasts a 75 ms lifetime with a 100 ms control in the same crossing geometry:
 the former expires at the exact in-step boundary while the latter intercepts,
@@ -299,6 +323,11 @@ matrix rows.
 
 ## Existing baseline
 
+Three independent Air-combat oracles now supplement the baseline: literal
+WGS84/MSL-to-ENU geometry, deterministic histories and TypeScript/Rust parity;
+the WVR study additionally uses a one-field release-time control to distinguish
+recorded `KILL` from `NO_EFFECT` without asserting named-system performance.
+
 Weapon-termination regression now includes independent relative-segment
 closest-approach cases, malformed admission, maximum-flight expiry, legacy-
 distance non-authority, a delayed release whose launch boundary remains the
@@ -310,6 +339,19 @@ threshold oracles, configuration contrast, label invariance, unavailable and
 non-geometric controls, exact once-only lifecycle/event causality, VSR v7
 mutation/readback, and exact-frame presentation checks. TypeScript/Rust parity
 does not replace the independent expected-value oracle.
+
+The #197 Air-combat gate adds a closed literal ENU/WGS84/MSL oracle for all
+three four-point routes, a one-metre inverse-projection budget, deterministic
+repeat histories, minimum pairwise trajectory contrast, an admitted
+route-coordinate mutation, complete TypeScript/Rust frame and event comparison
+under the governed absolute-plus-relative floating-point tolerance, and a
+single-field WVR control: release `20.00 s` records KILL/terminated while
+`20.65 s` records NO_EFFECT/active. VSR tests bind the exact scenario-package
+reference across compiled, manifest and report artifacts and reject malformed
+or coherently resealed divergence. Browser/Worker/VSR-creation tests also reject
+well-formed id/version/hash claims that do not match an exact retained package.
+The BVR and transition studies likewise carry release-time-only controls within
+0.25 s of their baseline; each must record a different canonical effect class.
 
 `performance:engine-wasm-load:verify` binds the production module to the exact
 pre-#196 baseline commit and interleaves 20 fresh Chromium contexts per
@@ -703,6 +745,16 @@ The first suites prove deployment-disabled scenario presentation and direct-link
 admission with semantic assertions. #62 remains open for canonical playback
 selectors, real Worker author/run/scrub journeys, accessibility, visual baselines
 and performance budgets.
+
+Issue #197 adds four minimal Playwright surface baselines at the governed
+1366×768 laptop viewport: exact unedited BVR matched-profile Map frames at
+launch and committed effect, the WVR close-merge 3D frame, and the
+transition-recommit 3D frame. The tests first
+assert the canonical frame/time, committed target effect, exact profile
+applicability, route/trail counts, store lifecycle and non-colour affiliation
+identity; a matching screenshot alone is never acceptance evidence. Other
+viewport projects run the same semantic journeys without duplicating
+platform-sensitive pixel baselines.
 
 `lib/frontend/selectors.ts` is the first canonical selector boundary. Telemetry
 uses its selected recorded frame and model time for both the marker and current

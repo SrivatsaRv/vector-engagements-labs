@@ -1,12 +1,19 @@
 import type { ProfileId } from "../engine/primitives.ts";
 import type { CompiledModelPack } from "../model-pack.ts";
-import type { OpenedVectorRecord } from "../record/vector-record.ts";
+import {
+  MAX_VECTOR_RECORD_BYTES,
+  type OpenedVectorRecord,
+} from "../record/vector-record.ts";
 import {
   prepareSimulation,
   type Scenario,
   type SimulationResult,
 } from "../simulation.ts";
 import { adaptPreparedSimulation } from "./model-pack-adapter.ts";
+import {
+  assertRetainedScenarioPackageReference,
+  type ScenarioPackageReference,
+} from "../scenario-package-reference.ts";
 import {
   BROWSER_RUNTIME_PROTOCOL,
   type BrowserRuntimeRequest,
@@ -52,12 +59,15 @@ export type BrowserSimulationProgress = {
 export type BrowserSimulationCompletion = {
   result: SimulationResult;
   record: OpenedVectorRecord;
+  /** Exact-length Worker-produced .vector bytes retained by the caller. */
+  serializedRecord: ArrayBuffer;
   recordId: string;
   contentDigest: string;
   boundaryCalls: number;
 };
 
 export type BrowserSimulationRunOptions = {
+  packageReference?: ScenarioPackageReference;
   timeoutMs?: number;
   batchTicks?: number;
   progressIntervalMs?: number;
@@ -227,6 +237,10 @@ export class BrowserSimulationClient {
     try {
       await this.initialize();
       const prepared = prepareSimulation(scenario, profileId);
+      if (options.packageReference) {
+        assertRetainedScenarioPackageReference(options.packageReference);
+        prepared.packageReference = structuredClone(options.packageReference);
+      }
       pack = await adaptPreparedSimulation(prepared);
       if (!this.loadedDigests.has(pack.digest)) {
         const requestId = this.nextId("load-pack");
@@ -280,6 +294,14 @@ export class BrowserSimulationClient {
       try {
         const record = response.record;
         if (
+          !Number.isSafeInteger(response.byteLength) ||
+          response.byteLength < 12 ||
+          response.byteLength > response.recordBuffer.byteLength ||
+          response.byteLength > MAX_VECTOR_RECORD_BYTES
+        ) {
+          throw new Error("Browser simulation completion record length is invalid.");
+        }
+        if (
           record.manifest.recordId !== response.recordId ||
           record.manifest.contentDigest !== response.contentDigest
         ) {
@@ -288,6 +310,7 @@ export class BrowserSimulationClient {
         return {
           result: record.result,
           record,
+          serializedRecord: response.recordBuffer.slice(0, response.byteLength),
           recordId: response.recordId,
           contentDigest: response.contentDigest,
           boundaryCalls: response.boundaryCalls,
@@ -322,7 +345,12 @@ export class BrowserSimulationClient {
     if (this.activeRunId || this.preparing) {
       throw new Error("A browser simulation run or record verification is already active.");
     }
-    if (byteLength < 12 || byteLength > buffer.byteLength) {
+    if (
+      !Number.isSafeInteger(byteLength) ||
+      byteLength < 12 ||
+      byteLength > buffer.byteLength ||
+      byteLength > MAX_VECTOR_RECORD_BYTES
+    ) {
       throw new Error("VECTOR record length is out of bounds.");
     }
     this.preparing = true;

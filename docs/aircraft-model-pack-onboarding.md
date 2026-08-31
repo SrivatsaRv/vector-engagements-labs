@@ -11,6 +11,12 @@ remain owned by #154, later #161 stages, and #155 in that causal order.
 
 ## Authority layers
 
+#197 adds no aircraft-model authority layer. Its exact scenario-package
+reference, bounded run duration, and optional authored-route profile belong to
+scenario orchestration and VSR binding downstream of the compiled model pack.
+They cannot supply evidence, promote a pack, select coefficients, or change the
+engine's governed physical models.
+
 Weapon termination is a separate, exact-key model-pack authority layer. Its
 criterion, intended use, radius and maximum flight time must be compiled and
 validated before runtime; catalog designation never supplies those values.
@@ -57,6 +63,13 @@ scenario/runtime boundary and never enter the Stage-B aircraft evidence chain.
 
 ## Schema and migration reference
 
+Forward migration 018 publishes the three #197 `vector.scenario.v4` packages
+at 1.2.0 while retaining their retired 1.1.0 rows; migration 017 remains
+byte- and checksum-frozen. The `vector.scenario-package-reference.v1` and
+`vector.authored-route-profile.v1` contracts are scenario/VSR schemas, not new
+model-pack schemas. No authored-source, compiled-pack, requirement, evidence,
+or model-pack digest version changes for #197.
+
 The current reference pack is 0.9.0 and adds
 `vector.weapon-termination-model.v1`. Forward migration 017 publishes that
 version and its intended-use/credibility identities while preserving prior
@@ -87,6 +100,12 @@ separate persistence contracts; they do not add aircraft-pack keys or silently
 promote a Stage-B identity.
 
 ## Closed requirements and evidence states
+
+The #197 routes, study-regime labels, expected outcomes, and run durations are
+scenario assumptions and regression descriptors. They do not satisfy an
+aircraft requirement, change a field-lineage state, or turn the displayed
+Su-30MKI, Astra, F-16C, or AIM-120 associations into named-performance
+authority. All existing evidence gaps and non-promotion rules remain in force.
 
 The #190 scenario does not admit a new aircraft or weapon model pack. It binds
 the published `vector-scalar-study-models@0.9.0` identity and retains
@@ -146,6 +165,12 @@ satisfy an aircraft requirement or repair an aircraft evidence gap; each family
 must pass its own admission contract before later scenario composition.
 
 ## Step-by-step onboarding
+
+#197 performs none of the onboarding steps below. Each study resolves the
+already-published model pack by its exact ID, version, and digest; the scenario
+content hash identifies the outer scenario definition, not model evidence or a
+replacement compiled-pack digest. Authored duration and route-profile metadata
+cannot select or modify a model during resolution.
 
 An onboarded weapon that can reach runtime must now declare one admissible
 termination model with positive finite SI radius and flight time, explicit
@@ -227,6 +252,11 @@ the repository policy.
 
 ## Anonymous worked example
 
+The #197 named study packages do not alter the anonymous Stage-B proof. They
+consume the current governed reference pack through normal scenario admission;
+their platform/tactical labels remain non-causal, and no anonymous or named pack
+is promoted by reproducing a study outcome.
+
 The anonymous fixtures were regenerated through the same compiler with exact
 termination authority and new content digests. Their different names and
 ordering still cannot create a special runtime branch.
@@ -260,6 +290,13 @@ payload. Pairing either example with a regional EnvironmentPack would create a
 separate scenario identity without changing the compiled aircraft-pack digest.
 
 ## Bounds, storage, and recovery
+
+#197 persists each scenario revision append-only and retains its exact package
+reference in saved-run/VSR admission so a current catalogue label cannot replace
+historical bytes. The optional profile and bounded, three-decimal
+`runDurationSeconds` remain inside the scenario envelope; no raw research bytes
+or model-pack corpus are copied into the VSR. Existing model-pack storage,
+recovery, and resource bounds are unchanged.
 
 The ninth scenario remains a separate immutable template row; it does not copy
 or mutate Stage-B source or derivative records. Recovery restores migration 017
@@ -310,7 +347,13 @@ its aircraft research backup format.
 
 ## Performance evidence
 
-The #190 release evidence runs the nine-scenario engine benchmark with the same
+The three #197 scenario outcomes and their matched WVR control are scenario
+regression evidence, not aircraft-model validation or a new capacity benchmark.
+They add no numerical core or compiled-pack tables. The historical
+585,000-byte WASM evidence gate and the current strict sub-620,000-byte optimized
+WASM ceiling remain unchanged, with no #197 budget exception.
+
+The archived #190 release evidence ran the nine-scenario engine benchmark with the same
 compiled-pack reuse path. The eight historical workloads retain their 75 ms p95
 budget and the new six-entity challenge has a separately reported 110 ms p95
 tier. Its 131.9-second geometric-intercept model time is a deterministic
@@ -346,12 +389,19 @@ measurements are not folded into Stage-B compile, publication or reuse timing.
 
 ## Nonclaims and deferred owners
 
+#197 demonstrates deterministic execution of three authored educational route
+profiles; it does not validate named aircraft, weapons, pilot tactics,
+probability of kill, operational doctrine, or real-world survivability. The
+scenario package reference, duration, and profile are orchestration/VSR binding
+around the unchanged governed model/engine contracts, not an engine ABI or
+model-pack physics extension.
+
 The generic target-effect authority added by #196 binds anonymous study model
 identities only. It does not turn aircraft/store compatibility or public
 Su-30MKI/F-16/Astra/AMRAAM context into susceptibility, warhead, fuze,
 probability-of-kill or named-system effectiveness evidence.
 
-The #190 package does not promote generic coefficients into Su-30MKI, F-16C or
+The archived #190 package does not promote generic coefficients into Su-30MKI, F-16C or
 Astra performance authority. Its compiled 25 m geometric-intercept assumption
 and 21.836104 m achieved closest approach are not detection, launch-zone, fuze,
 hit, damage, kill, probability-of-kill or tactical evidence. The target effect

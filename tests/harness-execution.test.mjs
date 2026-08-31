@@ -170,8 +170,15 @@ test("browser-local uses the governed isolated browser runner", async () => {
 
 test("the Worker verifier uses the pinned Playwright browser outside local overrides", async () => {
   const verifier = await readFile("scripts/verify-browser-worker.ts", "utf8");
+  const evidencePolicy = await readFile("scripts/air-combat-evidence-policy.ts", "utf8");
   assert.match(verifier, /VECTOR_CHROME_PATH\s*\?\?\s*chromium\.executablePath\(\)/);
   assert.doesNotMatch(verifier, /\/Applications\/Google Chrome\.app/);
+  assert.match(verifier, /fixtures\/vector-record\/issue-197/);
+  assert.match(verifier, /trackedAirCombatEvidenceSignature/);
+  assert.match(verifier, /nonManifestMembers/);
+  assert.match(verifier, /publishOrVerifyAirCombatEvidence/);
+  assert.match(evidencePolicy, /Tracked issue #197 evidence .* semantically stale/);
+  assert.match(evidencePolicy, /Write mode requires an explicit staging directory/);
 });
 
 async function unusedLocalPort() {

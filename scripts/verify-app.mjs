@@ -9,6 +9,7 @@ import {
   CURRENT_MODEL_PACK_ID,
   CURRENT_MODEL_PACK_VERSION,
 } from "../lib/reference-model-pack.ts";
+import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 
 const baseUrl = process.env.VECTOR_URL ?? "http://127.0.0.1:4317";
 const connectionString = process.env.DATABASE_URL;
@@ -223,17 +224,21 @@ try {
   const pafInstallations = catalog.installations.filter((item) => item.service === "PAF");
   assert.equal(pafInstallations.length, 15);
   assert.ok(pafInstallations.every((item) => item.icao_code && item.source_id === "shield-paf-orbat-2026-05-19"));
-  assert.equal(catalog.scenarioTemplates.length, 9);
-  assert.equal(
-    catalog.scenarioTemplates.filter((item) => item.version === "1.0.0").length,
-    0,
+  assert.equal(catalog.scenarioTemplates.length, SCENARIO_LIBRARY.length);
+  assert.deepEqual(
+    catalog.scenarioTemplates
+      .map(({ id, version, status }) => ({ id, version, status }))
+      .sort((left, right) => left.id.localeCompare(right.id)),
+    SCENARIO_LIBRARY
+      .map(({ id, version }) => ({ id, version, status: "VALIDATED" }))
+      .sort((left, right) => left.id.localeCompare(right.id)),
   );
-  assert.equal(
-    catalog.scenarioTemplates.filter((item) => item.version === "1.1.0").length,
-    9,
+  const crossingDefinition = SCENARIO_LIBRARY.find(
+    (item) => item.id === "a2a-crossing-intercept",
   );
+  assert.ok(crossingDefinition);
   const template = catalog.scenarioTemplates.find(
-    (item) => item.id === "a2a-crossing-intercept" && item.version === "1.1.0",
+    (item) => item.id === crossingDefinition.id && item.version === crossingDefinition.version,
   );
   assert.ok(template);
   assert.equal(template.schema_version, "vector.scenario.v4");
@@ -274,7 +279,7 @@ try {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       scenarioId: "a2a-crossing-intercept",
-      scenarioVersion: "1.1.0",
+      scenarioVersion: crossingDefinition.version,
       scenarioSchemaVersion: template.schema_version,
       scenarioContentHash: "0".repeat(64),
       draftRevision: 0,
@@ -288,7 +293,7 @@ try {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       scenarioId: "a2a-crossing-intercept",
-      scenarioVersion: "1.1.0",
+      scenarioVersion: crossingDefinition.version,
       scenarioSchemaVersion: template.schema_version,
       scenarioContentHash: template.content_hash,
       draftRevision: 0,

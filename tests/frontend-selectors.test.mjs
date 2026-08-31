@@ -23,7 +23,13 @@ test("display-time selection returns one canonical recorded frame identity", () 
 });
 
 test("current geometry consumes one selected frame and keeps weapon values unavailable before launch", () => {
-  const selected = selectDisplayFrame(result, result.frames[4].t);
+  const launchFrameIndex = result.frames.findIndex((frame) =>
+    frame.entities.some(
+      (entity) => entity.id === result.engineRun.primaryWeaponId,
+    )
+  );
+  assert.ok(launchFrameIndex > 0);
+  const selected = selectDisplayFrame(result, result.frames[launchFrameIndex].t);
   const geometry = selectCurrentGeometry(result, selected);
   assert.equal(geometry.state, "AVAILABLE");
   assert.equal(geometry.displayTimeSeconds, selected.displayTimeSeconds);
@@ -34,14 +40,11 @@ test("current geometry consumes one selected frame and keeps weapon values unava
   assert.equal(geometry.lineOfSightRateRadS, selected.frame.losRate);
   assert.equal(geometry.weapon.state, "AVAILABLE");
 
-  const prelaunch = {
-    ...result,
-    frames: result.frames.map((frame, index) => index !== selected.frameIndex
-      ? frame
-      : { ...frame, entities: frame.entities.filter((entity) => entity.id !== result.engineRun.primaryWeaponId) }),
-  };
-  const prelaunchSelected = selectDisplayFrame(prelaunch, selected.displayTimeSeconds);
-  const beforeLaunch = selectCurrentGeometry(prelaunch, prelaunchSelected);
+  const prelaunchSelected = selectDisplayFrame(
+    result,
+    result.frames[launchFrameIndex - 1].t,
+  );
+  const beforeLaunch = selectCurrentGeometry(result, prelaunchSelected);
   assert.equal(beforeLaunch.state, "AVAILABLE");
   assert.equal(beforeLaunch.relationship, "AIRCRAFT_TO_TARGET");
   assert.deepEqual(beforeLaunch.weapon, { state: "UNAVAILABLE", reason: "NOT_LAUNCHED" });

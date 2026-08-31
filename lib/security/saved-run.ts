@@ -32,13 +32,22 @@ import {
   engineDurationSecondsForDomain,
 } from "../engine/compiler.ts";
 import {
+  AIR_COMBAT_STUDY_ENUM_AUTHORITIES,
+  AUTHORED_AIRCRAFT_TAS_AUTHORITY,
+  AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY,
+  AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY,
+  AUTHORED_TRUE_HEADING_AUTHORITY,
+  AUTHORED_WGS84_LATITUDE_AUTHORITY,
+  AUTHORED_WGS84_LONGITUDE_AUTHORITY,
+  admitStructuredNumber,
   assertStructuredScenarioNumbers,
   ScenarioControlAdmissionError,
 } from "../scenario-control-authority.ts";
+import { buildAuthoredProfileBinding } from "../report-profile.ts";
 
 const domains = new Set(["A2A", "A2G", "G2A", "G2G"]);
 const profiles = new Set(["short", "medium", "sustained"]);
-const guidance = new Set(["direct", "loft"]);
+const guidance = new Set<string>(AIR_COMBAT_STUDY_ENUM_AUTHORITIES.guidance);
 const radarModes = new Set(["ACTIVE", "SILENT"]);
 const trackSources = new Set(["ONBOARD_RADAR", "DATALINK", "AIRBORNE_EARLY_WARNING", "VISUAL"]);
 
@@ -58,11 +67,36 @@ function optionalTime(value: unknown, field: string) {
   return value === null ? null : finiteNumber(value, 0, 600, field);
 }
 
+function governedNumber(
+  value: unknown,
+  authority: NonNullable<(typeof AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY)>,
+  field: string,
+) {
+  const admitted = admitStructuredNumber(value, authority);
+  if (!admitted.ok || admitted.value === null) {
+    throw new PublicApiError(400, `invalid_${field}_${admitted.ok ? "null" : admitted.code.toLowerCase()}`);
+  }
+  return admitted.value;
+}
+
+function governedRegionalNumber(
+  value: unknown,
+  authority: NonNullable<(typeof AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY)>,
+  minimum: number,
+  maximum: number,
+  field: string,
+) {
+  return finiteNumber(governedNumber(value, authority, field), minimum, maximum, field);
+}
+
 function spatialPlan(value: unknown): Scenario["spatialPlan"] {
   if (value === undefined) return undefined;
   if (!value || typeof value !== "object") throw new PublicApiError(400, "invalid_spatial_plan");
   const candidate = value as Record<string, unknown>;
-  const side = (input: unknown, name: string) => {
+  const side = (
+    input: unknown,
+    name: "blue" | "red",
+  ) => {
     if (!input || typeof input !== "object") throw new PublicApiError(400, `invalid_${name}_placement`);
     const placement = input as Record<string, unknown>;
     if (!placement.position || typeof placement.position !== "object") {
@@ -76,7 +110,7 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
       throw new PublicApiError(400, `invalid_${name}_route_plan`);
     }
     const acceptedRadii = routeAcceptanceRadiiM.map((entry, index) => {
-      const radius = finiteNumber(entry, 1, 25_000, `${name}_route_acceptance_radius_${index}`);
+      const radius = governedNumber(entry, AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY, `${name}_route_acceptance_radius_${index}`);
       if (index === 0 && radius !== 1) {
         throw new PublicApiError(400, `invalid_${name}_route_plan`);
       }
@@ -88,20 +122,20 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
       // documented all-fly-by execution rather than inventing v2 state.
       return {
         position: {
-          longitude: finiteNumber(point.longitude, 60, 100, `${name}_longitude`),
-          latitude: finiteNumber(point.latitude, 0, 40, `${name}_latitude`),
-          altitudeM: finiteNumber(point.altitudeM, -500, 30_000, `${name}_altitude`),
+          longitude: governedRegionalNumber(point.longitude, AUTHORED_WGS84_LONGITUDE_AUTHORITY, 60, 100, `${name}_longitude`),
+          latitude: governedRegionalNumber(point.latitude, AUTHORED_WGS84_LATITUDE_AUTHORITY, 0, 40, `${name}_latitude`),
+          altitudeM: governedNumber(point.altitudeM, AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY, `${name}_altitude`),
           verticalDatum: explicitMsl(point.verticalDatum, `${name}_vertical_datum`),
         },
-        headingDeg: finiteNumber(placement.headingDeg, 0, 360, `${name}_heading`),
-        speedMps: finiteNumber(placement.speedMps, 0, 3_000, `${name}_speed`),
+        headingDeg: governedNumber(placement.headingDeg, AUTHORED_TRUE_HEADING_AUTHORITY, `${name}_heading`),
+        speedMps: governedNumber(placement.speedMps, AUTHORED_AIRCRAFT_TAS_AUTHORITY, `${name}_speed`),
         route: route.map((entry, index) => {
           if (!entry || typeof entry !== "object") throw new PublicApiError(400, `invalid_${name}_route_${index}`);
           const routePoint = entry as Record<string, unknown>;
           return {
-            longitude: finiteNumber(routePoint.longitude, 60, 100, `${name}_route_longitude`),
-            latitude: finiteNumber(routePoint.latitude, 0, 40, `${name}_route_latitude`),
-            altitudeM: finiteNumber(routePoint.altitudeM, -500, 30_000, `${name}_route_altitude`),
+            longitude: governedRegionalNumber(routePoint.longitude, AUTHORED_WGS84_LONGITUDE_AUTHORITY, 60, 100, `${name}_route_longitude`),
+            latitude: governedRegionalNumber(routePoint.latitude, AUTHORED_WGS84_LATITUDE_AUTHORITY, 0, 40, `${name}_route_latitude`),
+            altitudeM: governedNumber(routePoint.altitudeM, AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY, `${name}_route_altitude`),
             verticalDatum: explicitMsl(routePoint.verticalDatum, `${name}_route_vertical_datum`),
           };
         }),
@@ -123,20 +157,20 @@ function spatialPlan(value: unknown): Scenario["spatialPlan"] {
     }) as ("START" | "FLY_BY" | "FLY_OVER")[];
     return {
       position: {
-        longitude: finiteNumber(point.longitude, 60, 100, `${name}_longitude`),
-        latitude: finiteNumber(point.latitude, 0, 40, `${name}_latitude`),
-        altitudeM: finiteNumber(point.altitudeM, -500, 30_000, `${name}_altitude`),
+        longitude: governedRegionalNumber(point.longitude, AUTHORED_WGS84_LONGITUDE_AUTHORITY, 60, 100, `${name}_longitude`),
+        latitude: governedRegionalNumber(point.latitude, AUTHORED_WGS84_LATITUDE_AUTHORITY, 0, 40, `${name}_latitude`),
+        altitudeM: governedNumber(point.altitudeM, AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY, `${name}_altitude`),
         verticalDatum: explicitMsl(point.verticalDatum, `${name}_vertical_datum`),
       },
-      headingDeg: finiteNumber(placement.headingDeg, 0, 360, `${name}_heading`),
-      speedMps: finiteNumber(placement.speedMps, 0, 3_000, `${name}_speed`),
+      headingDeg: governedNumber(placement.headingDeg, AUTHORED_TRUE_HEADING_AUTHORITY, `${name}_heading`),
+      speedMps: governedNumber(placement.speedMps, AUTHORED_AIRCRAFT_TAS_AUTHORITY, `${name}_speed`),
       route: route.map((entry, index) => {
         if (!entry || typeof entry !== "object") throw new PublicApiError(400, `invalid_${name}_route_${index}`);
         const routePoint = entry as Record<string, unknown>;
         return {
-          longitude: finiteNumber(routePoint.longitude, 60, 100, `${name}_route_longitude`),
-          latitude: finiteNumber(routePoint.latitude, 0, 40, `${name}_route_latitude`),
-          altitudeM: finiteNumber(routePoint.altitudeM, -500, 30_000, `${name}_route_altitude`),
+          longitude: governedRegionalNumber(routePoint.longitude, AUTHORED_WGS84_LONGITUDE_AUTHORITY, 60, 100, `${name}_route_longitude`),
+          latitude: governedRegionalNumber(routePoint.latitude, AUTHORED_WGS84_LATITUDE_AUTHORITY, 0, 40, `${name}_route_latitude`),
+          altitudeM: governedNumber(routePoint.altitudeM, AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY, `${name}_route_altitude`),
           verticalDatum: explicitMsl(
             routePoint.verticalDatum,
             `${name}_route_vertical_datum`,
@@ -281,6 +315,9 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
     lossIncreaseAt: optionalTime(input.lossIncreaseAt, "wind_shift_at"),
     lossIncreaseAmount: finiteNumber(input.lossIncreaseAmount, -150, 150, "wind_shift"),
     seed: finiteNumber(input.seed, 0, 2_147_483_647, "seed"),
+    runDurationSeconds: input.runDurationSeconds === undefined
+      ? undefined
+      : finiteNumber(input.runDurationSeconds, 0.001, 3_600, "run_duration_seconds"),
   };
   if (scenario.domain !== template.domain) throw new PublicApiError(409, "scenario_domain_mismatch");
   if (scenario.domain === "A2A" && !scenario.airMission) {
@@ -318,7 +355,8 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
         environmentPackDigest: environment.pack.identity.digest,
         environmentPack: environment.pack,
         fixedStepSeconds: ENGINE_FIXED_STEP_SECONDS,
-        durationSeconds: engineDurationSecondsForDomain(scenario.domain),
+        durationSeconds: scenario.runDurationSeconds
+          ?? engineDurationSecondsForDomain(scenario.domain),
       });
     }
   } catch (error) {
@@ -409,6 +447,12 @@ export async function buildVerifiedSavedRun(
       scope: template.scope,
       targetProfile: template.targetProfile,
       theatre: template.theatre,
+      ...(template.authoredProfile
+        ? {
+            authoredProfile: structuredClone(template.authoredProfile),
+            authoredProfileBinding: buildAuthoredProfileBinding(template, scenario),
+          }
+        : {}),
     },
   };
   return { scenario, result, report };

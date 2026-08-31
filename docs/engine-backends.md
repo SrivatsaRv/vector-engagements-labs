@@ -4,6 +4,16 @@ VECTOR has one engine contract and two browser implementations. The authored sce
 
 ## Rust / WebAssembly
 
+#197 does not add a Rust export, JSON field, numerical branch, model-pack
+projection, or physics coefficient. Its scenario-owned duration is compiled
+into the existing `EngineScenario.durationSeconds`; its exact scenario-package
+reference and authored-route profile are orchestration/VSR metadata outside the
+Rust numerical ABI. Both engines therefore receive the same already-compiled
+scenario, and neither may branch on the package ID, study regime, tactical
+label, or expected-outcome descriptor. The historical 585,000-byte evidence
+gate and current strict sub-620,000-byte optimized WASM ceiling are unchanged;
+#197 provides no additional binary-size budget.
+
 Ground-operation v2 is an exact cross-backend ABI: direct Rust/WASM reads the
 unchanged full compiled Air mission as independent authority, binds its generic
 projection to both compact runtime copies, and emits the same per-tick state,
@@ -121,6 +131,15 @@ It is not a separate product mode. Its purpose is controlled parity testing, dia
 
 ## Selection and provenance
 
+#197 adds backend-independent scenario provenance, not a backend selector. The
+VSR retains the exact `vector.scenario-package-reference.v1` identity and the
+admitted authored duration beside the existing engine/model/mission identities;
+the optional `vector.authored-route-profile.v1` remains descriptive. A package
+reference, route-profile label, expected outcome, or study regime cannot select
+TypeScript or Rust/WASM, repair a stale model-pack digest, or alter execution.
+Legacy scenarios that omit `runDurationSeconds` keep the existing domain
+default, identically for both backends.
+
 Backend selection cannot add, remove or reinterpret target-effect authority.
 Both backends retain the same authority/model/target-profile digests and seal
 the same canonical six-decimal causal projection into the commit; any mismatch
@@ -143,6 +162,11 @@ provenance. Backend choice cannot create, migrate, or repair mission intent.
 Airborne transfer provenance is likewise backend-neutral: authored digest,
 aircraft source identity, ordered transfer digests and the independent
 authority seal are identical in both engines and retained in the VSR.
+An accepted transfer keeps the full binary64 drag removal in aircraft state,
+but publishes `installedDragNewtons` with one shared non-negative
+multiply/round/divide rule at six decimal places. This narrows only the event
+evidence scalar, not the integrator, and gives TypeScript and Rust/WASM an exact
+event-stream equality boundary.
 Backend provenance now sits beside one content-addressed regional pack. A run
 is rejected when the runtime grid, source grids or compact pack binding do not
 match the archived EnvironmentPack digest.
@@ -197,6 +221,17 @@ runtime.
   verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
 
 ## Swap boundary
+
+The three #197 studies cross the existing swap boundary as ordinary compiled
+Air scenarios. `runDurationSeconds` changes only the existing terminal time
+limit; the package reference and authored-profile metadata remain outside the
+numerical swap and are copied only into persistence/VSR provenance. Exact route
+geometry, admitted mission values, model-pack identity, and compiled target-
+effect authority remain the causal inputs. Consequently, swapping backends
+must preserve the complete frames/events and study outcome without any
+scenario-ID or tactical-label special case. This adds no engine ABI or
+model-pack-physics change and does not revise either the 585,000-byte historical
+evidence gate or the current strict sub-620,000-byte WASM ceiling.
 
 The swap contract now includes exact target-effect result, reason, commit ID,
 causal termination receipt, target lifecycle and event/frame ordering. A backend

@@ -198,6 +198,11 @@ rows; it consumes their existing identities while upserting and verifying the
 eight historical canonical scenario packages. Migration 016 independently
 adds and reads back the ninth package, the governed high-energy crossing
 challenge, without rewriting any published historical package.
+Migration 017 remains the immutable `1.1.0`/model-pack `0.9.0` publication.
+Migration 018 adds exact `1.2.0` versions of the three Air-combat identities
+with authored BVR, WVR and transition routes, then marks only their superseded
+`1.1.0` rows `RETIRED`. It never rewrites an existing `(id, version)`; a
+conflicting pre-existing row fails exact package/hash readback and rolls back.
 
 Installation and study-area table definitions are owned by
 `db/schema/geospatial.ts`; this module split does not change their PostGIS

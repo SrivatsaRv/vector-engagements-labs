@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -42,6 +42,34 @@ function Harness({ onValidityChange, onEntityChange, initial = initialEntity }: 
 }
 
 describe("SpatialEntityEditor", () => {
+  it("binds every #197 spatial text control to malformed, nonfinite, precision, and range admission", async () => {
+    const onValidityChange = vi.fn();
+    render(<Harness onValidityChange={onValidityChange} />);
+    const cases = [
+      ["spatial.blue.start.longitude", "31.1234567890123456", "181", "75.5"],
+      ["spatial.blue.start.latitude", "31.1234567890123456", "91", "31.5"],
+      ["spatial.blue.start.altitude", "1.0001", "15000.001", "8500"],
+      ["spatial.blue.start.heading", "1.0001", "360", "90"],
+      ["spatial.blue.start.speed", "1.0001", "450.001", "270"],
+      ["spatial.blue.route[*].longitude", "31.1234567890123456", "181", "75.5"],
+      ["spatial.blue.route[*].latitude", "31.1234567890123456", "91", "31.5"],
+      ["spatial.blue.route[*].altitudeM", "1.0001", "15000.001", "9200"],
+      ["spatial.blue.route[*].acceptanceRadiusM", "1.0001", "25000.001", "2500"],
+    ] as const;
+
+    for (const [controlId, overPrecision, outOfRange, valid] of cases) {
+      const input = document.querySelector<HTMLInputElement>(`[data-control-id="${controlId}"]`);
+      expect(input, controlId).not.toBeNull();
+      for (const raw of ["1e", "1e999", overPrecision, outOfRange]) {
+        fireEvent.change(input!, { target: { value: raw } });
+        expect(input).toHaveValue(raw);
+        expect(input).toHaveAttribute("aria-invalid", "true");
+      }
+      fireEvent.change(input!, { target: { value: valid } });
+      expect(input, controlId).toHaveAttribute("aria-invalid", "false");
+    }
+  });
+
   it("preserves an invalid speed instead of silently clamping it", async () => {
     const user = userEvent.setup();
     const onValidityChange = vi.fn();
@@ -53,7 +81,7 @@ describe("SpatialEntityEditor", () => {
 
     expect(speed).toHaveValue("-1");
     expect(speed).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByText(/speed must be from 0 to 1,500 m\/s/i)).toBeVisible();
+    expect(screen.getByText(/speed must be from 0 to 450 m\/s/i)).toBeVisible();
     await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
 
     await user.clear(speed);
@@ -63,6 +91,30 @@ describe("SpatialEntityEditor", () => {
     expect(speed).toHaveValue("275");
     expect(speed).toHaveAttribute("aria-invalid", "false");
     await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(true));
+  });
+
+  it("uses the same three-decimal altitude and TAS boundaries as final admission", async () => {
+    const user = userEvent.setup();
+    const onValidityChange = vi.fn();
+    render(<Harness onValidityChange={onValidityChange} />);
+    const start = screen.getByRole("group", { name: "Airborne start" });
+    const speed = within(start).getByRole("textbox", { name: /true airspeed/i });
+    const altitude = within(start).getByRole("textbox", { name: /^altitude/i });
+
+    await user.clear(speed);
+    await user.type(speed, "450.001");
+    expect(speed).toHaveAttribute("aria-invalid", "true");
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
+
+    await user.clear(speed);
+    await user.type(speed, "450");
+    await user.keyboard("{Enter}");
+    expect(speed).toHaveAttribute("aria-invalid", "false");
+
+    await user.clear(altitude);
+    await user.type(altitude, "15000.001");
+    expect(altitude).toHaveAttribute("aria-invalid", "true");
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
   });
 
   it("rejects 360 degrees instead of normalizing it to north", async () => {

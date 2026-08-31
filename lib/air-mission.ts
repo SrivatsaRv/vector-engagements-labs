@@ -16,6 +16,10 @@ import {
   type CompiledModelPack,
 } from "./model-pack.ts";
 import {
+  AIR_COMBAT_STUDY_ENUM_AUTHORITIES,
+  AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY,
+  AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY,
+  AUTHORED_STORE_TRANSFER_TIME_AUTHORITY,
   MAX_AUTHORED_SCALAR_FRACTION_DIGITS,
   MAX_WGS84_FRACTION_DIGITS,
   hasDeclaredPrecision,
@@ -345,8 +349,8 @@ export type AircraftGroundEnvelope = {
 };
 
 export const AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2 = Object.freeze({
-  minimum: 0.001,
-  maximum: 1,
+  minimum: AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY.minimum,
+  maximum: AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY.maximum,
 });
 
 export type CompiledAirborneStoreTransfer = {
@@ -1022,7 +1026,7 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
   const rootKeys = ["schemaVersion", "id", "version", "objective", "side", "missionClass", "regime", "studyAreaId", "weatherPresetId", "assignedTargetIds", "flightPlans", "start", "assignments", "tasks", "policies", "fuel", "completionCondition", "abortCondition", "disengagementCondition", "recoveryCondition", "intendedUse", "provenance", "assumptions", "validityLimits"];
   exactRecord(value, rootKeys, "airMission");
   const mission = value as unknown as AirMissionDefinition;
-  if (mission.schemaVersion !== AIR_MISSION_SCHEMA_VERSION || !nonEmptyText(mission.id) || !nonEmptyText(mission.version) || !nonEmptyText(mission.objective) || !["BLUE", "RED"].includes(mission.side) || !["TACTICAL_INTERCEPT", "COMBAT_AIR_PATROL", "FIGHTER_SWEEP", "ESCORT"].includes(mission.missionClass) || !["BVR", "WVR_BFM", "UNRESTRICTED_TRANSITION"].includes(mission.regime) || !nonEmptyText(mission.studyAreaId) || !nonEmptyText(mission.weatherPresetId)) {
+  if (mission.schemaVersion !== AIR_MISSION_SCHEMA_VERSION || !nonEmptyText(mission.id) || !nonEmptyText(mission.version) || !nonEmptyText(mission.objective) || !["BLUE", "RED"].includes(mission.side) || !["TACTICAL_INTERCEPT", "COMBAT_AIR_PATROL", "FIGHTER_SWEEP", "ESCORT"].includes(mission.missionClass) || !(AIR_COMBAT_STUDY_ENUM_AUTHORITIES.engagementRegime as readonly string[]).includes(mission.regime) || !nonEmptyText(mission.studyAreaId) || !nonEmptyText(mission.weatherPresetId)) {
     fail("MISSION_SCHEMA_INVALID", "airMission", "The Air mission identity, taxonomy, or objective is invalid.", "Select a supported class/regime and provide stable identity and objective.");
   }
   if (mission.side !== "BLUE") fail("MISSION_SIDE_UNSUPPORTED", "side", "The current Air mission runtime admits the BLUE launcher-side mission only.", "Author the BLUE launcher-side mission; RED-side mission mapping is not available in vector.air-mission.v1.");
@@ -1045,7 +1049,7 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
       if (!isRecord(point.constraint.speed)) fail("MISSION_SCHEMA_INVALID", `${pointPath}.constraint.speed`, "Speed constraint is malformed.", "Choose TAS metres per second or Mach.");
       const speedKeys = point.constraint.speed.kind === "TAS" ? ["kind", "valueMps"] : ["kind", "value"];
       exactRecord(point.constraint.speed, speedKeys, `${pointPath}.constraint.speed`);
-      if (!nonEmptyText(point.id) || !["START", "FLY_BY", "FLY_OVER"].includes(point.turnMethod) || !Number.isFinite(point.acceptanceRadiusM) || point.acceptanceRadiusM < 1 || point.acceptanceRadiusM > 25_000 || (pointIndex === 0 && point.acceptanceRadiusM !== 1) || (point.turnMethod === "FLY_OVER" && point.acceptanceRadiusM !== 1) || (point.taskRef !== null && !nonEmptyText(point.taskRef)) || typeof point.constraint.locked !== "boolean" || !["MSL", "AGL"].includes(point.position.altitude.datum) || !["TAS", "MACH"].includes(point.constraint.speed.kind)) fail("MISSION_SCHEMA_INVALID", pointPath, "Route-point identity, turn, acceptance radius, datum, speed, lock, or task reference is invalid.", "Author an exact typed route point with a bounded radius; START and FLY_OVER use 1 metre.");
+      if (!nonEmptyText(point.id) || !(AIR_COMBAT_STUDY_ENUM_AUTHORITIES.routeTransition as readonly string[]).includes(point.turnMethod) || !Number.isFinite(point.acceptanceRadiusM) || point.acceptanceRadiusM < 1 || point.acceptanceRadiusM > 25_000 || !Number.isFinite(point.position.altitude.valueM) || point.position.altitude.valueM < AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY.minimum || point.position.altitude.valueM > AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY.maximum || (pointIndex === 0 && point.acceptanceRadiusM !== 1) || (point.turnMethod === "FLY_OVER" && point.acceptanceRadiusM !== 1) || (point.taskRef !== null && !nonEmptyText(point.taskRef)) || typeof point.constraint.locked !== "boolean" || !["MSL", "AGL"].includes(point.position.altitude.datum) || !["TAS", "MACH"].includes(point.constraint.speed.kind)) fail("MISSION_SCHEMA_INVALID", pointPath, "Route-point identity, turn, acceptance radius, altitude, datum, speed, lock, or task reference is invalid.", "Author an exact typed route point with bounded altitude and radius; START and FLY_OVER use 1 metre.");
       requireAuthoredPrecision(point.position.longitude, MAX_WGS84_FRACTION_DIGITS, `${pointPath}.position.longitude`);
       requireAuthoredPrecision(point.position.latitude, MAX_WGS84_FRACTION_DIGITS, `${pointPath}.position.latitude`);
       requireAuthoredPrecision(point.position.altitude.valueM, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${pointPath}.position.altitude.valueM`);
@@ -1063,7 +1067,7 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
     plan.legs.forEach((leg, legIndex) => {
       const legPath = `${planPath}.legs[${legIndex}]`;
       exactRecord(leg, ["id", "fromPointId", "toPointId", "role"], legPath);
-      if (!nonEmptyText(leg.id) || !nonEmptyText(leg.fromPointId) || !nonEmptyText(leg.toPointId) || !["DEPARTURE", "TRANSIT", "INGRESS", "INTERCEPT_ATTACK", "ON_STATION_PATROL", "REFUEL", "EGRESS", "RECOVERY", "DIVERT"].includes(leg.role)) fail("MISSION_SCHEMA_INVALID", legPath, "Flight-plan leg identity, endpoints, or role is invalid.", "Use an existing route-point pair and supported leg role.");
+      if (!nonEmptyText(leg.id) || !nonEmptyText(leg.fromPointId) || !nonEmptyText(leg.toPointId) || !(AIR_COMBAT_STUDY_ENUM_AUTHORITIES.flightLegRole as readonly string[]).includes(leg.role)) fail("MISSION_SCHEMA_INVALID", legPath, "Flight-plan leg identity, endpoints, or role is invalid.", "Use an existing route-point pair and supported leg role.");
     });
   });
 
@@ -1101,7 +1105,7 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
       assignment.storeTransferPlan.requests.forEach((request, requestIndex) => {
         const requestPath = `${path}.storeTransferPlan.requests[${requestIndex}]`;
         exactRecord(request, ["id", "launcherEntityId", "storeEntityId", "storeOrdinal", "stationId", "storeSourceObjectId", "operation", "requestedTimeSeconds", "installedDragAreaM2", "valueState", "evidenceRefIds", "limitationIds"], requestPath);
-        if (!nonEmptyText(request.id) || !nonEmptyText(request.launcherEntityId) || !nonEmptyText(request.storeEntityId) || !Number.isSafeInteger(request.storeOrdinal) || request.storeOrdinal < 1 || !nonEmptyText(request.stationId) || !nonEmptyText(request.storeSourceObjectId) || !["RELEASE", "JETTISON"].includes(request.operation) || !Number.isFinite(request.requestedTimeSeconds) || request.requestedTimeSeconds < 0 || !Number.isFinite(request.installedDragAreaM2) || request.installedDragAreaM2 < AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.minimum || request.installedDragAreaM2 > AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.maximum || !["MODEL_ASSUMPTION", "USER_AUTHORED"].includes(request.valueState) || !Array.isArray(request.evidenceRefIds) || !request.evidenceRefIds.length || request.evidenceRefIds.some((id) => !nonEmptyText(id)) || !Array.isArray(request.limitationIds) || !request.limitationIds.length || request.limitationIds.some((id) => !nonEmptyText(id))) {
+        if (!nonEmptyText(request.id) || !nonEmptyText(request.launcherEntityId) || !nonEmptyText(request.storeEntityId) || !Number.isSafeInteger(request.storeOrdinal) || request.storeOrdinal < 1 || !nonEmptyText(request.stationId) || !nonEmptyText(request.storeSourceObjectId) || !["RELEASE", "JETTISON"].includes(request.operation) || !Number.isFinite(request.requestedTimeSeconds) || request.requestedTimeSeconds < AUTHORED_STORE_TRANSFER_TIME_AUTHORITY.minimum || request.requestedTimeSeconds > AUTHORED_STORE_TRANSFER_TIME_AUTHORITY.maximum || !Number.isFinite(request.installedDragAreaM2) || request.installedDragAreaM2 < AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY.minimum || request.installedDragAreaM2 > AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY.maximum || !["MODEL_ASSUMPTION", "USER_AUTHORED"].includes(request.valueState) || !Array.isArray(request.evidenceRefIds) || !request.evidenceRefIds.length || request.evidenceRefIds.some((id) => !nonEmptyText(id)) || !Array.isArray(request.limitationIds) || !request.limitationIds.length || request.limitationIds.some((id) => !nonEmptyText(id))) {
           fail("MISSION_SCHEMA_INVALID", requestPath, "Store-transfer request identity, operation, SI values, provenance, or authority is invalid.", "Author finite physical transfer intent with exact identities and evidence/limitation references.");
         }
         requireAuthoredPrecision(request.requestedTimeSeconds, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${requestPath}.requestedTimeSeconds`);

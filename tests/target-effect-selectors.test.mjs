@@ -68,9 +68,10 @@ test("the selector presents the canonical commit only at and after its exact ret
   assert.equal(atBoundary.presentation.effectClass, event.payload.commit.result);
   assert.equal(atBoundary.projection.frameIndex, event.frameIndex);
   assert.equal(atBoundary.projection.modelTimeSeconds, event.modelTimeSeconds);
-  assert.equal(atBoundary.projection.authority.state, "UNAVAILABLE");
-  assert.equal(atBoundary.projection.effectReason, "AUTHORITY_UNAVAILABLE");
-  assert.equal(atBoundary.presentation.assumptionLabel, null);
+  assert.equal(atBoundary.projection.authority.state, "ADMITTED");
+  assert.equal(atBoundary.projection.effectReason, "THRESHOLD_BAND");
+  assert.equal(atBoundary.presentation.assumptionLabel, "MODEL_ASSUMPTION");
+  assert.equal(atBoundary.presentation.killClaimAuthorized, true);
 });
 
 test("selector requires exact target projection persistence and exclusive ownership on later frames", () => {
@@ -271,14 +272,15 @@ test("resealed high-energy KILL with an invented threshold cannot override indep
   const target = result.frames[event.frameIndex].entities.find(
     (entity) => entity.id === event.payload.commit.targetId,
   );
-  assert.equal(event.payload.commit.closestApproachM, 21.836104);
+  assert.equal(event.payload.commit.closestApproachM, 24.947303);
   assert.equal(event.payload.commit.result, "NO_EFFECT");
+  const inventedThresholdM = event.payload.commit.closestApproachM;
 
   const forged = structuredClone(event.payload.commit);
   Object.assign(forged, {
     result: "KILL",
     reason: "THRESHOLD_BAND",
-    selectedThresholdUpperBoundM: 21.836104,
+    selectedThresholdUpperBoundM: inventedThresholdM,
     targetEffectStateAfter: "KILL",
     targetLifecycleAfter: "TERMINATED",
   });
@@ -344,6 +346,9 @@ test("legacy NOT_MODELLED remains explicit when no canonical commit exists", () 
   delete result.frames[event.frameIndex].entities.find(
     (entity) => entity.id === event.payload.commit.targetId,
   ).targetEffect;
+  result.frames[event.frameIndex].entities.find(
+    (entity) => entity.id === event.payload.commit.targetId,
+  ).lifecycle = event.payload.commit.targetLifecycleBefore;
 
   const selected = selectCanonicalTargetEffect(
     result,
@@ -417,7 +422,7 @@ test("report export carries the exact canonical target-effect event projection",
   assert.equal(report.session.targetEffectEvent.eventId, event.id);
   assert.equal(report.session.targetEffectEvent.frameIndex, event.frameIndex);
   assert.equal(report.session.targetEffectEvent.time.value, event.modelTimeSeconds);
-  assert.equal(report.result.targetEffect.killClaimAuthorized, false);
-  assert.match(result.reason, /No governed target-effect result is available/);
-  assert.doesNotMatch(result.reason, /\bkill(?:ed)?\b/i);
+  assert.equal(report.result.targetEffect.killClaimAuthorized, true);
+  assert.match(result.reason, /scored a modeled kill/i);
+  assert.match(result.reason, /MODEL_ASSUMPTION limitations:/i);
 });

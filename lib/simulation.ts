@@ -36,7 +36,11 @@ import {
   assertRecordedSidePictures,
   projectObserverStates,
 } from "./information-state.ts";
-import { assertStructuredScenarioNumbers } from "./scenario-control-authority.ts";
+import {
+  assertAirCombatStudyScenarioEnums,
+  assertStructuredScenarioNumbers,
+} from "./scenario-control-authority.ts";
+import type { ScenarioPackageReference } from "./scenario-package-reference.ts";
 
 export { standardAtmosphere } from "./engine/atmosphere.ts";
 export type { AtmosphereState } from "./engine/atmosphere.ts";
@@ -135,6 +139,8 @@ export type Scenario = {
   lossIncreaseAt: number | null;
   lossIncreaseAmount: number;
   seed: number;
+  /** Scenario-owned model duration. Historical packages omit it and retain the domain default. */
+  runDurationSeconds?: number;
 };
 
 export type Frame = {
@@ -238,6 +244,8 @@ export type VehicleProfile = {
 
 export type PreparedSimulation = {
   scenario: Scenario;
+  /** Exact governed catalog package used to author this run, when available. */
+  packageReference?: ScenarioPackageReference;
   capabilityManifest: DeploymentCapabilityManifest;
   profileId: ProfileId;
   profile: VehicleProfile;
@@ -495,6 +503,7 @@ export function prepareSimulation(
   capabilityManifest = DEPLOYMENT_CAPABILITIES,
 ): PreparedSimulation {
   assertStructuredScenarioNumbers(input);
+  assertAirCombatStudyScenarioEnums(input);
   admitScenarioCapabilities(
     input as Scenario & Record<string, unknown>,
     capabilityManifest,
@@ -567,6 +576,7 @@ export function prepareSimulation(
       windShiftEastMps: input.lossIncreaseAmount,
       windShiftNorthMps: 0,
       seed: input.seed,
+      runDurationSeconds: input.runDurationSeconds,
       placement,
       airMission: input.airMission,
       authoredScenario: input,

@@ -343,6 +343,77 @@ byte-for-byte flat from run one through run 100. The governed bounds are 16 MiB
 absolute retained growth, at most 10% relative regression, and zero additional
 growth after the first run.
 
+Issue #197 adds `performance:air-combat-studies:verify`, a focused exact-package
+gate over the BVR offset/support, WVR one-circle/defensive-break and
+beam/drag/extend/recommit transition studies through both TypeScript and
+Rust/WASM. Seven measured runs per package/backend retain separate nearest-rank
+p50, p95 and maximum values for engine execution, VSR creation/serialization,
+cryptographic VSR reopen and report generation. Every reopened record must bind
+the exact retained package identity and every run must retain its governed
+outcome. The regression budgets are 150 ms engine p95, 250 ms record-create p95,
+250 ms open/verify p95 and 50 ms report p95. The exact-study artifact ceilings
+are 8 MiB per VSR and 512 KiB per JSON report. Those artifact limits are
+regression alarms, not transport capacities: the 8 MiB VSR ceiling is more than
+five times the current largest exact study while remaining one eighth of the
+independently enforced 64 MiB browser transport maximum; the report ceiling
+allows substantial diagnostic growth without allowing an accidental frame or
+event dump into the summary document. Raising any limit requires new measured
+evidence and a reviewed contract change.
+
+On 2026-08-31, Node v24.3.0 on an Apple M5 arm64 measured exact-study engine
+p95 values of 22.360–48.236 ms, VSR create/serialize p95 of 8.404–20.497 ms,
+cryptographic reopen p95 of 40.030–118.059 ms and report-generation p95 of
+2.531–6.227 ms across the six package/backend combinations. The largest VSR
+was 1,440,135 bytes and the largest JSON report was 298,300 bytes. All declared
+limits passed without override. These local measurements establish regression
+headroom; they are not named-platform fidelity or production-host capacity
+evidence.
+
+The separate `test:browser:air-combat-performance` journey measures the actual
+built Chromium application rather than extending those Node timings into a
+browser claim. It loads and runs all three exact packages through the production
+Worker, selects each canonical effect frame in 3D, advances live canonical 3D
+playback at 4× while collecting 90 `requestAnimationFrame` intervals, observes
+main-thread Long Tasks, materializes the retained Worker-produced VSR through
+the download boundary, and compares garbage-collected heap before and after
+each study and after navigation cleanup. Correct frame, time, effect, record ID,
+content digest and advancing playback are prerequisites; a fast but incorrect
+run cannot satisfy the performance gate.
+
+The calibrated regression alarms are 10,000 ms each for package load and
+Worker run completion, 2,000 ms for 3D canonical-frame selection, 34 ms
+nearest-rank animation-frame p95, 300 ms maximum cold-frame gap, at most ten Long
+Tasks with 1,000 ms maximum and 2,500 ms aggregate duration, 64 MiB maximum
+per-study garbage-collected JavaScript heap growth, 16 MiB maximum retained heap
+drift across navigation cleanup, and the same 8 MiB exact-study VSR ceiling as
+the Node gate. The Long Task bounds were calibrated from the first complete
+three-study Chromium calibration runs. With recording disabled, canonical record
+transfer, 3D selection, playback and VSR retention produced an 823 ms worst
+isolated task, a 1,996 ms worst aggregate and a 250.3 ms cold-frame gap while
+animation-frame p95 remained between 17.4 and 17.7 ms.
+These are deliberately broad local regression bounds: the
+34 ms cadence alarm is weaker than the 16.7 ms visible-frame north-star target,
+and the load/run limits are not interaction SLOs. Tightening them requires a
+stable controlled-runner history; raising them requires new measured evidence
+and review.
+
+Only the governed `laptop-1366` Chromium project supplies CDP garbage-collection
+and timing authority. The other four viewport projects verify that the evidence
+case remains registered without pretending emulated phone, tablet and desktop
+viewports are comparable memory machines. Their separate semantic journeys
+still exercise canonical playback across all five viewports. Every successful
+laptop run attaches the raw intervals, Long Task durations, heap values, VSR
+sizes and environment identity as
+`air-combat-browser-performance.json`. No browser result is recorded as measured
+in this document until that artifact passes on a clean frozen commit; a single
+laptop/browser result remains development regression evidence, not universal
+browser, production-host or named-aircraft capacity.
+
+Playwright trace, video and screenshot capture are disabled for this isolated
+measurement because continuous browser recording perturbs the same main thread
+and can manufacture Long Tasks. The JSON attachment remains enabled and is the
+diagnostic authority on both pass and fail.
+
 The Stage-B #170 workload is separately frozen at
 `fixtures/performance/model-pack-foundation-workload.v1.json`, digest
 `80853b04efb2396524217edac7937db2be673b7bd5e9ccdea70f44ae161c0796`.

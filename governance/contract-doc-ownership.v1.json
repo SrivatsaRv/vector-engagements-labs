@@ -1631,6 +1631,13 @@
         },
         {
           "kind": "EXACT",
+          "value": "lib/validation/air-combat-browser-performance.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "lib/validation/track-store-capacity.ts",
           "facets": [
             "verification"
@@ -1646,6 +1653,13 @@
         {
           "kind": "EXACT",
           "value": "scripts/benchmark-engine.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-air-combat-studies.ts",
           "facets": [
             "verification"
           ]
@@ -1715,6 +1729,20 @@
         {
           "kind": "EXACT",
           "value": "tests/airborne-store-transfer.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/air-combat-browser-performance-policy.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/browser/air-combat-performance.spec.ts",
           "facets": [
             "verification"
           ]
@@ -3074,6 +3102,51 @@
         },
         {
           "kind": "EXACT",
+          "value": "lib/report-debrief.ts",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/report-profile.ts",
+          "facets": [
+            "schema",
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/scenario-package-reference.ts",
+          "facets": [
+            "digest",
+            "schema",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/air-combat-evidence-policy.ts",
+          "facets": [
+            "digest",
+            "storage",
+            "verification",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/CanonicalReportDebrief.tsx",
+          "facets": [
+            "storage",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "app/report/page.tsx",
           "facets": [
             "digest",
@@ -3118,10 +3191,58 @@
       ],
       "testRules": [
         {
+          "kind": "PREFIX",
+          "value": "fixtures/vector-record/issue-197/",
+          "facets": [
+            "digest",
+            "storage",
+            "verification",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/air-combat-evidence-policy.test.mjs",
+          "facets": [
+            "digest",
+            "storage",
+            "verification",
+            "vsr"
+          ]
+        },
+        {
           "kind": "EXACT",
           "value": "tests/vector-record.test.mjs",
           "facets": [
             "digest",
+            "storage",
+            "verification",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/report-debrief.test.mjs",
+          "facets": [
+            "schema",
+            "storage",
+            "verification",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/canonical-report-debrief.test.tsx",
+          "facets": [
+            "storage",
+            "verification",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/browser/report-debrief.spec.ts",
+          "facets": [
             "storage",
             "verification",
             "vsr"
@@ -3440,6 +3561,13 @@
           ]
         },
         {
+          "kind": "PREFIX",
+          "value": "tests/browser/route-authoring.spec.ts-snapshots/",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
           "kind": "EXACT",
           "value": "tests/component/current-geometry.test.tsx",
           "facets": [
@@ -3504,6 +3632,14 @@
         {
           "kind": "EXACT",
           "value": "lib/frontend/selectors.ts",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/frontend/authored-profile-presentation.ts",
           "facets": [
             "ui",
             "vsr"
@@ -3588,6 +3724,23 @@
           "value": "tests/frontend-selectors.test.mjs",
           "facets": [
             "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/authored-profile-presentation.test.mjs",
+          "facets": [
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/canonical-frame-agreement.test.mjs",
+          "facets": [
+            "ui",
+            "verification",
             "vsr"
           ]
         },
@@ -4456,6 +4609,25 @@
         },
         {
           "kind": "EXACT",
+          "value": "governance/air-combat-study-control-matrix.v1.json",
+          "facets": [
+            "admission",
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "fixtures/scenarios/three-air-combat-geometry-oracle.v1.json",
+          "facets": [
+            "datum",
+            "digest",
+            "unit",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "lib/scenario-spatial.ts",
           "facets": [
             "schema",
@@ -4508,6 +4680,24 @@
         },
         {
           "kind": "EXACT",
+          "value": "scripts/generate-air-combat-study-migration.ts",
+          "facets": [
+            "digest",
+            "schema",
+            "storage"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-air-combat-control-matrix.mjs",
+          "facets": [
+            "admission",
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "app/api/catalog/route.ts",
           "facets": [
             "schema"
@@ -4529,6 +4719,48 @@
             "unit",
             "verification",
             "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/air-combat-study-scenarios.test.mjs",
+          "facets": [
+            "admission",
+            "datum",
+            "digest",
+            "runtime",
+            "schema",
+            "unit",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/air-combat-control-matrix.test.mjs",
+          "facets": [
+            "admission",
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/air-combat-study-control-admission.test.mjs",
+          "facets": [
+            "admission",
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/air-combat-study-independent-oracles.test.mjs",
+          "facets": [
+            "datum",
+            "digest",
+            "runtime",
+            "unit",
+            "verification"
           ]
         },
         {
@@ -5702,5 +5934,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "1ed48db84221d21b270899d5dedaae1d9a6e4c65b6ee4cedf4c163f7e239a176"
+  "canonicalSha256": "53b5a8eabe0b0bfd0487d54631fe2c024c98ff99a715ca9bd8621e906d50cbda"
 }

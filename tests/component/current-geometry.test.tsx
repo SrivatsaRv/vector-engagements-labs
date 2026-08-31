@@ -11,7 +11,10 @@ const result = createReferencePreview(
 
 describe("CurrentGeometry", () => {
   it("renders the exact selected-frame relationship and never aliases a launch platform as a weapon", () => {
-    const selected = selectDisplayFrame(result, 3.5);
+    const launchFrameIndex = result.frames.findIndex((frame) =>
+      frame.entities.some((entity) => entity.id === result.engineRun.primaryWeaponId));
+    expect(launchFrameIndex).toBeGreaterThan(0);
+    const selected = selectDisplayFrame(result, result.frames[launchFrameIndex].t);
     const activeGeometry = selectCurrentGeometry(result, selected);
     const { rerender } = render(<CurrentGeometry geometry={activeGeometry} />);
 
@@ -21,15 +24,11 @@ describe("CurrentGeometry", () => {
     expect(screen.getByText("WEAPON TO TARGET")).toBeVisible();
     expect(screen.getByText("Weapon speed")).toBeVisible();
 
-    const prelaunch = {
-      ...result,
-      frames: result.frames.map((frame, index) => index !== selected.frameIndex
-        ? frame
-        : { ...frame, entities: frame.entities.filter((entity) => entity.id !== result.engineRun.primaryWeaponId) }),
-    };
+    const prelaunchFrameIndex = launchFrameIndex - 1;
+    const prelaunchTimeSeconds = result.frames[prelaunchFrameIndex].t;
     const beforeLaunch = selectCurrentGeometry(
-      prelaunch,
-      selectDisplayFrame(prelaunch, selected.displayTimeSeconds),
+      result,
+      selectDisplayFrame(result, prelaunchTimeSeconds),
     );
     rerender(<CurrentGeometry geometry={beforeLaunch} />);
     expect(screen.getByText("AIRCRAFT TO TARGET")).toBeVisible();
@@ -39,8 +38,8 @@ describe("CurrentGeometry", () => {
     expect(screen.queryByText("Relative-position diagram")).not.toBeInTheDocument();
 
     const held = {
-      ...prelaunch,
-      frames: prelaunch.frames.map((frame, index) => index !== selected.frameIndex
+      ...result,
+      frames: result.frames.map((frame, index) => index !== prelaunchFrameIndex
         ? frame
         : {
             ...frame,
@@ -56,7 +55,7 @@ describe("CurrentGeometry", () => {
     };
     rerender(<CurrentGeometry geometry={selectCurrentGeometry(
       held,
-      selectDisplayFrame(held, selected.displayTimeSeconds),
+      selectDisplayFrame(held, prelaunchTimeSeconds),
     )} />);
     expect(screen.getByText("HOLD SHORT")).toBeVisible();
     expect(screen.getByText("UNAVAILABLE")).toBeVisible();
@@ -66,8 +65,8 @@ describe("CurrentGeometry", () => {
 
     for (const operationalState of ["TAKEOFF_ROLL", "ROTATE", "CLIMBOUT", "ENROUTE"] as const) {
       const valid = {
-        ...prelaunch,
-        frames: prelaunch.frames.map((frame, index) => index !== selected.frameIndex
+        ...result,
+        frames: result.frames.map((frame, index) => index !== prelaunchFrameIndex
           ? frame
           : {
               ...frame,
@@ -83,7 +82,7 @@ describe("CurrentGeometry", () => {
       };
       rerender(<CurrentGeometry geometry={selectCurrentGeometry(
         valid,
-        selectDisplayFrame(valid, selected.displayTimeSeconds),
+        selectDisplayFrame(valid, prelaunchTimeSeconds),
       )} />);
       expect(screen.getByText(operationalState.replaceAll("_", " "))).toBeVisible();
       expect(screen.getByText("VALID")).toBeVisible();

@@ -9,6 +9,7 @@ import { assertRuntimeModelPackDigest } from "../engine/runtime-model-pack.ts";
 import { compileAirMissionDefinition } from "../air-mission.ts";
 import { admitEnvironmentPack } from "../geospatial/environment-pack.ts";
 import { CURRENT_COMPILED_MODEL_PACK } from "../engine/weapon-admission.ts";
+import { assertRetainedScenarioPackageReference } from "../scenario-package-reference.ts";
 
 export async function adaptPreparedSimulation(
   prepared: PreparedSimulation,
@@ -46,6 +47,9 @@ export async function admitRuntimeModelPack(
     throw new Error("The runtime model-pack digest is not admitted by this deployment.");
   }
   const { scenario, engineScenario } = pack.prepared;
+  if (pack.prepared.packageReference) {
+    assertRetainedScenarioPackageReference(pack.prepared.packageReference);
+  }
   if (scenario.domain === "A2A") {
     if (!scenario.airMission || !engineScenario.airMission) {
       throw new Error("The Worker requires matching authored and compiled Air mission artifacts.");

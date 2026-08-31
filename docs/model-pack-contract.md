@@ -10,6 +10,13 @@ recording, reports, and both engine backends.
 
 ## Artifact boundaries
 
+#197 leaves every model-pack artifact boundary unchanged. Its exact
+`vector.scenario-package-reference.v1`, admitted `runDurationSeconds`, and
+optional `vector.authored-route-profile.v1` live in the outer scenario/VSR
+envelope. The scenario content hash identifies those scenario bytes; it is not
+a model-pack source or compiled digest and cannot authorize coefficients,
+evidence, target effects, or named-system performance.
+
 Weapon-termination authority is a model-pack component compiled into each
 runtime store; it is not scenario presentation state, renderer state or an
 environment value. Its content participates in the immutable pack digest.
@@ -42,6 +49,13 @@ scenario bindings; the resolved capacity and `MODEL_ASSUMPTION` envelope are
 compiled artifacts. Neither may be replaced by presentation or import labels.
 
 ## Versioned schemas
+
+#197 introduces no `vector.model-pack-source.*` or
+`vector.compiled-model-pack.*` version. Scenario-package references and
+authored-route profiles are deliberately not members of the model-pack schema
+family, and the optional scenario duration maps to the already-existing engine
+duration field. The current model-pack schema, digest, and Rust validation
+contract remain unchanged.
 
 `vector.compiled-aircraft-ground-envelope.v2` nests the exact-key
 `vector.compiled-aircraft-ground-dynamics.v1` projection. The projection seals
@@ -118,6 +132,11 @@ Worker/runtime/VSR admission stages land. See the normative
 [`aircraft onboarding guide`](aircraft-model-pack-onboarding.md).
 
 ## Source definition
+
+The three #197 study routes, durations, regime labels, and expected outcomes are
+scenario-authored assumptions or verification descriptors, not model-pack
+source data. They add no table cell, coefficient, validity domain, evidence row,
+or source/validation artifact to `ModelPackSource`.
 
 `WeaponTerminationModelSource` requires an explicit schema, intended use,
 criterion, positive SI radius and positive SI maximum flight time. The current
@@ -237,6 +256,13 @@ TrackStore mechanics only; no named aircraft sensor is thereby available.
 
 ## Compilation and digest
 
+#197 compiles route geometry and the admitted scenario duration through the
+existing scenario/mission compiler. `runDurationSeconds` becomes the existing
+`EngineScenario.durationSeconds`; omission retains the historical domain
+default. The scenario package content hash covers its immutable definition and
+is retained independently from the unchanged source-pack and compiled-pack
+digests. Profile labels do not enter compilation or either model-pack digest.
+
 Compilation exact-key validates the termination source and includes its frozen
 projection in the compiled-pack digest. Changing radius, time, criterion or
 intended use necessarily creates a different immutable pack identity.
@@ -304,6 +330,12 @@ numbers and indexes; it does not parse units, traverse source JSON, or query a
 database.
 
 ## Intended use and credibility
+
+The #197 BVR, WVR/BFM, and transition packages remain
+`PUBLIC_EDUCATIONAL` model-assumption studies under the existing intended-use
+contract. Their reproducible outcomes do not promote credibility or establish
+named Su-30MKI, Astra, F-16C, AIM-120, pilot-technique, damage, or operational
+effectiveness claims beyond the already-governed generic target-effect model.
 
 The #190 crossing package remains bound to
 `vector.intended-use.geometry-teaching@1.1.0`, the current generic model pack,
@@ -456,6 +488,15 @@ compiler. Production admission cannot consume or relabel this adapter.
 
 ## Scenario binding and patches
 
+#197 binds each 1.2.0 scenario to an exact
+`vector.scenario-package-reference.v1` `{ id, version, contentHash }` for
+Worker, saved-run, and VSR readback. Its optional
+`vector.authored-route-profile.v1` records descriptive route/regime/expected-
+outcome metadata, while `runDurationSeconds` is the only added causal scalar and
+uses the existing duration path. None is a model-pack patch: package IDs,
+profile labels, and expected outcomes may not branch physics or substitute a
+model identity.
+
 Target-effect authority is a separate scenario binding over exact compiled
 weapon and target model identities plus the retained model-pack digest. It is
 not a scalar patch: callers cannot author thresholds, substitute display names,
@@ -519,6 +560,13 @@ Draft patch addition creates a new revision.
 
 ## Loadout compatibility
 
+The #197 studies select their Su-30/Astra and F-16/AIM-120 teaching loadouts
+only through the existing station, store, quantity, and compatibility
+contracts. Their scenario package reference, authored profile, and duration do
+not add a store, admit a named loadout, alter carried mass/drag, or authorize a
+release. The WVR matched control changes only the already-admitted loft release
+time from 20 s to 20.65 s.
+
 Compatibility determines which compiled store may be instantiated; it does not
 select a target-effect result. The effect resolver requires its own exact
 weapon/target binding after a canonical termination. A compatible store with no
@@ -576,6 +624,13 @@ incompatible data rejects the scenario; it never falls back to the legacy model
 authoring list or a weapon-name heuristic.
 
 ## Persistence
+
+Forward migration 018 appends the three #197 scenario definitions at 1.2.0,
+retires their prior current rows without deleting them, and revalidates exact
+readback. Migration 017 and its checksum remain frozen. Saved runs and VSRs
+retain the exact scenario package reference and authored duration in addition
+to the existing model-pack/mission/engine identities; no model-pack row or
+compiled-pack digest is rewritten.
 
 Migration 017 publishes the immutable intended-use 1.1.0, model-pack 0.9.0,
 credibility-manifest 1.3.0 and compiled-pack records, then publishes `1.1.0`
@@ -673,6 +728,11 @@ deployments continue to apply the forward-only numbered migrations in
 
 ## Current reference pack
 
+#197 continues to use the exact current reference-pack ID, 0.9.0 version, and
+compiled digest. The three scenario packages add no new physical coefficient,
+termination/effect threshold, compatibility rule, evidence artifact, or pack
+version.
+
 ```text
 id:      vector-scalar-study-models
 version: 0.9.0
@@ -698,6 +758,13 @@ remain immutable historical artifacts. V0.9 adds the exact verification-only
 weapon-termination authority described below.
 
 ## Consumption rules for dependent workstreams
+
+Worker, saved-run, report, and VSR consumers must preserve and revalidate the
+#197 scenario package ID, version, and content hash together, and must preserve
+the admitted duration. They may display authored-profile labels, but may not use
+those labels, a scenario ID, or an expected outcome as a numerical/backend/model
+selector. Numerical consumers continue to receive only the normally compiled
+scenario and exact governed model-pack authorities.
 
 Target-effect consumers must preserve the full content-addressed authority and
 exact model-pack identities through compiler, both engines, Worker, VSR and
@@ -831,12 +898,26 @@ validation. The runtime must not fill the gap with a scalar fallback.
 
 ## Verification
 
-The #190 regression admits the same pack independently through TypeScript and
+#197 verification runs the three immutable 1.2.0 packages through normal
+compiler/Worker/VSR admission and checks the reproducible BVR `DEGRADED`, WVR
+presentation `KILL` (canonical `MISSION_KILL`), and transition `NO_EFFECT`
+results. An independent matched control changes only WVR loft release time from
+20 s to 20.65 s and requires `NO_EFFECT` with an active target; profile-label
+mutation must be invariant, while stale or corrupt package references and
+invalid duration precision fail admission. These checks exercise orchestration
+and record binding around the unchanged model-pack and engine contracts, not a
+new physics or engine-ABI claim.
+
+#197 also grants no binary-size exception: the historical 585,000-byte WASM
+evidence gate and current strict sub-620,000-byte optimized WASM ceiling remain
+unchanged.
+
+The archived #190 regression admits the same pack independently through TypeScript and
 Rust/WASM, compares the complete terminal frame and event stream, and runs a
 nearby failing control. Database verification separately requires the ninth
 row's exact intended-use and model-pack bindings.
 
-The challenge now reaches an engine-owned 21.836104 m geometric intercept at
+The frozen #190 `1.1.0` challenge reaches an engine-owned 21.836104 m geometric intercept at
 131.9 s under the 25 m verification-only criterion; the 46 km control reaches
 the time limit with a 530.164926 m closest approach. Tests independently cover
 between-step closest approach, malformed termination authority, legacy-distance

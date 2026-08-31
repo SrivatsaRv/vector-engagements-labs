@@ -9,6 +9,8 @@ import { buildVerifiedSavedRun, validateSavedScenario } from "../lib/security/sa
 import { DEFAULT_SCENARIO_DEFINITION } from "../lib/scenarios";
 import { createDefaultSpatialPlan } from "../lib/scenario-spatial";
 import { getStudyArea } from "../lib/study-areas";
+import { createDefaultAirMissionDefinition } from "../lib/air-mission";
+import { CURRENT_COMPILED_MODEL_PACK } from "../lib/engine/weapon-admission";
 
 test("bounded JSON admission rejects an oversized streamed body", async () => {
   const request = new Request("https://labs.reachdefence.com/api/telemetry", {
@@ -36,6 +38,28 @@ test("saved-run admission rejects a client-selected engine", () => {
   assert.throws(
     () => validateSavedScenario(input, DEFAULT_SCENARIO_DEFINITION),
     { code: "scenario_engine_forbidden" },
+  );
+});
+
+test("saved-run duration admission matches browser/compiler precision and legacy omission", () => {
+  const authored = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
+  authored.runDurationSeconds = 100.125;
+  assert.equal(
+    validateSavedScenario(authored, DEFAULT_SCENARIO_DEFINITION).runDurationSeconds,
+    100.125,
+  );
+
+  const malformed = structuredClone(authored);
+  malformed.runDurationSeconds = 100.1234;
+  assert.throws(
+    () => validateSavedScenario(malformed, DEFAULT_SCENARIO_DEFINITION),
+    { code: "CONTROL_NUMBER_PRECISION", fieldPath: "$.runDurationSeconds" },
+  );
+
+  delete authored.runDurationSeconds;
+  assert.equal(
+    validateSavedScenario(authored, DEFAULT_SCENARIO_DEFINITION).runDurationSeconds,
+    undefined,
   );
 });
 
@@ -68,6 +92,10 @@ test("saved-run admission preserves a persisted v1 all-fly-by route", () => {
     blueSpeedMps: scenario.launcherSpeed,
     redSpeedMps: scenario.targetSpeed,
     crossingAngleDeg: scenario.aspect,
+  });
+  scenario.airMission = createDefaultAirMissionDefinition({
+    scenario,
+    modelPack: CURRENT_COMPILED_MODEL_PACK,
   });
   delete scenario.spatialPlan.red.routeWaypointTransitions;
 

@@ -31,7 +31,7 @@ Open [http://localhost:4317](http://localhost:4317). Grafana is available at [ht
 Useful routes:
 
 - `/`: product entry and scenario quick start
-- `/scenarios`: eight versioned templates
+- `/scenarios`: nine versioned templates, including three Air-combat study profiles
 - `/lab`: choose a governed study area, including North Punjab or Ladakh, and construct a run
 - `/workbench?scenario=a2a-crossing-intercept`: Construct, Simulate, Observe, Explain, Compare, Report
 - `/math`: published equations, model limits, and reproducibility contract

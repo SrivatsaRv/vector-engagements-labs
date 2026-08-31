@@ -12,13 +12,21 @@ export const BROWSER_PROJECTS = Object.freeze([
   "desktop-1440",
   "full-hd",
 ]);
-export const BROWSER_CASES_PER_PROJECT = 5;
+export const BROWSER_CASES_PER_PROJECT = 13;
 export const BROWSER_CASE_TITLES = Object.freeze([
   "a disabled domain link cannot fall through to the A2A workbench",
   "Peace Drive I evidence is visibly context-only and fitted EW remains unknown",
+  "canonical report debrief remains exact, contained, and printable",
+  "the unedited BVR package remains MATCHED across canonical Map and 3D presentation",
   "browser presentation changes only at the canonical target-effect frame",
+  "the close-merge WVR effect remains canonical and labels exact authored intent",
+  "all three exact Air studies keep every playback and outcome surface on one canonical frame",
+  "an invalid non-spatial numeric draft cannot be bypassed by changing builder steps",
+  "duration and replay seed use governed raw admission before builder navigation",
   "shared transient controls hand off once and remain accessible, contained, and stable",
   "a current deployment manifest drives the real Worker run after route recovery",
+  "a Worker-produced VSR downloads and reopens without rerunning physics",
+  "the exact Air-combat studies retain bounded Worker and canonical 3D browser performance",
 ]);
 
 const npmExecutable = process.platform === "win32" ? "npx.cmd" : "npx";

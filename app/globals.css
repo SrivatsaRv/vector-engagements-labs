@@ -789,6 +789,55 @@ a {
   width: 100%;
   height: 100%;
 }
+.simulation-entity-label {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  top: 0;
+  width: 150px;
+  max-width: calc(100% - 12px);
+  padding: 3px 6px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #315f8d;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.simulation-entity-label.is-red {
+  color: #93483f;
+}
+.simulation-entity-label.is-compact {
+  width: 116px;
+  padding-block: 2px;
+  font-size: 9px;
+  opacity: .9;
+}
+.simulation-entity-label.is-weapon {
+  padding: 2px 4px;
+  color: #586771;
+  opacity: .86;
+}
+.simulation-entity-label.is-terminated {
+  text-decoration: line-through;
+  opacity: .58;
+}
+@media (max-width: 480px) {
+  .simulation-entity-label,
+  .simulation-entity-label.is-compact {
+    min-height: 20px;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+}
 .target-effect-summary {
   display: grid;
   gap: 3px;
@@ -1968,6 +2017,70 @@ a {
   font-size: 10px;
   line-height: 1.55;
   color: #515c65;
+}
+.report-section,
+.report-section * {
+  min-width: 0;
+}
+.report-section p,
+.report-section dd,
+.report-section li {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.report-causal-inputs {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--line2);
+  background: #fafbfb;
+}
+.report-canonical-geometry {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--line2);
+  background: #fafbfb;
+}
+.report-canonical-geometry h3 {
+  margin: 0;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.report-canonical-geometry small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+.report-causal-inputs h3,
+.report-causal-inputs h4,
+.report-causal-inputs p,
+.report-causal-inputs ol {
+  margin: 0;
+}
+.report-causal-inputs h3,
+.report-causal-inputs h4 {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.report-causal-side {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line2);
+  font-size: 9px;
+}
+.report-causal-side ol {
+  display: grid;
+  gap: 5px;
+  padding-left: 18px;
+}
+.report-causal-side small {
+  color: var(--muted);
 }
 .recommendation {
   display: flex;
@@ -4243,6 +4356,11 @@ button:disabled,
   .report-replay,
   .report-columns,
   .report-disclaimer,
+  .report-section,
+  .report-causal-inputs,
+  .report-canonical-geometry,
+  .report-causal-side,
+  .report-causal-side li,
   .report-sheet > footer {
     break-inside: avoid;
   }
@@ -5560,7 +5678,11 @@ button:disabled,
 @media (max-width: 1100px) { .telemetry-multiples { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* The map owns the upper-left control corner; keep the entity key clear of it. */
-.scene-wrap.map-surface .symbol-key { top: 54px; }
+.scene-wrap.map-surface .symbol-key {
+  top: 54px;
+  left: 58px;
+  max-width: calc(100% - 70px);
+}
 
 /* Six synchronized plots fit as two compact rows at laptop breakpoints. */
 .telemetry { overflow: hidden; }
@@ -6334,6 +6456,10 @@ button:disabled,
   .map-data-note { display: none; }
   .report-page { padding-left: 0; padding-right: 0; }
   .report-sheet { width: calc(100% - 16px); padding: 24px 16px; }
+  .report-section dl { grid-template-columns: minmax(0, 1fr); }
+  .report-section dd { text-align: left; }
+  .report-causal-inputs { padding: 10px; }
+  .report-canonical-geometry { padding: 10px; }
 }
 
 /* Responsive composition: landing, replay controls, 3D surface, and telemetry. */
@@ -6639,6 +6765,70 @@ button:disabled,
   .symbol-key span:last-child:nth-child(odd) {
     grid-column: 1;
   }
+}
+
+/* A VSR is the immutable playback authority. These controls remain separate
+   from the existing server Save run/report action. */
+.lab-shell { grid-template-rows: 64px 36px auto minmax(0, 1fr); }
+.vsr-record-bar {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 16px;
+  padding: 7px 18px;
+  border-bottom: 1px solid var(--line);
+  background: #f7f9fa;
+  color: var(--ink);
+  font-size: 10px;
+}
+.vsr-record-actions { display: flex; align-items: center; gap: 6px; }
+.vsr-record-actions button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+}
+.vsr-record-actions button:disabled { color: #89949d; background: #f1f3f4; }
+.vsr-record-actions button:focus-visible { outline: 2px solid #2f6fb5; outline-offset: 2px; }
+.vsr-record-input { display: none; }
+.vsr-record-identity {
+  min-width: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 16px;
+}
+.vsr-record-identity > div { min-width: 0; }
+.vsr-record-identity dt { color: var(--muted); }
+.vsr-record-identity dd { min-width: 0; margin: 2px 0 0; }
+.vsr-record-identity code {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 9px;
+}
+.vsr-record-bar > p { margin: 0; color: var(--muted); }
+.vsr-record-bar > .save-error { grid-column: 1 / -1; color: #8f342d; }
+
+@media (max-width: 760px) {
+  .lab-shell { grid-template-rows: 54px 32px auto minmax(0, 1fr); }
+  .vsr-record-bar { grid-template-columns: 1fr; padding: 8px 12px; }
+  .vsr-record-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .vsr-record-actions button { min-height: 44px; }
+  .vsr-record-identity { grid-template-columns: 1fr; gap: 6px; }
+  .vsr-record-identity code { font-size: 8px; }
+}
+@media (min-width: 2000px) {
+  .lab-shell { grid-template-rows: 72px 40px auto minmax(0, 1fr); }
+  .vsr-record-bar { padding-inline: 24px; font-size: 12px; }
 }
 
 /* #65 viewport shell: the centre surface owns all height released by the

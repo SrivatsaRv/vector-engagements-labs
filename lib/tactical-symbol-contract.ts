@@ -150,8 +150,8 @@ export function presentTacticalSymbol(input: TacticalSymbolInput): TacticalSymbo
 function labelScore(symbol: TacticalSymbolPresentation) {
   return (symbol.selected ? 10_000 : 0)
     + (symbol.lifecycle === "ENGAGING" ? 400 : 0)
-    + (symbol.kind === "GUIDED_WEAPON" ? 200 : 0)
-    + (symbol.kind === "AIRCRAFT" ? 100 : 0);
+    + (symbol.kind === "AIRCRAFT" ? 200 : 0)
+    + (symbol.kind === "GUIDED_WEAPON" ? 100 : 0);
 }
 
 /**

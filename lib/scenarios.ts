@@ -11,9 +11,21 @@ import {
   CURRENT_MODEL_PACK_ID,
   CURRENT_MODEL_PACK_VERSION,
 } from "./reference-model-pack.ts";
-import { createDefaultAirMissionDefinition } from "./air-mission.ts";
+import {
+  authorGenericAirborneStoreTransfer,
+  createDefaultAirMissionDefinition,
+  type EngagementRegime,
+  type FlightLegRole,
+} from "./air-mission.ts";
 import { CURRENT_COMPILED_MODEL_PACK } from "./engine/weapon-admission.ts";
-import { createDefaultSpatialPlan } from "./scenario-spatial.ts";
+import {
+  createDefaultSpatialPlan,
+  localToGeographic,
+  normalizeHeading,
+  spatialAspectDeg,
+  spatialHorizontalSeparationM,
+  type ScenarioSpatialPlan,
+} from "./scenario-spatial.ts";
 
 export type { EngagementDomain } from "./simulation.ts";
 export type ScenarioComplexity = "Foundation" | "Intermediate" | "Advanced";
@@ -23,6 +35,33 @@ export type FocusOption = {
   objective: string;
 };
 export type RunVariant = { title: string; description: string };
+
+export const AUTHORED_ROUTE_PROFILE_SCHEMA_VERSION =
+  "vector.authored-route-profile.v1" as const;
+export type AuthoredRouteProfileId =
+  | "bvr-offset-and-support"
+  | "wvr-one-circle-defensive-break"
+  | "beam-drag-extend-recommit";
+export type AuthoredRouteLegIntent =
+  | "MERGE"
+  | "OFFSET"
+  | "SUPPORT"
+  | "BEAM"
+  | "DRAG"
+  | "DEFENSIVE_BREAK"
+  | "ONE_CIRCLE"
+  | "EXTEND"
+  | "INTERCEPT"
+  | "RECOMMIT";
+export type AuthoredRouteProfile = {
+  schemaVersion: typeof AUTHORED_ROUTE_PROFILE_SCHEMA_VERSION;
+  id: AuthoredRouteProfileId;
+  label: string;
+  authority: "AUTHORED_ROUTE";
+  blue: { legs: AuthoredRouteLegIntent[] };
+  red: { legs: AuthoredRouteLegIntent[] };
+  limitations: string[];
+};
 
 export type ScenarioDefinition = {
   id: string;
@@ -44,6 +83,8 @@ export type ScenarioDefinition = {
   focusOptions: FocusOption[];
   runVariants: [RunVariant, RunVariant, RunVariant];
   presetRationale: { profile: string; geometry: string; conditions: string };
+  /** Descriptive authored-route intent. Runtime behavior comes only from scenario routes. */
+  authoredProfile?: AuthoredRouteProfile;
   scenario: Scenario;
 };
 
@@ -118,6 +159,120 @@ const scenario = (patch: Partial<Scenario>): Scenario => {
   };
 };
 
+type LocalRoutePoint = readonly [eastM: number, northM: number, altitudeMslM: number];
+
+const roundThree = (value: number) => Number(value.toFixed(3));
+
+function trueHeadingForLeg(route: readonly LocalRoutePoint[]) {
+  const [start, next] = route;
+  return roundThree(normalizeHeading(
+    (Math.atan2(next[0] - start[0], next[1] - start[1]) * 180) / Math.PI,
+  ));
+}
+
+function authoredSpatialPlan(input: {
+  areaId: string;
+  blueRoute: readonly LocalRoutePoint[];
+  redRoute: readonly LocalRoutePoint[];
+  blueSpeedMps: number;
+  redSpeedMps: number;
+}): ScenarioSpatialPlan {
+  const area = getStudyArea(input.areaId);
+  const project = (point: LocalRoutePoint) => ({
+    ...localToGeographic({ x: point[0], y: point[1], z: point[2] }, area),
+    // The authored MSL altitude is scenario authority. Do not retain inverse-
+    // transform floating-point residue in a content-addressed package.
+    altitudeM: point[2],
+  });
+  const side = (
+    route: readonly LocalRoutePoint[],
+    speedMps: number,
+  ) => {
+    const projected = route.map(project);
+    return {
+      position: projected[0],
+      headingDeg: trueHeadingForLeg(route),
+      speedMps,
+      route: projected,
+      routeAcceptanceRadiiM: projected.map((_, index) => index === 0 ? 1 : 500),
+      routeWaypointTransitions: projected.map((_, index) => index === 0 ? "START" as const : "FLY_BY" as const),
+    };
+  };
+  return {
+    blue: side(input.blueRoute, input.blueSpeedMps),
+    red: side(input.redRoute, input.redSpeedMps),
+  };
+}
+
+function authoredAirCombatScenario(input: {
+  name: string;
+  objective: string;
+  guidance: Scenario["guidance"];
+  regime: EngagementRegime;
+  durationSeconds: number;
+  releaseTimeSeconds: number;
+  blueRoute: readonly LocalRoutePoint[];
+  redRoute: readonly LocalRoutePoint[];
+  blueSpeedMps: number;
+  redSpeedMps: number;
+  blueLegRoles: readonly [FlightLegRole, FlightLegRole, FlightLegRole];
+}): Scenario {
+  const studyAreaId = "north-punjab";
+  const spatialPlan = authoredSpatialPlan({
+    areaId: studyAreaId,
+    blueRoute: input.blueRoute,
+    redRoute: input.redRoute,
+    blueSpeedMps: input.blueSpeedMps,
+    redSpeedMps: input.redSpeedMps,
+  });
+  const area = getStudyArea(studyAreaId);
+  let configured = scenario({
+    domain: "A2A",
+    name: input.name,
+    objective: input.objective,
+    bluePlatformId: "su-30mki",
+    blueSystemId: "astra-mk1",
+    redObjectId: "f-16c-block52-paf",
+    redSystemId: "aim-120c5",
+    studyAreaId,
+    weatherPresetId: "north-punjab-clear",
+    profile: "medium",
+    guidance: input.guidance,
+    altitude: input.blueRoute[0][2],
+    cruiseAltitude: input.blueRoute[0][2],
+    targetDelta: input.redRoute[0][2] - input.blueRoute[0][2],
+    range: roundThree(spatialHorizontalSeparationM(spatialPlan, area)),
+    aspect: roundThree(spatialAspectDeg(spatialPlan, area)),
+    launcherSpeed: input.blueSpeedMps,
+    targetSpeed: input.redSpeedMps,
+    blueFuelPercent: 70,
+    redFuelPercent: 70,
+    blueWeaponQuantity: 2,
+    redWeaponQuantity: 2,
+    seed: 42,
+    runDurationSeconds: input.durationSeconds,
+    spatialPlan,
+  });
+  const airMission = structuredClone(configured.airMission!);
+  airMission.regime = input.regime;
+  airMission.flightPlans[0].legs = airMission.flightPlans[0].legs.map(
+    (leg, index) => ({ ...leg, role: input.blueLegRoles[index] }),
+  );
+  configured = {
+    ...configured,
+    airMission: authorGenericAirborneStoreTransfer({
+      mission: airMission,
+      modelPack: CURRENT_COMPILED_MODEL_PACK,
+      storeOrdinal: 1,
+      operation: "RELEASE",
+      requestedTimeSeconds: input.releaseTimeSeconds,
+      installedDragAreaM2: 0.03,
+      valueState: "MODEL_ASSUMPTION",
+    }),
+  };
+  return configured;
+}
+
 const movingFocus: FocusOption[] = [
   {
     title: "Launch window",
@@ -190,23 +345,28 @@ const fixedRuns: [RunVariant, RunVariant, RunVariant] = [
 
 export const HIGH_ENERGY_CROSSING_CHALLENGE_ID =
   "a2a-high-energy-crossing-challenge";
+export const CURRENT_AIR_COMBAT_STUDY_IDS = [
+  "a2a-crossing-intercept",
+  "a2a-defensive-break",
+  HIGH_ENERGY_CROSSING_CHALLENGE_ID,
+] as const;
 
 export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
     id: "a2a-crossing-intercept",
-    version: "1.1.0",
+    version: "1.2.0",
     domain: "A2A",
-    title: "Su-30MKI / Astra versus F-16C Block 52",
+    title: "BVR offset and support: Su-30MKI versus F-16C",
     summary:
-      "Put a Su-30MKI and F-16C into a crossing study. Change the authored distance, angle, and routes.",
+      "Compare an authored Blue offset/support route with a Red beam/drag route in a long-range generic Air-combat study.",
     blue: "Su-30MKI carrying Astra Mk 1",
     red: "PAF F-16C Block 52 carrying AIM-120C-5",
     targetProfile: "PAF F-16C Block 52",
     theatre: "Open training airspace",
-    complexity: "Foundation",
-    scope: "One launcher, one manoeuvring target and one interceptor.",
-    tags: ["fighter vs fighter", "crossing geometry", "energy"],
+    complexity: "Advanced",
+    scope: "Generic assumption-backed BVR route and target-effect study; not named-aircraft, weapon, sensor, support, or pilot performance.",
+    tags: ["fighter vs fighter", "BVR", "authored offset", "authored beam drag"],
     targetMotion: "moving",
     environment:
       "Sourced regional terrain and atmosphere · exact EnvironmentPack identity recorded",
@@ -214,42 +374,61 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     runVariants: movingRuns,
     presetRationale: {
       profile:
-        "The 46 km baseline is regression-tested against VECTOR's current Astra coefficient set and the selected North Punjab weather preset. It is a reproducible model setup, not a published engagement-range claim.",
+        "A deterministic generic BVR authored-route profile under the current public-educational model pack.",
       geometry:
-        "A 145° crossing angle and 1,500 m altitude difference create a crossing intercept rather than a head-on pass or tail chase.",
+        "Blue offsets after its explicit release while Red beams, drags, and extends through four exact WGS84/MSL points.",
       conditions:
-        "Both aircraft use their admitted starting states and authored routes. Sensor, data-link, EW, and tactical-policy behavior are unavailable in this deployment.",
+        "The route geometry is causal. Tactical labels, sensor state, adaptive support, and autonomous pilot decisions do not alter runtime behavior.",
     },
-    scenario: scenario({
-      domain: "A2A",
-      name: "IAF Su-30MKI versus PAF F-16C Block 52",
+    authoredProfile: {
+      schemaVersion: AUTHORED_ROUTE_PROFILE_SCHEMA_VERSION,
+      id: "bvr-offset-and-support",
+      label: "BVR offset and support",
+      authority: "AUTHORED_ROUTE",
+      blue: { legs: ["OFFSET", "SUPPORT", "RECOMMIT"] },
+      red: { legs: ["BEAM", "DRAG", "EXTEND"] },
+      limitations: ["The autonomous pilot and adaptive tactic-selection policy are not modelled."],
+    },
+    scenario: authoredAirCombatScenario({
+      name: "BVR offset and support: Su-30MKI versus PAF F-16C Block 52",
       objective:
-        "Compare how starting distance, crossing angle, and authored routes change the Astra intercept opportunity.",
-      bluePlatformId: "su-30mki",
-      blueSystemId: "astra-mk1",
-      redObjectId: "f-16c-block52-paf",
-      redSystemId: "aim-120c5",
-      studyAreaId: "north-punjab",
-      weatherPresetId: "north-punjab-clear",
+        "Compare the canonical trajectory and generic target effect produced by explicit offset, support, beam, drag, and extension routes.",
       guidance: "direct",
-      range: 46000,
+      regime: "BVR",
+      durationSeconds: 100,
+      releaseTimeSeconds: 4,
+      blueSpeedMps: 275,
+      redSpeedMps: 250,
+      blueRoute: [
+        [-18_200, -5_600, 9_500],
+        [-8_400, 1_400, 9_500],
+        [2_800, 8_400, 9_500],
+        [12_600, 8_400, 9_500],
+      ],
+      redRoute: [
+        [18_200, 5_600, 8_200],
+        [18_200, -4_200, 8_200],
+        [25_200, -11_200, 8_200],
+        [36_400, -11_200, 8_200],
+      ],
+      blueLegRoles: ["INGRESS", "INTERCEPT_ATTACK", "EGRESS"],
     }),
   },
   {
     ...PACKAGE_GOVERNANCE,
     id: "a2a-defensive-break",
-    version: "1.1.0",
+    version: "1.2.0",
     domain: "A2A",
-    title: "Mirage 2000H / MICA IR versus F-16C Block 52",
+    title: "WVR one-circle defensive break: Su-30MKI versus F-16C",
     summary:
-      "Observe how a late defensive turn changes a short-range intercept and the remaining maneuver margin.",
-    blue: "Mirage 2000H carrying MICA IR",
+      "Observe a close authored one-circle turn against a defensive break and extension with an explicit generic store release.",
+    blue: "Su-30MKI carrying Astra Mk 1",
     red: "PAF F-16C Block 52 carrying AIM-120C-5",
     targetProfile: "PAF F-16C Block 52",
-    theatre: "Synthetic border sector",
-    complexity: "Intermediate",
-    scope: "Single engagement with a prepared target manoeuvre.",
-    tags: ["fighter vs fighter", "defensive manoeuvre", "timing"],
+    theatre: "Open training airspace",
+    complexity: "Advanced",
+    scope: "Generic assumption-backed WVR route and target-effect study; not named-aircraft, weapon, visual-sensor, or pilot performance.",
+    tags: ["fighter vs fighter", "WVR", "authored one circle", "authored defensive break"],
     targetMotion: "moving",
     environment:
       "Sourced regional terrain and atmosphere · exact EnvironmentPack identity recorded",
@@ -257,27 +436,44 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     runVariants: movingRuns,
     presetRationale: {
       profile:
-        "The 19 km start is inside VECTOR's 20 km MICA IR study boundary. Detailed variant source work remains incomplete and is marked in the catalog.",
+        "A deterministic generic WVR authored-route profile with a short, scenario-owned run duration.",
       geometry:
-        "A 120° crossing angle creates a crossing engagement rather than a head-on pass or tail chase.",
+        "Opposed starts merge into a Blue one-circle route and a Red break/extension route with unequal altitude and TAS.",
       conditions:
-        "A seven-g Red Team break creates the primary comparison against the steady-course baseline.",
+        "An explicit release at 20 model seconds is part of the content-addressed mission; no visual detection or pilot decision is inferred.",
     },
-    scenario: scenario({
-      domain: "A2A",
-      name: "Mirage 2000H / MICA IR versus F-16C Block 52",
+    authoredProfile: {
+      schemaVersion: AUTHORED_ROUTE_PROFILE_SCHEMA_VERSION,
+      id: "wvr-one-circle-defensive-break",
+      label: "WVR one-circle defensive break",
+      authority: "AUTHORED_ROUTE",
+      blue: { legs: ["MERGE", "ONE_CIRCLE", "EXTEND"] },
+      red: { legs: ["MERGE", "DEFENSIVE_BREAK", "EXTEND"] },
+      limitations: ["The autonomous pilot and adaptive tactic-selection policy are not modelled."],
+    },
+    scenario: authoredAirCombatScenario({
+      name: "WVR one-circle defensive break: Su-30MKI versus PAF F-16C Block 52",
       objective:
-        "Measure how a late defensive turn changes the short-range intercept window.",
-      bluePlatformId: "mirage-2000h",
-      blueSystemId: "mica-ir",
-      redObjectId: "f-16c-block52-paf",
-      redSystemId: "aim-120c5",
-      studyAreaId: "north-punjab",
-      weatherPresetId: "north-punjab-hot",
-      profile: "short",
-      guidance: "direct",
-      range: 19000,
-      aspect: 120,
+        "Compare the canonical merge, turn, energy, route transition, and generic target effect of explicit one-circle and defensive-break routes.",
+      guidance: "loft",
+      regime: "WVR_BFM",
+      durationSeconds: 45,
+      releaseTimeSeconds: 20,
+      blueSpeedMps: 260,
+      redSpeedMps: 235,
+      blueRoute: [
+        [-9_000, 0, 6_200],
+        [-2_000, 0, 6_200],
+        [2_000, 5_000, 6_200],
+        [-3_000, 10_000, 6_200],
+      ],
+      redRoute: [
+        [9_000, 0, 7_000],
+        [2_000, 0, 7_000],
+        [5_500, -5_000, 7_000],
+        [15_000, -5_000, 7_000],
+      ],
+      blueLegRoles: ["INGRESS", "INTERCEPT_ATTACK", "EGRESS"],
     }),
   },
   {
@@ -580,19 +776,19 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
     id: HIGH_ENERGY_CROSSING_CHALLENGE_ID,
-    version: "1.1.0",
+    version: "1.2.0",
     domain: "A2A",
-    title: "High-energy crossing challenge: Su-30MKI versus F-16C",
+    title: "Beam, drag, extend and recommit: Su-30MKI versus F-16C",
     summary:
-      "Run a non-default, late-completing crossing geometry that puts the current Astra study model near its deterministic time and energy boundary.",
+      "Compare an authored Red beam/drag/extend route with a Blue intercept and recommit route in a medium-range transition study.",
     blue: "Su-30MKI carrying Astra Mk 1",
     red: "PAF F-16C Block 52 carrying AIM-120C-5",
     targetProfile: "PAF F-16C Block 52",
     theatre: "Open training airspace",
     complexity: "Advanced",
     scope:
-      "One assumption-backed launcher, one manoeuvring target, and one guided fly-out; the engine-owned 25 m verification-only geometric intercept is not a target-damage or kill claim.",
-    tags: ["fighter vs fighter", "crossing challenge", "energy boundary"],
+      "Generic assumption-backed transition route and target-effect study; not named-aircraft, weapon, sensor, support, or pilot performance.",
+    tags: ["fighter vs fighter", "transition", "authored beam drag", "authored recommit"],
     targetMotion: "moving",
     environment:
       "Sourced regional terrain and atmosphere · exact EnvironmentPack identity recorded",
@@ -600,36 +796,44 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     runVariants: movingRuns,
     presetRationale: {
       profile:
-        "The 44 km start is a non-default deterministic challenge for the current Astra model assumption. It is not a published or operational engagement-range claim.",
+        "A deterministic generic unrestricted-transition authored-route profile under the current public-educational model pack.",
       geometry:
-        "A 105° crossing angle and 1,500 m altitude difference produce a late-completing crossing intercept rather than the library baseline or a simple head-on closure.",
+        "Red beams, drags, and extends while Blue flies an intercept, offset, and recommit through four exact WGS84/MSL points.",
       conditions:
-        "The case keeps the governed North Punjab winter atmosphere, explicit routes, 70% authored fuel, and two installed stores per aircraft. Sensor, EW, damage, fuze, tactics, and probability of kill remain unavailable.",
+        "The route geometry and explicit 50-second release are causal. Tactical labels, sensors, EW, and autonomous decisions remain unavailable.",
     },
-    scenario: scenario({
-      domain: "A2A",
-      name: "High-energy crossing challenge: Su-30MKI versus PAF F-16C Block 52",
+    authoredProfile: {
+      schemaVersion: AUTHORED_ROUTE_PROFILE_SCHEMA_VERSION,
+      id: "beam-drag-extend-recommit",
+      label: "Beam, drag, extend and recommit",
+      authority: "AUTHORED_ROUTE",
+      blue: { legs: ["INTERCEPT", "OFFSET", "RECOMMIT"] },
+      red: { legs: ["BEAM", "DRAG", "EXTEND"] },
+      limitations: ["The autonomous pilot and adaptive tactic-selection policy are not modelled."],
+    },
+    scenario: authoredAirCombatScenario({
+      name: "Beam, drag, extend and recommit: Su-30MKI versus PAF F-16C Block 52",
       objective:
-        "Test whether the current generic point-mass and Astra study assumptions can complete a demanding 44 km, 105° crossing geometry before the 140 second model limit.",
-      bluePlatformId: "su-30mki",
-      blueSystemId: "astra-mk1",
-      redObjectId: "f-16c-block52-paf",
-      redSystemId: "aim-120c5",
-      studyAreaId: "north-punjab",
-      weatherPresetId: "north-punjab-clear",
-      profile: "medium",
+        "Compare canonical initial commit, beam/drag extension, recommit, closure, fuel, stores, termination, and generic target effect.",
       guidance: "direct",
-      altitude: 8500,
-      targetDelta: 1500,
-      range: 44000,
-      aspect: 105,
-      launcherSpeed: 270,
-      targetSpeed: 250,
-      blueFuelPercent: 70,
-      redFuelPercent: 70,
-      blueWeaponQuantity: 2,
-      redWeaponQuantity: 2,
-      seed: 42,
+      regime: "UNRESTRICTED_TRANSITION",
+      durationSeconds: 140,
+      releaseTimeSeconds: 50,
+      blueSpeedMps: 268,
+      redSpeedMps: 245,
+      blueRoute: [
+        [-16_000, -5_000, 7_800],
+        [-3_000, 0, 7_800],
+        [7_000, -6_000, 7_800],
+        [18_000, -2_000, 7_800],
+      ],
+      redRoute: [
+        [16_000, 5_000, 9_000],
+        [16_000, -5_000, 9_000],
+        [28_000, -9_000, 9_000],
+        [40_000, -9_000, 9_000],
+      ],
+      blueLegRoles: ["INTERCEPT_ATTACK", "EGRESS", "INTERCEPT_ATTACK"],
     }),
   },
 ];

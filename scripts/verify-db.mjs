@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import postgres from "postgres";
 import { canonicalJson } from "../lib/canonical-json.ts";
 import { admitEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
-import { sha256Identity } from "../lib/geospatial/digest.ts";
+import { sha256HexSync, sha256Identity } from "../lib/geospatial/digest.ts";
 import { INSTALLATION_CATALOGUE, PUBLIC_INSTALLATIONS } from "../lib/installations.ts";
 import { STUDY_AREAS } from "../lib/study-areas.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
@@ -120,7 +120,7 @@ try {
   assert.equal(counts.environment_packs, 12);
   assert.equal(counts.study_areas, 6);
   assert.equal(counts.scenarios, SCENARIO_LIBRARY.length);
-  assert.equal(counts.retired_scenarios, SCENARIO_LIBRARY.length);
+  assert.equal(counts.retired_scenarios, SCENARIO_LIBRARY.length + 3);
 
   const [geospatial] = await sql`SELECT
     ST_SRID(location)::int AS srid,
@@ -212,7 +212,7 @@ try {
 
   const invalidPackages = await sql`SELECT id, version
     FROM scenario_templates
-    WHERE version='1.1.0' AND (
+    WHERE status='VALIDATED' AND (
       schema_version <> 'vector.scenario.v4'
       OR engine_version <> 'browser-point-mass-v0.5'
       OR content_hash !~ '^[0-9a-f]{64}$'
@@ -225,8 +225,21 @@ try {
       OR package->'scenario'->'airMission'->>'schemaVersion' <> 'vector.air-mission.v1'
     )`;
   assert.equal(invalidPackages.length, 0);
-  const currentPackages = await sql`SELECT id FROM scenario_templates WHERE version='1.1.0'`;
+  const currentPackages = await sql`SELECT id, version, package, content_hash
+    FROM scenario_templates WHERE status='VALIDATED'`;
   assert.equal(currentPackages.length, SCENARIO_LIBRARY.length);
+  const currentById = new Map(currentPackages.map((row) => [row.id, row]));
+  for (const definition of SCENARIO_LIBRARY) {
+    const row = currentById.get(definition.id);
+    assert.ok(row, `current scenario ${definition.id} is missing`);
+    assert.equal(row.version, definition.version);
+    assert.deepEqual(row.package, definition);
+    assert.equal(row.content_hash, sha256HexSync(definition));
+  }
+  const supersededAirCombatPackages = await sql`SELECT id FROM scenario_templates
+    WHERE version='1.1.0' AND status='RETIRED'
+      AND id IN ('a2a-crossing-intercept','a2a-defensive-break','a2a-high-energy-crossing-challenge')`;
+  assert.equal(supersededAirCombatPackages.length, 3);
   const invalidHistoricalPackages = await sql`SELECT id, version
     FROM scenario_templates
     WHERE version='1.0.0' AND (

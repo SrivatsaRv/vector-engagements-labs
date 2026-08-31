@@ -134,6 +134,15 @@ function refreshRuntimeStateSnapshot(target: RuntimeState, source: RuntimeState)
 }
 
 const G0 = 9.80665;
+const PUBLISHED_NONNEGATIVE_EVENT_SCALAR_SCALE = 1_000_000;
+
+function canonicalNonnegativeEventScalar(value: number) {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error("Published non-negative event scalar is outside its domain.");
+  }
+  return Math.round(value * PUBLISHED_NONNEGATIVE_EVENT_SCALAR_SCALE)
+    / PUBLISHED_NONNEGATIVE_EVENT_SCALAR_SCALE;
+}
 
 function interpolateTable(table: import("./contracts.ts").EngineTable1D, input: number) {
   const { axis, values } = table;
@@ -893,7 +902,19 @@ function activateWeapon(
       launcher.dragNewtons = Math.max(0, launcher.dragNewtons - transferredDragNewtons);
       launcher.storeMassKg -= weapon.launchMassKg;
       launcher.massKg -= weapon.launchMassKg;
-      transferEvent = outcome(true, "NONE", "AIRBORNE_TRANSFER_ADMITTED", transferredDragNewtons);
+      // The integrator retains the full binary64 value; only the published
+      // event scalar is canonicalized so independently implemented backends
+      // seal identical evidence. Installed drag is governed non-negative, so
+      // both Math.round and Rust f64::round resolve half-micro ties upward.
+      const publishedTransferredDragNewtons = canonicalNonnegativeEventScalar(
+        transferredDragNewtons,
+      );
+      transferEvent = outcome(
+        true,
+        "NONE",
+        "AIRBORNE_TRANSFER_ADMITTED",
+        publishedTransferredDragNewtons,
+      );
     }
   }
   state.position = { ...launcher.position };
