@@ -101,6 +101,7 @@ export function ReportReplay({
           selected={selected}
           profile={scenario.profile}
           layers={{ interceptor: true, target: true, lineOfSight: true }}
+          targetEffectOverlay
         />
         <div className="report-replay-metrics">
           <ReportReplayMetric label="Time" value={`${selected.displayTimeSeconds.toFixed(1)} s`} />

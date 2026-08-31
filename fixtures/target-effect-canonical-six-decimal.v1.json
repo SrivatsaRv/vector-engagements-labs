@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "vector.target-effect-canonical-number-fixture.v1",
+  "decimalPlaces": 6,
+  "rounding": "NEAREST_EXACT_BINARY64_TIES_AWAY_FROM_ZERO",
+  "zero": "NORMALIZE_POSITIVE",
+  "cases": [
+    { "id": "positive-half-micro", "input": 0.0000005, "expected": 0 },
+    { "id": "negative-half-micro", "input": -0.0000005, "expected": 0 },
+    { "id": "positive-next-half-micro", "input": 0.0000015, "expected": 0.000002 },
+    { "id": "negative-next-half-micro", "input": -0.0000015, "expected": -0.000002 },
+    { "id": "positive-exact-binary-tie", "input": 0.0078125, "expected": 0.007813 },
+    { "id": "negative-exact-binary-tie", "input": -0.0078125, "expected": -0.007813 },
+    { "id": "positive-immediately-below-half-micro", "input": 0.0000004999999999, "expected": 0 },
+    { "id": "positive-immediately-above-half-micro", "input": 0.0000005000000001, "expected": 0.000001 },
+    { "id": "negative-immediately-above-zero-side", "input": -0.0000004999999999, "expected": 0 },
+    { "id": "negative-immediately-below-zero-side", "input": -0.0000005000000001, "expected": -0.000001 },
+    { "id": "positive-threshold-near-tie", "input": 3.9999995, "expected": 3.999999 },
+    { "id": "negative-threshold-near-tie", "input": -3.9999995, "expected": -3.999999 },
+    { "id": "positive-kill-boundary-near-tie", "input": 4.0000005, "expected": 4 },
+    { "id": "positive-twenty-metre-near-tie", "input": 20.0000005, "expected": 20 },
+    { "id": "negative-twenty-metre-near-tie", "input": -20.0000005, "expected": -20 },
+    { "id": "positive-speed-near-tie", "input": 250.0000005, "expected": 250 },
+    { "id": "positive-mass-near-tie", "input": 12000.0000005, "expected": 12000.000001 },
+    { "id": "positive-altitude-exact-tie", "input": 9000.0000005, "expected": 9000.000001 },
+    { "id": "negative-altitude-exact-tie", "input": -9000.0000005, "expected": -9000.000001 },
+    { "id": "large-near-tie", "input": 999999999.0000005, "expected": 999999999 }
+  ]
+}

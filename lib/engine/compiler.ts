@@ -42,6 +42,7 @@ import {
   runtimeObserverSensors,
   runtimeWeaponTerminations,
 } from "./runtime-model-pack.ts";
+import { CURRENT_TARGET_EFFECT_AUTHORITY } from "./retained-target-effect-authority.ts";
 import {
   compileAirMissionDefinition,
   type AirMissionDefinition,
@@ -808,6 +809,9 @@ export function compileScenario(
     durationSeconds: engineDurationSecondsForDomain(input.domain),
     fixedStepSeconds: ENGINE_FIXED_STEP_SECONDS,
     ...(compiledAirMission ? { airMission: compiledAirMission } : {}),
+    ...(input.domain === "A2A"
+      ? { targetEffectAuthority: structuredClone(CURRENT_TARGET_EFFECT_AUTHORITY) }
+      : {}),
     ...(bluePlatform.groundOperation
       ? { airMissionRuntime: structuredClone(bluePlatform.groundOperation) }
       : {}),

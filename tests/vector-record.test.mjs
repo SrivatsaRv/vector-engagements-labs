@@ -50,6 +50,11 @@ import historicalModelPackBundle from "../fixtures/model-packs/vector-scalar-stu
 import { closestApproachOnRelativeSegment } from "../lib/engine/weapon-termination.ts";
 import { projectObserverStates } from "../lib/information-state.ts";
 import { createGenericTakeoffPerformanceScenario } from "../lib/validation/generic-takeoff-performance.ts";
+import {
+  createTargetEffectAuthority,
+  createTargetEffectModelForAuthority,
+} from "../lib/engine/target-effect-authority.ts";
+import { assertSimulationEventStream } from "../lib/engine/simulation-events.ts";
 
 function governWeaponTermination(scenario, weapon, changes) {
   const pack = resolveRetainedCompiledModelPack(scenario.modelPack);
@@ -90,6 +95,19 @@ function governWeaponTermination(scenario, weapon, changes) {
 const createdAt = "2026-08-06T00:00:00.000Z";
 const textEncoder = new TextEncoder();
 const jsonBytes = (value) => textEncoder.encode(canonicalJson(value));
+
+function expectedRecordReportResult(result) {
+  return {
+    outcome: result.outcome,
+    successful: result.successful,
+    termination: result.termination,
+    closestApproach: result.closestApproach,
+    timeOfFlight: result.timeOfFlight,
+    endSpeed: result.endSpeed,
+    peakDemand: result.peakDemand,
+    reason: result.reason,
+  };
+}
 
 function resealCompiledPack(pack) {
   const payload = structuredClone(pack);
@@ -237,6 +255,7 @@ for (const backend of ["typescript", "rust-wasm"]) {
     assert.deepEqual(opened.result.frames, result.frames);
     assert.deepEqual(opened.result.envelopes, result.envelopes);
     assert.equal(opened.result.reason, result.reason);
+    assert.deepEqual(opened.report.result, expectedRecordReportResult(opened.result));
     assert.equal(opened.events.state, "AVAILABLE");
     assert.ok(opened.events.items.length > 0);
     assert.deepEqual(opened.events, result.engineRun.events);
@@ -311,6 +330,7 @@ test("VSR recompiles an archived Air mission against its exact retained model pa
       delete entity.weapon.termination;
     }
   }
+  delete prepared.engineScenario.targetEffectAuthority;
 
   const result = simulate(currentScenario);
   let record = await createVectorSimulationRecord(prepared, result, createdAt);
@@ -1022,6 +1042,391 @@ test("VSR content identity and stable event ordering are deterministic", async (
   const reused = serializeVectorRecord(second, allocated.buffer);
   assert.equal(reused.buffer, allocated.buffer);
   assert.equal(reused.byteLength, allocated.byteLength);
+});
+
+test("VSR preserves one canonical target-effect identity across event, frame, manifest, and report", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  const effect = result.engineRun.events.items.find(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  assert.ok(effect?.payload.kind === "TARGET_EFFECT_COMMITTED");
+  assert.equal(effect.payload.commit.result, "NO_EFFECT");
+
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const serialized = serializeVectorRecord(record);
+  const opened = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+  const openedEffect = opened.events.state === "AVAILABLE"
+    ? opened.events.items.find((event) => event.payload.kind === "TARGET_EFFECT_COMMITTED")
+    : undefined;
+  const effectFrameTarget = opened.result.frames[effect.frameIndex].entities.find(
+    (entity) => entity.id === effect.payload.commit.targetId,
+  );
+
+  assert.deepEqual(openedEffect, effect);
+  assert.deepEqual(opened.manifest.targetEffect, opened.report.targetEffect);
+  assert.equal(opened.manifest.targetEffect.commit.eventId, effect.id);
+  assert.equal(opened.manifest.targetEffect.commit.commitId, effect.payload.commit.commitId);
+  assert.deepEqual(effectFrameTarget.targetEffect, {
+    commitId: effect.payload.commit.commitId,
+    state: "NO_EFFECT",
+  });
+  assert.ok(opened.result.frames.slice(0, effect.frameIndex).every(
+    (frame) => frame.entities.every((entity) => entity.targetEffect === undefined),
+  ));
+
+  const frameMember = record.members.find((member) => member.path === "frames.arrow");
+  assert.ok(frameMember);
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  const mutatedTarget = frames[effect.frameIndex].entities.find(
+    (entity) => entity.id === effect.payload.commit.targetId,
+  );
+  mutatedTarget.targetEffect.state = "KILL";
+  const mutated = await replaceRecordMember(
+    record,
+    "frames.arrow",
+    VECTOR_FRAME_SCHEMA,
+    encodeColumnarFrames(frames),
+  );
+  const mutatedSerialized = serializeVectorRecord(mutated);
+  await assert.rejects(
+    openVectorSimulationRecord(mutatedSerialized.buffer, mutatedSerialized.byteLength),
+    /projection does not persist on target/,
+  );
+});
+
+test("VSR rejects any coherently resealed non-canonical frozen report result", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const canonicalReport = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+
+  const positiveSerialized = serializeVectorRecord(record);
+  const opened = await openVectorSimulationRecord(
+    positiveSerialized.buffer,
+    positiveSerialized.byteLength,
+  );
+  assert.deepEqual(opened.report.result, expectedRecordReportResult(opened.result));
+
+  const mutations = [
+    ["outcome", (report) => { report.result.outcome = "Target destroyed"; }],
+    ["successful", (report) => { report.result.successful = !report.result.successful; }],
+    ["termination", (report) => { report.result.termination = "time_limit"; }],
+    ["closestApproach", (report) => { report.result.closestApproach += 1; }],
+    ["timeOfFlight", (report) => { report.result.timeOfFlight -= 0.05; }],
+    ["endSpeed", (report) => { report.result.endSpeed += 1; }],
+    ["peakDemand", (report) => { report.result.peakDemand += 1; }],
+    ["false kill reason", (report) => { report.result.reason = "The target was killed."; }],
+    ["missing key", (report) => { delete report.result.reason; }],
+    ["additional key", (report) => { report.result.effect = "KILL"; }],
+  ];
+  for (const [label, mutate] of mutations) {
+    const report = structuredClone(canonicalReport);
+    mutate(report);
+    const corrupt = await replaceRecordMember(
+      record,
+      "report.json",
+      reportMember.schemaVersion,
+      jsonBytes(report),
+    );
+    const serialized = serializeVectorRecord(corrupt);
+    await assert.rejects(
+      openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+      /frozen report result does not match its reconstructed canonical result/,
+      label,
+    );
+  }
+
+  const unavailableScenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-defensive-break",
+  ).scenario;
+  const unavailableResult = simulate(unavailableScenario);
+  const unavailableEffect = unavailableResult.engineRun.events.items.find(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  assert.equal(unavailableEffect?.payload.commit.result, "EFFECT_UNAVAILABLE");
+  const unavailableRecord = await createVectorSimulationRecord(
+    prepareSimulation(unavailableScenario),
+    unavailableResult,
+    createdAt,
+  );
+  const unavailableReportMember = unavailableRecord.members.find(
+    (member) => member.path === "report.json",
+  );
+  assert.ok(unavailableReportMember);
+  const falseNoEffectReport = JSON.parse(
+    new TextDecoder().decode(unavailableReportMember.bytes),
+  );
+  falseNoEffectReport.result.reason = "No target effect occurred.";
+  const falseNoEffectRecord = await replaceRecordMember(
+    unavailableRecord,
+    "report.json",
+    unavailableReportMember.schemaVersion,
+    jsonBytes(falseNoEffectReport),
+  );
+  const falseNoEffectSerialized = serializeVectorRecord(falseNoEffectRecord);
+  await assert.rejects(
+    openVectorSimulationRecord(
+      falseNoEffectSerialized.buffer,
+      falseNoEffectSerialized.byteLength,
+    ),
+    /frozen report result does not match its reconstructed canonical result/,
+  );
+});
+
+test("VSR binds the full report-facing engine projection to deterministic replay", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const result = simulate(scenario);
+  const record = await createVectorSimulationRecord(
+    prepareSimulation(scenario),
+    result,
+    createdAt,
+  );
+  const reportMember = record.members.find((member) => member.path === "report.json");
+  assert.ok(reportMember);
+  const canonicalReport = JSON.parse(new TextDecoder().decode(reportMember.bytes));
+  const mutations = [
+    ["coordinated peak demand", (report) => {
+      report.engine.peakCommandG += 1;
+      report.result.peakDemand = report.engine.peakCommandG;
+    }],
+    ["diagnostics", (report) => { report.engine.diagnostics.integratedSteps += 1; }],
+    ["additional engine key", (report) => { report.engine.effectAuthority = "invented"; }],
+  ];
+  for (const [label, mutate] of mutations) {
+    const report = structuredClone(canonicalReport);
+    mutate(report);
+    const corrupt = await replaceRecordMember(
+      record,
+      "report.json",
+      reportMember.schemaVersion,
+      jsonBytes(report),
+    );
+    const serialized = serializeVectorRecord(corrupt);
+    await assert.rejects(
+      openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+      /frozen report engine projection does not match deterministic engine replay/,
+      label,
+    );
+  }
+});
+
+test("VSR rejects a resealed target-effect projection before its exact causal frame", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  const effect = result.engineRun.events.items.find(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  assert.ok(effect?.payload.kind === "TARGET_EFFECT_COMMITTED");
+  const projection = {
+    commitId: effect.payload.commit.commitId,
+    state: effect.payload.commit.result,
+  };
+  const earlyFrameIndex = effect.frameIndex - 1;
+  const earlyTarget = result.engineRun.frames[earlyFrameIndex].entities.find(
+    (entity) => entity.id === effect.payload.commit.targetId,
+  );
+  earlyTarget.targetEffect = structuredClone(projection);
+  await assert.rejects(
+    createVectorSimulationRecord(prepared, result, createdAt),
+    /projection appears at frame .* before exact causal effect frame/,
+  );
+
+  const cleanResult = simulate(scenario);
+  const cleanRecord = await createVectorSimulationRecord(
+    prepareSimulation(scenario),
+    cleanResult,
+    createdAt,
+  );
+  const frameMember = cleanRecord.members.find(
+    (member) => member.path === "frames.arrow",
+  );
+  assert.ok(frameMember);
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  const exactTarget = frames[effect.frameIndex].entities.find(
+    (entity) => entity.id === effect.payload.commit.targetId,
+  );
+  assert.deepEqual(exactTarget.targetEffect, projection);
+  assert.ok(frames.slice(0, effect.frameIndex).every(
+    (frame) => frame.entities.every((entity) => entity.targetEffect === undefined),
+  ));
+
+  const resealedEarlyTarget = frames[earlyFrameIndex].entities.find(
+    (entity) => entity.id === effect.payload.commit.targetId,
+  );
+  resealedEarlyTarget.targetEffect = structuredClone(projection);
+  const resealed = await replaceRecordMember(
+    cleanRecord,
+    "frames.arrow",
+    VECTOR_FRAME_SCHEMA,
+    encodeColumnarFrames(frames),
+  );
+  const serialized = serializeVectorRecord(resealed);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /projection appears at frame .* before exact causal effect frame/,
+  );
+});
+
+test("target-effect projection ownership and persistence cover exact and later retained frames", () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const result = simulate(scenario);
+  const effect = result.engineRun.events.items.find(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  assert.ok(effect?.payload.kind === "TARGET_EFFECT_COMMITTED");
+  const projection = {
+    commitId: effect.payload.commit.commitId,
+    state: effect.payload.commit.result,
+  };
+  const frames = structuredClone(result.engineRun.frames);
+  const events = structuredClone(result.engineRun.events.items);
+  const continuation = structuredClone(frames.at(-1));
+  continuation.t = Number((continuation.t + result.engineRun.scenario.fixedStepSeconds).toFixed(6));
+  frames.push(continuation);
+  const completion = events.at(-1);
+  assert.equal(completion.payload.kind, "RUN_COMPLETED");
+  completion.tick += 1;
+  completion.modelTimeSeconds = continuation.t;
+  completion.frameIndex = frames.length - 1;
+  const validate = (candidateFrames) => assertSimulationEventStream(
+    events,
+    candidateFrames,
+    result.engineRun.scenario,
+    result.engineRun.termination,
+    result.engineRun.closestApproachM,
+    {
+      primaryWeaponId: result.engineRun.primaryWeaponId,
+      primaryTargetId: result.engineRun.primaryTargetId,
+    },
+  );
+
+  assert.doesNotThrow(() => validate(frames));
+  assert.deepEqual(
+    frames[effect.frameIndex].entities.find(
+      (entity) => entity.id === effect.payload.commit.targetId,
+    ).targetEffect,
+    projection,
+  );
+  assert.deepEqual(
+    frames.at(-1).entities.find(
+      (entity) => entity.id === effect.payload.commit.targetId,
+    ).targetEffect,
+    projection,
+  );
+
+  const cases = [
+    {
+      label: "exact-frame other entity",
+      pattern: /non-target entity .* frame 530/,
+      mutate(candidate) {
+        candidate[effect.frameIndex].entities.find(
+          (entity) => entity.id !== effect.payload.commit.targetId,
+        ).targetEffect = structuredClone(projection);
+      },
+    },
+    {
+      label: "later other entity",
+      pattern: /non-target entity .* frame 531/,
+      mutate(candidate) {
+        candidate.at(-1).entities.find(
+          (entity) => entity.id !== effect.payload.commit.targetId,
+        ).targetEffect = structuredClone(projection);
+      },
+    },
+    {
+      label: "later target removal",
+      pattern: /does not persist .* frame 531/,
+      mutate(candidate) {
+        delete candidate.at(-1).entities.find(
+          (entity) => entity.id === effect.payload.commit.targetId,
+        ).targetEffect;
+      },
+    },
+    {
+      label: "later target change",
+      pattern: /does not persist .* frame 531/,
+      mutate(candidate) {
+        candidate.at(-1).entities.find(
+          (entity) => entity.id === effect.payload.commit.targetId,
+        ).targetEffect.state = "KILL";
+      },
+    },
+  ];
+  for (const candidate of cases) {
+    const mutated = structuredClone(frames);
+    candidate.mutate(mutated);
+    assert.throws(
+      () => validate(mutated),
+      candidate.pattern,
+      candidate.label,
+    );
+  }
+});
+
+test("VSR rejects a jointly resealed unretained target-effect authority before replay", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const retainedAuthority = prepared.engineScenario.targetEffectAuthority;
+  assert.ok(retainedAuthority);
+
+  const modelMaterial = structuredClone(retainedAuthority.models[0]);
+  delete modelMaterial.digest;
+  modelMaterial.thresholds.degradedMaximumDistanceM = 24;
+  const resealedModel = createTargetEffectModelForAuthority(modelMaterial);
+  const resealedAuthority = createTargetEffectAuthority({
+    schemaVersion: retainedAuthority.schemaVersion,
+    id: retainedAuthority.id,
+    version: retainedAuthority.version,
+    intendedUse: structuredClone(retainedAuthority.intendedUse),
+    models: [structuredClone(resealedModel)],
+    bindings: retainedAuthority.bindings.map((binding) => ({
+      ...structuredClone(binding),
+      effectModelDigest: resealedModel.digest,
+    })),
+  });
+  assert.notEqual(resealedAuthority.digest, retainedAuthority.digest);
+  prepared.engineScenario.targetEffectAuthority = structuredClone(resealedAuthority);
+
+  const engineRun = runEngineBackend(
+    structuredClone(prepared.engineScenario),
+    prepared.capabilityManifest.engine.id,
+  );
+  const effect = engineRun.events.items.find(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  assert.ok(effect?.payload.kind === "TARGET_EFFECT_COMMITTED");
+  assert.equal(effect.payload.commit.result, "DEGRADED");
+  const result = buildSimulationResult(prepared, engineRun);
+  const resealedRecord = await createVectorSimulationRecord(prepared, result, createdAt);
+  assert.equal(resealedRecord.manifest.targetEffect.commit.result, "DEGRADED");
+  assert.equal(
+    resealedRecord.manifest.targetEffect.authority.digest,
+    resealedAuthority.digest,
+  );
+
+  const serialized = serializeVectorRecord(resealedRecord);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /No retained target-effect authority matches/,
+  );
 });
 
 test("VSR retains read-only compatibility with the last observer frame and picture schemas", async () => {
@@ -1817,10 +2222,18 @@ test("VSR rejects terminal geometry relabeled as a time-limit run", async () => 
   const finalWeapon = frames[terminal.frameIndex].entities.find(
     (entity) => entity.id === terminal.payload.weaponId,
   );
-  assert.ok(priorWeapon && finalWeapon);
+  const priorTarget = frames[terminal.frameIndex - 1].entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  const finalTarget = frames[terminal.frameIndex].entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  assert.ok(priorWeapon && finalWeapon && priorTarget && finalTarget);
   finalWeapon.lifecycle = priorWeapon.lifecycle;
   finalWeapon.weaponFlightState = priorWeapon.weaponFlightState;
   finalWeapon.phase = priorWeapon.phase;
+  finalTarget.lifecycle = priorTarget.lifecycle;
+  delete finalTarget.targetEffect;
   record = await replaceRecordMember(
     record,
     "frames.arrow",
@@ -1831,6 +2244,7 @@ test("VSR rejects terminal geometry relabeled as a time-limit run", async () => 
   const events = result.engineRun.events.items
     .filter((event) =>
       event.payload.kind !== "WEAPON_TERMINATED" &&
+      event.payload.kind !== "TARGET_EFFECT_COMMITTED" &&
       !(event.payload.kind === "ENTITY_LIFECYCLE_CHANGED" &&
         event.producer.entityId === terminal.payload.weaponId)
     )
@@ -1891,10 +2305,18 @@ test("VSR rejects a relabeled terminal run with its exact final-step evidence re
   const finalWeapon = frames[terminal.frameIndex].entities.find(
     (entity) => entity.id === terminal.payload.weaponId,
   );
-  assert.ok(priorWeapon && finalWeapon);
+  const priorTarget = removedFrame.entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  const finalTarget = frames[terminal.frameIndex].entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  assert.ok(priorWeapon && finalWeapon && priorTarget && finalTarget);
   finalWeapon.lifecycle = priorWeapon.lifecycle;
   finalWeapon.weaponFlightState = priorWeapon.weaponFlightState;
   finalWeapon.phase = priorWeapon.phase;
+  finalTarget.lifecycle = priorTarget.lifecycle;
+  delete finalTarget.targetEffect;
   frames.splice(removedFrameIndex, 1);
   assert.ok(
     frames.at(-1).t - frames.at(-2).t > prepared.engineScenario.fixedStepSeconds + 1e-6,
@@ -1910,6 +2332,7 @@ test("VSR rejects a relabeled terminal run with its exact final-step evidence re
   const events = result.engineRun.events.items
     .filter((event) =>
       event.payload.kind !== "WEAPON_TERMINATED" &&
+      event.payload.kind !== "TARGET_EFFECT_COMMITTED" &&
       !(event.payload.kind === "ENTITY_LIFECYCLE_CHANGED" &&
         event.producer.entityId === terminal.payload.weaponId)
     )

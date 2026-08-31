@@ -6,6 +6,12 @@ import {
   bindRuntimeModelPackDigest,
   runtimeWeaponTerminations,
 } from "../lib/engine/runtime-model-pack.ts";
+import {
+  createTargetEffectAuthority,
+  resolveTargetEffectAuthority,
+} from "../lib/engine/target-effect-authority.ts";
+import { CURRENT_TARGET_EFFECT_AUTHORITY } from "../lib/engine/retained-target-effect-authority.ts";
+import { assertSimulationEventStream } from "../lib/engine/simulation-events.ts";
 
 const baseEntity = {
   lifecycle: "ACTIVE",
@@ -206,6 +212,37 @@ function runTestEngine(scenario) {
   return runGovernedEngine(bindEngineTestAuthority(scenario), testAuthority.pack);
 }
 
+function bindTestTargetEffectAuthority(scenario) {
+  const target = scenario.entities.find((entity) => entity.id === "aircraft-red");
+  target.provenance = {
+    ...target.provenance,
+    modelVersion: "1.0.0",
+  };
+  const effectModel = structuredClone(CURRENT_TARGET_EFFECT_AUTHORITY.models[0]);
+  scenario.targetEffectAuthority = createTargetEffectAuthority({
+    schemaVersion: "vector.target-effect-authority.v1",
+    id: "engine-test-target-effects",
+    version: "1.0.0",
+    intendedUse: structuredClone(CURRENT_TARGET_EFFECT_AUTHORITY.intendedUse),
+    models: [effectModel],
+    bindings: [{
+      id: "engine-test-weapon-target-binding",
+      effectModelId: effectModel.id,
+      effectModelVersion: effectModel.version,
+      effectModelDigest: effectModel.digest,
+      weaponModelId: testWeaponModel.id,
+      weaponModelVersion: testWeaponModel.version,
+      weaponModelPackDigest: testAuthority.pack.digest,
+      targetModelId: target.provenance.modelId,
+      targetModelVersion: target.provenance.modelVersion,
+      targetModelPackDigest: target.provenance.modelPackDigest,
+      targetProfileId: effectModel.targetProfile.id,
+      targetProfileVersion: effectModel.targetProfile.version,
+    }],
+  });
+  return scenario;
+}
+
 // Deliberately local: this oracle must not import the production evaluator.
 function linearInterpolationOracle(axis, values, input) {
   if (input < axis[0] || input > axis.at(-1)) throw new RangeError("outside coverage");
@@ -324,6 +361,144 @@ test("engine owns geometric intercept termination and records no target-effect c
   assert.equal(finalWeapon.lifecycle, "TERMINATED");
   assert.equal(finalWeapon.weaponFlightState, "INTERCEPT");
   assert.equal(finalTarget.lifecycle, "ACTIVE", "geometric intercept must not invent target damage or kill");
+});
+
+test("governed target effect owns the exact target lifecycle transition after weapon termination", () => {
+  const scenario = bindTestTargetEffectAuthority(admitTestAircraft(testScenario()));
+  const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
+  const red = scenario.entities.find((entity) => entity.id === "aircraft-red");
+  red.initial.position = { x: 2, y: 0, z: 8000 };
+  red.initial.velocity = { ...blue.initial.velocity };
+
+  const boundScenario = bindEngineTestAuthority(scenario);
+  const boundWeapon = boundScenario.entities.find((entity) => entity.id === "weapon-blue");
+  const boundTarget = boundScenario.entities.find((entity) => entity.id === "aircraft-red");
+  const effectBinding = boundScenario.targetEffectAuthority.bindings[0];
+  assert.deepEqual(
+    {
+      weaponModelPackDigest: boundWeapon.provenance.modelPackDigest,
+      weaponModelId: boundWeapon.provenance.modelId,
+      weaponModelVersion: boundWeapon.provenance.modelVersion,
+      targetModelPackDigest: boundTarget.provenance.modelPackDigest,
+      targetModelId: boundTarget.provenance.modelId,
+      targetModelVersion: boundTarget.provenance.modelVersion,
+    },
+    {
+      weaponModelPackDigest: effectBinding.weaponModelPackDigest,
+      weaponModelId: effectBinding.weaponModelId,
+      weaponModelVersion: effectBinding.weaponModelVersion,
+      targetModelPackDigest: effectBinding.targetModelPackDigest,
+      targetModelId: effectBinding.targetModelId,
+      targetModelVersion: effectBinding.targetModelVersion,
+    },
+  );
+  assert.ok(resolveTargetEffectAuthority(
+    boundScenario.targetEffectAuthority,
+    boundWeapon,
+    boundTarget,
+  ));
+  const run = runGovernedEngine(boundScenario, testAuthority.pack);
+  const terminationIndex = run.events.items.findIndex(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  const effectIndex = run.events.items.findIndex(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  const termination = run.events.items[terminationIndex];
+  const effect = run.events.items[effectIndex];
+  const finalTarget = run.frames.at(-1).entities.find(
+    (entity) => entity.id === "aircraft-red",
+  );
+
+  assert.equal(run.termination, "weapon_intercept");
+  assert.ok(terminationIndex >= 0 && effectIndex > terminationIndex);
+  assert.deepEqual(effect.causeEventIds, [termination.id]);
+  assert.equal(effect.payload.commit.terminationReceipt.tick, termination.tick);
+  assert.equal(effect.payload.commit.terminationReceipt.localKey, termination.localKey);
+  assert.equal(effect.payload.commit.reason, "THRESHOLD_BAND");
+  assert.equal(effect.payload.commit.result, "KILL");
+  assert.equal(effect.payload.commit.targetLifecycleBefore, "ACTIVE");
+  assert.equal(effect.payload.commit.targetLifecycleAfter, "TERMINATED");
+  assert.equal(finalTarget.lifecycle, "TERMINATED");
+  assert.deepEqual(finalTarget.targetEffect, {
+    commitId: effect.payload.commit.commitId,
+    state: "KILL",
+  });
+  assert.equal(
+    run.events.items.filter((event) =>
+      event.payload.kind === "ENTITY_LIFECYCLE_CHANGED" &&
+      event.producer.entityId === "aircraft-red"
+    ).length,
+    0,
+    "the governed effect event, not a duplicate generic event, owns target termination",
+  );
+});
+
+test("target-effect event admission rejects duplicate and reordered application", () => {
+  const scenario = bindTestTargetEffectAuthority(admitTestAircraft(testScenario()));
+  const blue = scenario.entities.find((entity) => entity.id === "aircraft-blue");
+  const red = scenario.entities.find((entity) => entity.id === "aircraft-red");
+  red.initial.position = { x: 2, y: 0, z: 8000 };
+  red.initial.velocity = { ...blue.initial.velocity };
+  const boundScenario = bindEngineTestAuthority(scenario);
+  const run = runGovernedEngine(boundScenario, testAuthority.pack);
+  const events = structuredClone(run.events.items);
+  const effectIndex = events.findIndex(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  const terminationIndex = events.findIndex(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  assert.ok(effectIndex > terminationIndex && events.at(-1).payload.kind === "RUN_COMPLETED");
+
+  const duplicated = structuredClone(events);
+  const duplicate = structuredClone(duplicated[effectIndex]);
+  const completed = duplicated.pop();
+  duplicate.localKey = `${duplicate.localKey}:duplicate`;
+  duplicate.sequence = duplicated.length;
+  duplicate.id = `event-${duplicate.sequence.toString().padStart(6, "0")}`;
+  completed.sequence = duplicate.sequence + 1;
+  completed.id = `event-${completed.sequence.toString().padStart(6, "0")}`;
+  duplicated.push(duplicate, completed);
+  assert.throws(
+    () => assertSimulationEventStream(
+      duplicated,
+      run.frames,
+      boundScenario,
+      run.termination,
+      run.closestApproachM,
+      { primaryWeaponId: run.primaryWeaponId, primaryTargetId: run.primaryTargetId },
+    ),
+    /duplicate transition|exact governed target effect/,
+  );
+
+  const reordered = structuredClone(events);
+  [reordered[terminationIndex], reordered[effectIndex]] = [
+    reordered[effectIndex],
+    reordered[terminationIndex],
+  ];
+  const oldToNewId = new Map(
+    reordered.map((event, sequence) => [
+      event.id,
+      `event-${sequence.toString().padStart(6, "0")}`,
+    ]),
+  );
+  reordered.forEach((event, sequence) => {
+    event.sequence = sequence;
+    event.id = `event-${sequence.toString().padStart(6, "0")}`;
+    event.causeEventIds = event.causeEventIds.map((id) => oldToNewId.get(id));
+  });
+  assert.throws(
+    () => assertSimulationEventStream(
+      reordered,
+      run.frames,
+      boundScenario,
+      run.termination,
+      run.closestApproachM,
+      { primaryWeaponId: run.primaryWeaponId, primaryTargetId: run.primaryTargetId },
+    ),
+    /missing or future causal reference|canonical order/,
+  );
 });
 
 test("maximum admitted flight time terminates the weapon as expired", () => {

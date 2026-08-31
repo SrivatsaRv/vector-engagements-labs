@@ -27,6 +27,10 @@ describe("ViewportTelemetry", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(toggle).toHaveAttribute("aria-controls", "synchronized-run-telemetry");
     expect(screen.getByText(/computed at 3\.5 model seconds/i)).toBeVisible();
+    expect(screen.getByRole("region", { name: "Canonical target effect" })).toHaveAttribute(
+      "data-effect-state",
+      "UNAVAILABLE",
+    );
     expect(screen.queryByText("Altitude")).not.toBeVisible();
 
     await user.click(toggle);

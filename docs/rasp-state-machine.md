@@ -8,6 +8,12 @@ is not admitted by the production deployment and makes no named-sensor claim.
 
 ## Canonical boundary
 
+Target effect is downstream of, and distinct from, weapon termination and RASP
+observation. Exactly one `TARGET_EFFECT_COMMITTED` event may consume one exact
+termination receipt and same-frame target state. It may transition the target
+lifecycle only for the admitted `MISSION_KILL` or `KILL` result; it never
+creates a detection, track, identification or weapon-support state.
+
 Numeric syntax, structured type/finiteness/range/precision and whole-scenario
 relational admission all precede canonical runtime state. RASP receives only a
 compiled admitted scenario; it cannot round, coerce, default or otherwise
@@ -131,6 +137,12 @@ hides entities while this state is selected.
 
 ## Record and replay
 
+VSR v7 retains the effect authority, sealed commit, causal event IDs and target-
+frame `{commitId,state}` projection. Replay validates their exact agreement and
+then presents the recorded result; it does not rerun an effect model or infer
+damage from stored geometry. Historical v6 records remain active-target
+`NOT_MODELLED` evidence.
+
 A draft that fails control, structured or relational admission produces no run
 and therefore no VSR. Replay is not a second authoring boundary: it verifies
 the archived admitted identities and bytes and never reinterprets malformed
@@ -177,6 +189,11 @@ versions of all nine canonical scenario packages without rewriting either the
 existing `1.0.0` rows or migrations 015 and 016.
 Saved-run identity therefore retains the exact termination authority that
 produced its terminal event.
+When target-effect authority is retained, storage also preserves the ordered
+termination event, its single dependent effect event and the final completion
+event. The effect commit seals the termination receipt and same-frame target
+state; readback rejects a missing, duplicated, reordered or independently
+resealed link rather than inferring the result from archived geometry.
 
 Migration 016 stores the exact canonical #190 v4 package, content hash, current
 model-pack digest and North Punjab study-area identity as a ninth immutable
@@ -237,6 +254,11 @@ This slice does not make tactical decisions, launch-authority, weapon-support,
 or Su-30MKI/F-16 radar claims. Parent issue #26 remains open.
 
 ## Regression evidence
+
+Target-effect regression proves once-only event/lifecycle causality, exact
+TypeScript/Rust/WASM commit parity, malformed and reordered rejection, VSR v7
+mutation rejection, frozen v6 byte compatibility and exact-frame browser
+presentation. The no-effect control remains separate from unsupported RASP.
 
 Issue #193 adds exhaustive authority inventory and malformed-number tests,
 boundary/adjacent/precision cases, a component proof that rejected raw text is

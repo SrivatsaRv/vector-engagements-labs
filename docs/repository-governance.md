@@ -28,6 +28,12 @@ Repository administrators retain emergency recovery authority but should not use
 
 ## Continuous integration
 
+#196 registers `GENERIC_TARGET_EFFECT` as a distinct simulation-systems
+contract family with exact authority, evaluator, presentation, VSR fixture,
+parity and performance paths. Its declaration must accompany the pre-existing
+engine, physics, model-pack, mission, VSR and UI owners selected by shared-file
+changes; the new family cannot be hidden inside one of those broader contracts.
+
 #193 registers the raw numeric authoring component and the legacy Scenario
 control-authority inventory as exact UI-authoring and mission-contract paths.
 Their focused parser/matrix and component regressions are part of `ci-local`;
@@ -489,6 +495,13 @@ their ledger entries. Exemptions are permitted only for non-causal code paths
 and must state their rationale and the owning issue; #66 owns those policy
 exceptions. A new fallback or model-assumption indicator without that evidence
 fails the local and PR gate.
+
+`STUB-28` inventories the generic target-effect threshold and target-profile
+assumptions under #196/#28. Its runtime occurrences are allowances tied to
+that release-blocking row; fail-closed validation comments and non-causal
+display-label defaults are separately justified exemptions. This preserves a
+machine-checked distinction between executable assumption data, explicit
+rejection behavior and presentation resilience.
 
 Air mission ground-start authoring consumes the exact sourced runway geometry
 from the immutable EnvironmentPack. `STUB-24` remains a release-blocking

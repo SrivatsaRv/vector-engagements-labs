@@ -5,6 +5,7 @@ mod error;
 mod model_pack;
 mod public_aircraft_reference;
 mod simulation_events;
+mod target_effect;
 mod validation;
 mod wasm_abi;
 
@@ -26,6 +27,10 @@ use simulation_events::{
     SimulationEventPayload, SimulationEventReceipt, WeaponTerminationEvent,
 };
 pub use simulation_events::{SimulationEventStream, SimulationEventV2};
+use target_effect::{
+    authority_identity, evaluate_target_effect, TargetEffectAuthority, TargetEffectEvaluation,
+    TargetEffectFrameState, TargetEffectInput,
+};
 pub use validation::{
     validate_scenario, MAX_ENTITIES, MAX_EVENTS, MAX_INPUT_BYTES, MAX_INTEGRATED_STEPS,
     MAX_RECORDED_ENTITY_STATES, MAX_ROUTE_POINTS_PER_ENTITY,
@@ -857,6 +862,8 @@ pub struct EngineScenario {
     pub air_mission_store_aircraft_source_object_id: Option<String>,
     #[serde(default)]
     pub air_mission_runtime: Option<AircraftGroundOperation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_effect_authority: Option<TargetEffectAuthority>,
     pub model_pack: ModelPackBinding,
     pub entities: Vec<EntityDefinition>,
     pub environment: Environment,
@@ -940,6 +947,8 @@ pub struct EntityFrame {
     pub phase: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub weapon_flight_state: Option<WeaponFlightState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_effect: Option<TargetEffectFrameState>,
     pub value_state: ModelValueState,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aircraft_operational_state: Option<AircraftOperationalState>,
@@ -1701,6 +1710,7 @@ struct RuntimeState {
     thrust_newtons: f64,
     phase: String,
     weapon_flight_state: Option<WeaponFlightState>,
+    target_effect: Option<TargetEffectFrameState>,
     route_point_index: usize,
     aircraft_control: Option<AircraftControlFrame>,
     aircraft_operational_state: Option<AircraftOperationalState>,
@@ -1746,6 +1756,7 @@ impl RuntimeState {
             } else {
                 None
             },
+            target_effect: None,
             route_point_index: usize::from(starts_at_first_route_point),
             aircraft_control: None,
             aircraft_operational_state: if definition.kind != EntityKind::Aircraft {
@@ -1784,6 +1795,7 @@ fn refresh_runtime_state_snapshot(target: &mut RuntimeState, source: &RuntimeSta
     target.thrust_newtons = source.thrust_newtons;
     target.phase.clone_from(&source.phase);
     target.weapon_flight_state = source.weapon_flight_state;
+    target.target_effect.clone_from(&source.target_effect);
     target.route_point_index = source.route_point_index;
     target.aircraft_control.clone_from(&source.aircraft_control);
     target.aircraft_operational_state = source.aircraft_operational_state;
@@ -2814,6 +2826,7 @@ fn entity_frame(
         installed_store_ids: state.installed_store_ids.clone(),
         phase: state.phase.clone(),
         weapon_flight_state: state.weapon_flight_state,
+        target_effect: state.target_effect.clone(),
         value_state: state.definition.provenance.value_state,
         aircraft_operational_state: state.aircraft_operational_state,
         aircraft_operational_state_value_state: state.aircraft_operational_state.map(|_| {
@@ -3525,9 +3538,48 @@ fn run_validated_engine(mut scenario: EngineScenario) -> Result<EngineRun, Engin
             termination = decision.run_termination;
             completed_this_tick = true;
         }
+        let mut target_effect_evaluation: Option<TargetEffectEvaluation> = None;
+        if let (Some(decision), Some(authority)) = (
+            weapon_termination,
+            scenario.target_effect_authority.as_ref(),
+        ) {
+            if states[target_index].target_effect.is_some() {
+                return Err(EngineError::InvalidScenario(
+                    "target effect cannot be committed more than once".to_string(),
+                ));
+            }
+            let weapon_definition = states[weapon_index].definition.clone();
+            let target_definition = states[target_index].definition.clone();
+            let evaluation = evaluate_target_effect(TargetEffectInput {
+                authority,
+                weapon: &weapon_definition,
+                target: &target_definition,
+                target_lifecycle: states[target_index].lifecycle,
+                target_mass_kg: states[target_index].mass_kg,
+                target_speed_mps: states[target_index].velocity.magnitude(),
+                target_altitude_msl_m: states[target_index].position.z,
+                termination_tick: steps,
+                termination_local_key: format!("weapon-terminated:{weapon_id}"),
+                termination_cause: decision.cause,
+                closest_approach_m: decision.closest_approach_m,
+                model_time_seconds: next_event_time,
+            })?;
+            states[target_index].target_effect = Some(TargetEffectFrameState {
+                commit_id: evaluation.commit_id.clone(),
+                state: evaluation.result,
+            });
+            states[target_index].lifecycle = evaluation.target_lifecycle_after;
+            target_effect_evaluation = Some(evaluation);
+        }
         for (index, state) in states.iter().enumerate() {
             let prior = before_updates[index];
             if prior == state.lifecycle {
+                continue;
+            }
+            if target_effect_evaluation.as_ref().is_some_and(|evaluation| {
+                state.definition.id == evaluation.target_id
+                    && evaluation.target_lifecycle_before != evaluation.target_lifecycle_after
+            }) {
                 continue;
             }
             event_journal.emit(SimulationEventDraft::lifecycle_changed(
@@ -3565,23 +3617,46 @@ fn run_validated_engine(mut scenario: EngineScenario) -> Result<EngineRun, Engin
             } else {
                 closest_evidence_times.unwrap_or((event_time, next_event_time))
             };
-            event_journal.emit(SimulationEventDraft::weapon_terminated(
-                steps,
-                next_event_time,
-                WeaponTerminationEvent {
-                    weapon_id: &weapon_id,
-                    target_id: &target_id,
-                    from: decision.from,
-                    to: decision.to,
-                    cause: decision.cause,
-                    closest_approach_m: decision.closest_approach_m,
-                    closest_approach_prior_time_seconds: closest_approach_witness.0,
-                    closest_approach_next_time_seconds: closest_approach_witness.1,
-                    occurrence_time_seconds: decision.occurrence_time_seconds,
-                    intercept_radius_m: decision.intercept_radius_m,
-                    maximum_flight_time_seconds: decision.maximum_flight_time_seconds,
-                },
-            ))?;
+            let termination_receipt =
+                event_journal.emit(SimulationEventDraft::weapon_terminated(
+                    steps,
+                    next_event_time,
+                    WeaponTerminationEvent {
+                        weapon_id: &weapon_id,
+                        target_id: &target_id,
+                        from: decision.from,
+                        to: decision.to,
+                        cause: decision.cause,
+                        closest_approach_m: decision.closest_approach_m,
+                        closest_approach_prior_time_seconds: closest_approach_witness.0,
+                        closest_approach_next_time_seconds: closest_approach_witness.1,
+                        occurrence_time_seconds: decision.occurrence_time_seconds,
+                        intercept_radius_m: decision.intercept_radius_m,
+                        maximum_flight_time_seconds: decision.maximum_flight_time_seconds,
+                    },
+                ))?;
+            if let (Some(evaluation), Some(authority)) = (
+                target_effect_evaluation,
+                scenario.target_effect_authority.as_ref(),
+            ) {
+                if evaluation.termination_receipt.tick != termination_receipt.tick
+                    || evaluation.termination_receipt.local_key != termination_receipt.local_key
+                {
+                    return Err(EngineError::InvalidScenario(
+                        "target-effect commit lost its exact weapon-termination receipt"
+                            .to_string(),
+                    ));
+                }
+                let (authority_id, authority_version) = authority_identity(authority)?;
+                event_journal.emit(SimulationEventDraft::target_effect_committed(
+                    steps,
+                    next_event_time,
+                    authority_id,
+                    authority_version,
+                    evaluation,
+                    termination_receipt,
+                ))?;
+            }
         } else {
             let speed = states[weapon_index].velocity.magnitude();
             let weapon = states[weapon_index]
@@ -4087,6 +4162,7 @@ mod tests {
             air_mission_compiled_digest: None,
             air_mission_store_aircraft_source_object_id: None,
             air_mission_runtime: None,
+            target_effect_authority: None,
             model_pack: ModelPackBinding {
                 schema_version: "vector.compiled-model-pack.v1".to_string(),
                 id: "vector-scalar-study-models".to_string(),

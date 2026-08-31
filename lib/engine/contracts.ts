@@ -23,6 +23,11 @@ import type {
 } from "../geospatial/environment-pack.ts";
 import type { InstallationOriginReference } from "../mission-admission.ts";
 import type { CompiledAirMission } from "../air-mission.ts";
+import type { TargetEffectAuthorityV1 } from "./target-effect-authority.ts";
+import type {
+  TargetEffectEvaluation,
+  TargetEffectResult,
+} from "./target-effect.ts";
 
 export type EntityKind =
   | "AIRCRAFT"
@@ -61,6 +66,7 @@ export const SIMULATION_EVENT_PAYLOAD_SCHEMAS = {
   AIRCRAFT_OPERATIONAL_STATE_CHANGED: "vector.simulation-event-payload.aircraft-operational-state-changed.v1",
   AIRBORNE_STORE_TRANSFER_OUTCOME: "vector.simulation-event-payload.airborne-store-transfer-outcome.v1",
   WEAPON_TERMINATED: "vector.simulation-event-payload.weapon-terminated.v2",
+  TARGET_EFFECT_COMMITTED: "vector.simulation-event-payload.target-effect-committed.v1",
   RUN_COMPLETED: "vector.simulation-event-payload.run-completed.v1",
   TRACK_STATE_CHANGED: "vector.simulation-event-payload.track-state-changed.v3",
 } as const;
@@ -319,6 +325,13 @@ export type SimulationEventPayload =
       interceptRadiusM: number;
       maximumFlightTimeSeconds: number;
       targetEffect: "NOT_MODELLED";
+    }
+  | {
+      kind: "TARGET_EFFECT_COMMITTED";
+      schemaVersion: typeof SIMULATION_EVENT_PAYLOAD_SCHEMAS.TARGET_EFFECT_COMMITTED;
+      authorityId: string;
+      authorityVersion: string;
+      commit: TargetEffectEvaluation;
     }
   | {
       kind: "RUN_COMPLETED";
@@ -602,6 +615,8 @@ export type EngineScenario = {
   fixedStepSeconds: number;
   /** Present for scenarios authored through vector.air-mission.v1. */
   airMission?: CompiledAirMission;
+  /** Optional, separately content-addressed generic target-effect authority. */
+  targetEffectAuthority?: TargetEffectAuthorityV1;
   /** Compact engine-owned cross-binding for a compiled ground operation. */
   airMissionRuntime?: AircraftGroundOperation;
   modelPack: {
@@ -702,6 +717,11 @@ export type EngineEntityFrame = {
   installedStoreIds: string[];
   phase: string;
   weaponFlightState?: WeaponFlightState;
+  /** Canonical committed target effect; absent before the effect boundary. */
+  targetEffect?: {
+    commitId: string;
+    state: TargetEffectResult;
+  };
   valueState: ModelValueState;
   aircraftOperationalState?: AircraftOperationalState;
   aircraftOperationalStateValueState?: "VALID" | "TERMINATED";

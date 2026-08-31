@@ -15,6 +15,14 @@ import {
 } from "./contracts.ts";
 import { closestApproachOnRelativeSegment } from "./weapon-termination.ts";
 import { createEnvironmentSampler } from "../geospatial/environment-pack.ts";
+import {
+  assertTargetEffectEvaluation,
+  evaluateTargetEffect,
+} from "./target-effect.ts";
+import {
+  assertTargetEffectAuthority,
+  resolveTargetEffectAuthority,
+} from "./target-effect-authority.ts";
 
 export const MAX_SIMULATION_EVENTS = 100_000;
 const RETAINED_TERRAIN_CONTACT_TOLERANCE_M = 1e-8;
@@ -197,7 +205,9 @@ function evaluateWeaponTerminationBoundary(
     z: relativeStart.z + (relativeEnd.z - relativeStart.z) * activeStepFraction,
   };
   const terminalClosest = closestApproachOnRelativeSegment(relativeStart, activeRelativeEnd);
-  const targetUnavailable = frameTarget.lifecycle === "TERMINATED";
+  const targetUnavailable = frameTarget.lifecycle === "TERMINATED" &&
+    frameTarget.targetEffect?.state !== "KILL" &&
+    frameTarget.targetEffect?.state !== "MISSION_KILL";
   const geometricIntercept = expiryTimeSeconds > priorFrame.t &&
     terminalClosest.distanceM <= admission.interceptRadiusM;
   const flightTimeExpired = expiryTimeSeconds <= frame.t;
@@ -293,6 +303,7 @@ const PAYLOAD_KINDS = [
   "AIRCRAFT_OPERATIONAL_STATE_CHANGED",
   "AIRBORNE_STORE_TRANSFER_OUTCOME",
   "WEAPON_TERMINATED",
+  "TARGET_EFFECT_COMMITTED",
   "RUN_COMPLETED",
   "TRACK_STATE_CHANGED",
 ] as const;
@@ -476,11 +487,18 @@ function payloadSortKey(payload: SimulationEventPayload) {
       payload.closestApproachPriorTimeSeconds, payload.closestApproachNextTimeSeconds,
     ]);
   }
+  if (payload.kind === "TARGET_EFFECT_COMMITTED") {
+    return canonicalJson([
+      "6", payload.schemaVersion, payload.authorityId, payload.authorityVersion,
+      payload.commit.commitId, payload.commit.weaponId, payload.commit.targetId,
+      payload.commit.result,
+    ]);
+  }
   if (payload.kind === "RUN_COMPLETED") {
-    return canonicalJson(["6", payload.schemaVersion, payload.termination]);
+    return canonicalJson(["7", payload.schemaVersion, payload.termination]);
   }
   return canonicalJson([
-    "7", payload.schemaVersion, payload.perspective, payload.trackId,
+    "8", payload.schemaVersion, payload.perspective, payload.trackId,
     payload.from, payload.to, payload.cause, payload.sensorModelId,
     payload.sensorModelVersion, payload.modelPackDigest, payload.sourceSequence,
     payload.sourceTimeSeconds, payload.estimateValueState, payload.uncertaintyValueState,
@@ -576,6 +594,19 @@ function assertPayload(value: unknown, index: number): asserts value is Simulati
       (value.to === "FAILED" && value.cause === "TERRAIN_IMPACT") ||
       (value.to === "TARGET_UNAVAILABLE" && value.cause === "TARGET_UNAVAILABLE");
     if (!causeMatchesState) throw new Error(`Simulation event ${index} weapon terminal state and cause are inconsistent.`);
+  } else if (value.kind === "TARGET_EFFECT_COMMITTED") {
+    exactKeys(
+      value,
+      ["kind", "schemaVersion", "authorityId", "authorityVersion", "commit"],
+      [],
+      `Simulation event ${index} payload`,
+    );
+    if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.TARGET_EFFECT_COMMITTED) {
+      throw new Error(`Simulation event ${index} payload schema is unsupported.`);
+    }
+    nonEmptyString(value.authorityId, `Simulation event ${index} target-effect authority ID`);
+    nonEmptyString(value.authorityVersion, `Simulation event ${index} target-effect authority version`);
+    assertTargetEffectEvaluation(value.commit);
   } else if (value.kind === "RUN_COMPLETED") {
     exactKeys(value, ["kind", "schemaVersion", "termination"], [], `Simulation event ${index} payload`);
     if (value.schemaVersion !== SIMULATION_EVENT_PAYLOAD_SCHEMAS.RUN_COMPLETED) throw new Error(`Simulation event ${index} payload schema is unsupported.`);
@@ -936,6 +967,7 @@ export function assertSimulationEventStream(
   const lastEventIdByTrack = new Map<string, string>();
   let prior: SimulationEventV2 | undefined;
   let weaponTerminationEvents = 0;
+  let targetEffectEvents = 0;
   let weaponTerminationPayload: Extract<SimulationEventPayload, { kind: "WEAPON_TERMINATED" }> | undefined;
   let weaponTerminationEvent: SimulationEventV2 | undefined;
   for (const [index, raw] of values.entries()) {
@@ -975,7 +1007,11 @@ export function assertSimulationEventStream(
     });
     if (causeSequences.some((value, causeIndex) => causeIndex > 0 && value <= causeSequences[causeIndex - 1]!)) throw new Error(`Simulation event ${raw.id} causal references are not canonical.`);
     assertPayload(raw.payload, index);
-    if (raw.payload.kind !== "TRACK_STATE_CHANGED" && causeEventIds.length !== 0) {
+    if (
+      raw.payload.kind !== "TRACK_STATE_CHANGED" &&
+      raw.payload.kind !== "TARGET_EFFECT_COMMITTED" &&
+      causeEventIds.length !== 0
+    ) {
       throw new Error(`Simulation event ${raw.id} payload family does not admit causal references.`);
     }
     const event = raw as unknown as SimulationEventV2;
@@ -1159,9 +1195,14 @@ export function assertSimulationEventStream(
         (candidate) => candidate.id === payload.targetId,
       );
       const admission = weapon?.weapon?.termination;
+      const governedEffectTerminatesTarget =
+        scenario.targetEffectAuthority !== undefined &&
+        (frameTarget?.targetEffect?.state === "KILL" ||
+          frameTarget?.targetEffect?.state === "MISSION_KILL");
       const targetLifecycleMatchesCause = payload.cause === "TARGET_UNAVAILABLE"
         ? frameTarget?.lifecycle === "TERMINATED"
-        : ACTIVE_LIFECYCLES.some((lifecycle) => lifecycle === frameTarget?.lifecycle);
+        : ACTIVE_LIFECYCLES.some((lifecycle) => lifecycle === frameTarget?.lifecycle) ||
+          (governedEffectTerminatesTarget && frameTarget?.lifecycle === "TERMINATED");
       if (
         event.phase !== "TERMINATION" || event.producer.subsystem !== "WEAPON_DYNAMICS" ||
         event.producer.entityId !== payload.weaponId || !weapon || weapon.kind !== "GUIDED_WEAPON" ||
@@ -1240,6 +1281,137 @@ export function assertSimulationEventStream(
       } else if (payload.occurrenceTimeSeconds !== event.modelTimeSeconds) {
         throw new Error(`Simulation weapon-termination event ${event.id} does not match its exact terminal boundary time.`);
       }
+    } else if (event.payload.kind === "TARGET_EFFECT_COMMITTED") {
+      targetEffectEvents += 1;
+      const payload = event.payload;
+      const commit = payload.commit;
+      const authority = scenario.targetEffectAuthority;
+      const weapon = entityById.get(commit.weaponId);
+      const target = entityById.get(commit.targetId);
+      const frameTarget = frame.entities.find((candidate) => candidate.id === commit.targetId);
+      const priorFrameTarget = frames[event.frameIndex - 1]?.entities.find(
+        (candidate) => candidate.id === commit.targetId,
+      );
+      const expectedProjection = {
+        commitId: commit.commitId,
+        state: commit.result,
+      };
+      for (const [retainedFrameIndex, retainedFrame] of frames.entries()) {
+        for (const retainedEntity of retainedFrame.entities) {
+          if (
+            retainedEntity.id !== commit.targetId &&
+            retainedEntity.targetEffect !== undefined
+          ) {
+            throw new Error(
+              `Simulation non-target entity ${retainedEntity.id} carries a target-effect projection at frame ${retainedFrameIndex}.`,
+            );
+          }
+        }
+        const retainedTarget = retainedFrame.entities.find(
+          (entity) => entity.id === commit.targetId,
+        );
+        if (!retainedTarget) continue;
+        if (retainedFrameIndex < event.frameIndex) {
+          if (retainedTarget.targetEffect !== undefined) {
+            throw new Error(
+              `Simulation target-effect projection appears at frame ${retainedFrameIndex} before exact causal effect frame ${event.frameIndex}.`,
+            );
+          }
+        } else if (
+          canonicalJson(retainedTarget.targetEffect ?? null) !==
+          canonicalJson(expectedProjection)
+        ) {
+          throw new Error(
+            `Simulation target-effect projection does not persist on target ${commit.targetId} at frame ${retainedFrameIndex}.`,
+          );
+        }
+      }
+      if (!authority) {
+        throw new Error(`Simulation target-effect event ${event.id} has no admitted authority.`);
+      }
+      assertTargetEffectAuthority(authority);
+      if (
+        event.phase !== "TERMINATION" ||
+        event.producer.subsystem !== "WEAPON_DYNAMICS" ||
+        event.producer.entityId !== commit.weaponId ||
+        payload.authorityId !== authority.id ||
+        payload.authorityVersion !== authority.version ||
+        commit.modelPackDigest !== authority.digest ||
+        !weapon || weapon.kind !== "GUIDED_WEAPON" ||
+        !target || !frameTarget || !priorFrameTarget ||
+        event.participants.length !== 2 ||
+        !event.participants.some((item) => item.entityId === commit.weaponId && item.role === "WEAPON") ||
+        !event.participants.some((item) => item.entityId === commit.targetId && item.role === "TARGET") ||
+        !weaponTerminationEvent || !weaponTerminationPayload ||
+        weaponTerminationPayload.weaponId !== commit.weaponId ||
+        weaponTerminationPayload.targetId !== commit.targetId ||
+        event.tick !== weaponTerminationEvent.tick ||
+        event.frameIndex !== weaponTerminationEvent.frameIndex ||
+        event.modelTimeSeconds !== weaponTerminationEvent.modelTimeSeconds ||
+        event.causeEventIds.length !== 1 ||
+        event.causeEventIds[0] !== weaponTerminationEvent.id ||
+        commit.terminationReceipt.tick !== weaponTerminationEvent.tick ||
+        commit.terminationReceipt.localKey !== weaponTerminationEvent.localKey ||
+        commit.terminationReceipt.cause !== weaponTerminationPayload.cause ||
+        commit.terminationReceipt.modelTimeSeconds !== weaponTerminationEvent.modelTimeSeconds ||
+        frameTarget.targetEffect?.commitId !== commit.commitId ||
+        frameTarget.targetEffect.state !== commit.result ||
+        frameTarget.lifecycle !== commit.targetLifecycleAfter ||
+        priorFrameTarget.lifecycle !== commit.targetLifecycleBefore ||
+        lifecycleByEntity.get(commit.targetId) !== commit.targetLifecycleBefore
+      ) {
+        throw new Error(
+          `Simulation target-effect event ${event.id} has invalid authority, causality, ownership, or frame state.`,
+        );
+      }
+      let model: ReturnType<typeof resolveTargetEffectAuthority>["model"] | null = null;
+      try {
+        model = resolveTargetEffectAuthority(authority, weapon, target).model;
+      } catch {
+        // Exact binding absence is a recorded unavailable result; there is no
+        // nearest-model or named-platform fallback.
+        model = null;
+      }
+      const expected = evaluateTargetEffect({
+        modelPackDigest: authority.digest,
+        model,
+        weaponId: commit.weaponId,
+        termination: {
+          receipt: {
+            tick: weaponTerminationEvent.tick,
+            localKey: weaponTerminationEvent.localKey,
+          },
+          cause: weaponTerminationPayload.cause,
+          closestApproachM: weaponTerminationPayload.closestApproachM,
+          modelTimeSeconds: event.modelTimeSeconds,
+        },
+        target: {
+          entityId: commit.targetId,
+          kind: target.kind,
+          lifecycle: commit.targetLifecycleBefore,
+          massKg: frameTarget.massKg,
+          speedMps: frameTarget.speedMps,
+          altitudeMslM: frameTarget.position.z,
+        },
+      });
+      if (canonicalJson(expected) !== canonicalJson(commit)) {
+        throw new Error(`Simulation target-effect event ${event.id} does not reproduce from admitted inputs.`);
+      }
+      if (commit.targetLifecycleBefore !== commit.targetLifecycleAfter) {
+        const transitionIndex = consumedFrameTransitionsByEntity.get(commit.targetId) ?? 0;
+        const transition = frameTransitionsByEntity.get(commit.targetId)?.[transitionIndex];
+        if (
+          transition?.frameIndex !== event.frameIndex ||
+          transition.from !== commit.targetLifecycleBefore ||
+          transition.to !== commit.targetLifecycleAfter
+        ) {
+          throw new Error(
+            `Simulation target-effect event ${event.id} does not own its exact retained lifecycle transition.`,
+          );
+        }
+        consumedFrameTransitionsByEntity.set(commit.targetId, transitionIndex + 1);
+        lifecycleByEntity.set(commit.targetId, commit.targetLifecycleAfter);
+      }
     } else {
       const entityId = event.producer.entityId;
       const entity = entityId ? entityById.get(entityId) : undefined;
@@ -1306,6 +1478,25 @@ export function assertSimulationEventStream(
     const weaponTerminalRun = ["weapon_intercept", "weapon_miss", "weapon_expired", "weapon_failed", "target_unavailable"].includes(termination);
     if (weaponTerminationEvents !== (weaponTerminalRun ? 1 : 0)) {
       throw new Error("Simulation event stream does not contain the exact weapon termination required by the run outcome.");
+    }
+    const expectedTargetEffectEvents = scenario.targetEffectAuthority && weaponTerminalRun ? 1 : 0;
+    if (targetEffectEvents !== expectedTargetEffectEvents) {
+      throw new Error(
+        "Simulation event stream does not contain the exact governed target effect required by the admitted authority.",
+      );
+    }
+    if (
+      targetEffectEvents === 0 &&
+      frames.some((frame) => frame.entities.some(
+        (entity) => entity.targetEffect !== undefined,
+      ))
+    ) {
+      const projectionFrameIndex = frames.findIndex((frame) => frame.entities.some(
+        (entity) => entity.targetEffect !== undefined,
+      ));
+      throw new Error(
+        `Simulation target-effect projection appears at frame ${projectionFrameIndex} without a causal target-effect event.`,
+      );
     }
     if (!weaponTerminalRun && weaponTerminationEvents === 0 && frames.length >= 2) {
       const priorFrame = frames.at(-2)!;

@@ -563,10 +563,21 @@ test("the challenge completes late with TypeScript/Rust terminal and causal-even
   assertContractParity(rust.closestApproach, typescript.closestApproach, "closestApproachM");
   assertContractParity(rust.timeOfFlight, typescript.timeOfFlight, "timeOfFlightSeconds");
   assert.equal(typescript.engineRun.events.items.at(-1)?.payload.termination, "weapon_intercept");
-  const terminal = typescript.engineRun.events.items.at(-2)?.payload;
-  assert.equal(terminal?.kind, "WEAPON_TERMINATED");
-  assert.equal(terminal?.to, "INTERCEPT");
-  assert.equal(terminal?.targetEffect, "NOT_MODELLED");
+  const terminationIndex = typescript.engineRun.events.items.findIndex(
+    (event) => event.payload.kind === "WEAPON_TERMINATED",
+  );
+  const effectIndex = typescript.engineRun.events.items.findIndex(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  const terminationEvent = typescript.engineRun.events.items[terminationIndex];
+  const effectEvent = typescript.engineRun.events.items[effectIndex];
+  assert.ok(terminationIndex >= 0 && effectIndex === terminationIndex + 1);
+  assert.equal(terminationEvent.payload.to, "INTERCEPT");
+  assert.equal(terminationEvent.payload.targetEffect, "NOT_MODELLED");
+  assert.deepEqual(effectEvent.causeEventIds, [terminationEvent.id]);
+  assert.equal(effectEvent.payload.commit.terminationReceipt.tick, terminationEvent.tick);
+  assert.equal(effectEvent.payload.commit.terminationReceipt.localKey, terminationEvent.localKey);
+  assert.equal(effectEvent.payload.commit.result, "NO_EFFECT");
 
   assert.ok(typescript.pictures.length > 0);
   assert.ok(typescript.pictures.every((picture) =>

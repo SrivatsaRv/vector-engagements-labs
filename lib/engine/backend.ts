@@ -220,3 +220,8 @@ export const RUST_WASM_ENGINE_ARTIFACT = {
   sha256: VECTOR_ENGINE_WASM_SHA256,
   bytes: VECTOR_ENGINE_WASM_BYTES,
 } as const;
+
+/** Read-only release evidence; this does not expose or mutate the engine ABI. */
+export function rustWasmRetainedMemoryBytesForVerification() {
+  return getRustEngine().memory.buffer.byteLength;
+}

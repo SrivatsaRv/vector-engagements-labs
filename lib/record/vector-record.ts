@@ -41,9 +41,12 @@ import {
   type CompiledModelPack,
   verifyCompiledModelPackDigest,
 } from "../model-pack.ts";
+import { assertTargetEffectAuthority } from "../engine/target-effect-authority.ts";
+import { assertRetainedTargetEffectAuthority } from "../engine/retained-target-effect-authority.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
-export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v6" as const;
+export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v7" as const;
+export const PRE_TARGET_EFFECT_VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v6" as const;
 export const LEGACY_VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v5" as const;
 export const OLDER_VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v4" as const;
 export const VECTOR_EVENT_SCHEMA = SIMULATION_EVENT_SCHEMA;
@@ -93,8 +96,31 @@ export type VectorRecordManifest = {
     authoredDigest: string;
     compiledDigest: string;
   };
+  targetEffect?: TargetEffectRecordIdentity;
   requiredViewerFeatures: string[];
   members: VectorRecordMember[];
+};
+
+type TargetEffectRecordIdentity = {
+  authority: {
+    schemaVersion: "vector.target-effect-authority.v1";
+    id: string;
+    version: string;
+    digest: string;
+    intendedUseId: string;
+    intendedUseVersion: string;
+  };
+  commit?: {
+    eventId: string;
+    frameIndex: number;
+    commitId: string;
+    weaponId: string;
+    targetId: string;
+    result: "NO_EFFECT" | "DEGRADED" | "MISSION_KILL" | "KILL" | "EFFECT_UNAVAILABLE";
+    targetLifecycleBefore: string;
+    targetLifecycleAfter: string;
+    modelPackDigest: string;
+  };
 };
 
 export type VectorRecordEvent = SimulationEventV2;
@@ -113,8 +139,34 @@ type RecordReport = {
   };
   engine: Omit<EngineRun, "scenario" | "frames" | "events">;
   airMission?: VectorRecordManifest["airMission"];
+  targetEffect?: TargetEffectRecordIdentity;
   limitations: string[];
 };
+
+function recordReportResult(result: SimulationResult): RecordReport["result"] {
+  return {
+    outcome: result.outcome,
+    successful: result.successful,
+    termination: result.termination,
+    closestApproach: result.closestApproach,
+    timeOfFlight: result.timeOfFlight,
+    endSpeed: result.endSpeed,
+    peakDemand: result.peakDemand,
+    reason: result.reason,
+  };
+}
+
+function recordReportEngine(engineRun: EngineRun): RecordReport["engine"] {
+  return {
+    envelopes: engineRun.envelopes,
+    primaryWeaponId: engineRun.primaryWeaponId,
+    primaryTargetId: engineRun.primaryTargetId,
+    termination: engineRun.termination,
+    closestApproachM: engineRun.closestApproachM,
+    peakCommandG: engineRun.peakCommandG,
+    diagnostics: engineRun.diagnostics,
+  };
+}
 
 type MemberBytes = {
   path: string;
@@ -216,6 +268,7 @@ type EntityMetadata = Pick<
   | "lifecycle"
   | "phase"
   | "weaponFlightState"
+  | "targetEffect"
   | "valueState"
   | "aircraftOperationalState"
   | "aircraftOperationalStateValueState"
@@ -323,6 +376,9 @@ export function encodeColumnarFrames(frames: EngineFrame[]): Uint8Array {
       ...(entity.weaponFlightState
         ? { weaponFlightState: entity.weaponFlightState }
         : {}),
+      ...(entity.targetEffect
+        ? { targetEffect: structuredClone(entity.targetEffect) }
+        : {}),
       valueState: entity.valueState,
       ...(entity.aircraftOperationalState
         ? { aircraftOperationalState: entity.aircraftOperationalState }
@@ -381,7 +437,12 @@ export function decodeColumnarFrames(bytes: Uint8Array): EngineFrame[] {
     );
   }
   if (
-    ![VECTOR_FRAME_SCHEMA, LEGACY_VECTOR_FRAME_SCHEMA, OLDER_VECTOR_FRAME_SCHEMA].includes(header.schemaVersion as typeof VECTOR_FRAME_SCHEMA) ||
+    ![
+      VECTOR_FRAME_SCHEMA,
+      PRE_TARGET_EFFECT_VECTOR_FRAME_SCHEMA,
+      LEGACY_VECTOR_FRAME_SCHEMA,
+      OLDER_VECTOR_FRAME_SCHEMA,
+    ].includes(header.schemaVersion as typeof VECTOR_FRAME_SCHEMA) ||
     canonicalJson(header.columns) !== canonicalJson(FRAME_COLUMNS)
   ) {
     throw new Error("VECTOR frame schema is unsupported.");
@@ -486,6 +547,50 @@ async function member(
   };
 }
 
+function targetEffectRecordIdentity(
+  engineScenario: PreparedSimulation["engineScenario"],
+  events: readonly SimulationEventV2[],
+): TargetEffectRecordIdentity | undefined {
+  const authority = engineScenario.targetEffectAuthority;
+  if (!authority) return undefined;
+  assertTargetEffectAuthority(authority);
+  const effectEvents = events.filter(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  if (effectEvents.length > 1) {
+    throw new Error("VECTOR record cannot archive more than one target-effect commit.");
+  }
+  const effectEvent = effectEvents[0];
+  const commit = effectEvent?.payload.kind === "TARGET_EFFECT_COMMITTED"
+    ? effectEvent.payload.commit
+    : undefined;
+  return {
+    authority: {
+      schemaVersion: authority.schemaVersion,
+      id: authority.id,
+      version: authority.version,
+      digest: authority.digest,
+      intendedUseId: authority.intendedUse.id,
+      intendedUseVersion: authority.intendedUse.version,
+    },
+    ...(effectEvent && commit
+      ? {
+          commit: {
+            eventId: effectEvent.id,
+            frameIndex: effectEvent.frameIndex,
+            commitId: commit.commitId,
+            weaponId: commit.weaponId,
+            targetId: commit.targetId,
+            result: commit.result,
+            targetLifecycleBefore: commit.targetLifecycleBefore,
+            targetLifecycleAfter: commit.targetLifecycleAfter,
+            modelPackDigest: commit.modelPackDigest,
+          },
+        }
+      : {}),
+  };
+}
+
 export async function createVectorSimulationRecord(
   prepared: PreparedSimulation,
   result: SimulationResult,
@@ -497,27 +602,15 @@ export async function createVectorSimulationRecord(
   ) {
     throw new Error("Record backend provenance does not match the selected backend.");
   }
+  if (result.engineRun.events.state !== "AVAILABLE") {
+    throw new Error("A new VECTOR record requires an available simulation-event stream.");
+  }
+  const events = result.engineRun.events.items;
+  const recordedTargetEffect = targetEffectRecordIdentity(prepared.engineScenario, events);
   const report: RecordReport = {
     schemaVersion: "vector.report.v1",
-    result: {
-      outcome: result.outcome,
-      successful: result.successful,
-      termination: result.termination,
-      closestApproach: result.closestApproach,
-      timeOfFlight: result.timeOfFlight,
-      endSpeed: result.endSpeed,
-      peakDemand: result.peakDemand,
-      reason: result.reason,
-    },
-    engine: {
-      envelopes: result.engineRun.envelopes,
-      primaryWeaponId: result.engineRun.primaryWeaponId,
-      primaryTargetId: result.engineRun.primaryTargetId,
-      termination: result.engineRun.termination,
-      closestApproachM: result.engineRun.closestApproachM,
-      peakCommandG: result.engineRun.peakCommandG,
-      diagnostics: result.engineRun.diagnostics,
-    },
+    result: recordReportResult(result),
+    engine: recordReportEngine(result.engineRun),
     ...(prepared.engineScenario.airMission
       ? {
           airMission: {
@@ -529,15 +622,14 @@ export async function createVectorSimulationRecord(
           },
         }
       : {}),
+    ...(recordedTargetEffect
+      ? { targetEffect: structuredClone(recordedTargetEffect) }
+      : {}),
     limitations: [
       "Educational deterministic point-mass model; named-aircraft performance remains unsupported and no catalog association supplies runtime authority.",
       "Observer state is recorded from the canonical fail-closed tick boundary.",
     ],
   };
-  if (result.engineRun.events.state !== "AVAILABLE") {
-    throw new Error("A new VECTOR record requires an available simulation-event stream.");
-  }
-  const events = result.engineRun.events.items;
   assertSimulationEventStream(
     events,
     result.engineRun.frames,
@@ -652,12 +744,16 @@ export async function createVectorSimulationRecord(
           },
         }
       : {}),
+    ...(recordedTargetEffect
+      ? { targetEffect: structuredClone(recordedTargetEffect) }
+      : {}),
     requiredViewerFeatures: [
       VECTOR_FRAME_SCHEMA,
       VECTOR_EVENT_SCHEMA,
       VECTOR_PICTURE_SCHEMA,
       "vector.report.v1",
       ...(prepared.engineScenario.airMission ? [COMPILED_AIR_MISSION_SCHEMA_VERSION] : []),
+      ...(recordedTargetEffect ? ["vector.target-effect-authority.v1"] : []),
     ],
     members: nonManifest.map(({ bytes, ...item }) => ({
       ...item,
@@ -786,7 +882,12 @@ export async function openVectorSimulationRecord(
   const frameMember = header.members.find((candidate) => candidate.path === "frames.arrow");
   if (
     !frameMember ||
-    ![VECTOR_FRAME_SCHEMA, LEGACY_VECTOR_FRAME_SCHEMA, OLDER_VECTOR_FRAME_SCHEMA].includes(frameMember.schemaVersion as typeof VECTOR_FRAME_SCHEMA) ||
+    ![
+      VECTOR_FRAME_SCHEMA,
+      PRE_TARGET_EFFECT_VECTOR_FRAME_SCHEMA,
+      LEGACY_VECTOR_FRAME_SCHEMA,
+      OLDER_VECTOR_FRAME_SCHEMA,
+    ].includes(frameMember.schemaVersion as typeof VECTOR_FRAME_SCHEMA) ||
     !manifest.requiredViewerFeatures.includes(frameMember.schemaVersion)
   ) throw new Error("VECTOR record does not admit a supported frame schema.");
   const pictureMember = header.members.find((candidate) => candidate.path === "pictures.jsonl");
@@ -801,6 +902,7 @@ export async function openVectorSimulationRecord(
   }
   const supportedObserverPair =
     (frameMember.schemaVersion === VECTOR_FRAME_SCHEMA && pictureMember.schemaVersion === VECTOR_PICTURE_SCHEMA) ||
+    (frameMember.schemaVersion === PRE_TARGET_EFFECT_VECTOR_FRAME_SCHEMA && pictureMember.schemaVersion === VECTOR_PICTURE_SCHEMA) ||
     (frameMember.schemaVersion === LEGACY_VECTOR_FRAME_SCHEMA && pictureMember.schemaVersion === VECTOR_PICTURE_SCHEMA) ||
     (frameMember.schemaVersion === OLDER_VECTOR_FRAME_SCHEMA && pictureMember.schemaVersion === LEGACY_VECTOR_PICTURE_SCHEMA);
   if (!supportedObserverPair) {
@@ -820,6 +922,9 @@ export async function openVectorSimulationRecord(
     PreparedSimulation,
     "scenario"
   >;
+  if (compiled.engineScenario.targetEffectAuthority !== undefined) {
+    assertRetainedTargetEffectAuthority(compiled.engineScenario.targetEffectAuthority);
+  }
   const recordedModelPack = compiled.engineScenario.modelPack as
     typeof compiled.engineScenario.modelPack & {
       weaponTerminations?: typeof compiled.engineScenario.modelPack.weaponTerminations;
@@ -982,7 +1087,33 @@ export async function openVectorSimulationRecord(
           "VECTOR record weapon termination claim does not match deterministic engine replay.",
         );
       }
+      if (
+        canonicalJson(report.engine) !==
+        canonicalJson(recordReportEngine(replay))
+      ) {
+        throw new Error(
+          "VECTOR frozen report engine projection does not match deterministic engine replay.",
+        );
+      }
     }
+  }
+  const openedTargetEffect = events.state === "AVAILABLE"
+    ? targetEffectRecordIdentity(compiled.engineScenario, events.items)
+    : undefined;
+  if (
+    canonicalJson(openedTargetEffect ?? null) !== canonicalJson(manifest.targetEffect ?? null) ||
+    canonicalJson(openedTargetEffect ?? null) !== canonicalJson(report.targetEffect ?? null)
+  ) {
+    throw new Error("VECTOR target-effect authority, event, manifest, and report identity are inconsistent.");
+  }
+  if (
+    openedTargetEffect?.commit &&
+    (
+      frameMember.schemaVersion !== VECTOR_FRAME_SCHEMA ||
+      !manifest.requiredViewerFeatures.includes("vector.target-effect-authority.v1")
+    )
+  ) {
+    throw new Error("VECTOR target-effect records require canonical effect-frame and authority features.");
   }
   if (scenario.airMission) {
     const recordedMission = compiled.engineScenario.airMission;
@@ -1038,10 +1169,12 @@ export async function openVectorSimulationRecord(
   const prepared: PreparedSimulation = { scenario, ...compiled };
   const result = buildSimulationResult(prepared, engineRun, pictures);
   if (
-    result.termination !== report.result.termination ||
-    result.timeOfFlight !== report.result.timeOfFlight
+    canonicalJson(report.result) !==
+    canonicalJson(recordReportResult(result))
   ) {
-    throw new Error("VECTOR frozen report does not match its recorded frames.");
+    throw new Error(
+      "VECTOR frozen report result does not match its reconstructed canonical result.",
+    );
   }
   return {
     manifest,

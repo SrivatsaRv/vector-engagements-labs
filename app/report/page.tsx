@@ -12,6 +12,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { ReportReplay } from "@/components/ReportReplay";
+import { TargetEffectSummary } from "@/components/TargetEffectSummary";
 import { findPlatform, findWeapon, getSource } from "@/lib/capability-data";
 import { getCatalogObject } from "@/lib/object-catalog";
 import { getGovernedAircraftEvidenceClaim } from "@/lib/aircraft-evidence-registry";
@@ -27,6 +28,10 @@ import { simulate } from "@/lib/simulation";
 import { createEnvironmentSampler } from "@/lib/geospatial/environment-pack";
 import { ENGINE_VERSION } from "@/lib/engine/version";
 import { getStudyArea, getWeatherPreset } from "@/lib/study-areas";
+import {
+  selectCanonicalTargetEffect,
+  selectDisplayFrame,
+} from "@/lib/frontend/selectors";
 
 type ActionState = "idle" | "preparing" | "done" | "error";
 type PrintState = "idle" | "preparing" | "printing";
@@ -199,6 +204,10 @@ export default function ReportPage() {
     getGovernedAircraftEvidenceClaim(scenario.bluePlatformId),
     getGovernedAircraftEvidenceClaim(scenario.redObjectId),
   ].filter((item): item is NonNullable<typeof item> => Boolean(item));
+  const finalTargetEffect = selectCanonicalTargetEffect(
+    result,
+    selectDisplayFrame(result, result.timeOfFlight),
+  );
 
   const printReport = () => {
     setPrintState("preparing");
@@ -350,6 +359,7 @@ export default function ReportPage() {
               />
             </div>
           </section>
+          <TargetEffectSummary selection={finalTargetEffect} />
           <section className="report-brief">
             <div>
               <span>What was tested</span>
@@ -545,6 +555,16 @@ export default function ReportPage() {
             <div>
               <ReportSection title="Session timeline">
                 <div className="report-timeline">
+                  {finalTargetEffect.eventId && "modelTimeSeconds" in finalTargetEffect.projection && (
+                    <div data-testid="report-target-effect-event">
+                      <time>{finalTargetEffect.projection.modelTimeSeconds.toFixed(1)} s</time>
+                      <i className="target-effect" />
+                      <span>
+                        <strong>{finalTargetEffect.presentation.label}</strong>
+                        <small>{finalTargetEffect.presentation.headline}</small>
+                      </span>
+                    </div>
+                  )}
                   {data.events.map((event) => (
                     <div key={event.id}>
                       <time>{event.time.toFixed(1)} s</time>

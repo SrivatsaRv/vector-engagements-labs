@@ -346,6 +346,11 @@ measurements are not folded into Stage-B compile, publication or reuse timing.
 
 ## Nonclaims and deferred owners
 
+The generic target-effect authority added by #196 binds anonymous study model
+identities only. It does not turn aircraft/store compatibility or public
+Su-30MKI/F-16/Astra/AMRAAM context into susceptibility, warhead, fuze,
+probability-of-kill or named-system effectiveness evidence.
+
 The #190 package does not promote generic coefficients into Su-30MKI, F-16C or
 Astra performance authority. Its compiled 25 m geometric-intercept assumption
 and 21.836104 m achieved closest approach are not detection, launch-zone, fuze,

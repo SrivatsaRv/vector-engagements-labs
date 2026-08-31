@@ -2266,6 +2266,7 @@ test("the repository policy maps real simulation identities to their exact owner
   const delivery = family("DELIVERY_CONTRACT_GOVERNANCE");
   const modelPack = family("MODEL_PACK_COMPILER_RESOLVER");
   const engine = family("ENGINE_ABI_RUNTIME");
+  const targetEffect = family("GENERIC_TARGET_EFFECT");
   const genericAam = family("GENERIC_AAM_VERIFICATION");
   const tp1538Aero = family("TP1538_AERO_VERIFICATION");
   const genericSensorSources = family("EVIDENCE_GENERIC_SENSOR_SOURCE_FREEZE");
@@ -2526,5 +2527,16 @@ test("the repository policy maps real simulation identities to their exact owner
   assert.equal(prefixRule(modelPack, "drizzle/"), undefined);
   assert.equal(prefixRule(vsr, "drizzle/"), undefined);
   assert.deepEqual(ownersOf("fixtures/public-reference/nasa-tm-109057/workload.v5.json").map((owner) => owner.id), ["GENERIC_AAM_VERIFICATION"]);
+  assert.deepEqual(
+    targetEffect.testRules.find((rule) =>
+      rule.kind === "EXACT" &&
+      rule.value === "fixtures/target-effect-canonical-six-decimal.v1.json"
+    ).facets,
+    ["digest", "runtime", "unit", "verification"],
+  );
+  assert.deepEqual(
+    ownersOf("fixtures/target-effect-canonical-six-decimal.v1.json").map((owner) => owner.id),
+    ["GENERIC_TARGET_EFFECT"],
+  );
   assert.deepEqual(ownersOf("governance/environment-sources/nasa-power-hourly-20200115/manifest.v1.json").map((owner) => owner.id), ["GEOSPATIAL_ENVIRONMENT"]);
 });

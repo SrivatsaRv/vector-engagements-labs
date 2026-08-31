@@ -11,6 +11,10 @@ one family must not imply changes to unrelated contracts.
 
 #### Model packs
 
+- Add a separate content-addressed generic target-effect authority with exact
+  weapon/target/model-pack bindings, deterministic `MODEL_ASSUMPTION` threshold
+  bands, closed effect results, explicit target domain and named-effectiveness
+  nonclaims. Missing exact bindings fail closed as `EFFECT_UNAVAILABLE`.
 - Bind the #190 high-energy crossing scenario to the unchanged current generic
   model-pack ID/version/digest and existing compatibility rules. No coefficient,
   source, credibility, intended-use, named-performance or pack schema changes.
@@ -137,6 +141,10 @@ packages/hashes with canonical v4 packages and rejects mixed or residual rows.
 
 #### Engine ABI
 
+- Extend both production backends with optional strict target-effect authority,
+  canonical six-decimal effect inputs, identical commit/event/lifecycle output
+  and legacy no-authority behavior. No renderer or caller-authored proximity
+  value can enter the ABI as an effect result.
 Engine scenarios carry an optional compiled Air mission lineage envelope. The
 generic physics ABI is unchanged; Rust/WASM results reattach the verified
 envelope for backend-independent VSR provenance.
@@ -177,6 +185,33 @@ no exported simulation ABI, backend-selection rule or v2 runtime admission.
   holding movement unavailable.
 
 No pending family-specific entry.
+
+#### Generic target effect
+
+- Enforce the target-effect projection as persistent causal state: it is absent
+  before the exact commit frame, present only on the committed target from that
+  frame onward, and forbidden without a causal event. Align Rust/WASM with the
+  TypeScript six-decimal binary64 tie rule through one shared signed-boundary
+  oracle so effect class and content-addressed commit identity cannot diverge.
+- Require VSR replay to resolve the exact retained target-effect authority, and
+  require presentation to reproduce the stored evaluation from its retained
+  binding, causal termination and exact target frames before it can authorize
+  effect wording. Jointly resealed authority archives, stale commits and
+  internally valid invented thresholds now fail closed.
+- Correct the Browser Contract admission inventory for governed target-effect
+  presentation: the exact causal-frame proof runs without skips across all five
+  responsive viewports, and the fail-closed runner admits exactly 25/25 passing
+  cases rather than retaining the previous four-case project manifest.
+- Add the separately governed generic target-effect authority, deterministic
+  commit, once-only target lifecycle transition, canonical event/frame/VSR v7
+  identity and exact-frame Map/3D/telemetry/report presentation. Rebaseline the
+  production engine module to a strict sub-620,000-byte ceiling only after
+  compressed artifact, built Worker, interleaved Chromium initialization,
+  memory, latency and complete TypeScript/Rust parity evidence pass.
+- Register the generic threshold/profile values as release-blocking STUB-28
+  assumptions while separately classifying fail-closed validation text and
+  non-causal display-label defaults; no scanner suppression or named-system
+  effect claim is admitted.
 
 #### Generic AAM verification
 
@@ -233,6 +268,10 @@ including public-reference and performance subtrees.
 
 #### Simulation physics
 
+- Consume a committed weapon-termination receipt and same-frame target state in
+  one deterministic generic target-effect evaluator. Emit one causal
+  `TARGET_EFFECT_COMMITTED` event and let it own any exactly-once target
+  lifecycle transition; geometric intercept alone remains `NOT_MODELLED`.
 Compiled Air start, route speed, fuel and installed-store quantity now drive
 generic initial state, mass and endurance without mission-class or named-case
 physics branches.
@@ -297,6 +336,16 @@ No pending family-specific entry.
 
 #### Vector simulation records
 
+- Require the frozen report's exact eight-field result projection, including
+  governed reason text, to equal the reconstructed canonical result and bind
+  its report-facing engine projection to deterministic replay where replay is
+  already required. Coherently resealed false kill/no-effect language,
+  missing/additional result fields and coordinated peak-demand rewrites now fail
+  open-record admission.
+- Add frame schema v7 target-effect projection plus manifest/report authority,
+  event, frame, commit, result and lifecycle binding. VSR open rejects mutation
+  or causal disagreement without rerunning the effect, while the frozen v6
+  pre-effect record remains byte-compatible and readable.
 - Reject malformed numeric types, non-finite values, range/integer violations
   and excess authored precision before saved-run recomputation, VSR creation or
   persistence. This reuses browser/Worker admission codes and field paths and
@@ -385,6 +434,9 @@ writer/reader, Worker, or replay behavior.
 
 #### Mission scenarios
 
+- Compile the separately content-addressed target-effect authority into current
+  Air scenarios by exact weapon/target model-pack binding. The authority is not
+  editable mission intent, and its absence retains historical `NOT_MODELLED`.
 - Add `vector.scenario-control-authority.v1` as the content-addressed migration
   inventory for all 40 legacy Scenario fields. Strict raw admission covers the
   current editable Air-mission numeric controls, and shared structured

@@ -240,6 +240,11 @@ proof, x86-64 capacity result, or named-sensor performance claim.
 
 ## Required performance test matrix
 
+Target-effect delivery adds exact baseline/candidate WASM raw/compressed size,
+built Worker growth, Chromium initialization and 100-run retained-memory soak
+to the existing engine latency and capacity matrix. Passing parity does not
+waive any size, load, memory or scenario-throughput row.
+
 Issue #190 preserves the 75 ms p95 limit for the eight historical scenario
 workloads and adds an explicit 110 ms p95 tier for the ninth high-energy
 crossing challenge. Each backend still runs two complete warmup rounds and 25
@@ -299,7 +304,8 @@ explicit RELEASE request onto the admitted takeoff fixture and executes a
 three predeclared warmups and 20 measured samples; the report retains every
 sample, nearest-rank p50/p95 and the maximum separately. Every run must retain
 exactly one accepted/achieved transfer outcome, fewer than 150 frames, a p95
-below 100 ms, and the shared optimized-WASM size ceiling below 585,000 bytes.
+below 100 ms, and the shared optimized-WASM size ceiling declared by the
+verification-owned performance policy.
 This workload proves only the generic `PUBLIC_EDUCATIONAL` / assumption-backed
 mechanism. It is not named-aircraft/store, carriage, safe-separation,
 weapon-effectiveness, browser-rendering, server-throughput, landing or recovery
@@ -309,6 +315,33 @@ Air mission delivery retains the existing engine/Worker capacity gates and adds
 no per-tick catalogue or database work. Mission compilation and Worker
 re-admission occur once before execution; the applicable local performance gate
 must pass on the frozen completion candidate beside TypeScript/Rust parity.
+
+#196 rebaselines the shared production engine module only after strict generic
+target-effect authority, event, lifecycle and TypeScript/Rust parity increased
+the optimized artifact from the exact pre-change 581,120-byte commit
+`69dd91d821e164936f231a59254af950ed4a0f21` to 611,496 bytes. The governed
+ceiling is now strictly below 620,000 bytes, leaving 8,504 bytes (1.37%) of
+headroom. The candidate is 238,005 bytes at gzip-9 and 187,048 bytes at
+Brotli-11, below fixed 240,000/190,000-byte limits. The built simulation Worker
+is 1,702,667 raw, 527,604 gzip and 404,783 Brotli bytes: 4.83%, 4.90% and 4.71%
+above the frozen pre-#196 baseline and below the 5% limit in every form.
+
+`performance:engine-wasm-load:verify` interleaves 20 fresh Chromium contexts
+for the exact baseline and candidate to avoid assigning cold-start or thermal
+bias to one artifact. On 2026-08-31 the baseline/candidate initialization p95
+was 6.6/6.6 ms, no measured regression; candidate maximum was 6.8 ms and both
+retained the exact 1,114,112-byte initial memory. The absolute
+maximum remains 25 ms. This is one-time Worker initialization evidence, not a
+render-frame or simulation-throughput claim. The size rebaseline does not
+relax any engine-latency, correctness, parity, VSR, Worker or browser gate.
+
+`performance:engine-wasm-memory:verify` runs the same high-energy workload 100
+times through independently instantiated exact baseline and candidate modules.
+The baseline grows from 1,114,112 to 11,468,800 bytes on run one; the candidate
+grows to 11,534,336 bytes, a 0.63% retained-growth regression. Both remain
+byte-for-byte flat from run one through run 100. The governed bounds are 16 MiB
+absolute retained growth, at most 10% relative regression, and zero additional
+growth after the first run.
 
 The Stage-B #170 workload is separately frozen at
 `fixtures/performance/model-pack-foundation-workload.v1.json`, digest

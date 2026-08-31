@@ -456,6 +456,11 @@ compiler. Production admission cannot consume or relabel this adapter.
 
 ## Scenario binding and patches
 
+Target-effect authority is a separate scenario binding over exact compiled
+weapon and target model identities plus the retained model-pack digest. It is
+not a scalar patch: callers cannot author thresholds, substitute display names,
+or reseal a compact binding to create an effect model.
+
 Scenario patches may change a termination scalar only through its declared
 component-relative path with old/new value, SI unit, reason and provenance.
 They cannot introduce a second threshold or a renderer-owned override.
@@ -513,6 +518,11 @@ Unknown fields, stale digests, missing evidence, or non-finite values fail.
 Draft patch addition creates a new revision.
 
 ## Loadout compatibility
+
+Compatibility determines which compiled store may be instantiated; it does not
+select a target-effect result. The effect resolver requires its own exact
+weapon/target binding after a canonical termination. A compatible store with no
+such binding remains `EFFECT_UNAVAILABLE` and cannot change target lifecycle.
 
 Station/store compatibility resolves the store that owns the compiled
 termination model; compatibility itself does not authorize launch, intercept,
@@ -688,6 +698,11 @@ remain immutable historical artifacts. V0.9 adds the exact verification-only
 weapon-termination authority described below.
 
 ## Consumption rules for dependent workstreams
+
+Target-effect consumers must preserve the full content-addressed authority and
+exact model-pack identities through compiler, both engines, Worker, VSR and
+report. Only the evaluator may classify the canonical termination/target input;
+renderers consume its commit and may not recompute from range or geometry.
 
 Consumers must preserve the independently sealed full mission as authority over
 both compact runtime bindings. They may not substitute the older scalar STUB-24

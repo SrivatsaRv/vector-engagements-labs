@@ -2,6 +2,12 @@
 
 ## Mission-set taxonomy
 
+Target-effect labels describe the canonical model result, not real-world
+effectiveness: “no modeled effect”, “target degraded”, “mission-disabled”,
+“model-recorded terminal effect”, or “effect unavailable”. The word “kill” is
+authorized only by a canonical `KILL` commit whose exact event frame records the
+target `TERMINATED`; every admitted generic result displays `MODEL_ASSUMPTION`.
+
 VECTOR keeps the compact A2A/A2G/G2A/G2G identifiers for scanning, but gives each one a plain-language mission-set name:
 
 | Code | UI name                | Training scope                                                    |

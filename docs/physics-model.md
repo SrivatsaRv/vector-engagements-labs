@@ -122,10 +122,15 @@ the terminal step's separation. The old scenario
 terminate a released weapon. Map/3D proximity is presentation-only.
 
 `INTERCEPT` means only that the verification trajectory entered the admitted
-geometric radius. The target remains `ACTIVE`, and the canonical event records
-`targetEffect: NOT_MODELLED`. No current equation models a fuze, warhead,
-damage, destruction, kill, probability of kill or named-weapon terminal
-performance.
+geometric radius. The termination event therefore continues to record
+`targetEffect: NOT_MODELLED`. Without a separately admitted target-effect
+authority the target remains `ACTIVE`, preserving byte-compatible legacy
+behavior. A current public-educational Air compilation may separately bind the
+generic `MODEL_ASSUMPTION` authority described in
+[`target-effect-model.md`](target-effect-model.md). Its causal effect event may
+change target lifecycle; the geometric termination alone never does. No current
+equation claims named-weapon terminal performance, probability of kill, or
+operational damage fidelity.
 
 If an admitted weapon's assigned target is already terminated or becomes
 terminated, both engines set its achieved state to `TARGET_UNAVAILABLE`,
@@ -201,6 +206,13 @@ The high-energy crossing challenge and its 46 km control are now a termination
 contrast: one enters the compiled 25 m radius at 131.9 s and the other reaches
 140 s at 530.164926 m. Varying the legacy completion distance does not change
 the terminal result, proving that field is not causal authority.
+
+Target-effect contrast uses the same termination/target input under two
+independently digested generic threshold packs and requires different committed
+results. Separate below/equal/above boundary oracles cover every band, while
+the high-energy package remains a governed `NO_EFFECT` control at 21.836104 m.
+Labels, side and scenario title are varied independently and cannot change the
+commit.
 
 `tests/aircraft-configuration-contrast.test.mjs` executes one identical
 three-dimensional route and controller request with three deliberately distinct,
@@ -285,7 +297,11 @@ The gate now includes exact terminal-state/event parity, malformed termination-
 model rejection and between-step closest-approach agreement for all nine
 canonical scenarios. Raw Rust/WASM also binds weapon termination to the exact
 compiler-owned retained-pack identity and projection. The optimized artifact
-remains below the explicit 585,000-byte regression ceiling.
+also includes strict target-effect authority, evaluation, event and lifecycle
+parity. Its verification-owned regression ceiling is below 620,000 bytes and
+is coupled to compressed-size, production-Worker growth, interleaved baseline/
+candidate Chromium initialization and unchanged initial-memory gates; see
+`performance-capacity.md`.
 
 The Rust integrator may replace the TypeScript numerical loop only after deterministic parity, numerical-tolerance, malformed-package, extreme-condition, lifecycle, and benchmark tests pass. JavaScript remains responsible for product state and rendering; batches will use a browser Worker.
 

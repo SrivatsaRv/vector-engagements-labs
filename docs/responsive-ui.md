@@ -21,6 +21,11 @@ rendering sharpness; viewport width and height govern task geometry.
 
 ## Behavioral rules
 
+Canonical target-effect state remains visible at every viewport and uses the
+same selected frame as Map, 3D and telemetry. Compact layouts may shorten the
+limitation copy but cannot hide `MODEL_ASSUMPTION`, authorize kill wording, or
+show a committed result before its exact event frame.
+
 Mission, CAP-area, runway and flight-plan editors collapse to one column below
 720 px, retain native labels and keyboard order, and never hide an admission
 error or move Run ahead of validation.
@@ -50,6 +55,11 @@ overflow; unsupported installation markers remain visible but disabled.
   available for full-resolution inspection.
 
 ## Shared control and overlay contract
+
+Map and 3D share one read-only target-effect summary derived from canonical
+event/frame identity. The overlay carries result, event/frame/time and target
+lifecycle attributes for regression; it never consumes renderer separation or
+camera state as effect authority.
 
 Map and 3D overlays share the same pack version/digest, datum and source-time
 label. Loading or missing identity is explicit and does not substitute a default.
@@ -114,6 +124,11 @@ substitute a default value.
 
 ## Observe viewport shell
 
+Observe joins the selected canonical frame to at most one governed effect
+event. Before the boundary it states that no effect has occurred; at and after
+the boundary it shows the recorded result and limitations. Only a canonical
+`KILL` plus terminated target lifecycle can authorize kill wording.
+
 Observe is unavailable while any raw authoring control is invalid. A failed
 attempt returns the operator to Construct and does not present the previous run
 as the result of the invalid draft.
@@ -167,6 +182,13 @@ recorded frame, selected playback time, map camera truth, or another
 Disclosure's state.
 
 ## Automated proof
+
+The built five-viewport Chromium journey runs the high-energy package through
+each layout's real navigation path, proves the summary is
+`BEFORE_EFFECT_BOUNDARY` one frame early, and admits governed `NO_EFFECT` only
+at frame 530 / 131.9 s. Skips are not admitted. Component and selector tests
+cover all five results, unavailable authority, causal corruption and legacy
+records.
 
 Focused component proof injects malformed numeric text atomically, verifies it
 remains visible and uncommitted, then admits a valid replacement. The complete
