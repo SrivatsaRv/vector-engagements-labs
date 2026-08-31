@@ -188,6 +188,10 @@ No pending family-specific entry.
 
 #### Generic target effect
 
+- Correct the Browser Contract admission inventory for governed target-effect
+  presentation: the exact causal-frame proof runs without skips across all five
+  responsive viewports, and the fail-closed runner admits exactly 25/25 passing
+  cases rather than retaining the previous four-case project manifest.
 - Add the separately governed generic target-effect authority, deterministic
   commit, once-only target lifecycle transition, canonical event/frame/VSR v7
   identity and exact-frame Map/3D/telemetry/report presentation. Rebaseline the

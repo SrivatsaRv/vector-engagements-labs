@@ -637,15 +637,15 @@ checks that the log remains readable, and binds the same port again to prove
 cleanup. This process evidence is separate from the Browser Contract runner. CI
 builds the application once, then `scripts/run-browser-contracts.mjs` executes
 the five Playwright projects serially with a fresh managed Wrangler/Workerd
-process group for each viewport. The policy is `RUN_ALL_PROJECTS_ONCE`: all 20
+process group for each viewport. The policy is `RUN_ALL_PROJECTS_ONCE`: all 25
 cases execute without retries even after one project fails, so later-viewport
 evidence is not suppressed. An external `SIGINT` or `SIGTERM` is different: it
 terminates the active server and test process groups, records the interruption,
 does not start later projects, and exits nonzero. Any project, server,
 interruption, cleanup, or evidence-retention failure makes the aggregate command
 fail. A pass requires a nonempty managed-server log and parseable Playwright JSON
-bound to the expected project, exactly four executed cases, and their successful
-statuses. The four governed case identities are exact and distinct; global or
+bound to the expected project, exactly five executed cases, and their successful
+statuses. The five governed case identities are exact and distinct; global or
 per-result errors cannot coexist with a passing status. Every governed project
 entry must bind to the selected project's isolated output directory.
 Browser-test failures require retained trace, screenshot, and video

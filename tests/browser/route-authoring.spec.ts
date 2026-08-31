@@ -159,8 +159,7 @@ async function catalogFixture(scenarioId = "a2a-crossing-intercept") {
   };
 }
 
-test("browser presentation changes only at the canonical target-effect frame", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "laptop-1366", "One built Chromium contract owns the exact-frame proof.");
+test("browser presentation changes only at the canonical target-effect frame", async ({ page }) => {
   const scenarioId = "a2a-high-energy-crossing-challenge";
   const catalog = await catalogFixture(scenarioId);
   await page.route("**/api/catalog", (route) =>
@@ -169,7 +168,15 @@ test("browser presentation changes only at the canonical target-effect frame", a
   await page.route("**/api/map-tile?**", (route) => route.abort());
   await page.goto(`/workbench?scenario=${scenarioId}&start=guided`);
 
-  await page.getByRole("button", { name: "5 Validate" }).click();
+  const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
+  if (compact) {
+    await page.getByRole("button", { name: /Next: Forces & loadouts/i }).click();
+    await page.getByRole("button", { name: /Next: Place & flight/i }).click();
+    await page.getByRole("button", { name: /Next: Admitted conditions/i }).click();
+    await page.getByRole("button", { name: /Next: Validate/i }).click();
+  } else {
+    await page.getByRole("button", { name: "5 Validate" }).click();
+  }
   await expect(page.getByRole("button", { name: /run baseline/i })).toBeEnabled();
   await page.getByRole("button", { name: /run baseline/i }).click();
   await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(

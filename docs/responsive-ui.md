@@ -183,10 +183,12 @@ Disclosure's state.
 
 ## Automated proof
 
-The built laptop Chromium journey runs the high-energy package, proves the
-summary is `BEFORE_EFFECT_BOUNDARY` one frame early, and admits governed
-`NO_EFFECT` only at frame 530 / 131.9 s. Component and selector tests cover all
-five results, unavailable authority, causal corruption and legacy records.
+The built five-viewport Chromium journey runs the high-energy package through
+each layout's real navigation path, proves the summary is
+`BEFORE_EFFECT_BOUNDARY` one frame early, and admits governed `NO_EFFECT` only
+at frame 530 / 131.9 s. Skips are not admitted. Component and selector tests
+cover all five results, unavailable authority, causal corruption and legacy
+records.
 
 Focused component proof injects malformed numeric text atomically, verifies it
 remains visible and uncommitted, then admits a valid replacement. The complete
