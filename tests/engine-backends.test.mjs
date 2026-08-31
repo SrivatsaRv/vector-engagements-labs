@@ -10,6 +10,7 @@ import {
   VECTOR_ENGINE_WASM_OPTIMIZER,
 } from "../lib/engine/generated/vector-engine-wasm.ts";
 import { compileScenario } from "../lib/engine/compiler.ts";
+import { ENGINE_WASM_PERFORMANCE_POLICY } from "../lib/engine/performance-policy.ts";
 import {
   getProfile,
   simulateWithCapabilitiesForVerification,
@@ -183,7 +184,10 @@ test("TypeScript and Rust/WASM reject at the first regional sample after crossin
 test("committed Rust/WASM artifact has a stable integrity identity", () => {
   assert.match(RUST_WASM_ENGINE_ARTIFACT.sha256, /^[a-f0-9]{64}$/);
   assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes > 100_000);
-  assert.ok(RUST_WASM_ENGINE_ARTIFACT.bytes < 585_000);
+  assert.ok(
+    RUST_WASM_ENGINE_ARTIFACT.bytes <
+      ENGINE_WASM_PERFORMANCE_POLICY.maximumOptimizedWasmBytes,
+  );
   assert.equal(
     VECTOR_ENGINE_WASM_OPTIMIZER,
     "binaryen@131.0.0 -O3 -S2 --reorder-functions rust-wasm-features-v1",

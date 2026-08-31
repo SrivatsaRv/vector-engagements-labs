@@ -311,6 +311,7 @@ test("VSR recompiles an archived Air mission against its exact retained model pa
       delete entity.weapon.termination;
     }
   }
+  delete prepared.engineScenario.targetEffectAuthority;
 
   const result = simulate(currentScenario);
   let record = await createVectorSimulationRecord(prepared, result, createdAt);
@@ -1022,6 +1023,57 @@ test("VSR content identity and stable event ordering are deterministic", async (
   const reused = serializeVectorRecord(second, allocated.buffer);
   assert.equal(reused.buffer, allocated.buffer);
   assert.equal(reused.byteLength, allocated.byteLength);
+});
+
+test("VSR preserves one canonical target-effect identity across event, frame, manifest, and report", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  const effect = result.engineRun.events.items.find(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  assert.ok(effect?.payload.kind === "TARGET_EFFECT_COMMITTED");
+  assert.equal(effect.payload.commit.result, "NO_EFFECT");
+
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const serialized = serializeVectorRecord(record);
+  const opened = await openVectorSimulationRecord(serialized.buffer, serialized.byteLength);
+  const openedEffect = opened.events.state === "AVAILABLE"
+    ? opened.events.items.find((event) => event.payload.kind === "TARGET_EFFECT_COMMITTED")
+    : undefined;
+  const effectFrameTarget = opened.result.frames[effect.frameIndex].entities.find(
+    (entity) => entity.id === effect.payload.commit.targetId,
+  );
+
+  assert.deepEqual(openedEffect, effect);
+  assert.deepEqual(opened.manifest.targetEffect, opened.report.targetEffect);
+  assert.equal(opened.manifest.targetEffect.commit.eventId, effect.id);
+  assert.equal(opened.manifest.targetEffect.commit.commitId, effect.payload.commit.commitId);
+  assert.deepEqual(effectFrameTarget.targetEffect, {
+    commitId: effect.payload.commit.commitId,
+    state: "NO_EFFECT",
+  });
+
+  const frameMember = record.members.find((member) => member.path === "frames.arrow");
+  assert.ok(frameMember);
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  const mutatedTarget = frames[effect.frameIndex].entities.find(
+    (entity) => entity.id === effect.payload.commit.targetId,
+  );
+  mutatedTarget.targetEffect.state = "KILL";
+  const mutated = await replaceRecordMember(
+    record,
+    "frames.arrow",
+    VECTOR_FRAME_SCHEMA,
+    encodeColumnarFrames(frames),
+  );
+  const mutatedSerialized = serializeVectorRecord(mutated);
+  await assert.rejects(
+    openVectorSimulationRecord(mutatedSerialized.buffer, mutatedSerialized.byteLength),
+    /invalid authority, causality, ownership, or frame state/,
+  );
 });
 
 test("VSR retains read-only compatibility with the last observer frame and picture schemas", async () => {
@@ -1817,10 +1869,18 @@ test("VSR rejects terminal geometry relabeled as a time-limit run", async () => 
   const finalWeapon = frames[terminal.frameIndex].entities.find(
     (entity) => entity.id === terminal.payload.weaponId,
   );
-  assert.ok(priorWeapon && finalWeapon);
+  const priorTarget = frames[terminal.frameIndex - 1].entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  const finalTarget = frames[terminal.frameIndex].entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  assert.ok(priorWeapon && finalWeapon && priorTarget && finalTarget);
   finalWeapon.lifecycle = priorWeapon.lifecycle;
   finalWeapon.weaponFlightState = priorWeapon.weaponFlightState;
   finalWeapon.phase = priorWeapon.phase;
+  finalTarget.lifecycle = priorTarget.lifecycle;
+  delete finalTarget.targetEffect;
   record = await replaceRecordMember(
     record,
     "frames.arrow",
@@ -1831,6 +1891,7 @@ test("VSR rejects terminal geometry relabeled as a time-limit run", async () => 
   const events = result.engineRun.events.items
     .filter((event) =>
       event.payload.kind !== "WEAPON_TERMINATED" &&
+      event.payload.kind !== "TARGET_EFFECT_COMMITTED" &&
       !(event.payload.kind === "ENTITY_LIFECYCLE_CHANGED" &&
         event.producer.entityId === terminal.payload.weaponId)
     )
@@ -1891,10 +1952,18 @@ test("VSR rejects a relabeled terminal run with its exact final-step evidence re
   const finalWeapon = frames[terminal.frameIndex].entities.find(
     (entity) => entity.id === terminal.payload.weaponId,
   );
-  assert.ok(priorWeapon && finalWeapon);
+  const priorTarget = removedFrame.entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  const finalTarget = frames[terminal.frameIndex].entities.find(
+    (entity) => entity.id === terminal.payload.targetId,
+  );
+  assert.ok(priorWeapon && finalWeapon && priorTarget && finalTarget);
   finalWeapon.lifecycle = priorWeapon.lifecycle;
   finalWeapon.weaponFlightState = priorWeapon.weaponFlightState;
   finalWeapon.phase = priorWeapon.phase;
+  finalTarget.lifecycle = priorTarget.lifecycle;
+  delete finalTarget.targetEffect;
   frames.splice(removedFrameIndex, 1);
   assert.ok(
     frames.at(-1).t - frames.at(-2).t > prepared.engineScenario.fixedStepSeconds + 1e-6,
@@ -1910,6 +1979,7 @@ test("VSR rejects a relabeled terminal run with its exact final-step evidence re
   const events = result.engineRun.events.items
     .filter((event) =>
       event.payload.kind !== "WEAPON_TERMINATED" &&
+      event.payload.kind !== "TARGET_EFFECT_COMMITTED" &&
       !(event.payload.kind === "ENTITY_LIFECYCLE_CHANGED" &&
         event.producer.entityId === terminal.payload.weaponId)
     )

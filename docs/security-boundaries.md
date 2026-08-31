@@ -36,6 +36,10 @@ separation over the admitted weapon lifetime; a caller cannot substitute the
 terminal step's separation or reseal a contradictory event, frame and report.
 The read boundary compares the event value to the canonical six-decimal
 projection of `report.engine.closestApproachM` before exposing replay.
+Target-effect replay additionally requires exact authority, commit, causal
+termination event, target frame, manifest and report agreement. Hash resealing
+cannot change reason/result/lifecycle or insert sub-precision causal values;
+historical records without the authority remain explicitly `NOT_MODELLED`.
 
 Saved-run snapshots and saved-run admission counters now have separate
 domain-owned declaration modules behind the unchanged aggregate Drizzle schema.
@@ -182,6 +186,14 @@ boundary plus the admitted maximum lifetime and rejects any hash-resealed
 expiry event carrying a different occurrence time. Boundary-only miss, terrain
 and target-unavailable causes likewise require exact equality with the terminal
 event boundary.
+
+The separate generic target-effect authority is governed by STUB-28. Its
+radial thresholds and target-domain profile remain release-blocking
+`MODEL_ASSUMPTION` data owned by #196/#28. Admission binds the exact weapon,
+target, model-pack, termination receipt and same-frame target state; missing or
+out-of-domain authority records `EFFECT_UNAVAILABLE` and cannot change target
+lifecycle. Presentation may display only the committed result and cannot infer
+an effect from distance, team colour, label or named platform.
 
 Issue #151's generic mission-policy source policy scans every production and
 runtime-fixture root for exact hashes and SHA-256-confirmed raw or

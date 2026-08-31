@@ -1834,6 +1834,9 @@ fn validate_scenario_with_compiled_pack(
         )));
     }
     positive("fixedStepSeconds", scenario.fixed_step_seconds)?;
+    if let Some(authority) = scenario.target_effect_authority.as_ref() {
+        crate::target_effect::validate_target_effect_authority(authority)?;
+    }
     if scenario.model_pack.schema_version != "vector.compiled-model-pack.v1" {
         return Err(invalid("modelPack.schemaVersion is unsupported"));
     }

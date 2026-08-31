@@ -1,5 +1,6 @@
 import { authorGenericAirborneStoreTransfer } from "../air-mission.ts";
 import { CURRENT_COMPILED_MODEL_PACK } from "../engine/weapon-admission.ts";
+import { ENGINE_WASM_PERFORMANCE_POLICY } from "../engine/performance-policy.ts";
 import { createGenericTakeoffPerformanceScenario } from "./generic-takeoff-performance.ts";
 
 /** #187-owned additive workload; the frozen #182 takeoff fixture remains unchanged. */
@@ -12,7 +13,7 @@ export const GENERIC_AIRBORNE_STORE_TRANSFER_PERFORMANCE_PROFILE = Object.freeze
   percentile: 0.95,
   maximumP95Ms: 100,
   maximumFramesPerRun: 150,
-  maximumOptimizedWasmBytes: 585_000,
+  maximumOptimizedWasmBytes: ENGINE_WASM_PERFORMANCE_POLICY.maximumOptimizedWasmBytes,
   backends: Object.freeze(["typescript", "rust-wasm"] as const),
 });
 

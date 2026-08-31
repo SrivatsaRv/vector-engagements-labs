@@ -115,6 +115,12 @@ Use the smallest complete set for a change. State why any applicable layer was o
 
 ## Pre-engine control admission regression
 
+Target-effect authority is not editable scenario-builder input. Its compiler
+boundary still applies the same fail-closed layering: exact schema/digests and
+weapon/target bindings before ticks, then a canonical six-decimal projection of
+termination distance/time and target mass/speed/altitude before domain checks
+and commit hashing. Independently resealed noncanonical values are rejected.
+
 The #193 baseline makes the 40-field legacy `Scenario` authority inventory a
 compile-time complete `Record<keyof Scenario, ...>` with an immutable SHA-256
 identity. Its focused regression enumerates all 19 numeric legacy domains and
@@ -297,8 +303,24 @@ Weapon-termination regression now includes independent relative-segment
 closest-approach cases, malformed admission, maximum-flight expiry, legacy-
 distance non-authority, a delayed release whose launch boundary remains the
 lifetime minimum, nine-scenario TypeScript/Rust parity and built-Worker event/
-lifecycle readback. Every geometric-intercept assertion also verifies
-that target effect is not modelled.
+lifecycle readback. Legacy geometric-intercept assertions verify that target
+effect remains not modelled. The separate target-effect matrix adds strict
+content-addressed authority/commit admission, independent below/equal/above
+threshold oracles, configuration contrast, label invariance, unavailable and
+non-geometric controls, exact once-only lifecycle/event causality, VSR v7
+mutation/readback, and exact-frame presentation checks. TypeScript/Rust parity
+does not replace the independent expected-value oracle.
+
+`performance:engine-wasm-load:verify` binds the production module to the exact
+pre-#196 baseline commit and interleaves 20 fresh Chromium contexts per
+artifact. It gates raw/gzip/Brotli module size, built Worker raw/gzip/Brotli
+growth, relative initialization p95, absolute initialization maximum and exact
+initial memory through the shared `vector.engine-wasm-performance-policy.v1`.
+The current raw ceiling is strictly below 620,000 bytes; changing that single
+policy requires new measured evidence rather than scattered assertion edits.
+`performance:engine-wasm-memory:verify` independently instantiates the exact
+baseline and candidate, executes 100 high-energy runs, and gates initial bytes,
+absolute and relative retained growth, plus zero growth after run one.
 
 The generic sensor Stage-0 generator, deny-network verifier, and adversarial
 suite are mandatory quality checks. `worker-local` and hosted integration rerun

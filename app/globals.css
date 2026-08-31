@@ -789,6 +789,45 @@ a {
   width: 100%;
   height: 100%;
 }
+.target-effect-summary {
+  display: grid;
+  gap: 3px;
+  padding: 9px 11px;
+  border: 1px solid #cbd2d6;
+  border-left: 3px solid #607381;
+  background: rgba(255, 255, 255, 0.96);
+  color: #354550;
+}
+.target-effect-summary > span,
+.target-effect-summary > small {
+  color: #65747e;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+.target-effect-summary > strong { font-size: 11px; line-height: 1.35; }
+.target-effect-summary > p { margin: 2px 0 0; font-size: 10px; line-height: 1.45; }
+.target-effect-summary.target-effect-caution { border-left-color: #b07a31; }
+.target-effect-summary.target-effect-adverse { border-left-color: #a94f45; }
+.target-effect-summary.is-compact { max-width: min(340px, calc(100% - 24px)); padding: 7px 9px; }
+.engagement-map-shell > .target-effect-summary {
+  position: absolute;
+  z-index: 5;
+  top: 58px;
+  right: 12px;
+}
+.simulation-target-effect-overlay {
+  position: absolute;
+  z-index: 5;
+  top: 12px;
+  right: 12px;
+  pointer-events: none;
+}
+.telemetry-title .target-effect-summary { margin-top: 3px; padding: 3px 7px; border-width: 0 0 0 2px; background: transparent; }
+.telemetry-title .target-effect-summary > span,
+.telemetry-title .target-effect-summary > small { font-size: 7px; }
+.telemetry-title .target-effect-summary > strong { font-size: 9px; }
 .symbol-key {
   position: absolute;
   top: 10px;

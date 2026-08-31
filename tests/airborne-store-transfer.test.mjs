@@ -32,6 +32,7 @@ import {
   createGenericTakeoffPerformanceScenario,
 } from "../lib/validation/generic-takeoff-performance.ts";
 import { CURRENT_COMPILED_MODEL_PACK } from "../lib/engine/weapon-admission.ts";
+import { ENGINE_WASM_PERFORMANCE_POLICY } from "../lib/engine/performance-policy.ts";
 
 const sha256 = (value) => createHash("sha256").update(canonicalJson(value)).digest("hex");
 
@@ -199,7 +200,7 @@ test("ordinary scenario synchronization preserves authored store-transfer intent
     percentile: 0.95,
     maximumP95Ms: 100,
     maximumFramesPerRun: 150,
-    maximumOptimizedWasmBytes: 585_000,
+    maximumOptimizedWasmBytes: ENGINE_WASM_PERFORMANCE_POLICY.maximumOptimizedWasmBytes,
     backends: ["typescript", "rust-wasm"],
   });
   const scenario = createGenericAirborneStoreTransferScenario();

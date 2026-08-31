@@ -2566,6 +2566,203 @@
       ]
     },
     {
+      "id": "GENERIC_TARGET_EFFECT",
+      "workstream": "simulation-systems",
+      "implementationRules": [
+        {
+          "kind": "EXACT",
+          "value": "components/TargetEffectSummary.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "engine-rust/src/target_effect.rs",
+          "facets": [
+            "admission",
+            "digest",
+            "runtime",
+            "schema"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/engine/performance-policy.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/engine/retained-target-effect-authority.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "evidence",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/engine/target-effect-authority.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "schema"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/engine/target-effect.ts",
+          "facets": [
+            "admission",
+            "digest",
+            "runtime",
+            "schema",
+            "unit"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "lib/target-effect-presentation.ts",
+          "facets": [
+            "ui",
+            "validity"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-engine-wasm-loading.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/benchmark-engine-wasm-memory.ts",
+          "facets": [
+            "verification"
+          ]
+        }
+      ],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "fixtures/vector-record/pre-target-effect-not-modelled.vsr",
+          "facets": [
+            "verification",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/target-effect-summary.test.tsx",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/legacy-target-effect-vector-record.test.mjs",
+          "facets": [
+            "verification",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/target-effect-presentation.test.mjs",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/target-effect-rust-parity.test.mjs",
+          "facets": [
+            "runtime",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/target-effect-selectors.test.mjs",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/target-effect.test.mjs",
+          "facets": [
+            "admission",
+            "digest",
+            "runtime",
+            "schema",
+            "verification"
+          ]
+        }
+      ],
+      "generatedGroups": [],
+      "owningSections": [
+        {
+          "sectionId": "TARGET_EFFECT_AUTHORITY_BOUNDARY",
+          "path": "docs/target-effect-model.md",
+          "heading": "## Authority boundary",
+          "facets": [
+            "admission",
+            "digest",
+            "evidence",
+            "runtime",
+            "schema",
+            "unit",
+            "validity"
+          ]
+        },
+        {
+          "sectionId": "TARGET_EFFECT_CANONICAL_REPLAY",
+          "path": "docs/target-effect-model.md",
+          "heading": "## Canonical commit and replay",
+          "facets": [
+            "digest",
+            "runtime",
+            "schema",
+            "ui",
+            "vsr"
+          ]
+        },
+        {
+          "sectionId": "TARGET_EFFECT_VERIFICATION",
+          "path": "docs/target-effect-model.md",
+          "heading": "## Verification requirements",
+          "facets": [
+            "verification"
+          ]
+        }
+      ],
+      "migrationSections": [
+        {
+          "sectionId": "GENERIC_TARGET_EFFECT_CHANGELOG",
+          "path": "CHANGELOG.md",
+          "heading": "#### Generic target effect",
+          "facets": [
+            "admission",
+            "digest",
+            "runtime",
+            "schema",
+            "ui",
+            "unit",
+            "validity",
+            "vsr"
+          ]
+        }
+      ]
+    },
+    {
       "id": "BROWSER_WORKER_PROTOCOL",
       "workstream": "browser-runtime",
       "implementationRules": [
@@ -5328,6 +5525,7 @@
     "engine-rust/src/model_pack.rs",
     "engine-rust/src/public_aircraft_reference.rs",
     "engine-rust/src/simulation_events.rs",
+    "engine-rust/src/target_effect.rs",
     "engine-rust/src/validation.rs",
     "lib/canonical-json.ts",
     "lib/catalog-admission.ts",
@@ -5335,9 +5533,13 @@
     "lib/engine/compiler.ts",
     "lib/engine/contracts.ts",
     "lib/engine/core.ts",
+    "lib/engine/performance-policy.ts",
     "lib/engine/primitives.ts",
+    "lib/engine/retained-target-effect-authority.ts",
     "lib/engine/runtime-model-pack.ts",
     "lib/engine/simulation-events.ts",
+    "lib/engine/target-effect-authority.ts",
+    "lib/engine/target-effect.ts",
     "lib/engine/track-store.ts",
     "lib/engine/vector.ts",
     "lib/engine/weapon-admission.ts",
@@ -5490,5 +5692,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "bca766b131b5d80027b4d5bec5791dec633fbebc5e6648dc97c9e6aca832a4c2"
+  "canonicalSha256": "d0bf01dc06b0f542b03026994f95e1ae4e4373c054ceac389ef286561dfe4c09"
 }

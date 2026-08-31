@@ -4,6 +4,10 @@ import { getGovernedAircraftEvidenceClaim } from "./aircraft-evidence-registry.t
 import { getCatalogObject } from "./object-catalog.ts";
 import { findWeaponSimulationModel } from "./simulation-models.ts";
 import type { RegionalEnvironmentPack } from "./geospatial/environment-pack.ts";
+import {
+  selectCanonicalTargetEffect,
+  selectDisplayFrame,
+} from "./frontend/selectors.ts";
 
 export type ReportLibraryScenario = {
   id: string;
@@ -61,6 +65,10 @@ export function buildReportExport(
   library: ReportLibraryScenario,
   sourceState: "example" | "last-saved",
 ) {
+  const targetEffect = selectCanonicalTargetEffect(
+    data.result,
+    selectDisplayFrame(data.result, data.result.timeOfFlight),
+  );
   const bluePlatform = findPlatform(data.scenario.bluePlatformId);
   const blueWeapon = findWeapon(data.scenario.blueSystemId);
   const redPlatform = findPlatform(data.scenario.redObjectId);
@@ -206,9 +214,31 @@ export function buildReportExport(
         value: Number(data.result.peakDemand.toFixed(1)),
         unit: "g",
       },
+      targetEffect: {
+        state: targetEffect.presentation.state,
+        effectClass: targetEffect.presentation.effectClass,
+        eventId: targetEffect.eventId,
+        weaponId: targetEffect.weaponId,
+        targetId: targetEffect.targetId,
+        headline: targetEffect.presentation.headline,
+        detail: targetEffect.presentation.detail,
+        assumptionLabel: targetEffect.presentation.assumptionLabel,
+        killClaimAuthorized: targetEffect.presentation.killClaimAuthorized,
+        authority: targetEffect.projection.state === "RECORDED"
+          ? targetEffect.projection.authority
+          : null,
+      },
     },
     session: {
       createdAt: data.createdAt,
+      targetEffectEvent: targetEffect.eventId && "modelTimeSeconds" in targetEffect.projection
+        ? {
+            eventId: targetEffect.eventId,
+            frameIndex: targetEffect.projection.frameIndex,
+            time: { value: targetEffect.projection.modelTimeSeconds, unit: "s" },
+            effectClass: targetEffect.presentation.effectClass,
+          }
+        : null,
       events: data.events.map((event) => ({
         time: { value: Number(event.time.toFixed(1)), unit: "s" },
         type: event.type,

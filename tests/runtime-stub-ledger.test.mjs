@@ -11,11 +11,20 @@ import ledger from "../governance/runtime-stub-ledger.v1.json" with { type: "jso
 
 test("the runtime stub ledger is complete, ordered, source-backed, and executable", () => {
   const result = verifyRuntimeStubLedger();
-  assert.equal(result.entries, 27);
-  assert.equal(result.releaseBlocking, 27);
+  assert.equal(result.entries, 28);
+  assert.equal(result.releaseBlocking, 28);
   assert.ok(result.indicatorLines > 0);
   assert.equal(result.sourceLessPublicReferences, 9);
   assert.match(result.sha256, /^[a-f0-9]{64}$/u);
+});
+
+test("generic target-effect assumptions remain release-blocking and issue-owned", () => {
+  const entry = ledger.entries.find((candidate) => candidate.id === "STUB-28");
+  assert.deepEqual(entry?.owners, ["#28", "#196"]);
+  assert.equal(entry?.classification, "explicit_supported_assumption");
+  assert.equal(entry?.releaseBlocking, true);
+  assert.ok(entry?.evidence.includes("engine-rust/src/target_effect.rs"));
+  assert.ok(entry?.resolution.includes("named-system effect claims"));
 });
 
 test("source-less public references are inventoried instead of silently admitted", () => {

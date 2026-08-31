@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { CircleHelp, Layers3 } from "lucide-react";
 import { VectorMapControls, type MapCameraTelemetry } from "@/components/VectorMapControls";
 import { Disclosure } from "@/components/ui/OverlayPrimitives";
+import { TargetEffectSummary } from "@/components/TargetEffectSummary";
 import type { RaspTrack, SimulationResult } from "@/lib/simulation";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
 import {
@@ -15,6 +16,7 @@ import {
 import { emitBrowserTelemetry } from "@/lib/observability/client";
 import {
   selectObserverEntityPresentation,
+  selectCanonicalTargetEffect,
   type SelectedDisplayFrame,
 } from "@/lib/frontend/selectors";
 import {
@@ -70,6 +72,7 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
   });
   const spatial = result.engineRun.scenario.environment.studyArea;
   const origin = spatial.anchor;
+  const targetEffect = selectCanonicalTargetEffect(result, selected);
 
   useEffect(() => {
     queueMicrotask(() => setBasemap(readVectorBasemap()));
@@ -562,7 +565,11 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
       className="engagement-map-shell"
       data-display-frame-index={selected.frameIndex}
       data-display-time={selected.displayTimeSeconds}
+      data-effect-state={targetEffect.presentation.state}
+      data-effect-class={targetEffect.presentation.effectClass ?? "NONE"}
+      data-effect-event-id={targetEffect.eventId ?? "UNAVAILABLE"}
     >
+      <TargetEffectSummary selection={targetEffect} compact />
       <div className="map-scope-switch" aria-label="Map extent">
         <button
           className={mapScope === "ENGAGEMENT" ? "active" : ""}

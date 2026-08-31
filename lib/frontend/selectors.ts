@@ -3,6 +3,13 @@ import type {
   EngineEntityFrame,
 } from "../engine/contracts.ts";
 import type { Frame, RaspTrack, SimulationResult } from "../simulation.ts";
+import {
+  presentTargetEffect,
+  projectTargetEffectAtFrame,
+  type SelectedTargetEffect,
+  type StructuralTargetEffect,
+  type TargetEffectPresentation,
+} from "../target-effect-presentation.ts";
 
 export type SelectedDisplayFrame = {
   frame: Frame;
@@ -183,6 +190,218 @@ export function selectDisplayFrame(
   }
   const frame = result.frames[frameIndex];
   return { frame, frameIndex, displayTimeSeconds: frame.t };
+}
+
+export type CanonicalTargetEffectSelection = {
+  projection: SelectedTargetEffect;
+  presentation: TargetEffectPresentation;
+  eventId: string | null;
+  weaponId: string | null;
+  targetId: string | null;
+};
+
+function unavailableTargetEffect(
+  result: SimulationResult,
+  selected: SelectedDisplayFrame,
+  reason: string,
+): CanonicalTargetEffectSelection {
+  const projection = projectTargetEffectAtFrame(
+    { state: "UNAVAILABLE", reason },
+    selected,
+  );
+  return {
+    projection,
+    presentation: presentTargetEffect(projection),
+    eventId: null,
+    weaponId: result.engineRun.primaryWeaponId || null,
+    targetId: result.engineRun.primaryTargetId || null,
+  };
+}
+
+/**
+ * Binds target-effect presentation to one canonical event and the exact
+ * retained target frame carrying the same committed identity. Geometry,
+ * display labels and nearest distance never supply an effect classification.
+ */
+export function selectCanonicalTargetEffect(
+  result: SimulationResult,
+  selected: SelectedDisplayFrame,
+): CanonicalTargetEffectSelection {
+  if (result.engineRun.events.state !== "AVAILABLE") {
+    return unavailableTargetEffect(
+      result,
+      selected,
+      result.engineRun.events.reason,
+    );
+  }
+  const events = result.engineRun.events.items;
+  const committed = events.filter((event) =>
+    event.payload.kind === "TARGET_EFFECT_COMMITTED" &&
+    event.payload.commit.weaponId === result.engineRun.primaryWeaponId &&
+    event.payload.commit.targetId === result.engineRun.primaryTargetId
+  );
+  if (committed.length > 1) {
+    return unavailableTargetEffect(result, selected, "AMBIGUOUS_TARGET_EFFECT_EVENTS");
+  }
+
+  let structural: StructuralTargetEffect;
+  let eventId: string;
+  let weaponId: string;
+  let targetId: string;
+  if (committed.length === 1) {
+    const event = committed[0];
+    if (event.payload.kind !== "TARGET_EFFECT_COMMITTED") {
+      return unavailableTargetEffect(result, selected, "TARGET_EFFECT_EVENT_INVALID");
+    }
+    const payload = event.payload;
+    const commit = payload.commit;
+    const causalEvent = event.causeEventIds.length === 1
+      ? events.find((candidate) => candidate.id === event.causeEventIds[0])
+      : undefined;
+    const effectFrame = result.frames[event.frameIndex];
+    const targetAtEffectFrame = effectFrame?.entities.find(
+      (entity) => entity.id === commit.targetId,
+    );
+    const authority = result.engineRun.scenario.targetEffectAuthority;
+    if (!authority) {
+      return unavailableTargetEffect(result, selected, "TARGET_EFFECT_AUTHORITY_UNRESOLVED");
+    }
+    const causalAgreement = causalEvent?.payload.kind === "WEAPON_TERMINATED" &&
+      causalEvent.payload.weaponId === commit.weaponId &&
+      causalEvent.payload.targetId === commit.targetId &&
+      causalEvent.payload.cause === commit.terminationReceipt.cause &&
+      causalEvent.tick === commit.terminationReceipt.tick &&
+      causalEvent.tick === event.tick &&
+      causalEvent.frameIndex === event.frameIndex &&
+      causalEvent.localKey === commit.terminationReceipt.localKey &&
+      causalEvent.modelTimeSeconds === commit.terminationReceipt.modelTimeSeconds &&
+      causalEvent.modelTimeSeconds === event.modelTimeSeconds;
+    const frameAgreement = effectFrame?.t === event.modelTimeSeconds &&
+      targetAtEffectFrame?.lifecycle === commit.targetLifecycleAfter &&
+      targetAtEffectFrame?.targetEffect?.commitId === commit.commitId &&
+      targetAtEffectFrame.targetEffect.state === commit.result &&
+      commit.targetEffectStateAfter === commit.result;
+    const authorityAgreement = authority.id === payload.authorityId &&
+      authority.version === payload.authorityVersion &&
+      commit.modelPackDigest === authority.digest;
+    if (!causalAgreement || !frameAgreement || !authorityAgreement) {
+      return unavailableTargetEffect(result, selected, "INCONSISTENT_CANONICAL_TARGET_EFFECT");
+    }
+
+    const model = commit.valueState === "MODEL_ASSUMPTION"
+      ? authority.models.find((candidate) =>
+          candidate.id === commit.modelId &&
+          candidate.version === commit.modelVersion &&
+          candidate.digest === commit.modelDigest &&
+          candidate.intendedUse.id === commit.intendedUseId &&
+          candidate.intendedUse.version === commit.intendedUseVersion &&
+          candidate.targetProfile.id === commit.targetProfileId &&
+          candidate.targetProfile.version === commit.targetProfileVersion
+        )
+      : undefined;
+    if (
+      (commit.valueState === "MODEL_ASSUMPTION" && !model) ||
+      (commit.valueState === "UNAVAILABLE" && commit.reason !== "AUTHORITY_UNAVAILABLE") ||
+      (commit.result !== "EFFECT_UNAVAILABLE" && !model)
+    ) {
+      return unavailableTargetEffect(result, selected, "TARGET_EFFECT_AUTHORITY_UNRESOLVED");
+    }
+    const admittedAuthority = model
+      ? {
+          state: "ADMITTED" as const,
+          authorityId: authority.id,
+          authorityVersion: authority.version,
+          authorityDigest: authority.digest,
+          modelId: model.id,
+          modelVersion: model.version,
+          modelDigest: model.digest,
+          modelPackDigest: commit.modelPackDigest,
+          targetProfileId: model.targetProfile.id,
+          targetProfileVersion: model.targetProfile.version,
+          intendedUseId: model.intendedUse.id,
+          intendedUseVersion: model.intendedUse.version,
+          valueState: "MODEL_ASSUMPTION" as const,
+          limitationIds: model.limitationIds,
+        }
+      : null;
+    structural = {
+      state: "RECORDED",
+      eventId: event.id,
+      frameIndex: event.frameIndex,
+      modelTimeSeconds: event.modelTimeSeconds,
+      causalWeaponTerminationEventId: causalEvent.id,
+      weaponId: commit.weaponId,
+      targetId: commit.targetId,
+      targetLifecycleBefore: commit.targetLifecycleBefore,
+      targetLifecycleAfter: commit.targetLifecycleAfter,
+      targetLifecycleAtEffectFrame: targetAtEffectFrame.lifecycle,
+      effectClass: commit.result,
+      effectReason: commit.reason,
+      authority: admittedAuthority ?? { state: "UNAVAILABLE", reason: commit.reason },
+    };
+    eventId = event.id;
+    weaponId = commit.weaponId;
+    targetId = commit.targetId;
+  } else {
+    const legacy = events.filter((event) =>
+      event.payload.kind === "WEAPON_TERMINATED" &&
+      event.payload.weaponId === result.engineRun.primaryWeaponId &&
+      event.payload.targetId === result.engineRun.primaryTargetId &&
+      event.payload.targetEffect === "NOT_MODELLED"
+    );
+    if (legacy.length !== 1) {
+      return unavailableTargetEffect(
+        result,
+        selected,
+        legacy.length > 1 ? "AMBIGUOUS_LEGACY_TARGET_EFFECT_EVENTS" : "NO_TARGET_EFFECT_EVENT",
+      );
+    }
+    const event = legacy[0];
+    const effectFrame = result.frames[event.frameIndex];
+    const targetAtEffectFrame = effectFrame?.entities.find(
+      (entity) => entity.id === result.engineRun.primaryTargetId,
+    );
+    const previousTarget = result.frames[event.frameIndex - 1]?.entities.find(
+      (entity) => entity.id === result.engineRun.primaryTargetId,
+    );
+    if (
+      effectFrame?.t !== event.modelTimeSeconds ||
+      !targetAtEffectFrame ||
+      targetAtEffectFrame.targetEffect !== undefined ||
+      previousTarget?.lifecycle !== targetAtEffectFrame.lifecycle
+    ) {
+      return unavailableTargetEffect(result, selected, "INCONSISTENT_LEGACY_TARGET_EFFECT");
+    }
+    structural = {
+      state: "NOT_MODELLED",
+      eventId: event.id,
+      frameIndex: event.frameIndex,
+      modelTimeSeconds: event.modelTimeSeconds,
+      causalWeaponTerminationEventId: null,
+      weaponId: result.engineRun.primaryWeaponId,
+      targetId: result.engineRun.primaryTargetId,
+      targetLifecycleBefore: previousTarget.lifecycle,
+      targetLifecycleAfter: targetAtEffectFrame.lifecycle,
+      targetLifecycleAtEffectFrame: targetAtEffectFrame.lifecycle,
+    };
+    eventId = event.id;
+    weaponId = result.engineRun.primaryWeaponId;
+    targetId = result.engineRun.primaryTargetId;
+  }
+
+  const projection = projectTargetEffectAtFrame(structural, selected);
+  const weapon = result.entityManifest.find((entity) => entity.id === weaponId);
+  const target = result.entityManifest.find((entity) => entity.id === targetId);
+  return {
+    projection,
+    presentation: presentTargetEffect(projection, {
+      weapon: weapon?.designation,
+      target: target?.designation,
+    }),
+    eventId,
+    weaponId,
+    targetId,
+  };
 }
 
 export type EntityMetricSeries = {

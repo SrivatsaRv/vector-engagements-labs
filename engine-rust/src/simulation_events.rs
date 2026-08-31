@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
 
+use crate::target_effect::TargetEffectEvaluation;
 use crate::{
     Affiliation, AirborneStoreTransfer, AircraftOperationalState, EngineError, EntityKind,
     EntityLifecycle, StoreTransferOperation, Termination, WeaponFlightState,
@@ -19,6 +20,8 @@ pub const AIRBORNE_STORE_TRANSFER_OUTCOME_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.airborne-store-transfer-outcome.v1";
 pub const WEAPON_TERMINATED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.weapon-terminated.v2";
+pub const TARGET_EFFECT_COMMITTED_PAYLOAD_SCHEMA: &str =
+    "vector.simulation-event-payload.target-effect-committed.v1";
 pub const RUN_COMPLETED_PAYLOAD_SCHEMA: &str = "vector.simulation-event-payload.run-completed.v1";
 pub const TRACK_CHANGED_PAYLOAD_SCHEMA: &str =
     "vector.simulation-event-payload.track-state-changed.v3";
@@ -265,6 +268,16 @@ pub enum SimulationEventPayload {
         #[serde(rename = "targetEffect")]
         target_effect: &'static str,
     },
+    #[serde(rename = "TARGET_EFFECT_COMMITTED")]
+    TargetEffectCommitted {
+        #[serde(rename = "schemaVersion")]
+        schema_version: &'static str,
+        #[serde(rename = "authorityId")]
+        authority_id: String,
+        #[serde(rename = "authorityVersion")]
+        authority_version: String,
+        commit: Box<TargetEffectEvaluation>,
+    },
     #[serde(rename = "RUN_COMPLETED")]
     RunCompleted {
         #[serde(rename = "schemaVersion")]
@@ -366,8 +379,9 @@ impl SimulationEventPayload {
             Self::AircraftOperationalStateChanged { .. } => 3,
             Self::AirborneStoreTransferOutcome { .. } => 4,
             Self::WeaponTerminated { .. } => 5,
-            Self::RunCompleted { .. } => 6,
-            Self::TrackStateChanged { .. } => 7,
+            Self::TargetEffectCommitted { .. } => 6,
+            Self::RunCompleted { .. } => 7,
+            Self::TrackStateChanged { .. } => 8,
         }
     }
 
@@ -470,10 +484,32 @@ impl SimulationEventPayload {
                     ))
                 });
             }
+            Self::TargetEffectCommitted {
+                schema_version,
+                authority_id,
+                authority_version,
+                commit,
+            } => {
+                return serde_json::to_string(&serde_json::json!([
+                    "6",
+                    schema_version,
+                    authority_id,
+                    authority_version,
+                    commit.commit_id,
+                    commit.weapon_id,
+                    commit.target_id,
+                    commit.result,
+                ]))
+                .map_err(|error| {
+                    EngineError::Serialization(format!(
+                        "could not encode simulation event payload key: {error}"
+                    ))
+                });
+            }
             Self::RunCompleted {
                 schema_version,
                 termination,
-            } => vec!["6", schema_version, termination_key(*termination)],
+            } => vec!["7", schema_version, termination_key(*termination)],
             Self::TrackStateChanged {
                 schema_version,
                 perspective,
@@ -492,7 +528,7 @@ impl SimulationEventPayload {
                 uncertainty_value_state,
             } => {
                 return serde_json::to_string(&serde_json::json!([
-                    "7",
+                    "8",
                     schema_version,
                     perspective,
                     track_id,
@@ -752,6 +788,48 @@ impl SimulationEventDraft {
                 intercept_radius_m: event.intercept_radius_m,
                 maximum_flight_time_seconds: event.maximum_flight_time_seconds,
                 target_effect: "NOT_MODELLED",
+            },
+        }
+    }
+
+    pub fn target_effect_committed(
+        tick: u64,
+        time: f64,
+        authority_id: &str,
+        authority_version: &str,
+        commit: TargetEffectEvaluation,
+        cause: SimulationEventReceipt,
+    ) -> Self {
+        let weapon_id = commit.weapon_id.clone();
+        let target_id = commit.target_id.clone();
+        Self {
+            local_key: format!("target-effect:{}", commit.commit_id),
+            tick,
+            model_time_seconds: time,
+            phase: SimulationEventPhase::Termination,
+            producer: SimulationEventProducer {
+                subsystem: SimulationEventSubsystem::WeaponDynamics,
+                entity_id: Some(weapon_id.clone()),
+            },
+            owner_affiliation: None,
+            knowledge_scope: SimulationEventKnowledgeScope::World,
+            participants: vec![
+                SimulationEventParticipant {
+                    entity_id: weapon_id,
+                    role: SimulationEventParticipantRole::Weapon,
+                },
+                SimulationEventParticipant {
+                    entity_id: target_id,
+                    role: SimulationEventParticipantRole::Target,
+                },
+            ],
+            causes: vec![SimulationEventCauseReference::EventReceipt(cause)],
+            correlation_id: None,
+            payload: SimulationEventPayload::TargetEffectCommitted {
+                schema_version: TARGET_EFFECT_COMMITTED_PAYLOAD_SCHEMA,
+                authority_id: authority_id.to_string(),
+                authority_version: authority_version.to_string(),
+                commit: Box::new(commit),
             },
         }
     }

@@ -3,8 +3,12 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { SimulationResult } from "@/lib/simulation";
 import { TelemetryChart } from "@/components/TelemetryChart";
+import { TargetEffectSummary } from "@/components/TargetEffectSummary";
 import type { SelectedDisplayFrame } from "@/lib/frontend/selectors";
-import { selectAirborneStoreTransferOutcomes } from "@/lib/frontend/selectors";
+import {
+  selectAirborneStoreTransferOutcomes,
+  selectCanonicalTargetEffect,
+} from "@/lib/frontend/selectors";
 
 type Props = {
   expanded: boolean;
@@ -24,6 +28,7 @@ export function ViewportTelemetry({ expanded, onExpandedChange, result, selected
     ? `${(frame.range / 1000).toFixed(1)} km separation`
     : "Telemetry unavailable";
   const latestTransfer = selectAirborneStoreTransferOutcomes(result, selected).at(-1);
+  const targetEffect = selectCanonicalTargetEffect(result, selected);
 
   return (
     <section className={`telemetry ${expanded ? "is-expanded" : "is-collapsed"}`} aria-label="Synchronized run telemetry">
@@ -38,6 +43,7 @@ export function ViewportTelemetry({ expanded, onExpandedChange, result, selected
               {latestTransfer.operation} {latestTransfer.achieved ? "achieved" : "rejected"} · {latestTransfer.storeId} · {latestTransfer.stationId} · tick frame {latestTransfer.frameIndex} · {latestTransfer.limiter} · {latestTransfer.cause}
             </span>
           )}
+          <TargetEffectSummary selection={targetEffect} compact />
         </div>
         <button
           type="button"
@@ -50,6 +56,7 @@ export function ViewportTelemetry({ expanded, onExpandedChange, result, selected
           {expanded ? "Collapse telemetry" : "Expand telemetry"}
         </button>
       </div>
+      {expanded && <TargetEffectSummary selection={targetEffect} />}
       <div id={panelId} hidden={!expanded}>
         <TelemetryChart result={result} selected={selected} />
       </div>

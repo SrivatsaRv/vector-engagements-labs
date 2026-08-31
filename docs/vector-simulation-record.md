@@ -21,9 +21,14 @@ values and their exact compiled consequence.
 A weapon-terminal archive contains the compiled termination authority, the
 terminal achieved frame and exactly one `WEAPON_TERMINATED` event. Payload v2
 identifies the exact retained prior/next frame times that witness the lifetime
-minimum. The event
-records `targetEffect: NOT_MODELLED`; no archive consumer may promote geometric
-intercept to damage or kill.
+minimum. The event records `targetEffect: NOT_MODELLED`; no archive consumer may
+promote geometric intercept to damage or kill. When `compiled.json` also carries
+an admitted `vector.target-effect-authority.v1`, exactly one causal
+`TARGET_EFFECT_COMMITTED` event follows the termination. Frame schema v7 stores
+the target's `{ commitId, state }` projection, and manifest/report bind the same
+authority, event, frame, result and before/after lifecycle identity. Replay
+validates these values and never reruns the effect evaluator. Frame schema v6
+remains readable for pre-effect records.
 
 An admitted takeoff archive includes canonical operational frames and transition
 events beside the unchanged compiled Air-mission/model/environment identities.
@@ -121,6 +126,11 @@ it is not displayed as if it were a separate model sample.
 
 ## Frame contract
 
+Frame schema v7 adds only the optional target projection
+`targetEffect: { commitId, state }` on the affected entity. The complete model
+and causal receipt remain in the typed event/compiled authority; a frame cannot
+create, classify or independently authenticate an effect.
+
 Frames contain only state produced from a compiled admitted scenario. Raw
 authoring strings and rejected numeric values never enter a frame, and the
 record writer does not round or normalize them as a fallback.
@@ -181,6 +191,11 @@ environment dataset.
 Weapons remain loadout inventory before launch. Aircraft frames preserve the installed inventory identities and total store mass while the weapon is stowed. A launch event removes that store and its declared launch mass from the aircraft once, then creates the weapon's first world sample with the launch platform position and inherited velocity. Static objects may omit unchanged samples. The viewer interpolates only properties explicitly declared interpolable.
 
 ## Integrity and replay
+
+For a governed target effect, integrity is one conjunction across authority,
+termination receipt, effect event, target frame, manifest and report. Opening
+rejects a missing, duplicate, reordered or hash-resealed disagreement before
+returning playback; it never accepts a matching label or distance as repair.
 
 Scenario and compiled digests bind the exact admitted numeric representation.
 An input rejected for type, finiteness, range, integer or precision has no run
@@ -483,6 +498,9 @@ or cross-field validity.
 Browser consumers receive weapon terminal state and event evidence through the
 same VSR transfer as every other canonical frame/event. Map and 3D proximity,
 labels or playback sampling cannot replace or amend that evidence.
+Governed target-effect presentation joins the exact typed effect event to the
+selected v7 target frame. Before the event frame it remains pending; at or after
+that frame every browser consumer uses the same committed result and lifecycle.
 
 The Worker transfers the recorded runway lifecycle and controller/value-state
 fields through the existing VSR boundary. Browser map, 3D, telemetry, timeline
@@ -518,7 +536,9 @@ validated scenario and compiled values stored in the VSR and has no repair,
 rounding or default path for rejected authoring data.
 Replay now covers engine-owned weapon intercept, miss, expiry, terrain failure
 and target-unavailable outcomes with exact payload validation. It remains
-read-only and does not compute a fuze, target effect, damage state or kill.
+read-only and does not compute a fuze or target effect. When a governed effect
+commit exists, replay verifies and presents that recorded generic result;
+historical termination-only records retain `NOT_MODELLED`.
 
 The implemented ground-operation replay covers the admitted generic roll,
 rotation and climbout sequence through `ENROUTE`, with exact events and
@@ -566,15 +586,17 @@ This is the same path used by the browser Worker after
 it has produced and reopened the transferable record.
 
 `frames.arrow` currently contains the versioned VECTOR columnar codec
-`vector.frames.columnar.v6`: string/lifecycle, installed-store identity, and
+`vector.frames.columnar.v7`: string/lifecycle, installed-store identity, and
 aircraft operational/movement value-state metadata is encoded once in a
 canonical header and all numerical entity fields are stored as contiguous f64
-columns, including total installed-store mass. The historical path is retained
+columns, including total installed-store mass. V7 adds the optional target-
+effect commit/state projection. The historical path is retained
 for compatibility, but this
 implementation is not Apache Arrow IPC. An Arrow IPC adapter and downloadable
 ZIP container remain follow-up interoperability work; changing the frame codec
 requires a new member schema version and fixture migration.
 
+Version 7 preserves version 6 and adds the governed target-effect projection.
 Version 6 preserves the exhaustive observer state v2 and v3 from version 5 and
 adds optional achieved aircraft operational state plus explicit movement
 `VALID`/`UNAVAILABLE`/`TERMINATED` state. An admitted readiness hold is a valid
@@ -586,7 +608,7 @@ verification observation, uncertainty, and side-owned track without a world
 entity identity. The reader keeps frames-v5/pictures-v4 for pre-aircraft-state
 records and the prior frames-v4/pictures-v3 pair as a read-only v2-only format,
 rejecting v3 state in v4 members. The reader admits only v6/v4, v5/v4, and
-v4/v3 pairs; every cross-pair or missing/extra
+v4/v3 historical pairs beside the current v7/v4 pair; every cross-pair or missing/extra
 version fails before replay. Both
 formats reject any reconstructed observed-world identity or truth position.
 The requested

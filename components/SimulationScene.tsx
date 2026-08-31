@@ -7,9 +7,11 @@ import {
   type SimulationResult,
 } from "@/lib/simulation";
 import type { EngineEntityFrame } from "@/lib/engine/contracts";
+import { TargetEffectSummary } from "@/components/TargetEffectSummary";
 import { cameraRelativeThreePosition } from "@/lib/geospatial/geodesy";
 import {
   selectObserverEntityPresentation,
+  selectCanonicalTargetEffect,
   type SelectedDisplayFrame,
 } from "@/lib/frontend/selectors";
 
@@ -20,6 +22,7 @@ type Props = {
   layers: { interceptor: boolean; target: boolean; lineOfSight: boolean };
   raspTrack?: RaspTrack;
   layoutRevision?: number;
+  targetEffectOverlay?: boolean;
 };
 
 type ThreeState = {
@@ -146,9 +149,10 @@ function drawFrame(
   context.restore();
 }
 
-export function SimulationScene({ result, selected, layers, raspTrack, layoutRevision = 0 }: Props) {
+export function SimulationScene({ result, selected, layers, raspTrack, layoutRevision = 0, targetEffectOverlay = false }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const state = useRef<ThreeState | null>(null);
+  const targetEffect = selectCanonicalTargetEffect(result, selected);
 
   useEffect(() => {
     if (!mount.current) return;
@@ -295,11 +299,13 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
             map: texture,
             transparent: true,
             depthTest: false,
+            opacity: entity.lifecycle === "TERMINATED" ? 0.48 : 1,
           });
           symbol = new THREE.Sprite(material);
           const scale = entity.kind === "GUIDED_WEAPON" ? 1750 : 2600;
           symbol.scale.set(scale, scale, 1);
           if (entity.lifecycle === "STOWED") symbol.center.set(1.15, 0.5);
+          symbol.userData.lifecycle = entity.lifecycle;
           symbol.renderOrder = 10;
           current.symbols.set(entity.id, symbol);
           current.scene.add(symbol);
@@ -368,6 +374,20 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
           groundMarker.rotation.x = -Math.PI / 2;
           current.groundMarkers.set(entity.id, groundMarker);
           current.scene.add(groundMarker);
+        }
+
+        if (symbol.userData.lifecycle !== entity.lifecycle) {
+          const material = symbol.material as import("three").SpriteMaterial;
+          const canvas = material.map?.image;
+          if (canvas instanceof HTMLCanvasElement) {
+            const context = canvas.getContext("2d");
+            if (context) {
+              drawFrame(context, entity);
+              material.map!.needsUpdate = true;
+            }
+          }
+          material.opacity = entity.lifecycle === "TERMINATED" ? 0.48 : 1;
+          symbol.userData.lifecycle = entity.lifecycle;
         }
 
         const observerPresentation = selectObserverEntityPresentation(raspTrack, entity.id);
@@ -472,12 +492,22 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
   }, [layers, raspTrack, result, selected]);
 
   return (
-    <div
-      className="simulation-scene"
-      ref={mount}
-      aria-label="Three-dimensional engagement geometry with tactical entity symbols"
-      data-display-frame-index={selected.frameIndex}
-      data-display-time={selected.displayTimeSeconds}
-    />
+    <>
+      <div
+        className="simulation-scene"
+        ref={mount}
+        aria-label="Three-dimensional engagement geometry with tactical entity symbols"
+        data-display-frame-index={selected.frameIndex}
+        data-display-time={selected.displayTimeSeconds}
+        data-effect-state={targetEffect.presentation.state}
+        data-effect-class={targetEffect.presentation.effectClass ?? "NONE"}
+        data-effect-event-id={targetEffect.eventId ?? "UNAVAILABLE"}
+      />
+      {targetEffectOverlay && (
+        <div className="simulation-target-effect-overlay">
+          <TargetEffectSummary selection={targetEffect} compact />
+        </div>
+      )}
+    </>
   );
 }

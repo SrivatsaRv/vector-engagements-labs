@@ -8,9 +8,9 @@ import { STUDY_AREAS } from "../../lib/study-areas";
 import { WEAPON_SIMULATION_MODELS } from "../../lib/simulation-models";
 import { admitEnvironmentPack } from "../../lib/geospatial/environment-pack";
 
-async function catalogFixture() {
+async function catalogFixture(scenarioId = "a2a-crossing-intercept") {
   const definition = SCENARIO_LIBRARY.find(
-    (item) => item.id === "a2a-crossing-intercept",
+    (item) => item.id === scenarioId,
   )!;
   const template = {
     id: definition.id,
@@ -158,6 +158,46 @@ async function catalogFixture() {
     }],
   };
 }
+
+test("browser presentation changes only at the canonical target-effect frame", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "laptop-1366", "One built Chromium contract owns the exact-frame proof.");
+  const scenarioId = "a2a-high-energy-crossing-challenge";
+  const catalog = await catalogFixture(scenarioId);
+  await page.route("**/api/catalog", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
+  );
+  await page.route("**/api/map-tile?**", (route) => route.abort());
+  await page.goto(`/workbench?scenario=${scenarioId}&start=guided`);
+
+  await page.getByRole("button", { name: "5 Validate" }).click();
+  await expect(page.getByRole("button", { name: /run baseline/i })).toBeEnabled();
+  await page.getByRole("button", { name: /run baseline/i }).click();
+  await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
+    "Worker · completed",
+    { timeout: 30_000 },
+  );
+  const pause = page.getByRole("button", { name: "Pause run", exact: true });
+  if (await pause.isVisible()) await pause.click();
+
+  const timeline = page.getByRole("slider", { name: "Run timeline" });
+  await timeline.focus();
+  await page.keyboard.press("End");
+  const summary = page.locator('.target-effect-summary:visible').first();
+  await expect(summary).toHaveAttribute("data-effect-state", "RECORDED");
+  await expect(summary).toHaveAttribute("data-effect-class", "NO_EFFECT");
+  await expect(summary).toHaveAttribute("data-effect-frame-index", "530");
+  await expect(summary).toHaveAttribute("data-effect-time", "131.9");
+  await expect(summary).toHaveAttribute("data-target-lifecycle", "ACTIVE");
+  await expect(summary).toHaveAttribute("data-kill-claim-authorized", "false");
+  await expect(summary).toContainText("The target retained its recorded capability state");
+  await expect(summary).toContainText("MODEL_ASSUMPTION");
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(summary).toHaveAttribute("data-effect-state", "BEFORE_EFFECT_BOUNDARY");
+  await expect(summary).toHaveAttribute("data-effect-class", "NONE");
+  await expect(summary).toHaveAttribute("data-kill-claim-authorized", "false");
+  await expect(summary).toContainText("No target effect has occurred at this frame");
+});
 
 test("shared transient controls hand off once and remain accessible, contained, and stable", async ({ page }, testInfo) => {
   const runtimeErrors: string[] = [];

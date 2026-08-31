@@ -35,6 +35,7 @@ import { ViewportTelemetry } from "@/components/ViewportTelemetry";
 import { TrackStateInspector } from "@/components/TrackStateInspector";
 import { CurrentGeometry } from "@/components/CurrentGeometry";
 import { RouteTransitionInspector } from "@/components/RouteTransitionInspector";
+import { TargetEffectSummary } from "@/components/TargetEffectSummary";
 import { PlatformEvidence } from "@/components/PlatformEvidence";
 import { Disclosure } from "@/components/ui/OverlayPrimitives";
 import { applyTacticalLabelPolicy, presentTacticalSymbol } from "@/lib/tactical-symbol-contract";
@@ -100,6 +101,7 @@ import {
   type SimulationResult,
 } from "@/lib/simulation";
 import {
+  selectCanonicalTargetEffect,
   selectCurrentGeometry,
   selectDisplayFrame,
   selectRecordedTrackState,
@@ -950,6 +952,7 @@ function LabWorkbench({
                   profile={scenario.profile}
                   layers={layers}
                   layoutRevision={telemetryExpanded ? 1 : 0}
+                  targetEffectOverlay
                 />
               )}
               <TacticalSymbolLegend
@@ -2749,6 +2752,10 @@ function ResultsWorkspace({
         (event) => event.payload.kind === "AIRBORNE_STORE_TRANSFER_OUTCOME",
       )
     : [];
+  const finalTargetEffect = selectCanonicalTargetEffect(
+    result,
+    selectDisplayFrame(result, result.timeOfFlight),
+  );
   return (
     <section className="debrief-workspace">
       <header>
@@ -2804,9 +2811,20 @@ function ResultsWorkspace({
               value={`${Math.round(result.endSpeed)} m/s`}
             />
           </div>
+          <TargetEffectSummary selection={finalTargetEffect} />
         </article>
         <article className="event-log">
           <h2>What happened</h2>
+          {finalTargetEffect.eventId && "modelTimeSeconds" in finalTargetEffect.projection && (
+            <div data-testid="results-target-effect-event">
+              <time>{finalTargetEffect.projection.modelTimeSeconds.toFixed(2)} s</time>
+              <i className="target-effect" />
+              <span>
+                <strong>{finalTargetEffect.presentation.label}</strong>
+                <small>{finalTargetEffect.presentation.headline}</small>
+              </span>
+            </div>
+          )}
           {transferOutcomes.map((event) => event.payload.kind === "AIRBORNE_STORE_TRANSFER_OUTCOME" && (
             <div key={event.id} data-testid="results-airborne-store-transfer">
               <time>{event.modelTimeSeconds.toFixed(2)} s</time>

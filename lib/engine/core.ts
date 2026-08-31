@@ -60,6 +60,14 @@ import type { TrackTransitionCommit } from "./contracts.ts";
 import { sha256HexSync } from "../geospatial/digest.ts";
 import { AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2 } from "../air-mission.ts";
 import { closestApproachOnRelativeSegment } from "./weapon-termination.ts";
+import {
+  evaluateTargetEffect,
+  type TargetEffectEvaluation,
+} from "./target-effect.ts";
+import {
+  assertTargetEffectAuthority,
+  resolveTargetEffectAuthority,
+} from "./target-effect-authority.ts";
 
 type RuntimeState = {
   definition: EngineEntityDefinition;
@@ -79,6 +87,7 @@ type RuntimeState = {
   thrustNewtons: number;
   phase: string;
   weaponFlightState?: WeaponFlightState;
+  targetEffect?: NonNullable<EngineEntityFrame["targetEffect"]>;
   routePointIndex: number;
   aircraftControl?: NonNullable<EngineEntityFrame["aircraftControl"]>;
   aircraftOperationalState?: AircraftOperationalState;
@@ -116,6 +125,7 @@ function refreshRuntimeStateSnapshot(target: RuntimeState, source: RuntimeState)
   target.thrustNewtons = source.thrustNewtons;
   target.phase = source.phase;
   target.weaponFlightState = source.weaponFlightState;
+  target.targetEffect = source.targetEffect;
   target.routePointIndex = source.routePointIndex;
   target.aircraftControl = source.aircraftControl;
   target.aircraftOperationalState = source.aircraftOperationalState;
@@ -1257,6 +1267,9 @@ function toFrame(
     ...(state.weaponFlightState
       ? { weaponFlightState: state.weaponFlightState }
       : {}),
+    ...(state.targetEffect
+      ? { targetEffect: structuredClone(state.targetEffect) }
+      : {}),
     valueState: state.definition.provenance.valueState,
     ...(state.aircraftOperationalState
       ? {
@@ -1369,6 +1382,9 @@ export class EngineSession {
         .sort((left, right) => compareCanonicalText(left.id, right.id)),
     };
     this.scenario = scenario;
+    if (scenario.targetEffectAuthority !== undefined) {
+      assertTargetEffectAuthority(scenario.targetEffectAuthority);
+    }
     const retainedPack = findEngineCompiledModelPackAuthority(scenario.modelPack, verificationPack);
     const carriesWeaponTerminationAuthority = scenario.entities.some(
       (entity) => entity.kind === "GUIDED_WEAPON" && entity.weapon?.termination !== undefined,
@@ -2279,9 +2295,58 @@ export class EngineSession {
         this.termination = weaponTermination.runTermination;
         this.completed = true;
       }
+      let targetEffectEvaluation: TargetEffectEvaluation | undefined;
+      if (weaponTermination && scenario.targetEffectAuthority) {
+        let model: ReturnType<typeof resolveTargetEffectAuthority>["model"] | null = null;
+        try {
+          model = resolveTargetEffectAuthority(
+            scenario.targetEffectAuthority,
+            primaryWeapon.definition,
+            primaryTarget.definition,
+          ).model;
+        } catch {
+          // A well-formed authority that has no exact weapon/target binding is
+          // recorded as unavailable. It must never fall back to a nearby model.
+          model = null;
+        }
+        const weaponEventLocalKey = `weapon-terminated:${weaponTermination.payload.weaponId}`;
+        targetEffectEvaluation = evaluateTargetEffect({
+          modelPackDigest: scenario.targetEffectAuthority.digest,
+          model,
+          weaponId: primaryWeapon.definition.id,
+          termination: {
+            receipt: {
+              tick: this.integratedSteps,
+              localKey: weaponEventLocalKey,
+            },
+            cause: weaponTermination.payload.cause,
+            closestApproachM: weaponTermination.payload.closestApproachM,
+            modelTimeSeconds: nextEventTime,
+          },
+          target: {
+            entityId: primaryTarget.definition.id,
+            kind: primaryTarget.definition.kind,
+            lifecycle: primaryTarget.lifecycle,
+            massKg: primaryTarget.massKg,
+            speedMps: magnitude(primaryTarget.velocity),
+            altitudeMslM: primaryTarget.position.z,
+          },
+        });
+        primaryTarget.targetEffect = {
+          commitId: targetEffectEvaluation.commitId,
+          state: targetEffectEvaluation.result,
+        };
+        primaryTarget.lifecycle = targetEffectEvaluation.targetLifecycleAfter;
+      }
       for (const state of this.states.values()) {
         const prior = beforeUpdates.get(state.definition.id)!;
         if (prior === state.lifecycle) continue;
+        if (
+          targetEffectEvaluation &&
+          state.definition.id === targetEffectEvaluation.targetId &&
+          targetEffectEvaluation.targetLifecycleBefore !==
+            targetEffectEvaluation.targetLifecycleAfter
+        ) continue;
         this.eventJournal.emit({
           localKey: `entity-lifecycle:${state.definition.id}:${prior}:${state.lifecycle}`,
           tick: this.integratedSteps,
@@ -2325,7 +2390,7 @@ export class EngineSession {
       }
       if (weaponTermination) {
         const payload = weaponTermination.payload;
-        this.eventJournal.emit({
+        const terminationReceipt = this.eventJournal.emit({
           localKey: `weapon-terminated:${payload.weaponId}`,
           tick: this.integratedSteps,
           modelTimeSeconds: nextEventTime,
@@ -2339,6 +2404,34 @@ export class EngineSession {
           causes: [],
           payload,
         });
+        if (targetEffectEvaluation && scenario.targetEffectAuthority) {
+          if (
+            terminationReceipt.tick !== targetEffectEvaluation.terminationReceipt.tick ||
+            terminationReceipt.localKey !== targetEffectEvaluation.terminationReceipt.localKey
+          ) {
+            throw new Error("Target-effect commit lost its exact weapon-termination receipt.");
+          }
+          this.eventJournal.emit({
+            localKey: `target-effect:${targetEffectEvaluation.commitId}`,
+            tick: this.integratedSteps,
+            modelTimeSeconds: nextEventTime,
+            phase: "TERMINATION",
+            producer: { subsystem: "WEAPON_DYNAMICS", entityId: payload.weaponId },
+            knowledgeScope: "WORLD",
+            participants: [
+              { entityId: payload.weaponId, role: "WEAPON" },
+              { entityId: payload.targetId, role: "TARGET" },
+            ],
+            causes: [{ kind: "EVENT_RECEIPT", receipt: terminationReceipt }],
+            payload: {
+              kind: "TARGET_EFFECT_COMMITTED",
+              schemaVersion: SIMULATION_EVENT_PAYLOAD_SCHEMAS.TARGET_EFFECT_COMMITTED,
+              authorityId: scenario.targetEffectAuthority.id,
+              authorityVersion: scenario.targetEffectAuthority.version,
+              commit: targetEffectEvaluation,
+            },
+          });
+        }
       } else {
         const speed = magnitude(primaryWeapon.velocity);
         const weapon = primaryWeapon.definition.weapon!;

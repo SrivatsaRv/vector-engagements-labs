@@ -53,6 +53,13 @@ The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-eas
 
 ## Scenario artifact
 
+Air scenarios may carry one separately digested
+`vector.target-effect-authority.v1`. The compiler binds it by exact weapon and
+target model-pack identities; it is neither loadout compatibility nor a user-
+editable lethality value. Its absence preserves historical `NOT_MODELLED`, and
+an unresolvable binding remains explicitly unavailable rather than falling back
+to a label, side or nearby model.
+
 Runway-start artifacts now bind the exact generic ground-dynamics projection
 and its validity/evidence/limitation digest beside the already sourced runway,
 environment, fuel, mass and installed-store identities. The compiler rejects
@@ -126,6 +133,10 @@ rejected later by a conflicting local precision rule.
 Air-mission compilation binds each admitted store to the selected immutable
 model pack, including its termination authority. Mission labels, loadout names
 and task class cannot alter the termination criterion or infer a target effect.
+When a separately admitted target-effect authority is present, the terminal
+Air run records `WEAPON_TERMINATED`, then exactly one causally linked
+`TARGET_EFFECT_COMMITTED`, then `RUN_COMPLETED`. Tests and consumers select
+those typed events rather than assuming the termination event is penultimate.
 
 The #190 package carries its 44 km/105-degree geometry, MSL altitudes, TAS
 speeds, 70% fuel and two-store Blue assignment through the existing authored
@@ -378,6 +389,9 @@ as the legacy flat scenario controls.
 Future terminal-effect authoring must extend the governed model-pack and engine
 contracts; it cannot be added as a presentation-only dropdown. This slice adds
 no editable fuze, warhead, lethality, damage or kill control.
+The generic target-effect projection is therefore read-only builder provenance:
+operators cannot edit its threshold bands, target profile, evidence state or
+result, and a missing exact compiled binding becomes `EFFECT_UNAVAILABLE`.
 
 The high-energy crossing challenge is a governed configured template, not a
 scenario-name branch. Its fields remain the same visible range, aspect,
@@ -464,6 +478,11 @@ The internal `vector.scenario-draft.v1` state contract now provides the safe aut
 
 ## Full builder UX specification
 
+The builder does not expose effect thresholds as ordinary controls. After a
+run, Map, 3D, telemetry and report surfaces present only the selected frame's
+canonical target-effect commit. Before its exact event frame they show effect
+pending; proximity, trail overlap and authored labels cannot advance that state.
+
 For an admitted runway start, the run journey preserves the exact start/runway
 authority through the Worker and presents recorded hold, roll, rotate, climbout
 and enroute states. Cancellation or recovery restarts admission; it cannot reuse
@@ -514,6 +533,11 @@ fails and Simulate remains unavailable; the UI never reconstructs credibility
 from static labels.
 
 ### Artifact and state boundaries
+
+Target-effect thresholds and outcomes are not builder state. The compiled
+scenario may retain one exact effect authority selected by model identities;
+Observe receives only the engine commit/frame projection. Editing a label,
+route display or target selection cannot mutate or locally reseal that authority.
 
 Operational phase, movement value state, mass, fuel, stores and controller
 request/accept/achievement are computed result fields. Authoring may configure

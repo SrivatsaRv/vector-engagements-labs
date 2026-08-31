@@ -40,6 +40,12 @@ Blue uses blue and a round frame; Red uses red and a diamond frame; neutral or u
 
 ## Typed presentation grammar
 
+The target-effect overlay is a separate typed presentation projection. It joins
+one canonical `TARGET_EFFECT_COMMITTED` event to the exact target frame carrying
+the same commit ID/state and renders nothing from symbol proximity. A terminated
+symbol may be visually subdued only after that lifecycle exists in the selected
+recorded frame.
+
 The shared `tactical-symbol-contract.ts` grammar is the presentation adapter
 used by the engagement map, scenario-authoring map, entity legend and
 3D-adjacent legend. It accepts an already canonical entity/frame value and

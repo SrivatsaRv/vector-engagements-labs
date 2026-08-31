@@ -102,6 +102,17 @@ immutable terrain pack, velocity, launch/lifetime authority and target
 lifecycle to re-evaluate the ordered terminal cause. The legacy scenario completion distance and any
 renderer distance are outside this authority.
 
+Target effects are likewise backend-neutral and remain separate from weapon
+termination. When a scenario admits a `vector.target-effect-authority.v1`, both
+engines must resolve the exact weapon/target binding, evaluate the same
+content-addressed generic model from the canonical termination geometry and
+emit one `TARGET_EFFECT_COMMITTED` event with an identical sealed commit. The
+commit, resulting target lifecycle and frame identity are validated together;
+missing, stale, digest-mismatched, unsupported or out-of-domain authority fails
+closed to `EFFECT_UNAVAILABLE`. Geometry alone never authorizes a damage or kill
+claim. Scenarios without this authority retain the historical `NOT_MODELLED`
+termination result and byte-compatible record behavior.
+
 ## TypeScript reference
 
 The TypeScript engine is retained as an independently executable reference implementation. It uses the same coordinate frames, atmosphere, entity lifecycle, identity-bearing aircraft table interpolation with fail-closed coverage, aircraft state update, proportional-navigation guidance, coverage-envelope generation, termination rules, and sampling cadence.
@@ -109,6 +120,11 @@ The TypeScript engine is retained as an independently executable reference imple
 It is not a separate product mode. Its purpose is controlled parity testing, diagnosis, and performance comparison while the Rust implementation matures.
 
 ## Selection and provenance
+
+Backend selection cannot add, remove or reinterpret target-effect authority.
+Both backends retain the same authority/model/target-profile digests and seal
+the same canonical six-decimal causal projection into the commit; any mismatch
+is a parity failure rather than a tolerated floating-point difference.
 
 Both backends retain the exact 0.9.0 model-pack digest and the same compiled
 termination-model fields in run provenance. Backend selection cannot replace
@@ -178,6 +194,11 @@ runtime.
   verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
 
 ## Swap boundary
+
+The swap contract now includes exact target-effect result, reason, commit ID,
+causal termination receipt, target lifecycle and event/frame ordering. A backend
+that only matches trajectory/closest approach but diverges on any of those
+fields is not eligible for selection.
 
 Weapon terminal transitions sit inside the shared backend contract: either
 implementation must produce the same achieved state, cause, occurrence time

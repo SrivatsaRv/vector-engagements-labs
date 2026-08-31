@@ -633,6 +633,7 @@ test("every admitted active-world target lifecycle can produce a terminal weapon
 
 test("runtime decoding binds weapon terminal state, cause, and distance to the run", () => {
   const scenario = admittedScenario();
+  delete scenario.targetEffectAuthority;
   const weapon = scenario.entities.find((entity) => entity.kind === "GUIDED_WEAPON")!;
   governWeaponTermination(scenario, weapon, 0.1);
   const run = runEngineBackend(scenario, "typescript");

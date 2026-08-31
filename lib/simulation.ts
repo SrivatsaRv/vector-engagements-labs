@@ -10,6 +10,10 @@ import type {
   EngineRun,
   EngineScenario,
 } from "./engine/contracts.ts";
+import {
+  selectCanonicalTargetEffect,
+  selectDisplayFrame,
+} from "./frontend/selectors.ts";
 import type { AirMissionDefinition } from "./air-mission.ts";
 import {
   admitScenarioCapabilities,
@@ -716,7 +720,7 @@ export function buildSimulationResult(
   const last = frames.at(-1);
   const pictures = recordedPictures ?? projectObserverStates(engineRun.frames);
   assertRecordedSidePictures(engineRun.frames, pictures);
-  return {
+  const result: SimulationResult = {
     frames,
     outcome,
     successful,
@@ -731,6 +735,20 @@ export function buildSimulationResult(
     envelopes: engineRun.envelopes,
     pictures,
   };
+  const hasGovernedTargetEffect = engineRun.events.state === "AVAILABLE" &&
+    engineRun.events.items.some((event) =>
+      event.payload.kind === "TARGET_EFFECT_COMMITTED" &&
+      event.payload.commit.weaponId === engineRun.primaryWeaponId &&
+      event.payload.commit.targetId === engineRun.primaryTargetId
+    );
+  if (engineRun.termination === "weapon_intercept" && hasGovernedTargetEffect) {
+    const effect = selectCanonicalTargetEffect(
+      result,
+      selectDisplayFrame(result, result.timeOfFlight),
+    );
+    result.reason = `The engine-owned between-step closest approach entered the admitted geometric intercept radius. ${effect.presentation.headline}. ${effect.presentation.detail}`;
+  }
+  return result;
 }
 
 export function simulate(
@@ -776,7 +794,7 @@ export function explainResult(scenario: Scenario, result: SimulationResult) {
     return `The simulated ${weapon?.designation ?? "guided vehicle"} reached the configured 180 m completion threshold from a ${scenario.range / 1000} km start in ${result.timeOfFlight.toFixed(1)} seconds.`;
   }
   if (result.termination === "weapon_intercept") {
-    return `The engine-owned between-step closest approach reached ${result.closestApproach.toFixed(1)} m. This is a geometric intercept under the admitted verification-only termination model; target damage and kill are not modelled.`;
+    return result.reason;
   }
   if (result.termination === "weapon_miss") {
     return `The weapon terminated as a miss after its admitted energy continuation condition failed; closest approach was ${result.closestApproach.toFixed(1)} m.`;
