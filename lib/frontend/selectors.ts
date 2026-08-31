@@ -10,6 +10,16 @@ import {
   type StructuralTargetEffect,
   type TargetEffectPresentation,
 } from "../target-effect-presentation.ts";
+import {
+  assertTargetEffectEvaluation,
+  evaluateTargetEffect,
+  type TargetEffectEvaluation,
+} from "../engine/target-effect.ts";
+import {
+  resolveTargetEffectAuthority,
+} from "../engine/target-effect-authority.ts";
+import { assertRetainedTargetEffectAuthority } from "../engine/retained-target-effect-authority.ts";
+import { canonicalJson } from "../canonical-json.ts";
 
 export type SelectedDisplayFrame = {
   frame: Frame;
@@ -218,6 +228,15 @@ function unavailableTargetEffect(
   };
 }
 
+function validTargetEffectCommit(commit: TargetEffectEvaluation) {
+  try {
+    assertTargetEffectEvaluation(commit);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Binds target-effect presentation to one canonical event and the exact
  * retained target frame carrying the same committed identity. Geometry,
@@ -255,16 +274,47 @@ export function selectCanonicalTargetEffect(
     }
     const payload = event.payload;
     const commit = payload.commit;
+    if (!validTargetEffectCommit(commit)) {
+      return unavailableTargetEffect(result, selected, "TARGET_EFFECT_COMMIT_INVALID");
+    }
     const causalEvent = event.causeEventIds.length === 1
       ? events.find((candidate) => candidate.id === event.causeEventIds[0])
       : undefined;
     const effectFrame = result.frames[event.frameIndex];
+    const priorFrame = result.frames[event.frameIndex - 1];
     const targetAtEffectFrame = effectFrame?.entities.find(
+      (entity) => entity.id === commit.targetId,
+    );
+    const targetBeforeEffect = priorFrame?.entities.find(
       (entity) => entity.id === commit.targetId,
     );
     const authority = result.engineRun.scenario.targetEffectAuthority;
     if (!authority) {
       return unavailableTargetEffect(result, selected, "TARGET_EFFECT_AUTHORITY_UNRESOLVED");
+    }
+    try {
+      assertRetainedTargetEffectAuthority(authority);
+    } catch {
+      return unavailableTargetEffect(result, selected, "TARGET_EFFECT_AUTHORITY_INVALID");
+    }
+    const weaponDefinition = result.engineRun.scenario.entities.find(
+      (entity) => entity.id === commit.weaponId,
+    );
+    const targetDefinition = result.engineRun.scenario.entities.find(
+      (entity) => entity.id === commit.targetId,
+    );
+    if (!weaponDefinition || !targetDefinition) {
+      return unavailableTargetEffect(result, selected, "TARGET_EFFECT_ENTITY_BINDING_UNRESOLVED");
+    }
+    let resolvedModel: ReturnType<typeof resolveTargetEffectAuthority>["model"] | null = null;
+    try {
+      resolvedModel = resolveTargetEffectAuthority(
+        authority,
+        weaponDefinition,
+        targetDefinition,
+      ).model;
+    } catch {
+      resolvedModel = null;
     }
     const causalAgreement = causalEvent?.payload.kind === "WEAPON_TERMINATED" &&
       causalEvent.payload.weaponId === commit.weaponId &&
@@ -277,6 +327,7 @@ export function selectCanonicalTargetEffect(
       causalEvent.modelTimeSeconds === commit.terminationReceipt.modelTimeSeconds &&
       causalEvent.modelTimeSeconds === event.modelTimeSeconds;
     const frameAgreement = effectFrame?.t === event.modelTimeSeconds &&
+      targetBeforeEffect?.lifecycle === commit.targetLifecycleBefore &&
       targetAtEffectFrame?.lifecycle === commit.targetLifecycleAfter &&
       targetAtEffectFrame?.targetEffect?.commitId === commit.commitId &&
       targetAtEffectFrame.targetEffect.state === commit.result &&
@@ -284,20 +335,49 @@ export function selectCanonicalTargetEffect(
     const authorityAgreement = authority.id === payload.authorityId &&
       authority.version === payload.authorityVersion &&
       commit.modelPackDigest === authority.digest;
-    if (!causalAgreement || !frameAgreement || !authorityAgreement) {
+    if (
+      !causalAgreement ||
+      !frameAgreement ||
+      !authorityAgreement
+    ) {
+      return unavailableTargetEffect(result, selected, "INCONSISTENT_CANONICAL_TARGET_EFFECT");
+    }
+    if (
+      causalEvent?.payload.kind !== "WEAPON_TERMINATED" ||
+      !targetBeforeEffect ||
+      !targetAtEffectFrame
+    ) {
       return unavailableTargetEffect(result, selected, "INCONSISTENT_CANONICAL_TARGET_EFFECT");
     }
 
+    const independentlyEvaluated = evaluateTargetEffect({
+      modelPackDigest: authority.digest,
+      model: resolvedModel,
+      weaponId: weaponDefinition.id,
+      termination: {
+        receipt: {
+          tick: causalEvent.tick,
+          localKey: causalEvent.localKey,
+        },
+        cause: causalEvent.payload.cause,
+        closestApproachM: causalEvent.payload.closestApproachM,
+        modelTimeSeconds: causalEvent.modelTimeSeconds,
+      },
+      target: {
+        entityId: targetDefinition.id,
+        kind: targetDefinition.kind,
+        lifecycle: targetBeforeEffect.lifecycle,
+        massKg: targetAtEffectFrame.massKg,
+        speedMps: targetAtEffectFrame.speedMps,
+        altitudeMslM: targetAtEffectFrame.position.z,
+      },
+    });
+    if (canonicalJson(independentlyEvaluated) !== canonicalJson(commit)) {
+      return unavailableTargetEffect(result, selected, "TARGET_EFFECT_REEVALUATION_MISMATCH");
+    }
+
     const model = commit.valueState === "MODEL_ASSUMPTION"
-      ? authority.models.find((candidate) =>
-          candidate.id === commit.modelId &&
-          candidate.version === commit.modelVersion &&
-          candidate.digest === commit.modelDigest &&
-          candidate.intendedUse.id === commit.intendedUseId &&
-          candidate.intendedUse.version === commit.intendedUseVersion &&
-          candidate.targetProfile.id === commit.targetProfileId &&
-          candidate.targetProfile.version === commit.targetProfileVersion
-        )
+      ? resolvedModel ?? undefined
       : undefined;
     if (
       (commit.valueState === "MODEL_ASSUMPTION" && !model) ||

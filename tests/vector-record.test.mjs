@@ -50,6 +50,10 @@ import historicalModelPackBundle from "../fixtures/model-packs/vector-scalar-stu
 import { closestApproachOnRelativeSegment } from "../lib/engine/weapon-termination.ts";
 import { projectObserverStates } from "../lib/information-state.ts";
 import { createGenericTakeoffPerformanceScenario } from "../lib/validation/generic-takeoff-performance.ts";
+import {
+  createTargetEffectAuthority,
+  createTargetEffectModelForAuthority,
+} from "../lib/engine/target-effect-authority.ts";
 
 function governWeaponTermination(scenario, weapon, changes) {
   const pack = resolveRetainedCompiledModelPack(scenario.modelPack);
@@ -1073,6 +1077,56 @@ test("VSR preserves one canonical target-effect identity across event, frame, ma
   await assert.rejects(
     openVectorSimulationRecord(mutatedSerialized.buffer, mutatedSerialized.byteLength),
     /invalid authority, causality, ownership, or frame state/,
+  );
+});
+
+test("VSR rejects a jointly resealed unretained target-effect authority before replay", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const retainedAuthority = prepared.engineScenario.targetEffectAuthority;
+  assert.ok(retainedAuthority);
+
+  const modelMaterial = structuredClone(retainedAuthority.models[0]);
+  delete modelMaterial.digest;
+  modelMaterial.thresholds.degradedMaximumDistanceM = 24;
+  const resealedModel = createTargetEffectModelForAuthority(modelMaterial);
+  const resealedAuthority = createTargetEffectAuthority({
+    schemaVersion: retainedAuthority.schemaVersion,
+    id: retainedAuthority.id,
+    version: retainedAuthority.version,
+    intendedUse: structuredClone(retainedAuthority.intendedUse),
+    models: [structuredClone(resealedModel)],
+    bindings: retainedAuthority.bindings.map((binding) => ({
+      ...structuredClone(binding),
+      effectModelDigest: resealedModel.digest,
+    })),
+  });
+  assert.notEqual(resealedAuthority.digest, retainedAuthority.digest);
+  prepared.engineScenario.targetEffectAuthority = structuredClone(resealedAuthority);
+
+  const engineRun = runEngineBackend(
+    structuredClone(prepared.engineScenario),
+    prepared.capabilityManifest.engine.id,
+  );
+  const effect = engineRun.events.items.find(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  assert.ok(effect?.payload.kind === "TARGET_EFFECT_COMMITTED");
+  assert.equal(effect.payload.commit.result, "DEGRADED");
+  const result = buildSimulationResult(prepared, engineRun);
+  const resealedRecord = await createVectorSimulationRecord(prepared, result, createdAt);
+  assert.equal(resealedRecord.manifest.targetEffect.commit.result, "DEGRADED");
+  assert.equal(
+    resealedRecord.manifest.targetEffect.authority.digest,
+    resealedAuthority.digest,
+  );
+
+  const serialized = serializeVectorRecord(resealedRecord);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /No retained target-effect authority matches/,
   );
 });
 

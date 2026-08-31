@@ -42,6 +42,7 @@ import {
   verifyCompiledModelPackDigest,
 } from "../model-pack.ts";
 import { assertTargetEffectAuthority } from "../engine/target-effect-authority.ts";
+import { assertRetainedTargetEffectAuthority } from "../engine/retained-target-effect-authority.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v7" as const;
@@ -914,7 +915,7 @@ export async function openVectorSimulationRecord(
     "scenario"
   >;
   if (compiled.engineScenario.targetEffectAuthority !== undefined) {
-    assertTargetEffectAuthority(compiled.engineScenario.targetEffectAuthority);
+    assertRetainedTargetEffectAuthority(compiled.engineScenario.targetEffectAuthority);
   }
   const recordedModelPack = compiled.engineScenario.modelPack as
     typeof compiled.engineScenario.modelPack & {

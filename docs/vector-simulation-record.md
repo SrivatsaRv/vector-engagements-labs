@@ -196,6 +196,11 @@ For a governed target effect, integrity is one conjunction across authority,
 termination receipt, effect event, target frame, manifest and report. Opening
 rejects a missing, duplicate, reordered or hash-resealed disagreement before
 returning playback; it never accepts a matching label or distance as repair.
+An internally consistent content-addressed authority is not sufficient for
+replay: the archived authority ID, version and digest must resolve to the exact
+retained target-effect authority before the engine is invoked. Jointly changing
+thresholds and resealing the model, binding, authority, members, report and
+manifest therefore cannot introduce a new result through a VSR archive.
 
 Scenario and compiled digests bind the exact admitted numeric representation.
 An input rejected for type, finiteness, range, integer or precision has no run

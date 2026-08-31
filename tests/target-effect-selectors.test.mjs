@@ -7,9 +7,20 @@ import {
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 import { simulate } from "../lib/simulation.ts";
 import { buildReportExport } from "../lib/report-export.ts";
+import {
+  assertTargetEffectEvaluation,
+  evaluateTargetEffect,
+  targetEffectCommitDigest,
+} from "../lib/engine/target-effect.ts";
 
 function governedIntercept() {
   return simulate(SCENARIO_LIBRARY.find((item) => item.id === "a2a-defensive-break").scenario);
+}
+
+function governedHighEnergy() {
+  return simulate(SCENARIO_LIBRARY.find(
+    (item) => item.id === "a2a-high-energy-crossing-challenge",
+  ).scenario);
 }
 
 function committedEvent(result) {
@@ -46,29 +57,48 @@ test("the selector presents the canonical commit only at and after its exact ret
 });
 
 test("an admitted-model EFFECT_UNAVAILABLE retains model limitations and commit reason", () => {
-  for (const [reason, cause] of [
-    ["OUTSIDE_TARGET_DOMAIN", "GEOMETRIC_INTERCEPT"],
-    ["TARGET_UNAVAILABLE", "TARGET_UNAVAILABLE"],
-  ]) {
-    const result = governedIntercept();
+  for (const reason of ["OUTSIDE_TARGET_DOMAIN", "TARGET_UNAVAILABLE"]) {
+    const result = governedHighEnergy();
     const event = committedEvent(result);
     const causalEvent = result.engineRun.events.items.find(
       (candidate) => candidate.id === event.causeEventIds[0],
     );
+    const target = result.frames[event.frameIndex].entities.find(
+      (entity) => entity.id === event.payload.commit.targetId,
+    );
+    const priorTarget = result.frames[event.frameIndex - 1].entities.find(
+      (entity) => entity.id === event.payload.commit.targetId,
+    );
     const model = result.engineRun.scenario.targetEffectAuthority.models[0];
-    Object.assign(event.payload.commit, {
-      modelId: model.id,
-      modelVersion: model.version,
-      modelDigest: model.digest,
-      intendedUseId: model.intendedUse.id,
-      intendedUseVersion: model.intendedUse.version,
-      targetProfileId: model.targetProfile.id,
-      targetProfileVersion: model.targetProfile.version,
-      valueState: "MODEL_ASSUMPTION",
-      reason,
+    if (reason === "OUTSIDE_TARGET_DOMAIN") target.speedMps = 700;
+    if (reason === "TARGET_UNAVAILABLE") {
+      target.lifecycle = "TERMINATED";
+      priorTarget.lifecycle = "TERMINATED";
+    }
+    const evaluation = evaluateTargetEffect({
+      modelPackDigest: result.engineRun.scenario.targetEffectAuthority.digest,
+      model,
+      weaponId: event.payload.commit.weaponId,
+      termination: {
+        receipt: { tick: causalEvent.tick, localKey: causalEvent.localKey },
+        cause: causalEvent.payload.cause,
+        closestApproachM: causalEvent.payload.closestApproachM,
+        modelTimeSeconds: causalEvent.modelTimeSeconds,
+      },
+      target: {
+        entityId: target.id,
+        kind: target.kind,
+        lifecycle: target.lifecycle,
+        massKg: target.massKg,
+        speedMps: target.speedMps,
+        altitudeMslM: target.position.z,
+      },
     });
-    event.payload.commit.terminationReceipt.cause = cause;
-    causalEvent.payload.cause = cause;
+    event.payload.commit = structuredClone(evaluation);
+    target.targetEffect = {
+      commitId: evaluation.commitId,
+      state: evaluation.result,
+    };
 
     const selected = selectCanonicalTargetEffect(
       result,
@@ -98,6 +128,103 @@ test("canonical event/frame commit disagreement fails closed", () => {
   assert.equal(selected.presentation.state, "UNAVAILABLE");
   assert.equal(selected.presentation.killClaimAuthorized, false);
   assert.match(selected.presentation.detail, /INCONSISTENT_CANONICAL_TARGET_EFFECT/);
+  assert.doesNotMatch(
+    `${selected.presentation.label} ${selected.presentation.headline} ${selected.presentation.detail}`,
+    /\bkill(?:ed)?\b/i,
+  );
+});
+
+test("coordinated terminal-effect frame forgery fails with a stale or resealed commit identity", () => {
+  for (const reseal of [false, true]) {
+    const result = governedIntercept();
+    const event = committedEvent(result);
+    const originalCommitId = event.payload.commit.commitId;
+    const causalEvent = result.engineRun.events.items.find(
+      (candidate) => candidate.id === event.causeEventIds[0],
+    );
+    const target = result.frames[event.frameIndex].entities.find(
+      (entity) => entity.id === event.payload.commit.targetId,
+    );
+    const authority = result.engineRun.scenario.targetEffectAuthority;
+    const model = authority.models[0];
+    const forged = structuredClone(evaluateTargetEffect({
+      modelPackDigest: authority.digest,
+      model,
+      weaponId: event.payload.commit.weaponId,
+      termination: {
+        receipt: {
+          tick: causalEvent.tick,
+          localKey: causalEvent.localKey,
+        },
+        cause: causalEvent.payload.cause,
+        closestApproachM: 1,
+        modelTimeSeconds: causalEvent.modelTimeSeconds,
+      },
+      target: {
+        entityId: target.id,
+        kind: target.kind,
+        lifecycle: "ACTIVE",
+        massKg: target.massKg,
+        speedMps: target.speedMps,
+        altitudeMslM: target.position.z,
+      },
+    }));
+    if (!reseal) forged.commitId = originalCommitId;
+    event.payload.commit = forged;
+    target.lifecycle = "TERMINATED";
+    target.targetEffect = { commitId: forged.commitId, state: "KILL" };
+
+    const selected = selectCanonicalTargetEffect(
+      result,
+      selectDisplayFrame(result, result.timeOfFlight),
+    );
+    assert.equal(selected.presentation.state, "UNAVAILABLE");
+    assert.match(
+      selected.presentation.detail,
+      reseal
+        ? /TARGET_EFFECT_REEVALUATION_MISMATCH/
+        : /TARGET_EFFECT_COMMIT_INVALID/,
+    );
+    assert.equal(selected.presentation.killClaimAuthorized, false);
+    assert.doesNotMatch(
+      `${selected.presentation.label} ${selected.presentation.headline} ${selected.presentation.detail}`,
+      /\bkill(?:ed)?\b/i,
+    );
+  }
+});
+
+test("resealed high-energy KILL with an invented threshold cannot override independent evaluation", () => {
+  const result = governedHighEnergy();
+  const event = committedEvent(result);
+  const target = result.frames[event.frameIndex].entities.find(
+    (entity) => entity.id === event.payload.commit.targetId,
+  );
+  assert.equal(event.payload.commit.closestApproachM, 21.836104);
+  assert.equal(event.payload.commit.result, "NO_EFFECT");
+
+  const forged = structuredClone(event.payload.commit);
+  Object.assign(forged, {
+    result: "KILL",
+    reason: "THRESHOLD_BAND",
+    selectedThresholdUpperBoundM: 21.836104,
+    targetEffectStateAfter: "KILL",
+    targetLifecycleAfter: "TERMINATED",
+  });
+  const material = structuredClone(forged);
+  Reflect.deleteProperty(material, "commitId");
+  forged.commitId = targetEffectCommitDigest(material);
+  assert.doesNotThrow(() => assertTargetEffectEvaluation(forged));
+  event.payload.commit = forged;
+  target.lifecycle = "TERMINATED";
+  target.targetEffect = { commitId: forged.commitId, state: "KILL" };
+
+  const selected = selectCanonicalTargetEffect(
+    result,
+    selectDisplayFrame(result, result.timeOfFlight),
+  );
+  assert.equal(selected.presentation.state, "UNAVAILABLE");
+  assert.match(selected.presentation.detail, /TARGET_EFFECT_REEVALUATION_MISMATCH/);
+  assert.equal(selected.presentation.killClaimAuthorized, false);
   assert.doesNotMatch(
     `${selected.presentation.label} ${selected.presentation.headline} ${selected.presentation.detail}`,
     /\bkill(?:ed)?\b/i,
@@ -147,29 +274,38 @@ test("legacy NOT_MODELLED remains explicit when no canonical commit exists", () 
 });
 
 test("terminal-effect wording requires canonical KILL and TERMINATED target proof at the effect frame", () => {
-  const result = governedIntercept();
+  const result = governedHighEnergy();
   const event = committedEvent(result);
   const model = result.engineRun.scenario.targetEffectAuthority.models[0];
-  const commit = event.payload.commit;
-  Object.assign(commit, {
-    modelId: model.id,
-    modelVersion: model.version,
-    modelDigest: model.digest,
-    intendedUseId: model.intendedUse.id,
-    intendedUseVersion: model.intendedUse.version,
-    targetProfileId: model.targetProfile.id,
-    targetProfileVersion: model.targetProfile.version,
-    valueState: "MODEL_ASSUMPTION",
-    result: "KILL",
-    reason: "THRESHOLD_BAND",
-    targetEffectStateAfter: "KILL",
-    targetLifecycleAfter: "TERMINATED",
-  });
-  const target = result.frames[event.frameIndex].entities.find(
-    (entity) => entity.id === commit.targetId,
+  const causalEvent = result.engineRun.events.items.find(
+    (candidate) => candidate.id === event.causeEventIds[0],
   );
+  const target = result.frames[event.frameIndex].entities.find(
+    (entity) => entity.id === event.payload.commit.targetId,
+  );
+  causalEvent.payload.closestApproachM = 1;
+  const commit = evaluateTargetEffect({
+    modelPackDigest: result.engineRun.scenario.targetEffectAuthority.digest,
+    model,
+    weaponId: event.payload.commit.weaponId,
+    termination: {
+      receipt: { tick: causalEvent.tick, localKey: causalEvent.localKey },
+      cause: causalEvent.payload.cause,
+      closestApproachM: causalEvent.payload.closestApproachM,
+      modelTimeSeconds: causalEvent.modelTimeSeconds,
+    },
+    target: {
+      entityId: target.id,
+      kind: target.kind,
+      lifecycle: "ACTIVE",
+      massKg: target.massKg,
+      speedMps: target.speedMps,
+      altitudeMslM: target.position.z,
+    },
+  });
+  event.payload.commit = structuredClone(commit);
   target.lifecycle = "TERMINATED";
-  target.targetEffect.state = "KILL";
+  target.targetEffect = { commitId: commit.commitId, state: "KILL" };
 
   const selected = selectCanonicalTargetEffect(
     result,

@@ -54,9 +54,14 @@ keeps the effect decision and identity independent of unretained sub-precision
 floating-point drift between TypeScript and Rust/WASM.
 
 The canonical target frame carries only `{ commitId, state }`. Presentation
-surfaces join that projection to the typed event; they do not recompute an
-effect from rendered distance. `kill` wording is admitted only for a `KILL`
-commit whose exact event frame and after-lifecycle both show `TERMINATED`.
+surfaces join that projection to the typed event; they do not derive an effect
+from rendered distance. Before authorizing wording, the selector requires the
+retained authority and exact weapon/assigned-target binding, validates the
+commit digest and prior-frame lifecycle, independently repeats the deterministic
+evaluation from the causal termination receipt and exact retained effect-frame
+target state, and requires complete equality with the recorded commit. `kill`
+wording is admitted only for a reproduced `KILL` commit whose exact event frame
+and after-lifecycle both show `TERMINATED`.
 
 VSR frame schema v7 preserves the target-frame projection. The compiled member
 contains the full authority, while manifest and report bind the same authority,

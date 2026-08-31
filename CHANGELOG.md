@@ -188,6 +188,11 @@ No pending family-specific entry.
 
 #### Generic target effect
 
+- Require VSR replay to resolve the exact retained target-effect authority, and
+  require presentation to reproduce the stored evaluation from its retained
+  binding, causal termination and exact target frames before it can authorize
+  effect wording. Jointly resealed authority archives, stale commits and
+  internally valid invented thresholds now fail closed.
 - Correct the Browser Contract admission inventory for governed target-effect
   presentation: the exact causal-frame proof runs without skips across all five
   responsive viewports, and the fail-closed runner admits exactly 25/25 passing
