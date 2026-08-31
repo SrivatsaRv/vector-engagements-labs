@@ -124,7 +124,10 @@ It is not a separate product mode. Its purpose is controlled parity testing, dia
 Backend selection cannot add, remove or reinterpret target-effect authority.
 Both backends retain the same authority/model/target-profile digests and seal
 the same canonical six-decimal causal projection into the commit; any mismatch
-is a parity failure rather than a tolerated floating-point difference.
+is a parity failure rather than a tolerated floating-point difference. That
+projection rounds the exact binary64 value to the nearest `10^-6`, resolves an
+exact tie away from zero and normalizes signed zero; neither backend first
+multiplies in floating point and rounds the potentially altered intermediate.
 
 Both backends retain the exact 0.9.0 model-pack digest and the same compiled
 termination-model fields in run provenance. Backend selection cannot replace

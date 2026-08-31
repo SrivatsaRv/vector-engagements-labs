@@ -684,7 +684,45 @@ fn target_inside_domain(model: &ResolvedModel<'_>, input: &TargetEffectInput<'_>
 }
 
 fn canonical_effect_number(value: f64) -> f64 {
-    let rounded = (value * 1_000_000.0).round() / 1_000_000.0;
+    // Match ECMAScript Number#toFixed(6) over the exact IEEE-754 binary64
+    // value: choose the nearest integer multiple of 10^-6, take an exact
+    // halfway case away from zero, then normalize either signed zero to +0.
+    // Multiplying in f64 before rounding is not equivalent because that first
+    // operation can manufacture a tie (for example 0.0000005 * 1e6 == 0.5).
+    let magnitude = value.abs();
+    if magnitude >= 1e21 {
+        return value;
+    }
+    let bits = magnitude.to_bits();
+    let exponent_bits = ((bits >> 52) & 0x7ff) as i32;
+    let fraction_bits = bits & ((1_u64 << 52) - 1);
+    let (significand, binary_exponent) = if exponent_bits == 0 {
+        (fraction_bits, -1074)
+    } else {
+        ((1_u64 << 52) | fraction_bits, exponent_bits - 1023 - 52)
+    };
+    let rounded = if binary_exponent >= 0 {
+        magnitude
+    } else {
+        const DECIMAL_SCALE: u128 = 1_000_000;
+        let scaled_significand = u128::from(significand) * DECIMAL_SCALE;
+        let shift = (-binary_exponent) as u32;
+        let rounded_scaled = if shift >= 128 {
+            0
+        } else {
+            let integer = scaled_significand >> shift;
+            let remainder_mask = (1_u128 << shift) - 1;
+            let remainder = scaled_significand & remainder_mask;
+            let half = 1_u128 << (shift - 1);
+            integer + u128::from(remainder >= half)
+        };
+        rounded_scaled as f64 / DECIMAL_SCALE as f64
+    };
+    let rounded = if value.is_sign_negative() {
+        -rounded
+    } else {
+        rounded
+    };
     if rounded == 0.0 {
         0.0
     } else {
@@ -835,4 +873,55 @@ pub fn evaluate_target_effect(
             .map_err(|error| EngineError::Serialization(error.to_string()))?,
     )?;
     Ok(evaluation)
+}
+
+#[cfg(test)]
+mod tests {
+    use serde::Deserialize;
+
+    use super::canonical_effect_number;
+
+    #[derive(Deserialize)]
+    struct CanonicalNumberFixture {
+        id: String,
+        input: f64,
+        expected: f64,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct CanonicalNumberFixtures {
+        schema_version: String,
+        decimal_places: u8,
+        rounding: String,
+        zero: String,
+        cases: Vec<CanonicalNumberFixture>,
+    }
+
+    #[test]
+    fn canonical_numbers_match_the_shared_signed_half_boundary_oracle() -> serde_json::Result<()> {
+        let fixtures: CanonicalNumberFixtures = serde_json::from_str(include_str!(
+            "../../fixtures/target-effect-canonical-six-decimal.v1.json"
+        ))?;
+        assert_eq!(
+            fixtures.schema_version,
+            "vector.target-effect-canonical-number-fixture.v1"
+        );
+        assert_eq!(fixtures.decimal_places, 6);
+        assert_eq!(
+            fixtures.rounding,
+            "NEAREST_EXACT_BINARY64_TIES_AWAY_FROM_ZERO"
+        );
+        assert_eq!(fixtures.zero, "NORMALIZE_POSITIVE");
+        for fixture in fixtures.cases {
+            let actual = canonical_effect_number(fixture.input);
+            assert_eq!(
+                actual.to_bits(),
+                fixture.expected.to_bits(),
+                "{}",
+                fixture.id
+            );
+        }
+        Ok(())
+    }
 }

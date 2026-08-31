@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   assertTargetEffectEvaluation,
@@ -20,6 +21,13 @@ import {
 } from "../lib/engine/retained-target-effect-authority.ts";
 
 const MODEL_PACK_DIGEST = "1".repeat(64);
+const CANONICAL_NUMBER_FIXTURES = JSON.parse(readFileSync(
+  new URL(
+    "../fixtures/target-effect-canonical-six-decimal.v1.json",
+    import.meta.url,
+  ),
+  "utf8",
+));
 
 function material(overrides = {}) {
   return {
@@ -398,6 +406,44 @@ test("commit identity consumes the canonical six-decimal causal projection", () 
     target: { ...evaluationInput().target, speedMps: 60.646095 },
   }));
   assert.notEqual(typescriptDrift.commitId, materiallyDifferent.commitId);
+});
+
+test("target-effect canonical numbers match the shared signed half-boundary oracle", () => {
+  assert.deepEqual(
+    {
+      schemaVersion: CANONICAL_NUMBER_FIXTURES.schemaVersion,
+      decimalPlaces: CANONICAL_NUMBER_FIXTURES.decimalPlaces,
+      rounding: CANONICAL_NUMBER_FIXTURES.rounding,
+      zero: CANONICAL_NUMBER_FIXTURES.zero,
+    },
+    {
+      schemaVersion: "vector.target-effect-canonical-number-fixture.v1",
+      decimalPlaces: 6,
+      rounding: "NEAREST_EXACT_BINARY64_TIES_AWAY_FROM_ZERO",
+      zero: "NORMALIZE_POSITIVE",
+    },
+  );
+  for (const { id, input, expected } of CANONICAL_NUMBER_FIXTURES.cases) {
+    const actual = canonicalTargetEffectNumber(input);
+    assert.equal(actual, expected, id);
+    if (expected === 0) assert.equal(Object.is(actual, -0), false, `${id} negative zero`);
+  }
+  for (const malformed of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    assert.throws(() => canonicalTargetEffectNumber(malformed), { name: "TypeError" });
+  }
+});
+
+test("kill-band classification and commit identity consume the canonical boundary", () => {
+  const exactBoundary = evaluateTargetEffect(evaluationInput({
+    termination: { ...evaluationInput().termination, closestApproachM: 4 },
+  }));
+  const binaryValueBelowDecimalTie = evaluateTargetEffect(evaluationInput({
+    termination: { ...evaluationInput().termination, closestApproachM: 4.0000005 },
+  }));
+
+  assert.equal(binaryValueBelowDecimalTie.closestApproachM, 4);
+  assert.equal(binaryValueBelowDecimalTie.result, "KILL");
+  assert.equal(binaryValueBelowDecimalTie.commitId, exactBoundary.commitId);
 });
 
 test("strict evaluation admission rejects malformed and resealed contradictory commits", () => {

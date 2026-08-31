@@ -42,6 +42,23 @@ test("the selector presents the canonical commit only at and after its exact ret
   assert.equal(before.presentation.state, "BEFORE_EFFECT_BOUNDARY");
   assert.equal(before.presentation.killClaimAuthorized, false);
 
+  const earlyTarget = result.frames[event.frameIndex - 1].entities.find(
+    (entity) => entity.id === event.payload.commit.targetId,
+  );
+  earlyTarget.targetEffect = {
+    commitId: event.payload.commit.commitId,
+    state: event.payload.commit.result,
+  };
+  const forgedBefore = selectCanonicalTargetEffect(result, {
+    frame: result.frames[event.frameIndex - 1],
+    frameIndex: event.frameIndex - 1,
+    displayTimeSeconds: result.frames[event.frameIndex - 1].t,
+  });
+  assert.equal(forgedBefore.presentation.state, "UNAVAILABLE");
+  assert.match(forgedBefore.presentation.detail, /TARGET_EFFECT_BEFORE_CAUSAL_FRAME/);
+  assert.equal(forgedBefore.presentation.killClaimAuthorized, false);
+  delete earlyTarget.targetEffect;
+
   const atBoundary = selectCanonicalTargetEffect(result, {
     frame: result.frames[event.frameIndex],
     frameIndex: event.frameIndex,
@@ -54,6 +71,61 @@ test("the selector presents the canonical commit only at and after its exact ret
   assert.equal(atBoundary.projection.authority.state, "UNAVAILABLE");
   assert.equal(atBoundary.projection.effectReason, "AUTHORITY_UNAVAILABLE");
   assert.equal(atBoundary.presentation.assumptionLabel, null);
+});
+
+test("selector requires exact target projection persistence and exclusive ownership on later frames", () => {
+  const mutations = [
+    {
+      reason: "NON_TARGET_EFFECT_PROJECTION",
+      apply(frame, event) {
+        frame.entities.find(
+          (entity) => entity.id !== event.payload.commit.targetId,
+        ).targetEffect = {
+          commitId: event.payload.commit.commitId,
+          state: event.payload.commit.result,
+        };
+      },
+    },
+    {
+      reason: "TARGET_EFFECT_PROJECTION_NOT_PERSISTED",
+      apply(frame, event) {
+        delete frame.entities.find(
+          (entity) => entity.id === event.payload.commit.targetId,
+        ).targetEffect;
+      },
+    },
+    {
+      reason: "TARGET_EFFECT_PROJECTION_NOT_PERSISTED",
+      apply(frame, event) {
+        frame.entities.find(
+          (entity) => entity.id === event.payload.commit.targetId,
+        ).targetEffect.state = "KILL";
+      },
+    },
+  ];
+  for (const mutation of mutations) {
+    const result = governedHighEnergy();
+    const event = committedEvent(result);
+    const laterFrame = structuredClone(result.frames[event.frameIndex]);
+    laterFrame.t = Number((laterFrame.t + result.engineRun.scenario.fixedStepSeconds).toFixed(6));
+    result.frames.push(laterFrame);
+    const positive = selectCanonicalTargetEffect(result, {
+      frame: laterFrame,
+      frameIndex: event.frameIndex + 1,
+      displayTimeSeconds: laterFrame.t,
+    });
+    assert.equal(positive.presentation.effectClass, event.payload.commit.result);
+
+    mutation.apply(laterFrame, event);
+    const rejected = selectCanonicalTargetEffect(result, {
+      frame: laterFrame,
+      frameIndex: event.frameIndex + 1,
+      displayTimeSeconds: laterFrame.t,
+    });
+    assert.equal(rejected.presentation.state, "UNAVAILABLE");
+    assert.match(rejected.presentation.detail, new RegExp(mutation.reason));
+    assert.equal(rejected.presentation.killClaimAuthorized, false);
+  }
 });
 
 test("an admitted-model EFFECT_UNAVAILABLE retains model limitations and commit reason", () => {
@@ -259,6 +331,15 @@ test("legacy NOT_MODELLED remains explicit when no canonical commit exists", () 
   const event = committedEvent(result);
   result.engineRun.events.items = result.engineRun.events.items.filter(
     (candidate) => candidate.id !== event.id,
+  );
+  const unsupportedProjection = selectCanonicalTargetEffect(
+    result,
+    selectDisplayFrame(result, result.timeOfFlight),
+  );
+  assert.equal(unsupportedProjection.presentation.state, "UNAVAILABLE");
+  assert.match(
+    unsupportedProjection.presentation.detail,
+    /TARGET_EFFECT_WITHOUT_CAUSAL_EVENT/,
   );
   delete result.frames[event.frameIndex].entities.find(
     (entity) => entity.id === event.payload.commit.targetId,

@@ -246,6 +246,14 @@ export function selectCanonicalTargetEffect(
   result: SimulationResult,
   selected: SelectedDisplayFrame,
 ): CanonicalTargetEffectSelection {
+  const retainedSelectedFrame = result.frames[selected.frameIndex];
+  if (
+    !retainedSelectedFrame ||
+    retainedSelectedFrame.t !== selected.displayTimeSeconds ||
+    retainedSelectedFrame !== selected.frame
+  ) {
+    return unavailableTargetEffect(result, selected, "SELECTED_FRAME_NOT_RETAINED");
+  }
   if (result.engineRun.events.state !== "AVAILABLE") {
     return unavailableTargetEffect(
       result,
@@ -342,6 +350,39 @@ export function selectCanonicalTargetEffect(
     ) {
       return unavailableTargetEffect(result, selected, "INCONSISTENT_CANONICAL_TARGET_EFFECT");
     }
+    const expectedProjection = {
+      commitId: commit.commitId,
+      state: commit.result,
+    };
+    for (const [retainedFrameIndex, retainedFrame] of result.frames.entries()) {
+      if (retainedFrame.entities.some(
+        (entity) => entity.id !== commit.targetId && entity.targetEffect !== undefined,
+      )) {
+        return unavailableTargetEffect(
+          result,
+          selected,
+          "NON_TARGET_EFFECT_PROJECTION",
+        );
+      }
+      const retainedTarget = retainedFrame.entities.find(
+        (entity) => entity.id === commit.targetId,
+      );
+      if (!retainedTarget) continue;
+      const projection = canonicalJson(retainedTarget.targetEffect ?? null);
+      if (
+        (retainedFrameIndex < event.frameIndex && retainedTarget.targetEffect !== undefined) ||
+        (retainedFrameIndex >= event.frameIndex &&
+          projection !== canonicalJson(expectedProjection))
+      ) {
+        return unavailableTargetEffect(
+          result,
+          selected,
+          retainedFrameIndex < event.frameIndex
+            ? "TARGET_EFFECT_BEFORE_CAUSAL_FRAME"
+            : "TARGET_EFFECT_PROJECTION_NOT_PERSISTED",
+        );
+      }
+    }
     if (
       causalEvent?.payload.kind !== "WEAPON_TERMINATED" ||
       !targetBeforeEffect ||
@@ -423,6 +464,11 @@ export function selectCanonicalTargetEffect(
     weaponId = commit.weaponId;
     targetId = commit.targetId;
   } else {
+    if (result.frames.some((frame) => frame.entities.some(
+      (entity) => entity.targetEffect !== undefined,
+    ))) {
+      return unavailableTargetEffect(result, selected, "TARGET_EFFECT_WITHOUT_CAUSAL_EVENT");
+    }
     const legacy = events.filter((event) =>
       event.payload.kind === "WEAPON_TERMINATED" &&
       event.payload.weaponId === result.engineRun.primaryWeaponId &&

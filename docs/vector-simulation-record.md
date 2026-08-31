@@ -131,6 +131,14 @@ Frame schema v7 adds only the optional target projection
 and causal receipt remain in the typed event/compiled authority; a frame cannot
 create, classify or independently authenticate an effect.
 
+No entity may carry that projection before the exact frame cited by the causal
+`TARGET_EFFECT_COMMITTED` event. The event-stream validator enforces the same
+boundary for newly created records, opened frame members, and deterministic
+replay, so resealing an earlier frame cannot expose a future effect during
+playback. The projection remains identical on every later frame that retains
+the target, is forbidden on all non-target entities, and is absent throughout
+a record with no causal target-effect event.
+
 Frames contain only state produced from a compiled admitted scenario. Raw
 authoring strings and rejected numeric values never enter a frame, and the
 record writer does not round or normalize them as a fallback.

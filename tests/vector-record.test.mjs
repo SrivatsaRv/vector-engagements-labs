@@ -54,6 +54,7 @@ import {
   createTargetEffectAuthority,
   createTargetEffectModelForAuthority,
 } from "../lib/engine/target-effect-authority.ts";
+import { assertSimulationEventStream } from "../lib/engine/simulation-events.ts";
 
 function governWeaponTermination(scenario, weapon, changes) {
   const pack = resolveRetainedCompiledModelPack(scenario.modelPack);
@@ -1059,6 +1060,9 @@ test("VSR preserves one canonical target-effect identity across event, frame, ma
     commitId: effect.payload.commit.commitId,
     state: "NO_EFFECT",
   });
+  assert.ok(opened.result.frames.slice(0, effect.frameIndex).every(
+    (frame) => frame.entities.every((entity) => entity.targetEffect === undefined),
+  ));
 
   const frameMember = record.members.find((member) => member.path === "frames.arrow");
   assert.ok(frameMember);
@@ -1076,8 +1080,166 @@ test("VSR preserves one canonical target-effect identity across event, frame, ma
   const mutatedSerialized = serializeVectorRecord(mutated);
   await assert.rejects(
     openVectorSimulationRecord(mutatedSerialized.buffer, mutatedSerialized.byteLength),
-    /invalid authority, causality, ownership, or frame state/,
+    /projection does not persist on target/,
   );
+});
+
+test("VSR rejects a resealed target-effect projection before its exact causal frame", async () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const prepared = prepareSimulation(scenario);
+  const result = simulate(scenario);
+  const effect = result.engineRun.events.items.find(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  assert.ok(effect?.payload.kind === "TARGET_EFFECT_COMMITTED");
+  const projection = {
+    commitId: effect.payload.commit.commitId,
+    state: effect.payload.commit.result,
+  };
+  const earlyFrameIndex = effect.frameIndex - 1;
+  const earlyTarget = result.engineRun.frames[earlyFrameIndex].entities.find(
+    (entity) => entity.id === effect.payload.commit.targetId,
+  );
+  earlyTarget.targetEffect = structuredClone(projection);
+  await assert.rejects(
+    createVectorSimulationRecord(prepared, result, createdAt),
+    /projection appears at frame .* before exact causal effect frame/,
+  );
+
+  const cleanResult = simulate(scenario);
+  const cleanRecord = await createVectorSimulationRecord(
+    prepareSimulation(scenario),
+    cleanResult,
+    createdAt,
+  );
+  const frameMember = cleanRecord.members.find(
+    (member) => member.path === "frames.arrow",
+  );
+  assert.ok(frameMember);
+  const frames = decodeColumnarFrames(frameMember.bytes);
+  const exactTarget = frames[effect.frameIndex].entities.find(
+    (entity) => entity.id === effect.payload.commit.targetId,
+  );
+  assert.deepEqual(exactTarget.targetEffect, projection);
+  assert.ok(frames.slice(0, effect.frameIndex).every(
+    (frame) => frame.entities.every((entity) => entity.targetEffect === undefined),
+  ));
+
+  const resealedEarlyTarget = frames[earlyFrameIndex].entities.find(
+    (entity) => entity.id === effect.payload.commit.targetId,
+  );
+  resealedEarlyTarget.targetEffect = structuredClone(projection);
+  const resealed = await replaceRecordMember(
+    cleanRecord,
+    "frames.arrow",
+    VECTOR_FRAME_SCHEMA,
+    encodeColumnarFrames(frames),
+  );
+  const serialized = serializeVectorRecord(resealed);
+  await assert.rejects(
+    openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
+    /projection appears at frame .* before exact causal effect frame/,
+  );
+});
+
+test("target-effect projection ownership and persistence cover exact and later retained frames", () => {
+  const scenario = SCENARIO_LIBRARY.find(
+    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+  ).scenario;
+  const result = simulate(scenario);
+  const effect = result.engineRun.events.items.find(
+    (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
+  );
+  assert.ok(effect?.payload.kind === "TARGET_EFFECT_COMMITTED");
+  const projection = {
+    commitId: effect.payload.commit.commitId,
+    state: effect.payload.commit.result,
+  };
+  const frames = structuredClone(result.engineRun.frames);
+  const events = structuredClone(result.engineRun.events.items);
+  const continuation = structuredClone(frames.at(-1));
+  continuation.t = Number((continuation.t + result.engineRun.scenario.fixedStepSeconds).toFixed(6));
+  frames.push(continuation);
+  const completion = events.at(-1);
+  assert.equal(completion.payload.kind, "RUN_COMPLETED");
+  completion.tick += 1;
+  completion.modelTimeSeconds = continuation.t;
+  completion.frameIndex = frames.length - 1;
+  const validate = (candidateFrames) => assertSimulationEventStream(
+    events,
+    candidateFrames,
+    result.engineRun.scenario,
+    result.engineRun.termination,
+    result.engineRun.closestApproachM,
+    {
+      primaryWeaponId: result.engineRun.primaryWeaponId,
+      primaryTargetId: result.engineRun.primaryTargetId,
+    },
+  );
+
+  assert.doesNotThrow(() => validate(frames));
+  assert.deepEqual(
+    frames[effect.frameIndex].entities.find(
+      (entity) => entity.id === effect.payload.commit.targetId,
+    ).targetEffect,
+    projection,
+  );
+  assert.deepEqual(
+    frames.at(-1).entities.find(
+      (entity) => entity.id === effect.payload.commit.targetId,
+    ).targetEffect,
+    projection,
+  );
+
+  const cases = [
+    {
+      label: "exact-frame other entity",
+      pattern: /non-target entity .* frame 530/,
+      mutate(candidate) {
+        candidate[effect.frameIndex].entities.find(
+          (entity) => entity.id !== effect.payload.commit.targetId,
+        ).targetEffect = structuredClone(projection);
+      },
+    },
+    {
+      label: "later other entity",
+      pattern: /non-target entity .* frame 531/,
+      mutate(candidate) {
+        candidate.at(-1).entities.find(
+          (entity) => entity.id !== effect.payload.commit.targetId,
+        ).targetEffect = structuredClone(projection);
+      },
+    },
+    {
+      label: "later target removal",
+      pattern: /does not persist .* frame 531/,
+      mutate(candidate) {
+        delete candidate.at(-1).entities.find(
+          (entity) => entity.id === effect.payload.commit.targetId,
+        ).targetEffect;
+      },
+    },
+    {
+      label: "later target change",
+      pattern: /does not persist .* frame 531/,
+      mutate(candidate) {
+        candidate.at(-1).entities.find(
+          (entity) => entity.id === effect.payload.commit.targetId,
+        ).targetEffect.state = "KILL";
+      },
+    },
+  ];
+  for (const candidate of cases) {
+    const mutated = structuredClone(frames);
+    candidate.mutate(mutated);
+    assert.throws(
+      () => validate(mutated),
+      candidate.pattern,
+      candidate.label,
+    );
+  }
 });
 
 test("VSR rejects a jointly resealed unretained target-effect authority before replay", async () => {

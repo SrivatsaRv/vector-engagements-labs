@@ -319,18 +319,18 @@ must pass on the frozen completion candidate beside TypeScript/Rust parity.
 #196 rebaselines the shared production engine module only after strict generic
 target-effect authority, event, lifecycle and TypeScript/Rust parity increased
 the optimized artifact from the exact pre-change 581,120-byte commit
-`69dd91d821e164936f231a59254af950ed4a0f21` to 611,235 bytes. The governed
-ceiling is now strictly below 620,000 bytes, leaving 8,765 bytes (1.43%) of
-headroom. The candidate is 237,733 bytes at gzip-9 and 186,659 bytes at
+`69dd91d821e164936f231a59254af950ed4a0f21` to 611,496 bytes. The governed
+ceiling is now strictly below 620,000 bytes, leaving 8,504 bytes (1.37%) of
+headroom. The candidate is 238,005 bytes at gzip-9 and 187,048 bytes at
 Brotli-11, below fixed 240,000/190,000-byte limits. The built simulation Worker
-is 1,701,735 raw, 527,300 gzip and 404,944 Brotli bytes: 4.78%, 4.84% and 4.75%
+is 1,702,667 raw, 527,604 gzip and 404,783 Brotli bytes: 4.83%, 4.90% and 4.71%
 above the frozen pre-#196 baseline and below the 5% limit in every form.
 
 `performance:engine-wasm-load:verify` interleaves 20 fresh Chromium contexts
 for the exact baseline and candidate to avoid assigning cold-start or thermal
 bias to one artifact. On 2026-08-31 the baseline/candidate initialization p95
-was 5.5/5.9 ms, a 7.27% regression below the 10% limit; candidate maximum was
-6.5 ms and both retained the exact 1,114,112-byte initial memory. The absolute
+was 6.6/6.6 ms, no measured regression; candidate maximum was 6.8 ms and both
+retained the exact 1,114,112-byte initial memory. The absolute
 maximum remains 25 ms. This is one-time Worker initialization evidence, not a
 render-frame or simulation-throughput claim. The size rebaseline does not
 relax any engine-latency, correctness, parity, VSR, Worker or browser gate.

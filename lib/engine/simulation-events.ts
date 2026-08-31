@@ -1292,6 +1292,40 @@ export function assertSimulationEventStream(
       const priorFrameTarget = frames[event.frameIndex - 1]?.entities.find(
         (candidate) => candidate.id === commit.targetId,
       );
+      const expectedProjection = {
+        commitId: commit.commitId,
+        state: commit.result,
+      };
+      for (const [retainedFrameIndex, retainedFrame] of frames.entries()) {
+        for (const retainedEntity of retainedFrame.entities) {
+          if (
+            retainedEntity.id !== commit.targetId &&
+            retainedEntity.targetEffect !== undefined
+          ) {
+            throw new Error(
+              `Simulation non-target entity ${retainedEntity.id} carries a target-effect projection at frame ${retainedFrameIndex}.`,
+            );
+          }
+        }
+        const retainedTarget = retainedFrame.entities.find(
+          (entity) => entity.id === commit.targetId,
+        );
+        if (!retainedTarget) continue;
+        if (retainedFrameIndex < event.frameIndex) {
+          if (retainedTarget.targetEffect !== undefined) {
+            throw new Error(
+              `Simulation target-effect projection appears at frame ${retainedFrameIndex} before exact causal effect frame ${event.frameIndex}.`,
+            );
+          }
+        } else if (
+          canonicalJson(retainedTarget.targetEffect ?? null) !==
+          canonicalJson(expectedProjection)
+        ) {
+          throw new Error(
+            `Simulation target-effect projection does not persist on target ${commit.targetId} at frame ${retainedFrameIndex}.`,
+          );
+        }
+      }
       if (!authority) {
         throw new Error(`Simulation target-effect event ${event.id} has no admitted authority.`);
       }
@@ -1449,6 +1483,19 @@ export function assertSimulationEventStream(
     if (targetEffectEvents !== expectedTargetEffectEvents) {
       throw new Error(
         "Simulation event stream does not contain the exact governed target effect required by the admitted authority.",
+      );
+    }
+    if (
+      targetEffectEvents === 0 &&
+      frames.some((frame) => frame.entities.some(
+        (entity) => entity.targetEffect !== undefined,
+      ))
+    ) {
+      const projectionFrameIndex = frames.findIndex((frame) => frame.entities.some(
+        (entity) => entity.targetEffect !== undefined,
+      ));
+      throw new Error(
+        `Simulation target-effect projection appears at frame ${projectionFrameIndex} without a causal target-effect event.`,
       );
     }
     if (!weaponTerminalRun && weaponTerminationEvents === 0 && frames.length >= 2) {

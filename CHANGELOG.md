@@ -188,6 +188,11 @@ No pending family-specific entry.
 
 #### Generic target effect
 
+- Enforce the target-effect projection as persistent causal state: it is absent
+  before the exact commit frame, present only on the committed target from that
+  frame onward, and forbidden without a causal event. Align Rust/WASM with the
+  TypeScript six-decimal binary64 tie rule through one shared signed-boundary
+  oracle so effect class and content-addressed commit identity cannot diverge.
 - Require VSR replay to resolve the exact retained target-effect authority, and
   require presentation to reproduce the stored evaluation from its retained
   binding, causal termination and exact target frames before it can authorize

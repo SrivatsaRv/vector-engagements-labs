@@ -222,6 +222,10 @@ function finite(value: unknown, path: string, minimum?: number) {
  */
 export function canonicalTargetEffectNumber(value: number) {
   finite(value, "Target-effect canonical number");
+  // ECMAScript toFixed applies decimal rounding to the exact IEEE-754
+  // binary64 value. The shared Rust implementation decomposes those same
+  // bits; neither backend rounds a separately scaled floating-point value.
+  // Exact halfway cases resolve away from zero and signed zero normalizes.
   const rounded = Number(value.toFixed(TARGET_EFFECT_DECIMAL_PLACES));
   return Object.is(rounded, -0) ? 0 : rounded;
 }

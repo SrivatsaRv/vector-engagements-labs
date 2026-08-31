@@ -53,6 +53,14 @@ commit admission rejects a hash-resealed value carrying more precision. This
 keeps the effect decision and identity independent of unretained sub-precision
 floating-point drift between TypeScript and Rust/WASM.
 
+The projection rounds the exact IEEE-754 binary64 value to the nearest integer
+multiple of `10^-6`; an exact halfway case resolves away from zero. It does not
+multiply the value by one million in floating point before rounding, because
+that extra operation can manufacture a tie. TypeScript uses
+`Number(value.toFixed(6))`; Rust decomposes the same binary64 sign, significand
+and exponent before applying the identical integer rule. A shared signed,
+half-boundary fixture is the cross-backend oracle.
+
 The canonical target frame carries only `{ commitId, state }`. Presentation
 surfaces join that projection to the typed event; they do not derive an effect
 from rendered distance. Before authorizing wording, the selector requires the
@@ -62,6 +70,14 @@ evaluation from the causal termination receipt and exact retained effect-frame
 target state, and requires complete equality with the recorded commit. `kill`
 wording is admitted only for a reproduced `KILL` commit whose exact event frame
 and after-lifecycle both show `TERMINATED`.
+
+The projection is absent from every retained frame before the exact causal
+effect frame. This is a temporal authority boundary, not a display convention:
+record creation, archive open, and deterministic replay validation reject even
+a correctly hash-resealed frame member that moves the projection earlier. From
+the causal frame onward, every retained frame containing the committed target
+must carry exactly the same `{ commitId, state }`; no other entity may carry a
+target-effect projection, and a run without a causal effect event carries none.
 
 VSR frame schema v7 preserves the target-frame projection. The compiled member
 contains the full authority, while manifest and report bind the same authority,
@@ -82,11 +98,11 @@ performance evidence. Parity is necessary but is not its own oracle.
 
 The verification-owned optimized Rust/WASM ceiling is now strictly below
 620,000 decoded bytes. This is a measured rebaseline, not a size waiver: the
-611,235-byte candidate is 5.18% above the exact pre-#196 artifact, remains below
+611,496-byte candidate is 5.23% above the exact pre-#196 artifact, remains below
 240,000 gzip and 190,000 Brotli bytes, keeps production Worker raw/gzip/Brotli
 growth below 5%, holds initial WASM memory at 1,114,112 bytes, and limits an
 interleaved 20-context Chromium initialization p95 regression to 10%. The
 100-run high-energy soak reaches 11,534,336 bytes on run one and remains exactly
 flat; retained growth is only 0.63% above the exact baseline module. The ceiling
-leaves 8,765 bytes (1.43%) of explicit headroom; later features do not inherit
+leaves 8,504 bytes (1.37%) of explicit headroom; later features do not inherit
 permission to consume it without their own evidence.
