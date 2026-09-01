@@ -67,6 +67,15 @@ test("governed study areas are migration data and local Compose keeps migration 
   assert.match(dockerignore, /^outputs$/m);
 });
 
+test("Compose waits for the final PostgreSQL server before migration", async () => {
+  const compose = await read("compose.yaml");
+
+  assert.match(compose, /cat \/proc\/1\/task\/1\/children/);
+  assert.match(compose, /cat \/proc\/\$\$1\/comm/);
+  assert.match(compose, /pg_isready -U vector -d vector/);
+  assert.match(compose, /migrate:[\s\S]*database:[\s\S]*condition: service_healthy/);
+});
+
 test("Compose and release delivery admit one immutable production image", async () => {
   const [dockerfile, compose, release, packageJson, runtimeBuilder] = await Promise.all([
     read("Dockerfile"),

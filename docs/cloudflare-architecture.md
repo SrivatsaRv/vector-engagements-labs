@@ -148,6 +148,10 @@ readback before browser verification.
 Cloudflare does not run the PostgreSQL container. Hyperdrive supplies the Worker with a database connection string and connection management. Local development uses the same binding shape with a direct Compose connection. The app and physics do not require a server round trip per model step.
 
 Compose is intentionally small: one PostGIS service, one one-shot migration/seed service using the same application image, and one web service. The web container serves the built Worker bundle through Wrangler's local Cloudflare runtime; it does not run the HMR development server. Images are explicitly versioned; PostGIS is digest pinned; startup is gated by database health and successful migration.
+For a first start against an empty volume, database health additionally verifies
+that the image entrypoint has handed control to the final PostgreSQL process.
+This prevents the temporary initialization postmaster from releasing the
+migration dependency immediately before that temporary server shuts down.
 
 An x86-64 server remains a valid PostgreSQL origin and can also host the complete Compose stack plus a bounded native Rust worker pool. Interactive playback and ordinary runs remain browser-first. The workload, machine capability, clock separation, and evidence requirements are defined in [`performance-capacity.md`](performance-capacity.md).
 
