@@ -126,6 +126,13 @@ Migration 018 then produces 21 immutable scenario rows: nine `VALIDATED` rows
 and conflicting-row rollback are required before the catalog API can publish
 the new current versions.
 
+Migration 019 versions only the crossing study from `1.2.0` to `1.3.0`. Fresh
+and upgraded verification therefore requires 22 immutable scenario rows: nine
+`VALIDATED` current templates and 13 `RETIRED` historical versions. The database
+gate derives the validated count from the nine-entry scenario library and
+separately asserts the four additional retained version generations, preventing
+the new BVR history row from being mistaken for duplicate current catalog data.
+
 The PostGIS gate now exercises both sides of the Air mission transition: current
 v3 production rows are valid pre-migration input, while post-migration and fresh
 databases must expose canonical `vector.scenario.v4` Air envelopes through the

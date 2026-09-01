@@ -101,6 +101,10 @@ promote a Stage-B identity.
 
 ## Closed requirements and evidence states
 
+Issue #207 does not add named-aircraft evidence: database verification counts
+the new retired scenario version while continuing to require the same exact
+intended-use, credibility, and generic model-pack authorities.
+
 The #197 routes, study-regime labels, expected outcomes, and run durations are
 scenario assumptions and regression descriptors. They do not satisfy an
 aircraft requirement, change a field-lineage state, or turn the displayed
@@ -165,6 +169,10 @@ satisfy an aircraft requirement or repair an aircraft evidence gap; each family
 must pass its own admission contract before later scenario composition.
 
 ## Step-by-step onboarding
+
+Migration 019 reuses the existing compiled pack and therefore adds no onboarding
+step; the database gate verifies that scenario versioning cannot create or
+replace a model-pack identity.
 
 #197 performs none of the onboarding steps below. Each study resolves the
 already-published model pack by its exact ID, version, and digest; the scenario
@@ -252,6 +260,10 @@ the repository policy.
 
 ## Anonymous worked example
 
+The issue #207 database readback is an additional negative control for this
+example: a new scenario version changes catalog history, not anonymous pack
+content, configuration coverage, or verification evidence.
+
 The #197 named study packages do not alter the anonymous Stage-B proof. They
 consume the current governed reference pack through normal scenario admission;
 their platform/tactical labels remain non-causal, and no anonymous or named pack
@@ -290,6 +302,10 @@ payload. Pairing either example with a regional EnvironmentPack would create a
 separate scenario identity without changing the compiled aircraft-pack digest.
 
 ## Bounds, storage, and recovery
+
+Backup and recovery verification now expects 22 scenario rows after migration
+019 while preserving the existing compiled-model-pack and credibility rows
+byte-for-byte.
 
 #197 persists each scenario revision append-only and retains its exact package
 reference in saved-run/VSR admission so a current catalogue label cannot replace
@@ -347,6 +363,9 @@ its aircraft research backup format.
 
 ## Performance evidence
 
+The additional retired scenario row is verified as catalog history and is not
+loaded into the per-tick model-pack runtime or counted as a new execution pack.
+
 The three #197 scenario outcomes and their matched WVR control are scenario
 regression evidence, not aircraft-model validation or a new capacity benchmark.
 They add no numerical core or compiled-pack tables. The historical
@@ -388,6 +407,9 @@ measurements are not folded into Stage-B compile, publication or reuse timing.
 | non-promotable until runtime admission lands | Stage B is being used as Stage D | complete #154 first, then the separately reviewed Worker/runtime/VSR admission stage |
 
 ## Nonclaims and deferred owners
+
+Neither the BVR KILL demonstration nor its retained database history admits
+named Su-30MKI, F-16C, Astra, AIM-120, sensor, or pilot performance.
 
 #197 demonstrates deterministic execution of three authored educational route
 profiles; it does not validate named aircraft, weapons, pilot tactics,

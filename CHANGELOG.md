@@ -11,6 +11,10 @@ one family must not imply changes to unrelated contracts.
 
 #### Model packs
 
+- Database verification for migration 019 now distinguishes the additional
+  retired BVR scenario version from the unchanged compiled model-pack,
+  intended-use, credibility, loadout, and named-performance authorities.
+
 - Keep the compiled generic aircraft, weapon, credibility and target-effect
   model-pack contracts byte-identical while three new scenario-package versions
   bind those existing identities. Authored tactic names and route profiles do
