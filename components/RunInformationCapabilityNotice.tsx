@@ -15,7 +15,7 @@ export function RunInformationCapabilityNotice({
         <p>
           Both aircraft execute their authored routes. Blue has one explicit
           store-release request; Red carries recorded loadout inventory but does
-          not decide, defend in response to a detection, or launch AIM-120.
+          not decide, defend in response to a detection, or release a weapon.
         </p>
         <dl>
           <dt>Sensors and tracks</dt>

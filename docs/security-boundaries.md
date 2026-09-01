@@ -187,14 +187,17 @@ The shared public-API rate-window table is declared in
 `db/schema/public-api-admission.ts`; its limiter and relay behavior are
 unchanged.
 
-The catalog is cached for five minutes. The tile relay uses the versioned
-`vector-basemap-tile.v2` tuple: exactly one `revision`, `mode`, `z`, `x`, and
-`y`, all strictly canonical. Revision `osm-derived-v1` admits a fixed public OSM
-HTTPS raster upstream for standard, minimal, and tactical presentation; no
+The catalog is cached for five minutes. The tile relay admits exactly one
+`revision`, `mode`, `z`, `x`, and `y`, all strictly canonical. Its versioned
+`vector-basemap-tile.v3` cache identity contains only `revision`, `z`, `x`, and
+`y`; presentation mode is echoed in the response but cannot duplicate identical
+OSM bytes. Revision `osm-derived-v1` admits a fixed public OSM HTTPS raster
+upstream for standard, minimal, and tactical presentation; no
 browser-visible provider key or key-bearing style URL is accepted. Unknown,
 duplicate, encoded, empty, conflicting, leading-zero, stale-revision, or out-of-
 range input is rejected before cache or upstream work. Reordered valid query
-fields share one cache identity. The relay has a three-second timeout, accepts
+fields and all three presentation modes share one cache identity. The browser
+uses one raster source and applies mode-specific paint locally. The relay has a three-second timeout, accepts
 PNG or WebP only, buffers at most 4 MiB, coalesces identical misses, and caches
 only successful bounded responses for 24 hours. Cache schema and revision appear
 in the response and cache key, so an intentional authority change invalidates

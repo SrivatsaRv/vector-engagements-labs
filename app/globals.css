@@ -926,7 +926,7 @@ a {
 .target-effect-summary.target-effect-adverse { border-left-color: #a94f45; }
 .target-effect-summary.is-compact {
   max-width: min(340px, calc(100% - 24px));
-  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
   align-items: center;
   gap: 7px;
   padding: 5px 8px;
@@ -935,6 +935,10 @@ a {
   overflow: hidden;
   font-size: 9px;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.target-effect-summary.is-compact > small {
+  font-size: 7px;
   white-space: nowrap;
 }
 .engagement-map-shell > .target-effect-summary {
@@ -4526,7 +4530,7 @@ button:disabled,
   .report-evidence-disclosure:not([open]) > :not(summary),
   .report-detail-disclosure:not([open]) > :not(summary),
   .report-causal-inputs:not([open]) > :not(summary),
-  .report-canonical-geometry:not([open]) > :not(summary) { display: revert !important; }
+  .report-canonical-geometry:not([open]) > :not(summary) { display: block !important; }
   .report-nav,
   .report-replay-stage,
   .report-replay-controls {

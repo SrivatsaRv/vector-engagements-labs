@@ -26,8 +26,11 @@ export function TargetEffectSummary({
       <span>{presentation.label}</span>
       <strong>{compact ? presentation.compactHeadline : presentation.headline}</strong>
       {!compact && <p>{presentation.detail}</p>}
-      {!compact && presentation.assumptionLabel && (
-        <small>{presentation.assumptionLabel} · limitations shown above</small>
+      {presentation.assumptionLabel && (
+        <small>
+          {presentation.assumptionLabel}
+          {!compact && " · limitations shown above"}
+        </small>
       )}
     </section>
   );

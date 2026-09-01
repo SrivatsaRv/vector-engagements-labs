@@ -1,7 +1,7 @@
 import { incrementCounter, observeHistogram } from "@/lib/observability/metrics";
 import { PublicApiError } from "./public-api";
 
-export const BASEMAP_TILE_CACHE_SCHEMA = "vector-basemap-tile.v2";
+export const BASEMAP_TILE_CACHE_SCHEMA = "vector-basemap-tile.v3";
 export const BASEMAP_TILE_REVISION = "osm-derived-v1";
 export const BASEMAP_TILE_TTL_MS = 24 * 60 * 60 * 1000;
 export const BASEMAP_TILE_TIMEOUT_MS = 3_000;
@@ -80,7 +80,7 @@ export function parseCanonicalBasemapTile(url: URL): CanonicalBasemapTile {
 }
 
 export function basemapTileCacheKey(tile: CanonicalBasemapTile) {
-  return `${tile.schema}/${tile.revision}/${tile.mode}/${tile.z}/${tile.x}/${tile.y}`;
+  return `${tile.schema}/${tile.revision}/${tile.z}/${tile.x}/${tile.y}`;
 }
 
 export function basemapTileUpstreamUrl(tile: CanonicalBasemapTile) {
@@ -91,6 +91,16 @@ function freshCachedResponse(cached: Response, now: number) {
   const expiresAt = Number(cached.headers.get("x-vector-cache-expires-at"));
   if (!Number.isFinite(expiresAt) || expiresAt <= now) return undefined;
   return new Response(cached.body, { status: cached.status, statusText: cached.statusText, headers: new Headers(cached.headers) });
+}
+
+function responseForRequestedMode(response: Response, tile: CanonicalBasemapTile) {
+  const headers = new Headers(response.headers);
+  headers.set("x-vector-basemap", tile.mode);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 async function readBoundedImage(response: Response) {
@@ -167,7 +177,7 @@ export async function serveBasemapTile(request: Request, dependencies: BasemapTi
     const fresh = cached && freshCachedResponse(cached, dependencies.now());
     if (fresh) {
       outcome = "hit";
-      return fresh;
+      return responseForRequestedMode(fresh, tile);
     }
     if (cached) {
       try { await dependencies.cache.delete(key); } catch { /* stale cache cannot block bounded relay */ }
@@ -177,7 +187,7 @@ export async function serveBasemapTile(request: Request, dependencies: BasemapTi
     inFlight.set(key, pending);
     try {
       const response = await pending;
-      return response.clone();
+      return responseForRequestedMode(response.clone(), tile);
     } finally {
       if (inFlight.get(key) === pending) inFlight.delete(key);
     }

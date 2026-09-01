@@ -25,8 +25,9 @@ describe("RunInformationCapabilityNotice", () => {
       "Red carries recorded loadout inventory",
     );
     expect(screen.getByRole("status")).toHaveTextContent(
-      "does not decide, defend in response to a detection, or launch AIM-120",
+      "does not decide, defend in response to a detection, or release a weapon",
     );
+    expect(screen.getByRole("status")).not.toHaveTextContent("AIM-120");
     expect(screen.getByText("Sensors and tracks").nextElementSibling).toHaveTextContent(
       "no positive-range sensor model",
     );

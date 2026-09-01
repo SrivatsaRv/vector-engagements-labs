@@ -29,7 +29,7 @@ describe("TargetEffectSummary", () => {
     expect(summary).toHaveTextContent(/MODEL_ASSUMPTION limitations:/);
   });
 
-  it("uses the compact template without repeating model provenance", () => {
+  it("keeps the assumption authority in the compact template without repeating model detail", () => {
     const result = createReferencePreview(
       getScenarioDefinition("a2a-defensive-break")!.scenario,
     );
@@ -41,6 +41,7 @@ describe("TargetEffectSummary", () => {
 
     const summary = screen.getByRole("region", { name: "Canonical target effect" });
     expect(summary).toHaveTextContent(/Modeled kill.*F-16C Block 52 terminated at effect frame/i);
-    expect(summary).not.toHaveTextContent(/generic educational model|MODEL_ASSUMPTION limitations/i);
+    expect(summary).toHaveTextContent("MODEL_ASSUMPTION");
+    expect(summary).not.toHaveTextContent(/generic educational model|limitations shown above/i);
   });
 });

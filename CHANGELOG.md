@@ -306,9 +306,9 @@ including public-reference and performance subtrees.
 
 - Use the exact admitted load-factor ceiling after route-command limiting and
   canonicalize recorded aerodynamic-drag telemetry at `10^-3 N` after raw force
-  evaluation. TypeScript and Rust/WASM now retain identical VSR frame bytes
-  across supported Linux and macOS hosts without changing the force used for
-  motion or thrust demand.
+  evaluation and on the exact airborne-transfer boundary frame. TypeScript and
+  Rust/WASM now retain identical VSR frame bytes across supported Linux and
+  macOS hosts without changing the force used for motion or thrust demand.
 - Consume a committed weapon-termination receipt and same-frame target state in
   one deterministic generic target-effect evaluator. Emit one causal
   `TARGET_EFFECT_COMMITTED` event and let it own any exactly-once target
@@ -616,7 +616,13 @@ introduced.
   framework-owned browser icon, and keeps expanded telemetry, reports, and
   mathematical disclosures contained from 320-pixel phones through QHD
   monitors without changing scenario or engine authority.
-- Corrected the Observe and saved-report presentation contract: all governed basemap modes now use the versioned key-free OpenStreetMap authority, launch annotations retire after four model seconds, compact telemetry no longer duplicates detailed target-effect prose, short-wide maps restore bounded tactical-label scale, and saved reports lead with semantic run/route tables plus screen disclosures that expand for print.
+- Corrected the Observe and saved-report presentation contract: all governed
+  basemap modes now share one versioned key-free OpenStreetMap raster source and
+  cache identity, launch annotations retire after four model seconds, compact
+  telemetry keeps `MODEL_ASSUMPTION` without duplicating detailed target-effect
+  prose, short-wide maps restore bounded tactical-label scale, and saved reports
+  retain exact run reasons plus semantic run/route tables and screen disclosures
+  that expand for print.
 
 - Docker Compose now runs self-contained production, migration, and local-seed
   bundles from one `VECTOR_IMAGE`; database and telemetry values are supplied

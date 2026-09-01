@@ -913,7 +913,9 @@ function activateWeapon(
         0,
         priorDragAreaM2 - transfer.installedDragAreaM2,
       );
-      launcher.dragNewtons = Math.max(0, launcher.dragNewtons - transferredDragNewtons);
+      launcher.dragNewtons = canonicalRecordedDragNewtons(
+        Math.max(0, launcher.dragNewtons - transferredDragNewtons),
+      );
       launcher.storeMassKg -= weapon.launchMassKg;
       launcher.massKg -= weapon.launchMassKg;
       // The integrator retains the full binary64 value; only the published

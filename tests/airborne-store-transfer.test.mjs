@@ -250,6 +250,11 @@ test("authored governed transfer is exact, causal, independently balanced, and T
     assert.equal(event.payload.launcherMassAfterKg, launcher.massKg);
     assert.equal(event.payload.launcherFuelBeforeKg, event.payload.launcherFuelAfterKg);
     assert.equal(event.payload.launcherFuelAfterKg, launcher.fuelKg);
+    assert.equal(
+      launcher.dragNewtons,
+      Number(launcher.dragNewtons.toFixed(3)),
+      "the transfer-boundary frame must retain canonical recorded drag",
+    );
     assert.ok(Math.abs(
       event.payload.installedDragAreaBeforeM2
         - event.payload.installedDragAreaAfterM2
@@ -293,7 +298,7 @@ test("authored governed transfer is exact, causal, independently balanced, and T
     assert.equal(
       event.payload.installedDragNewtons,
       expectedPublishedInstalledDrag,
-      "event evidence uses the governed six-decimal scalar while state integration retains binary64 precision",
+      "event evidence uses the governed six-decimal scalar while raw force integration remains separate from recorded state",
     );
   }
 });

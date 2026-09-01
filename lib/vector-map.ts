@@ -18,31 +18,29 @@ export function writeVectorBasemap(value: VectorBasemap) {
 }
 
 export function buildVectorMapStyle(active: VectorBasemap) {
-  const source = (mode: Lowercase<VectorBasemap>) => ({
+  const source = {
     type: "raster" as const,
-    tiles: [`/api/map-tile?revision=${VECTOR_BASEMAP_TILE_REVISION}&mode=${mode}&z={z}&x={x}&y={y}`],
+    tiles: [`/api/map-tile?revision=${VECTOR_BASEMAP_TILE_REVISION}&mode=standard&z={z}&x={x}&y={y}`],
     tileSize: 256,
     attribution: "© OpenStreetMap contributors",
-  });
+  };
   return {
     version: 8 as const,
     sources: {
-      vectorStandard: source("standard"),
-      vectorMinimal: source("minimal"),
-      vectorTactical: source("tactical"),
+      vectorRaster: source,
     },
     layers: [
       {
         id: "basemap-standard",
         type: "raster" as const,
-        source: "vectorStandard",
+        source: "vectorRaster",
         layout: { visibility: active === "STANDARD" ? "visible" as const : "none" as const },
         paint: { "raster-opacity": 1 },
       },
       {
         id: "basemap-minimal",
         type: "raster" as const,
-        source: "vectorMinimal",
+        source: "vectorRaster",
         layout: { visibility: active === "MINIMAL" ? "visible" as const : "none" as const },
         paint: {
           "raster-saturation": -0.72,
@@ -55,7 +53,7 @@ export function buildVectorMapStyle(active: VectorBasemap) {
       {
         id: "basemap-tactical",
         type: "raster" as const,
-        source: "vectorTactical",
+        source: "vectorRaster",
         layout: { visibility: active === "TACTICAL" ? "visible" as const : "none" as const },
         paint: {
           "raster-saturation": -0.82,

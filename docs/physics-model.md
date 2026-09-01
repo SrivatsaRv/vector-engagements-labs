@@ -76,8 +76,9 @@ named non-negative six-decimal SI value in TypeScript and Rust/WASM. The event
 rounding does not quantize the store-area discontinuity retained by either
 integrator. Recorded aerodynamic drag for aircraft, guided stores, and
 jettisoned stores crosses a separate `10^-3 N` telemetry boundary after force
-evaluation so nonlinear load/drag arithmetic produces identical VSR frames on
-supported Linux and macOS hosts. Motion and thrust demand retain the raw
+evaluation and again on an airborne-transfer boundary frame, so nonlinear
+load/drag arithmetic produces identical VSR frames on supported Linux and macOS
+hosts. Motion and thrust demand retain the raw
 fixed-step force. A load-factor-limited route command also consumes and records the exact
 admitted ceiling instead of reconstructing it from the clamped vector.
 

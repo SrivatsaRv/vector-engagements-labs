@@ -57,7 +57,13 @@ test("equivalent tile tuples use a single cache identity regardless of parameter
   const identities = new Set(permutations(fields).map((items) => basemapTileCacheKey(
     parseCanonicalBasemapTile(new URL(request(items.join("&")).url)),
   )));
-  assert.deepEqual(identities, new Set(["vector-basemap-tile.v2/osm-derived-v1/minimal/3/2/1"]));
+  assert.deepEqual(identities, new Set(["vector-basemap-tile.v3/osm-derived-v1/3/2/1"]));
+  assert.deepEqual(
+    new Set(["minimal", "standard", "tactical"].map((mode) => basemapTileCacheKey(
+      parseCanonicalBasemapTile(new URL(validRequest(`mode=${mode}&z=3&x=2&y=1`).url)),
+    ))),
+    new Set(["vector-basemap-tile.v3/osm-derived-v1/3/2/1"]),
+  );
 });
 
 test("all governed presentation modes use the key-free OpenStreetMap tile authority", () => {
@@ -97,11 +103,17 @@ test("unknown, duplicate, encoded, empty, leading-zero, and out-of-range input r
 test("concurrent identical cache misses use one bounded upstream request", async () => {
   const fixture = dependencies();
   const startedAt = performance.now();
-  const responses = await Promise.all(Array.from({ length: 128 }, () => serveBasemapTile(validRequest("mode=tactical&z=3&x=2&y=1"), fixture.values)));
+  const modes = Array.from({ length: 128 }, (_, index) =>
+    (["minimal", "standard", "tactical"] as const)[index % 3]);
+  const responses = await Promise.all(modes.map((mode) =>
+    serveBasemapTile(validRequest(`mode=${mode}&z=3&x=2&y=1`), fixture.values)));
   assert.equal(fixture.upstreamCalls, 1);
   assert.equal(fixture.cache.puts, 1);
   assert.ok(performance.now() - startedAt < 1_000, "coalesced local load remains bounded");
-  await Promise.all(responses.map(async (response) => assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [1, 2, 3])));
+  await Promise.all(responses.map(async (response, index) => {
+    assert.equal(response.headers.get("x-vector-basemap"), modes[index]);
+    assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [1, 2, 3]);
+  }));
 });
 
 test("cache expiry uses the declared clock and a cache schema key", async () => {
@@ -143,7 +155,7 @@ test("cache adapters preserve the same response contract in Node and Worker-shap
   for (const cache of [new FakeCache(), new FakeCache()]) {
     const fixture = dependencies(cache);
     const response = await serveBasemapTile(validRequest("mode=minimal&z=3&x=2&y=1"), fixture.values);
-    assert.equal(response.headers.get("x-vector-cache-schema"), "vector-basemap-tile.v2");
+    assert.equal(response.headers.get("x-vector-cache-schema"), "vector-basemap-tile.v3");
     assert.equal(response.headers.get("x-vector-basemap"), "minimal");
     assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   }

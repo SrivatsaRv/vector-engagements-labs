@@ -176,11 +176,12 @@ giving Linux and macOS the same causal frame bytes.
 Airborne transfer provenance is likewise backend-neutral: authored digest,
 aircraft source identity, ordered transfer digests and the independent
 authority seal are identical in both engines and retained in the VSR.
-An accepted transfer keeps the full binary64 drag removal in aircraft state,
-but publishes `installedDragNewtons` with one shared non-negative
-multiply/round/divide rule at six decimal places. This narrows only the event
-evidence scalar, not the integrator, and gives TypeScript and Rust/WASM an exact
-event-stream equality boundary.
+An accepted transfer applies the exact store-area discontinuity to subsequent
+raw-force integration and recanonicalizes the immediate recorded aircraft-drag
+value at the same millinewton boundary. It publishes `installedDragNewtons`
+with a separate shared non-negative multiply/round/divide rule at six decimal
+places. Neither telemetry boundary quantizes the integrator, and TypeScript and
+Rust/WASM retain exact frame and event-stream equality.
 Backend provenance now sits beside one content-addressed regional pack. A run
 is rejected when the runtime grid, source grids or compact pack binding do not
 match the archived EnvironmentPack digest.

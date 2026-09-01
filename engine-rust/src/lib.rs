@@ -2594,8 +2594,9 @@ fn activate_weapons(
                     .remove(store_index);
                 states[launcher_index].installed_store_drag_area_m2 =
                     (prior_drag_area_m2 - transfer.installed_drag_area_m2).max(0.0);
-                states[launcher_index].drag_newtons =
-                    (states[launcher_index].drag_newtons - transferred_drag_newtons).max(0.0);
+                states[launcher_index].drag_newtons = canonical_recorded_drag_newtons(
+                    (states[launcher_index].drag_newtons - transferred_drag_newtons).max(0.0),
+                );
                 states[launcher_index].store_mass_kg -= weapon.launch_mass_kg;
                 states[launcher_index].mass_kg -= weapon.launch_mass_kg;
                 committed.push(StoreTransferOutcome {

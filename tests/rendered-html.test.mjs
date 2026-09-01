@@ -199,6 +199,8 @@ test("VECTOR map controls share the MIAR-derived navigation contract", async () 
   assert.match(mapContract, /vector\.map\.basemap\.v1/);
   assert.match(mapContract, /osm-derived-v1/);
   assert.match(mapContract, /OpenStreetMap contributors/);
+  assert.match(mapContract, /vectorRaster/);
+  assert.doesNotMatch(mapContract, /vectorStandard|vectorMinimal|vectorTactical/);
   assert.doesNotMatch(mapContract, /CARTO|cartocdn/);
   for (const surface of [engagement, authoring]) {
     assert.match(surface, /touchZoomRotate\.enableRotation\(\)/);

@@ -355,12 +355,7 @@ export default function ReportPage() {
             >
               <span>Model outcome</span>
               <strong>{result.outcome}</strong>
-              <p>
-                {finalTargetEffect.presentation.compactHeadline}
-                {"frameIndex" in finalTargetEffect.projection
-                  ? ` · terminal frame ${finalTargetEffect.projection.frameIndex}`
-                  : ""}
-              </p>
+              <p data-testid="report-result-reason">{result.reason}</p>
             </div>
             <div className="report-metrics">
               <ReportMetric
@@ -402,7 +397,7 @@ export default function ReportPage() {
                     ? `${scenario.range / 1000} km · launcher ${scenario.altitude} m · cruise ${scenario.cruiseAltitude} m · objective ${scenario.altitude + scenario.targetDelta} m`
                     : `${scenario.range / 1000} km · Blue ${scenario.altitude} m · Red ${scenario.altitude + scenario.targetDelta} m · crossing ${scenario.aspect}°`}</td>
                 </tr>
-                <tr><th scope="row">Result</th><td>Terminal state</td><td>{result.outcome} · {finalTargetEffect.presentation.compactHeadline}</td></tr>
+                <tr><th scope="row">Result</th><td>Terminal state</td><td>{result.outcome} · {result.reason}</td></tr>
               </tbody>
             </table>
           </section>
