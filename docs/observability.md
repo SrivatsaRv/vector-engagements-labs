@@ -25,6 +25,12 @@ Metrics use bounded labels. Run IDs, user-entered names, coordinates, and scenar
 
 Core metrics cover HTTP RED, PostgreSQL operations, verified scenario starts/completions/failures, compute duration, model duration, entity count, reports, map loading, browser long tasks, and navigation duration. Anonymous browser telemetry can write only bounded map and performance events. Run and report metrics are emitted by server-owned verification and persistence paths.
 
+The browser publishes at most one long-task sample in each ten-second window per
+document. Navigation and map events retain their existing bounded event shapes.
+This sampling is an observability boundary: it prevents instrumentation from
+exhausting anonymous admission or competing with navigation and simulation work,
+and it never changes model state, playback, or a saved record.
+
 Admission adds bounded outcome counters for saved-run acceptance, quota/capacity
 rejection, unavailable enforcement, and retention cleanup. IP addresses,
 actor hashes, run IDs, and lease IDs are never labels or structured-log values.

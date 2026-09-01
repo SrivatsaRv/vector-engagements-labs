@@ -5430,7 +5430,15 @@
           ]
         }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/component/browser-telemetry.test.tsx",
+          "facets": [
+            "runtime"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
         {
@@ -6002,5 +6010,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "1aaa99d1b643f44b6a6d86b736720172c962978b081300a8c53a0eeb68bc126f"
+  "canonicalSha256": "1a6354d1fb75bb7a8c49ee9da5e0bb29000f756c91186a1ab8b44e2bf5292cab"
 }
