@@ -272,6 +272,23 @@ test("validation blocks a zero-length authored route leg", () => {
   assert.equal(canConduct(checks), false);
 });
 
+test("pre-run validation rejects a store transfer outside the authored run window", () => {
+  const definition = SCENARIO_LIBRARY.find(
+    (item) => item.id === "a2a-defensive-break",
+  );
+  assert.ok(definition);
+  const scenario = structuredClone(definition.scenario);
+  scenario.runDurationSeconds = 10;
+
+  const checks = validateScenario(definition, scenario);
+  const mission = checks.find((item) => item.id === "air-mission");
+
+  assert.equal(mission?.state, "error");
+  assert.match(mission?.detail ?? "", /MISSION_LOADOUT_INVALID/);
+  assert.match(mission?.detail ?? "", /requestedTimeSeconds/);
+  assert.equal(canConduct(checks), false);
+});
+
 test("observer state is unavailable until an admitted sensor model is compiled", () => {
   const result = simulate(DEFAULT_SCENARIO);
   const frame = getFrameAt(result, 5);

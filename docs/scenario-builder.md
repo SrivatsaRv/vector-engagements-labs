@@ -45,6 +45,14 @@ zero-undulation display operation is an educational versioned fixture, not a
 regional geoid-accuracy claim; ETOPO source heights retain their explicit
 EGM2008 boundary in the pack.
 
+One shared structured spatial-admission gate covers both sides before
+preparation and Worker model-pack admission. It checks start and route
+longitude/latitude/MSL altitude, true heading, TAS, route/radius cardinality,
+`START`/`FLY_BY`/`FLY_OVER` identity, finite values, governed ranges and the
+respective WGS84 and authored-scalar precision limits. Legacy records may omit the transition
+array and retain their documented all-fly-by meaning; a present malformed array
+fails closed instead of being repaired.
+
 Both Construct and Observe use the same MapLibre navigation contract. The map starts flat; supports wheel zoom, drag pan, right-drag rotation, touch zoom/rotation, double-click zoom, and keyboard navigation; disables touch pitch and pitch-with-rotate; and exposes an explicit 0°/52° tilt preview. VECTOR-owned controls provide basemap selection, zoom, reset north/tilt, fit, cursor coordinates, zoom, bearing, and pitch. Standard, minimal, and low-light tactical basemaps are same-origin proxied and the selection persists in browser local storage. During waypoint placement the view is forced flat so a presentation gesture cannot obscure authored geometry. These camera and basemap choices are presentation state and never change simulation inputs.
 
 Replay markers default to the catalog designation, such as `Su-30MKI`, `F-16C Block 52`, or `Astra Mk 1`. Generated engine identifiers such as `BLUE WEAPON 1` remain internal replay identity and are not presented as the operator label.

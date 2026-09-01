@@ -1016,10 +1016,14 @@ function distanceM(left: MissionPosition, right: MissionPosition) {
 }
 
 function constrainedSpeedMps(point: FlightPlanRoutePoint) {
-  if (point.constraint.speed.kind === "TAS") return point.constraint.speed.valueMps;
-  const altitudeM = Math.min(25_000, Math.max(0, point.position.altitude.valueM));
-  const temperatureK = altitudeM <= 11_000 ? 288.15 - 0.0065 * altitudeM : 216.65;
-  return point.constraint.speed.value * Math.sqrt(1.4 * 287.05 * temperatureK);
+  const resolved = point.constraint.speed.kind === "TAS"
+    ? point.constraint.speed.valueMps
+    : (() => {
+        const altitudeM = Math.min(25_000, Math.max(0, point.position.altitude.valueM));
+        const temperatureK = altitudeM <= 11_000 ? 288.15 - 0.0065 * altitudeM : 216.65;
+        return point.constraint.speed.value * Math.sqrt(1.4 * 287.05 * temperatureK);
+      })();
+  return Number(resolved.toFixed(3));
 }
 
 function validateMissionShape(value: unknown): asserts value is AirMissionDefinition {

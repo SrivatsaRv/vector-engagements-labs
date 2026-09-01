@@ -37,8 +37,7 @@ import {
   projectObserverStates,
 } from "./information-state.ts";
 import {
-  assertAirCombatStudyScenarioEnums,
-  assertStructuredScenarioNumbers,
+  assertAirCombatStudyStructuredControls,
 } from "./scenario-control-authority.ts";
 import type { ScenarioPackageReference } from "./scenario-package-reference.ts";
 
@@ -502,8 +501,7 @@ export function prepareSimulation(
   profileId: ProfileId = input.profile,
   capabilityManifest = DEPLOYMENT_CAPABILITIES,
 ): PreparedSimulation {
-  assertStructuredScenarioNumbers(input);
-  assertAirCombatStudyScenarioEnums(input);
+  assertAirCombatStudyStructuredControls(input);
   admitScenarioCapabilities(
     input as Scenario & Record<string, unknown>,
     capabilityManifest,

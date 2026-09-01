@@ -10,6 +10,7 @@ import { compileAirMissionDefinition } from "../air-mission.ts";
 import { admitEnvironmentPack } from "../geospatial/environment-pack.ts";
 import { CURRENT_COMPILED_MODEL_PACK } from "../engine/weapon-admission.ts";
 import { assertRetainedScenarioPackageReference } from "../scenario-package-reference.ts";
+import { assertAirCombatStudyStructuredControls } from "../scenario-control-authority.ts";
 
 export async function adaptPreparedSimulation(
   prepared: PreparedSimulation,
@@ -47,6 +48,7 @@ export async function admitRuntimeModelPack(
     throw new Error("The runtime model-pack digest is not admitted by this deployment.");
   }
   const { scenario, engineScenario } = pack.prepared;
+  assertAirCombatStudyStructuredControls(scenario);
   if (pack.prepared.packageReference) {
     assertRetainedScenarioPackageReference(pack.prepared.packageReference);
   }

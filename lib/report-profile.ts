@@ -63,6 +63,7 @@ export type ReportCausalInputProjection = {
     stationId: string;
     operation: "RELEASE" | "JETTISON";
     requestedTimeSeconds: number;
+    installedDragAreaM2: number;
   }>;
   sides: {
     BLUE: ReportSideCausalInputs | null;
@@ -139,6 +140,7 @@ export function projectReportCausalInputs(
         stationId: request.stationId,
         operation: request.operation,
         requestedTimeSeconds: request.requestedTimeSeconds,
+        installedDragAreaM2: request.installedDragAreaM2,
       })) ?? []) ?? [],
     sides: {
       BLUE: scenario.spatialPlan ? sideProjection(scenario.spatialPlan.blue) : null,

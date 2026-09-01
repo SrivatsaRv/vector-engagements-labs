@@ -823,6 +823,7 @@ function LabWorkbench({
       );
     }
   }, [draftRevision, scenarioPackageReference, simulationClient, vectorRecord]);
+  const importedVectorRecordIsReportSource = vectorRecord?.source === "VERIFIED_IMPORT";
   const saveReport = async () => {
     if (!hasRun) {
       setSaveError("Conduct a run before saving a report.");
@@ -830,6 +831,11 @@ function LabWorkbench({
     }
     if (!templateIdentity || runDraftRevision !== draftRevision) {
       setSaveError("The saved template and completed run are out of sync. Conduct the run again.");
+      return null;
+    }
+    if (importedVectorRecordIsReportSource) {
+      setSaveError(null);
+      downloadVectorRecord();
       return null;
     }
     if (savedRunId) return savedRunId;
@@ -861,6 +867,10 @@ function LabWorkbench({
   };
   const openReport = async () => {
     if (!hasRun) return;
+    if (importedVectorRecordIsReportSource) {
+      setWorkspace("results");
+      return;
+    }
     const id = savedRunId ?? (await saveReport());
     if (id) router.push(`/report?run=${id}`);
   };
@@ -922,12 +932,27 @@ function LabWorkbench({
           </span>
           <button
             disabled={saving || !hasRun}
-            onClick={() =>
-              savedRunId ? router.push(`/report?run=${savedRunId}`) : void saveReport()
-            }
+            onClick={() => {
+              if (importedVectorRecordIsReportSource) {
+                downloadVectorRecord();
+                return;
+              }
+              if (savedRunId) router.push(`/report?run=${savedRunId}`);
+              else void saveReport();
+            }}
           >
-            {savedRunId ? <FileText size={14} /> : <Save size={14} />}
-            {saving ? "Saving run…" : savedRunId ? "View report" : "Save run"}
+            {importedVectorRecordIsReportSource
+              ? <Download size={14} />
+              : savedRunId
+                ? <FileText size={14} />
+                : <Save size={14} />}
+            {importedVectorRecordIsReportSource
+              ? "Download exact VSR"
+              : saving
+                ? "Saving run…"
+                : savedRunId
+                  ? "View report"
+                  : "Save run"}
           </button>
         </div>
       </header>
@@ -1026,6 +1051,7 @@ function LabWorkbench({
           saveError={saveError}
           saveReport={saveReport}
           openReport={openReport}
+          vectorRecord={vectorRecord}
         />
       )}
       {workspace === "run" && (
@@ -2948,6 +2974,7 @@ function ResultsWorkspace({
   saveError,
   saveReport,
   openReport,
+  vectorRecord,
 }: {
   scenario: Scenario;
   result: SimulationResult;
@@ -2957,6 +2984,7 @@ function ResultsWorkspace({
   saveError: string | null;
   saveReport: () => Promise<string | null>;
   openReport: () => Promise<void>;
+  vectorRecord: WorkbenchVectorRecord | null;
 }) {
   const bluePlatform = getCatalogObject(scenario.bluePlatformId);
   const blueSystem = getCatalogObject(scenario.blueSystemId);
@@ -2971,8 +2999,16 @@ function ResultsWorkspace({
     result,
     selectDisplayFrame(result, result.timeOfFlight),
   );
+  const importedVectorRecordIsReportSource = vectorRecord?.source === "VERIFIED_IMPORT";
   return (
-    <section className="debrief-workspace">
+    <section
+      className="debrief-workspace"
+      data-report-source={vectorRecord?.source ?? "UNAVAILABLE"}
+      data-record-id={vectorRecord?.recordId}
+      data-content-digest={vectorRecord?.contentDigest}
+      data-engine-backend={result.engineRun.diagnostics.backend}
+      data-canonical-frame-count={result.engineRun.frames.length}
+    >
       <header>
         <span>Explain and report</span>
         <h1>{scenario.name}</h1>
@@ -3074,13 +3110,31 @@ function ResultsWorkspace({
           <button
             disabled={saving}
             aria-busy={saving}
-            onClick={() => void (savedRunId ? openReport() : saveReport())}
+            onClick={() => void (
+              importedVectorRecordIsReportSource
+                ? saveReport()
+                : savedRunId
+                  ? openReport()
+                  : saveReport()
+            )}
           >
-            {savedRunId ? <FileText size={15} /> : <Save size={15} />}
-            {saving ? "Saving run…" : savedRunId ? "View full report" : "Save run"}
+            {importedVectorRecordIsReportSource
+              ? <Download size={15} />
+              : savedRunId
+                ? <FileText size={15} />
+                : <Save size={15} />}
+            {importedVectorRecordIsReportSource
+              ? "Download exact VSR"
+              : saving
+                ? "Saving run…"
+                : savedRunId
+                  ? "View full report"
+                  : "Save run"}
           </button>
           <small>
-            {savedRunId
+            {importedVectorRecordIsReportSource
+              ? "This debrief and download use the verified VSR's exact identity, backend, and canonical frames; server recomputation is disabled."
+              : savedRunId
               ? "Saved. The report is now a reproducible snapshot of this run."
               : "Saving freezes the scenario, model versions, telemetry, and sources before reporting."}
           </small>

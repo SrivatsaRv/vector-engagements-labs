@@ -319,6 +319,7 @@ test("profile applicability fails closed for every causal profile input", () => 
     ["radius", (scenario) => { scenario.spatialPlan.red.routeAcceptanceRadiiM[2] += 1; }],
     ["guidance", (scenario) => { scenario.guidance = "direct"; }],
     ["release", (scenario) => { scenario.airMission.assignments[0].storeTransferPlan.requests[0].requestedTimeSeconds += 0.05; }],
+    ["installed drag", (scenario) => { scenario.airMission.assignments[0].storeTransferPlan.requests[0].installedDragAreaM2 += 0.001; }],
     ["duration", (scenario) => { scenario.runDurationSeconds += 0.125; }],
     ["regime", (scenario) => { scenario.airMission.regime = "BVR"; }],
     ["Blue TAS", (scenario) => { scenario.spatialPlan.blue.speedMps += 1; }],

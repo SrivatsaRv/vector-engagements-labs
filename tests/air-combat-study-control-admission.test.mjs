@@ -11,7 +11,9 @@ import {
   AUTHORED_TRUE_HEADING_AUTHORITY,
   AUTHORED_WGS84_LATITUDE_AUTHORITY,
   AUTHORED_WGS84_LONGITUDE_AUTHORITY,
+  ScenarioControlAdmissionError,
   ScenarioEnumAdmissionError,
+  ScenarioSpatialAdmissionError,
   admitRawNumber,
   admitStructuredNumber,
   authoritiesEqual,
@@ -22,6 +24,10 @@ import {
   openVectorSimulationRecord,
   serializeVectorRecord,
 } from "../lib/record/vector-record.ts";
+import {
+  adaptPreparedSimulation,
+  admitRuntimeModelPack,
+} from "../lib/runtime/model-pack-adapter.ts";
 import {
   prepareSimulation,
   simulate,
@@ -163,6 +169,54 @@ test("#197 saved-run repeats spatial precision and guidance admission before rec
   const guidance = structuredClone(definition.scenario);
   guidance.guidance = "RETIRED_GUIDANCE";
   assert.throws(() => validateSavedScenario(guidance, definition), { code: "invalid_guidance" });
+});
+
+test("#197 prepare admission validates every governed Blue and Red spatial control", () => {
+  const definition = getScenarioDefinition("a2a-crossing-intercept");
+  assert.ok(definition?.scenario.spatialPlan);
+  const cases = [
+    ["position longitude", (side) => { side.position.longitude = 181; }, ScenarioControlAdmissionError, "position.longitude"],
+    ["position latitude", (side) => { side.position.latitude = Number.NaN; }, ScenarioControlAdmissionError, "position.latitude"],
+    ["position altitude precision", (side) => { side.position.altitudeM = 8_500.0001; }, ScenarioControlAdmissionError, "position.altitudeM"],
+    ["speed precision", (side) => { side.speedMps = 250.0001; }, ScenarioControlAdmissionError, "speedMps"],
+    ["heading precision", (side) => { side.headingDeg = 90.0001; }, ScenarioControlAdmissionError, "headingDeg"],
+    ["route longitude", (side) => { side.route[1].longitude = -181; }, ScenarioControlAdmissionError, "route[1].longitude"],
+    ["route latitude", (side) => { side.route[1].latitude = 91; }, ScenarioControlAdmissionError, "route[1].latitude"],
+    ["route altitude precision", (side) => { side.route[1].altitudeM = 8_500.0001; }, ScenarioControlAdmissionError, "route[1].altitudeM"],
+    ["route radius precision", (side) => { side.routeAcceptanceRadiiM[1] = 500.0001; }, ScenarioControlAdmissionError, "routeAcceptanceRadiiM[1]"],
+    ["route minimum cardinality", (side) => { side.route = []; side.routeAcceptanceRadiiM = []; side.routeWaypointTransitions = []; }, ScenarioSpatialAdmissionError, "route"],
+    ["route radius cardinality", (side) => { side.routeAcceptanceRadiiM.pop(); }, ScenarioSpatialAdmissionError, "routeAcceptanceRadiiM"],
+    ["route transition", (side) => { side.routeWaypointTransitions[1] = "RETIRED_V0"; }, ScenarioEnumAdmissionError, "routeWaypointTransitions[1]"],
+    ["route transition cardinality", (side) => { side.routeWaypointTransitions.pop(); }, ScenarioSpatialAdmissionError, "routeWaypointTransitions"],
+  ];
+
+  for (const sideName of ["blue", "red"]) {
+    for (const [name, mutate, ErrorType, pathSuffix] of cases) {
+      const scenario = structuredClone(definition.scenario);
+      mutate(scenario.spatialPlan[sideName]);
+      assert.throws(
+        () => prepareSimulation(scenario),
+        (error) => error instanceof ErrorType
+          && error.fieldPath === `$.spatialPlan.${sideName}.${pathSuffix}`,
+        `${sideName} ${name} bypassed structured admission`,
+      );
+    }
+  }
+});
+
+test("#197 Worker admission rejects a coherently resealed Red spatial-control bypass", async () => {
+  const definition = getScenarioDefinition("a2a-crossing-intercept");
+  assert.ok(definition?.scenario.spatialPlan);
+  const prepared = prepareSimulation(structuredClone(definition.scenario));
+  prepared.scenario.spatialPlan.red.speedMps = 250.0001;
+  const resealed = await adaptPreparedSimulation(prepared);
+
+  await assert.rejects(
+    () => admitRuntimeModelPack(resealed),
+    (error) => error instanceof ScenarioControlAdmissionError
+      && error.code === "CONTROL_NUMBER_PRECISION"
+      && error.fieldPath === "$.spatialPlan.red.speedMps",
+  );
 });
 
 test("#197 direct start heading is projection-only while the crossing control changes runtime geometry", () => {

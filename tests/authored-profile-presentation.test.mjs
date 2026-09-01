@@ -43,6 +43,7 @@ test("every canonical profile input mutation suppresses current authored-leg cla
     ["mission start", (scenario) => { scenario.airMission.start.kind = "AIRBORNE"; delete scenario.airMission.start.runway; }],
     ["flight-leg role", (scenario) => { scenario.airMission.flightPlans[0].legs[0].role = "EGRESS"; }],
     ["release request", (scenario) => { scenario.airMission.assignments[0].storeTransferPlan.requests[0].requestedTimeSeconds += 1; }],
+    ["installed store drag", (scenario) => { scenario.airMission.assignments[0].storeTransferPlan.requests[0].installedDragAreaM2 += 0.001; }],
     ["start position", (scenario) => { scenario.spatialPlan.blue.position.longitude += 0.001; }],
     ["start heading", (scenario) => { scenario.spatialPlan.blue.headingDeg += 1; }],
     ["start TAS", (scenario) => { scenario.spatialPlan.blue.speedMps += 1; }],

@@ -438,6 +438,144 @@ export class ScenarioEnumAdmissionError extends Error {
   }
 }
 
+export class ScenarioSpatialAdmissionError extends Error {
+  readonly code = "CONTROL_SPATIAL_INVALID" as const;
+  readonly fieldPath: string;
+
+  constructor(fieldPath: string) {
+    super(`CONTROL_SPATIAL_INVALID at ${fieldPath}.`);
+    this.name = "ScenarioSpatialAdmissionError";
+    this.fieldPath = fieldPath;
+  }
+}
+
+function structuredRecord(value: unknown, fieldPath: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ScenarioSpatialAdmissionError(fieldPath);
+  }
+  return value as Record<string, unknown>;
+}
+
+function assertGovernedStructuredNumber(
+  value: unknown,
+  authority: NumericAuthority,
+  fieldPath: string,
+): void {
+  const admitted = admitStructuredNumber(value, authority);
+  if (!admitted.ok || admitted.value === null) {
+    throw new ScenarioControlAdmissionError(
+      admitted.ok ? "CONTROL_NUMBER_EMPTY" : admitted.code,
+      fieldPath,
+    );
+  }
+}
+
+function assertStructuredSpatialPoint(value: unknown, fieldPath: string): void {
+  const point = structuredRecord(value, fieldPath);
+  assertGovernedStructuredNumber(
+    point.longitude,
+    AUTHORED_WGS84_LONGITUDE_AUTHORITY,
+    `${fieldPath}.longitude`,
+  );
+  assertGovernedStructuredNumber(
+    point.latitude,
+    AUTHORED_WGS84_LATITUDE_AUTHORITY,
+    `${fieldPath}.latitude`,
+  );
+  assertGovernedStructuredNumber(
+    point.altitudeM,
+    AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY,
+    `${fieldPath}.altitudeM`,
+  );
+  if (point.verticalDatum !== "MSL") {
+    throw new ScenarioEnumAdmissionError(`${fieldPath}.verticalDatum`);
+  }
+}
+
+/**
+ * Admits the complete authored spatial plan before either compilation or
+ * Worker execution. The same numeric and enum authorities drive raw controls,
+ * saved-run admission, and this structured boundary.
+ */
+export function assertStructuredScenarioSpatialPlan(value: unknown): void {
+  const scenario = structuredRecord(value, "$");
+  if (scenario.spatialPlan === undefined) return;
+  const spatialPlan = structuredRecord(scenario.spatialPlan, "$.spatialPlan");
+
+  for (const side of ["blue", "red"] as const) {
+    const sidePath = `$.spatialPlan.${side}`;
+    const placement = structuredRecord(spatialPlan[side], sidePath);
+    assertStructuredSpatialPoint(placement.position, `${sidePath}.position`);
+    assertGovernedStructuredNumber(
+      placement.headingDeg,
+      AUTHORED_TRUE_HEADING_AUTHORITY,
+      `${sidePath}.headingDeg`,
+    );
+    assertGovernedStructuredNumber(
+      placement.speedMps,
+      AUTHORED_AIRCRAFT_TAS_AUTHORITY,
+      `${sidePath}.speedMps`,
+    );
+
+    if (
+      !Array.isArray(placement.route)
+      || placement.route.length < 1
+      || placement.route.length > 64
+    ) {
+      throw new ScenarioSpatialAdmissionError(`${sidePath}.route`);
+    }
+    placement.route.forEach((point, pointIndex) => {
+      assertStructuredSpatialPoint(point, `${sidePath}.route[${pointIndex}]`);
+    });
+
+    const routeAcceptanceRadiiM = placement.routeAcceptanceRadiiM;
+    if (
+      !Array.isArray(routeAcceptanceRadiiM)
+      || routeAcceptanceRadiiM.length !== placement.route.length
+    ) {
+      throw new ScenarioSpatialAdmissionError(`${sidePath}.routeAcceptanceRadiiM`);
+    }
+    routeAcceptanceRadiiM.forEach((radius, pointIndex) => {
+      assertGovernedStructuredNumber(
+        radius,
+        AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY,
+        `${sidePath}.routeAcceptanceRadiiM[${pointIndex}]`,
+      );
+      if (pointIndex === 0 && radius !== 1) {
+        throw new ScenarioSpatialAdmissionError(
+          `${sidePath}.routeAcceptanceRadiiM[${pointIndex}]`,
+        );
+      }
+    });
+
+    if (placement.routeWaypointTransitions === undefined) continue;
+    if (
+      !Array.isArray(placement.routeWaypointTransitions)
+      || placement.routeWaypointTransitions.length !== placement.route.length
+    ) {
+      throw new ScenarioSpatialAdmissionError(`${sidePath}.routeWaypointTransitions`);
+    }
+    placement.routeWaypointTransitions.forEach((transition, pointIndex) => {
+      const admitted = admitsAirCombatStudyEnum("routeTransition", transition);
+      const validForIndex = pointIndex === 0
+        ? transition === "START"
+        : transition === "FLY_BY" || transition === "FLY_OVER";
+      const radius = routeAcceptanceRadiiM[pointIndex];
+      if (!admitted || !validForIndex || (transition === "FLY_OVER" && radius !== 1)) {
+        throw new ScenarioEnumAdmissionError(
+          `${sidePath}.routeWaypointTransitions[${pointIndex}]`,
+        );
+      }
+    });
+  }
+}
+
+export function assertAirCombatStudyStructuredControls(value: unknown): void {
+  assertStructuredScenarioNumbers(value);
+  assertAirCombatStudyScenarioEnums(value);
+  assertStructuredScenarioSpatialPlan(value);
+}
+
 export function assertAirCombatStudyScenarioEnums(value: unknown): void {
   if (!value || typeof value !== "object" || Array.isArray(value)) return;
   const scenario = value as Record<string, unknown>;

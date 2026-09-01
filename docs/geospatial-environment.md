@@ -43,6 +43,13 @@ frame, WGS84 position and transform version are frozen into the compiled
 scenario. JavaScript `number` and Rust engine state are IEEE-754 f64; only the
 final camera-relative Three.js adapter intentionally narrows to f32.
 
+Structured scenario admission now applies the same finite and range authorities
+to both BLUE and RED WGS84 route/start coordinates before compilation, Worker
+model-pack binding or VSR sealing. WGS84 coordinates retain their governed
+15-fractional-digit bound; heading, TAS, MSL altitude and acceptance radius use
+the shared three-decimal authored-scalar limit. A caller cannot bypass these
+authorities or route-transition rules through a structured payload.
+
 MapLibre reads each frame's recorded WGS84 position. Three.js reads the same
 frame's recorded ENU position and model time. Camera state, basemap projection,
 screen coordinates and Three.js objects never feed back into engine state.
@@ -72,6 +79,9 @@ horizontal solve and retains that MSL value. The separately versioned
 ellipsoid/MSL display conversion and is not a claim that real geoid undulation
 is zero. A non-zero production geoid grid requires a new content-addressed
 dataset and operation version; undeclared datum changes fail closed.
+Both side-owned starts and every route point are admitted against the shared
+MSL altitude range and three-decimal precision authority before either datum
+projection or engine compilation.
 
 ## Synthetic-environment manifest
 

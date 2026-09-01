@@ -35,7 +35,8 @@ The server also derives `vector.authored-profile-binding.v1` from the template's
 exact causal profile inputs. Presentation recomputes equality against the
 admitted saved scenario. It may say `MATCHED` only when both starts/routes,
 transitions/radii, headings/TAS, guidance, regime, leg roles, release request
-and duration are identical. Otherwise it says `MODIFIED_FROM`, preserves only
+time and installed drag area, and duration are identical. Otherwise it says
+`MODIFIED_FROM`, preserves only
 source ancestry and suppresses source leg-intent claims. Missing historical
 binding evidence cannot be treated as a match.
 

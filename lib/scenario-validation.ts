@@ -148,7 +148,8 @@ export function validateScenario(
         environmentPackDigest: environment.pack.identity.digest,
         environmentPack: environment.pack,
         fixedStepSeconds: ENGINE_FIXED_STEP_SECONDS,
-        durationSeconds: engineDurationSecondsForDomain(scenario.domain),
+        durationSeconds:
+          scenario.runDurationSeconds ?? engineDurationSecondsForDomain(scenario.domain),
       });
       missionValidation = {
         id: "air-mission",

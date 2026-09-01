@@ -1222,7 +1222,13 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
   const scenarioId = "a2a-defensive-break";
   const catalog = await catalogFixture(scenarioId);
   const runtimeErrors: string[] = [];
+  const serverRunRequests: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/runs") {
+      serverRunRequests.push(request.postData() ?? "");
+    }
+  });
   await page.route("**/api/catalog", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
   );
@@ -1273,6 +1279,8 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
   const contentDigest = await page.getByTestId("vsr-content-digest").innerText();
   expect(recordId).toMatch(/^[a-f0-9]{64}$/);
   expect(contentDigest).toMatch(/^[a-f0-9]{64}$/);
+  const exactBackend = await page.locator(".session-layout").getAttribute("data-engine-backend");
+  expect(exactBackend).toMatch(/^(typescript|rust-wasm)$/);
 
   const downloadPromise = page.waitForEvent("download");
   await recordRegion.getByRole("button", { name: "Download VSR", exact: true }).click();
@@ -1309,7 +1317,13 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
   expect(await workerRequestTypes()).not.toContain("run");
 
   await page.getByRole("button", { name: "Explain & report", exact: true }).click();
-  await expect(page.locator(".debrief-workspace h1")).toHaveText(
+  const importedDebrief = page.locator(".debrief-workspace");
+  await expect(importedDebrief).toHaveAttribute("data-report-source", "VERIFIED_IMPORT");
+  await expect(importedDebrief).toHaveAttribute("data-record-id", recordId);
+  await expect(importedDebrief).toHaveAttribute("data-content-digest", contentDigest);
+  await expect(importedDebrief).toHaveAttribute("data-engine-backend", exactBackend!);
+  await expect(importedDebrief).toHaveAttribute("data-canonical-frame-count", "117");
+  await expect(importedDebrief.locator("h1")).toHaveText(
     "WVR one-circle defensive break: Su-30MKI versus PAF F-16C Block 52",
   );
   await expect(page.locator(".results-overview article").filter({ hasText: "Model outcome" })).toContainText(
@@ -1327,6 +1341,16 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
     "data-effect-time",
     "28.4",
   );
+  const importedSaveDownloadPromise = page.waitForEvent("download");
+  await page.locator(".debrief-notes").getByRole(
+    "button",
+    { name: "Download exact VSR", exact: true },
+  ).click();
+  const importedSaveDownload = await importedSaveDownloadPromise;
+  const importedSavePath = testInfo.outputPath("imported-report-source.vector");
+  await importedSaveDownload.saveAs(importedSavePath);
+  expect(await readFile(importedSavePath)).toEqual(exactRecordBytes);
+  expect(serverRunRequests).toEqual([]);
 
   const corruptPath = testInfo.outputPath("corrupt-worker-produced.vector");
   const corruptRecordBytes = Buffer.from(exactRecordBytes);

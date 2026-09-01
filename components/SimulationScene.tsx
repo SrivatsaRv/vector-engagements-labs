@@ -443,6 +443,88 @@ export function SimulationScene({
   }, [layoutRevision]);
 
   useEffect(() => {
+    let cancelled = false;
+    void import("three").then((THREE) => {
+      const current = state.current;
+      if (cancelled || !current) return;
+      const point = (position: EngineEntityFrame["position"]) => {
+        const [x, y, z] = cameraRelativeThreePosition(position);
+        return new THREE.Vector3(x, y, z);
+      };
+      const scenarioEntities = result.engineRun.scenario.entities;
+
+      for (const [entityId, declaredRoute] of [...current.declaredRoutes]) {
+        const definition = scenarioEntities.find((candidate) => candidate.id === entityId);
+        if (definition?.route && definition.route.length > 1) {
+          declaredRoute.geometry.dispose();
+          declaredRoute.geometry = new THREE.BufferGeometry().setFromPoints(
+            definition.route.map(point),
+          );
+          declaredRoute.computeLineDistances();
+          continue;
+        }
+
+        current.scene.remove(declaredRoute);
+        declaredRoute.geometry.dispose();
+        const routeMaterials = Array.isArray(declaredRoute.material)
+          ? declaredRoute.material
+          : [declaredRoute.material];
+        for (const material of routeMaterials) material.dispose();
+        current.declaredRoutes.delete(entityId);
+
+        const activeRouteLeg = current.activeRouteLegs.get(entityId);
+        if (activeRouteLeg) {
+          current.scene.remove(activeRouteLeg);
+          activeRouteLeg.geometry.dispose();
+          const legMaterials = Array.isArray(activeRouteLeg.material)
+            ? activeRouteLeg.material
+            : [activeRouteLeg.material];
+          for (const material of legMaterials) material.dispose();
+          current.activeRouteLegs.delete(entityId);
+        }
+      }
+
+      for (const definition of scenarioEntities) {
+        if (
+          !definition.route ||
+          definition.route.length < 2 ||
+          !current.symbols.has(definition.id) ||
+          current.declaredRoutes.has(definition.id)
+        ) continue;
+        const declaredRoute = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(definition.route.map(point)),
+          new THREE.LineDashedMaterial({
+            color: affiliationColor(definition.affiliation),
+            transparent: true,
+            opacity: 0.34,
+            dashSize: 1_300,
+            gapSize: 850,
+          }),
+        );
+        declaredRoute.computeLineDistances();
+        declaredRoute.renderOrder = 2;
+        current.declaredRoutes.set(definition.id, declaredRoute);
+        current.scene.add(declaredRoute);
+
+        const activeRouteLeg = new THREE.Line(
+          new THREE.BufferGeometry(),
+          new THREE.LineBasicMaterial({
+            color: affiliationColor(definition.affiliation),
+            transparent: true,
+            opacity: 0.88,
+          }),
+        );
+        activeRouteLeg.renderOrder = 3;
+        current.activeRouteLegs.set(definition.id, activeRouteLeg);
+        current.scene.add(activeRouteLeg);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [result.engineRun.scenario, threeReadyRevision]);
+
+  useEffect(() => {
     import("three").then((THREE) => {
       const current = state.current;
       const frame = selected.frame;

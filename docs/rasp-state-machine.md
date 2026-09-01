@@ -212,6 +212,8 @@ baseline containing the template's exact causal profile inputs. Report
 projection compares the current admitted scenario against that baseline across
 both starts and WGS84/MSL routes, transitions, acceptance radii, headings/TAS,
 guidance, regime, Blue flight-leg roles, store-transfer request and duration.
+The store-transfer projection includes both requested time and installed drag
+area because each is consumed by execution and can change achieved dynamics.
 Exact equality is `MATCHED`; any difference is `MODIFIED_FROM`. A modified run
 retains source-profile ancestry but does not present the source leg intents as
 the edited run's achieved or selected tactic. A historical profile without the

@@ -1315,13 +1315,11 @@ test("Mach constraints compile deterministically into a causal airborne entry sp
   const altitudeM = point.position.altitude.valueM;
   const temperatureK = altitudeM <= 11_000 ? 288.15 - 0.0065 * altitudeM : 216.65;
   const mach = 0.82;
-  const tasMps = mach * Math.sqrt(1.4 * 287.05 * temperatureK);
+  const tasMps = Number((mach * Math.sqrt(1.4 * 287.05 * temperatureK)).toFixed(3));
   scenario.spatialPlan.blue.speedMps = tasMps;
   scenario.launcherSpeed = tasMps;
   for (const routePoint of scenario.airMission.flightPlans[0].routePoints) {
-    const routeAltitudeM = routePoint.position.altitude.valueM;
-    const routeTemperatureK = routeAltitudeM <= 11_000 ? 288.15 - 0.0065 * routeAltitudeM : 216.65;
-    routePoint.constraint.speed = { kind: "MACH", value: tasMps / Math.sqrt(1.4 * 287.05 * routeTemperatureK) };
+    routePoint.constraint.speed = { kind: "MACH", value: mach };
   }
   const compiled = prepareSimulation(scenario).engineScenario;
   assert.ok(Math.abs(compiled.airMission.start.initialSpeedMps - tasMps) < 1e-9);
