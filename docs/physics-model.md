@@ -53,6 +53,9 @@ legacy/synthetic scenarios with no regional runtime projection.
 - direct and commanded-loft guidance;
 - proportional-navigation acceleration demand with command limits;
 - deterministic execution of authored airborne route points;
+- one admitted scenario-duration limit in `[0.001, 3600] s`, preserved to at
+  most three authored fractional digits and consumed by the terminal-tick
+  boundary without a scenario-name override;
 - causal generic runway hold, roll, rotation and climbout with recorded
   requested/accepted/achieved movement, limiter, fuel/mass/store continuity,
   transition events, and stable fuel/force/overrun failures;
@@ -60,13 +63,18 @@ legacy/synthetic scenarios with no regional runtime projection.
   achieved airborne state: exact store mass and installed drag are removed
   once, fuel is unchanged, and the spawned store inherits the retained launcher
   position/velocity; operational rejection records typed limiter/cause without
-  mutation;
+mutation;
 - G2G commanded cruise altitude, with a terminal blend to objective elevation for direct paths and a higher commanded apex for lofted paths;
 - governed wind-shift events;
 - engine-owned between-step closest approach; verification-only geometric
   intercept; energy miss; flight-time expiry; terrain failure;
   target-unavailable and run-time termination; non-finite-state checks; and
   dry-mass margin diagnostics.
+
+Canonical store-transfer events publish the installed-drag scalar as the same
+named non-negative six-decimal SI value in TypeScript and Rust/WASM. The event
+rounding is a record/parity boundary only: both integrators retain full `f64`
+precision for force and trajectory calculations.
 
 Installed store drag for that transfer uses an authored/model-assumption SI
 area admitted only in the inclusive `[0.001, 1] m²` interval. This bounded
@@ -202,7 +210,7 @@ Aircraft motion uses the same standard atmosphere and wind field as a launched v
 
 ## Generic configuration-contrast evidence
 
-The high-energy crossing challenge and its 46 km control are now a termination
+The frozen #190 high-energy crossing challenge and its 46 km control are a termination
 contrast: one enters the compiled 25 m radius at 131.9 s and the other reaches
 140 s at 530.164926 m. Varying the legacy completion distance does not change
 the terminal result, proving that field is not causal authority.
@@ -210,7 +218,7 @@ the terminal result, proving that field is not causal authority.
 Target-effect contrast uses the same termination/target input under two
 independently digested generic threshold packs and requires different committed
 results. Separate below/equal/above boundary oracles cover every band, while
-the high-energy package remains a governed `NO_EFFECT` control at 21.836104 m.
+the archived #190 package remains a governed `NO_EFFECT` control at 21.836104 m.
 Labels, side and scenario title are varied independently and cannot change the
 commit.
 

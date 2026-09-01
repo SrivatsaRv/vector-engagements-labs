@@ -2451,6 +2451,12 @@ struct StoreTransferOutcome {
     cause: &'static str,
 }
 
+fn canonical_nonnegative_event_scalar(value: f64) -> f64 {
+    debug_assert!(value.is_finite() && value >= 0.0);
+    const SCALE: f64 = 1_000_000.0;
+    (value * SCALE).round() / SCALE
+}
+
 fn activate_weapons(
     states: &mut [RuntimeState],
     tick: u64,
@@ -2581,7 +2587,13 @@ fn activate_weapons(
                 states[launcher_index].mass_kg -= weapon.launch_mass_kg;
                 committed.push(StoreTransferOutcome {
                     transfer: transfer.clone(),
-                    installed_drag_newtons: transferred_drag_newtons,
+                    // Preserve full binary64 precision in the integrator but
+                    // publish the governed non-negative event scalar at six
+                    // decimals. This is the same multiply/round/divide rule
+                    // used by the TypeScript reference implementation.
+                    installed_drag_newtons: canonical_nonnegative_event_scalar(
+                        transferred_drag_newtons,
+                    ),
                     launcher_mass_before_kg,
                     launcher_mass_after_kg: states[launcher_index].mass_kg,
                     launcher_fuel_before_kg,

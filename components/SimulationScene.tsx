@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   type ProfileId,
   type RaspTrack,
+  type Scenario,
   type SimulationResult,
 } from "@/lib/simulation";
 import type { EngineEntityFrame } from "@/lib/engine/contracts";
@@ -14,6 +15,19 @@ import {
   selectCanonicalTargetEffect,
   type SelectedDisplayFrame,
 } from "@/lib/frontend/selectors";
+import {
+  selectAuthoredProfilePresentation,
+  type AuthoredProfilePresentation,
+} from "@/lib/frontend/authored-profile-presentation";
+import type { AuthoredRouteProfile } from "@/lib/scenarios";
+import type { AuthoredProfileBinding } from "@/lib/report-profile";
+import {
+  applyTacticalLabelCollisionPolicy,
+  presentTacticalSymbol,
+  tacticalSymbolAccessibleName,
+  type TacticalLabelScreenAnchor,
+  type TacticalSymbol,
+} from "@/lib/tactical-symbol-contract";
 
 type Props = {
   result: SimulationResult;
@@ -21,6 +35,9 @@ type Props = {
   profile: ProfileId;
   layers: { interceptor: boolean; target: boolean; lineOfSight: boolean };
   raspTrack?: RaspTrack;
+  authoredProfile?: AuthoredRouteProfile;
+  authoredProfileBinding?: AuthoredProfileBinding;
+  authoredScenario?: Scenario;
   layoutRevision?: number;
   targetEffectOverlay?: boolean;
 };
@@ -30,6 +47,10 @@ type ThreeState = {
   scene: import("three").Scene;
   camera: import("three").PerspectiveCamera;
   symbols: Map<string, import("three").Sprite>;
+  labels: Map<string, HTMLSpanElement>;
+  presentations: Map<string, TacticalSymbol>;
+  declaredRoutes: Map<string, import("three").Line>;
+  activeRouteLegs: Map<string, import("three").Line>;
   paths: Map<string, import("three").Line>;
   groundPaths: Map<string, import("three").Line>;
   altitudeCurtains: Map<string, import("three").Mesh>;
@@ -40,6 +61,49 @@ type ThreeState = {
   controls: { dispose: () => void; update: () => void };
   animation: number;
 };
+
+const LABEL_EDGE_PADDING_PX = 6;
+const FULL_LABEL_WIDTH_PX = 150;
+const COMPACT_LABEL_WIDTH_PX = 116;
+const LABEL_HEIGHT_PX = 20;
+
+function currentAuthoredLegIntent(
+  applicability: AuthoredProfilePresentation,
+  entity: EngineEntityFrame,
+) {
+  if (
+    applicability.state !== "MATCHED" ||
+    entity.kind !== "AIRCRAFT" ||
+    (entity.affiliation !== "BLUE" && entity.affiliation !== "RED") ||
+    entity.aircraftControl?.routePointIndex == null
+  ) return null;
+  const legIndex = Math.max(0, entity.aircraftControl.routePointIndex - 1);
+  const legs = entity.affiliation === "BLUE"
+    ? applicability.profile?.blue.legs
+    : applicability.profile?.red.legs;
+  return legs?.[legIndex] ?? null;
+}
+
+function labelPosition(
+  anchor: TacticalLabelScreenAnchor,
+  visibility: "VISIBLE" | "COMPACT",
+  bounds: DOMRect,
+) {
+  const width = visibility === "VISIBLE" ? FULL_LABEL_WIDTH_PX : COMPACT_LABEL_WIDTH_PX;
+  const preferredLeft = visibility === "VISIBLE"
+    ? anchor.x - width / 2
+    : anchor.x + 14;
+  const preferredTop = visibility === "VISIBLE" ? anchor.y + 18 : anchor.y - 46;
+  const maximumLeft = Math.max(LABEL_EDGE_PADDING_PX, bounds.width - width - LABEL_EDGE_PADDING_PX);
+  const maximumTop = Math.max(LABEL_EDGE_PADDING_PX, bounds.height - LABEL_HEIGHT_PX - LABEL_EDGE_PADDING_PX);
+  const left = Math.min(Math.max(preferredLeft, LABEL_EDGE_PADDING_PX), maximumLeft);
+  const top = Math.min(Math.max(preferredTop, LABEL_EDGE_PADDING_PX), maximumTop);
+  return {
+    left,
+    top,
+    edgeState: left === preferredLeft && top === preferredTop ? "CLEAR" : "CLAMPED",
+  } as const;
+}
 
 const affiliationColor = (affiliation: EngineEntityFrame["affiliation"]) =>
   affiliation === "BLUE" ? "#2f6fb5" : affiliation === "RED" ? "#a94f45" : "#606b73";
@@ -149,10 +213,53 @@ function drawFrame(
   context.restore();
 }
 
-export function SimulationScene({ result, selected, layers, raspTrack, layoutRevision = 0, targetEffectOverlay = false }: Props) {
+export function SimulationScene({
+  result,
+  selected,
+  layers,
+  raspTrack,
+  authoredProfile,
+  authoredProfileBinding,
+  authoredScenario,
+  layoutRevision = 0,
+  targetEffectOverlay = false,
+}: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const state = useRef<ThreeState | null>(null);
+  const [threeReadyRevision, setThreeReadyRevision] = useState(0);
   const targetEffect = selectCanonicalTargetEffect(result, selected);
+  const profileApplicability = useMemo(
+    () => selectAuthoredProfilePresentation(
+      result,
+      authoredProfile && authoredProfileBinding && authoredScenario
+        ? {
+            profile: authoredProfile,
+            binding: authoredProfileBinding,
+            currentScenario: authoredScenario,
+          }
+        : undefined,
+    ),
+    [authoredProfile, authoredProfileBinding, authoredScenario, result],
+  );
+  const declaredRouteCount = result.engineRun.scenario.entities.filter(
+    (entity) => (entity.route?.length ?? 0) > 1,
+  ).length;
+  const activeRouteLegCount = selected.frame?.entities.filter(
+    (entity) => entity.aircraftControl?.routePointIndex != null,
+  ).length ?? 0;
+  const achievedTrailCount = selected.frame.entities.filter((entity) =>
+    result.frames.filter((frame) =>
+      frame.t <= selected.displayTimeSeconds &&
+      frame.entities.some((candidate) =>
+        candidate.id === entity.id && candidate.lifecycle !== "STOWED")
+    ).length > 1
+  ).length;
+  const altitudeStemCount = selected.frame.entities.filter(
+    (entity) => entity.lifecycle !== "STOWED" && entity.position.z > 25,
+  ).length;
+  const launchedStoreCount = selected.frame.entities.filter(
+    (entity) => entity.kind === "GUIDED_WEAPON" && entity.lifecycle !== "STOWED",
+  ).length;
 
   useEffect(() => {
     if (!mount.current) return;
@@ -217,13 +324,72 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
       const render = () => {
         controls.update();
         renderer.render(scene, camera);
-        if (state.current) state.current.animation = requestAnimationFrame(render);
+        const bounds = renderer.domElement.getBoundingClientRect();
+        const currentState = state.current;
+        const anchors: TacticalLabelScreenAnchor[] = [];
+        for (const [id, label] of currentState?.labels ?? []) {
+          const symbol = currentState?.symbols.get(id);
+          if (!symbol?.visible || bounds.width === 0 || bounds.height === 0) {
+            label.hidden = true;
+            label.dataset.labelVisibility = "HIDDEN";
+            label.dataset.collisionState = "OFFSCREEN";
+            continue;
+          }
+          const projected = symbol.position.clone().project(camera);
+          const outsideClip = projected.z < -1 || projected.z > 1;
+          label.hidden = outsideClip;
+          if (outsideClip) {
+            label.dataset.labelVisibility = "HIDDEN";
+            label.dataset.collisionState = "OFFSCREEN";
+            continue;
+          }
+          const x = (projected.x * 0.5 + 0.5) * bounds.width;
+          const y = (-projected.y * 0.5 + 0.5) * bounds.height;
+          anchors.push({ id, x, y });
+        }
+        const presentations = applyTacticalLabelCollisionPolicy(
+          [...(currentState?.presentations.values() ?? [])],
+          anchors,
+        );
+        let visibleLabelCount = 0;
+        let hiddenLabelCount = 0;
+        for (const presentation of presentations) {
+          const label = currentState?.labels.get(presentation.id);
+          const anchor = anchors.find((candidate) => candidate.id === presentation.id);
+          const visibility = presentation.label.visibility;
+          if (!label || !anchor || visibility === "HIDDEN") {
+            if (label) {
+              label.hidden = true;
+              label.dataset.labelVisibility = "HIDDEN";
+              label.dataset.collisionState = anchor ? "HIDDEN" : "OFFSCREEN";
+            }
+            hiddenLabelCount += 1;
+            continue;
+          }
+          const placement = labelPosition(anchor, visibility, bounds);
+          label.hidden = false;
+          label.dataset.labelVisibility = visibility;
+          label.dataset.collisionState = "CLEAR";
+          label.dataset.edgeState = placement.edgeState;
+          label.classList.toggle("is-compact", visibility === "COMPACT");
+          label.style.transform = `translate3d(${placement.left}px, ${placement.top}px, 0)`;
+          visibleLabelCount += 1;
+        }
+        if (mount.current) {
+          mount.current.dataset.visibleLabelCount = String(visibleLabelCount);
+          mount.current.dataset.hiddenLabelCount = String(hiddenLabelCount);
+        }
+        if (currentState) currentState.animation = requestAnimationFrame(render);
       };
       state.current = {
         renderer,
         scene,
         camera,
         symbols: new Map(),
+        labels: new Map(),
+        presentations: new Map(),
+        declaredRoutes: new Map(),
+        activeRouteLegs: new Map(),
         paths: new Map(),
         groundPaths: new Map(),
         altitudeCurtains: new Map(),
@@ -234,6 +400,7 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
         controls,
         animation: 0,
       };
+      setThreeReadyRevision((value) => value + 1);
       render();
     });
 
@@ -253,6 +420,7 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
         }
       });
       current.renderer.dispose();
+      for (const label of current.labels.values()) label.remove();
       current.renderer.domElement.remove();
       state.current = null;
     };
@@ -273,6 +441,88 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
     });
     return () => cancelAnimationFrame(frame);
   }, [layoutRevision]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void import("three").then((THREE) => {
+      const current = state.current;
+      if (cancelled || !current) return;
+      const point = (position: EngineEntityFrame["position"]) => {
+        const [x, y, z] = cameraRelativeThreePosition(position);
+        return new THREE.Vector3(x, y, z);
+      };
+      const scenarioEntities = result.engineRun.scenario.entities;
+
+      for (const [entityId, declaredRoute] of [...current.declaredRoutes]) {
+        const definition = scenarioEntities.find((candidate) => candidate.id === entityId);
+        if (definition?.route && definition.route.length > 1) {
+          declaredRoute.geometry.dispose();
+          declaredRoute.geometry = new THREE.BufferGeometry().setFromPoints(
+            definition.route.map(point),
+          );
+          declaredRoute.computeLineDistances();
+          continue;
+        }
+
+        current.scene.remove(declaredRoute);
+        declaredRoute.geometry.dispose();
+        const routeMaterials = Array.isArray(declaredRoute.material)
+          ? declaredRoute.material
+          : [declaredRoute.material];
+        for (const material of routeMaterials) material.dispose();
+        current.declaredRoutes.delete(entityId);
+
+        const activeRouteLeg = current.activeRouteLegs.get(entityId);
+        if (activeRouteLeg) {
+          current.scene.remove(activeRouteLeg);
+          activeRouteLeg.geometry.dispose();
+          const legMaterials = Array.isArray(activeRouteLeg.material)
+            ? activeRouteLeg.material
+            : [activeRouteLeg.material];
+          for (const material of legMaterials) material.dispose();
+          current.activeRouteLegs.delete(entityId);
+        }
+      }
+
+      for (const definition of scenarioEntities) {
+        if (
+          !definition.route ||
+          definition.route.length < 2 ||
+          !current.symbols.has(definition.id) ||
+          current.declaredRoutes.has(definition.id)
+        ) continue;
+        const declaredRoute = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(definition.route.map(point)),
+          new THREE.LineDashedMaterial({
+            color: affiliationColor(definition.affiliation),
+            transparent: true,
+            opacity: 0.34,
+            dashSize: 1_300,
+            gapSize: 850,
+          }),
+        );
+        declaredRoute.computeLineDistances();
+        declaredRoute.renderOrder = 2;
+        current.declaredRoutes.set(definition.id, declaredRoute);
+        current.scene.add(declaredRoute);
+
+        const activeRouteLeg = new THREE.Line(
+          new THREE.BufferGeometry(),
+          new THREE.LineBasicMaterial({
+            color: affiliationColor(definition.affiliation),
+            transparent: true,
+            opacity: 0.88,
+          }),
+        );
+        activeRouteLeg.renderOrder = 3;
+        current.activeRouteLegs.set(definition.id, activeRouteLeg);
+        current.scene.add(activeRouteLeg);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [result.engineRun.scenario, threeReadyRevision]);
 
   useEffect(() => {
     import("three").then((THREE) => {
@@ -309,6 +559,49 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
           symbol.renderOrder = 10;
           current.symbols.set(entity.id, symbol);
           current.scene.add(symbol);
+
+          const label = document.createElement("span");
+          label.className = `simulation-entity-label is-${entity.affiliation.toLowerCase()}`;
+          label.dataset.entityId = entity.id;
+          label.dataset.affiliation = entity.affiliation;
+          label.dataset.entityKind = entity.kind;
+          label.dataset.collisionState = "OFFSCREEN";
+          label.dataset.edgeState = "CLEAR";
+          label.setAttribute("role", "img");
+          mount.current?.appendChild(label);
+          current.labels.set(entity.id, label);
+
+          const definition = result.engineRun.scenario.entities.find(
+            (candidate) => candidate.id === entity.id,
+          );
+          if (definition?.route && definition.route.length > 1) {
+            const declaredRoute = new THREE.Line(
+              new THREE.BufferGeometry().setFromPoints(definition.route.map(point)),
+              new THREE.LineDashedMaterial({
+                color: affiliationColor(entity.affiliation),
+                transparent: true,
+                opacity: 0.34,
+                dashSize: 1_300,
+                gapSize: 850,
+              }),
+            );
+            declaredRoute.computeLineDistances();
+            declaredRoute.renderOrder = 2;
+            current.declaredRoutes.set(entity.id, declaredRoute);
+            current.scene.add(declaredRoute);
+
+            const activeRouteLeg = new THREE.Line(
+              new THREE.BufferGeometry(),
+              new THREE.LineBasicMaterial({
+                color: affiliationColor(entity.affiliation),
+                transparent: true,
+                opacity: 0.88,
+              }),
+            );
+            activeRouteLeg.renderOrder = 3;
+            current.activeRouteLegs.set(entity.id, activeRouteLeg);
+            current.scene.add(activeRouteLeg);
+          }
 
           const path = new THREE.Line(
             new THREE.BufferGeometry(),
@@ -393,6 +686,13 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
         const observerPresentation = selectObserverEntityPresentation(raspTrack, entity.id);
         if (observerPresentation.state === "HIDDEN") {
           symbol.visible = false;
+          current.presentations.delete(entity.id);
+          const label = current.labels.get(entity.id);
+          if (label) label.hidden = true;
+          const declaredRoute = current.declaredRoutes.get(entity.id);
+          if (declaredRoute) declaredRoute.visible = false;
+          const activeRouteLeg = current.activeRouteLegs.get(entity.id);
+          if (activeRouteLeg) activeRouteLeg.visible = false;
           current.paths.get(entity.id)!.visible = false;
           current.groundPaths.get(entity.id)!.visible = false;
           current.altitudeCurtains.get(entity.id)!.visible = false;
@@ -406,6 +706,56 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
         const isTarget = entity.id === result.engineRun.primaryTargetId;
         symbol.visible =
           isWeapon ? layers.interceptor : isTarget ? layers.target : true;
+        const label = current.labels.get(entity.id);
+        if (label) {
+          const presentation = presentTacticalSymbol({
+            id: entity.id,
+            designation: entity.designation,
+            kind: entity.kind,
+            affiliation: entity.affiliation,
+            lifecycle: entity.lifecycle,
+            symbolRole: entity.symbolRole,
+            headingRad: entity.headingRad,
+            headingRequired: true,
+            valueState: "WORLD",
+          });
+          current.presentations.set(entity.id, presentation);
+          const authoredIntent = currentAuthoredLegIntent(profileApplicability, entity);
+          label.textContent = `${presentation.label.text} · ${Math.round(entity.position.z)} m${authoredIntent ? ` · ${authoredIntent} — authored intent; no autonomous selection` : ""}`;
+          label.setAttribute(
+            "aria-label",
+            `${tacticalSymbolAccessibleName(presentation)}, altitude ${Math.round(entity.position.z)} metres${authoredIntent ? `, ${authoredIntent.toLowerCase()} authored intent; no autonomous selection` : ""}`,
+          );
+          label.dataset.lifecycle = entity.lifecycle;
+          label.dataset.authoredIntent = authoredIntent ?? "UNAVAILABLE";
+          label.dataset.profileApplicability = profileApplicability.state;
+          label.classList.toggle("is-terminated", entity.lifecycle === "TERMINATED");
+          label.classList.toggle("is-weapon", entity.kind === "GUIDED_WEAPON");
+          label.hidden = !symbol.visible;
+        }
+        const definition = result.engineRun.scenario.entities.find(
+          (candidate) => candidate.id === entity.id,
+        );
+        const declaredRoute = current.declaredRoutes.get(entity.id);
+        const activeRouteLeg = current.activeRouteLegs.get(entity.id);
+        if (declaredRoute) declaredRoute.visible = symbol.visible;
+        if (
+          activeRouteLeg &&
+          definition?.route &&
+          entity.aircraftControl?.routePointIndex != null
+        ) {
+          const toIndex = entity.aircraftControl.routePointIndex;
+          const fromIndex = Math.max(0, toIndex - 1);
+          const from = definition.route[fromIndex];
+          const to = definition.route[toIndex];
+          activeRouteLeg.geometry.dispose();
+          activeRouteLeg.geometry = new THREE.BufferGeometry().setFromPoints(
+            from && to ? [point(from), point(to)] : [],
+          );
+          activeRouteLeg.visible = symbol.visible && Boolean(from && to && fromIndex !== toIndex);
+        } else if (activeRouteLeg) {
+          activeRouteLeg.visible = false;
+        }
 
         const path = current.paths.get(entity.id)!;
         const points = result.frames
@@ -465,6 +815,13 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
       for (const [id, symbol] of current.symbols) {
         if (!frame.entities.some((entity) => entity.id === id && entity.lifecycle !== "STOWED")) {
           symbol.visible = false;
+          current.presentations.delete(id);
+          const label = current.labels.get(id);
+          if (label) label.hidden = true;
+          const declaredRoute = current.declaredRoutes.get(id);
+          if (declaredRoute) declaredRoute.visible = false;
+          const activeRouteLeg = current.activeRouteLegs.get(id);
+          if (activeRouteLeg) activeRouteLeg.visible = false;
           current.paths.get(id)!.visible = false;
           current.groundPaths.get(id)!.visible = false;
           current.altitudeCurtains.get(id)!.visible = false;
@@ -489,7 +846,7 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
       current.lineOfSight.visible = layers.lineOfSight && Boolean(primaryWeapon && primaryTarget);
       current.uncertainty.visible = false;
     });
-  }, [layers, raspTrack, result, selected]);
+  }, [layers, profileApplicability, raspTrack, result, selected, threeReadyRevision]);
 
   return (
     <>
@@ -502,6 +859,14 @@ export function SimulationScene({ result, selected, layers, raspTrack, layoutRev
         data-effect-state={targetEffect.presentation.state}
         data-effect-class={targetEffect.presentation.effectClass ?? "NONE"}
         data-effect-event-id={targetEffect.eventId ?? "UNAVAILABLE"}
+        data-declared-route-count={declaredRouteCount}
+        data-active-route-leg-count={activeRouteLegCount}
+        data-achieved-trail-count={achievedTrailCount}
+        data-altitude-stem-count={altitudeStemCount}
+        data-launched-store-count={launchedStoreCount}
+        data-label-policy="TACTICAL_LABEL_POLICY_V1"
+        data-authored-profile-applicability={profileApplicability.state}
+        data-authored-profile-applicability-reason={profileApplicability.reason}
       />
       {targetEffectOverlay && (
         <div className="simulation-target-effect-overlay">

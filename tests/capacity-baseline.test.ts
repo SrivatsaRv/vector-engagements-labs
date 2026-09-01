@@ -22,6 +22,15 @@ test("the capacity baseline uses 100 admitted moving entities without fabricated
   assert.equal(CAPACITY_BASELINE_MANIFEST.unavailableCapabilities.weaponSupport.state, "UNAVAILABLE");
   assert.equal(CAPACITY_BASELINE_MANIFEST.unavailableCapabilities.virtualPilot.state, "UNAVAILABLE");
   assert.ok(scenario.entities.filter((entity) => entity.kind === "AIRCRAFT").every((entity) => entity.routePlan?.schemaVersion === "vector.route-plan.v2"));
+  assert.deepEqual(
+    scenario.entities
+      .filter((entity) => entity.kind === "GUIDED_WEAPON")
+      .map((entity) => [entity.id, entity.lifecycle, entity.weapon?.launchTimeSeconds]),
+    [
+      ["blue-weapon-1", "STOWED", 0],
+      ["blue-weapon-2", "STOWED", null],
+    ],
+  );
   assert.equal(scenario.geospatial.initialPositions.length, CAPACITY_BASELINE_ENTITY_COUNT);
   assert.ok(new Set(scenario.geospatial.initialPositions.map((item) => item.entityId)).size === CAPACITY_BASELINE_ENTITY_COUNT);
 });

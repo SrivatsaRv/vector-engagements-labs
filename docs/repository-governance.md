@@ -28,6 +28,13 @@ Repository administrators retain emergency recovery authority but should not use
 
 ## Continuous integration
 
+#197 registers its exact three-scenario geometry oracle, causal/runtime tests,
+forward migration generator, scenario-package reference and canonical report
+debrief under the existing mission-scenario and VSR owners. These paths select
+their admission, datum, digest, schema, storage, unit, runtime and verification
+facets; authored tactic labels remain non-causal presentation metadata and do
+not create a new pilot-policy contract family.
+
 #196 registers `GENERIC_TARGET_EFFECT` as a distinct simulation-systems
 contract family with exact authority, evaluator, presentation, VSR fixture,
 parity and performance paths. Its declaration must accompany the pre-existing

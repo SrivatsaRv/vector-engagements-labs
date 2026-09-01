@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import {
   admitRawNumber,
+  authoritiesEqual,
+  resolveAirCombatStudyNumericControlAuthority,
   type NumericAuthority,
 } from "@/lib/scenario-control-authority";
 
@@ -23,6 +25,10 @@ export function NumericAuthoringInput({
   onChange: (value: number | null) => void;
   onValidityChange: (controlId: string, valid: boolean) => void;
 }) {
+  const governedAuthority = resolveAirCombatStudyNumericControlAuthority(controlId);
+  if (governedAuthority && !authoritiesEqual(governedAuthority, authority)) {
+    throw new TypeError(`${controlId} is not bound to its governed #197 numeric authority.`);
+  }
   const [draft, setDraft] = useState({
     raw: value == null ? "" : String(value),
     sourceValue: value,
@@ -34,11 +40,17 @@ export function NumericAuthoringInput({
     ? (value == null ? "" : String(value))
     : draft.raw;
   const admission = admitRawNumber(raw, authority);
+  // Disabled controls are read-only projections of another authoritative
+  // choice (for example START or FLY_OVER waypoint semantics). Their sentinel
+  // value is still checked by structured scenario admission, but it is not an
+  // operator-editable raw draft and therefore must not poison the global raw
+  // authoring-validity registry.
+  const rawDraftValid = disabled || admission.ok;
 
   useEffect(() => {
-    onValidityChange(controlId, admission.ok);
+    onValidityChange(controlId, rawDraftValid);
     return () => onValidityChange(controlId, true);
-  }, [admission.ok, controlId, onValidityChange]);
+  }, [controlId, onValidityChange, rawDraftValid]);
 
   return (
     <>
@@ -47,8 +59,8 @@ export function NumericAuthoringInput({
         inputMode={authority.integer ? "numeric" : "decimal"}
         data-control-id={controlId}
         aria-label={ariaLabel}
-        aria-invalid={!admission.ok}
-        aria-describedby={!admission.ok ? `${controlId}-error` : undefined}
+        aria-invalid={!rawDraftValid}
+        aria-describedby={!rawDraftValid ? `${controlId}-error` : undefined}
         disabled={disabled}
         value={raw}
         onChange={(event) => {
@@ -58,7 +70,7 @@ export function NumericAuthoringInput({
           if (next.ok) onChange(next.value);
         }}
       />
-      {!admission.ok && (
+      {!rawDraftValid && (
         <small className="field-error" id={`${controlId}-error`} role="alert">
           {admission.code.replaceAll("CONTROL_NUMBER_", "").toLowerCase().replaceAll("_", " ")}
         </small>

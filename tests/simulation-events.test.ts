@@ -62,9 +62,16 @@ function governWeaponTermination(
 }
 
 function admittedScenario(): EngineScenario {
+  const authored = structuredClone(SCENARIO_LIBRARY[0]!.scenario);
+  // Journal and launch-boundary tests rewrite compact schedules directly.
+  // Compile them without a current study's independently sealed transfer plan
+  // so a launch-clock mutation does not correctly trip transfer authority.
+  for (const assignment of authored.airMission?.assignments ?? []) {
+    delete assignment.storeTransferPlan;
+  }
   return structuredClone(
     simulateWithCapabilitiesForVerification(
-      SCENARIO_LIBRARY[0]!.scenario,
+      authored,
       createVerificationDeploymentCapabilities("typescript", ["A2A"]),
     ).engineRun.scenario,
   );

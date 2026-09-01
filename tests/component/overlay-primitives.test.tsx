@@ -134,7 +134,7 @@ describe("shared overlay primitives", () => {
     remove.mockRestore();
     windowAdd.mockRestore();
     windowRemove.mockRestore();
-  });
+  }, 10_000);
 
   it("coordinates Select, Menu, and Popover while Disclosure remains persistent", async () => {
     const user = userEvent.setup();

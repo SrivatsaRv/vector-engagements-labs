@@ -1,4 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
+import { readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { sha256Hex } from "../../lib/canonical-json";
 import { ENGINE_VERSION } from "../../lib/engine/version";
 import { INSTALLATION_CATALOGUE, INSTALLATION_CATALOGUE_IDENTITY, PUBLIC_INSTALLATIONS } from "../../lib/installations";
@@ -159,14 +161,178 @@ async function catalogFixture(scenarioId = "a2a-crossing-intercept") {
   };
 }
 
-test("browser presentation changes only at the canonical target-effect frame", async ({ page }) => {
+async function expectLaptopVisual(
+  surface: Locator,
+  name: string,
+  testInfo: TestInfo,
+) {
+  if (testInfo.project.name !== "laptop-1366") return;
+  await expect(surface).toHaveScreenshot(name, {
+    animations: "disabled",
+    caret: "hide",
+    scale: "css",
+    maxDiffPixelRatio: 0.005,
+  });
+}
+
+const TRANSPARENT_RASTER_TILE = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+
+async function openGuidedWorkbench(page: Page, scenarioId: string) {
+  await page.goto(`/workbench?scenario=${scenarioId}&start=guided`, {
+    waitUntil: "domcontentloaded",
+  });
+  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText(
+    "PostGIS catalog connected",
+    { timeout: 20_000 },
+  );
+}
+
+async function selectCanonicalTimelineEnd(page: import("@playwright/test").Page) {
+  const timeline = page.getByRole("slider", { name: "Run timeline" });
+  await timeline.focus();
+  await page.keyboard.press("End");
+  return timeline;
+}
+
+async function selectTimelineBeforeEnd(
+  timeline: Locator,
+  deltaSeconds = 0.1,
+) {
+  await timeline.evaluate((element, delta) => {
+    const input = element as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    setter.call(input, String(Number(input.max) - delta));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, deltaSeconds);
+}
+
+test("the unedited BVR package remains MATCHED across canonical Map and 3D presentation", async ({ page }, testInfo) => {
+  const scenarioId = "a2a-crossing-intercept";
+  const catalog = await catalogFixture(scenarioId);
+  await page.route("**/api/catalog", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
+  );
+  await page.route("**/api/map-tile?**", (route) => route.fulfill({
+    status: 200,
+    contentType: "image/png",
+    body: TRANSPARENT_RASTER_TILE,
+  }));
+  await openGuidedWorkbench(page, scenarioId);
+  await expect(page.locator('[data-authored-profile="bvr-offset-and-support"]')).toContainText(
+    "Blue OFFSET → SUPPORT → RECOMMIT · Red BEAM → DRAG → EXTEND",
+  );
+
+  const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
+  if (compact) {
+    await page.getByRole("button", { name: /Next: Forces & loadouts/i }).click();
+    await page.getByRole("button", { name: /Next: Place & flight/i }).click();
+    await page.getByRole("button", { name: /Next: Admitted conditions/i }).click();
+    await page.getByRole("button", { name: /Next: Validate/i }).click();
+  } else {
+    await page.getByRole("button", { name: "5 Validate" }).click();
+  }
+  await page.getByRole("button", { name: /run baseline/i }).click();
+  await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
+    "Worker · completed",
+    { timeout: 30_000 },
+  );
+  const pause = page.getByRole("button", { name: "Pause run", exact: true });
+  if (await pause.isVisible()) await pause.click();
+  const compactPause = page.getByRole("button", { name: "Pause playback", exact: true });
+  if (await compactPause.isVisible()) await compactPause.click();
+
+  const timeline = page.getByRole("slider", { name: "Run timeline" });
+  await timeline.evaluate((element, modelTimeSeconds) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    setter.call(element, String(modelTimeSeconds));
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  }, 4);
+  const map = page.locator(".engagement-map-shell");
+  await expect(map).toHaveAttribute("data-display-frame-index", "17");
+  await expect(map).toHaveAttribute("data-display-time", "4");
+  await expect(map).toHaveAttribute("data-effect-state", "BEFORE_EFFECT_BOUNDARY");
+  await expect(map).toHaveAttribute("data-declared-route-feature-count", "2");
+  await expect(map.locator(".map-status")).toHaveCount(0);
+  const blueMap = map.locator('[data-entity-id="blue-platform-1"]');
+  const redMap = map.locator('[data-entity-id="red-object-1"]');
+  const weaponMap = map.locator('[data-entity-id="blue-weapon-1"]');
+  await expect(weaponMap).toHaveAttribute("data-lifecycle", "ACTIVE");
+  await expect(weaponMap).toHaveAttribute("data-flight-state", "BOOST");
+  await expect(weaponMap).toHaveAttribute("data-label-visibility", "COMPACT");
+  await expect(blueMap).toHaveAttribute("data-label-visibility", "VISIBLE");
+  await expect(map).toHaveAttribute("data-launched-store-count", "1");
+
+  const environmentIdentity = page.locator(".environment-pack-identity");
+  const recordedEntities = page.getByRole("list", { name: "Recorded entities" });
+  const mapToolbar = map.locator(".vector-map-toolbar");
+  const [environmentBox, legendBox, toolbarBox] = await Promise.all([
+    environmentIdentity.boundingBox(),
+    recordedEntities.boundingBox(),
+    mapToolbar.boundingBox(),
+  ]);
+  expect(environmentBox).not.toBeNull();
+  expect(legendBox).not.toBeNull();
+  expect(toolbarBox).not.toBeNull();
+  expect(environmentBox!.y + environmentBox!.height).toBeLessThanOrEqual(legendBox!.y);
+  const toolbarAndLegendDoNotOverlap =
+    toolbarBox!.x + toolbarBox!.width <= legendBox!.x
+    || legendBox!.x + legendBox!.width <= toolbarBox!.x
+    || toolbarBox!.y + toolbarBox!.height <= legendBox!.y
+    || legendBox!.y + legendBox!.height <= toolbarBox!.y;
+  expect(toolbarAndLegendDoNotOverlap).toBe(true);
+  await expectLaptopVisual(map, "bvr-long-range-launch-map.png", testInfo);
+
+  await timeline.focus();
+  await page.keyboard.press("End");
+  await expect(map).toHaveAttribute("data-display-frame-index", "294");
+  await expect(map).toHaveAttribute("data-display-time", "72.95");
+  await expect(map).toHaveAttribute("data-effect-state", "RECORDED");
+  await expect(map).toHaveAttribute("data-effect-class", "DEGRADED");
+  await expect(map).toHaveAttribute("data-declared-route-feature-count", "2");
+  await expect(map).toHaveAttribute("data-achieved-trail-feature-count", "3");
+  await expect(map).toHaveAttribute("data-launched-store-count", "1");
+  await expect(map.locator(".map-status")).toHaveCount(0);
+
+  await expect(blueMap).toContainText("Su-30MKI");
+  await expect(blueMap).toHaveAttribute("data-affiliation", "BLUE");
+  await expect(blueMap.locator("circle.tactical-frame")).toHaveCount(1);
+  await expect(redMap).toContainText("F-16C Block 52");
+  await expect(redMap).toHaveAttribute("data-affiliation", "RED");
+  await expect(redMap.locator("path.tactical-frame")).toHaveCount(1);
+  await expect(weaponMap).toContainText("Astra Mk 1");
+  await expect(weaponMap).toHaveAttribute("data-lifecycle", "TERMINATED");
+  await expect(weaponMap.locator('svg[data-symbol-role="GUIDED_MISSILE"]')).toHaveCount(1);
+  await expectLaptopVisual(map, "bvr-long-range-effect-map.png", testInfo);
+
+  await page.getByRole("button", { name: "3D", exact: true }).click();
+  const scene = page.locator(".simulation-scene");
+  await expect(scene).toHaveAttribute("data-display-frame-index", "294");
+  await expect(scene).toHaveAttribute("data-effect-class", "DEGRADED");
+  await expect(scene).toHaveAttribute("data-authored-profile-applicability", "MATCHED");
+  await expect(scene).toHaveAttribute("data-authored-profile-applicability-reason", "EXACT_CAUSAL_MATCH");
+  await expect(scene).toHaveAttribute("data-declared-route-count", "2");
+  await expect(scene).toHaveAttribute("data-achieved-trail-count", "3");
+  await expect(scene).toHaveAttribute("data-launched-store-count", "1");
+});
+
+test("browser presentation changes only at the canonical target-effect frame", async ({ page }, testInfo) => {
   const scenarioId = "a2a-high-energy-crossing-challenge";
   const catalog = await catalogFixture(scenarioId);
   await page.route("**/api/catalog", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
   );
   await page.route("**/api/map-tile?**", (route) => route.abort());
-  await page.goto(`/workbench?scenario=${scenarioId}&start=guided`);
+  await openGuidedWorkbench(page, scenarioId);
+  await expect(
+    page.locator('[data-authored-profile="beam-drag-extend-recommit"]'),
+  ).toContainText(
+    "Blue INTERCEPT → OFFSET → RECOMMIT · Red BEAM → DRAG → EXTEND",
+  );
 
   const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
   if (compact) {
@@ -185,6 +351,8 @@ test("browser presentation changes only at the canonical target-effect frame", a
   );
   const pause = page.getByRole("button", { name: "Pause run", exact: true });
   if (await pause.isVisible()) await pause.click();
+  const compactPause = page.getByRole("button", { name: "Pause playback", exact: true });
+  if (await compactPause.isVisible()) await compactPause.click();
 
   const timeline = page.getByRole("slider", { name: "Run timeline" });
   await timeline.focus();
@@ -192,18 +360,326 @@ test("browser presentation changes only at the canonical target-effect frame", a
   const summary = page.locator('.target-effect-summary:visible').first();
   await expect(summary).toHaveAttribute("data-effect-state", "RECORDED");
   await expect(summary).toHaveAttribute("data-effect-class", "NO_EFFECT");
-  await expect(summary).toHaveAttribute("data-effect-frame-index", "530");
-  await expect(summary).toHaveAttribute("data-effect-time", "131.9");
+  await expect(summary).toHaveAttribute("data-effect-frame-index", "461");
+  await expect(summary).toHaveAttribute("data-effect-time", "114.7");
   await expect(summary).toHaveAttribute("data-target-lifecycle", "ACTIVE");
   await expect(summary).toHaveAttribute("data-kill-claim-authorized", "false");
   await expect(summary).toContainText("The target retained its recorded capability state");
   await expect(summary).toContainText("MODEL_ASSUMPTION");
 
-  await page.keyboard.press("ArrowLeft");
+  await selectTimelineBeforeEnd(timeline);
   await expect(summary).toHaveAttribute("data-effect-state", "BEFORE_EFFECT_BOUNDARY");
   await expect(summary).toHaveAttribute("data-effect-class", "NONE");
   await expect(summary).toHaveAttribute("data-kill-claim-authorized", "false");
   await expect(summary).toContainText("No target effect has occurred at this frame");
+
+  await page.getByRole("button", { name: "3D", exact: true }).click();
+  const scene = page.locator(".simulation-scene");
+  await expect(scene).toHaveAttribute("data-display-frame-index", "460");
+  await expect(scene).toHaveAttribute("data-display-time", "114.65");
+  await expect(scene).toHaveAttribute("data-effect-state", "BEFORE_EFFECT_BOUNDARY");
+  await expect(scene).toHaveAttribute("data-effect-class", "NONE");
+  await expect(scene).toHaveAttribute("data-label-policy", "TACTICAL_LABEL_POLICY_V1");
+  await expect(scene).toHaveAttribute("data-authored-profile-applicability", "MATCHED");
+  await expect(scene).toHaveAttribute("data-authored-profile-applicability-reason", "EXACT_CAUSAL_MATCH");
+
+  await timeline.focus();
+  await page.keyboard.press("End");
+  await expect(scene).toHaveAttribute("data-display-frame-index", "461");
+  await expect(scene).toHaveAttribute("data-display-time", "114.7");
+  await expect(scene).toHaveAttribute("data-effect-state", "RECORDED");
+  await expect(scene).toHaveAttribute("data-effect-class", "NO_EFFECT");
+  await expect(scene).toHaveAttribute("data-visible-label-count", /[1-9]/);
+
+  const blueLabel = scene.locator('[data-entity-id="blue-platform-1"]');
+  const redLabel = scene.locator('[data-entity-id="red-object-1"]');
+  await expect(blueLabel).toContainText(/Su-30MKI.*RECOMMIT.*authored intent; no autonomous selection/i);
+  await expect(blueLabel).toHaveAttribute("data-authored-intent", "RECOMMIT");
+  await expect(blueLabel).toHaveAttribute("aria-label", /blue fighter.*recommit authored intent; no autonomous selection/i);
+  await expect(redLabel).toContainText(/F-16C Block 52.*EXTEND.*authored intent; no autonomous selection/i);
+  await expect(redLabel).toHaveAttribute("data-authored-intent", "EXTEND");
+  await expect(redLabel).toHaveAttribute("aria-label", /red fighter.*extend authored intent; no autonomous selection/i);
+  expect(await scene.locator(".simulation-entity-label").evaluateAll((labels) =>
+    labels.filter((label) => /BLUE 1|RED 1|WEAPON [0-9]/i.test(label.textContent ?? "")).length,
+  )).toBe(0);
+  const visibleLabels = scene.locator('.simulation-entity-label:not([hidden])');
+  await expect(visibleLabels.first()).toHaveAttribute("data-label-visibility", /VISIBLE|COMPACT/);
+  await expect(visibleLabels.first()).toHaveAttribute("data-collision-state", "CLEAR");
+  await expect(visibleLabels.first()).toHaveAttribute("data-edge-state", /CLEAR|CLAMPED/);
+  await expect(scene).toHaveAttribute("data-declared-route-count", "2");
+  await expect(scene).toHaveAttribute("data-achieved-trail-count", "3");
+  await expect(scene).toHaveAttribute("data-altitude-stem-count", "3");
+  await expect(scene).toHaveAttribute("data-launched-store-count", "1");
+  await expectLaptopVisual(scene, "transition-recommit-label-decluttering.png", testInfo);
+});
+
+test("the close-merge WVR effect remains canonical and labels exact authored intent", async ({ page }, testInfo) => {
+  const scenarioId = "a2a-defensive-break";
+  const catalog = await catalogFixture(scenarioId);
+  await page.route("**/api/catalog", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
+  );
+  await page.route("**/api/map-tile?**", (route) => route.abort());
+  await openGuidedWorkbench(page, scenarioId);
+  await expect(page.locator('[data-authored-profile="wvr-one-circle-defensive-break"]')).toContainText(
+    "Blue MERGE → ONE_CIRCLE → EXTEND · Red MERGE → DEFENSIVE_BREAK → EXTEND",
+  );
+
+  const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
+  if (compact) {
+    await page.getByRole("button", { name: /Next: Forces & loadouts/i }).click();
+    await page.getByRole("button", { name: /Next: Place & flight/i }).click();
+    await page.getByRole("button", { name: /Next: Admitted conditions/i }).click();
+    await page.getByRole("button", { name: /Next: Validate/i }).click();
+  } else {
+    await page.getByRole("button", { name: "5 Validate" }).click();
+  }
+  await page.getByRole("button", { name: /run baseline/i }).click();
+  await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
+    "Worker · completed",
+    { timeout: 30_000 },
+  );
+  const pause = page.getByRole("button", { name: "Pause run", exact: true });
+  if (await pause.isVisible()) await pause.click();
+  const compactPause = page.getByRole("button", { name: "Pause playback", exact: true });
+  if (await compactPause.isVisible()) await compactPause.click();
+
+  const timeline = page.getByRole("slider", { name: "Run timeline" });
+  await timeline.focus();
+  await page.keyboard.press("End");
+  const summary = page.locator('.target-effect-summary:visible').first();
+  await expect(summary).toHaveAttribute("data-effect-frame-index", "116");
+  await expect(summary).toHaveAttribute("data-effect-time", "28.4");
+  await selectTimelineBeforeEnd(timeline);
+  await expect(summary).toHaveAttribute("data-effect-state", "BEFORE_EFFECT_BOUNDARY");
+  await page.getByRole("button", { name: "3D", exact: true }).click();
+  const scene = page.locator(".simulation-scene");
+  await expect(scene).toHaveAttribute("data-display-frame-index", "114");
+  await expect(scene).toHaveAttribute("data-display-time", "28.25");
+  await expect(scene).toHaveAttribute("data-effect-state", "BEFORE_EFFECT_BOUNDARY");
+
+  await timeline.focus();
+  await page.keyboard.press("End");
+  await expect(scene).toHaveAttribute("data-display-frame-index", "116");
+  await expect(scene).toHaveAttribute("data-display-time", "28.4");
+  await expect(scene).toHaveAttribute("data-effect-state", "RECORDED");
+  await expect(scene).toHaveAttribute("data-effect-class", "KILL");
+  await expect(scene).toHaveAttribute("data-authored-profile-applicability", "MATCHED");
+  await expect(scene).toHaveAttribute("data-authored-profile-applicability-reason", "EXACT_CAUSAL_MATCH");
+  const redLabel = scene.locator('[data-entity-id="red-object-1"]');
+  const blueLabel = scene.locator('[data-entity-id="blue-platform-1"]');
+  await expect(blueLabel).toHaveAttribute("data-affiliation", "BLUE");
+  await expect(blueLabel).toHaveAttribute("aria-label", /blue fighter/i);
+  await expect(redLabel).toHaveAttribute("data-lifecycle", "TERMINATED");
+  await expect(redLabel).toHaveAttribute("data-affiliation", "RED");
+  await expect(redLabel).toHaveAttribute("data-authored-intent", /DEFENSIVE_BREAK|EXTEND/);
+  await expect(redLabel).toHaveAttribute("aria-label", /red fighter.*authored intent; no autonomous selection/i);
+  await expect(redLabel).toHaveAttribute("data-label-visibility", /VISIBLE|COMPACT/);
+  await expect(blueLabel).toHaveAttribute("data-label-visibility", /VISIBLE|COMPACT/);
+  await expect(scene.locator('[data-entity-id="blue-weapon-1"]')).toHaveAttribute(
+    "data-label-visibility",
+    "HIDDEN",
+  );
+  expect(await scene.locator(".simulation-entity-label").evaluateAll((labels) =>
+    labels.filter((label) => /BLUE 1|RED 1|WEAPON [0-9]/i.test(label.textContent ?? "")).length,
+  )).toBe(0);
+  await expect(scene).toHaveAttribute("data-visible-label-count", /[1-9]/);
+  await expect(scene).toHaveAttribute("data-declared-route-count", "2");
+  await expect(scene).toHaveAttribute("data-achieved-trail-count", "3");
+  await expect(scene).toHaveAttribute("data-altitude-stem-count", "3");
+  await expect(scene).toHaveAttribute("data-launched-store-count", "1");
+  await expectLaptopVisual(scene, "wvr-close-merge-altitude-stems.png", testInfo);
+});
+
+// Correctness journeys verify eventual authoritative Worker completion across
+// the viewport matrix. The dedicated browser-performance contract separately
+// retains the 10 s Worker budget on its controlled measurement viewport.
+const CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS = 45_000;
+
+const canonicalAirStudies = [
+  {
+    title: "the BVR Air study keeps every playback and outcome surface on one canonical frame",
+    id: "a2a-crossing-intercept",
+    frameIndex: "294",
+    time: "72.95",
+    effect: "DEGRADED",
+  },
+  {
+    title: "the WVR Air study keeps every playback and outcome surface on one canonical frame",
+    id: "a2a-defensive-break",
+    frameIndex: "116",
+    time: "28.4",
+    effect: "KILL",
+  },
+  {
+    title: "the transition Air study keeps every playback and outcome surface on one canonical frame",
+    id: "a2a-high-energy-crossing-challenge",
+    frameIndex: "461",
+    time: "114.7",
+    effect: "NO_EFFECT",
+  },
+] as const;
+
+for (const study of canonicalAirStudies) {
+  test(study.title, async ({ page }) => {
+    test.setTimeout(90_000);
+
+    const catalog = await catalogFixture(study.id);
+    await page.route("**/api/catalog", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
+    );
+    await page.route("**/api/map-tile?**", (route) => route.abort());
+    await openGuidedWorkbench(page, study.id);
+
+    const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
+    if (compact) {
+      await page.getByRole("button", { name: /Next: Forces & loadouts/i }).click();
+      await page.getByRole("button", { name: /Next: Place & flight/i }).click();
+      await page.getByRole("button", { name: /Next: Admitted conditions/i }).click();
+      await page.getByRole("button", { name: /Next: Validate/i }).click();
+    } else {
+      await page.getByRole("button", { name: "5 Validate" }).click();
+    }
+    await page.getByRole("button", { name: /run baseline/i }).click();
+    await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
+      "Worker · completed",
+      { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
+    );
+
+    const fourTimes = page.getByRole("button", { name: "4×", exact: true });
+    await fourTimes.click();
+    await expect(fourTimes).toHaveClass(/active/);
+    const pauseRun = page.getByRole("button", { name: "Pause run", exact: true });
+    if (await pauseRun.isVisible()) await pauseRun.click();
+    const pausePlayback = page.getByRole("button", { name: "Pause playback", exact: true });
+    if (await pausePlayback.isVisible()) await pausePlayback.click();
+
+    const timeline = await selectCanonicalTimelineEnd(page);
+    await expect(timeline).toHaveValue(study.time);
+    await expect(timeline).toHaveAttribute("data-selected-frame-index", study.frameIndex);
+    await expect(timeline).toHaveAttribute("data-selected-display-time", study.time);
+
+    const map = page.locator(".engagement-map-shell");
+    const playback = page.locator(".playback [data-frame-index]");
+    const telemetry = page.getByRole("region", { name: "Synchronized run telemetry" });
+    const geometry = page.locator(".current-geometry").first();
+    const routeTransition = page.locator(".route-transition-inspector:visible").first();
+    const targetEffect = page.locator(".target-effect-summary:visible").first();
+    await expect(map).toHaveAttribute("data-display-frame-index", study.frameIndex);
+    await expect(map).toHaveAttribute("data-display-time", study.time);
+    for (const surface of [playback, telemetry, geometry, routeTransition]) {
+      await expect(surface).toHaveAttribute("data-frame-index", study.frameIndex);
+      await expect(surface).toHaveAttribute("data-display-time", study.time);
+    }
+    await expect(map).toHaveAttribute("data-effect-class", study.effect);
+    await expect(targetEffect).toHaveAttribute("data-effect-frame-index", study.frameIndex);
+    await expect(targetEffect).toHaveAttribute("data-effect-time", study.time);
+    await expect(targetEffect).toHaveAttribute("data-effect-class", study.effect);
+
+    const pausedFrame = await playback.getAttribute("data-frame-index");
+    await page.waitForTimeout(150);
+    await expect(playback).toHaveAttribute("data-frame-index", pausedFrame!);
+
+    await page.getByRole("button", { name: "3D", exact: true }).click();
+    const scene = page.locator(".simulation-scene");
+    await expect(scene).toHaveAttribute("data-display-frame-index", study.frameIndex);
+    await expect(scene).toHaveAttribute("data-display-time", study.time);
+    await expect(scene).toHaveAttribute("data-effect-class", study.effect);
+
+    await selectTimelineBeforeEnd(timeline);
+    await expect(scene).not.toHaveAttribute("data-display-frame-index", study.frameIndex);
+    await expect(targetEffect).toHaveAttribute("data-effect-state", "BEFORE_EFFECT_BOUNDARY");
+    await timeline.focus();
+    await page.keyboard.press("End");
+    await expect(scene).toHaveAttribute("data-display-frame-index", study.frameIndex);
+    await expect(timeline).toHaveAttribute("data-selected-frame-index", study.frameIndex);
+    await expect(targetEffect).toHaveAttribute("data-effect-class", study.effect);
+
+    await page.getByRole("button", { name: "Explain & report", exact: true }).click();
+    const situationLogEffect = page.getByTestId("results-target-effect-event");
+    await expect(situationLogEffect).toHaveAttribute("data-effect-frame-index", study.frameIndex);
+    await expect(situationLogEffect).toHaveAttribute("data-effect-time", study.time);
+    await expect(situationLogEffect).toHaveAttribute("data-effect-class", study.effect);
+  });
+}
+
+test("an invalid non-spatial numeric draft cannot be bypassed by changing builder steps", async ({ page }) => {
+  const catalog = await catalogFixture();
+  await page.route("**/api/catalog", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
+  );
+  await page.route("**/api/map-tile?**", (route) => route.abort());
+  await openGuidedWorkbench(page, "a2a-crossing-intercept");
+
+  const missionClass = page.getByRole("combobox", { name: "Mission class" });
+  await missionClass.selectOption("COMBAT_AIR_PATROL");
+  const flightSize = page.getByRole("textbox", { name: "CAP flight size" });
+  await flightSize.fill("1e");
+  await expect(flightSize).toHaveValue("1e");
+  await expect(flightSize).toHaveAttribute("aria-invalid", "true");
+
+  const nextStep = page.getByRole("button", {
+    name: "Next: Forces & loadouts",
+    exact: true,
+  });
+  await nextStep.click();
+  await expect(page.getByRole("heading", { name: /What is this run comparing/i })).toBeVisible();
+  await expect(flightSize).toBeVisible();
+  await expect(flightSize).toHaveValue("1e");
+  const describedBy = await flightSize.getAttribute("aria-describedby");
+  expect(describedBy).toBeTruthy();
+  const liveError = page.locator(`[id="${describedBy}"]`);
+  await expect(liveError).toHaveRole("alert");
+  await expect(liveError).toContainText(/syntax/i);
+
+  await flightSize.fill("2");
+  await expect(flightSize).toHaveAttribute("aria-invalid", "false");
+  await nextStep.click();
+  await expect(page.getByRole("heading", { name: /Who is fighting/i })).toBeVisible();
+});
+
+test("duration and replay seed use governed raw admission before builder navigation", async ({ page }) => {
+  const catalog = await catalogFixture();
+  await page.route("**/api/catalog", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
+  );
+  await page.route("**/api/map-tile?**", (route) => route.abort());
+  await openGuidedWorkbench(page, "a2a-crossing-intercept");
+
+  const duration = page.getByRole("textbox", { name: "Run duration" });
+  const seed = page.getByRole("textbox", { name: "Replay seed" });
+  const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
+  const nextStep = compact
+    ? page.getByRole("button", { name: /^Next: Forces & loadouts$/i })
+    : page.getByRole("button", { name: /^2 Forces & loadouts$/i });
+  await expect(duration).toHaveValue("100");
+  await expect(seed).toHaveValue("42");
+
+  await seed.fill("");
+  await expect(seed).toHaveValue("");
+  await expect(seed).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByRole("alert")).toContainText("empty");
+  await nextStep.click();
+  await expect(seed).toBeVisible();
+  await expect(seed).toHaveValue("");
+
+  await seed.fill("42");
+  await expect(seed).toHaveAttribute("aria-invalid", "false");
+  await duration.fill("54.1251");
+  await seed.fill("42.5");
+  await expect(duration).toHaveAttribute("aria-invalid", "true");
+  await expect(seed).toHaveAttribute("aria-invalid", "true");
+  await nextStep.click();
+  await expect(duration).toBeVisible();
+  await expect(duration).toHaveValue("54.1251");
+  await expect(page.getByRole("alert")).toHaveCount(2);
+
+  await duration.fill("54.125");
+  await seed.fill("314159");
+  await expect(duration).toHaveAttribute("aria-invalid", "false");
+  await expect(seed).toHaveAttribute("aria-invalid", "false");
+  await nextStep.click();
+  await expect(page.getByRole("heading", { name: /Who is fighting/i })).toBeVisible();
 });
 
 test("shared transient controls hand off once and remain accessible, contained, and stable", async ({ page }, testInfo) => {
@@ -217,8 +693,7 @@ test("shared transient controls hand off once and remain accessible, contained, 
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
   );
   await page.route("**/api/map-tile?**", (route) => route.abort());
-  await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided");
-  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText("PostGIS catalog connected");
+  await openGuidedWorkbench(page, "a2a-crossing-intercept");
   const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
 
   if (compact) await page.getByRole("button", { name: /Next: Forces & loadouts/i }).click();
@@ -417,6 +892,10 @@ test("shared transient controls hand off once and remain accessible, contained, 
 });
 
 test("a current deployment manifest drives the real Worker run after route recovery", async ({ page }) => {
+  // This journey authors every mission layer before starting the real Worker.
+  // Keep its orchestration timeout distinct from the explicit Worker and 3D
+  // performance budgets asserted in air-combat-performance.spec.ts.
+  test.setTimeout(90_000);
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const catalog = await catalogFixture();
@@ -428,8 +907,7 @@ test("a current deployment manifest drives the real Worker run after route recov
   // viewport to the tile proxy's network sockets.
   await page.route("**/api/map-tile?**", (route) => route.abort());
 
-  await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided");
-  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText("PostGIS catalog connected");
+  await openGuidedWorkbench(page, "a2a-crossing-intercept");
   await expect(page.getByRole("region", { name: "Air mission contract" })).toContainText("vector.air-mission.v1");
   await page.getByRole("combobox", { name: "Mission class" }).selectOption("COMBAT_AIR_PATROL");
   await expect(page.getByRole("group", { name: "CAP defaults" })).toBeVisible();
@@ -527,7 +1005,6 @@ test("a current deployment manifest drives the real Worker run after route recov
   const routeEditor = page.getByRole("region", { name: /route coordinates/i }).first();
   const projectedRouteLongitude = routeEditor.locator("fieldset").first().getByLabel("Longitude", { exact: true });
   await expect.poll(async () => Number(await projectedRouteLongitude.inputValue())).toBeCloseTo(editedMissionLongitude, 6);
-
   const speed = page.getByRole("textbox", { name: /true airspeed/i });
   await speed.fill("-1");
   await expect(speed).toHaveValue("-1");
@@ -579,14 +1056,14 @@ test("a current deployment manifest drives the real Worker run after route recov
   await expect(page.getByRole("button", { name: /run baseline/i })).toBeEnabled();
   await page.getByRole("button", { name: /run baseline/i }).click();
 
-  if (compact) {
-    await expect(page.locator(".session-layout")).toBeVisible({ timeout: 30_000 });
-  } else {
-    await expect(page.getByText(/Run 01 · (Playing|Paused)/i)).toBeVisible({ timeout: 30_000 });
-  }
   await expect(
     page.locator('.catalog-state[data-runtime-state="completed"]'),
-  ).toHaveText("Worker · completed");
+  ).toHaveText("Worker · completed", { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS });
+  if (compact) {
+    await expect(page.locator(".session-layout")).toBeVisible();
+  } else {
+    await expect(page.getByText(/Run 01 · (Playing|Paused)/i)).toBeVisible();
+  }
   await expect(page.getByRole("list", { name: "Recorded entities" })).toBeVisible();
   await expect(page.getByRole("list", { name: "Recorded entities" }).locator("svg[data-availability=\"AVAILABLE\"]").first()).toBeVisible();
   await expect(page.getByText("Condition injection", { exact: true })).toHaveCount(0);
@@ -715,7 +1192,45 @@ test("a current deployment manifest drives the real Worker run after route recov
     await expect(mapStatus).toContainText(/Loading basemap|Basemap unavailable/);
   }
   await page.getByRole("button", { name: "3D", exact: true }).click();
-  await expect(page.locator(".simulation-scene")).toHaveAttribute("data-display-time", mapDisplayTime!);
+  const threeScene = page.locator(".simulation-scene");
+  await expect(threeScene).toHaveAttribute("data-display-time", mapDisplayTime!);
+  await expect(threeScene).toHaveAttribute("data-declared-route-count", /[2-9]/);
+  await expect(threeScene).toHaveAttribute("data-active-route-leg-count", /[1-9]/);
+  await expect(threeScene).toHaveAttribute("data-label-policy", "TACTICAL_LABEL_POLICY_V1");
+  await expect(threeScene).toHaveAttribute("data-authored-profile-applicability", "MODIFIED_FROM");
+  await expect(threeScene).toHaveAttribute(
+    "data-authored-profile-applicability-reason",
+    "CAUSAL_INPUTS_MODIFIED",
+  );
+  const modifiedProfileNotice = page.locator(
+    '.lab-notice > [data-authored-profile-applicability="MODIFIED_FROM"]',
+  );
+  await expect(modifiedProfileNotice).not.toHaveAttribute("data-authored-profile");
+  await expect(modifiedProfileNotice).not.toContainText(
+    /OFFSET|SUPPORT|RECOMMIT|BEAM|DRAG|EXTEND/,
+  );
+  await expect(threeScene).toHaveAttribute("data-visible-label-count", /[1-9]/);
+  const blue3dLabel = page.locator('.simulation-entity-label[data-entity-id="blue-platform-1"]');
+  const red3dLabel = page.locator('.simulation-entity-label[data-entity-id="red-object-1"]');
+  await expect(blue3dLabel).toContainText(/Su-30MKI · [0-9]+ m/i);
+  await expect(blue3dLabel).not.toContainText(/BLUE 1|authored intent/i);
+  await expect(blue3dLabel).toHaveAttribute("data-affiliation", "BLUE");
+  await expect(blue3dLabel).toHaveAttribute("data-authored-intent", "UNAVAILABLE");
+  await expect(blue3dLabel).toHaveAttribute("aria-label", /blue fighter/i);
+  await expect(red3dLabel).toContainText(/F-16C Block 52 · [0-9]+ m/i);
+  await expect(red3dLabel).not.toContainText(/RED 1|authored intent/i);
+  await expect(red3dLabel).toHaveAttribute("data-affiliation", "RED");
+  await expect(red3dLabel).toHaveAttribute("data-authored-intent", "UNAVAILABLE");
+  await expect(red3dLabel).toHaveAttribute("aria-label", /red fighter/i);
+  const rendered3dLabels = threeScene.locator(".simulation-entity-label");
+  const generatedCallsignLeaks = await rendered3dLabels.evaluateAll((labels) =>
+    labels.filter((label) => /BLUE 1|RED 1|WEAPON [0-9]/i.test(label.textContent ?? "")).length,
+  );
+  expect(generatedCallsignLeaks).toBe(0);
+  const visible3dLabels = threeScene.locator('.simulation-entity-label:not([hidden])');
+  await expect(visible3dLabels.first()).toHaveAttribute("data-label-visibility", /VISIBLE|COMPACT/);
+  await expect(visible3dLabels.first()).toHaveAttribute("data-collision-state", "CLEAR");
+  await expect(visible3dLabels.first()).toHaveAttribute("data-edge-state", /CLEAR|CLAMPED/);
   await expect(
     page.getByRole("list", { name: "Recorded entities" }).locator('[data-entity-id="blue-weapon-1"]'),
   ).toHaveCount(1);
@@ -724,5 +1239,210 @@ test("a current deployment manifest drives the real Worker run after route recov
   await expect(page.getByTestId("results-airborne-store-transfer")).toContainText(
     /JETTISON achieved[\s\S]*blue-weapon-1[\s\S]*AIRBORNE_TRANSFER_ADMITTED/,
   );
+  expect(runtimeErrors).toEqual([]);
+});
+
+test("a Worker-produced VSR downloads and reopens without rerunning physics", async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
+  const scenarioId = "a2a-defensive-break";
+  const catalog = await catalogFixture(scenarioId);
+  const runtimeErrors: string[] = [];
+  const serverRunRequests: string[] = [];
+  page.on("pageerror", (error) => runtimeErrors.push(error.message));
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/runs") {
+      serverRunRequests.push(request.postData() ?? "");
+    }
+  });
+  await page.route("**/api/catalog", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
+  );
+  await page.route("**/api/map-tile?**", (route) => route.abort());
+  await page.addInitScript(() => {
+    const requestTypes: string[] = [];
+    Object.defineProperty(window, "__vectorWorkerRequestTypes", {
+      configurable: true,
+      value: requestTypes,
+    });
+    const nativePostMessage = Worker.prototype.postMessage;
+    Object.defineProperty(Worker.prototype, "postMessage", {
+      configurable: true,
+      writable: true,
+      value(this: Worker, message: unknown, transferOrOptions?: Transferable[] | StructuredSerializeOptions) {
+        if (message && typeof message === "object" && "type" in message) {
+          requestTypes.push(String((message as { type: unknown }).type));
+        }
+        return Reflect.apply(
+          nativePostMessage,
+          this,
+          transferOrOptions === undefined ? [message] : [message, transferOrOptions],
+        );
+      },
+    });
+  });
+
+  await openGuidedWorkbench(page, scenarioId);
+  const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
+  if (compact) {
+    await page.getByRole("button", { name: /Next: Forces & loadouts/i }).click();
+    await page.getByRole("button", { name: /Next: Place & flight/i }).click();
+    await page.getByRole("button", { name: /Next: Admitted conditions/i }).click();
+    await page.getByRole("button", { name: /Next: Validate/i }).click();
+  } else {
+    await page.getByRole("button", { name: "5 Validate" }).click();
+  }
+  await page.getByRole("button", { name: /run baseline/i }).click();
+  await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
+    "Worker · completed",
+    { timeout: 45_000 },
+  );
+
+  const recordRegion = page.getByRole("region", { name: "VECTOR Simulation Record" });
+  await expect(recordRegion).toHaveAttribute("data-record-source", "WORKER_RUN");
+  await expect(recordRegion).toContainText("Worker-produced record");
+  const recordId = await page.getByTestId("vsr-record-id").innerText();
+  const contentDigest = await page.getByTestId("vsr-content-digest").innerText();
+  expect(recordId).toMatch(/^[a-f0-9]{64}$/);
+  expect(contentDigest).toMatch(/^[a-f0-9]{64}$/);
+  const exactBackend = await page.locator(".session-layout").getAttribute("data-engine-backend");
+  expect(exactBackend).toMatch(/^(typescript|rust-wasm)$/);
+
+  const downloadPromise = page.waitForEvent("download");
+  await recordRegion.getByRole("button", { name: "Download VSR", exact: true }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(
+    new RegExp(`^${scenarioId}-[a-f0-9]{12}\\.vector$`),
+  );
+  const exactRecordPath = testInfo.outputPath("worker-produced.vector");
+  await download.saveAs(exactRecordPath);
+  const exactRecordBytes = await readFile(exactRecordPath);
+  expect(exactRecordBytes.byteLength).toBeGreaterThan(12);
+
+  await page.reload();
+  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText("PostGIS catalog connected");
+  await expect(recordRegion).toHaveAttribute("data-record-source", "NONE");
+  await page.locator('input[aria-label="Open VSR file"]').setInputFiles(exactRecordPath);
+  await expect(recordRegion).toHaveAttribute("data-record-source", "VERIFIED_IMPORT", {
+    timeout: 30_000,
+  });
+  await expect(recordRegion).toContainText("Worker-verified import");
+  await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
+    "Worker · completed",
+  );
+  await expect(page.getByTestId("vsr-record-id")).toHaveText(recordId);
+  await expect(page.getByTestId("vsr-content-digest")).toHaveText(contentDigest);
+  await expect(page.locator(".session-layout")).toBeVisible();
+  const importedProfileNotice = page.locator(
+    '[data-authored-profile="wvr-one-circle-defensive-break"]',
+  );
+  await expect(importedProfileNotice).toHaveAttribute(
+    "data-authored-profile-applicability",
+    "MATCHED",
+  );
+  await expect(importedProfileNotice).toContainText(
+    "Blue MERGE → ONE_CIRCLE → EXTEND · Red MERGE → DEFENSIVE_BREAK → EXTEND",
+  );
+  await expect(page.locator(".scenario-name strong")).toHaveText(
+    "WVR one-circle defensive break: Su-30MKI versus PAF F-16C Block 52",
+  );
+
+  const workerRequestTypes = async () => page.evaluate(() =>
+    [...((window as unknown as { __vectorWorkerRequestTypes?: string[] }).__vectorWorkerRequestTypes ?? [])]);
+  await expect.poll(workerRequestTypes).toContain("open-record");
+  expect(await workerRequestTypes()).not.toContain("run");
+
+  await page.getByRole("button", { name: "Explain & report", exact: true }).click();
+  const importedDebrief = page.locator(".debrief-workspace");
+  await expect(importedDebrief).toHaveAttribute("data-report-source", "VERIFIED_IMPORT");
+  await expect(importedDebrief).toHaveAttribute("data-record-id", recordId);
+  await expect(importedDebrief).toHaveAttribute("data-content-digest", contentDigest);
+  await expect(importedDebrief).toHaveAttribute("data-engine-backend", exactBackend!);
+  await expect(importedDebrief).toHaveAttribute("data-canonical-frame-count", "117");
+  await expect(importedDebrief.locator("h1")).toHaveText(
+    "WVR one-circle defensive break: Su-30MKI versus PAF F-16C Block 52",
+  );
+  await expect(page.locator(".results-overview article").filter({ hasText: "Model outcome" })).toContainText(
+    "Geometric intercept",
+  );
+  await expect(page.locator(".debrief-outcome .target-effect-summary")).toHaveAttribute(
+    "data-effect-class",
+    "KILL",
+  );
+  await expect(page.getByTestId("results-target-effect-event")).toHaveAttribute(
+    "data-effect-frame-index",
+    "116",
+  );
+  await expect(page.getByTestId("results-target-effect-event")).toHaveAttribute(
+    "data-effect-time",
+    "28.4",
+  );
+  const canonicalDebrief = page.getByRole("region", { name: "Canonical run debrief" });
+  await expect(canonicalDebrief).toBeVisible();
+  await expect(canonicalDebrief.getByTestId("report-authored-route-profile")).toHaveAttribute(
+    "data-profile-applicability",
+    "MATCHED",
+  );
+  await expect(canonicalDebrief.getByTestId("report-authored-route-profile")).toContainText(
+    /MERGE[\s\S]*ONE_CIRCLE[\s\S]*EXTEND[\s\S]*DEFENSIVE_BREAK/,
+  );
+  await expect(canonicalDebrief.getByTestId("report-exact-causal-inputs")).toContainText(
+    /Run duration[\s\S]*45 s[\s\S]*Guidance \/ regime[\s\S]*loft \/ WVR_BFM/,
+  );
+  await expect(canonicalDebrief.getByTestId("report-canonical-geometry")).toContainText(
+    /Weapon world-entry \/ launch frame[\s\S]*Closest active-aircraft approach/,
+  );
+  await expect(canonicalDebrief.getByTestId("report-recorded-causal-facts")).toContainText(
+    /Weapon entered world[\s\S]*Weapon termination[\s\S]*Primary-weapon recorded flight states[\s\S]*Recorded route-index changes/,
+  );
+  const importedSaveDownloadPromise = page.waitForEvent("download");
+  await page.locator(".debrief-notes").getByRole(
+    "button",
+    { name: "Download exact VSR", exact: true },
+  ).click();
+  const importedSaveDownload = await importedSaveDownloadPromise;
+  const importedSavePath = testInfo.outputPath("imported-report-source.vector");
+  await importedSaveDownload.saveAs(importedSavePath);
+  expect(await readFile(importedSavePath)).toEqual(exactRecordBytes);
+  expect(serverRunRequests).toEqual([]);
+
+  const corruptPath = testInfo.outputPath("corrupt-worker-produced.vector");
+  const corruptRecordBytes = Buffer.from(exactRecordBytes);
+  corruptRecordBytes[corruptRecordBytes.length - 1] ^= 0xff;
+  await writeFile(corruptPath, corruptRecordBytes);
+  await page.locator('input[aria-label="Open VSR file"]').setInputFiles(corruptPath);
+  await expect(recordRegion.getByRole("alert")).toContainText("VSR verification failed");
+  await expect(recordRegion).toHaveAttribute("data-record-source", "VERIFIED_IMPORT");
+  await expect(page.getByTestId("vsr-record-id")).toHaveText(recordId);
+  await expect(page.getByTestId("vsr-content-digest")).toHaveText(contentDigest);
+  await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
+    "Worker · completed",
+  );
+  await expect(page.locator(".debrief-outcome .target-effect-summary")).toHaveAttribute(
+    "data-effect-class",
+    "KILL",
+  );
+
+  const mismatchedPackagePath = resolve(
+    "fixtures/vector-record/issue-197/a2a-crossing-intercept.vector",
+  );
+  await page.locator('input[aria-label="Open VSR file"]').setInputFiles(mismatchedPackagePath);
+  await expect(recordRegion.getByRole("alert")).toContainText(
+    "The verified VSR scenario package does not match this workbench package.",
+    { timeout: 30_000 },
+  );
+  await expect(recordRegion).toHaveAttribute("data-record-source", "VERIFIED_IMPORT");
+  await expect(page.getByTestId("vsr-record-id")).toHaveText(recordId);
+  await expect(page.getByTestId("vsr-content-digest")).toHaveText(contentDigest);
+  await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
+    "Worker · completed",
+  );
+  await expect(page.locator(".debrief-workspace h1")).toHaveText(
+    "WVR one-circle defensive break: Su-30MKI versus PAF F-16C Block 52",
+  );
+  await expect(page.locator(".debrief-outcome .target-effect-summary")).toHaveAttribute(
+    "data-effect-class",
+    "KILL",
+  );
+  expect(await workerRequestTypes()).not.toContain("run");
   expect(runtimeErrors).toEqual([]);
 });

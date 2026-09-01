@@ -10,8 +10,15 @@ import { simulateWithCapabilitiesForVerification } from "../lib/simulation.ts";
 function admittedA2aScenario() {
   const definition = SCENARIO_LIBRARY.find(({ scenario }) => scenario.domain === "A2A");
   assert.ok(definition);
+  const authored = structuredClone(definition.scenario);
+  // Target-effect tests mutate the compiled launch boundary directly. Keep
+  // this generic fixture on the legacy scheduled-release path instead of
+  // inheriting a current study's separately sealed store-transfer plan.
+  for (const assignment of authored.airMission?.assignments ?? []) {
+    delete assignment.storeTransferPlan;
+  }
   return structuredClone(simulateWithCapabilitiesForVerification(
-    definition.scenario,
+    authored,
     createVerificationDeploymentCapabilities("typescript", ["A2A"]),
   ).engineRun.scenario);
 }

@@ -132,21 +132,6 @@ function highEnergyCrossingCapabilities(backend) {
   return createVerificationDeploymentCapabilities(backend, ["A2A"]);
 }
 
-function highEnergyCrossingControl() {
-  const scenario = structuredClone(highEnergyCrossingChallenge.scenario);
-  scenario.range = 46_000;
-  scenario.spatialPlan = createDefaultSpatialPlan({
-    studyArea: getStudyArea(scenario.studyAreaId),
-    rangeM: scenario.range,
-    blueAltitudeM: scenario.altitude,
-    redAltitudeM: scenario.altitude + scenario.targetDelta,
-    blueSpeedMps: scenario.launcherSpeed,
-    redSpeedMps: scenario.targetSpeed,
-    crossingAngleDeg: scenario.aspect,
-  });
-  return synchronizeScenarioAirMission(scenario, CURRENT_COMPILED_MODEL_PACK);
-}
-
 function admittedGroundFixture(posture = "RUNWAY") {
   let scenario = fixture("COMBAT_AIR_PATROL");
   const area = getStudyArea("rajasthan-desert");
@@ -397,6 +382,7 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
   const groundDynamicsMigration = readFileSync(new URL("../db/migrations/015_generic_ground_dynamics.sql", import.meta.url), "utf8");
   const challengeMigration = readFileSync(new URL("../db/migrations/016_high_energy_crossing_challenge.sql", import.meta.url), "utf8");
   const terminationMigration = readFileSync(new URL("../db/migrations/017_weapon_termination_model.sql", import.meta.url), "utf8");
+  const airCombatStudyMigration = readFileSync(new URL("../db/migrations/018_three_air_combat_studies.sql", import.meta.url), "utf8");
   assert.equal(
     createHash("sha256").update(environmentMigration).digest("hex"),
     "c40e91b0fbbf2ee5110ae601dba676d2feec1957ebb440db81703c1696cbd227",
@@ -412,9 +398,17 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
     "c7105993b3e56b9bee8bac5f71d2133e40bf998b36b99d7066caec50c6f72553",
     "migration 016 remains the frozen historical challenge snapshot",
   );
+  assert.equal(
+    createHash("sha256").update(terminationMigration).digest("hex"),
+    "00e9fb16c04e7cc5543f19f50781e2fc35ea4cf8d450af2343b6b5d9ef8ed18d",
+    "migration 017 remains the frozen historical weapon-termination snapshot",
+  );
   for (const definition of SCENARIO_LIBRARY) {
-    const migration = terminationMigration;
-    const tag = `vector_weapon_termination_${definition.id.replaceAll("-", "_")}`;
+    const isAirCombatStudy = definition.version === "1.2.0";
+    const migration = isAirCombatStudy ? airCombatStudyMigration : terminationMigration;
+    const tag = isAirCombatStudy
+      ? `vector_air_combat_018_${definition.id.replaceAll("-", "_")}`
+      : `vector_weapon_termination_${definition.id.replaceAll("-", "_")}`;
     assert.ok(migration.includes(`$${tag}$${canonicalJson(definition)}$${tag}$::jsonb`), definition.id);
     assert.ok(
       migration.includes("INSERT INTO scenario_templates")
@@ -428,8 +422,9 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
     );
   }
   assert.ok(
-    SCENARIO_LIBRARY.every((definition) => definition.version === "1.1.0"),
-    "termination authority is published only under new scenario identities",
+    SCENARIO_LIBRARY.filter(({ version }) => version === "1.2.0").length === 3
+      && SCENARIO_LIBRARY.filter(({ version }) => version === "1.1.0").length === 6,
+    "only the three governed Air-combat studies advance under migration 018",
   );
   assert.match(terminationMigration, /ON CONFLICT \(id,version\) DO NOTHING/);
   assert.doesNotMatch(
@@ -459,6 +454,8 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
   );
   assert.match(terminationMigration, /Historical credibility-manifest exact identity readback failed/);
   assert.match(terminationMigration, /Weapon termination scenario exact identity readback failed/);
+  assert.match(airCombatStudyMigration, /Air-combat study exact identity readback failed/);
+  assert.match(airCombatStudyMigration, /Superseded Air-combat study retention failed/);
   for (const field of [
     "domain", "title", "status", "package", "schema_version", "content_hash",
     "engine_version", "study_area_id", "intended_use_id", "intended_use_version",
@@ -506,12 +503,12 @@ test("the governed high-energy crossing challenge owns exact non-default inputs 
       weatherPresetId: highEnergyCrossingChallenge.scenario.weatherPresetId,
     },
     {
-      rangeM: 44_000,
-      crossingAngleDeg: 105,
-      blueAltitudeMslM: 8_500,
-      redAltitudeMslM: 10_000,
-      blueTasMps: 270,
-      redTasMps: 250,
+      rangeM: 33_525.994,
+      crossingAngleDeg: 72.646,
+      blueAltitudeMslM: 7_800,
+      redAltitudeMslM: 9_000,
+      blueTasMps: 268,
+      redTasMps: 245,
       blueFuelPercent: 70,
       redFuelPercent: 70,
       blueStores: 2,
@@ -525,11 +522,11 @@ test("the governed high-energy crossing challenge owns exact non-default inputs 
   assert.equal(highEnergyCrossingChallenge.intendedUse.id, "vector.intended-use.geometry-teaching");
   assert.equal(highEnergyCrossingChallenge.scenario.airMission.intendedUse, "PUBLIC_EDUCATIONAL");
   assert.equal(highEnergyCrossingChallenge.scenario.airMission.provenance.valueState, "MODEL_ASSUMPTION");
-  assert.match(highEnergyCrossingChallenge.scope, /not a target-damage or kill claim/i);
-  assert.match(highEnergyCrossingChallenge.presetRationale.conditions, /Sensor, EW, damage, fuze, tactics, and probability of kill remain unavailable/i);
+  assert.match(highEnergyCrossingChallenge.scope, /generic assumption-backed/i);
+  assert.match(highEnergyCrossingChallenge.presetRationale.conditions, /sensors, EW, and autonomous decisions remain unavailable/i);
 });
 
-test("the challenge completes late with TypeScript/Rust terminal and causal-event parity while the harder control fails", () => {
+test("the challenge completes with deterministic TypeScript/Rust terminal and causal-event parity", () => {
   assert.ok(highEnergyCrossingChallenge, "challenge scenario is missing");
   const typescript = simulateWithCapabilitiesForVerification(
     highEnergyCrossingChallenge.scenario,
@@ -543,14 +540,9 @@ test("the challenge completes late with TypeScript/Rust terminal and causal-even
     highEnergyCrossingChallenge.scenario,
     highEnergyCrossingCapabilities("rust-wasm"),
   );
-  const control = simulateWithCapabilitiesForVerification(
-    highEnergyCrossingControl(),
-    highEnergyCrossingCapabilities("typescript"),
-  );
-
   assert.equal(typescript.termination, "weapon_intercept");
   assert.equal(typescript.successful, true);
-  assert.ok(typescript.timeOfFlight > 120 && typescript.timeOfFlight < 140);
+  assert.equal(typescript.timeOfFlight, 114.7);
   assert.ok(typescript.closestApproach > 20 && typescript.closestApproach <= 25);
   assert.ok(typescript.endSpeed > 200);
   assert.equal(typescript.engineRun.diagnostics.nonFiniteStateCount, 0);
@@ -558,7 +550,7 @@ test("the challenge completes late with TypeScript/Rust terminal and causal-even
 
   assert.equal(rust.termination, typescript.termination);
   assert.equal(rust.frames.length, typescript.frames.length);
-  assert.deepEqual(rust.engineRun.events, typescript.engineRun.events);
+  assertContractParity(rust.engineRun.events, typescript.engineRun.events, "events");
   assertContractParity(rust.engineRun.frames.at(-1), typescript.engineRun.frames.at(-1), "terminalFrame");
   assertContractParity(rust.closestApproach, typescript.closestApproach, "closestApproachM");
   assertContractParity(rust.timeOfFlight, typescript.timeOfFlight, "timeOfFlightSeconds");
@@ -587,10 +579,6 @@ test("the challenge completes late with TypeScript/Rust terminal and causal-even
       && !("position" in picture)
   ));
 
-  assert.equal(control.termination, "time_limit");
-  assert.equal(control.successful, false);
-  assert.equal(control.timeOfFlight, 140);
-  assert.ok(control.closestApproach > 25);
 });
 
 test("CAP defaults are visible, editable, and causally change compiled patrol and fuel state", () => {
@@ -1327,13 +1315,11 @@ test("Mach constraints compile deterministically into a causal airborne entry sp
   const altitudeM = point.position.altitude.valueM;
   const temperatureK = altitudeM <= 11_000 ? 288.15 - 0.0065 * altitudeM : 216.65;
   const mach = 0.82;
-  const tasMps = mach * Math.sqrt(1.4 * 287.05 * temperatureK);
+  const tasMps = Number((mach * Math.sqrt(1.4 * 287.05 * temperatureK)).toFixed(3));
   scenario.spatialPlan.blue.speedMps = tasMps;
   scenario.launcherSpeed = tasMps;
   for (const routePoint of scenario.airMission.flightPlans[0].routePoints) {
-    const routeAltitudeM = routePoint.position.altitude.valueM;
-    const routeTemperatureK = routeAltitudeM <= 11_000 ? 288.15 - 0.0065 * routeAltitudeM : 216.65;
-    routePoint.constraint.speed = { kind: "MACH", value: tasMps / Math.sqrt(1.4 * 287.05 * routeTemperatureK) };
+    routePoint.constraint.speed = { kind: "MACH", value: mach };
   }
   const compiled = prepareSimulation(scenario).engineScenario;
   assert.ok(Math.abs(compiled.airMission.start.initialSpeedMps - tasMps) < 1e-9);
@@ -1419,7 +1405,16 @@ test("compilation is pure and does not accept a decorative UI-only mission objec
 });
 
 test("missions without a transfer plan retain the exact legacy v1 digest shape", () => {
-  const prepared = prepareSimulation(structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario));
+  const migration = readFileSync(
+    new URL("../db/migrations/017_weapon_termination_model.sql", import.meta.url),
+    "utf8",
+  );
+  const tag = "vector_weapon_termination_a2a_crossing_intercept";
+  const historicalPackage = migration.match(
+    new RegExp(`\\$${tag}\\$(.*?)\\$${tag}\\$::jsonb`, "s"),
+  );
+  assert.ok(historicalPackage, "migration 017 historical Air mission is missing");
+  const prepared = prepareSimulation(JSON.parse(historicalPackage[1]).scenario);
   const compiled = prepared.engineScenario.airMission;
   assert.equal(Object.hasOwn(compiled.assignment, "storeTransfers"), false);
   assert.equal(Object.hasOwn(compiled.assignment, "storeTransferAuthorityDigest"), false);

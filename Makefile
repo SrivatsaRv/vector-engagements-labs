@@ -59,6 +59,7 @@ performance-local:
 	npm run performance:track-store:verify
 	npm run capacity:baseline:verify
 	npm run performance:generic-airborne-store-transfer:verify
+	npm run performance:air-combat-studies:verify
 
 capacity-baseline-local:
 	npm run capacity:baseline:verify
@@ -122,6 +123,7 @@ ci-quality:
 	npm run environment:migration:verify
 	npm run ground-dynamics:migration:verify
 	npm run weapon-termination:migration:verify
+	npm run air-combat-studies:migration:verify
 	npm run tp1538:sources:verify
 	npm run tp1538:aero:adjudication:verify
 	npm run tp1538:aero:workload:verify

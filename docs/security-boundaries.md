@@ -17,6 +17,29 @@ Air-domain saved-run admission requires the authored v1 mission unchanged,
 recompiles it against exact environment/model identities, and returns stable
 mission code/field-path errors. It never fills missing class, start, route,
 loadout, fuel, recovery, policy, engine, or support values.
+Every submitted Blue/Red route point, transition and acceptance radius is
+re-admitted before recompilation. Optional `runDurationSeconds` accepts only a
+finite value in `[0.001, 3600] s` with at most three fractional digits and is
+passed unchanged to the terminal-tick boundary. Omission is retained for
+historical packages and selects the versioned domain default; the server does
+not persist a newly invented duration.
+
+`vector.authored-route-profile.v1` is server-selected package/report metadata,
+not caller-supplied engine policy. Saved-run validation does not admit a request
+profile into `Scenario`; the report copies the selected template's exact-key
+profile, side leg-intent labels and limitations when present. Those fields
+cannot authorize an autonomous pilot, maneuver, launch, effect or lifecycle
+transition. Historical templates and saved reports without a profile remain
+readable and are reported as having no preserved authored profile.
+The server also derives `vector.authored-profile-binding.v1` from the template's
+exact causal profile inputs. Presentation recomputes equality against the
+admitted saved scenario. It may say `MATCHED` only when both starts/routes,
+transitions/radii, headings/TAS, guidance, regime, leg roles, release request
+time and installed drag area, and duration are identical. Otherwise it says
+`MODIFIED_FROM`, preserves only
+source ancestry and suppresses source leg-intent claims. Missing historical
+binding evidence cannot be treated as a match.
+
 Saved-run admission validates the complete regional EnvironmentPack, compact
 runtime binding and exact runway origin schema. Corrupt, stale, unknown or
 cross-environment identities fail closed without catalogue fallback.
@@ -40,6 +63,41 @@ Target-effect replay additionally requires exact authority, commit, causal
 termination event, target frame, manifest and report agreement. Hash resealing
 cannot change reason/result/lifecycle or insert sub-precision causal values;
 historical records without the authority remain explicitly `NOT_MODELLED`.
+
+A governed-package VSR uses the closed
+`vector.scenario-package-reference.v1` tuple of package ID, version and 64-hex
+content hash. Record creation and opening require exact equality across
+`compiled.json`, `manifest.json` and `report.json`, plus the matching required
+viewer feature. Resealing one or all archive members cannot make divergent
+tuples authoritative. A feature without a tuple, a tuple without all three
+artifacts, unknown keys or a malformed digest fails closed. Historical records
+with no optional tuple remain admissible and are never upgraded from a current
+database or catalogue row.
+New-run creation additionally resolves the tuple against the deployment's
+retained scenario inventory at browser and Worker boundaries; an arbitrary
+well-formed hash cannot be self-sealed as governed provenance.
+
+Saved-report debrief text is derived only after record admission from retained
+frames, typed events, compiled/authored routes and optional template-owned
+profile metadata. Route transitions, weapon world entry, store transfer,
+termination, target effect, fuel, mass, installed stores and final aircraft
+separation must each remain traceable to their recorded value. A descriptive
+leg cannot be presented as an autonomous-pilot choice. Terminal kill wording
+requires the exact admitted `KILL` commit and target-lifecycle proof and must
+show its generic educational model/authority and limitations; it is never a
+named-system effectiveness, probability-of-kill or pilot-performance claim.
+Launch geometry must use the exact frame cited by the unique weapon world-entry
+event. Aircraft closest-approach and authored-leg comparison may reduce only
+retained aircraft frames; the latter additionally requires exact profile-input
+applicability. Missing or unreached `INTERCEPT`/`RECOMMIT` frames remain
+unavailable and cannot be repaired from a profile label, declared waypoint,
+final frame or scenario identity.
+The report's exact causal-input projection retains authored versus
+versioned-default duration authority and both side-owned WGS84/MSL routes. Its
+weapon-state timeline is formed only from changes in the primary weapon's
+recorded `weaponFlightState`; observer and track availability is copied from an
+exact retained observer-state frame. No report label may synthesize either from
+time, separation, scenario identity or guidance mode.
 
 Saved-run snapshots and saved-run admission counters now have separate
 domain-owned declaration modules behind the unchanged aggregate Drizzle schema.
@@ -145,6 +203,15 @@ Migration 016's duplicated canonical package/readback bytes contain two visible
 classifies them under release-blocking STUB-01/STUB-02 and STUB-04 respectively,
 owned by #64/#28/#38/#60. The governed challenge therefore cannot be used to
 retire named-model or generic-force-package debt merely because it completes.
+
+Migration 018's three canonical study packages and three immutable readback
+copies retain six visible `MODEL_ASSUMPTION` lines and six fixed duel-slot
+lines. The runtime-stub ledger classifies those lines under release-blocking
+STUB-01, STUB-02, STUB-26, STUB-28 and STUB-04: publishing deterministic BVR,
+WVR and transition evidence does not validate named aircraft or weapon
+performance, generic store-release aerodynamics, target-effect thresholds, or
+the fixed two-actor allocation. The migration remains useful as governed study
+evidence while every one of those limitations stays explicit and issue-owned.
 
 The Rust/WASM artifact now binds the exact Binaryen 131.0.0 optimization policy
 into its source identity and verifies optimized bytes, length and required ABI

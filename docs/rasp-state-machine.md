@@ -32,6 +32,22 @@ edges reject instead of being inferred from elapsed time.
 `vector.compiled-air-mission.v1` is immutable run provenance beside the engine
 scenario, not a second track/picture state machine. Start, route, fuel and store
 consequences enter through ordinary canonical entities and frames.
+The three current Air-combat packages may additionally carry the closed,
+optional `vector.authored-route-profile.v1` description. Its profile label,
+side-owned leg-intent labels and limitations have `AUTHORED_ROUTE` authority
+only: they describe the exact package route but cannot select a controller,
+autonomous pilot response, tactic or target effect. Runtime authority remains
+the admitted WGS84/MSL route points, route-plan transitions and acceptance
+radii, compiled Blue flight-plan roles, and recorded aircraft-control state.
+Only a recorded route-point-index change may be reported as an achieved route
+transition.
+
+`Scenario.runDurationSeconds` is a separate optional causal input. When
+present, its admitted finite value in `[0.001, 3600] s` becomes the exact engine
+terminal duration; when absent, the versioned domain default remains
+authoritative for historical packages. Neither the descriptive profile nor a
+scenario title can extend or terminate a run.
+
 Environment sampling is causal state input: sourced density/wind and DEM
 collision can change motion or termination, but do not invent RASP knowledge,
 sensor detection, decisions, or narrative state.
@@ -143,6 +159,15 @@ then presents the recorded result; it does not rerun an effect model or infer
 damage from stored geometry. Historical v6 records remain active-target
 `NOT_MODELLED` evidence.
 
+For a run prepared from a governed package,
+`vector.scenario-package-reference.v1` binds the exact package ID, version and
+content hash. `compiled.json`, `manifest.json` and `report.json` must carry the
+same exact-key tuple, and the manifest must declare its viewer feature. A
+missing member, malformed hash, independently valid but different tuple, or
+feature declaration without a value rejects before replay. Historical records
+that predate this optional reference remain readable and do not acquire a
+reference through a current catalogue lookup.
+
 A draft that fails control, structured or relational admission produces no run
 and therefore no VSR. Replay is not a second authoring boundary: it verifies
 the archived admitted identities and bytes and never reinterprets malformed
@@ -177,6 +202,47 @@ Accepted or rejected store-transfer outcomes replay from the archived event and
 boundary frame. Replay never reruns release physics or reconstructs a missing
 store, and a rejected outcome leaves the store stowed.
 
+Authored routes and optional run duration replay from `scenario.json` and their
+compiled projection; missing historical duration retains the archived
+versioned domain-default behavior. The separately saved report may preserve an
+optional authored-route profile, but replay never reconstructs profile intent
+from geometry or uses a profile label as execution authority.
+New saved reports retain a separate `vector.authored-profile-binding.v1`
+baseline containing the template's exact causal profile inputs. Report
+projection compares the current admitted scenario against that baseline across
+both starts and WGS84/MSL routes, transitions, acceptance radii, headings/TAS,
+guidance, regime, Blue flight-leg roles, store-transfer request and duration.
+The store-transfer projection includes both requested time and installed drag
+area because each is consumed by execution and can change achieved dynamics.
+Exact equality is `MATCHED`; any difference is `MODIFIED_FROM`. A modified run
+retains source-profile ancestry but does not present the source leg intents as
+the edited run's achieved or selected tactic. A historical profile without the
+binding remains explicitly unverified rather than being promoted to a match.
+
+The report debrief is a pure recorded-causal projection. It may join preserved
+profile identity and route-leg descriptions to recorded route-index changes,
+world-entry and store-transfer receipts, weapon termination and target-effect
+events, initial/final aircraft fuel, mass and installed stores, and final
+aircraft separation. It cannot invent an unrecorded transition or pilot
+decision. Kill wording requires the exact admitted `KILL` commit and lifecycle
+proof and must identify the generic educational model/authority, model time and
+limitations; it is not named-aircraft, named-weapon or pilot effectiveness.
+The launch-geometry row is bound to the unique primary-weapon
+`ENTITY_ENTERED_WORLD` event and its exact retained frame; range/closure are the
+recorded weapon-to-target values at that boundary, while both aircraft
+altitudes come from the same frame. Closest-aircraft approach is the minimum
+aircraft-to-aircraft separation across retained frames in which both aircraft
+remain active. Initial `INTERCEPT` and `RECOMMIT` geometry may be labelled only
+for an exactly `MATCHED` authored profile and the first retained active-aircraft
+frame on that route leg. If a leg is never reached, the report says so instead
+of relabelling the final frame or declared route point as achieved geometry.
+The exact report input block uses `vector.report-causal-inputs.v1` and shows the
+effective duration plus authored/legacy-default status, mission start, guidance,
+regime, release request, leg roles and both side-owned starts/routes. Primary-
+weapon flight-state history is a compact projection of recorded
+`weaponFlightState` changes only; observer/track availability is copied from the
+typed final retained frame and is never inferred from range or guidance.
+
 ## Air mission record storage
 
 Saved-run creation repeats the shared structured numeric and Air-mission
@@ -189,6 +255,13 @@ versions of all nine canonical scenario packages without rewriting either the
 existing `1.0.0` rows or migrations 015 and 016.
 Saved-run identity therefore retains the exact termination authority that
 produced its terminal event.
+The authored scenario member retains every exact Blue/Red route point,
+transition method and acceptance radius plus optional `runDurationSeconds`.
+Compilation retains the causal Blue Air-mission route and engine duration;
+recorded Red execution remains ordinary entity/controller state. The optional
+`vector.authored-route-profile.v1` is package/report metadata only and is never
+inserted into engine state or RASP pictures.
+
 When target-effect authority is retained, storage also preserves the ordered
 termination event, its single dependent effect event and the final completion
 event. The effect commit seals the termination receipt and same-frame target
@@ -213,6 +286,14 @@ that authored artifact against the archived environment pack and model-pack
 binding, then requires exact equality across all four members before any replay
 is exposed. A current catalog lookup, UI default, or report label cannot repair
 or replace missing mission intent.
+
+New governed-package records also bind the same
+`vector.scenario-package-reference.v1` value through `compiled.json`,
+`manifest.json` and `report.json`. That cross-artifact equality is independent
+of Air-mission digest equality: both gates must pass. Historical records may
+omit the package reference, authored profile and scenario-owned duration; the
+reader preserves their older mission/frame schemas and domain-default duration
+rather than synthesizing current package metadata.
 
 An archived compiled-mission v1 assignment with no authored transfer plan keeps
 its historical key set and digest during that recompilation. Readback does not
@@ -259,6 +340,20 @@ Target-effect regression proves once-only event/lifecycle causality, exact
 TypeScript/Rust/WASM commit parity, malformed and reordered rejection, VSR v7
 mutation rejection, frozen v6 byte compatibility and exact-frame browser
 presentation. The no-effect control remains separate from unsupported RASP.
+
+Issue #197 regression fixes three exact multi-leg Air-combat packages and proves
+that descriptive profile/leg labels cannot change frames or events, while route
+geometry, release time and optional duration remain causal. It covers the
+three-decimal duration boundary and historical omission, rejects malformed or
+unknown profile fields, and compares independent geographic, route-transition,
+mass/fuel/store, termination and effect oracles. VSR tests require exact
+scenario-package reference equality across compiled, manifest and report
+artifacts and retain no-reference compatibility. Report tests require the
+recorded-causal debrief, distinct non-kill wording and the exact generic-model
+limitations for an authorized `KILL`; component tests expose the same event,
+frame and model-time identity. Edited-route tests require `MODIFIED_FROM` and
+suppressed leg intent, while exact all-three-package and historical-duration
+tests cover `MATCHED`, authored duration and versioned-default omission.
 
 Issue #193 adds exhaustive authority inventory and malformed-number tests,
 boundary/adjacent/precision cases, a component proof that rejected raw text is

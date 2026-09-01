@@ -70,6 +70,18 @@ Saved-run snapshot table declarations are isolated in
 | `report.json` | frozen report content and analyst notes |
 | `assets/` | optional portable GeoJSON, silhouettes or low-poly models identified by content hash |
 
+When a run begins from a governed PostGIS template, its prepared runtime pack
+also carries the closed `vector.scenario-package-reference.v1` tuple: package
+ID, version and 64-hex content hash. `compiled.json`, `manifest.json` and
+`report.json` must contain the identical tuple and the manifest must declare the
+matching required viewer feature. Opening rejects malformed, partial or
+cross-artifact-divergent references. Historical records without the optional
+tuple remain readable; a new record cannot claim a feature without its value.
+Before creating a new record, browser and Worker admission also resolve the
+tuple against the deployment's exact retained package inventory. Archive
+readback remains self-contained and structural so a correctly retained older
+record does not become unreadable merely because the live catalog advances.
+
 The implemented archive is a deterministic binary envelope (`vector.archive.v1`)
 with a bounded member table followed by member payloads. The outer table hashes
 every member, including `manifest.json`; the manifest independently binds every
@@ -125,6 +137,11 @@ and visible model-time labels consume that same recorded frame identity and its
 it is not displayed as if it were a separate model sample.
 
 ## Frame contract
+
+Authored-route profile labels and the scenario-package reference add no entity
+sample fields. Frames continue to carry only recorded active-route index,
+position, lifecycle and controller state; report leg transitions are derived
+from changes in those recorded indices rather than from profile text.
 
 Frame schema v7 adds only the optional target projection
 `targetEffect: { commitId, state }` on the affected entity. The complete model
@@ -199,6 +216,11 @@ environment dataset.
 Weapons remain loadout inventory before launch. Aircraft frames preserve the installed inventory identities and total store mass while the weapon is stowed. A launch event removes that store and its declared launch mass from the aircraft once, then creates the weapon's first world sample with the launch platform position and inherited velocity. Static objects may omit unchanged samples. The viewer interpolates only properties explicitly declared interpolable.
 
 ## Integrity and replay
+
+When present, the governed scenario-package reference must be identical in
+compiled, manifest and report members and must match the required viewer
+feature. Replay rejects partial, malformed or coherently resealed divergence;
+historical archives that never declared the optional feature remain readable.
 
 For a governed target effect, integrity is one conjunction across authority,
 termination receipt, effect event, target frame, manifest and report. Opening
@@ -343,7 +365,7 @@ and runway-evidence digest before exposing its operational/value-state fields.
 Record digests and replay verification are unchanged by the persistence-module
 ownership split.
 
-The manifest records SHA-256 hashes for the canonical scenario, compiled engine input, compiled model pack, frames, events, sources and optional assets. It also records intended-use and credibility-manifest identities. Saving a run is complete only after all required hashes and a terminal run state exist. Editing a scenario creates a new draft revision; it cannot mutate a saved VSR.
+The manifest records SHA-256 hashes for the canonical scenario, compiled engine input, compiled model pack, frames, events, sources and optional assets. It also records intended-use and credibility-manifest identities and, when available, the exact governed scenario-package reference. Saving a run is complete only after all required hashes and a terminal run state exist. Editing a scenario creates a new draft revision; it cannot mutate a saved VSR.
 
 ### Simulation event stream
 
@@ -511,6 +533,11 @@ authoritative v2 stream.
 
 ## Browser and interoperability boundary
 
+The browser receives the verified package reference and optional authored-route
+profile only after Worker/VSR admission. It may render the profile and recorded
+route progress, but cannot rewrite package identity, synthesize a transition or
+promote a descriptive tactic into engine input.
+
 The browser owns raw lexical feedback, while the Worker and saved-run boundary
 repeat the shared structured and relational admission semantics. A transport
 adapter may serialize an admitted value but may not broaden its type, precision
@@ -547,9 +574,34 @@ exposed.
 Browser and Worker consumers continue to receive saved records through the
 same aggregate persistence/API contract.
 
+The workbench exposes two explicitly local artifact actions. **Download VSR**
+writes the exact-length byte copy received from the completed simulation Worker;
+it does not serialize the React result or request a server recomputation.
+**Open/verify VSR** transfers a bounded copy to that Worker, admits all member,
+digest, replay and retained-authority checks, then requires the record's exact
+scenario-package `{ id, version, contentHash }` to match the package open in the
+workbench. Only then may the UI replace its scenario and canonical result. The
+full `recordId` and `contentDigest` are visible readback. A rejected import
+cannot clear or mutate an already-open run, and verified replay does not execute
+engine ticks. These controls do not replace the separately persisted server
+saved-run/report path.
+
 VSR is designed for browser production and playback. Frames use a transferable columnar buffer so a Web Worker, TypeScript engine or Rust/WASM engine can produce the same record contract. An ACMI 2.2 exporter can be added as an interoperability adapter; ACMI is not used as VECTOR's internal source of model truth because it does not carry VECTOR's full coefficient, provenance and scenario contracts.
 
 ## Implemented replay boundary
+
+Current replay exposes the exact admitted package reference, authored profile,
+recorded route-index transitions and causal effect receipts used by the #197
+debrief. It does not rerun pilot logic or reconstruct an unrecorded tactic from
+the declared or achieved path.
+
+Report geometry is likewise a projection, not a replay calculation. The unique
+weapon world-entry event selects the exact launch frame and its recorded
+weapon-to-target range/closure; both aircraft altitudes are copied from that
+same frame. Closest active-aircraft approach and matched-profile leg geometry
+are deterministic reductions over retained aircraft frames. An authored leg
+with no retained active-aircraft frame remains explicitly unavailable, even if
+the declared route or profile name contains that leg.
 
 Replay remains read-only with respect to authored input. It exposes the exact
 validated scenario and compiled values stored in the VSR and has no repair,

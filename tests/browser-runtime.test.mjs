@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { EngineSession, runEngine } from "../lib/engine/core.ts";
 import { BrowserSimulationClient } from "../lib/runtime/browser-simulation-client.ts";
-import { adaptPreparedSimulation, verifyRuntimeModelPack } from "../lib/runtime/model-pack-adapter.ts";
+import {
+  adaptPreparedSimulation,
+  admitRuntimeModelPack,
+  verifyRuntimeModelPack,
+} from "../lib/runtime/model-pack-adapter.ts";
 import {
   BROWSER_RUNTIME_PROTOCOL,
   BROWSER_RUNTIME_PROTOCOL_VERSION,
@@ -10,6 +14,8 @@ import {
 } from "../lib/runtime/protocol.ts";
 import { prepareSimulation } from "../lib/simulation.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
+import { createVerificationDeploymentCapabilities } from "../lib/runtime/deployment-capabilities.ts";
+import { retainedScenarioPackageReference } from "../lib/scenario-package-reference.ts";
 
 test("browser runtime protocol identity and message admission are versioned", () => {
   assert.equal(BROWSER_RUNTIME_PROTOCOL, "vector.browser-runtime.v1");
@@ -73,12 +79,99 @@ test("client delegates saved-record verification to the Worker", async () => {
   client.terminate();
 });
 
+test("client retains exact Worker-produced VSR bytes while recycling the transfer buffer", async () => {
+  const recordId = "b".repeat(64);
+  const contentDigest = "c".repeat(64);
+  const transferred = new ArrayBuffer(32);
+  const expected = Uint8Array.from([86, 69, 67, 84, 79, 82, 49, 0, 4, 0, 0, 0]);
+  new Uint8Array(transferred).set(expected);
+  const opened = {
+    manifest: { recordId, contentDigest },
+    result: { outcome: "worker-result" },
+  };
+  const requests = [];
+  class CompletionWorker extends EventTarget {
+    postMessage(message) {
+      requests.push(message);
+      if (message.type === "recycle-buffer") return;
+      const response = message.type === "initialize"
+        ? { type: "initialized", state: "ready" }
+        : message.type === "load-model-pack"
+          ? {
+              type: "model-pack-loaded",
+              state: "ready",
+              digest: message.pack.digest,
+              cached: false,
+            }
+          : {
+              type: "completed",
+              state: "completed",
+              runId: message.runId,
+              backend: "typescript",
+              recordId,
+              contentDigest,
+              byteLength: expected.byteLength,
+              boundaryCalls: 1,
+              recordBuffer: transferred,
+              record: opened,
+            };
+      queueMicrotask(() => this.dispatchEvent(new MessageEvent("message", {
+        data: {
+          protocol: BROWSER_RUNTIME_PROTOCOL,
+          requestId: message.requestId,
+          ...response,
+        },
+      })));
+    }
+    terminate() {}
+  }
+  const client = new BrowserSimulationClient(() => new CompletionWorker());
+  const completion = await client.run(SCENARIO_LIBRARY[0].scenario);
+  assert.equal(completion.serializedRecord.byteLength, expected.byteLength);
+  assert.deepEqual(new Uint8Array(completion.serializedRecord), expected);
+  const recycle = requests.find((request) => request.type === "recycle-buffer");
+  assert.equal(recycle.buffer, transferred);
+  assert.notEqual(completion.serializedRecord, transferred);
+  new Uint8Array(transferred).fill(0);
+  assert.deepEqual(
+    new Uint8Array(completion.serializedRecord),
+    expected,
+    "recycling cannot mutate the retained exact-length VSR copy",
+  );
+  client.terminate();
+});
+
 test("digest adapter detects compiled-pack mutation", async () => {
   const prepared = prepareSimulation(SCENARIO_LIBRARY[0].scenario);
   const pack = await adaptPreparedSimulation(prepared);
   assert.equal(await verifyRuntimeModelPack(pack), true);
   pack.prepared.engineScenario.seed += 1;
   assert.equal(await verifyRuntimeModelPack(pack), false);
+});
+
+test("runtime adapter digest binds the governed scenario-package reference", async () => {
+  const definition = SCENARIO_LIBRARY[0];
+  const prepared = prepareSimulation(definition.scenario);
+  prepared.packageReference = retainedScenarioPackageReference(definition);
+  const pack = await adaptPreparedSimulation(prepared);
+  assert.equal(await verifyRuntimeModelPack(pack), true);
+  pack.prepared.packageReference.version = "9.9.9";
+  assert.equal(await verifyRuntimeModelPack(pack), false);
+});
+
+test("Worker admission rejects a digest-valid but unretained scenario-package claim", async () => {
+  const definition = SCENARIO_LIBRARY[0];
+  const prepared = prepareSimulation(definition.scenario);
+  prepared.packageReference = {
+    ...retainedScenarioPackageReference(definition),
+    contentHash: "b".repeat(64),
+  };
+  const pack = await adaptPreparedSimulation(prepared);
+  assert.equal(await verifyRuntimeModelPack(pack), true);
+  await assert.rejects(
+    admitRuntimeModelPack(pack),
+    /does not match an exact retained deployment package/,
+  );
 });
 
 test("client timeout terminates the stuck Worker and initializes a replacement", async () => {
@@ -224,7 +317,15 @@ for (const batchTicks of [1, 7, 128, 2_048]) {
 }
 
 test("completed Worker batch time uses the canonical off-grid terminal boundary", () => {
-  const prepared = prepareSimulation(SCENARIO_LIBRARY[0].scenario);
+  const definition = SCENARIO_LIBRARY.find(
+    ({ id }) => id === "a2g-emitter-corridor",
+  );
+  assert.ok(definition);
+  const prepared = prepareSimulation(
+    definition.scenario,
+    definition.scenario.profile,
+    createVerificationDeploymentCapabilities("typescript", ["A2A", "A2G"]),
+  );
   const scenario = structuredClone(prepared.engineScenario);
   scenario.fixedStepSeconds = 0.003;
   scenario.durationSeconds = 0.008;

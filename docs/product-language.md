@@ -19,16 +19,38 @@ VECTOR keeps the compact A2A/A2G/G2A/G2G identifiers for scanning, but gives eac
 
 These labels are intentionally narrower than operational doctrine. VECTOR is a public-data educational model and does not claim to simulate the full counterair, counterland, strategic-attack, or targeting processes. UI copy names the configured platform, weapon, target, and information state whenever the catalog contains them; “abstract profile” is not used as a substitute for incomplete data.
 
-The scenario library contains nine governed entries. Its third A2A entry is the
-non-default **High-energy crossing challenge: Su-30MKI versus F-16C**. The title
-describes the authored aircraft identities and geometry; it does not promote the
-anonymous assumption model pack into named-platform performance evidence or
-describe its 25 m verification-only geometric intercept as target damage, a
-kill, probability of kill, or named-weapon effectiveness. Product copy uses
-“geometric intercept” only when the engine emitted the typed terminal event and
-must show that target effect is not modelled. Miss, flight-time expiry and
-terrain failure each use their causal terminal reason; none may fall through to
-copy claiming that the scenario reached its model-time limit.
+The scenario library contains nine governed entries. Its three current A2A
+`1.2.0` packages are distinct authored-route study profiles:
+
+- **BVR offset and support** compares a Blue offset/support/recommit route with
+  a Red beam/drag/extend route.
+- **WVR one-circle defensive break** compares a close merge and one-circle
+  route with a defensive break and extension.
+- **Beam, drag, extend and recommit** is the unrestricted-transition study,
+  connecting the BVR and WVR geometry regimes without claiming a tactical
+  decision policy.
+
+These names describe frozen route geometry, release timing, and recorded model
+inputs. They do not claim that the engine chooses tactics, that an autonomous
+pilot observes or responds to the opponent, or that a named aircraft, weapon,
+sensor, datalink, or pilot would achieve the recorded result.
+
+For these profiles, `KILL`, `DEGRADED`, and `NO_EFFECT` are generic
+assumption-model result classes. UI and report copy may show “model-recorded
+KILL” only when the canonical target-effect commit records `KILL`, the exact
+causal frame records the target lifecycle as `TERMINATED`, and the event points
+back to its weapon-termination receipt. `DEGRADED` means the admitted generic
+threshold band was reached without authorizing a terminal named-target claim;
+`NO_EFFECT` means no admitted effect threshold was reached. The report must keep
+the commit identity, model/authority identity and digest, event/frame/time,
+termination receipt, and `MODEL_ASSUMPTION` limitation together as the causal
+proof. A geometric intercept alone, presentation label, or profile name cannot
+manufacture an effect claim, probability of kill, or named-system
+effectiveness.
+
+Miss, flight-time expiry and terrain failure each use their causal terminal
+reason; none may fall through to copy claiming that the scenario reached its
+model-time limit.
 
 `RELEASE` and `JETTISON` describe only the generic public-educational lifecycle
 selected by authored intent. They do not imply safe separation, emergency

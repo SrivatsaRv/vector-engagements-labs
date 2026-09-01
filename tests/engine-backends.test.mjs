@@ -133,14 +133,56 @@ const assertPictureParity = (actual, expected, label) => {
   }
 };
 
-function regionalBoundaryCrossingScenario() {
+function neutralScheduledA2AScenario() {
   const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
-  const scenario = structuredClone(
-    simulateWithCapabilitiesForVerification(
-      SCENARIO_LIBRARY[0].scenario,
-      capabilities,
-    ).engineRun.scenario,
+  const authored = structuredClone(SCENARIO_LIBRARY[0].scenario);
+  for (const assignment of authored.airMission?.assignments ?? []) {
+    delete assignment.storeTransferPlan;
+  }
+  return structuredClone(
+    simulateWithCapabilitiesForVerification(authored, capabilities).engineRun.scenario,
   );
+}
+
+function compilerInputFor(definition, overrides = {}) {
+  const scenario = definition.scenario;
+  return {
+    id: definition.id,
+    version: definition.version,
+    domain: scenario.domain,
+    name: scenario.name,
+    bluePlatformId: scenario.bluePlatformId,
+    blueSystemId: scenario.blueSystemId,
+    redObjectId: scenario.redObjectId,
+    redSystemId: scenario.redSystemId,
+    studyAreaId: scenario.studyAreaId,
+    weatherPresetId: scenario.weatherPresetId,
+    profile: scenario.profile,
+    guidance: scenario.guidance,
+    altitude: scenario.altitude,
+    cruiseAltitude: scenario.cruiseAltitude,
+    targetDelta: scenario.targetDelta,
+    range: scenario.range,
+    aspect: scenario.aspect,
+    launcherSpeed: scenario.launcherSpeed,
+    targetSpeed: scenario.targetSpeed,
+    blueFuelPercent: scenario.blueFuelPercent,
+    redFuelPercent: scenario.redFuelPercent,
+    blueWeaponQuantity: scenario.blueWeaponQuantity,
+    redWeaponQuantity: scenario.redWeaponQuantity,
+    windEastMps: scenario.wind,
+    windNorthMps: scenario.windNorth,
+    temperatureOffset: scenario.temperatureOffset,
+    windShiftAt: null,
+    windShiftEastMps: 0,
+    windShiftNorthMps: 0,
+    seed: scenario.seed,
+    ...overrides,
+  };
+}
+
+function regionalBoundaryCrossingScenario() {
+  const scenario = neutralScheduledA2AScenario();
   const grid = scenario.environment.runtimeEnvironment.terrain.grid;
   const eastDeg = grid.westDeg + grid.longitudeStepDeg * (grid.columns - 1);
   const latitudeDeg = grid.southDeg + grid.latitudeStepDeg * (grid.rows - 1) / 2;
@@ -228,6 +270,16 @@ for (const definition of SCENARIO_LIBRARY) {
       typescript.engineRun.events,
       "delivered run/lifecycle events must preserve TypeScript/Rust ordering and payload parity",
     );
+    const transferOutcome = typescript.engineRun.events.items.find(
+      ({ payload }) => payload.kind === "AIRBORNE_STORE_TRANSFER_OUTCOME" && payload.accepted,
+    );
+    if (transferOutcome) {
+      assert.equal(
+        transferOutcome.payload.installedDragNewtons,
+        Number(transferOutcome.payload.installedDragNewtons.toFixed(6)),
+        "published store-transfer drag must use the shared six-decimal event authority",
+      );
+    }
     if (definition.scenario.domain === "A2A") {
       assert.ok(typescript.pictures.length > 0, "A2A ticks must publish canonical observer state");
       assert.ok(typescript.pictures.every((picture) => picture.trackState === "UNSUPPORTED" && !picture.visible && !("position" in picture)));
@@ -303,44 +355,29 @@ for (const definition of SCENARIO_LIBRARY) {
 test("explicit backend selection never silently falls through", () => {
   const definition = SCENARIO_LIBRARY[0];
   const profile = getProfile(definition.scenario);
-  const compiled = compileScenario(
-    {
-      id: definition.id,
-      version: definition.version,
-      domain: definition.scenario.domain,
-      name: definition.scenario.name,
-      bluePlatformId: definition.scenario.bluePlatformId,
-      blueSystemId: definition.scenario.blueSystemId,
-      redObjectId: definition.scenario.redObjectId,
-      redSystemId: definition.scenario.redSystemId,
-      studyAreaId: definition.scenario.studyAreaId,
-      weatherPresetId: definition.scenario.weatherPresetId,
-      profile: definition.scenario.profile,
-      guidance: definition.scenario.guidance,
-      altitude: definition.scenario.altitude,
-      cruiseAltitude: definition.scenario.cruiseAltitude,
-      targetDelta: definition.scenario.targetDelta,
-      range: definition.scenario.range,
-      aspect: definition.scenario.aspect,
-      launcherSpeed: definition.scenario.launcherSpeed,
-      targetSpeed: definition.scenario.targetSpeed,
-      blueFuelPercent: definition.scenario.blueFuelPercent,
-      redFuelPercent: definition.scenario.redFuelPercent,
-      blueWeaponQuantity: definition.scenario.blueWeaponQuantity,
-      redWeaponQuantity: definition.scenario.redWeaponQuantity,
-      windEastMps: definition.scenario.wind,
-      windNorthMps: definition.scenario.windNorth,
-      temperatureOffset: definition.scenario.temperatureOffset,
-      windShiftAt: null,
-      windShiftEastMps: 0,
-      windShiftNorthMps: 0,
-      seed: definition.scenario.seed,
-    },
-    profile,
-  );
+  const compiled = compileScenario(compilerInputFor(definition), profile);
   assert.throws(
     () => runEngineBackend(compiled, "other"),
     /Unknown VECTOR engine backend/,
+  );
+});
+
+test("direct compiler admits only three-decimal authored run durations", () => {
+  const definition = SCENARIO_LIBRARY[0];
+  const profile = getProfile(definition.scenario);
+  assert.equal(
+    compileScenario(
+      compilerInputFor(definition, { runDurationSeconds: 80.125 }),
+      profile,
+    ).durationSeconds,
+    80.125,
+  );
+  assert.throws(
+    () => compileScenario(
+      compilerInputFor(definition, { runDurationSeconds: 80.1234 }),
+      profile,
+    ),
+    /at most three decimal places/,
   );
 });
 
@@ -527,15 +564,7 @@ test("both engines fail closed when an authored route has no matching fly-by pla
 });
 
 test("both engines terminate an admitted weapon when its assigned target is unavailable", () => {
-  const capabilities = createVerificationDeploymentCapabilities("typescript", [
-    "A2A",
-  ]);
-  const scenario = structuredClone(
-    simulateWithCapabilitiesForVerification(
-      SCENARIO_LIBRARY[0].scenario,
-      capabilities,
-    ).engineRun.scenario,
-  );
+  const scenario = neutralScheduledA2AScenario();
   const target = scenario.entities.find((entity) => entity.id === "red-object-1");
   assert.ok(target, "fixture must contain the primary weapon target");
   target.lifecycle = "TERMINATED";
@@ -570,13 +599,7 @@ test("both engines terminate an admitted weapon when its assigned target is unav
 });
 
 test("both engines exclude a geometric intercept occurring after an in-step expiry", () => {
-  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
-  const baseline = structuredClone(
-    simulateWithCapabilitiesForVerification(
-      SCENARIO_LIBRARY[0].scenario,
-      capabilities,
-    ).engineRun.scenario,
-  );
+  const baseline = neutralScheduledA2AScenario();
   const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
   const red = baseline.entities.find((entity) => entity.id === "red-object-1");
   const weapon = baseline.entities.find((entity) => entity.weapon);
@@ -610,13 +633,7 @@ test("both engines exclude a geometric intercept occurring after an in-step expi
 });
 
 test("both engines validate a geometric intercept admitted before an in-step expiry", () => {
-  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
-  const baseline = structuredClone(
-    simulateWithCapabilitiesForVerification(
-      SCENARIO_LIBRARY[0].scenario,
-      capabilities,
-    ).engineRun.scenario,
-  );
+  const baseline = neutralScheduledA2AScenario();
   const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
   const red = baseline.entities.find((entity) => entity.id === "red-object-1");
   const weapon = baseline.entities.find((entity) => entity.weapon);
@@ -643,13 +660,7 @@ test("both engines validate a geometric intercept admitted before an in-step exp
 });
 
 test("both engines start off-grid weapon lifetime at the achieved activation boundary", () => {
-  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
-  const baseline = structuredClone(
-    simulateWithCapabilitiesForVerification(
-      SCENARIO_LIBRARY[0].scenario,
-      capabilities,
-    ).engineRun.scenario,
-  );
+  const baseline = neutralScheduledA2AScenario();
   const weapon = baseline.entities.find((entity) => entity.weapon);
   assert.ok(weapon?.weapon);
   weapon.weapon.launchTimeSeconds = 0.025;
@@ -674,13 +685,7 @@ test("both engines start off-grid weapon lifetime at the achieved activation bou
 });
 
 test("both engines bind non-intercept events to the lifetime closest approach", () => {
-  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
-  const baseline = structuredClone(
-    simulateWithCapabilitiesForVerification(
-      SCENARIO_LIBRARY[0].scenario,
-      capabilities,
-    ).engineRun.scenario,
-  );
+  const baseline = neutralScheduledA2AScenario();
   const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
   const red = baseline.entities.find((entity) => entity.id === "red-object-1");
   const weapon = baseline.entities.find((entity) => entity.weapon);
@@ -722,13 +727,7 @@ test("both engines bind non-intercept events to the lifetime closest approach", 
 });
 
 test("both engines exclude stowed geometry from the weapon-lifetime closest approach", () => {
-  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
-  const baseline = structuredClone(
-    simulateWithCapabilitiesForVerification(
-      SCENARIO_LIBRARY[0].scenario,
-      capabilities,
-    ).engineRun.scenario,
-  );
+  const baseline = neutralScheduledA2AScenario();
   const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
   const red = baseline.entities.find((entity) => entity.id === "red-object-1");
   const weapon = baseline.entities.find((entity) => entity.weapon);
@@ -761,13 +760,7 @@ test("both engines exclude stowed geometry from the weapon-lifetime closest appr
 });
 
 test("both engines retain a launch-boundary minimum before a delayed expiry", () => {
-  const capabilities = createVerificationDeploymentCapabilities("typescript", ["A2A"]);
-  const baseline = structuredClone(
-    simulateWithCapabilitiesForVerification(
-      SCENARIO_LIBRARY[0].scenario,
-      capabilities,
-    ).engineRun.scenario,
-  );
+  const baseline = neutralScheduledA2AScenario();
   const blue = baseline.entities.find((entity) => entity.id === "blue-platform-1");
   const red = baseline.entities.find((entity) => entity.id === "red-object-1");
   const weapon = baseline.entities.find((entity) => entity.weapon);
@@ -1839,15 +1832,7 @@ test("both engines count only guided entities toward the scheduled-release limit
 });
 
 test("Rust/WASM and TypeScript preserve aircraft store-mass transfer at release", () => {
-  const capabilities = createVerificationDeploymentCapabilities("typescript", [
-    "A2A",
-  ]);
-  const scenario = structuredClone(
-    simulateWithCapabilitiesForVerification(
-      SCENARIO_LIBRARY[0].scenario,
-      capabilities,
-    ).engineRun.scenario,
-  );
+  const scenario = neutralScheduledA2AScenario();
   scenario.durationSeconds = 4;
   const weapon = scenario.entities.find((entity) => entity.weapon);
   assert.ok(weapon?.weapon);

@@ -46,6 +46,22 @@ and neither backend changes scenario or frame schemas.
 
 ## Dedicated simulation Worker
 
+#197 keeps the numerical Worker boundary unchanged while strengthening the
+scenario envelope around it. Before dispatch, the browser binds the selected
+immutable `vector.scenario.v4` definition to an exact
+`vector.scenario-package-reference.v1` `{ id, version, contentHash }`, admits
+the scenario-owned `runDurationSeconds`, and preserves the optional
+`vector.authored-route-profile.v1` descriptor for VSR explanation. The
+reference must resolve to the exact id/version/content hash in the deployment's
+retained scenario inventory before browser dispatch and again at Worker
+admission; a digest-valid adapter cannot mint an arbitrary package claim. The
+duration is passed through the existing compiled `EngineScenario.durationSeconds`; the
+package reference and tactical profile labels are not numerical inputs and
+must never select a backend, model, route controller, or target-effect branch.
+The three #197 Air studies therefore use the same model-pack, mission compiler,
+Worker protocol, fixed-step engine, and event contract as every other admitted
+Air run.
+
 The Worker transports the compiler-admitted weapon-termination model unchanged
 and returns the engine-owned terminal state and event in the VSR. It cannot use
 renderer distance, progress state or a legacy profile threshold to terminate a
@@ -103,10 +119,17 @@ Worker results are a content-addressed VSR. The simulation Worker verifies and
 opens the archive—including any deterministic terminal-engine replay—before it
 posts the structured playback result and transfers the raw `ArrayBuffer` to the
 main thread. The main thread never reruns engine ticks while accepting a record.
-It returns the raw buffer to the Worker for bounded reuse after matching the
-opened manifest identity to the completion receipt. Saved or uploaded records
-use the same Worker's `open-record` request; the client transfers a bounded copy
-so the caller retains its source bytes. The Worker retains at most two returned
+After matching the opened manifest identity to the completion receipt, the
+client retains one exact-length copy, bounded by the 64 MiB VSR transport
+maximum, and returns the original capacity buffer to the Worker for reuse.
+Workbench **Download VSR** uses only that Worker-produced copy; it never asks the
+server or main thread to recreate the run. **Open/verify VSR** sends a bounded
+copy through the same Worker's `open-record` request, requires the exact current
+retained scenario-package tuple, and installs the opened scenario/result only
+after verification succeeds. The workbench reads back the full record ID and
+content digest and leaves the prior canonical run unchanged after corrupt,
+unsupported or different-package imports. The existing server **Save run** and
+report path remains separate. The Worker retains at most two returned
 buffers, each no larger than 64 MiB, and uses a power-of-two capacity so
 subsequent records can reuse storage. No `SharedArrayBuffer` or cross-origin
 isolation is required.
@@ -119,6 +142,54 @@ validity domains do not cover the aircraft. The Worker does not maintain a
 weaker model-pack validator.
 
 ## Built Worker verification
+
+The #197 built-Worker gate prepares exactly three immutable 1.2.0 Air-combat
+study packages (BVR, WVR/BFM, and transition), transfers their ordinary VSRs,
+reopens every transferred record through the Worker verifier, and verifies that
+each record retains the selected package ID, version,
+content hash, and compiled authored duration. The authored route profile stays
+in the immutable scenario definition; it is not duplicated into the VSR or
+treated as engine input. The gate proves the
+published BVR study produces `DEGRADED`, the WVR study produces a canonical
+`KILL` with target lifecycle `TERMINATED`, and the transition study produces
+`NO_EFFECT`. A matched WVR control changes only the admitted loft release time
+from 20 s to 20.65 s and must instead retain an active target with
+`NO_EFFECT`.
+These are orchestration/VSR assertions around the existing engine and governed
+model-pack contracts, not a new engine ABI, coefficient set, or named-platform
+physics claim.
+
+`npm run worker:verify -- --write-air-combat-evidence <directory>` writes the
+four transferred `.vector` records and a deterministic compact JSON inventory
+of package identity, record digest, duration, outcome, size and terminal
+lifecycle. The destination must be a distinct empty staging directory. Write
+mode validates and emits the newly generated set without consulting tracked
+equality, so a stale tracked set cannot prevent its own recovery; the operator
+replaces tracked files only after inspecting the staging set. Without the flag,
+normal CI remains strict and retains no binary evidence artifact in the
+worktree.
+
+The exact issue #197 acceptance run is retained under
+`fixtures/vector-record/issue-197/`: three canonical `.vector` records, the
+20.65 s WVR release-time control, and `air-combat-study-evidence.json`. The
+inventory binds each file name, byte length, record digest, 1.2.0 package tuple,
+duration, termination, effect, closest approach and terminal lifecycles. These
+files are generated evidence, not alternate runtime inputs or precomputed
+visual tracks.
+
+Plain `npm run worker:verify` is also the semantic freshness gate for those
+tracked artifacts. It requires the exact five-file inventory, matches record
+IDs and byte lengths, validates every archived member digest, compares every
+non-manifest member and compares the manifest after excluding only
+`createdAt` and the content digest derived from that timestamp. Missing or
+stale evidence therefore fails normal Worker CI. Whole-archive hashes are not
+used as the oracle because record creation intentionally records wall-clock
+creation time. The exact fixture-directory prefix is registered in contract
+governance and the verifier rejects missing, extra or renamed evidence files.
+
+#197 grants no browser-artifact size allowance. The historical 585,000-byte
+evidence gate and the current strict sub-620,000-byte optimized WASM ceiling
+remain unchanged and are enforced by the existing build/performance checks.
 
 The built-Worker journey includes CAP/BVR with an exact sourced Jodhpur runway start
 and proves that the admitted artifact, rather than a UI label, reaches a
@@ -148,12 +219,9 @@ verification-only manifest to exercise an unselected backend: that would be
 correctly rejected as stale at the Worker boundary. Cross-backend numerical
 parity remains owned by `tests/engine-backends.test.mjs` outside the deployed
 browser admission path.
-For #190, this built gate selects the governed 44 km/105-degree crossing
-challenge, opens `report.json` and `frames.arrow` from the transferred VSR, and
-requires a successful `weapon_intercept` termination at 131.9 s with a
-21.836104 m closest approach inside the compiled 25 m verification-only radius.
-It also requires the typed `WEAPON_TERMINATED` event, the terminal weapon frame,
-an active target and `targetEffect: NOT_MODELLED`. A title, rendered path,
+The retained #190 regression still opens `report.json` and `frames.arrow` from
+its transferred VSR and verifies the typed termination event, terminal weapon
+frame, target lifecycle, and target-effect result. A title, rendered path,
 renderer proximity or progress message cannot satisfy that assertion.
 Saved-record admission additionally recomputes the terminal predicate and the
 weapon-lifetime closest approach from exact engine-retained fixed-step evidence;

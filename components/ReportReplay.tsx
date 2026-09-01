@@ -10,13 +10,16 @@ import {
 } from "@/lib/simulation";
 import { findWeaponSimulationModel } from "@/lib/simulation-models";
 import { selectDisplayFrame, selectRecordedTrackState } from "@/lib/frontend/selectors";
+import type { ReportLibraryScenario } from "@/lib/report-export";
 
 export function ReportReplay({
   scenario,
   result,
+  libraryScenario,
 }: {
   scenario: Scenario;
   result: SimulationResult;
+  libraryScenario: ReportLibraryScenario;
 }) {
   const [time, setTime] = useState(() =>
     Math.min(result.timeOfFlight * 0.42, result.timeOfFlight),
@@ -101,6 +104,9 @@ export function ReportReplay({
           selected={selected}
           profile={scenario.profile}
           layers={{ interceptor: true, target: true, lineOfSight: true }}
+          authoredProfile={libraryScenario.authoredProfile}
+          authoredProfileBinding={libraryScenario.authoredProfileBinding}
+          authoredScenario={scenario}
           targetEffectOverlay
         />
         <div className="report-replay-metrics">
@@ -156,7 +162,7 @@ export function ReportReplay({
           type="range"
           min={0}
           max={result.timeOfFlight || 1}
-          step={0.1}
+          step={0.001}
           value={time}
           onChange={(event) => {
             setPlaying(false);

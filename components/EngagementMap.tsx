@@ -73,6 +73,17 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
   const spatial = result.engineRun.scenario.environment.studyArea;
   const origin = spatial.anchor;
   const targetEffect = selectCanonicalTargetEffect(result, selected);
+  const declaredRouteFeatureCount = buildDeclaredRouteFeatures(result, origin).length;
+  const achievedTrailFeatureCount = buildTrackFeatures(
+    result,
+    selected.frame,
+    selected.displayTimeSeconds,
+    origin,
+    undefined,
+  ).length;
+  const launchedStoreCount = selected.frame.entities.filter(
+    (entity) => entity.kind === "GUIDED_WEAPON" && entity.lifecycle !== "STOWED",
+  ).length;
 
   useEffect(() => {
     queueMicrotask(() => setBasemap(readVectorBasemap()));
@@ -335,8 +346,8 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           layout: {
             "text-field": ["concat", ["get", "label"], " · T+", ["to-string", ["get", "modelTime"]], "s"],
             "text-size": 10,
-            "text-offset": [0, 1.4],
-            "text-anchor": "top",
+            "text-offset": [7, 3.4],
+            "text-anchor": "top-left",
           },
           paint: { "text-color": "#34424c", "text-halo-color": "#ffffff", "text-halo-width": 1 },
         });
@@ -438,9 +449,7 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
         selected: entity.id === selectedEntityId,
         valueState: "WORLD",
       }));
-      const presentations = applyTacticalLabelCollisionPolicy(
-        basePresentations,
-        frame.entities.map((entity) => {
+      const projectedAnchors = frame.entities.map((entity) => {
           const [longitude, latitude] = recordedLngLat(
             frame.geographicPositions,
             entity.id,
@@ -449,7 +458,10 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           );
           const point = map.project([longitude, latitude]);
           return { id: entity.id, x: point.x, y: point.y };
-        }),
+        });
+      const presentations = applyTacticalLabelCollisionPolicy(
+        basePresentations,
+        projectedAnchors,
       );
       const presentationById = new Map(presentations.map((presentation) => [presentation.id, presentation]));
       for (const entity of frame.entities) {
@@ -476,6 +488,11 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
         if (!marker) {
           const element = document.createElement("div");
           element.className = "map-tactical-marker";
+          element.dataset.entityId = entity.id;
+          element.dataset.affiliation = entity.affiliation;
+          element.dataset.entityKind = entity.kind;
+          element.dataset.lifecycle = entity.lifecycle;
+          element.dataset.flightState = entity.weaponFlightState ?? "NOT_APPLICABLE";
           element.innerHTML = `${tacticalSymbolMarkup(presentation)}<span></span>`;
           element.tabIndex = 0;
           element.setAttribute("role", "button");
@@ -524,7 +541,11 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           marker.getElement().style.setProperty("--entity-heading", `${presentation.headingDeg}deg`);
         }
         marker.getElement().dataset.labelVisibility = presentation.label.visibility;
+        const currentLabel = marker.getElement().querySelector("span");
+        if (currentLabel) currentLabel.hidden = presentation.label.visibility === "HIDDEN";
         marker.getElement().dataset.selected = String(presentation.availability === "AVAILABLE" && presentation.selected);
+        marker.getElement().dataset.lifecycle = entity.lifecycle;
+        marker.getElement().dataset.flightState = entity.weaponFlightState ?? "NOT_APPLICABLE";
       }
       // No uncertainty marker is shown until an admitted sensor model emits a
       // side-owned position estimate.
@@ -555,8 +576,17 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
         ["get", "modelTime"],
         displayTimeSeconds,
       ];
+      const launchLabelFilter: import("maplibre-gl").FilterSpecification = [
+        "<=",
+        ["get", "modelTime"],
+        displayTimeSeconds - result.engineRun.diagnostics.fixedStepSeconds / 2,
+      ];
       map.setFilter("launch-events", launchFilter);
-      map.setFilter("launch-event-labels", launchFilter);
+      // At the exact transfer frame the guided-store marker is the primary
+      // identity. Delay the duplicate launch annotation until the next
+      // retained frame so it cannot collide with the coincident launcher/store
+      // labels; the launch circle itself remains exact-frame visible.
+      map.setFilter("launch-event-labels", launchLabelFilter);
     });
   }, [mapStatus, origin, result, selected, raspTrack, selectedEntityId]);
 
@@ -568,6 +598,9 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
       data-effect-state={targetEffect.presentation.state}
       data-effect-class={targetEffect.presentation.effectClass ?? "NONE"}
       data-effect-event-id={targetEffect.eventId ?? "UNAVAILABLE"}
+      data-declared-route-feature-count={declaredRouteFeatureCount}
+      data-achieved-trail-feature-count={achievedTrailFeatureCount}
+      data-launched-store-count={launchedStoreCount}
     >
       <TargetEffectSummary selection={targetEffect} compact />
       <div className="map-scope-switch" aria-label="Map extent">

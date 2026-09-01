@@ -11,10 +11,15 @@ one family must not imply changes to unrelated contracts.
 
 #### Model packs
 
+- Keep the compiled generic aircraft, weapon, credibility and target-effect
+  model-pack contracts byte-identical while three new scenario-package versions
+  bind those existing identities. Authored tactic names and route profiles do
+  not promote named-aircraft or named-weapon evidence.
 - Add a separate content-addressed generic target-effect authority with exact
   weapon/target/model-pack bindings, deterministic `MODEL_ASSUMPTION` threshold
   bands, closed effect results, explicit target domain and named-effectiveness
   nonclaims. Missing exact bindings fail closed as `EFFECT_UNAVAILABLE`.
+
 - Bind the #190 high-energy crossing scenario to the unchanged current generic
   model-pack ID/version/digest and existing compatibility rules. No coefficient,
   source, credibility, intended-use, named-performance or pack schema changes.
@@ -112,6 +117,9 @@ promotion remain downstream under #154, later #161 stages and #155.
 
 #### Database schema
 
+- Add forward-only migration 018 for the exact three Air-combat `1.2.0`
+  packages, retaining their immutable superseded `1.1.0` rows as `RETIRED` and
+  rejecting a conflicting pre-existing package identity on exact readback.
 - Add forward-only migration 017 for intended-use 1.1.0, model-pack 0.9.0,
   credibility 1.3.0 and new `1.1.0` versions of all nine exact scenario
   bindings while retaining every `1.0.0` row and freezing migrations 015 and
@@ -141,6 +149,10 @@ packages/hashes with canonical v4 packages and rejects mixed or residual rows.
 
 #### Engine ABI
 
+- Carry the scenario-owned run duration and governed scenario-package reference
+  through the existing prepared-runtime envelope without adding an exported
+  Rust/WASM symbol, changing the numerical ABI, or raising the production WASM
+  size and memory ceilings.
 - Extend both production backends with optional strict target-effect authority,
   canonical six-decimal effect inputs, identical commit/event/lifecycle output
   and legacy no-authority behavior. No renderer or caller-authored proximity
@@ -188,6 +200,11 @@ No pending family-specific entry.
 
 #### Generic target effect
 
+- Bind the three 1.2.0 Air-combat studies to the retained generic effect
+  authority and prove the WVR `KILL` against a release-time-only non-kill
+  control. Update selector, map, report, replay and legacy `NOT_MODELLED`
+  regressions to require coherent event, frame and lifecycle state rather than
+  pre-#197 frame numbers or historical closest-approach constants.
 - Enforce the target-effect projection as persistent causal state: it is absent
   before the exact commit frame, present only on the committed target from that
   frame onward, and forbidden without a causal event. Align Rust/WASM with the
@@ -200,8 +217,9 @@ No pending family-specific entry.
   internally valid invented thresholds now fail closed.
 - Correct the Browser Contract admission inventory for governed target-effect
   presentation: the exact causal-frame proof runs without skips across all five
-  responsive viewports, and the fail-closed runner admits exactly 25/25 passing
-  cases rather than retaining the previous four-case project manifest.
+  responsive viewports. The fail-closed runner now requires the complete twelve-
+  case inventory on each viewport, 60/60 expected results, rather than retaining
+  the previous four-case project manifest.
 - Add the separately governed generic target-effect authority, deterministic
   commit, once-only target lifecycle transition, canonical event/frame/VSR v7
   identity and exact-frame Map/3D/telemetry/report presentation. Rebaseline the
@@ -314,10 +332,23 @@ admission, or tick behavior.
 - Require direct Rust/WASM callers to bind every entity termination model to
   the authenticated runtime-pack projection; an empty projection can no longer
   admit arbitrary radius or lifetime values.
+- Execute the three #197 BVR, WVR and transition packages through one generic
+  authored-route, duration, release and target-effect path with no actor,
+  scenario or presentation-name branch. Each intended effect now has a nearby
+  one-field release-time control with a different canonical result.
+- Publish the installed-drag event scalar as the same non-negative six-decimal
+  SI value in TypeScript and Rust/WASM while retaining full `f64` force and
+  trajectory precision inside both integrators.
 
 No pending family-specific entry.
 
 #### Browser Worker protocol
+
+The prepared request now binds the optional governed scenario-package
+ID/version/content hash and scenario-owned run duration before execution. The
+message inventory and transfer protocol are unchanged; Worker admission rejects
+a divergent reference before ticks and the built verification opens the same
+reference from the resulting VSR.
 
 The production-built Worker verifier now conducts the governed #190
 high-energy crossing package and opens its transferred VSR to assert the
@@ -331,11 +362,19 @@ identity before caching or executing a runtime adapter.
   cooperative 128-sample cancellation chunks and same-Worker retry recovery.
 - Re-admit the full authored/compiled/compact airborne-transfer lineage and
   return its exact canonical outcome through the real built Worker.
+- Add a verification-owned Chromium/laptop regression policy for all three
+  exact #197 studies. It binds Worker load/run timing to canonical 3D effect
+  selection, live playback cadence, Long Task observations, retained VSR bytes,
+  and garbage-collected heap without making a production-capacity or
+  named-platform performance claim.
 
 No pending family-specific entry.
 
 #### Vector simulation records
 
+- Bind the exact governed scenario package ID, version and content hash across
+  browser runtime and VSR compiled/manifest/report artifacts, with malformed and
+  divergent-reference rejection and legacy read compatibility.
 - Require the frozen report's exact eight-field result projection, including
   governed reason text, to equal the reconstructed canonical result and bind
   its report-facing engine projection to deterministic replay where replay is
@@ -434,6 +473,14 @@ writer/reader, Worker, or replay behavior.
 
 #### Mission scenarios
 
+- Publish governed `1.2.0` BVR offset/support, WVR one-circle/defensive-break,
+  and beam/drag/extend/recommit Su-30MKI/F-16 study packages with exact
+  four-point routes, explicit release times and scenario-owned run durations.
+- Add canonical 3D callsign/designation/altitude labels, declared routes and
+  active-leg overlays, plus a report debrief derived from recorded route,
+  transfer, termination and target-effect facts. KILL language remains limited
+  to the generic admitted authority and explicitly excludes autonomous-pilot or
+  named-system performance claims.
 - Compile the separately content-addressed target-effect authority into current
   Air scenarios by exact weapon/target model-pack binding. The authority is not
   editable mission intent, and its absence retains historical `NOT_MODELLED`.

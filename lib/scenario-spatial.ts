@@ -172,7 +172,7 @@ export function localToGeographic(
   return {
     longitude: msl.longitudeDeg,
     latitude: msl.latitudeDeg,
-    altitudeM: msl.altitude.valueM,
+    altitudeM: Number(msl.altitude.valueM.toFixed(3)),
     verticalDatum: "MSL",
   };
 }
@@ -189,7 +189,7 @@ function engineToScenarioSpatial(
   return {
     longitude: msl.longitudeDeg,
     latitude: msl.latitudeDeg,
-    altitudeM: msl.altitude.valueM,
+    altitudeM: Number(msl.altitude.valueM.toFixed(3)),
     verticalDatum: "MSL",
   };
 }
@@ -330,7 +330,9 @@ export function withSpatialAspectDeg(
     ...plan,
     red: {
       ...plan.red,
-      headingDeg: normalizeHeading(lineBearing - side * aspectDeg),
+      headingDeg: Number(
+        normalizeHeading(lineBearing - side * aspectDeg).toFixed(3),
+      ),
     },
   };
 }

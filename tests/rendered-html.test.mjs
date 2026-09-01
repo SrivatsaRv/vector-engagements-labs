@@ -49,13 +49,22 @@ test("server-renders the scenario library and configured workbench", async () =>
     libraryResponse.text(),
     workbenchResponse.text(),
   ]);
-  assert.match(library, /Su-30MKI \/ Astra versus F-16C Block 52/);
+  assert.match(library, /BVR offset and support: Su-30MKI versus F-16C/);
+  assert.match(library, /WVR one-circle defensive break: Su-30MKI versus F-16C/);
   assert.match(
     library,
-    /High-energy crossing challenge: Su-30MKI versus F-16C/,
+    /Beam, drag, extend and recommit: Su-30MKI versus F-16C/,
   );
+  assert.match(library, /Su-30MKI carrying Astra Mk 1/);
+  assert.match(library, /PAF F-16C Block 52 carrying AIM-120C-5/);
+  assert.match(library, /Scenario <!-- -->1\.2\.0/);
   assert.match(library, /All scenarios/);
   assert.match(library, />9</);
+  assert.match(workbench, /BVR offset and support: Su-30MKI versus F-16C/);
+  assert.match(
+    workbench,
+    /BVR offset and support · Blue OFFSET → SUPPORT → RECOMMIT · Red BEAM → DRAG → EXTEND · authored routes, no autonomous pilot\./,
+  );
   assert.match(workbench, /Review the configured experiment/);
   assert.match(workbench, /Run baseline/);
   assert.match(

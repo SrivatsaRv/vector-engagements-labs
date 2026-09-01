@@ -92,13 +92,24 @@ test("map contract produces installations, routes, launch, tracks and vectors fr
   assert.ok(routes.every((feature) => feature.properties.entityId));
 
   const launches = buildLaunchFeatures(result, origin);
+  const compiledLaunches = result.engineRun.scenario.entities
+    .filter((entity) => entity.weapon?.launchTimeSeconds != null)
+    .map((entity) => ({
+      entityId: entity.id,
+      modelTime: entity.weapon.launchTimeSeconds,
+    }));
   assert.equal(
     launches.length,
-    result.engineRun.scenario.entities.filter(
-      (entity) => entity.weapon?.launchTimeSeconds !== null && entity.weapon,
-    ).length,
+    compiledLaunches.length,
   );
-  assert.ok(launches.every((feature) => feature.properties.modelTime === 0));
+  assert.deepEqual(
+    launches.map((feature) => ({
+      entityId: feature.properties.entityId,
+      modelTime: feature.properties.modelTime,
+    })),
+    compiledLaunches,
+  );
+  assert.ok(launches.every((feature) => feature.properties.achieved === true));
   assert.ok(launches.every((feature) => feature.geometry.coordinates.every(Number.isFinite)));
 
   const tracks = buildTrackFeatures(result, frame, frame.t, origin);

@@ -14,23 +14,34 @@ describe("ViewportTelemetry", () => {
   it("keeps canonical telemetry hidden until the accessible disclosure is expanded", async () => {
     const user = userEvent.setup();
     const onExpandedChange = vi.fn();
+    const effectEvent = result.engineRun.events.state === "AVAILABLE"
+      ? result.engineRun.events.items.find((event) => event.payload.kind === "TARGET_EFFECT_COMMITTED")
+      : undefined;
+    expect(effectEvent?.frameIndex).toBeGreaterThan(0);
+    if (!effectEvent || effectEvent.frameIndex < 1) {
+      throw new Error("Expected a retained frame before the canonical target-effect boundary.");
+    }
+    const selected = selectDisplayFrame(result, result.frames[effectEvent.frameIndex - 1].t);
     render(
       <ViewportTelemetry
         expanded={false}
         onExpandedChange={onExpandedChange}
         result={result}
-        selected={selectDisplayFrame(result, 3.5)}
+        selected={selected}
       />,
     );
 
     const toggle = screen.getByRole("button", { name: /expand telemetry/i });
+    const telemetry = screen.getByRole("region", { name: "Synchronized run telemetry" });
+    expect(telemetry).toHaveAttribute("data-frame-index", String(selected.frameIndex));
+    expect(telemetry).toHaveAttribute("data-display-time", String(selected.displayTimeSeconds));
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(toggle).toHaveAttribute("aria-controls", "synchronized-run-telemetry");
-    expect(screen.getByText(/computed at 3\.5 model seconds/i)).toBeVisible();
-    expect(screen.getByRole("region", { name: "Canonical target effect" })).toHaveAttribute(
-      "data-effect-state",
-      "UNAVAILABLE",
-    );
+    expect(screen.getByText((content) =>
+      content.includes(`Computed at ${selected.displayTimeSeconds.toFixed(1)} model seconds`))).toBeVisible();
+    const effectSummary = screen.getByRole("region", { name: "Canonical target effect" });
+    expect(effectSummary).toHaveAttribute("data-effect-state", "BEFORE_EFFECT_BOUNDARY");
+    expect(effectSummary).toHaveAttribute("data-kill-claim-authorized", "false");
     expect(screen.queryByText("Altitude")).not.toBeVisible();
 
     await user.click(toggle);

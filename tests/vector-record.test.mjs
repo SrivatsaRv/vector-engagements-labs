@@ -55,6 +55,7 @@ import {
   createTargetEffectModelForAuthority,
 } from "../lib/engine/target-effect-authority.ts";
 import { assertSimulationEventStream } from "../lib/engine/simulation-events.ts";
+import { retainedScenarioPackageReference } from "../lib/scenario-package-reference.ts";
 
 function governWeaponTermination(scenario, weapon, changes) {
   const pack = resolveRetainedCompiledModelPack(scenario.modelPack);
@@ -95,6 +96,19 @@ function governWeaponTermination(scenario, weapon, changes) {
 const createdAt = "2026-08-06T00:00:00.000Z";
 const textEncoder = new TextEncoder();
 const jsonBytes = (value) => textEncoder.encode(canonicalJson(value));
+
+function scenarioById(id) {
+  const definition = SCENARIO_LIBRARY.find((entry) => entry.id === id);
+  assert.ok(definition, `Missing exact scenario fixture ${id}`);
+  return definition.scenario;
+}
+
+function legacyNoReleaseAirScenario(durationSeconds) {
+  const scenario = structuredClone(scenarioById("a2a-crossing-intercept"));
+  delete scenario.airMission.assignments[0].storeTransferPlan;
+  if (durationSeconds !== undefined) scenario.runDurationSeconds = durationSeconds;
+  return scenario;
+}
 
 function expectedRecordReportResult(result) {
   return {
@@ -281,8 +295,85 @@ for (const backend of ["typescript", "rust-wasm"]) {
   });
 }
 
+test("VSR binds the exact governed scenario-package reference across every replay artifact", async () => {
+  const definition = SCENARIO_LIBRARY.find(
+    ({ id }) => id === "a2a-defensive-break",
+  );
+  assert.ok(definition);
+  const prepared = prepareSimulation(definition.scenario);
+  prepared.packageReference = retainedScenarioPackageReference(definition);
+  const result = simulate(definition.scenario);
+  const record = await createVectorSimulationRecord(prepared, result, createdAt);
+  const serialized = serializeVectorRecord(record);
+  const opened = await openVectorSimulationRecord(
+    serialized.buffer,
+    serialized.byteLength,
+  );
+
+  assert.deepEqual(opened.manifest.scenarioPackage, prepared.packageReference);
+  assert.deepEqual(opened.report.scenarioPackage, prepared.packageReference);
+  assert.ok(
+    opened.manifest.requiredViewerFeatures.includes(
+      "vector.scenario-package-reference.v1",
+    ),
+  );
+
+  const compiledMember = record.members.find(
+    ({ path }) => path === "compiled.json",
+  );
+  assert.ok(compiledMember);
+  const compiled = JSON.parse(new TextDecoder().decode(compiledMember.bytes));
+  compiled.packageReference.version = "9.9.9";
+  const inconsistent = await replaceRecordMember(
+    record,
+    "compiled.json",
+    compiledMember.schemaVersion,
+    jsonBytes(compiled),
+  );
+  const inconsistentBytes = serializeVectorRecord(inconsistent);
+  await assert.rejects(
+    openVectorSimulationRecord(
+      inconsistentBytes.buffer,
+      inconsistentBytes.byteLength,
+    ),
+    /scenario-package reference is inconsistent/,
+  );
+});
+
+test("VSR rejects a malformed scenario-package reference before serialization", async () => {
+  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const prepared = prepareSimulation(scenario);
+  prepared.packageReference = {
+    schemaVersion: "vector.scenario-package-reference.v1",
+    id: "a2a-crossing-intercept",
+    version: "1.2.0",
+    contentHash: "not-a-digest",
+  };
+  await assert.rejects(
+    createVectorSimulationRecord(prepared, simulate(scenario), createdAt),
+    /scenario-package reference.*malformed/i,
+  );
+});
+
+test("VSR creation rejects a structurally valid but unretained package reference", async () => {
+  const definition = SCENARIO_LIBRARY[0];
+  const prepared = prepareSimulation(definition.scenario);
+  prepared.packageReference = {
+    ...retainedScenarioPackageReference(definition),
+    version: "9.9.9",
+  };
+  await assert.rejects(
+    createVectorSimulationRecord(
+      prepared,
+      simulate(definition.scenario),
+      createdAt,
+    ),
+    /does not match an exact retained deployment package/,
+  );
+});
+
 test("VSR recompiles an archived Air mission against its exact retained model pack", async () => {
-  const currentScenario = SCENARIO_LIBRARY[0].scenario;
+  const currentScenario = legacyNoReleaseAirScenario(1);
   const historicalModelPack = historicalModelPackBundle.pack;
   const scenario = synchronizeScenarioAirMission(
     structuredClone(currentScenario),
@@ -357,7 +448,7 @@ test("VSR recompiles an archived Air mission against its exact retained model pa
 });
 
 test("VSR recompiles an archived Air mission against its authenticated supplied verification pack", async () => {
-  const currentScenario = SCENARIO_LIBRARY[0].scenario;
+  const currentScenario = legacyNoReleaseAirScenario();
   const base = prepareSimulation(currentScenario);
   const binding = await bindVerificationTrackModelPack(base.engineScenario);
   const scenario = synchronizeScenarioAirMission(
@@ -938,7 +1029,7 @@ test("archived model-pack resolution rejects every partial identity match", () =
 });
 
 test("VSR admits an off-grid scheduled launch at its first fixed-step boundary", async () => {
-  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const scenario = legacyNoReleaseAirScenario();
   const prepared = prepareSimulation(scenario);
   const weapon = prepared.engineScenario.entities.find((entity) =>
     entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds === 0
@@ -962,7 +1053,7 @@ test("VSR admits an off-grid scheduled launch at its first fixed-step boundary",
 });
 
 test("VSR rejects a hash-resealed expiry time that contradicts the achieved launch boundary", async () => {
-  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const scenario = legacyNoReleaseAirScenario();
   const prepared = prepareSimulation(scenario);
   const weapon = prepared.engineScenario.entities.find((entity) =>
     entity.kind === "GUIDED_WEAPON" && entity.weapon?.launchTimeSeconds === 0
@@ -1145,16 +1236,25 @@ test("VSR rejects any coherently resealed non-canonical frozen report result", a
     );
   }
 
-  const unavailableScenario = SCENARIO_LIBRARY.find(
-    (entry) => entry.id === "a2a-defensive-break",
-  ).scenario;
-  const unavailableResult = simulate(unavailableScenario);
+  const unavailableScenario = scenarioById("a2a-defensive-break");
+  const unavailablePrepared = prepareSimulation(unavailableScenario);
+  const unavailableTarget = unavailablePrepared.engineScenario.entities.find(
+    (entity) => entity.id === "red-object-1" && entity.aircraft,
+  );
+  assert.ok(unavailableTarget?.aircraft);
+  unavailableTarget.aircraft.emptyMassKg += 30_000;
+  unavailableTarget.initial.massKg += 30_000;
+  const unavailableResult = buildSimulationResult(
+    unavailablePrepared,
+    runEngineBackend(unavailablePrepared.engineScenario, "typescript"),
+  );
   const unavailableEffect = unavailableResult.engineRun.events.items.find(
     (event) => event.payload.kind === "TARGET_EFFECT_COMMITTED",
   );
   assert.equal(unavailableEffect?.payload.commit.result, "EFFECT_UNAVAILABLE");
+  assert.equal(unavailableEffect?.payload.commit.reason, "OUTSIDE_TARGET_DOMAIN");
   const unavailableRecord = await createVectorSimulationRecord(
-    prepareSimulation(unavailableScenario),
+    unavailablePrepared,
     unavailableResult,
     createdAt,
   );
@@ -1329,11 +1429,13 @@ test("target-effect projection ownership and persistence cover exact and later r
     ).targetEffect,
     projection,
   );
+  const exactEffectFrameIndex = effect.frameIndex;
+  const retainedFrameIndex = frames.length - 1;
 
   const cases = [
     {
       label: "exact-frame other entity",
-      pattern: /non-target entity .* frame 530/,
+      pattern: new RegExp(`non-target entity .* frame ${exactEffectFrameIndex}`),
       mutate(candidate) {
         candidate[effect.frameIndex].entities.find(
           (entity) => entity.id !== effect.payload.commit.targetId,
@@ -1342,7 +1444,7 @@ test("target-effect projection ownership and persistence cover exact and later r
     },
     {
       label: "later other entity",
-      pattern: /non-target entity .* frame 531/,
+      pattern: new RegExp(`non-target entity .* frame ${retainedFrameIndex}`),
       mutate(candidate) {
         candidate.at(-1).entities.find(
           (entity) => entity.id !== effect.payload.commit.targetId,
@@ -1351,7 +1453,7 @@ test("target-effect projection ownership and persistence cover exact and later r
     },
     {
       label: "later target removal",
-      pattern: /does not persist .* frame 531/,
+      pattern: new RegExp(`does not persist .* frame ${retainedFrameIndex}`),
       mutate(candidate) {
         delete candidate.at(-1).entities.find(
           (entity) => entity.id === effect.payload.commit.targetId,
@@ -1360,7 +1462,7 @@ test("target-effect projection ownership and persistence cover exact and later r
     },
     {
       label: "later target change",
-      pattern: /does not persist .* frame 531/,
+      pattern: new RegExp(`does not persist .* frame ${retainedFrameIndex}`),
       mutate(candidate) {
         candidate.at(-1).entities.find(
           (entity) => entity.id === effect.payload.commit.targetId,
@@ -1381,7 +1483,7 @@ test("target-effect projection ownership and persistence cover exact and later r
 
 test("VSR rejects a jointly resealed unretained target-effect authority before replay", async () => {
   const scenario = SCENARIO_LIBRARY.find(
-    (entry) => entry.id === "a2a-high-energy-crossing-challenge",
+    (entry) => entry.id === "a2a-crossing-intercept",
   ).scenario;
   const prepared = prepareSimulation(scenario);
   const retainedAuthority = prepared.engineScenario.targetEffectAuthority;
@@ -1430,7 +1532,7 @@ test("VSR rejects a jointly resealed unretained target-effect authority before r
 });
 
 test("VSR retains read-only compatibility with the last observer frame and picture schemas", async () => {
-  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const scenario = createGenericTakeoffPerformanceScenario();
   const result = simulate(scenario);
   const record = await createVectorSimulationRecord(prepareSimulation(scenario), result, createdAt);
   const frameMember = record.members.find((member) => member.path === "frames.arrow");
@@ -1962,7 +2064,9 @@ test("VSR rejects a hash-resealed terminal-event distance that contradicts the r
   const events = structuredClone(result.engineRun.events.items);
   const terminal = events.find((event) => event.payload.kind === "WEAPON_TERMINATED");
   assert.ok(terminal);
-  terminal.payload.closestApproachM += 1;
+  // Keep the event internally consistent with its INTERCEPT terminal state so
+  // this mutation reaches the exact retained-geometry comparison it targets.
+  terminal.payload.closestApproachM -= 1;
   const corrupt = await replaceRecordMember(
     record,
     "events.jsonl",
@@ -2098,9 +2202,7 @@ test("VSR binds a terminal event to the report's exact primary weapon and target
 });
 
 test("VSR binds a nonterminal report's primary weapon and target to deterministic replay", async () => {
-  const scenario = SCENARIO_LIBRARY.find(
-    (entry) => entry.id === "a2a-crossing-intercept",
-  ).scenario;
+  const scenario = legacyNoReleaseAirScenario(1);
   const prepared = prepareSimulation(scenario);
   const result = simulate(scenario);
   assert.equal(result.engineRun.termination, "time_limit");
@@ -2800,9 +2902,7 @@ test("VSR rejects removal and replacement of the declared lifetime-minimum witne
 });
 
 test("VSR rejects a geometric intercept whose target is terminal in the event frame", async () => {
-  const scenario = SCENARIO_LIBRARY.find(
-    (entry) => entry.id === "a2a-defensive-break",
-  ).scenario;
+  const scenario = scenarioById("a2a-crossing-intercept");
   const result = simulate(scenario);
   assert.equal(result.engineRun.events.state, "AVAILABLE");
   const terminal = result.engineRun.events.items.find(
@@ -2822,6 +2922,7 @@ test("VSR rejects a geometric intercept whose target is terminal in the event fr
     (entity) => entity.id === terminal.payload.targetId,
   );
   assert.ok(target);
+  assert.equal(target.lifecycle, "ACTIVE");
   target.lifecycle = "TERMINATED";
   const corrupt = await replaceRecordMember(
     record,
@@ -2906,7 +3007,7 @@ test("VSR rejects a lifecycle event whose valid from-enum falsifies canonical hi
 });
 
 test("VSR rejects valid-state events moved away from their transition boundaries", async () => {
-  const scenario = SCENARIO_LIBRARY[0].scenario;
+  const scenario = legacyNoReleaseAirScenario(1);
   const prepared = prepareSimulation(scenario);
   const result = simulate(scenario);
   const engineRun = result.engineRun;
@@ -2942,10 +3043,9 @@ test("VSR rejects valid-state events moved away from their transition boundaries
   const earlyCompletion = structuredClone(engineRun.events.items);
   const completed = earlyCompletion.at(-1);
   assert.equal(completed?.payload.kind, "RUN_COMPLETED");
-  const terminalTime = engineRun.frames.at(-1).t;
-  const earlierTime = Number((terminalTime - 0.25).toFixed(6));
-  const earlierFrame = engineRun.frames.findIndex((frame) => frame.t === earlierTime);
+  const earlierFrame = engineRun.frames.length - 2;
   assert.ok(earlierFrame >= 0);
+  const earlierTime = engineRun.frames[earlierFrame].t;
   completed.tick = Math.round(earlierTime / engineRun.scenario.fixedStepSeconds);
   completed.modelTimeSeconds = earlierTime;
   completed.frameIndex = earlierFrame;

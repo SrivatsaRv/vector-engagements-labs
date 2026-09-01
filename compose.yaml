@@ -16,7 +16,12 @@ services:
     volumes:
       - vector_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vector -d vector"]
+      # The official image briefly starts a temporary postmaster while it
+      # initializes an empty volume. pg_isready alone can mark that process
+      # healthy immediately before it is stopped, racing the migration job.
+      # Wait until the entrypoint's direct child has become the final postgres
+      # process, then verify database readiness.
+      test: ["CMD-SHELL", "set -- $$(cat /proc/1/task/1/children); [ \"$$#\" -eq 1 ] && [ \"$$(cat /proc/$$1/comm)\" = postgres ] && pg_isready -U vector -d vector"]
       interval: 3s
       timeout: 3s
       retries: 20

@@ -70,6 +70,54 @@ const number = (
   unit,
 });
 
+export const AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY = Object.freeze(
+  number(0, 15_000, "m_MSL", MAX_AUTHORED_SCALAR_FRACTION_DIGITS),
+);
+export const AUTHORED_AIRCRAFT_TAS_AUTHORITY = Object.freeze(
+  number(0, 450, "m/s", MAX_AUTHORED_SCALAR_FRACTION_DIGITS),
+);
+export const AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY = Object.freeze(
+  number(1, 25_000, "m", MAX_AUTHORED_SCALAR_FRACTION_DIGITS),
+);
+export const AUTHORED_WGS84_LONGITUDE_AUTHORITY = Object.freeze(
+  number(-180, 180, "deg_WGS84", MAX_WGS84_FRACTION_DIGITS),
+);
+export const AUTHORED_WGS84_LATITUDE_AUTHORITY = Object.freeze(
+  number(-90, 90, "deg_WGS84", MAX_WGS84_FRACTION_DIGITS),
+);
+export const AUTHORED_TRUE_HEADING_AUTHORITY = Object.freeze(
+  number(0, 359.999, "deg_true", MAX_AUTHORED_SCALAR_FRACTION_DIGITS),
+);
+export const AUTHORED_CROSSING_ANGLE_AUTHORITY = Object.freeze(
+  number(0, 180, "deg", MAX_AUTHORED_SCALAR_FRACTION_DIGITS),
+);
+export const AUTHORED_STORE_TRANSFER_TIME_AUTHORITY = Object.freeze(
+  number(0, 300, "s", MAX_AUTHORED_SCALAR_FRACTION_DIGITS),
+);
+export const AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY = Object.freeze(
+  number(0.001, 1, "m2", MAX_AUTHORED_SCALAR_FRACTION_DIGITS),
+);
+
+export const AIR_COMBAT_STUDY_ENUM_AUTHORITIES = Object.freeze({
+  guidance: Object.freeze(["direct", "loft"] as const),
+  engagementRegime: Object.freeze(["BVR", "WVR_BFM", "UNRESTRICTED_TRANSITION"] as const),
+  routeTransition: Object.freeze(["START", "FLY_BY", "FLY_OVER"] as const),
+  flightLegRole: Object.freeze([
+    "DEPARTURE", "TRANSIT", "INGRESS", "INTERCEPT_ATTACK", "ON_STATION_PATROL",
+    "REFUEL", "EGRESS", "RECOVERY", "DIVERT",
+  ] as const),
+});
+
+export type AirCombatStudyEnumAuthority = keyof typeof AIR_COMBAT_STUDY_ENUM_AUTHORITIES;
+
+export function admitsAirCombatStudyEnum(
+  authority: AirCombatStudyEnumAuthority,
+  value: unknown,
+): boolean {
+  return typeof value === "string"
+    && (AIR_COMBAT_STUDY_ENUM_AUTHORITIES[authority] as readonly string[]).includes(value);
+}
+
 const row = (
   value: Omit<ScenarioFieldAuthority, "draftPath">,
   field: keyof Scenario,
@@ -147,13 +195,13 @@ export const LEGACY_SCENARIO_CONTROL_AUTHORITY = {
   redJammer: hidden("redJammer", "UNAVAILABLE", "NO_RUNTIME_EFFECT", null, null, "REMOVE_UNADMITTED_CAPABILITY_DEFAULT"),
   profile: hidden("profile", "MODEL_PACK", "DUPLICATE_AUTHORITY", "$.model.profile", "engine/legacy-profile", "DERIVE_FROM_SELECTED_MODEL_PACK"),
   guidance: authored("guidance", "ENGINE_CONSUMED", "$.guidance.mode", "engine/guidance", null, "MIGRATE_TO_EXPLICIT_VERIFICATION_ASSUMPTION"),
-  altitude: authored("altitude", "DUPLICATE_AUTHORITY", "$.entities[BLUE].initialState.position", "engine/entity-spawn", number(0, 15_000, "m_MSL", 0), "DERIVE_FROM_SPATIAL_START"),
+  altitude: authored("altitude", "DUPLICATE_AUTHORITY", "$.entities[BLUE].initialState.position", "engine/entity-spawn", AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY, "DERIVE_FROM_SPATIAL_START"),
   cruiseAltitude: authored("cruiseAltitude", "CONDITIONAL", "$.guidance.cruiseAltitudeM", "engine/guidance", number(30, 15_000, "m_MSL", MAX_AUTHORED_SCALAR_FRACTION_DIGITS)),
   targetDelta: authored("targetDelta", "DUPLICATE_AUTHORITY", "$.entities[RED].initialState.position", "engine/entity-spawn", number(-12_000, 12_000, "m", 0), "DERIVE_FROM_SPATIAL_STARTS"),
   range: authored("range", "DUPLICATE_AUTHORITY", "$.entities[*].initialState.position", "engine/entity-spawn", number(5_000, 170_000, "m", 0), "DERIVE_FROM_SPATIAL_STARTS"),
-  aspect: authored("aspect", "DUPLICATE_AUTHORITY", "$.entities[*].initialState.heading", "engine/entity-spawn", number(0, 180, "deg", 0), "DERIVE_FROM_SPATIAL_STARTS"),
-  launcherSpeed: authored("launcherSpeed", "DUPLICATE_AUTHORITY", "$.entities[BLUE].initialState.velocity", "engine/entity-spawn", number(0, 450, "m/s", 0), "MIGRATE_TO_ENTITY_START_CONSTRAINT"),
-  targetSpeed: authored("targetSpeed", "DUPLICATE_AUTHORITY", "$.entities[RED].initialState.velocity", "engine/entity-spawn", number(0, 450, "m/s", 0), "MIGRATE_TO_ENTITY_START_CONSTRAINT"),
+  aspect: authored("aspect", "DUPLICATE_AUTHORITY", "$.entities[*].initialState.heading", "engine/entity-spawn", AUTHORED_CROSSING_ANGLE_AUTHORITY, "DERIVE_FROM_SPATIAL_STARTS"),
+  launcherSpeed: authored("launcherSpeed", "DUPLICATE_AUTHORITY", "$.entities[BLUE].initialState.velocity", "engine/entity-spawn", AUTHORED_AIRCRAFT_TAS_AUTHORITY, "MIGRATE_TO_ENTITY_START_CONSTRAINT"),
+  targetSpeed: authored("targetSpeed", "DUPLICATE_AUTHORITY", "$.entities[RED].initialState.velocity", "engine/entity-spawn", AUTHORED_AIRCRAFT_TAS_AUTHORITY, "MIGRATE_TO_ENTITY_START_CONSTRAINT"),
   wind: authored("wind", "ENGINE_CONSUMED", "$.environment.atmosphere.windEastMps", "engine/aerodynamics", number(-40, 40, "m/s", MAX_AUTHORED_SCALAR_FRACTION_DIGITS), "MIGRATE_TO_PRESET_OVERRIDE_WITH_ANCESTRY"),
   windNorth: hidden("windNorth", "PRESET", "ENGINE_CONSUMED", "$.environment.atmosphere.windNorthMps", "engine/aerodynamics", "SHOW_PRESET_VALUE_OR_AUTHORIZED_OVERRIDE", number(-150, 150, "m/s", 3)),
   visibilityKm: hidden("visibilityKm", "PRESET", "CONDITIONAL", "$.environment.atmosphere.visibilityKm", "information-state", "SHOW_NO_SENSOR_EFFECT_UNTIL_VISUAL_MODEL_EXISTS", number(0.1, 300, "km", 3)),
@@ -163,8 +211,73 @@ export const LEGACY_SCENARIO_CONTROL_AUTHORITY = {
   airMission: authored("airMission", "ENGINE_CONSUMED", "$.airMission", "engine/mission-adapter"),
   lossIncreaseAt: hidden("lossIncreaseAt", "UNAVAILABLE", "CONDITIONAL", "$.environment.events[*].time", "engine/environment-events", "REMOVE_UNVERSIONED_HIDDEN_WIND_SHIFT", number(0, 300, "s", 3, false, true)),
   lossIncreaseAmount: hidden("lossIncreaseAmount", "UNAVAILABLE", "CONDITIONAL", "$.environment.events[*].windShiftEastMps", "engine/environment-events", "REMOVE_UNVERSIONED_HIDDEN_WIND_SHIFT", number(-150, 150, "m/s", 3)),
-  seed: hidden("seed", "DEPLOYMENT", "COMPILE_ONLY", "$.seed", null, "SHOW_READ_ONLY_OR_VERIFICATION_ONLY_AUTHORITY", number(0, 2_147_483_647, "1", 0, true)),
+  seed: authored(
+    "seed",
+    "NO_RUNTIME_EFFECT",
+    "$.seed",
+    null,
+    number(0, 2_147_483_647, "1", 0, true, false),
+    "RECORDED_REPLAY_IDENTITY_NO_STOCHASTIC_RUNTIME_EFFECT",
+  ),
+  runDurationSeconds: authored("runDurationSeconds", "ENGINE_CONSUMED", "$.durationSeconds", "engine/terminal-tick", number(0.001, 3_600, "s", MAX_AUTHORED_SCALAR_FRACTION_DIGITS, false, true)),
 } satisfies Record<keyof Scenario, ScenarioFieldAuthority>;
+
+/**
+ * Resolves only the raw text controls exercised by the three #197 studies.
+ * Other workspace controls remain owned by #193 and deliberately return null.
+ */
+export function resolveAirCombatStudyNumericControlAuthority(
+  controlId: string,
+): NumericAuthority | null {
+  if (controlId === "scenario.runDurationSeconds") {
+    return LEGACY_SCENARIO_CONTROL_AUTHORITY.runDurationSeconds.numeric;
+  }
+  if (controlId === "scenario.seed") {
+    return LEGACY_SCENARIO_CONTROL_AUTHORITY.seed.numeric;
+  }
+  if (/^spatial\.(?:blue|red)\.start\.longitude$/.test(controlId)
+    || /^spatial\.(?:blue|red)\.route\[\*\]\.longitude$/.test(controlId)
+    || /^airMission\.flightPlans\[0\]\.routePoints\[\d+\]\.longitude$/.test(controlId)) {
+    return AUTHORED_WGS84_LONGITUDE_AUTHORITY;
+  }
+  if (/^spatial\.(?:blue|red)\.start\.latitude$/.test(controlId)
+    || /^spatial\.(?:blue|red)\.route\[\*\]\.latitude$/.test(controlId)
+    || /^airMission\.flightPlans\[0\]\.routePoints\[\d+\]\.latitude$/.test(controlId)) {
+    return AUTHORED_WGS84_LATITUDE_AUTHORITY;
+  }
+  if (/^spatial\.(?:blue|red)\.start\.altitude$/.test(controlId)
+    || /^spatial\.(?:blue|red)\.route\[\*\]\.altitudeM$/.test(controlId)
+    || /^airMission\.flightPlans\[0\]\.routePoints\[\d+\]\.altitudeMslM$/.test(controlId)) {
+    return AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY;
+  }
+  if (/^spatial\.(?:blue|red)\.start\.heading$/.test(controlId)) {
+    return AUTHORED_TRUE_HEADING_AUTHORITY;
+  }
+  if (/^spatial\.(?:blue|red)\.start\.speed$/.test(controlId)) {
+    return AUTHORED_AIRCRAFT_TAS_AUTHORITY;
+  }
+  if (/^spatial\.(?:blue|red)\.route\[\*\]\.acceptanceRadiusM$/.test(controlId)
+    || /^airMission\.flightPlans\[0\]\.routePoints\[\d+\]\.acceptanceRadiusM$/.test(controlId)) {
+    return AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY;
+  }
+  if (controlId === "airMission.assignments[0].storeTransfer.requests[0].requestedTimeSeconds") {
+    return AUTHORED_STORE_TRANSFER_TIME_AUTHORITY;
+  }
+  if (controlId === "airMission.assignments[0].storeTransfer.requests[0].installedDragAreaM2") {
+    return AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY;
+  }
+  return null;
+}
+
+export function authoritiesEqual(left: NumericAuthority, right: NumericAuthority): boolean {
+  return left.kind === right.kind
+    && left.minimum === right.minimum
+    && left.maximum === right.maximum
+    && left.integer === right.integer
+    && left.nullable === right.nullable
+    && left.precision === right.precision
+    && left.unit === right.unit;
+}
 
 export const LEGACY_SCENARIO_FIELD_NAMES = Object.freeze(
   Object.keys(LEGACY_SCENARIO_CONTROL_AUTHORITY).sort() as Array<keyof Scenario>,
@@ -294,6 +407,9 @@ export function validateStructuredScenarioNumbers(value: unknown) {
   const errors: Array<{ fieldPath: string; code: ScenarioNumberAdmissionCode }> = [];
   for (const [field, row] of Object.entries(LEGACY_SCENARIO_CONTROL_AUTHORITY)) {
     if (!row.numeric) continue;
+    // Historical scenario packages predate an authored run duration and retain
+    // the versioned domain default. New packages must provide a number or fail.
+    if (field === "runDurationSeconds" && input[field] === undefined) continue;
     // Duplicate legacy projections may contain higher-precision computed
     // values, but they remain untrusted input until #154 removes them. Skip
     // only authored precision; type, nullability, finiteness, range and integer
@@ -309,6 +425,191 @@ export function validateStructuredScenarioNumbers(value: unknown) {
 export function assertStructuredScenarioNumbers(value: unknown): void {
   const error = validateStructuredScenarioNumbers(value)[0];
   if (error) throw new ScenarioControlAdmissionError(error.code, error.fieldPath);
+}
+
+export class ScenarioEnumAdmissionError extends Error {
+  readonly code = "CONTROL_ENUM_UNSUPPORTED" as const;
+  readonly fieldPath: string;
+
+  constructor(fieldPath: string) {
+    super(`CONTROL_ENUM_UNSUPPORTED at ${fieldPath}.`);
+    this.name = "ScenarioEnumAdmissionError";
+    this.fieldPath = fieldPath;
+  }
+}
+
+export class ScenarioSpatialAdmissionError extends Error {
+  readonly code = "CONTROL_SPATIAL_INVALID" as const;
+  readonly fieldPath: string;
+
+  constructor(fieldPath: string) {
+    super(`CONTROL_SPATIAL_INVALID at ${fieldPath}.`);
+    this.name = "ScenarioSpatialAdmissionError";
+    this.fieldPath = fieldPath;
+  }
+}
+
+function structuredRecord(value: unknown, fieldPath: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ScenarioSpatialAdmissionError(fieldPath);
+  }
+  return value as Record<string, unknown>;
+}
+
+function assertGovernedStructuredNumber(
+  value: unknown,
+  authority: NumericAuthority,
+  fieldPath: string,
+): void {
+  const admitted = admitStructuredNumber(value, authority);
+  if (!admitted.ok || admitted.value === null) {
+    throw new ScenarioControlAdmissionError(
+      admitted.ok ? "CONTROL_NUMBER_EMPTY" : admitted.code,
+      fieldPath,
+    );
+  }
+}
+
+function assertStructuredSpatialPoint(value: unknown, fieldPath: string): void {
+  const point = structuredRecord(value, fieldPath);
+  assertGovernedStructuredNumber(
+    point.longitude,
+    AUTHORED_WGS84_LONGITUDE_AUTHORITY,
+    `${fieldPath}.longitude`,
+  );
+  assertGovernedStructuredNumber(
+    point.latitude,
+    AUTHORED_WGS84_LATITUDE_AUTHORITY,
+    `${fieldPath}.latitude`,
+  );
+  assertGovernedStructuredNumber(
+    point.altitudeM,
+    AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY,
+    `${fieldPath}.altitudeM`,
+  );
+  if (point.verticalDatum !== "MSL") {
+    throw new ScenarioEnumAdmissionError(`${fieldPath}.verticalDatum`);
+  }
+}
+
+/**
+ * Admits the complete authored spatial plan before either compilation or
+ * Worker execution. The same numeric and enum authorities drive raw controls,
+ * saved-run admission, and this structured boundary.
+ */
+export function assertStructuredScenarioSpatialPlan(value: unknown): void {
+  const scenario = structuredRecord(value, "$");
+  if (scenario.spatialPlan === undefined) return;
+  const spatialPlan = structuredRecord(scenario.spatialPlan, "$.spatialPlan");
+
+  for (const side of ["blue", "red"] as const) {
+    const sidePath = `$.spatialPlan.${side}`;
+    const placement = structuredRecord(spatialPlan[side], sidePath);
+    assertStructuredSpatialPoint(placement.position, `${sidePath}.position`);
+    assertGovernedStructuredNumber(
+      placement.headingDeg,
+      AUTHORED_TRUE_HEADING_AUTHORITY,
+      `${sidePath}.headingDeg`,
+    );
+    assertGovernedStructuredNumber(
+      placement.speedMps,
+      AUTHORED_AIRCRAFT_TAS_AUTHORITY,
+      `${sidePath}.speedMps`,
+    );
+
+    if (
+      !Array.isArray(placement.route)
+      || placement.route.length < 1
+      || placement.route.length > 64
+    ) {
+      throw new ScenarioSpatialAdmissionError(`${sidePath}.route`);
+    }
+    placement.route.forEach((point, pointIndex) => {
+      assertStructuredSpatialPoint(point, `${sidePath}.route[${pointIndex}]`);
+    });
+
+    const routeAcceptanceRadiiM = placement.routeAcceptanceRadiiM;
+    if (
+      !Array.isArray(routeAcceptanceRadiiM)
+      || routeAcceptanceRadiiM.length !== placement.route.length
+    ) {
+      throw new ScenarioSpatialAdmissionError(`${sidePath}.routeAcceptanceRadiiM`);
+    }
+    routeAcceptanceRadiiM.forEach((radius, pointIndex) => {
+      assertGovernedStructuredNumber(
+        radius,
+        AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY,
+        `${sidePath}.routeAcceptanceRadiiM[${pointIndex}]`,
+      );
+      if (pointIndex === 0 && radius !== 1) {
+        throw new ScenarioSpatialAdmissionError(
+          `${sidePath}.routeAcceptanceRadiiM[${pointIndex}]`,
+        );
+      }
+    });
+
+    if (placement.routeWaypointTransitions === undefined) continue;
+    if (
+      !Array.isArray(placement.routeWaypointTransitions)
+      || placement.routeWaypointTransitions.length !== placement.route.length
+    ) {
+      throw new ScenarioSpatialAdmissionError(`${sidePath}.routeWaypointTransitions`);
+    }
+    placement.routeWaypointTransitions.forEach((transition, pointIndex) => {
+      const admitted = admitsAirCombatStudyEnum("routeTransition", transition);
+      const validForIndex = pointIndex === 0
+        ? transition === "START"
+        : transition === "FLY_BY" || transition === "FLY_OVER";
+      const radius = routeAcceptanceRadiiM[pointIndex];
+      if (!admitted || !validForIndex || (transition === "FLY_OVER" && radius !== 1)) {
+        throw new ScenarioEnumAdmissionError(
+          `${sidePath}.routeWaypointTransitions[${pointIndex}]`,
+        );
+      }
+    });
+  }
+}
+
+export function assertAirCombatStudyStructuredControls(value: unknown): void {
+  assertStructuredScenarioNumbers(value);
+  assertAirCombatStudyScenarioEnums(value);
+  assertStructuredScenarioSpatialPlan(value);
+}
+
+export function assertAirCombatStudyScenarioEnums(value: unknown): void {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return;
+  const scenario = value as Record<string, unknown>;
+  if (!admitsAirCombatStudyEnum("guidance", scenario.guidance)) {
+    throw new ScenarioEnumAdmissionError("$.guidance");
+  }
+  const mission = scenario.airMission;
+  if (!mission || typeof mission !== "object" || Array.isArray(mission)) return;
+  const authored = mission as Record<string, unknown>;
+  if (!admitsAirCombatStudyEnum("engagementRegime", authored.regime)) {
+    throw new ScenarioEnumAdmissionError("$.airMission.regime");
+  }
+  const flightPlans = authored.flightPlans;
+  if (!Array.isArray(flightPlans)) return;
+  flightPlans.forEach((plan, planIndex) => {
+    if (!plan || typeof plan !== "object" || Array.isArray(plan)) return;
+    const typedPlan = plan as Record<string, unknown>;
+    if (Array.isArray(typedPlan.routePoints)) {
+      typedPlan.routePoints.forEach((point, pointIndex) => {
+        if (!point || typeof point !== "object" || Array.isArray(point)) return;
+        if (!admitsAirCombatStudyEnum("routeTransition", (point as Record<string, unknown>).turnMethod)) {
+          throw new ScenarioEnumAdmissionError(`$.airMission.flightPlans[${planIndex}].routePoints[${pointIndex}].turnMethod`);
+        }
+      });
+    }
+    if (Array.isArray(typedPlan.legs)) {
+      typedPlan.legs.forEach((leg, legIndex) => {
+        if (!leg || typeof leg !== "object" || Array.isArray(leg)) return;
+        if (!admitsAirCombatStudyEnum("flightLegRole", (leg as Record<string, unknown>).role)) {
+          throw new ScenarioEnumAdmissionError(`$.airMission.flightPlans[${planIndex}].legs[${legIndex}].role`);
+        }
+      });
+    }
+  });
 }
 
 export function admitRawScenarioNumber(field: keyof Scenario, raw: string): RawNumberAdmission {

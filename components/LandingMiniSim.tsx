@@ -14,6 +14,7 @@ import {
 } from "@/lib/simulation";
 import { domainCapability } from "@/lib/runtime/deployment-capabilities";
 import { selectDisplayFrame } from "@/lib/frontend/selectors";
+import { buildAuthoredProfileBinding } from "@/lib/report-profile";
 
 const DOMAINS: EngagementDomain[] = ["A2A", "A2G", "G2A", "G2G"];
 
@@ -98,6 +99,9 @@ export function LandingMiniSim() {
           selected={selected}
           profile={definition.scenario.profile}
           layers={{ interceptor: true, target: true, lineOfSight: true }}
+          authoredProfile={definition.authoredProfile}
+          authoredProfileBinding={buildAuthoredProfileBinding(definition, definition.scenario)}
+          authoredScenario={definition.scenario}
         />
         <div className="landing-sim-readout">
           <span>3D separation</span>
@@ -139,7 +143,7 @@ export function LandingMiniSim() {
           type="range"
           min={0}
           max={result.timeOfFlight || 1}
-          step={0.1}
+          step={0.001}
           value={time}
           onChange={(event) => {
             setPlaying(false);

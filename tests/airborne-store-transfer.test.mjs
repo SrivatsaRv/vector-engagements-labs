@@ -287,7 +287,14 @@ test("authored governed transfer is exact, causal, independently balanced, and T
     );
     const expectedInstalledDrag = 0.5 * environment.atmosphere.densityKgM3
       * airspeed ** 2 * event.payload.installedDragAreaM2;
-    assert.ok(Math.abs(event.payload.installedDragNewtons - expectedInstalledDrag) < 1e-8);
+    const expectedPublishedInstalledDrag = Math.round(
+      expectedInstalledDrag * 1_000_000,
+    ) / 1_000_000;
+    assert.equal(
+      event.payload.installedDragNewtons,
+      expectedPublishedInstalledDrag,
+      "event evidence uses the governed six-decimal scalar while state integration retains binary64 precision",
+    );
   }
 });
 

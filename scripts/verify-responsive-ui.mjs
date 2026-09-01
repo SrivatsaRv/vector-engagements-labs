@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
 import { chromium } from "playwright-core";
@@ -12,6 +12,14 @@ const outputDirectory = resolve("outputs/responsive");
 const deploymentCapabilities = JSON.parse(
   readFileSync(new URL("../config/deployment-capabilities.json", import.meta.url), "utf8"),
 );
+const admittedModelPackDigests = new Set(deploymentCapabilities.admittedModelPackDigests ?? []);
+const modelPackFixtureDirectory = new URL("../fixtures/model-packs/", import.meta.url);
+const admittedModelPack = readdirSync(modelPackFixtureDirectory)
+  .filter((name) => name.endsWith(".compiled.json"))
+  .map((name) => JSON.parse(readFileSync(new URL(name, modelPackFixtureDirectory), "utf8")))
+  .find((bundle) => admittedModelPackDigests.has(bundle.pack?.digest));
+assert.ok(admittedModelPack, "deployment must resolve one admitted compiled model-pack fixture");
+const expectedModelPackLabel = `${admittedModelPack.pack.id}@${admittedModelPack.pack.version}`;
 const expectedEngineBackend = deploymentCapabilities.engine?.id;
 assert.ok(
   expectedEngineBackend === "typescript" || expectedEngineBackend === "rust-wasm",
@@ -271,7 +279,10 @@ try {
     const credibilityText = await page.locator(".credibility-admission").innerText();
     assert.match(credibilityText, /DRAFT/);
     assert.match(credibilityText, /BLOCKING:/);
-    assert.match(credibilityText, /vector-scalar-study-models@0\.8\.0/);
+    assert.ok(
+      credibilityText.includes(expectedModelPackLabel),
+      `${viewport.width}: credibility surface does not show ${expectedModelPackLabel}`,
+    );
     assert.equal(await runButton.isEnabled(), true, `${viewport.width}: calibrated template is not runnable`);
     await runButton.click();
     await page.locator(".session-layout").waitFor();

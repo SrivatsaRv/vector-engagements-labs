@@ -45,6 +45,14 @@ zero-undulation display operation is an educational versioned fixture, not a
 regional geoid-accuracy claim; ETOPO source heights retain their explicit
 EGM2008 boundary in the pack.
 
+One shared structured spatial-admission gate covers both sides before
+preparation and Worker model-pack admission. It checks start and route
+longitude/latitude/MSL altitude, true heading, TAS, route/radius cardinality,
+`START`/`FLY_BY`/`FLY_OVER` identity, finite values, governed ranges and the
+respective WGS84 and authored-scalar precision limits. Legacy records may omit the transition
+array and retain their documented all-fly-by meaning; a present malformed array
+fails closed instead of being repaired.
+
 Both Construct and Observe use the same MapLibre navigation contract. The map starts flat; supports wheel zoom, drag pan, right-drag rotation, touch zoom/rotation, double-click zoom, and keyboard navigation; disables touch pitch and pitch-with-rotate; and exposes an explicit 0°/52° tilt preview. VECTOR-owned controls provide basemap selection, zoom, reset north/tilt, fit, cursor coordinates, zoom, bearing, and pitch. Standard, minimal, and low-light tactical basemaps are same-origin proxied and the selection persists in browser local storage. During waypoint placement the view is forced flat so a presentation gesture cannot obscure authored geometry. These camera and basemap choices are presentation state and never change simulation inputs.
 
 Replay markers default to the catalog designation, such as `Su-30MKI`, `F-16C Block 52`, or `Astra Mk 1`. Generated engine identifiers such as `BLUE WEAPON 1` remain internal replay identity and are not presented as the operator label.
@@ -52,6 +60,12 @@ Replay markers default to the catalog designation, such as `Su-30MKI`, `F-16C Bl
 The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-east mountains, the Arabian Sea, and coastal Gujarat. Their boundaries are educational visualization contexts, not operational engagement boxes. These governed rows are delivered by checksum-tracked migration and verified against the TypeScript contract; production deployment does not run the development seed. Selecting a study area is a directly visible preset choice. The first complete builder does not ask the operator to draw a study-area polygon.
 
 ## Scenario artifact
+
+Current governed Air-combat packages may add an optional closed authored-route
+profile and scenario-owned run duration. The profile is explanatory metadata;
+the exact route points, release request, guidance mode and duration remain the
+causal compiled inputs. A prepared run also binds the package ID, version and
+content hash without creating a parallel scenario schema.
 
 Air scenarios may carry one separately digested
 `vector.target-effect-authority.v1`. The compiler binds it by exact weapon and
@@ -90,7 +104,7 @@ scalars use at most three fractional digits. Whole-package relational checks
 then bind route/start, task, fuel, loadout, runway, environment and timing
 authority before the final engine scenario is constructed.
 
-### Governed high-energy crossing challenge
+### Archived #190 high-energy crossing challenge
 
 Issue #190 adds `a2a-high-energy-crossing-challenge@1.0.0` as an immutable
 non-default Su-30MKI/F-16C demonstration package. It starts at 44,000 m
@@ -99,9 +113,10 @@ horizontal range and 105 degrees crossing angle. Blue is authored airborne at
 carry two installed stores and 70% authored fuel. The package binds seed 42, a
 direct guided path, and the exact North Punjab clear-winter EnvironmentPack.
 
-Those values are normal scenario inputs consumed through the existing compiler;
+Those archived `1.0.0`/`1.1.0` values are normal scenario inputs consumed
+through the existing compiler;
 there is no actor-name, scenario-name, or presentation-label branch in the
-runtime. Under the current generic point-mass and verification-only termination
+runtime. Under the frozen #190 generic point-mass and verification-only termination
 assumptions, both TypeScript and Rust/WASM reach an engine-owned geometric
 intercept at 131.9 model seconds with a 21.836104 m closest approach inside the
 compiled 25 m radius. A 46,000 m control with the other inputs held constant
@@ -118,6 +133,11 @@ remain `UNSUPPORTED` with no inferred position because this deployment has no
 admitted sensor model.
 
 ## Air mission contract
+
+For the three `1.2.0` Air-combat studies, mission admission repeats the shared
+duration, route-coordinate, altitude, speed, acceptance-radius, guidance and
+release-time authorities before compilation. The closed profile identity and
+leg labels cannot alter those values or select aircraft control autonomously.
 
 Every authored numeric value is admitted before mission compilation. Ordinary
 decision and scalar inputs accept decimal notation only and no more than three
@@ -138,7 +158,7 @@ Air run records `WEAPON_TERMINATED`, then exactly one causally linked
 `TARGET_EFFECT_COMMITTED`, then `RUN_COMPLETED`. Tests and consumers select
 those typed events rather than assuming the termination event is penultimate.
 
-The #190 package carries its 44 km/105-degree geometry, MSL altitudes, TAS
+The archived #190 package carries its 44 km/105-degree geometry, MSL altitudes, TAS
 speeds, 70% fuel and two-store Blue assignment through the existing authored
 and compiled Air-mission contracts. No schema field or mission-policy authority
 is added; those SI values are package-owned `MODEL_ASSUMPTION` inputs.
@@ -378,6 +398,11 @@ layers remain with #155, #87, #60 and the runtime owners.
 
 ## Builder expansion boundary
 
+Issue #197 exposes the three governed BVR, WVR and transition profiles through
+the existing builder rather than adding free-form tactic execution. Editing a
+causal route, timing or guidance value produces a new experiment; descriptive
+leg-intent metadata remains read-only package context.
+
 A new editable control is not complete when it merely renders. Its owning
 contract must declare raw lexical admission, the structured field type and
 precision, cross-field constraints, the compiled/runtime consumer or explicit
@@ -407,6 +432,82 @@ mass/station/rule identity or mark a request accepted/achieved; those outcomes
 come only from the engine-owned event.
 
 The configured-template builder edits every input used by the nine validated templates. Its **Place & flight** surface now performs direct geographic start placement, heading, altitude and speed editing, and Blue/Red route and waypoint authoring inside a selected preset study area. Map gestures and numeric fields update one spatial plan; compilation converts it to local east-north-up engine state. The admitted point-mass aircraft controller executes compiled three-dimensional route points and records requested, accepted, and achieved movement. The authored route remains visible beside the computed track so the two cannot be confused.
+
+Three current Air-combat templates are published at `1.2.0`: BVR offset/support,
+WVR one-circle/defensive-break, and unrestricted beam/drag/extend/recommit.
+Each package owns four exact WGS84/MSL points per side, explicit starting TAS,
+one generic Astra release request, and optional strict
+`vector.authored-route-profile.v1` metadata. Profile and leg-intent labels are
+descriptive only: changing them cannot change compiled state, while changing a
+route point, guidance mode, release time, or admitted radius must. The WVR
+comparison makes that boundary explicit: its lofted release at `20.00 s`
+records the generic model's `KILL` class, while the otherwise identical
+fixed-step-aligned `20.65 s` release records `NO_EFFECT`. Neither result is a
+named-weapon effectiveness or pilot-performance claim.
+Independent nearby release-time controls also change BVR `DEGRADED` to
+`NO_EFFECT` at 3.750 s and transition `NO_EFFECT` to `DEGRADED` at 50.050 s;
+all three controls change exactly one authored field.
+
+| Package/profile | Initial horizontal geometry | Blue/Red MSL and TAS | Guidance/release/duration | Frozen generic result |
+| --- | --- | --- | --- | --- |
+| `a2a-crossing-intercept@1.2.0` / BVR offset-support | 38,083.948 m; 72.897° aspect | 9,500/8,200 m; 275/250 m/s | direct; 4.000 s; 100.000 s | `DEGRADED`; 72.950 s; 19.900251 m |
+| `a2a-defensive-break@1.2.0` / WVR one-circle-break | 17,999.982 m; 0° aspect | 6,200/7,000 m; 260/235 m/s | loft; 20.000 s; 45.000 s | `KILL`; 28.400 s; 3.745229 m |
+| `a2a-high-energy-crossing-challenge@1.2.0` / transition | 33,525.994 m; 72.646° aspect | 7,800/9,000 m; 268/245 m/s | direct; 50.000 s; 140.000 s | `NO_EFFECT`; 114.700 s; 24.947303 m |
+
+The exact four-point local ENU and inverse-projected WGS84/MSL route sequences,
+including headings, leg lengths and the WVR matched control, are frozen in
+`fixtures/scenarios/three-air-combat-geometry-oracle.v1.json` and reproduced by
+migration 018. The table is a readable projection of that authority, not a
+second source of scenario truth.
+
+`Scenario.runDurationSeconds` is optional for compatibility with immutable
+historical packages. When present it is engine-consumed authority in
+`[0.001, 3600] s` with at most three fractional digits and is passed unchanged
+through browser, server, mission compilation, and the engine terminal-tick
+boundary. When absent, the versioned domain default remains authoritative.
+Migration `017` is frozen by checksum; migration `018` publishes the three new
+content-addressed packages and retires, but never overwrites, their `1.1.0`
+predecessors.
+
+### Manual verification for the three Air-combat studies
+
+Start the production-shaped local stack with `make compose-up`, then open each
+exact package through the workbench:
+
+- `http://localhost:4317/workbench?scenario=a2a-crossing-intercept&start=guided`
+- `http://localhost:4317/workbench?scenario=a2a-defensive-break&start=guided`
+- `http://localhost:4317/workbench?scenario=a2a-high-energy-crossing-challenge&start=guided`
+
+In **Define**, verify the authored duration and replay seed, then inspect the
+two four-point routes in **Place & flight**. Run the unchanged package, pause,
+seek and single-step the timeline, switch between Map and 3D, and confirm the
+designation/callsign labels, authored-intent qualifier, route versus achieved
+trail, altitude stems, store lifecycle and target-effect summary remain on the
+same selected frame. Save the run, reopen the downloaded VSR and view the
+report. The unchanged BVR/WVR/transition packages must respectively report
+`DEGRADED`, `KILL` and `NO_EFFECT`; the WVR target alone transitions to
+`TERMINATED`. The report must call the profile authored rather than autonomous,
+show exact duration/release/route inputs, fuel/stores, phase chronology and
+unavailable observer/track state, and retain the public-educational limitation.
+
+For reproducible non-UI evidence, run
+`npm run worker:verify -- --write-air-combat-evidence <directory>`. The command
+emits the three exact VSRs, the WVR 20.65-second matched control and a compact
+digest/size/outcome inventory; it then reopens every record through the built
+Worker before succeeding.
+
+The merge evidence generated by that command is retained in
+`fixtures/vector-record/issue-197/`. Open the three canonical `.vector` files
+or the matched control through the normal record-open path; use
+`air-combat-study-evidence.json` to verify the exact record/package identity,
+duration, effect, closest approach and terminal lifecycle before comparing the
+visualization or report.
+
+The ordinary `npm run worker:verify` CI gate regenerates the same four runs in
+memory and fails if this directory is missing or semantically stale. Freshness
+means exact inventory, record ID, byte length, all non-manifest members and a
+normalized manifest; only the wall-clock `createdAt` field and its derived
+manifest digest may differ between generations.
 
 Each configured route now compiles a `vector.route-plan.v2` constraint with one
 acceptance radius and one transition mode per route point. The initial point has
@@ -478,6 +579,17 @@ The internal `vector.scenario-draft.v1` state contract now provides the safe aut
 
 ## Full builder UX specification
 
+Selecting one of the current Air-combat studies presents its governed profile,
+side-owned leg sequence and limitations beside the editable causal controls.
+Invalid raw numeric drafts remain mounted in builder state and block both step
+navigation and Run; a prior admitted value cannot silently replace malformed
+text when an editor unmounts.
+Saved reports retain the selected profile as source ancestry, but compare a
+separate exact causal-input baseline before describing applicability. Unedited
+starts/routes, transitions/radii, headings/TAS, guidance, regime, leg roles,
+release and duration are `MATCHED`. Any change is `MODIFIED_FROM`; source leg
+labels are then omitted rather than being presented as the edited run's tactic.
+
 The builder does not expose effect thresholds as ordinary controls. After a
 run, Map, 3D, telemetry and report surfaces present only the selected frame's
 canonical target-effect commit. Before its exact event frame they show effect
@@ -533,6 +645,11 @@ fails and Simulate remains unavailable; the UI never reconstructs credibility
 from static labels.
 
 ### Artifact and state boundaries
+
+The selected package reference and authored-route profile are retained above
+step rendering and copied only from the admitted governed template. Raw numeric
+drafts are likewise retained above step rendering until corrected; only parsed,
+admitted values may enter the scenario artifact or enable execution.
 
 Target-effect thresholds and outcomes are not builder state. The compiled
 scenario may retain one exact effect authority selected by model identities;
@@ -664,12 +781,15 @@ precision is not a general exemption for fuel, time, speed, mass, drag, wind or
 decision values.
 
 `vector.scenario-control-authority.v1` is the content-addressed transition
-inventory for all 40 fields in the legacy `Scenario` intake. Each row declares
+inventory for all 41 fields in the legacy `Scenario` intake. Each row declares
 the field category, edit authority, causal state, draft and compiled paths,
 runtime consumer, record projection, validator and retirement disposition.
-Hidden radar, track-source, datalink, jammer, profile, preset-weather,
-verification-event and seed fields are explicitly prohibited from becoming
-unreviewed authoring controls. This is a migration authority, not a second
+Hidden radar, track-source, datalink, jammer, profile, preset-weather and
+verification-event fields are explicitly prohibited from becoming unreviewed
+authoring controls. Issue #197 deliberately admits duration and seed through
+the shared numeric authority: duration is engine-consumed, while seed is
+visibly labelled as recorded replay identity with no stochastic effect in the
+current deterministic runtime. This is a migration authority, not a second
 scenario schema: `vector.air-mission.v1` and the cross-domain scenario kernel
 remain the canonical target contracts.
 

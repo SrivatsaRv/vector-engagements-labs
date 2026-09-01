@@ -36,7 +36,7 @@ engagement envelope. These meanings are governed by scenario and engine state.
 | Installation | affiliation-framed control-tower silhouette and station label | public-reference station layer is enabled |
 | Fixed objective | objective-flag silhouette | declared as a scenario entity |
 
-Blue uses blue and a round frame; Red uses red and a diamond frame; neutral or unknown uses grey and a square frame. The inner silhouette communicates object kind. A label always carries callsign or designation, so color is never the only identity channel.
+Blue uses blue and a round frame; Red uses red and a diamond frame; neutral or unknown uses grey and a square frame. The inner silhouette communicates object kind. An operator label always carries the governed designation plus a textual affiliation/kind accessible name, so color is never the only identity channel. Generated engine callsigns are replay identities and are never exposed as operator-facing aircraft or weapon labels.
 
 ## Typed presentation grammar
 
@@ -60,6 +60,21 @@ because the bound assumption pack admits no sensor model. The engine-owned
 and run termination, not the symbol source state and not the meaning of the
 rendered marks. Presentation may annotate the typed terminal event, but it may
 not derive a hit, damage or kill from marker proximity.
+The three current Air-combat studies additionally draw each compiled declared
+route as a dashed affiliation-owned line, the selected frame's active route leg
+as a solid segment, and the achieved recorded path through the existing trail.
+The 3D surface projects a non-colour label containing governed designation and
+recorded altitude for each current entity. It applies the same shared tactical
+label priority and CSS-pixel collision policy as the map, clamps accepted label
+boxes to the visible surface edge, and exposes visibility, collision and edge
+state for deterministic browser verification. When the compiled Air-mission's
+authored digest exactly matches a retained scenario profile, an aircraft label
+may also name the current authored leg selected by the recorded
+`routePointIndex`. The label states “authored intent; no autonomous selection”.
+A modified or unavailable source profile suppresses leg intent rather than
+inferring it from geometry. These overlays use the same selected canonical frame
+and compiled route; they do not infer a tactic, target effect, track, or pilot
+decision from geometry.
 An airborne store therefore becomes renderable only when the canonical boundary
 frame contains its exact entity identity. The transfer outcome may annotate
 that frame, but presentation cannot create the mark early, repair a rejected
@@ -80,7 +95,10 @@ then engaging entity, then guided weapon, then aircraft, with stable entity ID
 as the tie-breaker. The first label is visible, the next two are compact, and
 the remainder are hidden until selection. The map then compares those label
 boxes in its projected CSS-pixel surface: a lower-priority collision is hidden;
-the selected marker keeps a full label and keyboard focus can select it. The
+the selected marker keeps a full label and keyboard focus can select it. The 3D
+surface uses the same priority/collision result and clamps retained labels to a
+six-pixel safe edge; compact phone labels retain a ten-pixel font and a twenty-
+pixel line box. The
 projection is a render-only input. This policy changes DOM visibility only; it
 does not alter a frame, record, entity lifecycle or playback state.
 

@@ -1,0 +1,213 @@
+{
+  "schemaVersion": "vector.three-air-combat-geometry-oracle.v1",
+  "authority": "INDEPENDENT_LITERAL_VERIFICATION",
+  "coordinateConvention": {
+    "axes": "LOCAL_EAST_NORTH_UP",
+    "horizontalUnit": "m",
+    "verticalUnit": "m_MSL",
+    "headingConvention": "degrees_true_clockwise_from_north"
+  },
+  "derivation": {
+    "routePoints": "Frozen issue-owned local inputs; no production transform or guidance output was used as an oracle.",
+    "heading": "Independently calculated atan2(delta east, delta north), normalized to [0,360), then frozen to six decimals.",
+    "rangeAndAspect": "Independently calculated from the frozen WGS84 starts, then frozen to three decimals.",
+    "legLength": "Independently calculated three-dimensional Euclidean distance between adjacent frozen local points, then frozen to six decimals.",
+    "geographicPoints": "Frozen WGS84/MSL authored inputs used by scenario admission; these bind the geodetic route without reusing the production transform in the test."
+  },
+  "projectionRoundTripToleranceM": 1,
+  "studies": [
+    {
+      "scenarioId": "a2a-crossing-intercept",
+      "scenarioVersion": "1.2.0",
+      "profileId": "bvr-offset-and-support",
+      "regime": "BVR",
+      "durationSeconds": 100,
+      "releaseTimeSeconds": 4,
+      "installedDragAreaM2": 0.03,
+      "blueTasMps": 275,
+      "redTasMps": 250,
+      "initialGeometry": {
+        "horizontalSeparationM": 38083.948,
+        "blueHeadingDeg": 54.462,
+        "redHeadingDeg": 180,
+        "aspectDeg": 72.897,
+        "altitudeDifferenceM": -1300
+      },
+      "blueRoute": {
+        "points": [
+          { "eastM": -18200, "northM": -5600, "altitudeMslM": 9500 },
+          { "eastM": -8400, "northM": 1400, "altitudeMslM": 9500 },
+          { "eastM": 2800, "northM": 8400, "altitudeMslM": 9500 },
+          { "eastM": 12600, "northM": 8400, "altitudeMslM": 9500 }
+        ],
+        "legLengthsM": [12043.255374, 13207.573585, 9800],
+        "geographicPoints": [
+          { "longitudeDeg": 74.00819988871388, "latitudeDeg": 31.749427331118415, "altitudeMslM": 9500 },
+          { "longitudeDeg": 74.11141651061382, "latitudeDeg": 31.81257619666229, "altitudeMslM": 9500 },
+          { "longitudeDeg": 74.22954791159634, "latitudeDeg": 31.875638274400192, "altitudeMslM": 9500 },
+          { "longitudeDeg": 74.33296537527247, "latitudeDeg": 31.87557218400527, "altitudeMslM": 9500 }
+        ]
+      },
+      "redRoute": {
+        "points": [
+          { "eastM": 18200, "northM": 5600, "altitudeMslM": 8200 },
+          { "eastM": 18200, "northM": -4200, "altitudeMslM": 8200 },
+          { "eastM": 25200, "northM": -11200, "altitudeMslM": 8200 },
+          { "eastM": 36400, "northM": -11200, "altitudeMslM": 8200 }
+        ],
+        "legLengthsM": [9800, 9899.494937, 11200],
+        "geographicPoints": [
+          { "longitudeDeg": 74.39204761385054, "latitudeDeg": 31.850293253835023, "altitudeMslM": 8200 },
+          { "longitudeDeg": 74.39186513623486, "latitudeDeg": 31.762026585763262, "altitudeMslM": 8200 },
+          { "longitudeDeg": 74.46547833191528, "latitudeDeg": 31.69884611896163, "altitudeMslM": 8200 },
+          { "longitudeDeg": 74.58346572031701, "latitudeDeg": 31.69854594123828, "altitudeMslM": 8200 }
+        ]
+      },
+      "runtimeExpectation": {
+        "termination": "weapon_intercept",
+        "effectClass": "DEGRADED",
+        "timeOfFlightSeconds": 72.95,
+        "closestApproachM": 19.900251
+      },
+      "matchedControl": {
+        "changedField": "airMission.assignments[0].storeTransferPlan.requests[0].requestedTimeSeconds",
+        "value": 3.75,
+        "termination": "weapon_intercept",
+        "effectClass": "NO_EFFECT",
+        "timeOfFlightSeconds": 72.6,
+        "closestApproachM": 21.731797
+      }
+    },
+    {
+      "scenarioId": "a2a-defensive-break",
+      "scenarioVersion": "1.2.0",
+      "profileId": "wvr-one-circle-defensive-break",
+      "regime": "WVR_BFM",
+      "durationSeconds": 45,
+      "releaseTimeSeconds": 20,
+      "installedDragAreaM2": 0.03,
+      "blueTasMps": 260,
+      "redTasMps": 235,
+      "initialGeometry": {
+        "horizontalSeparationM": 17999.982,
+        "blueHeadingDeg": 90,
+        "redHeadingDeg": 270,
+        "aspectDeg": 0,
+        "altitudeDifferenceM": 800
+      },
+      "blueRoute": {
+        "points": [
+          { "eastM": -9000, "northM": 0, "altitudeMslM": 6200 },
+          { "eastM": -2000, "northM": 0, "altitudeMslM": 6200 },
+          { "eastM": 2000, "northM": 5000, "altitudeMslM": 6200 },
+          { "eastM": -3000, "northM": 10000, "altitudeMslM": 6200 }
+        ],
+        "legLengthsM": [7000, 6403.124237, 7071.067812],
+        "geographicPoints": [
+          { "longitudeDeg": 74.10505300929003, "latitudeDeg": 31.799964595775204, "altitudeMslM": 6200 },
+          { "longitudeDeg": 74.17890065037113, "latitudeDeg": 31.799998251642528, "altitudeMslM": 6200 },
+          { "longitudeDeg": 74.22110959058296, "latitudeDeg": 31.8450465640222, "altitudeMslM": 6200 },
+          { "longitudeDeg": 74.16832023956874, "latitudeDeg": 31.890092308524004, "altitudeMslM": 6200 }
+        ]
+      },
+      "redRoute": {
+        "points": [
+          { "eastM": 9000, "northM": 0, "altitudeMslM": 7000 },
+          { "eastM": 2000, "northM": 0, "altitudeMslM": 7000 },
+          { "eastM": 5500, "northM": -5000, "altitudeMslM": 7000 },
+          { "eastM": 15000, "northM": -5000, "altitudeMslM": 7000 }
+        ],
+        "legLengthsM": [7000, 6103.277808, 9500],
+        "geographicPoints": [
+          { "longitudeDeg": 74.29493510578118, "latitudeDeg": 31.799964604660204, "altitudeMslM": 7000 },
+          { "longitudeDeg": 74.2210967085266, "latitudeDeg": 31.799998252081878, "altitudeMslM": 7000 },
+          { "longitudeDeg": 74.25798780299692, "latitudeDeg": 31.754943836549526, "altitudeMslM": 7000 },
+          { "longitudeDeg": 74.35814820599376, "latitudeDeg": 31.75485888365386, "altitudeMslM": 7000 }
+        ]
+      },
+      "runtimeExpectation": {
+        "termination": "weapon_intercept",
+        "effectClass": "KILL",
+        "timeOfFlightSeconds": 28.4,
+        "closestApproachM": 3.745229
+      },
+      "matchedControl": {
+        "changedField": "airMission.assignments[0].storeTransferPlan.requests[0].requestedTimeSeconds",
+        "value": 20.65,
+        "termination": "weapon_intercept",
+        "effectClass": "NO_EFFECT",
+        "timeOfFlightSeconds": 28.8,
+        "closestApproachM": 23.746881
+      }
+    },
+    {
+      "scenarioId": "a2a-high-energy-crossing-challenge",
+      "scenarioVersion": "1.2.0",
+      "profileId": "beam-drag-extend-recommit",
+      "regime": "UNRESTRICTED_TRANSITION",
+      "durationSeconds": 140,
+      "releaseTimeSeconds": 50,
+      "installedDragAreaM2": 0.03,
+      "blueTasMps": 268,
+      "redTasMps": 245,
+      "initialGeometry": {
+        "horizontalSeparationM": 33525.994,
+        "blueHeadingDeg": 68.962,
+        "redHeadingDeg": 180,
+        "aspectDeg": 72.646,
+        "altitudeDifferenceM": 1200
+      },
+      "blueRoute": {
+        "points": [
+          { "eastM": -16000, "northM": -5000, "altitudeMslM": 7800 },
+          { "eastM": -3000, "northM": 0, "altitudeMslM": 7800 },
+          { "eastM": 7000, "northM": -6000, "altitudeMslM": 7800 },
+          { "eastM": 18000, "northM": -2000, "altitudeMslM": 7800 }
+        ],
+        "legLengthsM": [13928.388277, 11661.90379, 11704.699911],
+        "geographicPoints": [
+          { "longitudeDeg": 74.03132974216987, "latitudeDeg": 31.754851054021064, "altitudeMslM": 7800 },
+          { "longitudeDeg": 74.16835889965864, "latitudeDeg": 31.799996068168564, "altitudeMslM": 7800 },
+          { "longitudeDeg": 74.27378625621236, "latitudeDeg": 31.745933841398628, "altitudeMslM": 7800 },
+          { "longitudeDeg": 74.38980910302007, "latitudeDeg": 31.781843667644022, "altitudeMslM": 7800 }
+        ]
+      },
+      "redRoute": {
+        "points": [
+          { "eastM": 16000, "northM": 5000, "altitudeMslM": 9000 },
+          { "eastM": 16000, "northM": -5000, "altitudeMslM": 9000 },
+          { "eastM": 28000, "northM": -9000, "altitudeMslM": 9000 },
+          { "eastM": 40000, "northM": -9000, "altitudeMslM": 9000 }
+        ],
+        "legLengthsM": [10000, 12649.110641, 12000],
+        "geographicPoints": [
+          { "longitudeDeg": 74.3688022444087, "latitudeDeg": 31.844916498329642, "altitudeMslM": 9000 },
+          { "longitudeDeg": 74.3686386134201, "latitudeDeg": 31.754859590789405, "altitudeMslM": 9000 },
+          { "longitudeDeg": 74.49500143157616, "latitudeDeg": 31.718606656924127, "altitudeMslM": 9000 },
+          { "longitudeDeg": 74.62142674063875, "latitudeDeg": 31.718251441465345, "altitudeMslM": 9000 }
+        ]
+      },
+      "runtimeExpectation": {
+        "termination": "weapon_intercept",
+        "effectClass": "NO_EFFECT",
+        "timeOfFlightSeconds": 114.7,
+        "closestApproachM": 24.947303
+      },
+      "matchedControl": {
+        "changedField": "airMission.assignments[0].storeTransferPlan.requests[0].requestedTimeSeconds",
+        "value": 50.05,
+        "termination": "weapon_intercept",
+        "effectClass": "DEGRADED",
+        "timeOfFlightSeconds": 112.15,
+        "closestApproachM": 17.444767
+      }
+    }
+  ],
+  "contrastPolicy": {
+    "routeMutationScenarioId": "a2a-crossing-intercept",
+    "blueRoutePointIndex": 1,
+    "longitudeDeltaDeg": 0.005,
+    "minimumCanonicalPositionDeltaM": 1,
+    "minimumPairwiseHistoryDistanceM": 100
+  }
+}

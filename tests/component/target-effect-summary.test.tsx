@@ -9,7 +9,7 @@ import { getScenarioDefinition } from "@/lib/scenarios";
 import { createReferencePreview } from "@/lib/simulation";
 
 describe("TargetEffectSummary", () => {
-  it("exposes canonical event/frame state and no terminal claim for an unavailable effect", () => {
+  it("authorizes modeled-kill wording only from the canonical terminal event and frame", () => {
     const result = createReferencePreview(
       getScenarioDefinition("a2a-defensive-break")!.scenario,
     );
@@ -20,9 +20,12 @@ describe("TargetEffectSummary", () => {
     render(<TargetEffectSummary selection={selection} />);
 
     const summary = screen.getByRole("region", { name: "Canonical target effect" });
-    expect(summary).toHaveAttribute("data-effect-class", "EFFECT_UNAVAILABLE");
-    expect(summary).toHaveAttribute("data-kill-claim-authorized", "false");
-    expect(screen.getByText("Effect unavailable")).toBeVisible();
-    expect(summary).not.toHaveTextContent(/\bkill(?:ed)?\b/i);
+    expect(summary).toHaveAttribute("data-effect-state", "RECORDED");
+    expect(summary).toHaveAttribute("data-effect-class", "KILL");
+    expect(summary).toHaveAttribute("data-target-lifecycle", "TERMINATED");
+    expect(summary).toHaveAttribute("data-kill-claim-authorized", "true");
+    expect(screen.getByText("Modeled kill")).toBeVisible();
+    expect(summary).toHaveTextContent(/scored a modeled kill/i);
+    expect(summary).toHaveTextContent(/MODEL_ASSUMPTION limitations:/);
   });
 });

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Check,
@@ -11,6 +11,7 @@ import {
   CircleX,
   Copy,
   Database,
+  Download,
   Eye,
   EyeOff,
   FileText,
@@ -25,6 +26,7 @@ import {
   Sparkles,
   Target,
   TriangleAlert,
+  Upload,
 } from "lucide-react";
 import { ObjectPicker } from "@/components/ObjectPicker";
 import { EngagementMap, type MapInstallation } from "@/components/EngagementMap";
@@ -36,6 +38,7 @@ import { TrackStateInspector } from "@/components/TrackStateInspector";
 import { CurrentGeometry } from "@/components/CurrentGeometry";
 import { RouteTransitionInspector } from "@/components/RouteTransitionInspector";
 import { TargetEffectSummary } from "@/components/TargetEffectSummary";
+import { CanonicalReportDebrief } from "@/components/CanonicalReportDebrief";
 import { PlatformEvidence } from "@/components/PlatformEvidence";
 import { Disclosure } from "@/components/ui/OverlayPrimitives";
 import { applyTacticalLabelPolicy, presentTacticalSymbol } from "@/lib/tactical-symbol-contract";
@@ -60,6 +63,8 @@ import {
   getScenarioDefinition,
   type ScenarioDefinition,
 } from "@/lib/scenarios";
+import { buildAuthoredProfileBinding } from "@/lib/report-profile";
+import { buildCanonicalReportDebrief } from "@/lib/report-debrief";
 import {
   findWeaponSimulationModel,
   registerDatabaseSimulationModels,
@@ -91,6 +96,7 @@ import {
   SCENARIO_PACKAGE_SCHEMA_VERSION,
   type StoredScenarioPackage,
 } from "@/lib/scenario-package";
+import { SCENARIO_PACKAGE_REFERENCE_SCHEMA_VERSION } from "@/lib/scenario-package-reference";
 import {
   createReferencePreview,
   explainResult,
@@ -108,7 +114,6 @@ import {
   selectRouteTransitionStates,
 } from "@/lib/frontend/selectors";
 import {
-  AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2,
   authorGenericAirborneStoreTransfer,
   bindRunwayEvidence,
   createDefaultAirMissionDefinition,
@@ -116,8 +121,17 @@ import {
   updateScenarioAirMissionRoutePoint,
 } from "@/lib/air-mission";
 import { CURRENT_COMPILED_MODEL_PACK } from "@/lib/engine/weapon-admission";
+import { MAX_VECTOR_RECORD_BYTES } from "@/lib/record/vector-record";
 import { NumericAuthoringInput } from "@/components/NumericAuthoringInput";
 import {
+  AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY,
+  AUTHORED_CROSSING_ANGLE_AUTHORITY,
+  AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY,
+  AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY,
+  AUTHORED_STORE_TRANSFER_TIME_AUTHORITY,
+  AUTHORED_WGS84_LATITUDE_AUTHORITY,
+  AUTHORED_WGS84_LONGITUDE_AUTHORITY,
+  LEGACY_SCENARIO_CONTROL_AUTHORITY,
   MAX_WGS84_FRACTION_DIGITS,
   type NumericAuthority,
 } from "@/lib/scenario-control-authority";
@@ -130,6 +144,12 @@ type EventItem = {
   type: "run" | "fault" | "observation";
   title: string;
   detail: string;
+};
+type WorkbenchVectorRecord = {
+  source: "WORKER_RUN" | "VERIFIED_IMPORT";
+  serializedRecord: ArrayBuffer;
+  recordId: string;
+  contentDigest: string;
 };
 const CONFIGURE_STEPS = [
   "Define",
@@ -265,6 +285,9 @@ function LabWorkbench({
     },
   ]);
   const [savedRunId, setSavedRunId] = useState<string | null>(null);
+  const [vectorRecord, setVectorRecord] = useState<WorkbenchVectorRecord | null>(null);
+  const [vectorRecordError, setVectorRecordError] = useState<string | null>(null);
+  const vectorRecordInput = useRef<HTMLInputElement>(null);
   const [draftRevision, setDraftRevision] = useState(0);
   const [runDraftRevision, setRunDraftRevision] = useState<number | null>(null);
   const [templateIdentity, setTemplateIdentity] = useState<{
@@ -307,6 +330,17 @@ function LabWorkbench({
     setTelemetryExpanded(expanded);
   }, []);
   const authoringInputsValid = invalidAuthoringControls.size === 0;
+  const scenarioPackageReference = useMemo(
+    () => templateIdentity
+      ? {
+          schemaVersion: SCENARIO_PACKAGE_REFERENCE_SCHEMA_VERSION,
+          id: definition.id,
+          version: definition.version,
+          contentHash: templateIdentity.contentHash,
+        }
+      : undefined,
+    [definition.id, definition.version, templateIdentity],
+  );
   const setAuthoringControlValidity = useCallback((controlId: string, valid: boolean) => {
     setInvalidAuthoringControls((current) => {
       const next = new Set(current);
@@ -493,6 +527,8 @@ function LabWorkbench({
       setHasRun(false);
       setPlaying(false);
       setSavedRunId(null);
+      setVectorRecord(null);
+      setVectorRecordError(null);
       setRunDraftRevision(null);
       setWorkspace("configure");
       setSaveError("Configuration changed. Conduct a new run before saving or reporting.");
@@ -500,7 +536,7 @@ function LabWorkbench({
   }, [hasRun]);
 
   const run = useCallback(async () => {
-    if (catalogState !== "POSTGIS") {
+    if (catalogState !== "POSTGIS" || !scenarioPackageReference) {
       setSaveError("Wait for the PostGIS scenario package before conducting the run.");
       return;
     }
@@ -514,11 +550,18 @@ function LabWorkbench({
       setRunProgress(0);
       setRuntimeState("initialization");
       const completion = await simulationClient.run(scenario, scenario.profile, {
+        packageReference: scenarioPackageReference,
         onState: setRuntimeState,
         onProgress: ({ progress }) => setRunProgress(progress),
       });
       const next = completion.result;
       setResult(next);
+      setVectorRecord({
+        source: "WORKER_RUN",
+        serializedRecord: completion.serializedRecord,
+        recordId: completion.recordId,
+        contentDigest: completion.contentDigest,
+      });
     } catch (error) {
       if (error instanceof BrowserSimulationCancelledError) {
         setRuntimeState("ready");
@@ -538,6 +581,7 @@ function LabWorkbench({
     setHasRun(true);
     setRunDraftRevision(draftRevision);
     setSavedRunId(null);
+    setVectorRecordError(null);
     setSaveError(null);
     setEvents((items) => [
       ...items,
@@ -549,7 +593,7 @@ function LabWorkbench({
         detail: `${getCatalogObject(scenario.blueSystemId).designation} · ${findWeaponSimulationModel(scenario.blueSystemId)?.id ?? "model unavailable"}@${findWeaponSimulationModel(scenario.blueSystemId)?.version ?? "unknown"} · ${scenario.guidance} path · ${formatDistanceKm(scenario.range)} km`,
       },
     ]);
-  }, [authoringInputsValid, catalogState, definition, draftRevision, scenario, simulationClient, spatialInputsValid]);
+  }, [authoringInputsValid, catalogState, definition, draftRevision, scenario, scenarioPackageReference, simulationClient, spatialInputsValid]);
 
   useEffect(() => {
     if (!playing) return;
@@ -636,12 +680,15 @@ function LabWorkbench({
     try {
       setRuntimeState("initialization");
       const short = await simulationClient.run(scenario, "short", {
+        packageReference: scenarioPackageReference,
         onState: setRuntimeState,
       });
       const medium = await simulationClient.run(scenario, "medium", {
+        packageReference: scenarioPackageReference,
         onState: setRuntimeState,
       });
       const sustained = await simulationClient.run(scenario, "sustained", {
+        packageReference: scenarioPackageReference,
         onState: setRuntimeState,
       });
       setComparison({
@@ -669,10 +716,18 @@ function LabWorkbench({
     try {
       setRuntimeState("initialization");
       const completion = await simulationClient.run(baseline, baseline.profile, {
+        packageReference: scenarioPackageReference,
         onState: setRuntimeState,
         onProgress: ({ progress }) => setRunProgress(progress),
       });
       setResult(completion.result);
+      setVectorRecord({
+        source: "WORKER_RUN",
+        serializedRecord: completion.serializedRecord,
+        recordId: completion.recordId,
+        contentDigest: completion.contentDigest,
+      });
+      setVectorRecordError(null);
     } catch (error) {
       if (error instanceof BrowserSimulationCancelledError) {
         setRuntimeState("ready");
@@ -696,6 +751,88 @@ function LabWorkbench({
       },
     ]);
   };
+  const downloadVectorRecord = useCallback(() => {
+    if (!vectorRecord) {
+      setVectorRecordError("Conduct or verify a run before downloading its VSR.");
+      return;
+    }
+    const url = URL.createObjectURL(
+      new Blob([new Uint8Array(vectorRecord.serializedRecord)], {
+        type: "application/octet-stream",
+      }),
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${definition.id}-${vectorRecord.recordId.slice(0, 12)}.vector`;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }, [definition.id, vectorRecord]);
+  const openVectorRecord = useCallback(async (file: File) => {
+    if (file.size < 12 || file.size > MAX_VECTOR_RECORD_BYTES) {
+      setVectorRecordError(
+        `VSR verification failed: file size must be between 12 and ${MAX_VECTOR_RECORD_BYTES} bytes.`,
+      );
+      return;
+    }
+    setVectorRecordError(null);
+    setRuntimeState("initialization");
+    try {
+      const serializedRecord = await file.arrayBuffer();
+      const opened = await simulationClient.openRecord(serializedRecord);
+      const openedPackage = opened.manifest.scenarioPackage;
+      if (
+        !scenarioPackageReference ||
+        !openedPackage ||
+        openedPackage.schemaVersion !== scenarioPackageReference.schemaVersion ||
+        openedPackage.id !== scenarioPackageReference.id ||
+        openedPackage.version !== scenarioPackageReference.version ||
+        openedPackage.contentHash !== scenarioPackageReference.contentHash
+      ) {
+        throw new Error(
+          "The verified VSR scenario package does not match this workbench package.",
+        );
+      }
+      const restoredRevision = draftRevision + 1;
+      setScenario(structuredClone(opened.scenario));
+      setResult(opened.result);
+      setVectorRecord({
+        source: "VERIFIED_IMPORT",
+        serializedRecord,
+        recordId: opened.manifest.recordId,
+        contentDigest: opened.manifest.contentDigest,
+      });
+      setTime(0);
+      setPlaying(false);
+      setWorkspace("run");
+      setComparison(null);
+      setHasRun(true);
+      setDraftRevision(restoredRevision);
+      setRunDraftRevision(restoredRevision);
+      setSavedRunId(null);
+      setSaveError(null);
+      setEvents([{
+        id: Date.now(),
+        time: 0,
+        type: "run",
+        title: "Verified VSR opened",
+        detail: `Record ${opened.manifest.recordId} restored without rerunning physics.`,
+      }]);
+      setRuntimeState("completed");
+    } catch (error) {
+      setRuntimeState(vectorRecord ? "completed" : "failed");
+      setVectorRecordError(
+        `VSR verification failed: ${error instanceof Error ? error.message : "record admission failed."}`,
+      );
+    }
+  }, [draftRevision, scenarioPackageReference, simulationClient, vectorRecord]);
+  const importedVectorRecordIsReportSource = vectorRecord?.source === "VERIFIED_IMPORT";
+  const authoredProfileBinding = useMemo(
+    () => buildAuthoredProfileBinding(definition, scenario),
+    [definition, scenario],
+  );
+  const matchedAuthoredProfile = authoredProfileBinding?.applicability === "MATCHED"
+    ? definition.authoredProfile
+    : undefined;
   const saveReport = async () => {
     if (!hasRun) {
       setSaveError("Conduct a run before saving a report.");
@@ -703,6 +840,11 @@ function LabWorkbench({
     }
     if (!templateIdentity || runDraftRevision !== draftRevision) {
       setSaveError("The saved template and completed run are out of sync. Conduct the run again.");
+      return null;
+    }
+    if (importedVectorRecordIsReportSource) {
+      setSaveError(null);
+      downloadVectorRecord();
       return null;
     }
     if (savedRunId) return savedRunId;
@@ -734,6 +876,10 @@ function LabWorkbench({
   };
   const openReport = async () => {
     if (!hasRun) return;
+    if (importedVectorRecordIsReportSource) {
+      setWorkspace("results");
+      return;
+    }
     const id = savedRunId ?? (await saveReport());
     if (id) router.push(`/report?run=${id}`);
   };
@@ -795,22 +941,96 @@ function LabWorkbench({
           </span>
           <button
             disabled={saving || !hasRun}
-            onClick={() =>
-              savedRunId ? router.push(`/report?run=${savedRunId}`) : void saveReport()
-            }
+            onClick={() => {
+              if (importedVectorRecordIsReportSource) {
+                downloadVectorRecord();
+                return;
+              }
+              if (savedRunId) router.push(`/report?run=${savedRunId}`);
+              else void saveReport();
+            }}
           >
-            {savedRunId ? <FileText size={14} /> : <Save size={14} />}
-            {saving ? "Saving run…" : savedRunId ? "View report" : "Save run"}
+            {importedVectorRecordIsReportSource
+              ? <Download size={14} />
+              : savedRunId
+                ? <FileText size={14} />
+                : <Save size={14} />}
+            {importedVectorRecordIsReportSource
+              ? "Download exact VSR"
+              : saving
+                ? "Saving run…"
+                : savedRunId
+                  ? "View report"
+                  : "Save run"}
           </button>
         </div>
       </header>
       <div className="lab-notice">
         <CircleAlert size={13} />
-        <span>
-          {definition.scope} Public-data approximation; model assumptions are
-          shown before the run.
+        <span
+          data-authored-profile={matchedAuthoredProfile?.id}
+          data-authored-profile-applicability={
+            authoredProfileBinding?.applicability ?? "UNVERIFIED_LEGACY"
+          }
+        >
+          {matchedAuthoredProfile
+            ? `${matchedAuthoredProfile.label} · Blue ${matchedAuthoredProfile.blue.legs.join(" → ")} · Red ${matchedAuthoredProfile.red.legs.join(" → ")} · authored routes, no autonomous pilot.`
+            : `${definition.scope} Public-data approximation; model assumptions are shown before the run.`}
         </span>
       </div>
+      <section
+        className="vsr-record-bar vector-record-panel"
+        aria-label="VECTOR Simulation Record"
+        data-record-source={vectorRecord?.source ?? "NONE"}
+      >
+        <div className="vsr-record-actions">
+          <button
+            type="button"
+            disabled={!vectorRecord || runtimeBusy}
+            onClick={downloadVectorRecord}
+          >
+            <Download size={14} /> Download VSR
+          </button>
+          <button
+            type="button"
+            disabled={runtimeBusy || !scenarioPackageReference}
+            onClick={() => vectorRecordInput.current?.click()}
+          >
+            <Upload size={14} /> Open/verify VSR
+          </button>
+          <input
+            ref={vectorRecordInput}
+            className="vsr-record-input"
+            type="file"
+            accept=".vector,application/octet-stream"
+            aria-label="Open VSR file"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = "";
+              if (file) void openVectorRecord(file);
+            }}
+          />
+        </div>
+        {vectorRecord ? (
+          <dl className="vsr-record-identity">
+            <div>
+              <dt>Source</dt>
+              <dd>{vectorRecord.source === "WORKER_RUN" ? "Worker-produced record" : "Worker-verified import"}</dd>
+            </div>
+            <div>
+              <dt>Record ID</dt>
+              <dd><code data-testid="vsr-record-id">{vectorRecord.recordId}</code></dd>
+            </div>
+            <div>
+              <dt>Content digest</dt>
+              <dd><code data-testid="vsr-content-digest">{vectorRecord.contentDigest}</code></dd>
+            </div>
+          </dl>
+        ) : (
+          <p>No Worker-produced or Worker-verified record is loaded.</p>
+        )}
+        {vectorRecordError && <p className="save-error" role="alert">{vectorRecordError}</p>}
+      </section>
 
       {workspace === "configure" && (
         <ConfigureWorkspace
@@ -829,6 +1049,7 @@ function LabWorkbench({
           runways={catalogRunways}
           environmentPacks={catalogEnvironmentPacks}
           spatialInputsValid={spatialInputsValid}
+          authoringInputsValid={authoringInputsValid}
           onSpatialValidityChange={setSpatialInputsValid}
           onAuthoringControlValidity={setAuthoringControlValidity}
           run={run}
@@ -836,6 +1057,7 @@ function LabWorkbench({
       )}
       {workspace === "results" && (
         <ResultsWorkspace
+          definition={definition}
           scenario={scenario}
           result={result}
           events={events}
@@ -844,6 +1066,7 @@ function LabWorkbench({
           saveError={saveError}
           saveReport={saveReport}
           openReport={openReport}
+          vectorRecord={vectorRecord}
         />
       )}
       {workspace === "run" && (
@@ -951,6 +1174,9 @@ function LabWorkbench({
                   selected={selectedDisplayFrame}
                   profile={scenario.profile}
                   layers={layers}
+                  authoredProfile={definition.authoredProfile}
+                  authoredProfileBinding={authoredProfileBinding}
+                  authoredScenario={scenario}
                   layoutRevision={telemetryExpanded ? 1 : 0}
                   targetEffectOverlay
                 />
@@ -976,6 +1202,7 @@ function LabWorkbench({
             <Playback
               result={result}
               time={time}
+              frameIndex={selectedDisplayFrame.frameIndex}
               displayTimeSeconds={selectedDisplayFrame.displayTimeSeconds}
               setTime={setTime}
               playing={playing}
@@ -1081,6 +1308,7 @@ function ConfigureWorkspace({
   runways,
   environmentPacks,
   spatialInputsValid,
+  authoringInputsValid,
   onSpatialValidityChange,
   onAuthoringControlValidity,
   run,
@@ -1100,6 +1328,7 @@ function ConfigureWorkspace({
   runways: CatalogRunway[];
   environmentPacks: CatalogEnvironmentPack[];
   spatialInputsValid: boolean;
+  authoringInputsValid: boolean;
   onSpatialValidityChange: (valid: boolean) => void;
   onAuthoringControlValidity: (controlId: string, valid: boolean) => void;
   run: () => void;
@@ -1510,7 +1739,13 @@ function ConfigureWorkspace({
     ],
   ];
   const navigateStep = (value: number) => {
-    if (step === 2 && !spatialInputsValid && value !== 2) return;
+    // Raw numeric drafts are owned by their mounted authoring control. Do not
+    // unmount an invalid control and let its last admitted numeric value run in
+    // its place; the operator must correct the visible draft first.
+    if (
+      value !== step &&
+      ((!spatialInputsValid && step === 2) || !authoringInputsValid)
+    ) return;
     setStep(value);
   };
   const advance = () => (step === 4 ? run() : navigateStep(step + 1));
@@ -1566,6 +1801,34 @@ function ConfigureWorkspace({
                 onChange={(event) => update("objective", event.target.value)}
               />
             </label>
+            <div className="advanced-grid" role="group" aria-label="Run identity and termination">
+              <label className="field">
+                <span>Run duration (model s, optional)</span>
+                <NumericAuthoringInput
+                  controlId="scenario.runDurationSeconds"
+                  ariaLabel="Run duration"
+                  value={scenario.runDurationSeconds}
+                  authority={LEGACY_SCENARIO_CONTROL_AUTHORITY.runDurationSeconds.numeric!}
+                  onChange={(value) => update("runDurationSeconds", value ?? undefined)}
+                  onValidityChange={onAuthoringControlValidity}
+                />
+                <small>Stops at this model-time limit unless a canonical terminal condition occurs first.</small>
+              </label>
+              <label className="field">
+                <span>Replay seed</span>
+                <NumericAuthoringInput
+                  controlId="scenario.seed"
+                  ariaLabel="Replay seed"
+                  value={scenario.seed}
+                  authority={LEGACY_SCENARIO_CONTROL_AUTHORITY.seed.numeric!}
+                  onChange={(value) => {
+                    if (value !== null) update("seed", value);
+                  }}
+                  onValidityChange={onAuthoringControlValidity}
+                />
+                <small>Recorded replay identity. The current deterministic runtime has no stochastic seed effect.</small>
+              </label>
+            </div>
             {scenario.airMission && (
               <section className="air-mission-editor" aria-label="Air mission contract">
                 <header>
@@ -2155,7 +2418,7 @@ function ConfigureWorkspace({
                               controlId="airMission.assignments[0].storeTransfer.requests[0].requestedTimeSeconds"
                               ariaLabel="Store transfer requested time"
                               value={request.requestedTimeSeconds}
-                              authority={numericAuthority(0, 300, 3, "s")}
+                              authority={AUTHORED_STORE_TRANSFER_TIME_AUTHORITY}
                               onChange={(value) => updateStoreTransfer({ requestedTimeSeconds: value! })}
                               onValidityChange={onAuthoringControlValidity}
                             />
@@ -2166,12 +2429,7 @@ function ConfigureWorkspace({
                               controlId="airMission.assignments[0].storeTransfer.requests[0].installedDragAreaM2"
                               ariaLabel="Store installed drag area"
                               value={request.installedDragAreaM2}
-                              authority={numericAuthority(
-                                AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.minimum,
-                                AIRBORNE_STORE_TRANSFER_INSTALLED_DRAG_AREA_M2.maximum,
-                                3,
-                                "m2",
-                              )}
+                              authority={AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY}
                               onChange={(value) => updateStoreTransfer({ installedDragAreaM2: value! })}
                               onValidityChange={onAuthoringControlValidity}
                             />
@@ -2222,7 +2480,7 @@ function ConfigureWorkspace({
                             controlId={`airMission.flightPlans[0].routePoints[${index}].longitude`}
                             ariaLabel={`${point.id} longitude`}
                             value={point.position.longitude}
-                            authority={numericAuthority(-180, 180, MAX_WGS84_FRACTION_DIGITS, "deg_WGS84")}
+                            authority={AUTHORED_WGS84_LONGITUDE_AUTHORITY}
                             onChange={(value) => updateMissionRoutePoint(index, { position: { ...point.position, longitude: value! } })}
                             onValidityChange={onAuthoringControlValidity}
                           />
@@ -2233,7 +2491,7 @@ function ConfigureWorkspace({
                             controlId={`airMission.flightPlans[0].routePoints[${index}].latitude`}
                             ariaLabel={`${point.id} latitude`}
                             value={point.position.latitude}
-                            authority={numericAuthority(-90, 90, MAX_WGS84_FRACTION_DIGITS, "deg_WGS84")}
+                            authority={AUTHORED_WGS84_LATITUDE_AUTHORITY}
                             onChange={(value) => updateMissionRoutePoint(index, { position: { ...point.position, latitude: value! } })}
                             onValidityChange={onAuthoringControlValidity}
                           />
@@ -2244,7 +2502,7 @@ function ConfigureWorkspace({
                             controlId={`airMission.flightPlans[0].routePoints[${index}].altitudeMslM`}
                             ariaLabel={`${point.id} altitude metres MSL`}
                             value={point.position.altitude.valueM}
-                            authority={numericAuthority(0, 30_000, 1, "m_MSL")}
+                            authority={AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY}
                             onChange={(value) => updateMissionRoutePoint(index, { position: { ...point.position, altitude: { ...point.position.altitude, valueM: value! } } })}
                             onValidityChange={onAuthoringControlValidity}
                           />
@@ -2269,7 +2527,7 @@ function ConfigureWorkspace({
                             ariaLabel={`${point.id} acceptance radius metres`}
                             value={point.acceptanceRadiusM}
                             disabled={index === 0 || point.turnMethod === "FLY_OVER"}
-                            authority={numericAuthority(1, 25_000, 1, "m")}
+                            authority={AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY}
                             onChange={(value) => updateMissionRoutePoint(index, { acceptanceRadiusM: value! })}
                             onValidityChange={onAuthoringControlValidity}
                           />
@@ -2453,9 +2711,9 @@ function ConfigureWorkspace({
                       controlId="scenario.aspect"
                       label="Starting crossing angle"
                       value={scenario.aspect}
-                      min={0}
-                      max={180}
-                      step={5}
+                      min={AUTHORED_CROSSING_ANGLE_AUTHORITY.minimum}
+                      max={AUTHORED_CROSSING_ANGLE_AUTHORITY.maximum}
+                      step={10 ** -AUTHORED_CROSSING_ANGLE_AUTHORITY.precision}
                       unit="°"
                       onChange={(value) => {
                         if (scenario.spatialPlan && selectedStudyArea) {
@@ -2725,6 +2983,7 @@ function ValidationList({ items }: { items: ValidationItem[] }) {
 }
 
 function ResultsWorkspace({
+  definition,
   scenario,
   result,
   events,
@@ -2733,7 +2992,9 @@ function ResultsWorkspace({
   saveError,
   saveReport,
   openReport,
+  vectorRecord,
 }: {
+  definition: ScenarioDefinition;
   scenario: Scenario;
   result: SimulationResult;
   events: EventItem[];
@@ -2742,6 +3003,7 @@ function ResultsWorkspace({
   saveError: string | null;
   saveReport: () => Promise<string | null>;
   openReport: () => Promise<void>;
+  vectorRecord: WorkbenchVectorRecord | null;
 }) {
   const bluePlatform = getCatalogObject(scenario.bluePlatformId);
   const blueSystem = getCatalogObject(scenario.blueSystemId);
@@ -2756,8 +3018,22 @@ function ResultsWorkspace({
     result,
     selectDisplayFrame(result, result.timeOfFlight),
   );
+  const importedVectorRecordIsReportSource = vectorRecord?.source === "VERIFIED_IMPORT";
+  const importedCanonicalDebrief = useMemo(
+    () => importedVectorRecordIsReportSource
+      ? buildCanonicalReportDebrief(result, definition, scenario)
+      : null,
+    [definition, importedVectorRecordIsReportSource, result, scenario],
+  );
   return (
-    <section className="debrief-workspace">
+    <section
+      className="debrief-workspace"
+      data-report-source={vectorRecord?.source ?? "UNAVAILABLE"}
+      data-record-id={vectorRecord?.recordId}
+      data-content-digest={vectorRecord?.contentDigest}
+      data-engine-backend={result.engineRun.diagnostics.backend}
+      data-canonical-frame-count={result.engineRun.frames.length}
+    >
       <header>
         <span>Explain and report</span>
         <h1>{scenario.name}</h1>
@@ -2816,7 +3092,13 @@ function ResultsWorkspace({
         <article className="event-log">
           <h2>What happened</h2>
           {finalTargetEffect.eventId && "modelTimeSeconds" in finalTargetEffect.projection && (
-            <div data-testid="results-target-effect-event">
+            <div
+              data-testid="results-target-effect-event"
+              data-effect-event-id={finalTargetEffect.eventId}
+              data-effect-frame-index={finalTargetEffect.projection.frameIndex}
+              data-effect-time={finalTargetEffect.projection.modelTimeSeconds}
+              data-effect-class={finalTargetEffect.presentation.effectClass ?? "NONE"}
+            >
               <time>{finalTargetEffect.projection.modelTimeSeconds.toFixed(2)} s</time>
               <i className="target-effect" />
               <span>
@@ -2853,18 +3135,39 @@ function ResultsWorkspace({
           <button
             disabled={saving}
             aria-busy={saving}
-            onClick={() => void (savedRunId ? openReport() : saveReport())}
+            onClick={() => void (
+              importedVectorRecordIsReportSource
+                ? saveReport()
+                : savedRunId
+                  ? openReport()
+                  : saveReport()
+            )}
           >
-            {savedRunId ? <FileText size={15} /> : <Save size={15} />}
-            {saving ? "Saving run…" : savedRunId ? "View full report" : "Save run"}
+            {importedVectorRecordIsReportSource
+              ? <Download size={15} />
+              : savedRunId
+                ? <FileText size={15} />
+                : <Save size={15} />}
+            {importedVectorRecordIsReportSource
+              ? "Download exact VSR"
+              : saving
+                ? "Saving run…"
+                : savedRunId
+                  ? "View full report"
+                  : "Save run"}
           </button>
           <small>
-            {savedRunId
+            {importedVectorRecordIsReportSource
+              ? "This debrief and download use the verified VSR's exact identity, backend, and canonical frames; server recomputation is disabled."
+              : savedRunId
               ? "Saved. The report is now a reproducible snapshot of this run."
               : "Saving freezes the scenario, model versions, telemetry, and sources before reporting."}
           </small>
         </article>
       </div>
+      {importedCanonicalDebrief && (
+        <CanonicalReportDebrief debrief={importedCanonicalDebrief} />
+      )}
     </section>
   );
 }
@@ -3026,6 +3329,7 @@ const numericAuthority = (
 function Playback({
   result,
   time,
+  frameIndex,
   displayTimeSeconds,
   setTime,
   playing,
@@ -3035,6 +3339,7 @@ function Playback({
 }: {
   result: SimulationResult;
   time: number;
+  frameIndex: number;
   displayTimeSeconds: number;
   setTime: (value: number) => void;
   playing: boolean;
@@ -3056,14 +3361,19 @@ function Playback({
       </button>
       <input
         aria-label="Run timeline"
+        data-selected-frame-index={frameIndex}
+        data-selected-display-time={displayTimeSeconds}
         type="range"
         min={0}
         max={result.timeOfFlight || 1}
-        step={0.1}
+        step={0.001}
         value={time}
         onChange={(event) => setTime(Number(event.target.value))}
       />
-      <span data-display-time={displayTimeSeconds}>
+      <span
+        data-display-time={displayTimeSeconds}
+        data-frame-index={frameIndex}
+      >
         {displayTimeSeconds.toFixed(1)} / {result.timeOfFlight.toFixed(1)} s
       </span>
       <div>

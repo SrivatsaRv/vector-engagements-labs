@@ -8,6 +8,9 @@ import {
   selectCanonicalTargetEffect,
   selectDisplayFrame,
 } from "./frontend/selectors.ts";
+import type { AuthoredRouteProfile } from "./scenarios.ts";
+import { buildCanonicalReportDebrief } from "./report-debrief.ts";
+import type { AuthoredProfileBinding } from "./report-profile.ts";
 
 export type ReportLibraryScenario = {
   id: string;
@@ -17,6 +20,8 @@ export type ReportLibraryScenario = {
   scope: string;
   targetProfile: string;
   theatre: string;
+  authoredProfile?: AuthoredRouteProfile;
+  authoredProfileBinding?: AuthoredProfileBinding;
 };
 
 export type ReportData = {
@@ -69,6 +74,7 @@ export function buildReportExport(
     data.result,
     selectDisplayFrame(data.result, data.result.timeOfFlight),
   );
+  const debrief = buildCanonicalReportDebrief(data.result, library, data.scenario);
   const bluePlatform = findPlatform(data.scenario.bluePlatformId);
   const blueWeapon = findWeapon(data.scenario.blueSystemId);
   const redPlatform = findPlatform(data.scenario.redObjectId);
@@ -127,6 +133,8 @@ export function buildReportExport(
         version: library.version,
         domain: library.domain,
         title: library.title,
+        authoredProfile: library.authoredProfile ?? null,
+        authoredProfileBinding: library.authoredProfileBinding ?? null,
       },
       intent: {
         name: data.scenario.name,
@@ -228,6 +236,7 @@ export function buildReportExport(
           ? targetEffect.projection.authority
           : null,
       },
+      debrief,
     },
     session: {
       createdAt: data.createdAt,

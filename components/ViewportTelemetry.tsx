@@ -31,7 +31,12 @@ export function ViewportTelemetry({ expanded, onExpandedChange, result, selected
   const targetEffect = selectCanonicalTargetEffect(result, selected);
 
   return (
-    <section className={`telemetry ${expanded ? "is-expanded" : "is-collapsed"}`} aria-label="Synchronized run telemetry">
+    <section
+      className={`telemetry ${expanded ? "is-expanded" : "is-collapsed"}`}
+      aria-label="Synchronized run telemetry"
+      data-display-time={selected.displayTimeSeconds}
+      data-frame-index={selected.frameIndex}
+    >
       <div className="telemetry-title">
         <div>
           <strong>Synchronized run telemetry</strong>

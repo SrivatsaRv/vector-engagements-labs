@@ -1,4 +1,8 @@
-import type { ScenarioDefinition } from "./scenarios.ts";
+import {
+  AUTHORED_ROUTE_PROFILE_SCHEMA_VERSION,
+  type AuthoredRouteProfile,
+  type ScenarioDefinition,
+} from "./scenarios.ts";
 
 export const SCENARIO_PACKAGE_SCHEMA_VERSION = "vector.scenario.v4";
 
@@ -18,6 +22,43 @@ export type StoredScenarioPackage = {
   model_pack_version: string;
   model_pack_digest: string;
 };
+
+const PROFILE_IDS = new Set([
+  "bvr-offset-and-support",
+  "wvr-one-circle-defensive-break",
+  "beam-drag-extend-recommit",
+]);
+const LEG_INTENTS = new Set([
+  "MERGE", "OFFSET", "SUPPORT", "BEAM", "DRAG", "DEFENSIVE_BREAK",
+  "ONE_CIRCLE", "EXTEND", "INTERCEPT", "RECOMMIT",
+]);
+
+function exactKeys(value: object, expected: readonly string[]) {
+  const actual = Object.keys(value).sort();
+  return actual.length === expected.length
+    && actual.every((key, index) => key === [...expected].sort()[index]);
+}
+
+export function isAuthoredRouteProfile(value: unknown): value is AuthoredRouteProfile {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const profile = value as Partial<AuthoredRouteProfile>;
+  if (!exactKeys(profile, ["schemaVersion", "id", "label", "authority", "blue", "red", "limitations"])) return false;
+  if (
+    profile.schemaVersion !== AUTHORED_ROUTE_PROFILE_SCHEMA_VERSION
+    || !PROFILE_IDS.has(profile.id ?? "")
+    || typeof profile.label !== "string"
+    || profile.label.trim().length === 0
+    || profile.authority !== "AUTHORED_ROUTE"
+    || !Array.isArray(profile.limitations)
+    || profile.limitations.length === 0
+    || profile.limitations.some((item) => typeof item !== "string" || item.trim().length === 0)
+  ) return false;
+  for (const side of [profile.blue, profile.red]) {
+    if (!side || typeof side !== "object" || Array.isArray(side) || !exactKeys(side, ["legs"])) return false;
+    if (!Array.isArray(side.legs) || side.legs.length !== 3 || side.legs.some((leg) => !LEG_INTENTS.has(leg))) return false;
+  }
+  return true;
+}
 
 export function isScenarioDefinition(value: unknown): value is ScenarioDefinition {
   if (!value || typeof value !== "object") return false;
@@ -45,6 +86,7 @@ export function isScenarioDefinition(value: unknown): value is ScenarioDefinitio
       candidate.scenario.studyAreaId &&
       candidate.scenario.weatherPresetId &&
       Number.isFinite(candidate.scenario.seed) &&
+      (candidate.authoredProfile === undefined || isAuthoredRouteProfile(candidate.authoredProfile)) &&
       (candidate.scenario.domain !== "A2A" || candidate.scenario.airMission?.schemaVersion === "vector.air-mission.v1"),
   );
 }

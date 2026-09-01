@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  AUTHORED_AIRCRAFT_TAS_AUTHORITY,
+  AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY,
+  AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY,
   LEGACY_SCENARIO_CONTROL_AUTHORITY,
   LEGACY_SCENARIO_FIELD_NAMES,
   SCENARIO_CONTROL_AUTHORITY_IDENTITY,
@@ -12,6 +15,7 @@ import {
   assertStructuredScenarioNumbers,
   validateStructuredScenarioNumbers,
 } from "../lib/scenario-control-authority.ts";
+import { PublicApiError } from "../lib/security/public-api.ts";
 import { validateSavedScenario } from "../lib/security/saved-run.ts";
 import { DEFAULT_SCENARIO_DEFINITION } from "../lib/scenarios.ts";
 import { prepareSimulation } from "../lib/simulation.ts";
@@ -25,8 +29,8 @@ const malformedNumbers = [
 test("legacy-scenario-authority-complete: every legacy scenario field has one immutable authority row", () => {
   assert.equal(SCENARIO_CONTROL_AUTHORITY_SCHEMA_VERSION, "vector.scenario-control-authority.v1");
   assert.match(SCENARIO_CONTROL_AUTHORITY_IDENTITY.digest, /^sha256:[0-9a-f]{64}$/);
-  assert.equal(LEGACY_SCENARIO_FIELD_NAMES.length, 40);
-  assert.equal(new Set(LEGACY_SCENARIO_FIELD_NAMES).size, 40);
+  assert.equal(LEGACY_SCENARIO_FIELD_NAMES.length, 41);
+  assert.equal(new Set(LEGACY_SCENARIO_FIELD_NAMES).size, 41);
   for (const field of LEGACY_SCENARIO_FIELD_NAMES) {
     const row = LEGACY_SCENARIO_CONTROL_AUTHORITY[field];
     assert.equal(row.draftPath, `$.${field}`);
@@ -60,7 +64,6 @@ test("legacy-hidden-authority-poison-inventory: every hidden value is classified
     "redJammer",
     "redRadarMode",
     "redTrackSource",
-    "seed",
     "visibilityKm",
     "windNorth",
   ]);
@@ -77,7 +80,7 @@ test("numeric-authoring-malformed-corpus: every numeric authority rejects malfor
   const numericFields = Object.entries(LEGACY_SCENARIO_CONTROL_AUTHORITY)
     .filter(([, row]) => row.numeric)
     .map(([field]) => field);
-  assert.equal(numericFields.length, 19);
+  assert.equal(numericFields.length, 20);
   for (const field of numericFields) {
     for (const raw of malformedNumbers) {
       const result = admitRawScenarioNumber(field, raw);
@@ -127,10 +130,63 @@ test("numeric-authoring-precision: authored precision is enforced independently 
     ok: false,
     code: "CONTROL_NUMBER_INTEGER",
   });
+  assert.deepEqual(admitRawScenarioNumber("runDurationSeconds", "54.125"), {
+    ok: true,
+    value: 54.125,
+  });
+  assert.deepEqual(admitRawScenarioNumber("runDurationSeconds", "54.1251"), {
+    ok: false,
+    code: "CONTROL_NUMBER_PRECISION",
+  });
+  assert.deepEqual(admitRawScenarioNumber("seed", "42.5"), {
+    ok: false,
+    code: "CONTROL_NUMBER_INTEGER",
+  });
   assert.deepEqual(admitRawScenarioNumber("range", "4.999e3"), {
     ok: false,
     code: "CONTROL_NUMBER_RANGE",
   });
+});
+
+test("replay seed is an explicit required integer at raw, structured, compiler, and saved-run boundaries", () => {
+  const authority = LEGACY_SCENARIO_CONTROL_AUTHORITY.seed.numeric;
+  assert.deepEqual(authority, {
+    kind: "NUMBER",
+    minimum: 0,
+    maximum: 2_147_483_647,
+    integer: true,
+    nullable: false,
+    precision: 0,
+    unit: "1",
+  });
+  assert.deepEqual(admitRawScenarioNumber("seed", ""), {
+    ok: false,
+    code: "CONTROL_NUMBER_EMPTY",
+  });
+  assert.deepEqual(admitStructuredNumber(null, authority), {
+    ok: false,
+    code: "CONTROL_NUMBER_EMPTY",
+  });
+
+  const nullSeed = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
+  nullSeed.seed = null;
+  assert.deepEqual(
+    validateStructuredScenarioNumbers(nullSeed).find((error) => error.fieldPath === "$.seed"),
+    { fieldPath: "$.seed", code: "CONTROL_NUMBER_EMPTY" },
+  );
+  assert.throws(
+    () => prepareSimulation(nullSeed),
+    (error) => error instanceof ScenarioControlAdmissionError
+      && error.code === "CONTROL_NUMBER_EMPTY"
+      && error.fieldPath === "$.seed",
+  );
+  assert.throws(
+    () => validateSavedScenario(nullSeed, DEFAULT_SCENARIO_DEFINITION),
+    (error) => error instanceof PublicApiError
+      && error.status === 400
+      && error.code === "CONTROL_NUMBER_EMPTY"
+      && error.fieldPath === "$.seed",
+  );
 });
 
 test("numeric-authoring-no-silent-zero: blank, whitespace and negative zero remain distinct", () => {
@@ -172,6 +228,54 @@ test("structured-number-admission: type, finite, precision and range checks repe
     ok: false,
     code: "CONTROL_NUMBER_RANGE",
   });
+});
+
+test("spatial and mission editors share exact altitude, TAS, and route-radius domains", () => {
+  assert.deepEqual(AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY, {
+    kind: "NUMBER",
+    minimum: 0,
+    maximum: 15_000,
+    integer: false,
+    nullable: false,
+    precision: 3,
+    unit: "m_MSL",
+  });
+  assert.deepEqual(AUTHORED_AIRCRAFT_TAS_AUTHORITY, {
+    kind: "NUMBER",
+    minimum: 0,
+    maximum: 450,
+    integer: false,
+    nullable: false,
+    precision: 3,
+    unit: "m/s",
+  });
+  assert.deepEqual(AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY, {
+    kind: "NUMBER",
+    minimum: 1,
+    maximum: 25_000,
+    integer: false,
+    nullable: false,
+    precision: 3,
+    unit: "m",
+  });
+  for (const authority of [
+    AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY,
+    AUTHORED_AIRCRAFT_TAS_AUTHORITY,
+    AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY,
+  ]) {
+    assert.deepEqual(admitStructuredNumber(authority.maximum, authority), {
+      ok: true,
+      value: authority.maximum,
+    });
+    assert.deepEqual(admitStructuredNumber(authority.maximum + 0.001, authority), {
+      ok: false,
+      code: "CONTROL_NUMBER_RANGE",
+    });
+    assert.deepEqual(admitStructuredNumber(authority.minimum + 0.0001, authority), {
+      ok: false,
+      code: "CONTROL_NUMBER_PRECISION",
+    });
+  }
 });
 
 test("duplicate-authority projections skip only precision and retain domain admission", () => {

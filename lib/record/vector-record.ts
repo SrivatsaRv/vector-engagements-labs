@@ -43,6 +43,12 @@ import {
 } from "../model-pack.ts";
 import { assertTargetEffectAuthority } from "../engine/target-effect-authority.ts";
 import { assertRetainedTargetEffectAuthority } from "../engine/retained-target-effect-authority.ts";
+import {
+  assertRetainedScenarioPackageReference,
+  assertScenarioPackageReference,
+  SCENARIO_PACKAGE_REFERENCE_SCHEMA_VERSION,
+  type ScenarioPackageReference,
+} from "../scenario-package-reference.ts";
 
 export const VECTOR_RECORD_SCHEMA = "vector.record.v1" as const;
 export const VECTOR_FRAME_SCHEMA = "vector.frames.columnar.v7" as const;
@@ -96,6 +102,7 @@ export type VectorRecordManifest = {
     authoredDigest: string;
     compiledDigest: string;
   };
+  scenarioPackage?: ScenarioPackageReference;
   targetEffect?: TargetEffectRecordIdentity;
   requiredViewerFeatures: string[];
   members: VectorRecordMember[];
@@ -139,6 +146,7 @@ type RecordReport = {
   };
   engine: Omit<EngineRun, "scenario" | "frames" | "events">;
   airMission?: VectorRecordManifest["airMission"];
+  scenarioPackage?: ScenarioPackageReference;
   targetEffect?: TargetEffectRecordIdentity;
   limitations: string[];
 };
@@ -602,6 +610,9 @@ export async function createVectorSimulationRecord(
   ) {
     throw new Error("Record backend provenance does not match the selected backend.");
   }
+  if (prepared.packageReference) {
+    assertRetainedScenarioPackageReference(prepared.packageReference);
+  }
   if (result.engineRun.events.state !== "AVAILABLE") {
     throw new Error("A new VECTOR record requires an available simulation-event stream.");
   }
@@ -621,6 +632,9 @@ export async function createVectorSimulationRecord(
             compiledDigest: prepared.engineScenario.airMission.compiledDigest,
           },
         }
+      : {}),
+    ...(prepared.packageReference
+      ? { scenarioPackage: structuredClone(prepared.packageReference) }
       : {}),
     ...(recordedTargetEffect
       ? { targetEffect: structuredClone(recordedTargetEffect) }
@@ -668,6 +682,9 @@ export async function createVectorSimulationRecord(
         profileId: prepared.profileId,
         profile: prepared.profile,
         engineScenario: canonicalEngineScenario,
+        ...(prepared.packageReference
+          ? { packageReference: structuredClone(prepared.packageReference) }
+          : {}),
       }),
     ),
     member("entities.json", "vector.entities.v1", "application/json", true, jsonBytes(canonicalEntityManifest)),
@@ -744,6 +761,9 @@ export async function createVectorSimulationRecord(
           },
         }
       : {}),
+    ...(prepared.packageReference
+      ? { scenarioPackage: structuredClone(prepared.packageReference) }
+      : {}),
     ...(recordedTargetEffect
       ? { targetEffect: structuredClone(recordedTargetEffect) }
       : {}),
@@ -753,6 +773,9 @@ export async function createVectorSimulationRecord(
       VECTOR_PICTURE_SCHEMA,
       "vector.report.v1",
       ...(prepared.engineScenario.airMission ? [COMPILED_AIR_MISSION_SCHEMA_VERSION] : []),
+      ...(prepared.packageReference
+        ? [SCENARIO_PACKAGE_REFERENCE_SCHEMA_VERSION]
+        : []),
       ...(recordedTargetEffect ? ["vector.target-effect-authority.v1"] : []),
     ],
     members: nonManifest.map(({ bytes, ...item }) => ({
@@ -1021,6 +1044,40 @@ export async function openVectorSimulationRecord(
   }
   const report = JSON.parse(decoder.decode(required("report.json"))) as RecordReport;
   if (report.schemaVersion !== "vector.report.v1") throw new Error("VECTOR report schema is unsupported.");
+  const packageReferences = [
+    compiled.packageReference,
+    manifest.scenarioPackage,
+    report.scenarioPackage,
+  ];
+  const hasScenarioPackageReference = packageReferences.some(
+    (reference) => reference !== undefined,
+  );
+  if (hasScenarioPackageReference) {
+    for (const reference of packageReferences) {
+      assertScenarioPackageReference(reference);
+    }
+    if (
+      !manifest.requiredViewerFeatures.includes(
+        SCENARIO_PACKAGE_REFERENCE_SCHEMA_VERSION,
+      ) ||
+      canonicalJson(compiled.packageReference) !==
+        canonicalJson(manifest.scenarioPackage) ||
+      canonicalJson(compiled.packageReference) !==
+        canonicalJson(report.scenarioPackage)
+    ) {
+      throw new Error(
+        "VECTOR scenario-package reference is inconsistent across compiled, manifest, and report artifacts.",
+      );
+    }
+  } else if (
+    manifest.requiredViewerFeatures.includes(
+      SCENARIO_PACKAGE_REFERENCE_SCHEMA_VERSION,
+    )
+  ) {
+    throw new Error(
+      "VECTOR record declares a scenario-package feature without a reference.",
+    );
+  }
   if (canonicalJson(report.airMission ?? null) !== canonicalJson(manifest.airMission ?? null)) {
     throw new Error("VECTOR report Air mission lineage is inconsistent.");
   }

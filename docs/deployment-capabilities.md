@@ -47,6 +47,12 @@ criteria remain open.
   admitted through `vector.air-mission.v1`. A ground start still requires an
   exact installation/source identity and content-addressed runway evidence;
   the capability list is not permission to invent either.
+- The retained A2A catalog includes the exact `1.2.0` BVR offset/support, WVR
+  one-circle/defensive-break, and beam/drag/extend/recommit study packages.
+  Their package IDs, versions and content hashes are re-admitted before browser
+  dispatch and inside the Worker. The authored profile labels add no autonomous
+  policy capability; causal authority remains with admitted route, release,
+  guidance, duration, model-pack and effect inputs.
 - A2G, G2A and G2G are disabled by deployment. Their library entries remain
   visible as future study material, but they have no Run link.
 - A disabled or unknown direct link shows an unavailable state. It never opens

@@ -48,6 +48,7 @@ import {
   type AirMissionDefinition,
 } from "../air-mission.ts";
 import type { Scenario } from "../simulation.ts";
+import { hasDeclaredPrecision } from "../scenario-control-authority.ts";
 
 export const ENGINE_FIXED_STEP_SECONDS = 0.05;
 export function engineDurationSecondsForDomain(domain: EngagementDomain) {
@@ -87,6 +88,8 @@ export type ScenarioCompilerInput = {
   windShiftEastMps: number;
   windShiftNorthMps: number;
   seed: number;
+  /** Explicit authored duration; omission preserves the historical domain default. */
+  runDurationSeconds?: number;
   airMission?: AirMissionDefinition;
   authoredScenario?: Scenario;
   placement?: {
@@ -269,6 +272,18 @@ export function compileScenario(
   input: ScenarioCompilerInput,
   profile: CompilerProfile,
 ): EngineScenario {
+  const durationSeconds = input.runDurationSeconds
+    ?? engineDurationSecondsForDomain(input.domain);
+  if (
+    !Number.isFinite(durationSeconds)
+    || durationSeconds < 0.001
+    || durationSeconds > 3_600
+    || !hasDeclaredPrecision(durationSeconds, 3)
+  ) {
+    throw new Error(
+      "Compiled run duration must be from 0.001 to 3600 seconds with at most three decimal places.",
+    );
+  }
   if (!Number.isInteger(input.blueWeaponQuantity) || input.blueWeaponQuantity <= 0 || input.blueWeaponQuantity > 64 || !Number.isInteger(input.redWeaponQuantity) || input.redWeaponQuantity < 0 || input.redWeaponQuantity > 64) {
     throw new Error("Compiled loadout quantities must be bounded integers.");
   }
@@ -298,7 +313,7 @@ export function compileScenario(
           environmentPackDigest: environmentPack.identity.digest,
           environmentPack,
           fixedStepSeconds: ENGINE_FIXED_STEP_SECONDS,
-          durationSeconds: engineDurationSecondsForDomain(input.domain),
+          durationSeconds,
         })
       : (() => {
           throw new Error("An authored Air mission requires its exact scenario context.");
@@ -806,7 +821,7 @@ export function compileScenario(
     domain: input.domain,
     name: input.name,
     seed: input.seed,
-    durationSeconds: engineDurationSecondsForDomain(input.domain),
+    durationSeconds,
     fixedStepSeconds: ENGINE_FIXED_STEP_SECONDS,
     ...(compiledAirMission ? { airMission: compiledAirMission } : {}),
     ...(input.domain === "A2A"

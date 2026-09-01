@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { ReportReplay } from "@/components/ReportReplay";
 import { TargetEffectSummary } from "@/components/TargetEffectSummary";
+import { CanonicalReportDebrief } from "@/components/CanonicalReportDebrief";
 import { findPlatform, findWeapon, getSource } from "@/lib/capability-data";
 import { getCatalogObject } from "@/lib/object-catalog";
 import { getGovernedAircraftEvidenceClaim } from "@/lib/aircraft-evidence-registry";
@@ -32,6 +33,8 @@ import {
   selectCanonicalTargetEffect,
   selectDisplayFrame,
 } from "@/lib/frontend/selectors";
+import { buildCanonicalReportDebrief } from "@/lib/report-debrief";
+import { buildAuthoredProfileBinding } from "@/lib/report-profile";
 
 type ActionState = "idle" | "preparing" | "done" | "error";
 type PrintState = "idle" | "preparing" | "printing";
@@ -83,6 +86,15 @@ function createExampleReport(): StoredReport {
       scope: DEFAULT_SCENARIO_DEFINITION.scope,
       targetProfile: DEFAULT_SCENARIO_DEFINITION.targetProfile,
       theatre: DEFAULT_SCENARIO_DEFINITION.theatre,
+      ...(DEFAULT_SCENARIO_DEFINITION.authoredProfile
+        ? {
+            authoredProfile: structuredClone(DEFAULT_SCENARIO_DEFINITION.authoredProfile),
+            authoredProfileBinding: buildAuthoredProfileBinding(
+              DEFAULT_SCENARIO_DEFINITION,
+              scenario,
+            ),
+          }
+        : {}),
     },
   };
 }
@@ -207,6 +219,11 @@ export default function ReportPage() {
   const finalTargetEffect = selectCanonicalTargetEffect(
     result,
     selectDisplayFrame(result, result.timeOfFlight),
+  );
+  const canonicalDebrief = buildCanonicalReportDebrief(
+    result,
+    libraryScenario,
+    scenario,
   );
 
   const printReport = () => {
@@ -360,6 +377,7 @@ export default function ReportPage() {
             </div>
           </section>
           <TargetEffectSummary selection={finalTargetEffect} />
+          <CanonicalReportDebrief debrief={canonicalDebrief} />
           <section className="report-brief">
             <div>
               <span>What was tested</span>
@@ -410,7 +428,11 @@ export default function ReportPage() {
               </strong>
             </div>
           </section>
-          <ReportReplay scenario={scenario} result={result} />
+          <ReportReplay
+            scenario={scenario}
+            result={result}
+            libraryScenario={libraryScenario}
+          />
           <div className="report-columns">
             <div>
               <ReportSection title="Starting state">
@@ -556,7 +578,13 @@ export default function ReportPage() {
               <ReportSection title="Session timeline">
                 <div className="report-timeline">
                   {finalTargetEffect.eventId && "modelTimeSeconds" in finalTargetEffect.projection && (
-                    <div data-testid="report-target-effect-event">
+                    <div
+                      data-testid="report-target-effect-event"
+                      data-effect-event-id={finalTargetEffect.eventId}
+                      data-effect-frame-index={finalTargetEffect.projection.frameIndex}
+                      data-effect-time={finalTargetEffect.projection.modelTimeSeconds}
+                      data-effect-class={finalTargetEffect.presentation.effectClass ?? "NONE"}
+                    >
                       <time>{finalTargetEffect.projection.modelTimeSeconds.toFixed(1)} s</time>
                       <i className="target-effect" />
                       <span>
