@@ -481,16 +481,34 @@ test("the close-merge WVR effect remains canonical and labels exact authored int
   await expectLaptopVisual(scene, "wvr-close-merge-altitude-stems.png", testInfo);
 });
 
-test("all three exact Air studies keep every playback and outcome surface on one canonical frame", async ({ page }) => {
-  test.setTimeout(120_000);
+const canonicalAirStudies = [
+  {
+    title: "the BVR Air study keeps every playback and outcome surface on one canonical frame",
+    id: "a2a-crossing-intercept",
+    frameIndex: "294",
+    time: "72.95",
+    effect: "DEGRADED",
+  },
+  {
+    title: "the WVR Air study keeps every playback and outcome surface on one canonical frame",
+    id: "a2a-defensive-break",
+    frameIndex: "116",
+    time: "28.4",
+    effect: "KILL",
+  },
+  {
+    title: "the transition Air study keeps every playback and outcome surface on one canonical frame",
+    id: "a2a-high-energy-crossing-challenge",
+    frameIndex: "461",
+    time: "114.7",
+    effect: "NO_EFFECT",
+  },
+] as const;
 
-  const studies = [
-    { id: "a2a-crossing-intercept", frameIndex: "294", time: "72.95", effect: "DEGRADED" },
-    { id: "a2a-defensive-break", frameIndex: "116", time: "28.4", effect: "KILL" },
-    { id: "a2a-high-energy-crossing-challenge", frameIndex: "461", time: "114.7", effect: "NO_EFFECT" },
-  ] as const;
+for (const study of canonicalAirStudies) {
+  test(study.title, async ({ page }) => {
+    test.setTimeout(90_000);
 
-  for (const study of studies) {
     const catalog = await catalogFixture(study.id);
     await page.route("**/api/catalog", (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
@@ -567,8 +585,8 @@ test("all three exact Air studies keep every playback and outcome surface on one
     await expect(situationLogEffect).toHaveAttribute("data-effect-frame-index", study.frameIndex);
     await expect(situationLogEffect).toHaveAttribute("data-effect-time", study.time);
     await expect(situationLogEffect).toHaveAttribute("data-effect-class", study.effect);
-  }
-});
+  });
+}
 
 test("an invalid non-spatial numeric draft cannot be bypassed by changing builder steps", async ({ page }) => {
   const catalog = await catalogFixture();
