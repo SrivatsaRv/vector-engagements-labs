@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type TestInfo } from "@playwright/test";
+import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { sha256Hex } from "../../lib/canonical-json";
@@ -180,6 +180,16 @@ const TRANSPARENT_RASTER_TILE = Buffer.from(
   "base64",
 );
 
+async function openGuidedWorkbench(page: Page, scenarioId: string) {
+  await page.goto(`/workbench?scenario=${scenarioId}&start=guided`, {
+    waitUntil: "domcontentloaded",
+  });
+  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText(
+    "PostGIS catalog connected",
+    { timeout: 20_000 },
+  );
+}
+
 async function selectCanonicalTimelineEnd(page: import("@playwright/test").Page) {
   const timeline = page.getByRole("slider", { name: "Run timeline" });
   await timeline.focus();
@@ -211,7 +221,7 @@ test("the unedited BVR package remains MATCHED across canonical Map and 3D prese
     contentType: "image/png",
     body: TRANSPARENT_RASTER_TILE,
   }));
-  await page.goto(`/workbench?scenario=${scenarioId}&start=guided`);
+  await openGuidedWorkbench(page, scenarioId);
   await expect(page.locator('[data-authored-profile="bvr-offset-and-support"]')).toContainText(
     "Blue OFFSET → SUPPORT → RECOMMIT · Red BEAM → DRAG → EXTEND",
   );
@@ -317,7 +327,7 @@ test("browser presentation changes only at the canonical target-effect frame", a
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
   );
   await page.route("**/api/map-tile?**", (route) => route.abort());
-  await page.goto(`/workbench?scenario=${scenarioId}&start=guided`);
+  await openGuidedWorkbench(page, scenarioId);
   await expect(
     page.locator('[data-authored-profile="beam-drag-extend-recommit"]'),
   ).toContainText(
@@ -410,7 +420,7 @@ test("the close-merge WVR effect remains canonical and labels exact authored int
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
   );
   await page.route("**/api/map-tile?**", (route) => route.abort());
-  await page.goto(`/workbench?scenario=${scenarioId}&start=guided`);
+  await openGuidedWorkbench(page, scenarioId);
   await expect(page.locator('[data-authored-profile="wvr-one-circle-defensive-break"]')).toContainText(
     "Blue MERGE → ONE_CIRCLE → EXTEND · Red MERGE → DEFENSIVE_BREAK → EXTEND",
   );
@@ -514,7 +524,7 @@ for (const study of canonicalAirStudies) {
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
     );
     await page.route("**/api/map-tile?**", (route) => route.abort());
-    await page.goto(`/workbench?scenario=${study.id}&start=guided`);
+    await openGuidedWorkbench(page, study.id);
 
     const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
     if (compact) {
@@ -594,13 +604,7 @@ test("an invalid non-spatial numeric draft cannot be bypassed by changing builde
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
   );
   await page.route("**/api/map-tile?**", (route) => route.abort());
-  await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided", {
-    waitUntil: "domcontentloaded",
-  });
-  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText(
-    "PostGIS catalog connected",
-    { timeout: 20_000 },
-  );
+  await openGuidedWorkbench(page, "a2a-crossing-intercept");
 
   const missionClass = page.getByRole("combobox", { name: "Mission class" });
   await missionClass.selectOption("COMBAT_AIR_PATROL");
@@ -635,11 +639,7 @@ test("duration and replay seed use governed raw admission before builder navigat
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
   );
   await page.route("**/api/map-tile?**", (route) => route.abort());
-  await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided");
-  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText(
-    "PostGIS catalog connected",
-    { timeout: 20_000 },
-  );
+  await openGuidedWorkbench(page, "a2a-crossing-intercept");
 
   const duration = page.getByRole("textbox", { name: "Run duration" });
   const seed = page.getByRole("textbox", { name: "Replay seed" });
@@ -678,8 +678,7 @@ test("shared transient controls hand off once and remain accessible, contained, 
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
   );
   await page.route("**/api/map-tile?**", (route) => route.abort());
-  await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided");
-  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText("PostGIS catalog connected");
+  await openGuidedWorkbench(page, "a2a-crossing-intercept");
   const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
 
   if (compact) await page.getByRole("button", { name: /Next: Forces & loadouts/i }).click();
@@ -889,8 +888,7 @@ test("a current deployment manifest drives the real Worker run after route recov
   // viewport to the tile proxy's network sockets.
   await page.route("**/api/map-tile?**", (route) => route.abort());
 
-  await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided");
-  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText("PostGIS catalog connected");
+  await openGuidedWorkbench(page, "a2a-crossing-intercept");
   await expect(page.getByRole("region", { name: "Air mission contract" })).toContainText("vector.air-mission.v1");
   await page.getByRole("combobox", { name: "Mission class" }).selectOption("COMBAT_AIR_PATROL");
   await expect(page.getByRole("group", { name: "CAP defaults" })).toBeVisible();
@@ -1252,8 +1250,7 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
     });
   });
 
-  await page.goto(`/workbench?scenario=${scenarioId}&start=guided`);
-  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText("PostGIS catalog connected");
+  await openGuidedWorkbench(page, scenarioId);
   const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
   if (compact) {
     await page.getByRole("button", { name: /Next: Forces & loadouts/i }).click();
