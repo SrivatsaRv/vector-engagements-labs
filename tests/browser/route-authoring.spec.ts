@@ -491,6 +491,11 @@ test("the close-merge WVR effect remains canonical and labels exact authored int
   await expectLaptopVisual(scene, "wvr-close-merge-altitude-stems.png", testInfo);
 });
 
+// Correctness journeys verify eventual authoritative Worker completion across
+// the viewport matrix. The dedicated browser-performance contract separately
+// retains the 10 s Worker budget on its controlled measurement viewport.
+const CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS = 45_000;
+
 const canonicalAirStudies = [
   {
     title: "the BVR Air study keeps every playback and outcome surface on one canonical frame",
@@ -538,7 +543,7 @@ for (const study of canonicalAirStudies) {
     await page.getByRole("button", { name: /run baseline/i }).click();
     await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
       "Worker · completed",
-      { timeout: 30_000 },
+      { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
     );
 
     const fourTimes = page.getByRole("button", { name: "4×", exact: true });
@@ -880,7 +885,7 @@ test("a current deployment manifest drives the real Worker run after route recov
   // This journey authors every mission layer before starting the real Worker.
   // Keep its orchestration timeout distinct from the explicit Worker and 3D
   // performance budgets asserted in air-combat-performance.spec.ts.
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const catalog = await catalogFixture();
@@ -1044,7 +1049,7 @@ test("a current deployment manifest drives the real Worker run after route recov
 
   await expect(
     page.locator('.catalog-state[data-runtime-state="completed"]'),
-  ).toHaveText("Worker · completed", { timeout: 45_000 });
+  ).toHaveText("Worker · completed", { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS });
   if (compact) {
     await expect(page.locator(".session-layout")).toBeVisible();
   } else {
