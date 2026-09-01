@@ -173,11 +173,11 @@ test("the Worker verifier uses the pinned Playwright browser outside local overr
   const evidencePolicy = await readFile("scripts/air-combat-evidence-policy.ts", "utf8");
   assert.match(verifier, /VECTOR_CHROME_PATH\s*\?\?\s*chromium\.executablePath\(\)/);
   assert.doesNotMatch(verifier, /\/Applications\/Google Chrome\.app/);
-  assert.match(verifier, /fixtures\/vector-record\/issue-197/);
+  assert.match(verifier, /fixtures\/vector-record\/issue-207/);
   assert.match(verifier, /trackedAirCombatEvidenceSignature/);
   assert.match(verifier, /nonManifestMembers/);
   assert.match(verifier, /publishOrVerifyAirCombatEvidence/);
-  assert.match(evidencePolicy, /Tracked issue #197 evidence .* semantically stale/);
+  assert.match(evidencePolicy, /Tracked issue #207 evidence .* semantically stale/);
   assert.match(evidencePolicy, /Write mode requires an explicit staging directory/);
 });
 

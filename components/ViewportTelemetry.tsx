@@ -44,11 +44,17 @@ export function ViewportTelemetry({ expanded, onExpandedChange, result, selected
             Computed at {selected.displayTimeSeconds.toFixed(1)} model seconds · {summary}
           </span>
           {latestTransfer && (
-            <span data-testid="airborne-store-transfer-outcome">
-              {latestTransfer.operation} {latestTransfer.achieved ? "achieved" : "rejected"} · {latestTransfer.storeId} · {latestTransfer.stationId} · tick frame {latestTransfer.frameIndex} · {latestTransfer.limiter} · {latestTransfer.cause}
+            <span
+              data-testid="airborne-store-transfer-outcome"
+              data-store-id={latestTransfer.storeId}
+              data-station-id={latestTransfer.stationId}
+              data-limiter={latestTransfer.limiter}
+              data-cause={latestTransfer.cause}
+            >
+              Store {latestTransfer.operation.toLowerCase()} · {latestTransfer.achieved ? "achieved" : "rejected"} · frame {latestTransfer.frameIndex}
             </span>
           )}
-          <TargetEffectSummary selection={targetEffect} compact />
+          {!expanded && <TargetEffectSummary selection={targetEffect} compact />}
         </div>
         <button
           type="button"

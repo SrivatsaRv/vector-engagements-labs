@@ -898,17 +898,17 @@ validation. The runtime must not fill the gap with a scalar fallback.
 
 ## Verification
 
-#197 verification runs the three immutable 1.2.0 packages through normal
-compiler/Worker/VSR admission and checks the reproducible BVR `DEGRADED`, WVR
-presentation `KILL` (canonical `MISSION_KILL`), and transition `NO_EFFECT`
-results. An independent matched control changes only WVR loft release time from
-20 s to 20.65 s and requires `NO_EFFECT` with an active target; profile-label
+#207 verification runs BVR `1.3.0` and the two retained `1.2.0` packages through
+normal compiler/Worker/VSR admission and checks reproducible BVR `KILL`, WVR
+`KILL`, and transition `NO_EFFECT` results. Independent matched controls change
+only BVR release time from 2 s to 1.95 s and WVR loft release time from 20 s to
+20.65 s; each requires `NO_EFFECT` with an active target. Profile-label
 mutation must be invariant, while stale or corrupt package references and
 invalid duration precision fail admission. These checks exercise orchestration
 and record binding around the unchanged model-pack and engine contracts, not a
 new physics or engine-ABI claim.
 
-#197 also grants no binary-size exception: the historical 585,000-byte WASM
+#207 also grants no binary-size exception: the historical 585,000-byte WASM
 evidence gate and current strict sub-620,000-byte optimized WASM ceiling remain
 unchanged.
 

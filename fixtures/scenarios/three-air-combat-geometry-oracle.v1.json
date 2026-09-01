@@ -18,64 +18,64 @@
   "studies": [
     {
       "scenarioId": "a2a-crossing-intercept",
-      "scenarioVersion": "1.2.0",
-      "profileId": "bvr-offset-and-support",
+      "scenarioVersion": "1.3.0",
+      "profileId": "bvr-mutual-offset-defensive-turn",
       "regime": "BVR",
       "durationSeconds": 100,
-      "releaseTimeSeconds": 4,
+      "releaseTimeSeconds": 2,
       "installedDragAreaM2": 0.03,
       "blueTasMps": 275,
       "redTasMps": 250,
       "initialGeometry": {
-        "horizontalSeparationM": 38083.948,
-        "blueHeadingDeg": 54.462,
-        "redHeadingDeg": 180,
-        "aspectDeg": 72.897,
+        "horizontalSeparationM": 36496.426,
+        "blueHeadingDeg": 90,
+        "redHeadingDeg": 258.2,
+        "aspectDeg": 2.338,
         "altitudeDifferenceM": -1300
       },
       "blueRoute": {
         "points": [
-          { "eastM": -18200, "northM": -5600, "altitudeMslM": 9500 },
-          { "eastM": -8400, "northM": 1400, "altitudeMslM": 9500 },
-          { "eastM": 2800, "northM": 8400, "altitudeMslM": 9500 },
-          { "eastM": 12600, "northM": 8400, "altitudeMslM": 9500 }
+          { "eastM": -18000, "northM": -3000, "altitudeMslM": 9500 },
+          { "eastM": -13000, "northM": -3000, "altitudeMslM": 9500 },
+          { "eastM": -5000, "northM": 5000, "altitudeMslM": 9500 },
+          { "eastM": 6000, "northM": 5000, "altitudeMslM": 9500 }
         ],
-        "legLengthsM": [12043.255374, 13207.573585, 9800],
+        "legLengthsM": [5000, 11313.708499, 11000],
         "geographicPoints": [
-          { "longitudeDeg": 74.00819988871388, "latitudeDeg": 31.749427331118415, "altitudeMslM": 9500 },
-          { "longitudeDeg": 74.11141651061382, "latitudeDeg": 31.81257619666229, "altitudeMslM": 9500 },
-          { "longitudeDeg": 74.22954791159634, "latitudeDeg": 31.875638274400192, "altitudeMslM": 9500 },
-          { "longitudeDeg": 74.33296537527247, "latitudeDeg": 31.87557218400527, "altitudeMslM": 9500 }
+          { "longitudeDeg": 74.01025975218442, "latitudeDeg": 31.772843551335697, "altitudeMslM": 9500 },
+          { "longitudeDeg": 74.06296513693178, "latitudeDeg": 31.7729111586361, "altitudeMslM": 9500 },
+          { "longitudeDeg": 74.14725328820464, "latitudeDeg": 31.84501401621564, "altitudeMslM": 9500 },
+          { "longitudeDeg": 74.26329604628654, "latitudeDeg": 31.845009204822787, "altitudeMslM": 9500 }
         ]
       },
       "redRoute": {
         "points": [
-          { "eastM": 18200, "northM": 5600, "altitudeMslM": 8200 },
-          { "eastM": 18200, "northM": -4200, "altitudeMslM": 8200 },
-          { "eastM": 25200, "northM": -11200, "altitudeMslM": 8200 },
-          { "eastM": 36400, "northM": -11200, "altitudeMslM": 8200 }
+          { "eastM": 18000, "northM": 3000, "altitudeMslM": 8200 },
+          { "eastM": 13105.663, "northM": 1977.52, "altitudeMslM": 8200 },
+          { "eastM": 3866.868, "northM": -1849.315, "altitudeMslM": 8200 },
+          { "eastM": 15866.868, "northM": -5849.315, "altitudeMslM": 8200 }
         ],
-        "legLengthsM": [9800, 9899.494937, 11200],
+        "legLengthsM": [5000.000002, 9999.999958, 12649.110641],
         "geographicPoints": [
-          { "longitudeDeg": 74.39204761385054, "latitudeDeg": 31.850293253835023, "altitudeMslM": 8200 },
-          { "longitudeDeg": 74.39186513623486, "latitudeDeg": 31.762026585763262, "altitudeMslM": 8200 },
-          { "longitudeDeg": 74.46547833191528, "latitudeDeg": 31.69884611896163, "altitudeMslM": 8200 },
-          { "longitudeDeg": 74.58346572031701, "latitudeDeg": 31.69854594123828, "altitudeMslM": 8200 }
+          { "longitudeDeg": 74.38988930217533, "latitudeDeg": 31.826878857630714, "altitudeMslM": 8200 },
+          { "longitudeDeg": 74.33824347903237, "latitudeDeg": 31.817736150281366, "altitudeMslM": 8200 },
+          { "longitudeDeg": 74.24077411739279, "latitudeDeg": 31.783336922278412, "altitudeMslM": 8200 },
+          { "longitudeDeg": 74.36724257036997, "latitudeDeg": 31.747206064531518, "altitudeMslM": 8200 }
         ]
       },
       "runtimeExpectation": {
         "termination": "weapon_intercept",
-        "effectClass": "DEGRADED",
-        "timeOfFlightSeconds": 72.95,
-        "closestApproachM": 19.900251
+        "effectClass": "KILL",
+        "timeOfFlightSeconds": 36,
+        "closestApproachM": 2.438845
       },
       "matchedControl": {
         "changedField": "airMission.assignments[0].storeTransferPlan.requests[0].requestedTimeSeconds",
-        "value": 3.75,
+        "value": 1.95,
         "termination": "weapon_intercept",
         "effectClass": "NO_EFFECT",
-        "timeOfFlightSeconds": 72.6,
-        "closestApproachM": 21.731797
+        "timeOfFlightSeconds": 35.95,
+        "closestApproachM": 22.693748
       }
     },
     {

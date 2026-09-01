@@ -14,6 +14,10 @@ Primary references:
 
 ## Archive contents
 
+Issue #207 changes recorded values, not archive members or schema. The current
+BVR archive binds scenario package `1.3.0`; the #197 BVR archive continues to
+bind historical `1.2.0`.
+
 No archive is created from a draft that fails lexical, structured numeric or
 whole-scenario admission. This gate changes no VSR member or schema: it ensures
 that `scenario.json` and `compiled.json` can contain only the admitted authored
@@ -114,7 +118,7 @@ atmosphere, installation/runway catalogue identity and limitations. A replay
 does not consult PostGIS or substitute a current/superseding pack, study-area
 default, runway record or weather version.
 
-Basemap tiles are referenced by provider and style revision, not silently embedded. A portable export may include explicitly licensed terrain or static assets. Missing optional assets must degrade to class silhouettes and a neutral terrain surface without changing telemetry.
+Basemap tiles are referenced by provider and style revision, not silently embedded. The current browser presentation records the `osm-derived-v1` tile/presentation revision: standard, minimal, and tactical share the OpenStreetMap tile authority and differ only by deterministic renderer paint. A portable export may include explicitly licensed terrain or static assets. Missing optional assets must degrade to class silhouettes and a neutral terrain surface without changing telemetry.
 
 Each new `pictures.jsonl` entry uses the required `vector.pictures.v4` schema and
 its member hash is bound by `manifest.json`. It carries `modelTimeSeconds`, the model-clock identity
@@ -137,6 +141,10 @@ and visible model-time labels consume that same recorded frame identity and its
 it is not displayed as if it were a separate model sample.
 
 ## Frame contract
+
+The current BVR canonical frame 146 at 36.000 s carries the weapon termination,
+generic `KILL` commit and Red lifecycle `TERMINATED`. The matched 1.950 s
+release control has no target termination.
 
 Authored-route profile labels and the scenario-package reference add no entity
 sample fields. Frames continue to carry only recorded active-route index,
@@ -216,6 +224,10 @@ environment dataset.
 Weapons remain loadout inventory before launch. Aircraft frames preserve the installed inventory identities and total store mass while the weapon is stowed. A launch event removes that store and its declared launch mass from the aircraft once, then creates the weapon's first world sample with the launch platform position and inherited velocity. Static objects may omit unchanged samples. The viewer interpolates only properties explicitly declared interpolable.
 
 ## Integrity and replay
+
+Reopen verifies the exact BVR `1.3.0` package reference and content hash before
+replaying its frames or effect. A historical or control record cannot be
+substituted merely because it uses the same scenario ID.
 
 When present, the governed scenario-package reference must be identical in
 compiled, manifest and report members and must match the required viewer
@@ -533,6 +545,10 @@ authoritative v2 stream.
 
 ## Browser and interoperability boundary
 
+The #207 built-Worker gate transfers and reopens five current records: three
+canonical studies plus the BVR and WVR release-only controls. This adds no new
+Worker message or VSR wire shape.
+
 The browser receives the verified package reference and optional authored-route
 profile only after Worker/VSR admission. It may render the profile and recorded
 route progress, but cannot rewrite package identity, synthesize a transition or
@@ -589,6 +605,10 @@ saved-run/report path.
 VSR is designed for browser production and playback. Frames use a transferable columnar buffer so a Web Worker, TypeScript engine or Rust/WASM engine can produce the same record contract. An ACMI 2.2 exporter can be added as an interoperability adapter; ACMI is not used as VECTOR's internal source of model truth because it does not carry VECTOR's full coefficient, provenance and scenario contracts.
 
 ## Implemented replay boundary
+
+Replay reproduces the BVR `KILL`/termination pair and the BVR control
+`NO_EFFECT`/active-target pair from their retained authorities. Presentation
+cannot infer either result from the authored profile label.
 
 Current replay exposes the exact admitted package reference, authored profile,
 recorded route-index transitions and causal effect receipts used by the #197

@@ -40,7 +40,7 @@ const definitions = CURRENT_AIR_COMBAT_STUDY_IDS.map((id) => {
 });
 
 const expectedOutcomes = new Map<string, string>([
-  ["a2a-crossing-intercept", "DEGRADED"],
+  ["a2a-crossing-intercept", "KILL"],
   ["a2a-defensive-break", "KILL"],
   ["a2a-high-energy-crossing-challenge", "NO_EFFECT"],
 ]);

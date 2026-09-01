@@ -47,8 +47,9 @@ criteria remain open.
   admitted through `vector.air-mission.v1`. A ground start still requires an
   exact installation/source identity and content-addressed runway evidence;
   the capability list is not permission to invent either.
-- The retained A2A catalog includes the exact `1.2.0` BVR offset/support, WVR
-  one-circle/defensive-break, and beam/drag/extend/recommit study packages.
+- The retained A2A catalog includes the exact `1.3.0` BVR mutual-offset and
+  defensive-turn package plus the `1.2.0` WVR one-circle/defensive-break and
+  beam/drag/extend/recommit study packages.
   Their package IDs, versions and content hashes are re-admitted before browser
   dispatch and inside the Worker. The authored profile labels add no autonomous
   policy capability; causal authority remains with admitted route, release,
@@ -68,6 +69,11 @@ criteria remain open.
   capability manifest and model-pack digest. No radar-jamming measurement
   effect is admitted. Data link, AEW, EW, and terrain interaction remain
   disabled and cannot inject a track or support state.
+- Operator-facing capability copy is projected from both the deployment switch
+  and the exact compiled run authority. A switch may forbid a capability but
+  cannot promote a missing sensor, data-link, EW or virtual-pilot model to
+  available. The current BVR package therefore describes Red AIM-120s as
+  retained inventory, not as a return-shot capability.
 - Mission emission/weapon/completion/abort/recovery policy is authored,
   compiled, and recorded. Autonomous virtual-pilot policy execution remains
   outside this deployment; the product still exposes no decorative

@@ -19,11 +19,14 @@ VECTOR keeps the compact A2A/A2G/G2A/G2G identifiers for scanning, but gives eac
 
 These labels are intentionally narrower than operational doctrine. VECTOR is a public-data educational model and does not claim to simulate the full counterair, counterland, strategic-attack, or targeting processes. UI copy names the configured platform, weapon, target, and information state whenever the catalog contains them; “abstract profile” is not used as a substitute for incomplete data.
 
-The scenario library contains nine governed entries. Its three current A2A
-`1.2.0` packages are distinct authored-route study profiles:
+The scenario library contains nine governed entries. Its current A2A packages
+are distinct authored-route study profiles: BVR at `1.3.0`, with WVR and the
+transition study at `1.2.0`:
 
-- **BVR offset and support** compares a Blue offset/support/recommit route with
-  a Red beam/drag/extend route.
+- **BVR mutual offset and defensive turn** compares a Blue
+  offset/recommit/extend route with a Red offset/defensive-break/extend route.
+  The Red turn is authored, not selected in response to a launch, and Red does
+  not employ its retained AIM-120 inventory.
 - **WVR one-circle defensive break** compares a close merge and one-circle
   route with a defensive break and extension.
 - **Beam, drag, extend and recommit** is the unrestricted-transition study,

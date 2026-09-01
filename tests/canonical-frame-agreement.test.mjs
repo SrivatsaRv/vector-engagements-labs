@@ -17,7 +17,7 @@ import {
 import { simulateWithCapabilitiesForVerification } from "../lib/simulation.ts";
 
 const EXPECTED_EFFECTS = new Map([
-  ["a2a-crossing-intercept", "DEGRADED"],
+  ["a2a-crossing-intercept", "KILL"],
   ["a2a-defensive-break", "KILL"],
   ["a2a-high-energy-crossing-challenge", "NO_EFFECT"],
 ]);

@@ -343,8 +343,9 @@ byte-for-byte flat from run one through run 100. The governed bounds are 16 MiB
 absolute retained growth, at most 10% relative regression, and zero additional
 growth after the first run.
 
-Issue #197 adds `performance:air-combat-studies:verify`, a focused exact-package
-gate over the BVR offset/support, WVR one-circle/defensive-break and
+Issue #207 retains `performance:air-combat-studies:verify` as a focused
+exact-package gate over the BVR mutual-offset/defensive-turn, WVR
+one-circle/defensive-break and
 beam/drag/extend/recommit transition studies through both TypeScript and
 Rust/WASM. Seven measured runs per package/backend retain separate nearest-rank
 p50, p95 and maximum values for engine execution, VSR creation/serialization,

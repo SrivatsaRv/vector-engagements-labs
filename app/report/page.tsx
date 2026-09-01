@@ -355,7 +355,12 @@ export default function ReportPage() {
             >
               <span>Model outcome</span>
               <strong>{result.outcome}</strong>
-              <p>{result.reason}</p>
+              <p>
+                {finalTargetEffect.presentation.compactHeadline}
+                {"frameIndex" in finalTargetEffect.projection
+                  ? ` · terminal frame ${finalTargetEffect.projection.frameIndex}`
+                  : ""}
+              </p>
             </div>
             <div className="report-metrics">
               <ReportMetric
@@ -376,37 +381,30 @@ export default function ReportPage() {
               />
             </div>
           </section>
-          <TargetEffectSummary selection={finalTargetEffect} />
+          <details className="report-evidence-disclosure">
+            <summary>Model evidence and limitations</summary>
+            <TargetEffectSummary selection={finalTargetEffect} />
+          </details>
           <CanonicalReportDebrief debrief={canonicalDebrief} />
-          <section className="report-brief">
-            <div>
-              <span>What was tested</span>
-              <strong>{scenario.objective}</strong>
-            </div>
-            <div>
-              <span>Blue Team</span>
-              <strong>
-                {bluePlatformName} · {blueWeaponName} ×{" "}
-                {scenario.blueWeaponQuantity}
-              </strong>
-            </div>
-            <div>
-              <span>Red Team</span>
-              <strong>
-                {redPlatformName}
-                {redWeaponName
-                  ? ` · ${redWeaponName} × ${scenario.redWeaponQuantity}`
-                  : ""}
-              </strong>
-            </div>
-            <div>
-              <span>Starting conditions</span>
-              <strong>
-                {scenario.domain === "G2G"
-                  ? `${scenario.range / 1000} km · launcher ${scenario.altitude} m · cruise ${scenario.cruiseAltitude} m · objective ${scenario.altitude + scenario.targetDelta} m`
-                  : `${scenario.range / 1000} km · Blue ${scenario.altitude} m · Red ${scenario.altitude + scenario.targetDelta} m · ${scenario.aspect}°`}
-              </strong>
-            </div>
+          <section className="report-run-table-section" aria-labelledby="report-run-table-title">
+            <h2 id="report-run-table-title">Run summary</h2>
+            <table className="report-run-table" aria-label="Run summary">
+              <thead>
+                <tr><th scope="col">Area</th><th scope="col">Field</th><th scope="col">Recorded value</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">Study</th><td>Purpose</td><td>{scenario.objective}</td></tr>
+                <tr><th scope="row">Blue</th><td>Force</td><td>{bluePlatformName} · {blueWeaponName} × {scenario.blueWeaponQuantity}</td></tr>
+                <tr><th scope="row">Red</th><td>Force</td><td>{redPlatformName}{redWeaponName ? ` · ${redWeaponName} × ${scenario.redWeaponQuantity}` : ""}</td></tr>
+                <tr>
+                  <th scope="row">Start</th><td>Geometry</td>
+                  <td>{scenario.domain === "G2G"
+                    ? `${scenario.range / 1000} km · launcher ${scenario.altitude} m · cruise ${scenario.cruiseAltitude} m · objective ${scenario.altitude + scenario.targetDelta} m`
+                    : `${scenario.range / 1000} km · Blue ${scenario.altitude} m · Red ${scenario.altitude + scenario.targetDelta} m · crossing ${scenario.aspect}°`}</td>
+                </tr>
+                <tr><th scope="row">Result</th><td>Terminal state</td><td>{result.outcome} · {finalTargetEffect.presentation.compactHeadline}</td></tr>
+              </tbody>
+            </table>
           </section>
           <section className="report-findings">
             <div>

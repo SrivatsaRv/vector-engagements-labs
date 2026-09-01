@@ -49,7 +49,7 @@ test("server-renders the scenario library and configured workbench", async () =>
     libraryResponse.text(),
     workbenchResponse.text(),
   ]);
-  assert.match(library, /BVR offset and support: Su-30MKI versus F-16C/);
+  assert.match(library, /BVR mutual offset and defensive turn: Su-30MKI versus F-16C/);
   assert.match(library, /WVR one-circle defensive break: Su-30MKI versus F-16C/);
   assert.match(
     library,
@@ -60,10 +60,10 @@ test("server-renders the scenario library and configured workbench", async () =>
   assert.match(library, /Scenario <!-- -->1\.2\.0/);
   assert.match(library, /All scenarios/);
   assert.match(library, />9</);
-  assert.match(workbench, /BVR offset and support: Su-30MKI versus F-16C/);
+  assert.match(workbench, /BVR mutual offset and defensive turn: Su-30MKI versus F-16C/);
   assert.match(
     workbench,
-    /BVR offset and support · Blue OFFSET → SUPPORT → RECOMMIT · Red BEAM → DRAG → EXTEND · authored routes, no autonomous pilot\./,
+    /BVR mutual offset and defensive turn · Blue OFFSET → RECOMMIT → EXTEND · Red OFFSET → DEFENSIVE_BREAK → EXTEND · authored routes, no autonomous pilot\./,
   );
   assert.match(workbench, /Review the configured experiment/);
   assert.match(workbench, /Run baseline/);
@@ -184,6 +184,9 @@ test("VECTOR map controls share the MIAR-derived navigation contract", async () 
   assert.match(controls, /BRG/);
   assert.match(mapContract, /TACTICAL/);
   assert.match(mapContract, /vector\.map\.basemap\.v1/);
+  assert.match(mapContract, /osm-derived-v1/);
+  assert.match(mapContract, /OpenStreetMap contributors/);
+  assert.doesNotMatch(mapContract, /CARTO|cartocdn/);
   for (const surface of [engagement, authoring]) {
     assert.match(surface, /touchZoomRotate\.enableRotation\(\)/);
     assert.match(surface, /touchPitch\.disable\(\)/);

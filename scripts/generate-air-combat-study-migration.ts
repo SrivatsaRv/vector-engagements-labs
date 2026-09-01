@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -17,6 +18,26 @@ if (process.argv.slice(2).some((argument) => !["--check", "--write"].includes(ar
   throw new Error("Unknown argument.");
 }
 
+const frozen018Path = resolve("db/migrations/018_three_air_combat_studies.sql");
+const frozen018 = readFileSync(frozen018Path, "utf8");
+const frozen018Digest = createHash("sha256").update(frozen018).digest("hex");
+if (frozen018Digest !== "278da504c99c5e02a0f2de1ac188de8477afb48782a062e4a2697b08ec9b6da2") {
+  throw new Error("Historical Air-combat migration 018 is not immutable.");
+}
+
+const currentIds = new Set<string>(CURRENT_AIR_COMBAT_STUDY_IDS);
+const studies = SCENARIO_LIBRARY.filter(({ id }) => currentIds.has(id));
+const definition = studies.find(({ id }) => id === "a2a-crossing-intercept");
+if (
+  studies.length !== CURRENT_AIR_COMBAT_STUDY_IDS.length
+  || !definition
+  || definition.version !== "1.3.0"
+  || definition.authoredProfile?.id !== "bvr-mutual-offset-defensive-turn"
+  || studies.filter(({ version }) => version === "1.2.0").length !== 2
+) {
+  throw new Error("The current Air-combat study versions are incomplete or not governed.");
+}
+
 const escapeSql = (value: string) => value.replaceAll("'", "''");
 const sqlText = (value: string) => `'${escapeSql(value)}'`;
 const dollarJson = (tag: string, value: unknown) => {
@@ -25,38 +46,18 @@ const dollarJson = (tag: string, value: unknown) => {
   return `$${tag}$${json}$${tag}$::jsonb`;
 };
 
-const currentIds = new Set<string>(CURRENT_AIR_COMBAT_STUDY_IDS);
-const studies = SCENARIO_LIBRARY.filter(({ id }) => currentIds.has(id));
-if (
-  studies.length !== CURRENT_AIR_COMBAT_STUDY_IDS.length
-  || studies.some(({ version, authoredProfile }) =>
-    version !== "1.2.0" || authoredProfile?.schemaVersion !== "vector.authored-route-profile.v1"
-  )
-) {
-  throw new Error("The current Air-combat study set is incomplete or not governed at 1.2.0.");
-}
-
-const insertStatements = studies.map((definition) => {
-  const tag = `vector_air_combat_018_${definition.id.replaceAll("-", "_")}`;
-  return `INSERT INTO scenario_templates (id,version,domain,title,status,package,schema_version,content_hash,engine_version,study_area_id,intended_use_id,intended_use_version,model_pack_id,model_pack_version,model_pack_digest) VALUES (${sqlText(definition.id)},${sqlText(definition.version)},${sqlText(definition.domain)},${sqlText(definition.title)},'VALIDATED',${dollarJson(tag, definition)},${sqlText(SCENARIO_PACKAGE_SCHEMA_VERSION)},${sqlText(sha256HexSync(definition))},${sqlText(ENGINE_VERSION)},${sqlText(definition.scenario.studyAreaId)},${sqlText(definition.intendedUse.id)},${sqlText(definition.intendedUse.version)},${sqlText(definition.modelPack.id)},${sqlText(definition.modelPack.version)},${sqlText(definition.modelPack.digest)}) ON CONFLICT (id,version) DO NOTHING;`;
-}).join("\n");
-
-const expectedRows = studies.map((definition) =>
-  `(${sqlText(definition.id)},${sqlText(definition.version)},${sqlText(definition.domain)},${sqlText(definition.title)},'VALIDATED',${dollarJson(`vector_air_combat_018_expected_${definition.id.replaceAll("-", "_")}`, definition)},${sqlText(SCENARIO_PACKAGE_SCHEMA_VERSION)},${sqlText(sha256HexSync(definition))},${sqlText(ENGINE_VERSION)},${sqlText(definition.scenario.studyAreaId)},${sqlText(definition.intendedUse.id)},${sqlText(definition.intendedUse.version)},${sqlText(definition.modelPack.id)},${sqlText(definition.modelPack.version)},${sqlText(definition.modelPack.digest)})`,
-).join(",\n      ");
-
-const idList = studies.map(({ id }) => sqlText(id)).join(",");
-const generated = `-- Forward-only publication of the three governed Air-combat studies owned by issue #197.
+const tag = "vector_bvr_kill_019_a2a_crossing_intercept";
+const expectedTag = "vector_bvr_kill_019_expected_a2a_crossing_intercept";
+const generated = `-- Forward-only publication of the issue #207 BVR KILL demonstration.
+-- Migration 018 remains immutable and independently addressable.
 BEGIN;
 
-${insertStatements}
+INSERT INTO scenario_templates (id,version,domain,title,status,package,schema_version,content_hash,engine_version,study_area_id,intended_use_id,intended_use_version,model_pack_id,model_pack_version,model_pack_digest) VALUES (${sqlText(definition.id)},${sqlText(definition.version)},${sqlText(definition.domain)},${sqlText(definition.title)},'VALIDATED',${dollarJson(tag, definition)},${sqlText(SCENARIO_PACKAGE_SCHEMA_VERSION)},${sqlText(sha256HexSync(definition))},${sqlText(ENGINE_VERSION)},${sqlText(definition.scenario.studyAreaId)},${sqlText(definition.intendedUse.id)},${sqlText(definition.intendedUse.version)},${sqlText(definition.modelPack.id)},${sqlText(definition.modelPack.version)},${sqlText(definition.modelPack.digest)}) ON CONFLICT (id,version) DO NOTHING;
 
--- Superseded packages remain immutable and independently addressable, but
--- only the authored-route 1.2.0 versions are offered as current inputs.
 UPDATE scenario_templates
 SET status='RETIRED'
-WHERE version='1.1.0'
-  AND id IN (${idList})
+WHERE id=${sqlText(definition.id)}
+  AND version='1.2.0'
   AND status='VALIDATED';
 
 DO $$
@@ -64,7 +65,7 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM (VALUES
-      ${expectedRows}
+      (${sqlText(definition.id)},${sqlText(definition.version)},${sqlText(definition.domain)},${sqlText(definition.title)},'VALIDATED',${dollarJson(expectedTag, definition)},${sqlText(SCENARIO_PACKAGE_SCHEMA_VERSION)},${sqlText(sha256HexSync(definition))},${sqlText(ENGINE_VERSION)},${sqlText(definition.scenario.studyAreaId)},${sqlText(definition.intendedUse.id)},${sqlText(definition.intendedUse.version)},${sqlText(definition.modelPack.id)},${sqlText(definition.modelPack.version)},${sqlText(definition.modelPack.digest)})
     ) AS expected(id,version,domain,title,status,package,schema_version,content_hash,engine_version,study_area_id,intended_use_id,intended_use_version,model_pack_id,model_pack_version,model_pack_digest)
     LEFT JOIN scenario_templates current ON current.id=expected.id AND current.version=expected.version
     WHERE current.id IS NULL OR current.domain IS DISTINCT FROM expected.domain
@@ -81,24 +82,24 @@ BEGIN
        OR current.model_pack_version IS DISTINCT FROM expected.model_pack_version
        OR current.model_pack_digest IS DISTINCT FROM expected.model_pack_digest
   ) THEN
-    RAISE EXCEPTION 'Air-combat study exact identity readback failed';
+    RAISE EXCEPTION 'BVR KILL demonstration exact identity readback failed';
   END IF;
-  IF (
-    SELECT count(*) FROM scenario_templates
-    WHERE version='1.1.0' AND id IN (${idList}) AND status='RETIRED'
-  ) <> ${studies.length} THEN
-    RAISE EXCEPTION 'Superseded Air-combat study retention failed';
+  IF NOT EXISTS (
+    SELECT 1 FROM scenario_templates
+    WHERE id=${sqlText(definition.id)} AND version='1.2.0' AND status='RETIRED'
+  ) THEN
+    RAISE EXCEPTION 'Historical BVR 1.2.0 retention failed';
   END IF;
 END $$;
 
 COMMIT;
 `;
 
-const migrationPath = resolve("db/migrations/018_three_air_combat_studies.sql");
+const migrationPath = resolve("db/migrations/019_bvr_kill_demonstration.sql");
 if (checkOnly) {
   const existing = readFileSync(migrationPath, "utf8");
-  if (existing !== generated) throw new Error("Air-combat study migration is stale.");
+  if (existing !== generated) throw new Error("BVR KILL demonstration migration is stale.");
 } else {
   writeFileSync(migrationPath, generated);
 }
-process.stdout.write(`${checkOnly ? "verified" : "generated"} three Air-combat study migration\n`);
+process.stdout.write(`${checkOnly ? "verified" : "generated"} frozen 018 and BVR KILL migration 019\n`);

@@ -68,6 +68,7 @@
       ,{ "path": "db/migrations/016_high_energy_crossing_challenge.sql", "indicator": "model-assumption", "expectedLines": 2, "entryIds": ["STUB-01", "STUB-02"] }
       ,{ "path": "db/migrations/017_weapon_termination_model.sql", "indicator": "model-assumption", "expectedLines": 6, "entryIds": ["STUB-27"] }
       ,{ "path": "db/migrations/018_three_air_combat_studies.sql", "indicator": "model-assumption", "expectedLines": 6, "entryIds": ["STUB-01", "STUB-02", "STUB-26", "STUB-28"] }
+      ,{ "path": "db/migrations/019_bvr_kill_demonstration.sql", "indicator": "model-assumption", "expectedLines": 2, "entryIds": ["STUB-01", "STUB-02", "STUB-26", "STUB-28"] }
       ,{ "path": "engine-rust/src/validation.rs", "indicator": "model-assumption", "expectedLines": 2, "entryIds": ["STUB-24", "STUB-26"] }
       ,{ "path": "lib/engine/core.ts", "indicator": "model-assumption", "expectedLines": 2, "entryIds": ["STUB-24", "STUB-26"] }
       ,{ "path": "lib/scenarios.ts", "indicator": "model-assumption", "expectedLines": 1, "entryIds": ["STUB-26"] }
@@ -81,6 +82,7 @@
       ,{ "path": "db/migrations/016_high_energy_crossing_challenge.sql", "indicator": "named-duel-id", "expectedLines": 2, "entryIds": ["STUB-04"] }
       ,{ "path": "db/migrations/017_weapon_termination_model.sql", "indicator": "named-duel-id", "expectedLines": 6, "entryIds": ["STUB-04"] }
       ,{ "path": "db/migrations/018_three_air_combat_studies.sql", "indicator": "named-duel-id", "expectedLines": 6, "entryIds": ["STUB-04"] }
+      ,{ "path": "db/migrations/019_bvr_kill_demonstration.sql", "indicator": "named-duel-id", "expectedLines": 2, "entryIds": ["STUB-04"] }
       ,{ "path": "engine-rust/src/target_effect.rs", "indicator": "model-assumption", "expectedLines": 2, "entryIds": ["STUB-28"] }
       ,{ "path": "lib/engine/retained-target-effect-authority.ts", "indicator": "model-assumption", "expectedLines": 1, "entryIds": ["STUB-28"] }
       ,{ "path": "lib/engine/target-effect.ts", "indicator": "model-assumption", "expectedLines": 6, "entryIds": ["STUB-28"] }

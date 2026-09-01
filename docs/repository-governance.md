@@ -28,6 +28,12 @@ Repository administrators retain emergency recovery authority but should not use
 
 ## Continuous integration
 
+Issue #207 extends the governed contract inventory for the run-information
+projection and the current Worker evidence directory. CI treats the new
+frontend projector, notice, unit/component regressions, migration 019 and
+`fixtures/vector-record/issue-207/` as owned contract artifacts; the prior #197
+evidence remains mapped and immutable.
+
 #197 registers its exact three-scenario geometry oracle, causal/runtime tests,
 forward migration generator, scenario-package reference and canonical report
 debrief under the existing mission-scenario and VSR owners. These paths select

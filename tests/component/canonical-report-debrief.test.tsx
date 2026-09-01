@@ -109,7 +109,7 @@ describe("CanonicalReportDebrief", () => {
     render(<CanonicalReportDebrief debrief={debrief} />);
 
     expect(screen.getByTestId("report-launch-geometry")).toHaveTextContent(
-      /WEAPON_TO_TARGET · frame 17 · 4\.000 s · range 36792\.146 m · closure 322\.564 m\/s · Blue altitude 9500\.000 m MSL · Red altitude 8200\.000 m MSL/i,
+      /WEAPON_TO_TARGET · frame 9 · 2\.000 s · range 35478\.100 m · closure 520\.738 m\/s · Blue altitude 9500\.000 m MSL · Red altitude 8200\.000 m MSL/i,
     );
     expect(screen.getByTestId("report-canonical-geometry")).toHaveTextContent(
       /not autonomous-pilot choices or named-system effectiveness/i,

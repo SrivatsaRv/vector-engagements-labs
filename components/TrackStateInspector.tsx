@@ -11,6 +11,16 @@ type Props = {
   onPerspectiveChange: (perspective: Perspective) => void;
 };
 
+function unavailableTrackMessage(reason: string) {
+  if (reason === "SENSOR_MODEL_UNAVAILABLE") {
+    return "No admitted sensor model; no track is shown.";
+  }
+  if (reason === "PICTURE_NOT_RECORDED") {
+    return "No observer picture is recorded at this frame.";
+  }
+  return `No track is shown · ${reason.replaceAll("_", " ").toLowerCase()}.`;
+}
+
 /**
  * Presentation-only inspector for a frozen observer-picture sample. It only
  * renders a selected recorded value and intentionally has no simulation input.
@@ -21,6 +31,9 @@ export function TrackStateInspector({
   onPerspectiveChange,
 }: Props) {
   const unavailable = selected.state === "UNAVAILABLE";
+  const unavailableReason = selected.state === "UNAVAILABLE"
+    ? selected.reason
+    : "TRACK_UNAVAILABLE";
   const track = unavailable ? null : selected.track;
   const stateLabel = selected.state === "UNAVAILABLE"
     ? "Unavailable"
@@ -85,7 +98,7 @@ export function TrackStateInspector({
           )}
         </>
       ) : track ? (
-        <>
+        track.visible ? <>
           <dl className="track-state-data">
             <div><dt>Owner</dt><dd>{track.perspective}</dd></div>
             <div><dt>Lifecycle</dt><dd>{track.trackState.replaceAll("_", " ")}</dd></div>
@@ -95,17 +108,28 @@ export function TrackStateInspector({
             <div><dt>Cause</dt><dd>{track.availabilityReason.replaceAll("_", " ")}</dd></div>
           </dl>
           <p className="track-state-note">{track.stateExplanation}</p>
-          {!track.visible && (
-            <p className="track-state-unavailable" role="status">
-              <CircleAlert size={14} aria-hidden="true" />
-              No position is displayed. {availability.replaceAll("_", " ")} prevents an admitted current track.
-            </p>
-          )}
+        </> : <>
+          <p className="track-state-unavailable" role="status">
+            <CircleAlert size={14} aria-hidden="true" />
+            {unavailableTrackMessage(availability)}
+          </p>
+          <details className="track-evidence-disclosure">
+            <summary>Track evidence</summary>
+            <dl className="track-state-data">
+              <div><dt>Owner</dt><dd>{track.perspective}</dd></div>
+              <div><dt>Lifecycle</dt><dd>{track.trackState.replaceAll("_", " ")}</dd></div>
+              <div><dt>Freshness</dt><dd>{track.ageSeconds.toFixed(1)} s old</dd></div>
+              <div><dt>Uncertainty</dt><dd>Unavailable</dd></div>
+              <div><dt>Source</dt><dd>{track.source}</dd></div>
+              <div><dt>Cause</dt><dd>{track.availabilityReason.replaceAll("_", " ")}</dd></div>
+            </dl>
+            <p className="track-state-note">{track.stateExplanation}</p>
+          </details>
         </>
       ) : (
         <p className="track-state-unavailable" role="status">
           <CircleAlert size={14} aria-hidden="true" />
-          No observer-picture sample was recorded at {selected.displayTimeSeconds.toFixed(1)} s. The inspector does not infer a track.
+          {unavailableTrackMessage(unavailableReason)} · {selected.displayTimeSeconds.toFixed(1)} s
         </p>
       )}
     </section>

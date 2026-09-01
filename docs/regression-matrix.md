@@ -21,6 +21,19 @@ This matrix is the minimum proof required before a feature milestone is committe
 
 ## Commit gates
 
+### Tactical replay and report presentation (#41 slice)
+
+- Basemap modes resolve through the same-origin `osm-derived-v1` OSM tile
+  authority; no key-dependent style or tile endpoint is admitted.
+- Launch annotation is transient for four model seconds, the telemetry owns the
+  single compact outcome template, and unsupported track evidence remains
+  selection-driven behind a disclosure.
+- `tests/browser/route-authoring.spec.ts` proves short-wide overlay containment,
+  key-free tiles, visible participant labels, and frame-earned outcome copy.
+- `tests/browser/report-debrief.spec.ts` proves the saved report exposes semantic
+  run-summary and authored-route tables without horizontal overflow; print expands
+  the underlying evidence disclosures.
+
 ### Canonical simulation-event foundation (#41A)
 
 - `tests/simulation-events.test.ts` proves deterministic per-tick ordering,

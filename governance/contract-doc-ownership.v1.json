@@ -3192,6 +3192,16 @@
       "testRules": [
         {
           "kind": "PREFIX",
+          "value": "fixtures/vector-record/issue-207/",
+          "facets": [
+            "digest",
+            "storage",
+            "verification",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "PREFIX",
           "value": "fixtures/vector-record/issue-197/",
           "facets": [
             "digest",
@@ -3407,6 +3417,24 @@
         },
         {
           "kind": "EXACT",
+          "value": "lib/frontend/information-capability.ts",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/RunInformationCapabilityNotice.tsx",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "components/PlatformEvidence.tsx",
           "facets": [
             "admission",
@@ -3425,6 +3453,24 @@
         }
       ],
       "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/run-information-capability.test.mjs",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/run-information-capability-notice.test.tsx",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
         {
           "kind": "EXACT",
           "value": "tests/catalog-admission.test.mjs",
@@ -5934,5 +5980,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "53b5a8eabe0b0bfd0487d54631fe2c024c98ff99a715ca9bd8621e906d50cbda"
+  "canonicalSha256": "c2a44dab079d9f58bb4dcda38e527df6512b9db320c54e898a18f35154b747d6"
 }

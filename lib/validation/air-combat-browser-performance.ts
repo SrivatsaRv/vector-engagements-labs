@@ -18,9 +18,9 @@ export const AIR_COMBAT_BROWSER_PERFORMANCE_POLICY = Object.freeze({
   studies: Object.freeze([
     Object.freeze({
       scenarioId: "a2a-crossing-intercept" as const,
-      frameIndex: 294,
-      modelTimeSeconds: 72.95,
-      effectClass: "DEGRADED" as const,
+      frameIndex: 146,
+      modelTimeSeconds: 36,
+      effectClass: "KILL" as const,
     }),
     Object.freeze({
       scenarioId: "a2a-defensive-break" as const,

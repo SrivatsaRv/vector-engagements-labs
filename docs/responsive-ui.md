@@ -21,6 +21,11 @@ rendering sharpness; viewport width and height govern task geometry.
 
 ## Behavioral rules
 
+The Conditions surface shows only causal atmosphere values for the current
+runtime. Visibility and humidity are omitted; temperature-derived density and
+speed of sound plus both wind components remain visible because they affect
+aerodynamic drag.
+
 At every supported viewport the selected Air-combat profile, current leg intent,
 designation/affiliation/altitude label and recorded effect boundary remain
 legible. Generated engine callsigns, including weapon callsigns, are not
@@ -47,6 +52,10 @@ overflow; unsupported installation markers remain visible but disabled.
 - Phone removes the desktop rails instead of compressing them into unusable columns.
 - MapLibre canvases must have a non-zero task-appropriate height at every class.
 - QHD and 4K expand operational surfaces and control density; they do not merely add empty margins.
+- On a short QHD Construct step, the heading, fields, mission contract and
+  comparison choices share one left edge and a bounded 1,120-pixel reading
+  measure. The action rail follows that authored content instead of being
+  detached at the bottom of an otherwise empty viewport.
 - Phone replay stacks telemetry and makes the simulation column vertically scrollable.
 - The live 3D renderer observes its container, so orientation changes and panel reflow update the WebGL viewport without stretching or clipping.
 - Landing copy, calls to action and live preview remain within the first natural reading sequence on small screens; no fixed hero height creates blank space.
@@ -62,6 +71,10 @@ overflow; unsupported installation markers remain visible but disabled.
   available for full-resolution inspection.
 
 ## Shared control and overlay contract
+
+The information-state notice uses one projection of deployment policy and exact
+compiled run authority. It names Red stores as inventory while explicitly
+withholding sensor response, EW, data-link and autonomous-launch claims.
 
 The #197 route overlay uses one admitted compiled route and selected recorded
 frame: dashed declared legs, one solid active leg and the achieved trail. Map,
@@ -136,6 +149,10 @@ substitute a default value.
 
 ## Observe viewport shell
 
+For BVR `1.3.0`, Observe keeps both authored routes, achieved trails, platform
+labels, the launched Blue store and the exact frame-146 terminal result on the
+same selected canonical frame. Red's turn is labelled authored intent.
+
 Observe joins the selected canonical frame to at most one governed effect
 event. Before the boundary it states that no effect has occurred; at and after
 the boundary it shows the recorded result and limitations. Only a canonical
@@ -208,6 +225,27 @@ state-based rather than screenshot-only. Current authored-leg intent appears
 only for an exact retained Air-mission digest match and is explicitly described
 as authored intent with no autonomous selection; modified runs suppress it.
 
+The Map does not retain a duplicate outcome card. A launch circle remains tied
+to its canonical event, while its short `Launch · <time> s` annotation is shown
+for four model seconds after the next retained frame and then removed from the
+visual field. Synchronized telemetry owns one compact effect template while
+collapsed and one detailed evidence projection while expanded; it never renders
+both at once. A short-wide map container restores the base symbol and control
+scale even on a high-resolution display, so viewport width alone cannot enlarge
+labels into collisions.
+
+Saved reports use a semantic three-column run table and an authored-route-leg
+table for the first scan. Exact causal inputs, geometry proof, event identities,
+model evidence, and limitations use labelled disclosures on screen and expand
+automatically for print. Canonical facts remain present; progressive disclosure
+changes hierarchy only.
+
+The run inspector does not show a terminal outcome before the selected effect
+frame. Before that boundary it shows `Outcome pending` and the recorded boundary
+time; after it, it shows one compact terminal template and four summary metrics.
+An unavailable observer picture shows one controlled-language status. Raw track
+source, cause, age, uncertainty, and lifecycle remain in `Track evidence`.
+
 MapLibre and Three.js observe committed container dimensions. A telemetry
 transition therefore reallocates the canvas row while preserving camera/extent
 unless the operator explicitly chooses Fit. Reduced-motion preference removes
@@ -219,6 +257,11 @@ recorded frame, selected playback time, map camera truth, or another
 Disclosure's state.
 
 ## Automated proof
+
+Component tests cover unavailable and positive capability projections. Browser
+tests cover absence of stale “enabled” claims and non-causal atmosphere rows,
+plus BVR launch at 2.000 s and canonical `KILL` at 36.000 s across the viewport
+matrix.
 
 The five-viewport journey confirms the selected governed Air-combat profile's
 visible non-autonomy/non-effectiveness limitations, projected aircraft labels

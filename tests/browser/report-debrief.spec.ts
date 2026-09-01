@@ -32,6 +32,11 @@ test("canonical report debrief remains exact, contained, and printable", async (
   await expect(page.getByTestId("report-observer-track-availability")).toContainText(
     /IAF: sensor UNSUPPORTED · track UNSUPPORTED/i,
   );
+  const runTable = page.getByRole("table", { name: "Run summary" });
+  await expect(runTable).toBeVisible();
+  await expect(runTable.getByRole("columnheader")).toHaveCount(3);
+  await expect(runTable).toContainText(/Blue.*Su-30MKI.*Astra Mk[- ]I/i);
+  await expect(page.getByRole("table", { name: "Authored route legs" })).toBeVisible();
 
   const originalViewport = page.viewportSize();
   const viewports = testInfo.project.name === "phone-390"

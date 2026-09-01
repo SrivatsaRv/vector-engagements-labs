@@ -46,6 +46,10 @@ and neither backend changes scenario or frame schemas.
 
 ## Dedicated simulation Worker
 
+Issue #207 does not change the Worker protocol. It expands the verification
+workload to the current BVR `1.3.0` package and two release-only controls, while
+retaining transfer, recycling, cancellation and exact-package admission.
+
 #197 keeps the numerical Worker boundary unchanged while strengthening the
 scenario envelope around it. Before dispatch, the browser binds the selected
 immutable `vector.scenario.v4` definition to an exact
@@ -143,16 +147,17 @@ weaker model-pack validator.
 
 ## Built Worker verification
 
-The #197 built-Worker gate prepares exactly three immutable 1.2.0 Air-combat
-study packages (BVR, WVR/BFM, and transition), transfers their ordinary VSRs,
+The #207 built-Worker gate prepares the current immutable Air-combat set: BVR
+`1.3.0` plus WVR/BFM and transition at `1.2.0`. It transfers their ordinary VSRs,
 reopens every transferred record through the Worker verifier, and verifies that
 each record retains the selected package ID, version,
 content hash, and compiled authored duration. The authored route profile stays
 in the immutable scenario definition; it is not duplicated into the VSR or
 treated as engine input. The gate proves the
-published BVR study produces `DEGRADED`, the WVR study produces a canonical
-`KILL` with target lifecycle `TERMINATED`, and the transition study produces
-`NO_EFFECT`. A matched WVR control changes only the admitted loft release time
+published BVR and WVR studies each produce a canonical `KILL` with target
+lifecycle `TERMINATED`, and the transition study produces `NO_EFFECT`. A
+matched BVR control changes only release time from 2 s to 1.95 s and produces
+`NO_EFFECT`; a matched WVR control changes only the admitted loft release time
 from 20 s to 20.65 s and must instead retain an active target with
 `NO_EFFECT`.
 These are orchestration/VSR assertions around the existing engine and governed
@@ -169,10 +174,11 @@ replaces tracked files only after inspecting the staging set. Without the flag,
 normal CI remains strict and retains no binary evidence artifact in the
 worktree.
 
-The exact issue #197 acceptance run is retained under
-`fixtures/vector-record/issue-197/`: three canonical `.vector` records, the
-20.65 s WVR release-time control, and `air-combat-study-evidence.json`. The
-inventory binds each file name, byte length, record digest, 1.2.0 package tuple,
+The exact issue #207 acceptance run is retained under
+`fixtures/vector-record/issue-207/`: three canonical `.vector` records, the
+1.95 s BVR and 20.65 s WVR release-time controls, and
+`air-combat-study-evidence.json`. The #197 directory remains historical. The
+current inventory binds each file name, byte length, record digest, package tuple,
 duration, termination, effect, closest approach and terminal lifecycles. These
 files are generated evidence, not alternate runtime inputs or precomputed
 visual tracks.
@@ -187,7 +193,7 @@ used as the oracle because record creation intentionally records wall-clock
 creation time. The exact fixture-directory prefix is registered in contract
 governance and the verifier rejects missing, extra or renamed evidence files.
 
-#197 grants no browser-artifact size allowance. The historical 585,000-byte
+#207 grants no browser-artifact size allowance. The historical 585,000-byte
 evidence gate and the current strict sub-620,000-byte optimized WASM ceiling
 remain unchanged and are enforced by the existing build/performance checks.
 

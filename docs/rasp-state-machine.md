@@ -8,6 +8,10 @@ is not admitted by the production deployment and makes no named-sensor claim.
 
 ## Canonical boundary
 
+BVR `1.3.0` changes scenario inputs, not the RASP schema. Its Blue and Red route
+transitions are ordinary authored aircraft-control changes; Red has no
+sensor-triggered transition or autonomous response state.
+
 Target effect is downstream of, and distinct from, weapon termination and RASP
 observation. Exactly one `TARGET_EFFECT_COMMITTED` event may consume one exact
 termination receipt and same-frame target state. It may transition the target
@@ -153,6 +157,10 @@ hides entities while this state is selected.
 
 ## Record and replay
 
+Current #207 records preserve the same canonical frame/event contract. The BVR
+record commits generic `KILL` and Red `TERMINATED` at 36.000 s, while its
+1.950 s release-only control records `NO_EFFECT` and leaves Red `ACTIVE`.
+
 VSR v7 retains the effect authority, sealed commit, causal event IDs and target-
 frame `{commitId,state}` projection. Replay validates their exact agreement and
 then presents the recorded result; it does not rerun an effect model or infer
@@ -245,6 +253,10 @@ typed final retained frame and is never inferred from range or guidance.
 
 ## Air mission record storage
 
+Migration 019 appends BVR `1.3.0` and retires without overwriting `1.2.0`.
+WVR and transition remain current at `1.2.0`; all historical versions remain
+addressable by exact package identity and digest.
+
 Saved-run creation repeats the shared structured numeric and Air-mission
 compiler checks before recomputation or persistence. An invalid type,
 non-finite value, out-of-range value or excess precision returns the same stable
@@ -335,6 +347,10 @@ This slice does not make tactical decisions, launch-authority, weapon-support,
 or Su-30MKI/F-16 radar claims. Parent issue #26 remains open.
 
 ## Regression evidence
+
+Issue #207 freezes TypeScript/Rust full-frame and event parity, two nearby
+defensive-turn geometry contrasts, the BVR release-only non-kill control, built
+Worker reopen, VSR/report projection and exact browser frame 146 at 36.000 s.
 
 Target-effect regression proves once-only event/lifecycle causality, exact
 TypeScript/Rust/WASM commit parity, malformed and reordered rejection, VSR v7

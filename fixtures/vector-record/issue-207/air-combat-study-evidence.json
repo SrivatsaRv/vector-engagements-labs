@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "vector.air-combat-study-evidence.v1",
+  "artifacts": [
+    {
+      "filename": "a2a-crossing-intercept.vector",
+      "scenarioId": "a2a-crossing-intercept",
+      "control": false,
+      "recordId": "494177000b918524c9d028512eaffba4fca01f24f256cda1b4c8652b62953733",
+      "byteLength": 785908,
+      "packageReference": {
+        "contentHash": "37c9dbe963e7663562665e6368071f97aa563d60c45ee86cebe607b9437275e4",
+        "id": "a2a-crossing-intercept",
+        "schemaVersion": "vector.scenario-package-reference.v1",
+        "version": "1.3.0"
+      },
+      "compiledDurationSeconds": 100,
+      "termination": "weapon_intercept",
+      "targetEffectResult": "KILL",
+      "timeOfFlightSeconds": 36,
+      "closestApproachM": 2.438845,
+      "terminalWeaponLifecycle": "TERMINATED",
+      "terminalTargetLifecycle": "TERMINATED"
+    },
+    {
+      "filename": "a2a-defensive-break.vector",
+      "scenarioId": "a2a-defensive-break",
+      "control": false,
+      "recordId": "311440a69ec955a6b3c263f15544cae7b02dfbfbfc1fcc16367ce0a6273c8f5e",
+      "byteLength": 599394,
+      "packageReference": {
+        "contentHash": "83e6657dea3f9b246a19125a5d62a616c477a4d364d5fb6823aa608ec53534c5",
+        "id": "a2a-defensive-break",
+        "schemaVersion": "vector.scenario-package-reference.v1",
+        "version": "1.2.0"
+      },
+      "compiledDurationSeconds": 45,
+      "termination": "weapon_intercept",
+      "targetEffectResult": "KILL",
+      "timeOfFlightSeconds": 28.4,
+      "closestApproachM": 3.745229,
+      "terminalWeaponLifecycle": "TERMINATED",
+      "terminalTargetLifecycle": "TERMINATED"
+    },
+    {
+      "filename": "a2a-high-energy-crossing-challenge.vector",
+      "scenarioId": "a2a-high-energy-crossing-challenge",
+      "control": false,
+      "recordId": "3aaf03283a0094c3f59f812ccc3ca8ad8825139cc146ca770a8ce53e3f271307",
+      "byteLength": 2049471,
+      "packageReference": {
+        "contentHash": "2bb894f31d0457926fc4b52a8680785d870a76831e73b8112aa9b6212cb42743",
+        "id": "a2a-high-energy-crossing-challenge",
+        "schemaVersion": "vector.scenario-package-reference.v1",
+        "version": "1.2.0"
+      },
+      "compiledDurationSeconds": 140,
+      "termination": "weapon_intercept",
+      "targetEffectResult": "NO_EFFECT",
+      "timeOfFlightSeconds": 114.7,
+      "closestApproachM": 24.947303,
+      "terminalWeaponLifecycle": "TERMINATED",
+      "terminalTargetLifecycle": "ACTIVE"
+    },
+    {
+      "filename": "a2a-crossing-intercept-release-1.95-control.vector",
+      "scenarioId": "a2a-crossing-intercept",
+      "control": true,
+      "recordId": "0026818d46f0606d3b7ef8a994c835cefefacd43b760d37f17066a4a6058de46",
+      "byteLength": 790411,
+      "packageReference": {
+        "contentHash": "37c9dbe963e7663562665e6368071f97aa563d60c45ee86cebe607b9437275e4",
+        "id": "a2a-crossing-intercept",
+        "schemaVersion": "vector.scenario-package-reference.v1",
+        "version": "1.3.0"
+      },
+      "compiledDurationSeconds": 100,
+      "termination": "weapon_intercept",
+      "targetEffectResult": "NO_EFFECT",
+      "timeOfFlightSeconds": 35.95,
+      "closestApproachM": 22.693748,
+      "terminalWeaponLifecycle": "TERMINATED",
+      "terminalTargetLifecycle": "ACTIVE"
+    },
+    {
+      "filename": "a2a-defensive-break-release-20.65-control.vector",
+      "scenarioId": "a2a-defensive-break",
+      "control": true,
+      "recordId": "5cf2d8e0cf7c84236619d17f058606c7d5a7cd3745737e452e38a46ed422fb87",
+      "byteLength": 606148,
+      "packageReference": {
+        "contentHash": "83e6657dea3f9b246a19125a5d62a616c477a4d364d5fb6823aa608ec53534c5",
+        "id": "a2a-defensive-break",
+        "schemaVersion": "vector.scenario-package-reference.v1",
+        "version": "1.2.0"
+      },
+      "compiledDurationSeconds": 45,
+      "termination": "weapon_intercept",
+      "targetEffectResult": "NO_EFFECT",
+      "timeOfFlightSeconds": 28.8,
+      "closestApproachM": 23.746881,
+      "terminalWeaponLifecycle": "TERMINATED",
+      "terminalTargetLifecycle": "ACTIVE"
+    }
+  ]
+}

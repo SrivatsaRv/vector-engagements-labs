@@ -44,6 +44,11 @@ because its canonical termination receipt and same-frame target state evaluate
 under the retained generic authority; its one-field release-time control does
 not. The BVR and transition packages retain their separately evaluated results.
 
+Issue #207 versions the crossing study so its engine-owned between-step closest
+approach enters the retained kill band. The resulting `KILL` and target
+termination remain generic model-assumption outputs; neither the Astra label nor
+the F-16 presentation identity selects or strengthens that effect.
+
 ## Canonical commit and replay
 
 `TARGET_EFFECT_COMMITTED` cites exactly one earlier `WEAPON_TERMINATED` event.
@@ -102,6 +107,11 @@ closest approach with a historical value fails even if an attacker recomputes
 archive hashes. Legacy reconstruction must remove both the authority projection
 and its lifecycle consequence to remain a coherent `NOT_MODELLED` record.
 
+The issue #207 crossing record applies the same rule in the opposite direction:
+its target is `ACTIVE` before the committed effect and `TERMINATED` at the exact
+effect frame, and every report or viewport must consume that retained transition
+rather than infer a kill from plotted proximity.
+
 ## Verification requirements
 
 Completion requires independent below/equal/above threshold oracles, two-pack
@@ -111,9 +121,11 @@ rejection, complete TypeScript/Rust-WASM frame/event/hash parity, Worker and
 server admission, VSR mutation/readback, exact-frame browser projection, and
 performance evidence. Parity is necessary but is not its own oracle.
 
-Issue #197 adds a matched release-time control for the WVR kill, exact
-TypeScript/Rust full-history parity for all three study outcomes, and selector,
-map, report and VSR regression over the retained 1.2.0 package identities. The
+Issue #207 adds a matched release-time control for the BVR kill, retains the WVR
+kill control, proves exact TypeScript/Rust full-history parity for all three
+current study outcomes, and covers selector, map, report and VSR regression over
+BVR `1.3.0` and the retained WVR/transition `1.2.0` identities. The historical
+BVR `1.2.0` package and #197 evidence remain immutable. The
 legacy test path explicitly rebuilds a lifecycle-consistent pre-authority
 record; it cannot obtain compatibility by ignoring a new commit or projection.
 

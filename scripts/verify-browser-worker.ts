@@ -99,7 +99,7 @@ type AirCombatEvidenceSignature = {
 };
 
 const TRACKED_AIR_COMBAT_EVIDENCE_DIRECTORY = resolve(
-  "fixtures/vector-record/issue-197",
+  "fixtures/vector-record/issue-207",
 );
 
 function trackedAirCombatEvidenceSignature(
@@ -227,6 +227,18 @@ const studyPacks = await Promise.all(studyDefinitions.map(async (definition) => 
   control: false,
   pack: await prepareStudyPack(definition),
 })));
+const bvrDefinition = studyDefinitions.find(({ id }) => id === "a2a-crossing-intercept");
+if (!bvrDefinition) throw new Error("BVR study is missing.");
+const bvrControlScenario = structuredClone(bvrDefinition.scenario);
+const bvrControlRequest = bvrControlScenario.airMission?.assignments[0]
+  ?.storeTransferPlan?.requests[0];
+if (!bvrControlRequest) throw new Error("BVR control has no release request.");
+bvrControlRequest.requestedTimeSeconds = 1.95;
+studyPacks.push({
+  scenarioId: bvrDefinition.id,
+  control: true,
+  pack: await prepareStudyPack(bvrDefinition, bvrControlScenario),
+});
 const wvrDefinition = studyDefinitions.find(({ id }) => id === "a2a-defensive-break");
 if (!wvrDefinition) throw new Error("WVR study is missing.");
 const wvrControlScenario = structuredClone(wvrDefinition.scenario);
@@ -597,9 +609,10 @@ try {
   assert.match(workerVerification.staleAdmissionError, /capability-manifest-stale/);
   assert.match(workerVerification.verificationAdmissionError, /capability-manifest-stale/);
   const expectedRuns = [
-    { scenarioId: "a2a-crossing-intercept", control: false, duration: 100, effect: "DEGRADED", time: 72.95, closest: 19.900251, target: "ACTIVE" },
+    { scenarioId: "a2a-crossing-intercept", control: false, duration: 100, effect: "KILL", time: 36, closest: 2.438845, target: "TERMINATED" },
     { scenarioId: "a2a-defensive-break", control: false, duration: 45, effect: "KILL", time: 28.4, closest: 3.745229, target: "TERMINATED" },
     { scenarioId: "a2a-high-energy-crossing-challenge", control: false, duration: 140, effect: "NO_EFFECT", time: 114.7, closest: 24.947303, target: "ACTIVE" },
+    { scenarioId: "a2a-crossing-intercept", control: true, duration: 100, effect: "NO_EFFECT", time: 35.95, closest: 22.693748, target: "ACTIVE" },
     { scenarioId: "a2a-defensive-break", control: true, duration: 45, effect: "NO_EFFECT", time: 28.8, closest: 23.746881, target: "ACTIVE" },
   ];
   assert.equal(workerVerification.results.length, expectedRuns.length);
@@ -639,7 +652,11 @@ try {
   const evidenceInventory = {
     schemaVersion: "vector.air-combat-study-evidence.v1",
     artifacts: workerVerification.results.map((result) => ({
-      filename: `${result.scenarioId}${result.control ? "-release-20.65-control" : ""}.vector`,
+      filename: `${result.scenarioId}${result.control
+        ? result.scenarioId === "a2a-crossing-intercept"
+          ? "-release-1.95-control"
+          : "-release-20.65-control"
+        : ""}.vector`,
       scenarioId: result.scenarioId,
       control: result.control,
       recordId: result.recordId,

@@ -117,6 +117,9 @@ promotion remain downstream under #154, later #161 stages and #155.
 
 #### Database schema
 
+- Add forward-only migration 019 for BVR `1.3.0`, preserving and retiring the
+  exact BVR `1.2.0` row while leaving the current WVR and transition packages at
+  `1.2.0`; migration 018 is checksum-frozen and never rewritten.
 - Add forward-only migration 018 for the exact three Air-combat `1.2.0`
   packages, retaining their immutable superseded `1.1.0` rows as `RETIRED` and
   rejecting a conflicting pre-existing package identity on exact readback.
@@ -200,6 +203,10 @@ No pending family-specific entry.
 
 #### Generic target effect
 
+- Bind the BVR `1.3.0` package to a reproducible generic `KILL` at 36.000 s and
+  a release-time-only `NO_EFFECT` control at 1.950 s. Both aircraft transition
+  through authored turn legs; the result does not claim autonomous defence,
+  Red weapon employment, or named-system effectiveness.
 - Bind the three 1.2.0 Air-combat studies to the retained generic effect
   authority and prove the WVR `KILL` against a release-time-only non-kill
   control. Update selector, map, report, replay and legacy `NOT_MODELLED`
@@ -344,6 +351,9 @@ No pending family-specific entry.
 
 #### Browser Worker protocol
 
+- Expand the unchanged built-Worker protocol gate to BVR `1.3.0`, WVR and
+  transition plus BVR/WVR release-only controls; regenerate and independently
+  reopen the five exact #207 records without changing message shapes.
 The prepared request now binds the optional governed scenario-package
 ID/version/content hash and scenario-owned run duration before execution. The
 message inventory and transfer protocol are unchanged; Worker admission rejects
@@ -372,6 +382,10 @@ No pending family-specific entry.
 
 #### Vector simulation records
 
+- Retain a new #207 evidence inventory for the three current studies and two
+  matched controls while preserving #197 as immutable historical evidence.
+  Exact package mismatch continues to fail without replacing the prior verified
+  record state.
 - Bind the exact governed scenario package ID, version and content hash across
   browser runtime and VSR compiled/manifest/report artifacts, with malformed and
   divergent-reference rejection and legacy read compatibility.
@@ -454,6 +468,11 @@ writer/reader, Worker, or replay behavior.
 
 #### Capability descriptors
 
+- Project run information availability from both deployment policy and the
+  exact compiled model pack. Missing sensors, data link, EW, or virtual-pilot
+  authority now remains visibly unavailable even if a deployment switch is on;
+  non-causal visibility and humidity values are removed from the authoring
+  atmosphere card.
 - Give live authoring controls stable semantic IDs and block Run while an
   editable numeric control contains raw text that has not passed syntax, range,
   integer and precision admission. Repeat structured type/range/precision,
@@ -473,6 +492,10 @@ writer/reader, Worker, or replay behavior.
 
 #### Mission scenarios
 
+- Publish governed BVR `1.3.0` with Blue offset/recommit and Red authored
+  defensive-turn geometry, a 2.000 s generic release, a canonical 36.000 s
+  `KILL`, and a one-field 1.950 s `NO_EFFECT` control. Red retains both AIM-120
+  stores and has no autonomous response or launch capability.
 - Publish governed `1.2.0` BVR offset/support, WVR one-circle/defensive-break,
   and beam/drag/extend/recommit Su-30MKI/F-16 study packages with exact
   four-point routes, explicit release times and scenario-owned run durations.
@@ -571,6 +594,8 @@ introduced.
 - Engineering principles for the open-source simulation-library boundary, SOLID design, twelve-factor operation, and release evidence.
 
 ### Changed
+
+- Corrected the Observe and saved-report presentation contract: all governed basemap modes now use the versioned key-free OpenStreetMap authority, launch annotations retire after four model seconds, compact telemetry no longer duplicates detailed target-effect prose, short-wide maps restore bounded tactical-label scale, and saved reports lead with semantic run/route tables plus screen disclosures that expand for print.
 
 - Docker Compose now runs self-contained production, migration, and local-seed
   bundles from one `VECTOR_IMAGE`; database and telemetry values are supplied
