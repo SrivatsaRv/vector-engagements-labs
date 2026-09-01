@@ -755,6 +755,14 @@ applicability, route/trail counts, store lifecycle and non-colour affiliation
 identity; a matching screenshot alone is never acceptance evidence. Other
 viewport projects run the same semantic journeys without duplicating
 platform-sensitive pixel baselines.
+The laptop baselines are retained independently for Darwin and Linux because
+font rasterization is platform-specific; both inventories represent the same
+semantically asserted frame rather than treating one platform's pixels as the
+other's oracle. The longer VSR download/reopen journey has a 90-second test
+lifecycle ceiling so loaded CI can finish setup and both record boundaries,
+while its initial Worker completion remains bounded to 45 seconds and the
+separate exact-study browser performance gate keeps the 10-second Worker-run
+budget unchanged.
 
 `lib/frontend/selectors.ts` is the first canonical selector boundary. Telemetry
 uses its selected recorded frame and model time for both the marker and current

@@ -1195,6 +1195,7 @@ test("a current deployment manifest drives the real Worker run after route recov
 });
 
 test("a Worker-produced VSR downloads and reopens without rerunning physics", async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
   const scenarioId = "a2a-defensive-break";
   const catalog = await catalogFixture(scenarioId);
   const runtimeErrors: string[] = [];
@@ -1240,7 +1241,7 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
   await page.getByRole("button", { name: /run baseline/i }).click();
   await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
     "Worker · completed",
-    { timeout: 30_000 },
+    { timeout: 45_000 },
   );
 
   const recordRegion = page.getByRole("region", { name: "VECTOR Simulation Record" });
