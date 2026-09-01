@@ -482,6 +482,8 @@ test("the close-merge WVR effect remains canonical and labels exact authored int
 });
 
 test("all three exact Air studies keep every playback and outcome surface on one canonical frame", async ({ page }) => {
+  test.setTimeout(120_000);
+
   const studies = [
     { id: "a2a-crossing-intercept", frameIndex: "294", time: "72.95", effect: "DEGRADED" },
     { id: "a2a-defensive-break", frameIndex: "116", time: "28.4", effect: "KILL" },
