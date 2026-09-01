@@ -8,7 +8,7 @@ export default function ScenariosPage() {
       <ProductHeader current="scenarios" />
       <section className="library-page-intro">
         <div>
-          <span className="overline">Versioned experiment scenarios</span>
+          <span className="overline">Available simulations</span>
           <h1>
             Choose the engagement.
             <br />
@@ -17,14 +17,14 @@ export default function ScenariosPage() {
         </div>
         <div>
           <p>
-            Every scenario opens ready to run with forces, starting geometry, a
+            Each simulation opens ready to run with forces, starting geometry, a
             flight profile, and declared model limits. Use it unchanged or
             adjust one condition for comparison.
           </p>
           <div className="library-trust">
             <span>
               <Database size={14} />
-              Versioned starting state
+              Saved starting state
             </span>
             <span>
               <ShieldCheck size={14} />

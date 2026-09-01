@@ -505,6 +505,71 @@ a {
   align-items: center;
   gap: 6px;
 }
+.open-source-section {
+  max-width: 1192px;
+  margin: 0 auto;
+  padding: 78px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 72px;
+}
+.open-source-section .overline,
+.about-hero > span,
+.about-open-source > span,
+.about-faq header > span {
+  color: var(--blue);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .14em;
+}
+.open-source-section h2 {
+  margin: 16px 0 0;
+  font: 500 36px/1.15 Georgia, serif;
+}
+.open-source-section p {
+  margin: 2px 0 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.open-source-section a,
+.about-hero a {
+  width: max-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+/* About page: short product statement, evidence boundaries, and FAQ. */
+.about-page { min-height: 100vh; background: #f7f6f2; color: var(--ink); }
+.about-hero,
+.about-facts,
+.about-open-source,
+.about-faq { width: min(1120px, calc(100% - clamp(36px, 8vw, 120px))); margin-inline: auto; }
+.about-hero { padding: clamp(64px, 9vw, 112px) 0 72px; border-bottom: 1px solid var(--line); }
+.about-hero h1 { max-width: 900px; margin: 17px 0 18px; font: 500 clamp(42px, 6vw, 72px)/1.03 Georgia, serif; letter-spacing: -.04em; }
+.about-hero p { max-width: 700px; margin: 0 0 25px; color: var(--muted); font-size: 16px; line-height: 1.65; }
+.about-facts { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--line); }
+.about-facts article { min-height: 170px; padding: 30px 26px; display: flex; gap: 13px; border-right: 1px solid var(--line); }
+.about-facts article:last-child { border-right: 0; }
+.about-facts svg { flex: none; color: var(--green); margin-top: 2px; }
+.about-facts h2 { margin: 0 0 9px; font-size: 14px; }
+.about-facts p,
+.about-open-source p,
+.about-faq p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
+.about-open-source { padding: 72px 0; border-bottom: 1px solid var(--line); }
+.about-open-source h2 { margin: 12px 0 14px; font: 500 34px/1.15 Georgia, serif; }
+.about-open-source p { max-width: 720px; }
+.about-faq { padding: 72px 0 96px; display: grid; grid-template-columns: .65fr 1.35fr; gap: 72px; }
+.about-faq h2 { margin: 12px 0 0; font: 500 30px/1.2 Georgia, serif; }
+.about-faq > div { border-top: 1px solid var(--line); }
+.about-faq article { padding: 22px 0; border-bottom: 1px solid var(--line); }
+.about-faq h3 { margin: 0 0 8px; font-size: 13px; }
 .lab-shell {
   height: 100vh;
   display: grid;
@@ -2651,9 +2716,7 @@ a {
   gap: 6px;
 }
 .scenario-library {
-  display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
-  gap: 22px;
+  display: block;
 }
 .scenario-library.compact {
   display: block;
@@ -2686,11 +2749,11 @@ a {
 }
 .scenario-card-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 .scenario-library.compact .scenario-card-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -6018,6 +6081,7 @@ button:disabled,
   .math-equations article > p,
   .math-equations article > a { grid-column: 1; }
   .math-version-contract { grid-template-columns: 1fr; }
+  .math-layer-contract article { grid-template-columns: 1fr; gap: 6px; }
 }
 @media (max-width: 620px) {
   .math-index { grid-template-columns: 1fr; }
@@ -7054,13 +7118,20 @@ button:disabled,
   .map-tactical-marker svg[data-kind="AIRCRAFT"] .tactical-heading-layer,
   .map-tactical-marker svg[data-kind="GUIDED_WEAPON"] .tactical-heading-layer { transition: none; }
 }
+@media (min-width: 2000px) and (max-width: 3199px) {
+  .simulation-column { --telemetry-height: 60px; grid-template-rows: 72px minmax(360px, 1fr) 52px var(--telemetry-height); }
+  .simulation-column.telemetry-expanded { --telemetry-height: clamp(270px, 24vh, 390px); }
+}
 @media (min-width: 3200px) {
   .simulation-column { --telemetry-height: 60px; grid-template-rows: 88px minmax(560px, 1fr) 60px var(--telemetry-height); }
   .simulation-column.telemetry-expanded { --telemetry-height: clamp(360px, 25vh, 520px); }
 }
 @media (max-width: 1100px) {
-  .simulation-column { grid-template-rows: max-content minmax(360px, 58svh) max-content var(--telemetry-height); }
-  .simulation-column.telemetry-expanded { grid-template-rows: max-content minmax(320px, 48svh) max-content var(--telemetry-height); }
+  .simulation-column { overflow-x: hidden; overflow-y: auto; grid-template-rows: max-content minmax(360px, 58svh) max-content var(--telemetry-height); }
+  .simulation-column.telemetry-expanded { --telemetry-height: max-content; grid-template-rows: max-content minmax(320px, 48svh) max-content var(--telemetry-height); }
+  .telemetry.is-expanded { overflow: visible; }
+  .telemetry.is-expanded .telemetry-multiples { height: auto; grid-auto-rows: minmax(108px, auto); overflow: visible; }
+  .telemetry.is-expanded .telemetry-panel { min-height: 108px; }
 }
 @media (max-width: 760px) {
   .simulation-column { --telemetry-height: 52px; grid-template-rows: max-content minmax(360px, 58svh) max-content var(--telemetry-height); }
@@ -7073,4 +7144,13 @@ button:disabled,
   .engagement-map-shell { min-height: 0; }
   .map-context-disclosure { left: 10px; right: auto; bottom: 52px; max-width: calc(100% - 20px); }
   .engagement-map-shell .maplibregl-ctrl-attrib { margin-bottom: 97px; }
+  .open-source-section { width: calc(100% - 36px); padding: 54px 0; grid-template-columns: 1fr; gap: 22px; }
+  .open-source-section h2 { font-size: 30px; }
+  .about-hero { padding: 54px 0; }
+  .about-hero h1 { font-size: clamp(38px, 11vw, 50px); }
+  .about-facts { grid-template-columns: 1fr; }
+  .about-facts article { min-height: 0; padding: 24px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  .about-facts article:last-child { border-bottom: 0; }
+  .about-open-source { padding: 54px 0; }
+  .about-faq { padding: 54px 0 72px; grid-template-columns: 1fr; gap: 28px; }
 }

@@ -59,6 +59,12 @@ overflow; unsupported installation markers remain visible but disabled.
 - Phone replay stacks telemetry and makes the simulation column vertically scrollable.
 - The live 3D renderer observes its container, so orientation changes and panel reflow update the WebGL viewport without stretching or clipping.
 - Landing copy, calls to action and live preview remain within the first natural reading sequence on small screens; no fixed hero height creates blank space.
+- The public scenario library renders only deployment-admitted runnable entries.
+  Disabled mission domains do not appear as filters, empty cards, or advanced
+  choices in the release-facing catalog.
+- The About page keeps its product statement, three capability facts,
+  open-source rationale, and three-question FAQ readable as one column on phone
+  and bounded text on desktop.
 - Report reading width remains bounded even when operational maps expand.
 - On compact run results, an always-visible `Explain & report` action preserves
   access when the desktop navigation rail is intentionally hidden.

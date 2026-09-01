@@ -1,20 +1,14 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { ScenarioLibrary } from "@/components/ScenarioLibrary";
 
 describe("ScenarioLibrary deployment admission", () => {
-  it("offers admitted Air scenarios and labels disabled domains without run links", async () => {
-    const user = userEvent.setup();
+  it("shows only admitted runnable scenarios", () => {
     render(<ScenarioLibrary />);
 
-    expect(screen.getAllByRole("link", { name: /review and run/i }).length).toBeGreaterThan(0);
-    await user.click(screen.getByRole("button", { name: /^A2G/i }));
-
-    expect(screen.queryByRole("link", { name: /review and run/i })).not.toBeInTheDocument();
-    expect(
-      screen.getAllByText(/outside the active release scope/i).length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /review and run/i })).toHaveLength(3);
+    expect(screen.getByText(/BVR mutual offset and defensive turn/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Air strike: hardened aircraft shelters/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^A2G/i })).not.toBeInTheDocument();
   });
 });
-

@@ -148,17 +148,16 @@ export default function MathPage() {
       <ProductHeader current="math" />
       <section className="math-hero">
         <span>MODEL TRANSPARENCY · {ENGINE_VERSION}</span>
-        <h1>Math behind Vector Engagement Labs</h1>
+        <h1>How Vector calculates a run</h1>
         <p>
-          Every displayed result should be traceable to an input, an equation,
-          a coefficient state, and the exact frames saved with the run.
+          A run starts with the values you choose. Vector applies the equations
+          below, saves every step, and uses those saved steps in the replay and report.
         </p>
         <div className="math-warning">
           <CircleAlert size={18} />
           <p>
-            This is a deterministic educational 3DOF model. Public facts and
-            model coefficients remain separate; the equations do not validate
-            named-system operational performance.
+            The current public model is educational. It separates public facts
+            from model assumptions and does not predict real named-system performance.
           </p>
         </div>
       </section>

@@ -335,6 +335,50 @@ test("the unedited BVR package remains MATCHED across canonical Map and 3D prese
   await expect(scene).toHaveAttribute("data-declared-route-count", "2");
   await expect(scene).toHaveAttribute("data-achieved-trail-count", "3");
   await expect(scene).toHaveAttribute("data-launched-store-count", "1");
+
+  const telemetryToggle = page.getByRole("button", { name: /expand telemetry/i });
+  await telemetryToggle.click();
+  await expect(page.locator(".telemetry.is-expanded")).toBeVisible();
+  await expect(page.locator(".telemetry-panel")).toHaveCount(6);
+
+  const originalViewport = page.viewportSize()!;
+  const verificationViewports = [
+    originalViewport,
+    ...(testInfo.project.name === "tablet-768" ? [{ width: 1_024, height: 768 }] : []),
+    ...(testInfo.project.name === "full-hd" ? [{ width: 2_560, height: 1_440 }] : []),
+  ];
+  for (const viewport of verificationViewports) {
+    await page.setViewportSize(viewport);
+    if (viewport.width <= 1_100) {
+      await page.locator(".telemetry-panel").last().scrollIntoViewIfNeeded();
+    }
+    const layout = await page.evaluate(() => {
+      const rect = (selector: string) => {
+        const value = document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+        return { left: value.left, right: value.right, top: value.top, bottom: value.bottom };
+      };
+      return {
+        viewportWidth: innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        playback: rect(".playback"),
+        telemetryTitle: rect(".telemetry-title"),
+        panels: [...document.querySelectorAll<HTMLElement>(".telemetry-panel")].map((panel) => {
+          const box = panel.getBoundingClientRect();
+          const chart = panel.querySelector<SVGElement>("svg")!.getBoundingClientRect();
+          return { left: box.left, right: box.right, width: box.width, chartWidth: chart.width, chartHeight: chart.height };
+        }),
+      };
+    });
+    expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
+    expect(layout.playback.bottom).toBeLessThanOrEqual(layout.telemetryTitle.top + 1);
+    for (const panel of layout.panels) {
+      expect(panel.left).toBeGreaterThanOrEqual(-1);
+      expect(panel.right).toBeLessThanOrEqual(layout.viewportWidth + 1);
+      expect(panel.width).toBeGreaterThan(150);
+      expect(panel.chartWidth).toBeGreaterThan(120);
+      expect(panel.chartHeight).toBeGreaterThanOrEqual(31);
+    }
+  }
 });
 
 test("short-wide BVR playback keeps key-free tiles, labels, controls, and frame-earned copy separate", async ({ page }) => {

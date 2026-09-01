@@ -3860,6 +3860,20 @@
       "implementationRules": [
         {
           "kind": "EXACT",
+          "value": "app/about/page.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/icon.svg",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "components/EngagementMap.tsx",
           "facets": [
             "ui"
@@ -4051,6 +4065,14 @@
         }
       ],
       "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/browser/public-presentation.spec.ts",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
         {
           "kind": "EXACT",
           "value": "tests/browser-contract-runner.test.mjs",
@@ -5980,5 +6002,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "c2a44dab079d9f58bb4dcda38e527df6512b9db320c54e898a18f35154b747d6"
+  "canonicalSha256": "1aaa99d1b643f44b6a6d86b736720172c962978b081300a8c53a0eeb68bc126f"
 }

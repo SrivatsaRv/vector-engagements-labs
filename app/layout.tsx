@@ -7,14 +7,14 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.SITE_URL || "https://labs.reachdefence.com"),
   title: "Vector Engagement Labs by Reach Defence",
   description:
-    "Build a combat scenario, run it in your browser, replay every move, and compare the result.",
+    "Open source warfare simulation that runs in your browser with physics, 3D replay, telemetry, and inspectable reports.",
   openGraph: {
     type: "website",
     url: "https://labs.reachdefence.com",
     siteName: "Vector Engagement Labs by Reach Defence",
     title: "Vector Engagement Labs by Reach Defence",
     description:
-      "Build a combat scenario, run it in your browser, replay every move, and compare the result.",
+      "Open source warfare simulation that runs in your browser with physics, 3D replay, telemetry, and inspectable reports.",
     images: [
       {
         url: "/og.png",
@@ -28,12 +28,8 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Vector Engagement Labs by Reach Defence",
     description:
-      "Build a combat scenario, run it in your browser, replay every move, and compare the result.",
+      "Open source warfare simulation that runs in your browser with physics, 3D replay, telemetry, and inspectable reports.",
     images: ["/og.png"],
-  },
-  icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
   },
 };
 

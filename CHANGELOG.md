@@ -599,6 +599,11 @@ introduced.
 
 ### Changed
 
+- Public navigation now exposes only deployment-admitted Air-to-air studies,
+  adds a concise About and three-question FAQ page, serves the Vector `V` as a
+  framework-owned browser icon, and keeps expanded telemetry, reports, and
+  mathematical disclosures contained from 320-pixel phones through QHD
+  monitors without changing scenario or engine authority.
 - Corrected the Observe and saved-report presentation contract: all governed basemap modes now use the versioned key-free OpenStreetMap authority, launch annotations retire after four model seconds, compact telemetry no longer duplicates detailed target-effect prose, short-wide maps restore bounded tactical-label scale, and saved reports lead with semantic run/route tables plus screen disclosures that expand for print.
 
 - Docker Compose now runs self-contained production, migration, and local-seed
