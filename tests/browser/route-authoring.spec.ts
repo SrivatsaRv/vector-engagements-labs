@@ -877,6 +877,10 @@ test("shared transient controls hand off once and remain accessible, contained, 
 });
 
 test("a current deployment manifest drives the real Worker run after route recovery", async ({ page }) => {
+  // This journey authors every mission layer before starting the real Worker.
+  // Keep its orchestration timeout distinct from the explicit Worker and 3D
+  // performance budgets asserted in air-combat-performance.spec.ts.
+  test.setTimeout(60_000);
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const catalog = await catalogFixture();
@@ -1038,14 +1042,14 @@ test("a current deployment manifest drives the real Worker run after route recov
   await expect(page.getByRole("button", { name: /run baseline/i })).toBeEnabled();
   await page.getByRole("button", { name: /run baseline/i }).click();
 
-  if (compact) {
-    await expect(page.locator(".session-layout")).toBeVisible({ timeout: 30_000 });
-  } else {
-    await expect(page.getByText(/Run 01 · (Playing|Paused)/i)).toBeVisible({ timeout: 30_000 });
-  }
   await expect(
     page.locator('.catalog-state[data-runtime-state="completed"]'),
-  ).toHaveText("Worker · completed");
+  ).toHaveText("Worker · completed", { timeout: 45_000 });
+  if (compact) {
+    await expect(page.locator(".session-layout")).toBeVisible();
+  } else {
+    await expect(page.getByText(/Run 01 · (Playing|Paused)/i)).toBeVisible();
+  }
   await expect(page.getByRole("list", { name: "Recorded entities" })).toBeVisible();
   await expect(page.getByRole("list", { name: "Recorded entities" }).locator("svg[data-availability=\"AVAILABLE\"]").first()).toBeVisible();
   await expect(page.getByText("Condition injection", { exact: true })).toHaveCount(0);
