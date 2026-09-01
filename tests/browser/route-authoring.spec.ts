@@ -611,9 +611,10 @@ test("the close-merge WVR effect remains canonical and labels exact authored int
 });
 
 // Correctness journeys verify eventual authoritative Worker completion across
-// the viewport matrix. The dedicated browser-performance contract separately
-// retains the 10 s Worker budget on its controlled measurement viewport.
-const CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS = 45_000;
+// the full serial viewport matrix. Allow hosted-runner tail latency here; the
+// dedicated browser-performance contract separately retains the strict 10 s
+// Worker budget on its controlled measurement viewport.
+const CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS = 75_000;
 
 const canonicalAirStudies = [
   {
@@ -641,7 +642,7 @@ const canonicalAirStudies = [
 
 for (const study of canonicalAirStudies) {
   test(study.title, async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
 
     const catalog = await catalogFixture(study.id);
     await page.route("**/api/catalog", (route) =>
@@ -1053,7 +1054,7 @@ test("a current deployment manifest drives the real Worker run after route recov
   // This journey authors every mission layer before starting the real Worker.
   // Keep its orchestration timeout distinct from the explicit Worker and 3D
   // performance budgets asserted in air-combat-performance.spec.ts.
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const catalog = await catalogFixture();
@@ -1404,7 +1405,7 @@ test("a current deployment manifest drives the real Worker run after route recov
 });
 
 test("a Worker-produced VSR downloads and reopens without rerunning physics", async ({ page }, testInfo) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const scenarioId = "a2a-defensive-break";
   const catalog = await catalogFixture(scenarioId);
   const runtimeErrors: string[] = [];
@@ -1455,7 +1456,7 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
   await page.getByRole("button", { name: /run baseline/i }).click();
   await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
     "Worker · completed",
-    { timeout: 45_000 },
+    { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
   );
 
   const recordRegion = page.getByRole("region", { name: "VECTOR Simulation Record" });
