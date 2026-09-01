@@ -38,6 +38,7 @@ import { TrackStateInspector } from "@/components/TrackStateInspector";
 import { CurrentGeometry } from "@/components/CurrentGeometry";
 import { RouteTransitionInspector } from "@/components/RouteTransitionInspector";
 import { TargetEffectSummary } from "@/components/TargetEffectSummary";
+import { CanonicalReportDebrief } from "@/components/CanonicalReportDebrief";
 import { PlatformEvidence } from "@/components/PlatformEvidence";
 import { Disclosure } from "@/components/ui/OverlayPrimitives";
 import { applyTacticalLabelPolicy, presentTacticalSymbol } from "@/lib/tactical-symbol-contract";
@@ -63,6 +64,7 @@ import {
   type ScenarioDefinition,
 } from "@/lib/scenarios";
 import { buildAuthoredProfileBinding } from "@/lib/report-profile";
+import { buildCanonicalReportDebrief } from "@/lib/report-debrief";
 import {
   findWeaponSimulationModel,
   registerDatabaseSimulationModels,
@@ -824,6 +826,13 @@ function LabWorkbench({
     }
   }, [draftRevision, scenarioPackageReference, simulationClient, vectorRecord]);
   const importedVectorRecordIsReportSource = vectorRecord?.source === "VERIFIED_IMPORT";
+  const authoredProfileBinding = useMemo(
+    () => buildAuthoredProfileBinding(definition, scenario),
+    [definition, scenario],
+  );
+  const matchedAuthoredProfile = authoredProfileBinding?.applicability === "MATCHED"
+    ? definition.authoredProfile
+    : undefined;
   const saveReport = async () => {
     if (!hasRun) {
       setSaveError("Conduct a run before saving a report.");
@@ -958,9 +967,14 @@ function LabWorkbench({
       </header>
       <div className="lab-notice">
         <CircleAlert size={13} />
-        <span data-authored-profile={definition.authoredProfile?.id}>
-          {definition.authoredProfile
-            ? `${definition.authoredProfile.label} · Blue ${definition.authoredProfile.blue.legs.join(" → ")} · Red ${definition.authoredProfile.red.legs.join(" → ")} · authored routes, no autonomous pilot.`
+        <span
+          data-authored-profile={matchedAuthoredProfile?.id}
+          data-authored-profile-applicability={
+            authoredProfileBinding?.applicability ?? "UNVERIFIED_LEGACY"
+          }
+        >
+          {matchedAuthoredProfile
+            ? `${matchedAuthoredProfile.label} · Blue ${matchedAuthoredProfile.blue.legs.join(" → ")} · Red ${matchedAuthoredProfile.red.legs.join(" → ")} · authored routes, no autonomous pilot.`
             : `${definition.scope} Public-data approximation; model assumptions are shown before the run.`}
         </span>
       </div>
@@ -1043,6 +1057,7 @@ function LabWorkbench({
       )}
       {workspace === "results" && (
         <ResultsWorkspace
+          definition={definition}
           scenario={scenario}
           result={result}
           events={events}
@@ -1160,7 +1175,7 @@ function LabWorkbench({
                   profile={scenario.profile}
                   layers={layers}
                   authoredProfile={definition.authoredProfile}
-                  authoredProfileBinding={buildAuthoredProfileBinding(definition, scenario)}
+                  authoredProfileBinding={authoredProfileBinding}
                   authoredScenario={scenario}
                   layoutRevision={telemetryExpanded ? 1 : 0}
                   targetEffectOverlay
@@ -2968,6 +2983,7 @@ function ValidationList({ items }: { items: ValidationItem[] }) {
 }
 
 function ResultsWorkspace({
+  definition,
   scenario,
   result,
   events,
@@ -2978,6 +2994,7 @@ function ResultsWorkspace({
   openReport,
   vectorRecord,
 }: {
+  definition: ScenarioDefinition;
   scenario: Scenario;
   result: SimulationResult;
   events: EventItem[];
@@ -3002,6 +3019,12 @@ function ResultsWorkspace({
     selectDisplayFrame(result, result.timeOfFlight),
   );
   const importedVectorRecordIsReportSource = vectorRecord?.source === "VERIFIED_IMPORT";
+  const importedCanonicalDebrief = useMemo(
+    () => importedVectorRecordIsReportSource
+      ? buildCanonicalReportDebrief(result, definition, scenario)
+      : null,
+    [definition, importedVectorRecordIsReportSource, result, scenario],
+  );
   return (
     <section
       className="debrief-workspace"
@@ -3142,6 +3165,9 @@ function ResultsWorkspace({
           </small>
         </article>
       </div>
+      {importedCanonicalDebrief && (
+        <CanonicalReportDebrief debrief={importedCanonicalDebrief} />
+      )}
     </section>
   );
 }

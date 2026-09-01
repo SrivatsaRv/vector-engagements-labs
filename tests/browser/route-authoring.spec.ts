@@ -1005,7 +1005,6 @@ test("a current deployment manifest drives the real Worker run after route recov
   const routeEditor = page.getByRole("region", { name: /route coordinates/i }).first();
   const projectedRouteLongitude = routeEditor.locator("fieldset").first().getByLabel("Longitude", { exact: true });
   await expect.poll(async () => Number(await projectedRouteLongitude.inputValue())).toBeCloseTo(editedMissionLongitude, 6);
-
   const speed = page.getByRole("textbox", { name: /true airspeed/i });
   await speed.fill("-1");
   await expect(speed).toHaveValue("-1");
@@ -1203,6 +1202,13 @@ test("a current deployment manifest drives the real Worker run after route recov
     "data-authored-profile-applicability-reason",
     "CAUSAL_INPUTS_MODIFIED",
   );
+  const modifiedProfileNotice = page.locator(
+    '.lab-notice > [data-authored-profile-applicability="MODIFIED_FROM"]',
+  );
+  await expect(modifiedProfileNotice).not.toHaveAttribute("data-authored-profile");
+  await expect(modifiedProfileNotice).not.toContainText(
+    /OFFSET|SUPPORT|RECOMMIT|BEAM|DRAG|EXTEND/,
+  );
   await expect(threeScene).toHaveAttribute("data-visible-label-count", /[1-9]/);
   const blue3dLabel = page.locator('.simulation-entity-label[data-entity-id="blue-platform-1"]');
   const red3dLabel = page.locator('.simulation-entity-label[data-entity-id="red-object-1"]');
@@ -1326,6 +1332,16 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
   await expect(page.getByTestId("vsr-record-id")).toHaveText(recordId);
   await expect(page.getByTestId("vsr-content-digest")).toHaveText(contentDigest);
   await expect(page.locator(".session-layout")).toBeVisible();
+  const importedProfileNotice = page.locator(
+    '[data-authored-profile="wvr-one-circle-defensive-break"]',
+  );
+  await expect(importedProfileNotice).toHaveAttribute(
+    "data-authored-profile-applicability",
+    "MATCHED",
+  );
+  await expect(importedProfileNotice).toContainText(
+    "Blue MERGE → ONE_CIRCLE → EXTEND · Red MERGE → DEFENSIVE_BREAK → EXTEND",
+  );
   await expect(page.locator(".scenario-name strong")).toHaveText(
     "WVR one-circle defensive break: Su-30MKI versus PAF F-16C Block 52",
   );
@@ -1359,6 +1375,24 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
   await expect(page.getByTestId("results-target-effect-event")).toHaveAttribute(
     "data-effect-time",
     "28.4",
+  );
+  const canonicalDebrief = page.getByRole("region", { name: "Canonical run debrief" });
+  await expect(canonicalDebrief).toBeVisible();
+  await expect(canonicalDebrief.getByTestId("report-authored-route-profile")).toHaveAttribute(
+    "data-profile-applicability",
+    "MATCHED",
+  );
+  await expect(canonicalDebrief.getByTestId("report-authored-route-profile")).toContainText(
+    /MERGE[\s\S]*ONE_CIRCLE[\s\S]*EXTEND[\s\S]*DEFENSIVE_BREAK/,
+  );
+  await expect(canonicalDebrief.getByTestId("report-exact-causal-inputs")).toContainText(
+    /Run duration[\s\S]*45 s[\s\S]*Guidance \/ regime[\s\S]*loft \/ WVR_BFM/,
+  );
+  await expect(canonicalDebrief.getByTestId("report-canonical-geometry")).toContainText(
+    /Weapon world-entry \/ launch frame[\s\S]*Closest active-aircraft approach/,
+  );
+  await expect(canonicalDebrief.getByTestId("report-recorded-causal-facts")).toContainText(
+    /Weapon entered world[\s\S]*Weapon termination[\s\S]*Primary-weapon recorded flight states[\s\S]*Recorded route-index changes/,
   );
   const importedSaveDownloadPromise = page.waitForEvent("download");
   await page.locator(".debrief-notes").getByRole(
