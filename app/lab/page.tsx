@@ -1806,7 +1806,9 @@ function ConfigureWorkspace({
                   ariaLabel="Replay seed"
                   value={scenario.seed}
                   authority={LEGACY_SCENARIO_CONTROL_AUTHORITY.seed.numeric!}
-                  onChange={(value) => update("seed", value!)}
+                  onChange={(value) => {
+                    if (value !== null) update("seed", value);
+                  }}
                   onValidityChange={onAuthoringControlValidity}
                 />
                 <small>Recorded replay identity. The current deterministic runtime has no stochastic seed effect.</small>

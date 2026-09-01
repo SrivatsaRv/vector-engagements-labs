@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { synchronizeScenarioAirMission } from "../lib/air-mission.ts";
+import { CURRENT_COMPILED_MODEL_PACK } from "../lib/engine/weapon-admission.ts";
 import { selectAuthoredProfilePresentation } from "../lib/frontend/authored-profile-presentation.ts";
 import { buildAuthoredProfileBinding } from "../lib/report-profile.ts";
 import { getScenarioDefinition } from "../lib/scenarios.ts";
@@ -33,6 +35,41 @@ test("authored-profile presentation ignores names and binds the exact causal pro
     selectAuthoredProfilePresentation(renamedResult, authorityFor(renamed)).state,
     "MATCHED",
   );
+});
+
+test("ordinary scenario synchronization preserves governed leg roles and exact profile applicability", () => {
+  const originalRoles = definition.scenario.airMission.flightPlans[0].legs.map(
+    (leg) => leg.role,
+  );
+  const cases = [
+    ["rename", "MATCHED", (scenario) => { scenario.name = "Operator-local display rename"; }],
+    ["duration", "MODIFIED_FROM", (scenario) => { scenario.runDurationSeconds += 1; }],
+    ["seed", "MATCHED", (scenario) => { scenario.seed += 1; }],
+    ["blue fuel", "MATCHED", (scenario) => { scenario.blueFuelPercent -= 1; }],
+    ["red fuel", "MATCHED", (scenario) => { scenario.redFuelPercent -= 1; }],
+  ];
+
+  for (const [name, expectedApplicability, mutate] of cases) {
+    const edited = structuredClone(definition.scenario);
+    mutate(edited);
+    const synchronized = synchronizeScenarioAirMission(
+      edited,
+      CURRENT_COMPILED_MODEL_PACK,
+    );
+    assert.deepEqual(
+      synchronized.airMission.flightPlans[0].legs.map((leg) => leg.role),
+      originalRoles,
+      `${name}: leg roles`,
+    );
+    assert.equal(
+      selectAuthoredProfilePresentation(
+        simulate(synchronized),
+        authorityFor(synchronized),
+      ).state,
+      expectedApplicability,
+      `${name}: applicability`,
+    );
+  }
 });
 
 test("every canonical profile input mutation suppresses current authored-leg claims", () => {

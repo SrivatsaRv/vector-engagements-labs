@@ -15,6 +15,7 @@ import {
   assertStructuredScenarioNumbers,
   validateStructuredScenarioNumbers,
 } from "../lib/scenario-control-authority.ts";
+import { PublicApiError } from "../lib/security/public-api.ts";
 import { validateSavedScenario } from "../lib/security/saved-run.ts";
 import { DEFAULT_SCENARIO_DEFINITION } from "../lib/scenarios.ts";
 import { prepareSimulation } from "../lib/simulation.ts";
@@ -145,6 +146,47 @@ test("numeric-authoring-precision: authored precision is enforced independently 
     ok: false,
     code: "CONTROL_NUMBER_RANGE",
   });
+});
+
+test("replay seed is an explicit required integer at raw, structured, compiler, and saved-run boundaries", () => {
+  const authority = LEGACY_SCENARIO_CONTROL_AUTHORITY.seed.numeric;
+  assert.deepEqual(authority, {
+    kind: "NUMBER",
+    minimum: 0,
+    maximum: 2_147_483_647,
+    integer: true,
+    nullable: false,
+    precision: 0,
+    unit: "1",
+  });
+  assert.deepEqual(admitRawScenarioNumber("seed", ""), {
+    ok: false,
+    code: "CONTROL_NUMBER_EMPTY",
+  });
+  assert.deepEqual(admitStructuredNumber(null, authority), {
+    ok: false,
+    code: "CONTROL_NUMBER_EMPTY",
+  });
+
+  const nullSeed = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
+  nullSeed.seed = null;
+  assert.deepEqual(
+    validateStructuredScenarioNumbers(nullSeed).find((error) => error.fieldPath === "$.seed"),
+    { fieldPath: "$.seed", code: "CONTROL_NUMBER_EMPTY" },
+  );
+  assert.throws(
+    () => prepareSimulation(nullSeed),
+    (error) => error instanceof ScenarioControlAdmissionError
+      && error.code === "CONTROL_NUMBER_EMPTY"
+      && error.fieldPath === "$.seed",
+  );
+  assert.throws(
+    () => validateSavedScenario(nullSeed, DEFAULT_SCENARIO_DEFINITION),
+    (error) => error instanceof PublicApiError
+      && error.status === 400
+      && error.code === "CONTROL_NUMBER_EMPTY"
+      && error.fieldPath === "$.seed",
+  );
 });
 
 test("numeric-authoring-no-silent-zero: blank, whitespace and negative zero remain distinct", () => {

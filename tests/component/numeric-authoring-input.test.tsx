@@ -7,6 +7,7 @@ import {
   AUTHORED_STORE_TRANSFER_TIME_AUTHORITY,
   AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY,
   AUTHORED_WGS84_LONGITUDE_AUTHORITY,
+  LEGACY_SCENARIO_CONTROL_AUTHORITY,
 } from "@/lib/scenario-control-authority";
 
 const authority: NumericAuthority = {
@@ -20,6 +21,30 @@ const authority: NumericAuthority = {
 };
 
 describe("NumericAuthoringInput", () => {
+  it("keeps a cleared required replay seed invalid without committing null", () => {
+    const onChange = vi.fn();
+    const onValidityChange = vi.fn();
+    render(
+      <NumericAuthoringInput
+        controlId="scenario.seed"
+        ariaLabel="Replay seed"
+        value={42}
+        authority={LEGACY_SCENARIO_CONTROL_AUTHORITY.seed.numeric!}
+        onChange={onChange}
+        onValidityChange={onValidityChange}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "Replay seed" });
+    fireEvent.change(input, { target: { value: "" } });
+
+    expect(input).toHaveValue("");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("alert")).toHaveTextContent("empty");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onValidityChange).toHaveBeenLastCalledWith("scenario.seed", false);
+  });
+
   it("fails closed when a #197 live control is wired to a different authority", () => {
     const onChange = vi.fn();
     const onValidityChange = vi.fn();

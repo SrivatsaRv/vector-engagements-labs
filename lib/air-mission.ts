@@ -907,12 +907,28 @@ export function synchronizeScenarioAirMission(
         return { ...structuredClone(current.tasks), joinUpPointId: (next.tasks as Extract<AirMissionTasks, { kind: "ESCORT" }>).joinUpPointId };
     }
   })();
+  const synchronizedFlightPlans = next.flightPlans.map((nextPlan) => {
+    const currentPlan = current.flightPlans.find((plan) => plan.id === nextPlan.id);
+    if (!currentPlan) return nextPlan;
+    return {
+      ...nextPlan,
+      legs: nextPlan.legs.map((nextLeg) => {
+        const currentLeg = currentPlan.legs.find((leg) =>
+          leg.id === nextLeg.id &&
+          leg.fromPointId === nextLeg.fromPointId &&
+          leg.toPointId === nextLeg.toPointId
+        );
+        return currentLeg ? { ...nextLeg, role: currentLeg.role } : nextLeg;
+      }),
+    };
+  });
   return {
     ...scenario,
     airMission: {
       ...next,
       id: current.id,
       version: current.version,
+      flightPlans: synchronizedFlightPlans,
       start: structuredClone(environmentChanged ? next.start : current.start),
       regime: current.regime,
       assignments: next.assignments.map((assignment, index) => ({

@@ -216,7 +216,7 @@ export const LEGACY_SCENARIO_CONTROL_AUTHORITY = {
     "NO_RUNTIME_EFFECT",
     "$.seed",
     null,
-    number(0, 2_147_483_647, "1", 0, true),
+    number(0, 2_147_483_647, "1", 0, true, false),
     "RECORDED_REPLAY_IDENTITY_NO_STOCHASTIC_RUNTIME_EFFECT",
   ),
   runDurationSeconds: authored("runDurationSeconds", "ENGINE_CONSUMED", "$.durationSeconds", "engine/terminal-tick", number(0.001, 3_600, "s", MAX_AUTHORED_SCALAR_FRACTION_DIGITS, false, true)),

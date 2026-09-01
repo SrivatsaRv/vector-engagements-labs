@@ -56,6 +56,9 @@ describe("CanonicalReportDebrief", () => {
       /45 s · SCENARIO_AUTHORED/i,
     );
     expect(screen.getByTestId("report-exact-causal-inputs")).toHaveTextContent(
+      /RELEASE blue-weapon-1 at 20 s · installed drag 0\.03 m² · blue-flight-1-store-transfer-1/i,
+    );
+    expect(screen.getByTestId("report-exact-causal-inputs")).toHaveTextContent(
       /Point 4.*FLY_BY.*acceptance 500 m/i,
     );
     expect(screen.getByTestId("report-weapon-flight-state-timeline")).toHaveTextContent(

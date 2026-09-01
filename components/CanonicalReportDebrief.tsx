@@ -116,7 +116,7 @@ export function CanonicalReportDebrief({
             {debrief.causalInputs.releaseRequests.length === 0
               ? "No authored release or jettison request"
               : debrief.causalInputs.releaseRequests.map((request) =>
-                  `${request.operation} ${request.storeEntityId} at ${exactNumber(request.requestedTimeSeconds)} s · ${request.requestId}`
+                  `${request.operation} ${request.storeEntityId} at ${exactNumber(request.requestedTimeSeconds)} s · installed drag ${exactNumber(request.installedDragAreaM2)} m² · ${request.requestId}`
                 ).join("; ")}
           </dd>
         </dl>

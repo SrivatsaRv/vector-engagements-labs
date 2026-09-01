@@ -655,6 +655,16 @@ test("duration and replay seed use governed raw admission before builder navigat
   await expect(duration).toHaveValue("100");
   await expect(seed).toHaveValue("42");
 
+  await seed.fill("");
+  await expect(seed).toHaveValue("");
+  await expect(seed).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByRole("alert")).toContainText("empty");
+  await nextStep.click();
+  await expect(seed).toBeVisible();
+  await expect(seed).toHaveValue("");
+
+  await seed.fill("42");
+  await expect(seed).toHaveAttribute("aria-invalid", "false");
   await duration.fill("54.1251");
   await seed.fill("42.5");
   await expect(duration).toHaveAttribute("aria-invalid", "true");

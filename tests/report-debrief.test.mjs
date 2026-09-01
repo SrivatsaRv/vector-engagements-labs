@@ -138,6 +138,10 @@ test("report export preserves authored profile and debrief while legacy definiti
   assert.equal(exported.scenario.library.authoredProfileBinding.applicability, "MATCHED");
   assert.equal(exported.result.debrief.profile?.id, definition.authoredProfile.id);
   assert.equal(exported.result.debrief.causalInputs.duration.valueSeconds, 100);
+  assert.equal(
+    exported.result.debrief.causalInputs.releaseRequests[0].installedDragAreaM2,
+    0.03,
+  );
   assert.equal(exported.result.debrief.launch.frameIndex, 17);
   assert.equal(
     Number(exported.result.debrief.launch.rangeM.toFixed(6)),
@@ -204,6 +208,7 @@ test("all three report profiles retain exact causal starts, routes, duration, re
       authoredFieldPresent: true,
     }, id);
     assert.equal(debrief.causalInputs.releaseRequests[0]?.requestedTimeSeconds, releaseTime, id);
+    assert.equal(debrief.causalInputs.releaseRequests[0]?.installedDragAreaM2, 0.03, id);
     assert.equal(debrief.causalInputs.sides.BLUE?.start.tasMps, blueTas, id);
     assert.equal(debrief.causalInputs.sides.RED?.start.tasMps, redTas, id);
     assert.equal(debrief.causalInputs.sides.BLUE?.route.length, 4, id);
