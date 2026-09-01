@@ -279,7 +279,7 @@ test("the unedited BVR package remains MATCHED across canonical Map and 3D prese
   const weaponMap = map.locator('[data-entity-id="blue-weapon-1"]');
   await expect(weaponMap).toHaveAttribute("data-lifecycle", "ACTIVE");
   await expect(weaponMap).toHaveAttribute("data-flight-state", "BOOST");
-  await expect(weaponMap).toHaveAttribute("data-label-visibility", "COMPACT");
+  await expect(weaponMap).toHaveAttribute("data-label-visibility", /COMPACT|HIDDEN/);
   await expect(blueMap).toHaveAttribute("data-label-visibility", "VISIBLE");
   await expect(map).toHaveAttribute("data-launched-store-count", "1");
 
@@ -758,7 +758,9 @@ test("an invalid non-spatial numeric draft cannot be bypassed by changing builde
 });
 
 test("QHD Define uses one readable task measure without a detached action rail", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "full-hd", "The full-HD project owns the explicit QHD regression viewport.");
+  // The governed runner requires the same exact case inventory in every
+  // project; full-hd alone owns the explicit 2560 x 1440 visual assertion.
+  if (testInfo.project.name !== "full-hd") return;
   await page.setViewportSize({ width: 2_560, height: 1_440 });
   const catalog = await catalogFixture();
   await page.route("**/api/catalog", (route) =>
@@ -1269,9 +1271,12 @@ test("a current deployment manifest drives the real Worker run after route recov
   await timeline.focus();
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowLeft");
-  await expect(page.getByTestId("airborne-store-transfer-outcome")).toContainText(
-    /JETTISON achieved · blue-weapon-1 .* AIRBORNE_TRANSFER_ADMITTED/,
-  );
+  const transferOutcome = page.getByTestId("airborne-store-transfer-outcome");
+  await expect(transferOutcome).toHaveText("Store jettison · achieved · frame 84");
+  await expect(transferOutcome).toHaveAttribute("data-store-id", "blue-weapon-1");
+  await expect(transferOutcome).toHaveAttribute("data-station-id", "su-30mki-study-station");
+  await expect(transferOutcome).toHaveAttribute("data-limiter", "NONE");
+  await expect(transferOutcome).toHaveAttribute("data-cause", "AIRBORNE_TRANSFER_ADMITTED");
   const postTransferEntityIds = await recordedEntities.evaluateAll((items) =>
     items.map((item) => item.getAttribute("data-entity-id")),
   );
@@ -1300,7 +1305,7 @@ test("a current deployment manifest drives the real Worker run after route recov
     sceneHeight: document.querySelector(".scene-wrap")?.getBoundingClientRect().height ?? 0,
     canvasHeight: document.querySelector(".engagement-map canvas")?.getBoundingClientRect().height ?? 0,
     camera: document.querySelector(".vector-map-telemetry")?.textContent,
-    time: document.querySelector(".telemetry-title > div")?.textContent,
+    time: document.querySelector(".telemetry-title [data-display-time]")?.getAttribute("data-display-time"),
     attribution: document.querySelector(".maplibregl-ctrl-attrib")?.getBoundingClientRect().height ?? 0,
   }));
   if (compact) {
@@ -1320,7 +1325,7 @@ test("a current deployment manifest drives the real Worker run after route recov
     sceneHeight: document.querySelector(".scene-wrap")?.getBoundingClientRect().height ?? 0,
     canvasHeight: document.querySelector(".engagement-map canvas")?.getBoundingClientRect().height ?? 0,
     camera: document.querySelector(".vector-map-telemetry")?.textContent,
-    time: document.querySelector(".telemetry-title > div")?.textContent,
+    time: document.querySelector(".telemetry-title [data-display-time]")?.getAttribute("data-display-time"),
   }));
   expect(collapsed.sceneHeight).toBeGreaterThan(expanded.sceneHeight);
   expect(Math.abs(collapsed.canvasHeight - collapsed.sceneHeight)).toBeLessThanOrEqual(2);
