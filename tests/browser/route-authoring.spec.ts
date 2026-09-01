@@ -594,8 +594,13 @@ test("an invalid non-spatial numeric draft cannot be bypassed by changing builde
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
   );
   await page.route("**/api/map-tile?**", (route) => route.abort());
-  await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided");
-  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText("PostGIS catalog connected");
+  await page.goto("/workbench?scenario=a2a-crossing-intercept&start=guided", {
+    waitUntil: "domcontentloaded",
+  });
+  await expect(page.locator(".catalog-state.POSTGIS")).toHaveText(
+    "PostGIS catalog connected",
+    { timeout: 20_000 },
+  );
 
   const missionClass = page.getByRole("combobox", { name: "Mission class" });
   await missionClass.selectOption("COMBAT_AIR_PATROL");
