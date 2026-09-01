@@ -1,8 +1,9 @@
 /** Public, non-secret runtime admission limits shared by every deployment adapter. */
-export const PUBLIC_API_ADMISSION_POLICY_VERSION = "public-api-admission.v1";
+export const PUBLIC_API_ADMISSION_POLICY_VERSION = "public-api-admission.v2";
 
 export const PUBLIC_API_ADMISSION_POLICY = {
   PUBLIC_API_RATE_LIMITER: { limit: 120, periodSeconds: 60 },
+  BROWSER_TELEMETRY_RATE_LIMITER: { limit: 60, periodSeconds: 60 },
   TILE_RATE_LIMITER: { limit: 600, periodSeconds: 60 },
 } as const;
 

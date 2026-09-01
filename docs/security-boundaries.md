@@ -113,17 +113,21 @@ server-generated report. Request bodies are capped at 96 KiB, route plans at 64
 waypoints per side, and physics inputs at documented finite study limits.
 Database connections, locks, and statements have explicit timeouts.
 
-`public-api-admission.v1` is the versioned anonymous-admission policy. The
-Cloudflare edge uses its two declared Rate Limiting bindings; Node/container
+`public-api-admission.v2` is the versioned anonymous-admission policy. The
+Cloudflare edge uses its three declared Rate Limiting bindings; Node/container
 deployments use the same limits in Postgres-backed fixed windows. A deployed
 adapter that cannot enforce its declared limiter rejects the request with
 `rate_limit_unavailable`; it must not fall back to unlimited access. Rate-limit
 rejections use `rate_limit_exceeded` and include `Retry-After`.
 
+Browser telemetry has its own 60-request-per-minute binding. Its best-effort
+navigation, map, and sampled long-task events cannot consume the separate public
+API budget used by catalog and saved-run requests.
+
 `/api/health` is an admission-readiness check. It reports the non-secret
 policy version, runtime adapter, limiter identity, and `ready` state only after
 the deployment has configured the required limiter backend. A missing Node
-database URL or either Cloudflare limiter binding returns
+database URL or any Cloudflare limiter binding returns
 `rate_limit_unavailable` with HTTP 503. The normal health database query then
 proves the configured backing store is reachable; it does not expose a
 connection string, client identity, or limiter state.

@@ -121,6 +121,10 @@ promotion remain downstream under #154, later #161 stages and #155.
 
 #### Database schema
 
+- Add forward-only migration 020 for `public-api-admission.v2`. Browser
+  telemetry receives its own 60-request-per-minute durable policy identity and
+  cannot consume the catalog or saved-run API budget; migration 011 remains
+  checksum-frozen.
 - Add forward-only migration 019 for BVR `1.3.0`, preserving and retiring the
   exact BVR `1.2.0` row while leaving the current WVR and transition packages at
   `1.2.0`; migration 018 is checksum-frozen and never rewritten.

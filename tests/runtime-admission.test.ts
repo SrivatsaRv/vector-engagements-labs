@@ -12,7 +12,7 @@ import { PublicApiError, publicApiError } from "../lib/security/public-api";
 import { GET as healthGet } from "../app/api/health/route";
 
 test("admission policy gives every configured limiter an explicit positive window", () => {
-  assert.equal(PUBLIC_API_ADMISSION_POLICY_VERSION, "public-api-admission.v1");
+  assert.equal(PUBLIC_API_ADMISSION_POLICY_VERSION, "public-api-admission.v2");
   for (const policy of Object.values(PUBLIC_API_ADMISSION_POLICY)) {
     assert.ok(Number.isSafeInteger(policy.limit) && policy.limit > 0);
     assert.ok(
@@ -50,7 +50,7 @@ test("readiness fails closed when the Node limiter store is not configured", asy
   delete process.env.DATABASE_URL;
   try {
     assert.deepEqual(await publicApiAdmissionStatus(), {
-      policyVersion: "public-api-admission.v1",
+      policyVersion: "public-api-admission.v2",
       runtime: "node",
       limiter: "unavailable",
       ready: false,
@@ -71,7 +71,7 @@ test("readiness fails closed when the Cloudflare limiter bindings are absent", a
   delete process.env.VECTOR_RUNTIME;
   try {
     assert.deepEqual(await publicApiAdmissionStatus(), {
-      policyVersion: "public-api-admission.v1",
+      policyVersion: "public-api-admission.v2",
       runtime: "cloudflare",
       limiter: "unavailable",
       ready: false,

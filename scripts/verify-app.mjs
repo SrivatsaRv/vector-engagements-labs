@@ -37,7 +37,7 @@ try {
   assert.equal(health.status, 200);
   const healthPayload = await health.json();
   assert.equal(healthPayload.status, "ready");
-  assert.equal(healthPayload.publicApiAdmission.policyVersion, "public-api-admission.v1");
+  assert.equal(healthPayload.publicApiAdmission.policyVersion, "public-api-admission.v2");
   assert.equal(healthPayload.publicApiAdmission.ready, true);
   assert.ok(
     ["postgres-fixed-window", "cloudflare-rate-limiting"].includes(

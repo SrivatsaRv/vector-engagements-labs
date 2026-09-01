@@ -49,6 +49,57 @@ test("Node adapter enforces the declared public limit in the durable database", 
   }
 });
 
+test("browser telemetry cannot spend the durable public API budget", { skip: !hasDatabase }, async () => {
+  const previousRuntime = process.env.VECTOR_RUNTIME;
+  process.env.VECTOR_RUNTIME = "node";
+  const telemetryPolicy = PUBLIC_API_ADMISSION_POLICY.BROWSER_TELEMETRY_RATE_LIMITER;
+  const request = new Request("https://labs.reachdefence.com/api/telemetry");
+  const now = Date.now();
+  const windowStartMs = Math.floor(now / (telemetryPolicy.periodSeconds * 1000)) * telemetryPolicy.periodSeconds * 1000;
+  const actorHash = await requestActorHash(request);
+  try {
+    await withDatabase((sql) => sql`
+      DELETE FROM public_api_rate_windows
+      WHERE actor_hash = ${actorHash}
+        AND window_started_at = to_timestamp(${windowStartMs} / 1000.0)
+        AND policy_id IN ('BROWSER_TELEMETRY_RATE_LIMITER', 'PUBLIC_API_RATE_LIMITER')
+    `);
+    await withDatabase((sql) => sql`
+      INSERT INTO public_api_rate_windows
+        (policy_id, actor_hash, window_started_at, request_count)
+      VALUES ('BROWSER_TELEMETRY_RATE_LIMITER', ${actorHash}, to_timestamp(${windowStartMs} / 1000.0), ${telemetryPolicy.limit})
+    `);
+
+    await assert.rejects(
+      () => enforceRateLimit(request, "BROWSER_TELEMETRY_RATE_LIMITER"),
+      { code: "rate_limit_exceeded" },
+    );
+    await enforceRateLimit(request, "PUBLIC_API_RATE_LIMITER");
+
+    const rows = await withDatabase((sql) => sql`
+      SELECT policy_id, request_count
+      FROM public_api_rate_windows
+      WHERE actor_hash = ${actorHash}
+        AND window_started_at = to_timestamp(${windowStartMs} / 1000.0)
+        AND policy_id IN ('BROWSER_TELEMETRY_RATE_LIMITER', 'PUBLIC_API_RATE_LIMITER')
+      ORDER BY policy_id
+    `);
+    assert.deepEqual(rows.map(({ policy_id, request_count }) => ({ policy_id, request_count })), [
+      { policy_id: "BROWSER_TELEMETRY_RATE_LIMITER", request_count: telemetryPolicy.limit },
+      { policy_id: "PUBLIC_API_RATE_LIMITER", request_count: 1 },
+    ]);
+  } finally {
+    await withDatabase((sql) => sql`
+      DELETE FROM public_api_rate_windows
+      WHERE actor_hash = ${actorHash}
+        AND window_started_at = to_timestamp(${windowStartMs} / 1000.0)
+        AND policy_id IN ('BROWSER_TELEMETRY_RATE_LIMITER', 'PUBLIC_API_RATE_LIMITER')
+    `);
+    if (previousRuntime === undefined) delete process.env.VECTOR_RUNTIME;
+    else process.env.VECTOR_RUNTIME = previousRuntime;
+  }
+});
+
 test("saved-run admission bounds global leases and releases capacity", { skip: !hasDatabase }, async () => {
   const previousRuntime = process.env.VECTOR_RUNTIME;
   process.env.VECTOR_RUNTIME = "node";

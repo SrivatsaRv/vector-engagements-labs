@@ -7,8 +7,14 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 test("database-backed public APIs invoke the shared rate limiter", async () => {
   const runs = await read("app/api/runs/route.ts");
   const catalog = await read("app/api/catalog/route.ts");
+  const telemetry = await read("app/api/telemetry/route.ts");
+  const telemetryMigration = await read("db/migrations/020_browser_telemetry_admission.sql");
   assert.match(runs, /enforceRateLimit\(request, "PUBLIC_API_RATE_LIMITER"\)/);
   assert.match(catalog, /enforceRateLimit\(request, "PUBLIC_API_RATE_LIMITER"\)/);
+  assert.match(telemetry, /enforceRateLimit\(request, "BROWSER_TELEMETRY_RATE_LIMITER"\)/);
+  assert.doesNotMatch(telemetry, /enforceRateLimit\(request, "PUBLIC_API_RATE_LIMITER"\)/);
+  assert.match(telemetryMigration, /BROWSER_TELEMETRY_RATE_LIMITER/);
+  assert.match(telemetryMigration, /public_api_rate_windows_policy_id_check/);
   assert.match(runs, /MAX_SAVED_RUN_REQUEST_BYTES/);
 });
 

@@ -2,26 +2,25 @@ import React from "react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const telemetry = vi.hoisted(() => ({ emit: vi.fn() }));
-
-vi.mock("@/lib/observability/client", () => ({
-  emitBrowserTelemetry: telemetry.emit,
-}));
-
 import { BrowserTelemetry } from "@/components/BrowserTelemetry";
+import { PUBLIC_API_ADMISSION_POLICY } from "@/lib/security/admission-policy";
 
 describe("BrowserTelemetry", () => {
   afterEach(() => {
     cleanup();
-    telemetry.emit.mockReset();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
-  it("samples long tasks at a bounded per-document cadence", () => {
+  it("keeps five dense viewport documents below the isolated telemetry budget", async () => {
     let callback: PerformanceObserverCallback | undefined;
     const observe = vi.fn();
     const disconnect = vi.fn();
+    const requests: RequestInit[] = [];
+    const fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push(init ?? {});
+      return new Response(null, { status: 204 });
+    });
 
     class TestPerformanceObserver {
       constructor(next: PerformanceObserverCallback) {
@@ -34,32 +33,46 @@ describe("BrowserTelemetry", () => {
     }
 
     vi.stubGlobal("PerformanceObserver", TestPerformanceObserver);
+    vi.stubGlobal("fetch", fetch);
     vi.spyOn(performance, "getEntriesByType").mockReturnValue([
       { duration: 125 } as PerformanceNavigationTiming,
     ]);
 
-    const view = render(<BrowserTelemetry />);
+    for (let viewport = 0; viewport < 5; viewport += 1) {
+      const view = render(<BrowserTelemetry />);
+      expect(callback).toBeTypeOf("function");
+      callback?.(
+        {
+          getEntries: () => Array.from({ length: 600 }, (_, index) => ({
+            startTime: index * 100,
+            duration: 50 + (index % 10),
+          })),
+        } as PerformanceObserverEntryList,
+        {} as PerformanceObserver,
+      );
+      view.unmount();
+    }
+
+    const expectedRequests = 5 * (1 + 6);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(expectedRequests));
+
+    expect(observe).toHaveBeenCalledTimes(5);
     expect(observe).toHaveBeenCalledWith({ type: "longtask", buffered: true });
-    expect(callback).toBeTypeOf("function");
-
-    callback?.(
-      {
-        getEntries: () => [
-          { startTime: 100, duration: 60 },
-          { startTime: 5_000, duration: 70 },
-          { startTime: 10_100, duration: 80 },
-        ],
-      } as PerformanceObserverEntryList,
-      {} as PerformanceObserver,
+    expect(disconnect).toHaveBeenCalledTimes(5);
+    expect(expectedRequests).toBeLessThan(
+      PUBLIC_API_ADMISSION_POLICY.BROWSER_TELEMETRY_RATE_LIMITER.limit,
     );
-
-    expect(telemetry.emit.mock.calls).toEqual([
-      [{ type: "browser_navigation", durationMs: 125 }],
-      [{ type: "browser_long_task", durationMs: 60 }],
-      [{ type: "browser_long_task", durationMs: 80 }],
-    ]);
-
-    view.unmount();
-    expect(disconnect).toHaveBeenCalledOnce();
+    expect(requests.every((request) => request.keepalive === true)).toBe(true);
+    expect(fetch.mock.calls.every(([url]) => url === "/api/telemetry")).toBe(true);
+    expect(
+      requests.map(({ body }) => JSON.parse(String(body)).type).filter(
+        (type) => type === "browser_navigation",
+      ),
+    ).toHaveLength(5);
+    expect(
+      requests.map(({ body }) => JSON.parse(String(body)).type).filter(
+        (type) => type === "browser_long_task",
+      ),
+    ).toHaveLength(30);
   });
 });
