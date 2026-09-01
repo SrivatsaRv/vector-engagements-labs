@@ -245,6 +245,11 @@ built Worker growth, Chromium initialization and 100-run retained-memory soak
 to the existing engine latency and capacity matrix. Passing parity does not
 waive any size, load, memory or scenario-throughput row.
 
+The shared load-factor clamp and millinewton aerodynamic-drag boundary do not add
+an iteration, allocation, Worker message, or frame column. Existing engine,
+record, browser cadence, memory, VSR-size, and optimized-WASM limits remain the
+release alarms for this numerical stabilization.
+
 Issue #190 preserves the 75 ms p95 limit for the eight historical scenario
 workloads and adds an explicit 110 ms p95 tier for the ninth high-energy
 crossing challenge. Each backend still runs two complete warmup rounds and 25

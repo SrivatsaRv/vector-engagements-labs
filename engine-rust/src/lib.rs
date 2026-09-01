@@ -2111,7 +2111,7 @@ fn update_ground_aircraft(
                 .to_string(),
         ));
     }
-    state.drag_newtons = drag;
+    state.drag_newtons = canonical_recorded_drag_newtons(drag);
     state.thrust_newtons = thrust;
     state.available_g = model.maximum_command_g;
 
@@ -2334,6 +2334,11 @@ fn update_aircraft(
     }
     let accepted_steering = requested_steering.clamp_magnitude(model.maximum_command_g * G0);
     let steering_limited = requested_steering.magnitude() > accepted_steering.magnitude() + 1e-9;
+    let accepted_steering_g = if steering_limited {
+        model.maximum_command_g
+    } else {
+        accepted_steering.magnitude() / G0
+    };
     let (density, speed_of_sound, base_wind) = environment_sample(scenario, state.position, time)?;
     let airspeed = state
         .velocity
@@ -2342,7 +2347,7 @@ fn update_aircraft(
         .max(1.0);
     let longitudinal_acceleration = {
         let dynamic_pressure = (0.5 * density * airspeed * airspeed).max(1.0);
-        let steering_g = accepted_steering.magnitude() / G0;
+        let steering_g = accepted_steering_g;
         let load_factor = (1.0 + steering_g * steering_g).sqrt();
         let lift_coefficient =
             state.mass_kg * G0 * load_factor / (dynamic_pressure * model.reference_area_m2);
@@ -2373,14 +2378,16 @@ fn update_aircraft(
         let consumed = state.fuel_kg.min(fuel_flow * dt);
         state.fuel_kg -= consumed;
         state.mass_kg = (model.empty_mass_kg + state.store_mass_kg).max(state.mass_kg - consumed);
-        state.drag_newtons = drag;
+        // Motion retains the raw force above. Only recorded drag telemetry crosses
+        // this millinewton boundary, removing host-specific last-bit VSR drift.
+        state.drag_newtons = canonical_recorded_drag_newtons(drag);
         state.thrust_newtons = if state.fuel_kg > 0.0 {
             thrust_demand
         } else {
             0.0
         };
         state.available_g = model.maximum_command_g;
-        (state.thrust_newtons - state.drag_newtons) / state.mass_kg
+        (state.thrust_newtons - drag) / state.mass_kg
     };
     let next_speed = (speed + longitudinal_acceleration * dt).max(60.0);
     let steered_velocity = state.velocity.add(accepted_steering.scale(dt));
@@ -2391,7 +2398,7 @@ fn update_aircraft(
     };
     state.heading_rad = state.velocity.y.atan2(state.velocity.x);
     state.position = state.position.add(state.velocity.scale(dt));
-    state.commanded_g = accepted_steering.magnitude() / G0;
+    state.commanded_g = accepted_steering_g;
     state.phase = if route_point.is_some() {
         "Following route"
     } else {
@@ -2454,6 +2461,12 @@ struct StoreTransferOutcome {
 fn canonical_nonnegative_event_scalar(value: f64) -> f64 {
     debug_assert!(value.is_finite() && value >= 0.0);
     const SCALE: f64 = 1_000_000.0;
+    (value * SCALE).round() / SCALE
+}
+
+fn canonical_recorded_drag_newtons(value: f64) -> f64 {
+    debug_assert!(value.is_finite() && value >= 0.0);
+    const SCALE: f64 = 1_000.0;
     (value * SCALE).round() / SCALE
 }
 
@@ -2660,7 +2673,7 @@ fn update_weapon(
             });
         state.velocity = state.velocity.add(acceleration.scale(dt));
         state.position = state.position.add(state.velocity.scale(dt));
-        state.drag_newtons = drag;
+        state.drag_newtons = canonical_recorded_drag_newtons(drag);
         state.thrust_newtons = 0.0;
         state.commanded_g = 0.0;
         state.phase = "Jettisoned".to_string();
@@ -2786,7 +2799,7 @@ fn update_weapon(
     state.heading_rad = state.velocity.y.atan2(state.velocity.x);
     state.commanded_g = guidance.magnitude() / G0;
     state.available_g = weapon.maximum_command_g;
-    state.drag_newtons = drag;
+    state.drag_newtons = canonical_recorded_drag_newtons(drag);
     state.thrust_newtons = thrust;
     state.phase = if burning {
         "Powered flight"

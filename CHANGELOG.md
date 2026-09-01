@@ -156,6 +156,9 @@ packages/hashes with canonical v4 packages and rejects mixed or residual rows.
 
 #### Engine ABI
 
+- Rebuild the production Rust/WASM artifact with the shared load-factor clamp
+  and `10^-3 N` aerodynamic-drag boundary. No exported symbol, scenario schema,
+  coefficient, or size ceiling changes.
 - Carry the scenario-owned run duration and governed scenario-package reference
   through the existing prepared-runtime envelope without adding an exported
   Rust/WASM symbol, changing the numerical ABI, or raising the production WASM
@@ -297,6 +300,11 @@ including public-reference and performance subtrees.
 
 #### Simulation physics
 
+- Use the exact admitted load-factor ceiling after route-command limiting and
+  canonicalize recorded aerodynamic-drag telemetry at `10^-3 N` after raw force
+  evaluation. TypeScript and Rust/WASM now retain identical VSR frame bytes
+  across supported Linux and macOS hosts without changing the force used for
+  motion or thrust demand.
 - Consume a committed weapon-termination receipt and same-frame target state in
   one deterministic generic target-effect evaluator. Emit one causal
   `TARGET_EFFECT_COMMITTED` event and let it own any exactly-once target

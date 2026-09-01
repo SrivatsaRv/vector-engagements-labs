@@ -73,8 +73,13 @@ mutation;
 
 Canonical store-transfer events publish the installed-drag scalar as the same
 named non-negative six-decimal SI value in TypeScript and Rust/WASM. The event
-rounding is a record/parity boundary only: both integrators retain full `f64`
-precision for force and trajectory calculations.
+rounding does not quantize the store-area discontinuity retained by either
+integrator. Recorded aerodynamic drag for aircraft, guided stores, and
+jettisoned stores crosses a separate `10^-3 N` telemetry boundary after force
+evaluation so nonlinear load/drag arithmetic produces identical VSR frames on
+supported Linux and macOS hosts. Motion and thrust demand retain the raw
+fixed-step force. A load-factor-limited route command also consumes and records the exact
+admitted ceiling instead of reconstructing it from the clamped vector.
 
 Installed store drag for that transfer uses an authored/model-assumption SI
 area admitted only in the inclusive `[0.001, 1] m²` interval. This bounded
@@ -210,6 +215,11 @@ Aircraft motion uses the same standard atmosphere and wind field as a launched v
 
 ## Generic configuration-contrast evidence
 
+The route-control regression now asserts that a limited command records the
+exact admitted load-factor ceiling and that aerodynamic drag is a canonical
+three-decimal SI force. The #207 Worker evidence then reproduces all five study
+and contrast VSR member identities on macOS arm64 and Linux amd64.
+
 The frozen #190 high-energy crossing challenge and its 46 km control are a termination
 contrast: one enters the compiled 25 m radius at 131.9 s and the other reaches
 140 s at 530.164926 m. Varying the legacy completion distance does not change
@@ -300,6 +310,11 @@ apply jamming, link it, or support a weapon. An unavailable path yields
 Complete nonlinear aircraft coefficient-table and engine-map execution; store drag, station moments, jettison, and other store-consumption events; maneuvering 6DOF attitude/control transients; pilot decision logic; take-off, landing, and runway operations; detailed seeker/autopilot/fuze/warhead behavior; production terrain ingestion or terrain-aware sensor state; waveform-level EW and countermeasures; probability of kill; validated operational routes or current force disposition.
 
 ## Rust/WASM gate
+
+The gate rebuilds Rust/WASM from the same limiter and force-boundary source,
+checks direct TypeScript/Rust route parity, and rejects a stale generated
+module. Exact two-host Worker evidence supplements that backend comparison; a
+rounded report outcome alone is insufficient.
 
 The gate now includes exact terminal-state/event parity, malformed termination-
 model rejection and between-step closest-approach agreement for all nine

@@ -4,6 +4,12 @@ VECTOR has one engine contract and two browser implementations. The authored sce
 
 ## Rust / WebAssembly
 
+The production module and TypeScript reference apply the same exact
+load-factor ceiling after route-command limiting and the same millinewton SI
+boundary to recorded aerodynamic-drag telemetry after force evaluation. The raw
+force still drives integration and thrust demand. The rebuilt module adds
+no export or input field and stays inside the existing size ceiling.
+
 #197 does not add a Rust export, JSON field, numerical branch, model-pack
 projection, or physics coefficient. Its scenario-owned duration is compiled
 into the existing `EngineScenario.durationSeconds`; its exact scenario-package
@@ -159,6 +165,14 @@ model-assumption authority rather than a deployment-capability selector.
 
 Air runs add authored and compiled mission digests to backend-independent
 provenance. Backend choice cannot create, migrate, or repair mission intent.
+When route steering reaches the admitted load-factor limiter, both backends use
+that exact declared ceiling for aerodynamic load and the recorded `commandedG`
+value. They do not reconstruct the ceiling from the clamped vector magnitude,
+which can introduce a host-specific last-bit difference into drag telemetry.
+The recorded aerodynamic drag crosses one shared `10^-3 N` boundary before VSR
+serialization. Force integration and thrust demand retain the raw fixed-step
+value. This preserves the admitted coefficients, inputs, and trajectory while
+giving Linux and macOS the same causal frame bytes.
 Airborne transfer provenance is likewise backend-neutral: authored digest,
 aircraft source identity, ordered transfer digests and the independent
 authority seal are identical in both engines and retained in the VSR.
@@ -221,6 +235,10 @@ runtime.
   verify the standalone generic AAM corpus/workload and Node-hosted evaluator.
 
 ## Swap boundary
+
+Backend eligibility includes the exact limited `commandedG` and canonical
+aerodynamic-drag value. A backend that reconstructs the clamp from vector magnitude
+or retains a host-specific last bit in that force cannot cross the swap boundary.
 
 The three #197 studies cross the existing swap boundary as ordinary compiled
 Air scenarios. `runDurationSeconds` changes only the existing terminal time
