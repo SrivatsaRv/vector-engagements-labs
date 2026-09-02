@@ -334,6 +334,10 @@ Compose, runtime-binding, dependency, and workflow changes add an image rebuild
 and the integration gates. Unknown paths run everything until ownership is
 declared in `scripts/classify-ci-changes.mjs`.
 
+Protected production verification checks out the admitted exact SHA with full
+trusted history. This preserves `origin/main` for the contract-documentation
+gate without changing the revision that `make ci-local` verifies.
+
 Tracked record, mission/spatial-admission, frontend-selector, runtime-security,
 compiled-model, governed-environment-source, Worker, and VSR paths have explicit
 classifier ownership. A path alias for a file that does not exist is not gate
