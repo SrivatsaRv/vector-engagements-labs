@@ -740,6 +740,11 @@ test("hosted jobs provision the exact renderer before entering the offline gate"
   const deploymentCacheAt = deploymentVerifyJob.indexOf("uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830");
   const deploymentInstallAt = deploymentVerifyJob.indexOf("run: scripts/install-pinned-poppler-ubuntu.sh");
   const deploymentVerifyAt = deploymentVerifyJob.indexOf("run: make ci-local");
+  assert.equal(
+    (deploymentVerifyJob.match(/if: \$\{\{ hashFiles\('scripts\/install-pinned-poppler-ubuntu\.sh'\) != '' \}\}/gu) ?? []).length,
+    2,
+    "deployment renderer setup must skip only admitted revisions that predate the governed bootstrap",
+  );
   assert.ok(deploymentCacheAt >= 0, "deployment verification must restore the governed renderer cache");
   assert.ok(deploymentInstallAt > deploymentCacheAt, "deployment verification must install the governed renderer after cache restore");
   assert.ok(deploymentVerifyAt > deploymentInstallAt, "deployment verification must provision the renderer before the offline gate");

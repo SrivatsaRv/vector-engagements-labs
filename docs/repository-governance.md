@@ -32,6 +32,8 @@ The protected Cloudflare verifier provisions the same content-keyed Poppler
 26.05.0 image required by `make ci-local` before entering that gate. A missing
 or substituted renderer therefore fails before migrations or Worker publish,
 while the admitted commit remains the sole contract-document comparison base.
+An admitted historical revision that predates the renderer contract skips only
+that absent bootstrap and remains subject to its own revision-local gates.
 
 Issue #207 extends the governed contract inventory for the run-information
 projection and the current Worker evidence directory. CI treats the new

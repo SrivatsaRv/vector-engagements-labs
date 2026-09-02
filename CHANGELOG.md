@@ -301,7 +301,9 @@ on a pinned Ubuntu base. Both `pdftoppm` and `pdfinfo` come from that image, so
 the mandatory source suite cannot consume an ambient runner tool. Protected
 production verification now restores and validates the same image before
 `make ci-local`, blocking migration and publish when the renderer is absent or
-different. The production quarantine now covers the entire `fixtures/` tree,
+different. Admitted historical revisions skip the bootstrap only when their
+checked-out source predates the governed installer. The production quarantine
+now covers the entire `fixtures/` tree,
 including public-reference and performance subtrees.
 
 #### Simulation physics

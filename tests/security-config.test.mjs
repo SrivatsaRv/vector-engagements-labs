@@ -49,6 +49,11 @@ test("release and deployment workflows admit reviewed, CI-green main history", a
   const rendererCacheAt = verifyJob.indexOf("uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830");
   const rendererInstallAt = verifyJob.indexOf("run: scripts/install-pinned-poppler-ubuntu.sh");
   const admittedSourceAt = verifyJob.indexOf("run: make ci-local");
+  assert.equal(
+    (verifyJob.match(/if: \$\{\{ hashFiles\('scripts\/install-pinned-poppler-ubuntu\.sh'\) != '' \}\}/gu) ?? []).length,
+    2,
+    "renderer cache and install must be revision-aware for admitted history before the bootstrap existed",
+  );
   assert.ok(rendererCacheAt >= 0, "production verification must restore the governed renderer cache");
   assert.ok(rendererInstallAt > rendererCacheAt, "production verification must install the governed renderer after cache restore");
   assert.ok(admittedSourceAt > rendererInstallAt, "production verification must provision the renderer before make ci-local");

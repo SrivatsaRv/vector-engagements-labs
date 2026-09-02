@@ -80,11 +80,13 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Restore the content-keyed renderer image
+        if: ${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh') != '' }}
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: ${{ runner.tool_cache }}/vector-poppler-26.05.0-ubuntu24-amd64
           key: vector-poppler-ubuntu24-amd64-${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh', 'scripts/pinned-poppler-ubuntu.Dockerfile', 'scripts/pinned-pdftoppm-wrapper.sh.in') }}
       - name: Install the pinned offline PDF renderer
+        if: ${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh') != '' }}
         run: scripts/install-pinned-poppler-ubuntu.sh
       - name: Require production bindings
         env:
