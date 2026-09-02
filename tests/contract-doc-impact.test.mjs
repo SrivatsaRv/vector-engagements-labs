@@ -2472,11 +2472,18 @@ test("the repository policy maps real simulation identities to their exact owner
     value: "verification-rust/generic-aam/",
     facets: ["datum", "digest", "schema", "unit", "verification"],
   }]);
-  assert.deepEqual(generated.generatorRules, [{
-    kind: "EXACT",
-    value: "scripts/build-generic-aam-verifier.mjs",
-    facets: ["datum", "digest", "schema", "unit", "verification"],
-  }]);
+  assert.deepEqual(generated.generatorRules, [
+    {
+      kind: "EXACT",
+      value: "scripts/build-generic-aam-verifier.mjs",
+      facets: ["datum", "digest", "schema", "unit", "verification"],
+    },
+    {
+      kind: "EXACT",
+      value: "scripts/lib/verification-wasm-optimizer.mjs",
+      facets: ["digest", "verification"],
+    },
+  ]);
   assert.deepEqual(generated.freshnessArgv, ["node", "scripts/build-generic-aam-verifier.mjs", "--check"]);
 
   assert.equal(geospatial.implementationRules.some((rule) => rule.kind === "PREFIX" && rule.value === "lib/geospatial/"), false);

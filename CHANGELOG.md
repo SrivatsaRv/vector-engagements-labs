@@ -160,6 +160,14 @@ packages/hashes with canonical v4 packages and rejects mixed or residual rows.
 
 #### Engine ABI
 
+- Pin Rust 1.97.1 across local, pull-request, release and production workflows,
+  and cold-rebuild all three committed WASM artifacts in hosted CI so compiler
+  drift or cached Cargo outputs cannot pass release verification.
+- Standardize both verification artifacts on Linux/amd64, canonicalize
+  workspace, Cargo and Rustup paths, discard ambient Rust flags, and use a
+  digest-pinned Rust 1.97.1 Linux builder from other developer hosts before the
+  shared Binaryen 131.0.0 post-link pass.
+
 - Rebuild the production Rust/WASM artifact with the shared load-factor clamp
   and `10^-3 N` aerodynamic-drag boundary. No exported symbol, scenario schema,
   coefficient, or size ceiling changes.
@@ -251,6 +259,9 @@ No pending family-specific entry.
 
 #### Generic AAM verification
 
+- Standardize the verification artifact on Linux/amd64 Rust 1.97.1, canonical
+  workspace/toolchain paths and Binaryen 131.0.0 so macOS and deployment gates
+  verify one exact artifact identity without changing its ABI or arithmetic.
 - Bind offline admission to the exact raw NASA TM-109057 corpus bytes, correct
   the production-ABI documentation to preserve the separate verification-only
   Rust/WASM boundary, and close the named Apple M5 performance evidence
@@ -266,6 +277,9 @@ No pending family-specific entry.
 
 #### TP-1538 verification tooling
 
+- Standardize the generated verifier on the same digest-pinned Linux/amd64
+  Rust 1.97.1 and Binaryen 131.0.0 policy without changing corpus values,
+  adjudication, evaluator operations, ABI or performance ceilings.
 - Admit the complete content-addressed NASA TP-1538 generic-F-16 aerodynamic
   corpus after two isolated 14,705-position transcriptions, deterministic
   comparison, and 1,311 page-grounded adjudications. Preserve all 13,587

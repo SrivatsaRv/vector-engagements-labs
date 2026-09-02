@@ -12,6 +12,10 @@ The current separate corpus is `governance/nasa-tm-109057-generic-aam-verificati
 
 The current governed bounded workload is `fixtures/public-reference/nasa-tm-109057/workload.v5.json`, 7,922 bytes, SHA-256 `b1f2092dc810909ffa0b4c9c1b2cf33102ca02f0a10a9bbb24d653ed2bc7c4be`. Its sorted 15-case cross-platform semantic batch digest is `430a2a8a5ffa120f86e9ea2d9e5128526a397d2aa4f53609b0aff9cfae2c87e2`. Immutable workload v2–v4 remain unchanged; v3 is exactly 8,223 bytes with SHA-256 `0b7f7ba1395ff58629c26aaa62e46c239121d37e4197a2246e1064aa8caeb556`, and reviewed v4 is exactly 7,922 bytes with SHA-256 `9df2c63309e22931deed24c2ee267b7efed2fc7783061ad84b2628f8e577012d`. Each evaluator run used by these workloads still owns raw `outputSha256` and `contentSha256` identities over all binary64 frames and terminal metadata. Those raw identities prove exact same-runtime repeatability and field tamper detection; they are deliberately not cross-host goldens. Exact arithmetic, boundary, convergence, parity, and controlled-configuration claims require the independent anchors below.
 
+The generated verifier identity additionally binds the exact Linux/amd64 Rust
+1.97.1 builder, canonical workspace/toolchain path remaps and Binaryen 131.0.0
+post-link policy. Host-native compiler layout is not artifact authority.
+
 The TP-1538 tooling introduced by #178 is a separate family with distinct
 source, schema, ABI prefix, artifact and record identities. It reuses no
 generic-AAM corpus value, workload, oracle or admission decision.
@@ -45,6 +49,8 @@ raw-file and benchmark checks cannot reconcile, average or default a source
 conflict.
 TP-1538 transcription or adjudication decisions cannot resolve or supersede
 any generic-AAM discrepancy.
+The Linux/amd64 artifact build policy changes none of D01–D10; it only removes
+host linker and path layout from the admitted verifier identity.
 
 ## Executable contract
 
@@ -52,6 +58,8 @@ any generic-AAM discrepancy.
 
 The performance report is evidence about these unchanged input/run contracts;
 it is not an alternate input schema, backend selector or runtime admission path.
+The build target and optimizer identity are included in the verifier source
+digest. They do not add a request field, output field or numerical branch.
 
 At integer tick `n`, time is `n/tickRateHz`. The evaluator advances the constant-velocity target, evaluates prior missile state, applies the printed explicit update order, burns mass through second 8, recomputes relative geometry, creates PN signals, applies the printed speed/mass g-limit and control response, then evaluates:
 
@@ -83,7 +91,7 @@ The v4 successor was prompted by a real cross-host falsifier at immutable `b77f6
 
 Independent review of immutable v4 SHA `6a97c3b230c6751080cb88485859b4743dba3593` then exposed the short-horizon parity gap: the prior test stopped after two seconds. The full governed workload had 36 values above `1e-9`, only in CPA distance (34) and time (2): `CONFLICT_THRUST` 20, `RATE128_SEEKER30` 10, `RATE64_SEEKER20` 4, and `RATE32_SEEKER30` 2. Maximum distance delta was `2.0713287085527554e-8` at `CONFLICT_THRUST` tick 101 (relative `1.3612619218727864e-11`); maximum time delta was `3.499962986097671e-9` at tick 100 (relative `2.033981575206581e-12`). Results were identical on macOS arm64 / Node 24.3.0 and Linux x64 / Node 22.18.0. Direct point, cross-product, and direct-square-root recomputations retained the same maximum distance delta, showing cancellation amplification from already-admitted sub-`1e-9` trajectory drift rather than an implementation-order defect. V5 therefore leaves printed evaluator arithmetic unchanged and binds the proportionate CPA-only combined tolerances above. The corpus records the exact per-rate/seeker maxima, host identities, values, counts, formula, and rationale. The v5 verifier produces the same semantic batch `430a2a8a…`, 12,145-frame/364,350-comparison parity report, and 36/36 focused pass on both declared hosts.
 
-Two independently generated artifacts have separate integrity and size gates. The production Rust/WASM artifact retains its existing 500,000-byte ceiling and contains no generic-AAM code; the current pre-freeze artifact is 410,994 bytes, SHA-256 `22e250cb506d1464544b6b25f05d5db3c0914fc6fe7bfdc9290141fe01dac1bd`, from production-source identity `e78eb3302d48d916e0bbcd934a13627be85c37d9f17d328027d71ab2830cc678`. The verification-only artifact also has an unchanged 500,000-byte ceiling; the current pre-freeze artifact is 205,536 bytes, SHA-256 `cac19c36ae8c03a8d10d9caa0d1b82f9f31e2c602fc91748598b44f2c6dcb94e`, from verification-source identity `4156fb4e400ebc9aa4a735896472264e61b17ef382311ef048c8eff9963892b8`. Both exact identities are rebuilt and verified in a clean clone before freeze.
+Two independently generated artifacts have separate integrity and size gates. The production Rust/WASM artifact retains its existing 500,000-byte ceiling and contains no generic-AAM code; the current pre-freeze artifact is 410,994 bytes, SHA-256 `22e250cb506d1464544b6b25f05d5db3c0914fc6fe7bfdc9290141fe01dac1bd`, from production-source identity `e78eb3302d48d916e0bbcd934a13627be85c37d9f17d328027d71ab2830cc678`. The verification-only artifact also has an unchanged 500,000-byte ceiling; the governed Linux/amd64 Rust 1.97.1 and Binaryen 131.0.0 artifact is 172,869 bytes, SHA-256 `6cf4a37145c7a5fc8dc8cb0aa2847bbf365b5d782b0aa85934bb3449dd0c4bc8`, from verification-source identity `fc8e058161bffd227f13e99c97406612a7076dd4ea764b700a7a95c51e15aa4b`. Canonical workspace, Cargo and Rustup path remapping removes host paths; non-Linux-x64 workstations use the digest-pinned Linux builder. Both exact identities are rebuilt and verified in a clean clone before freeze.
 
 On Apple M5 / macOS arm64 / Node v24.3.0, three isolated final 20-batch runs (15 cases, 12,145 frames, approximately 11.0 MB JSON per batch) observed TypeScript p95 23.220–25.989 ms and Node-hosted Rust-WASM p95 158.133–177.073 ms. The closed `APPLE_M5_NODE24` profile retains 30 and 200 ms gates; runtime, OS, architecture, CPU, core count and memory must all match, and legacy environment variables cannot change either ceiling. The benchmark verifies the exact v5 workload bytes before building inputs, rejects a dirty or unidentified Git state before measurement, measures both backends before evaluating either threshold, and emits the exact commit plus all workload/source/corpus/decision/batch identities, full 20-sample distributions, p50/p95/p99/max, RSS growth, frames, and bytes. Every measured batch is admitted only after strict run decoding, exact per-case terminal/tick/cause/frame-count and semantic-digest comparison, exact 12,145-frame accounting, and the governed sorted batch digest; an empty, shortened, malformed, or semantically changed evaluator result cannot become faster evidence. Two prior TypeScript p95 results of 35.614 and 119.161 ms are excluded as contaminated: concurrent clean-clone Vitest workers occupied 70–90% CPU across eight processes; the unchanged benchmark passed before and after that load ended. It makes no Worker, UI, 100-entity, or product-capacity claim. A regression-first canonical-text digest implementation produced a 1,366.461 ms TypeScript p95 and was rejected; the admitted fixed-order binary64 output encoding preserves all governed fields while keeping both unchanged performance gates.
 

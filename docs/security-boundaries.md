@@ -212,6 +212,17 @@ spending limits and abuse monitoring remain deployment duties.
 
 ## Delivery trust
 
+Production, release and pull-request workflows use repository-owned Rust
+1.97.1. Hosted pull-request verification starts the three committed WASM builds
+from empty Cargo output directories and compares their reconstructed bytes with
+the repository artifacts. Floating compiler updates and cached target outputs
+cannot supply release evidence.
+Both verification-only artifacts are owned by one Linux/amd64 build policy.
+Their builders discard caller Rust flags, remap workspace and toolchain paths,
+and require a digest-pinned Rust image from non-Linux-x64 developer hosts. A
+host-specific Cargo registry path or linker layout therefore cannot become an
+unreviewed production artifact.
+
 The protected Cloudflare verification job restores and validates the governed,
 content-keyed Poppler renderer before `make ci-local`. Missing or substituted
 renderer tooling stops delivery before database migration or Worker publish.

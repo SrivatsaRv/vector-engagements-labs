@@ -297,6 +297,7 @@ test("generic AAM validation and generated verifier paths select Rust ownership"
     "lib/validation/generic-aam-verification-wasm.ts",
     "lib/validation/generated/generic-aam-verifier-wasm.ts",
     "scripts/build-generic-aam-verifier.mjs",
+    "scripts/lib/verification-wasm-optimizer.mjs",
     "verification-rust/generic-aam/src/model.rs",
   ]) {
     assert.equal(selected([path]).includes("rust_tests"), true, `${path} must select the Rust verifier owner`);
@@ -464,6 +465,7 @@ test("workflow changes fail closed through every available gate", () => {
     "container",
   ];
   assert.deepEqual(selected([".github/workflows/ci.yml"]), everyGate);
+  assert.deepEqual(selected(["rust-toolchain.toml"]), everyGate);
   assert.deepEqual(selected(["scripts/classify-ci-changes.mjs"]), everyGate);
   assert.deepEqual(selected(["governance/contract-doc-ownership.v1.json"]), everyGate);
   assert.deepEqual(selected(["scripts/lib/contract-doc-impact.mjs"]), everyGate);

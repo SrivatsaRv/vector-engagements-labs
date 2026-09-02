@@ -152,7 +152,7 @@ export const CLASSIFIER_DECISION_CONTRACT = deepFreeze({
         /^lib\/engine\//,
         /^lib\/validation\/(?:public-aircraft-reference|generic-aam-verification|generic-aam-verification-wasm|generated\/generic-aam-verifier-wasm|tp1538-aero-verification|tp1538-aero-verification-wasm|generated\/tp1538-aero-verifier-wasm)\.ts$/,
         /^lib\/(?:model-pack|reference-model-pack|simulation-models)\.ts$/,
-        /^scripts\/(?:benchmark-generic-aam|benchmark-tp1538-aero|build-generic-aam-verifier|build-rust-engine|build-tp1538-aero-verifier|generate-model-pack-fixture|generate-nasa-generic-aam-workload|generate-tp1538-aero-workload|verify-nasa-generic-aam-reference|verify-public-aircraft-reference)\.(?:mjs|ts)$/,
+        /^scripts\/(?:benchmark-generic-aam|benchmark-tp1538-aero|build-generic-aam-verifier|build-rust-engine|build-tp1538-aero-verifier|generate-model-pack-fixture|generate-nasa-generic-aam-workload|generate-tp1538-aero-workload|lib\/verification-wasm-optimizer|verify-nasa-generic-aam-reference|verify-public-aircraft-reference)\.(?:mjs|ts)$/,
         /^tests\/(?:generic-aam-oracles|generic-aam-verification|tp1538-aero-reference)\.test\.mjs$/,
       ),
     },

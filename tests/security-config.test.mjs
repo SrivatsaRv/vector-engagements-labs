@@ -61,6 +61,64 @@ test("release and deployment workflows admit reviewed, CI-green main history", a
   assert.doesNotMatch(deploy, /npm run db:seed/);
 });
 
+test("release workflows pin the compiler that owns committed WASM bytes", async () => {
+  const [toolchain, ci, release, deploy] = await Promise.all([
+    read("rust-toolchain.toml"),
+    read(".github/workflows/ci.yml"),
+    read(".github/workflows/release.yml"),
+    read(".github/workflows/deploy-cloudflare.yml"),
+  ]);
+  assert.match(toolchain, /channel = "1\.97\.1"/);
+  assert.match(toolchain, /targets = \["wasm32-unknown-unknown"\]/);
+  for (const workflow of [ci, release, deploy]) {
+    assert.doesNotMatch(workflow, /toolchain: stable/);
+    for (const setup of workflow.matchAll(/uses: actions-rust-lang\/setup-rust-toolchain@[\s\S]*?(?=\n\s+- name:|$)/g)) {
+      assert.match(setup[0], /toolchain: 1\.97\.1/);
+    }
+  }
+});
+
+test("verification WASM builds replace host paths and ambient Rust flags", async () => {
+  const {
+    verificationWasmCargoEnvironment,
+    verificationWasmBuildRuntime,
+    VERIFICATION_WASM_BUILD_POLICY,
+    VERIFICATION_WASM_LINUX_AMD64_BUILDER,
+  } = await import("../scripts/lib/verification-wasm-optimizer.mjs");
+  const environment = verificationWasmCargoEnvironment("/host/work tree", {
+    CARGO_HOME: "/host/cargo home",
+    RUSTUP_HOME: "/host/rustup home",
+    RUSTFLAGS: "--cfg ambient_rustflags_must_not_survive",
+    CARGO_ENCODED_RUSTFLAGS: "ambient encoded flags must not survive",
+  });
+  assert.equal(environment.RUSTFLAGS, undefined);
+  assert.deepEqual(environment.CARGO_ENCODED_RUSTFLAGS.split("\x1f"), [
+    "--remap-path-prefix=/host/work tree=/vector/source",
+    "--remap-path-prefix=/host/cargo home=/vector/cargo",
+    "--remap-path-prefix=/host/rustup home=/vector/rustup",
+  ]);
+  assert.match(VERIFICATION_WASM_BUILD_POLICY, /ambient-flags=discarded/);
+  assert.equal(verificationWasmBuildRuntime("linux", "x64"), "native-linux-amd64");
+  assert.equal(verificationWasmBuildRuntime("linux", "arm64"), "docker-linux-amd64");
+  assert.equal(verificationWasmBuildRuntime("darwin", "arm64"), "docker-linux-amd64");
+  assert.match(VERIFICATION_WASM_LINUX_AMD64_BUILDER, /^rust@sha256:[a-f0-9]{64}$/u);
+  assert.match(VERIFICATION_WASM_BUILD_POLICY, /linux-amd64-rust-1\.97\.1/);
+
+  for (const path of [
+    "scripts/build-generic-aam-verifier.mjs",
+    "scripts/build-tp1538-aero-verifier.mjs",
+  ]) {
+    const builder = await read(path);
+    assert.match(builder, /buildVerificationWasm\(\{ root, manifest, wasmPath, cargo \}\)/);
+    assert.match(builder, /await optimizeVerificationWasm\(/);
+    assert.match(builder, /VERIFICATION_WASM_BUILD_POLICY/);
+  }
+
+  const optimizer = await read("scripts/lib/verification-wasm-optimizer.mjs");
+  assert.doesNotMatch(optimizer, /import binaryen from/u);
+  assert.match(optimizer, /await import\("binaryen"\)/u);
+});
+
 test("pull-request validation is change-aware with one stable required gate", async () => {
   const [ci, scheduledCodeql] = await Promise.all([
     read(".github/workflows/ci.yml"),
@@ -85,6 +143,29 @@ test("pull-request validation is change-aware with one stable required gate", as
   assert.match(ci, /npm run reference-aircraft:verify/);
   assert.doesNotMatch(ci, /performance-local|benchmark-engine/);
   assert.doesNotMatch(scheduledCodeql, /pull_request:|branches: \[main\]/);
+});
+
+test("hosted Rust verification rebuilds every committed WASM artifact from cold outputs", async () => {
+  const ci = await read(".github/workflows/ci.yml");
+  const rustJob = ci.split(/^  rust_tests:/m)[1]?.split(/^  browser_tests:/m)[0];
+  assert.ok(rustJob, "Rust/WASM parity job must exist");
+  const verifyAt = rustJob.indexOf("npm run engine:rust:verify");
+  for (const manifest of [
+    "engine-rust/Cargo.toml",
+    "verification-rust/generic-aam/Cargo.toml",
+    "verification-rust/tp1538-aero/Cargo.toml",
+  ]) {
+    const cleanAt = rustJob.indexOf(`cargo clean --manifest-path ${manifest}`);
+    assert.ok(cleanAt >= 0 && cleanAt < verifyAt, `${manifest} must be cleaned before WASM verification`);
+  }
+  for (const command of [
+    "npm run engine:rust:verify",
+    "npm run reference-aam:rust:verify",
+    "npm run tp1538:aero:rust:verify",
+  ]) {
+    assert.ok(rustJob.includes(command), `${command} must run in hosted CI`);
+  }
+  assert.doesNotMatch(rustJob, /Swatinem\/rust-cache@/);
 });
 
 test("Cloudflare toolchain is pinned to the governed proxy-regression compatibility set", async () => {
