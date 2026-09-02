@@ -66,7 +66,6 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.admit.outputs.sha }}
-          fetch-depth: 0
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
@@ -100,6 +99,8 @@ jobs:
           CLOUDFLARE_HYPERDRIVE_ID: ${{ vars.CLOUDFLARE_HYPERDRIVE_ID }}
         run: npx wrangler hyperdrive get "${CLOUDFLARE_HYPERDRIVE_ID}"
       - name: Verify admitted source
+        env:
+          VECTOR_CONTRACT_DOC_BASE_SHA: ${{ needs.admit.outputs.sha }}
         run: make ci-local
       - name: Verify production catalog without mutation
         env:
