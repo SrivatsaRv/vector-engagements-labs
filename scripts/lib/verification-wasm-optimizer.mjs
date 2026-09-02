@@ -1,4 +1,3 @@
-import binaryen from "binaryen";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -87,19 +86,19 @@ export function buildVerificationWasm({ root, manifest, wasmPath, cargo = proces
   }
 }
 
-const OPTIMIZER_FEATURES =
-  binaryen.Features.MutableGlobals |
-  binaryen.Features.NontrappingFPToInt |
-  binaryen.Features.BulkMemory |
-  binaryen.Features.SignExt |
-  binaryen.Features.ReferenceTypes |
-  binaryen.Features.BulkMemoryOpt;
-
-export function optimizeVerificationWasm(rawBytes) {
+export async function optimizeVerificationWasm(rawBytes) {
+  const { default: binaryen } = await import("binaryen");
+  const optimizerFeatures =
+    binaryen.Features.MutableGlobals |
+    binaryen.Features.NontrappingFPToInt |
+    binaryen.Features.BulkMemory |
+    binaryen.Features.SignExt |
+    binaryen.Features.ReferenceTypes |
+    binaryen.Features.BulkMemoryOpt;
   binaryen.setOptimizeLevel(3);
   binaryen.setShrinkLevel(2);
   const wasmModule = binaryen.readBinary(rawBytes);
-  wasmModule.setFeatures(OPTIMIZER_FEATURES);
+  wasmModule.setFeatures(optimizerFeatures);
   wasmModule.optimize();
   wasmModule.runPasses(["reorder-functions"]);
   if (!wasmModule.validate()) {

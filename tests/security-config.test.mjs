@@ -110,8 +110,13 @@ test("verification WASM builds replace host paths and ambient Rust flags", async
   ]) {
     const builder = await read(path);
     assert.match(builder, /buildVerificationWasm\(\{ root, manifest, wasmPath, cargo \}\)/);
+    assert.match(builder, /await optimizeVerificationWasm\(/);
     assert.match(builder, /VERIFICATION_WASM_BUILD_POLICY/);
   }
+
+  const optimizer = await read("scripts/lib/verification-wasm-optimizer.mjs");
+  assert.doesNotMatch(optimizer, /import binaryen from/u);
+  assert.match(optimizer, /await import\("binaryen"\)/u);
 });
 
 test("pull-request validation is change-aware with one stable required gate", async () => {
