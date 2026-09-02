@@ -297,6 +297,7 @@ test("generic AAM validation and generated verifier paths select Rust ownership"
     "lib/validation/generic-aam-verification-wasm.ts",
     "lib/validation/generated/generic-aam-verifier-wasm.ts",
     "scripts/build-generic-aam-verifier.mjs",
+    "scripts/lib/verification-wasm-optimizer.mjs",
     "verification-rust/generic-aam/src/model.rs",
   ]) {
     assert.equal(selected([path]).includes("rust_tests"), true, `${path} must select the Rust verifier owner`);

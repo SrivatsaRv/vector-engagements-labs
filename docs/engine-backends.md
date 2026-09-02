@@ -9,6 +9,13 @@ verification WASM artifacts. Hosted CI removes all three Cargo output
 directories before reconstructing and byte-checking those artifacts. Release
 and production workflows install the same compiler version; a floating channel
 or cached target directory is not artifact authority.
+The generic-AAM and TP-1538 builders also standardize on Linux/amd64, replace
+host workspace, Cargo and Rustup paths with canonical prefixes, and discard
+ambient Rust flags. A non-Linux-x64 workstation therefore builds those two
+artifacts through the exact digest-pinned Rust 1.97.1 Linux image used by the
+governed policy. Binaryen 131.0.0 then applies the same post-link optimization.
+This is artifact reproducibility only and changes no verification ABI or
+numerical behavior.
 
 The production module and TypeScript reference apply the same exact
 load-factor ceiling after route-command limiting and the same millinewton SI

@@ -2041,6 +2041,11 @@
               "kind": "EXACT",
               "value": "scripts/build-tp1538-aero-verifier.mjs",
               "facets": ["digest", "verification"]
+            },
+            {
+              "kind": "EXACT",
+              "value": "scripts/lib/verification-wasm-optimizer.mjs",
+              "facets": ["digest", "verification"]
             }
           ],
           "freshnessArgv": ["node", "scripts/build-tp1538-aero-verifier.mjs", "--check"]
@@ -2363,6 +2368,14 @@
                 "digest",
                 "schema",
                 "unit",
+                "verification"
+              ]
+            },
+            {
+              "kind": "EXACT",
+              "value": "scripts/lib/verification-wasm-optimizer.mjs",
+              "facets": [
+                "digest",
                 "verification"
               ]
             }
@@ -5885,6 +5898,7 @@
     "lib/security/saved-run.ts",
     "lib/simulation.ts",
     "scripts/generate-weapon-termination-migration.ts",
+    "scripts/lib/verification-wasm-optimizer.mjs",
     "scripts/seed-db.ts",
     "scripts/verify-credibility-catalog.mjs",
     "scripts/verify-db.mjs",
@@ -6018,5 +6032,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "49fc55eac1c1a45b9c887b1dfae84b7dab59418dddd01e436d822c1bd6be0e7f"
+  "canonicalSha256": "6b02408b0d52397bbb68724e9ee76b3cee4d20a915d36244d4ec1fc98f419f89"
 }

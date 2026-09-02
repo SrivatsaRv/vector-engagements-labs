@@ -78,6 +78,42 @@ test("release workflows pin the compiler that owns committed WASM bytes", async 
   }
 });
 
+test("verification WASM builds replace host paths and ambient Rust flags", async () => {
+  const {
+    verificationWasmCargoEnvironment,
+    verificationWasmBuildRuntime,
+    VERIFICATION_WASM_BUILD_POLICY,
+    VERIFICATION_WASM_LINUX_AMD64_BUILDER,
+  } = await import("../scripts/lib/verification-wasm-optimizer.mjs");
+  const environment = verificationWasmCargoEnvironment("/host/work tree", {
+    CARGO_HOME: "/host/cargo home",
+    RUSTUP_HOME: "/host/rustup home",
+    RUSTFLAGS: "--cfg ambient_rustflags_must_not_survive",
+    CARGO_ENCODED_RUSTFLAGS: "ambient encoded flags must not survive",
+  });
+  assert.equal(environment.RUSTFLAGS, undefined);
+  assert.deepEqual(environment.CARGO_ENCODED_RUSTFLAGS.split("\x1f"), [
+    "--remap-path-prefix=/host/work tree=/vector/source",
+    "--remap-path-prefix=/host/cargo home=/vector/cargo",
+    "--remap-path-prefix=/host/rustup home=/vector/rustup",
+  ]);
+  assert.match(VERIFICATION_WASM_BUILD_POLICY, /ambient-flags=discarded/);
+  assert.equal(verificationWasmBuildRuntime("linux", "x64"), "native-linux-amd64");
+  assert.equal(verificationWasmBuildRuntime("linux", "arm64"), "docker-linux-amd64");
+  assert.equal(verificationWasmBuildRuntime("darwin", "arm64"), "docker-linux-amd64");
+  assert.match(VERIFICATION_WASM_LINUX_AMD64_BUILDER, /^rust@sha256:[a-f0-9]{64}$/u);
+  assert.match(VERIFICATION_WASM_BUILD_POLICY, /linux-amd64-rust-1\.97\.1/);
+
+  for (const path of [
+    "scripts/build-generic-aam-verifier.mjs",
+    "scripts/build-tp1538-aero-verifier.mjs",
+  ]) {
+    const builder = await read(path);
+    assert.match(builder, /buildVerificationWasm\(\{ root, manifest, wasmPath, cargo \}\)/);
+    assert.match(builder, /VERIFICATION_WASM_BUILD_POLICY/);
+  }
+});
+
 test("pull-request validation is change-aware with one stable required gate", async () => {
   const [ci, scheduledCodeql] = await Promise.all([
     read(".github/workflows/ci.yml"),

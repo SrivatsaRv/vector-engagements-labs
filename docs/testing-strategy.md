@@ -12,9 +12,18 @@ The #142 gate admits two complete, isolated manual transcripts, reports every st
 
 The admitted corpus must then replay identical full-state results through TypeScript and the generated-schema Rust/WASM verifier, survive bounded UTF-8 record readback, and recover a separate verification-only Worker from the same corpus after termination. Corpus admission replays each resolved state/value and `AGREED_DOUBLE_ENTRY` or `SOURCE_ADJUDICATED` label from the exact embedded transcripts and complete frozen adjudication artifact. That artifact's content digest and comparison raw/canonical binding are part of the corpus digest, so a recomputed top-level digest cannot detach a value from its evidence lineage or collapse two raw-distinct evidence chains. The immutable performance workload binds its corpus, requests, expected results and runtime identity; its executable policy rejects dirty or unidentified measurement state and validates every complete measured output against the frozen result digest. Pre-optimization admission, 4,096-operation batch, Worker, memory and WASM-size limits are maintained in [`tp1538-aero-verification.md`](tp1538-aero-verification.md). `make ci-local`, exact-SHA clean-clone execution, and built-bundle isolation remain completion gates rather than substitutes for the independent numeric workflow.
 
+Verifier freshness also requires the governed Linux/amd64 Rust 1.97.1 target,
+canonical workspace/toolchain paths and Binaryen 131.0.0. A non-Linux-x64
+workstation must use the digest-pinned builder rather than emit host-native
+bytes.
+
 ## Value-free TP-1538 aerodynamic tooling
 
 `make tp1538-adjudication-local` independently exercises the decision CLI over two bounded `TEST_ONLY_SYNTHETIC` mismatches. It proves immutable comparison admission; exact create/apply/validate/freeze state transitions; complete, duplicate-free mismatch coverage; canonical digest naming; exclusive `0444` persistence and raw readback; finalizer consumption; corpus retention/replay of the frozen artifact and comparison raw/canonical binding; raw-distinct evidence-chain identity; and hostile page, coordinate, decision, state/value, rationale, actor, stale-digest, symlink, oversize and tamper rejection. The separate `make tp1538-aero-local` gate regenerates the real workload byte-for-byte and runs real-corpus page oracles, full-state parity, record, Worker-replacement, size and isolation evidence.
+
+The value-free tooling remains host-independent data work. Only the generated
+Rust/WASM verifier is standardized on the digest-pinned Linux/amd64 builder;
+that boundary adds no numeric or adjudication authority.
 
 ## Generic mission-policy Stage-0 source freeze
 
@@ -338,6 +347,12 @@ engine, generic AAM verifier and TP-1538 verifier before rebuilding and
 byte-checking all three artifacts. Release and production workflows install the
 same exact compiler. A floating `stable` toolchain or cached target directory is
 not release evidence.
+The verification builders additionally own Linux/amd64 as their artifact
+target, canonicalize workspace, Cargo and Rustup paths, and replace ambient Rust
+flags. Non-Linux-x64 local gates use the digest-pinned Rust 1.97.1 builder image;
+Linux x64 CI builds natively under the identical compiler, remap policy and
+Binaryen 131.0.0 optimizer. Regression coverage checks the platform decision,
+image digest, exact path-remap flags and both cold artifact freshness commands.
 
 Production verification binds the contract-documentation base and tested head
 to the same admitted SHA. A regression fixture keeps a newer main tip present
