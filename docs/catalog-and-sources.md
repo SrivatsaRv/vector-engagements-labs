@@ -238,7 +238,9 @@ hash or total still fails. Generator freshness plus full bundle verification is
 mandatory in `make ci-quality` through `generic-sensor:sources:verify`.
 The hosted verifier toolchain exposes both `pdftoppm` and `pdfinfo` from the
 same pinned Poppler 26.05.0 image before any quality, web-contract, or
-integration source check; the runner's ambient utilities are not evidence.
+integration source check. Protected production verification restores and
+validates that image before `make ci-local`; the runner's ambient utilities are
+not evidence in CI or delivery.
 
 The corresponding legal artifact keeps redistribution, reference execution,
 and adaptation as independent decisions. Redistribution is

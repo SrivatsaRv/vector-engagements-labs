@@ -28,6 +28,11 @@ Repository administrators retain emergency recovery authority but should not use
 
 ## Continuous integration
 
+The protected Cloudflare verifier provisions the same content-keyed Poppler
+26.05.0 image required by `make ci-local` before entering that gate. A missing
+or substituted renderer therefore fails before migrations or Worker publish,
+while the admitted commit remains the sole contract-document comparison base.
+
 Issue #207 extends the governed contract inventory for the run-information
 projection and the current Worker evidence directory. CI treats the new
 frontend projector, notice, unit/component regressions, migration 019 and
