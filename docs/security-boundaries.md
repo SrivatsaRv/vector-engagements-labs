@@ -298,7 +298,10 @@ Release workflows run from the trusted `main` definition and accept only an
 existing semantic tag in reviewed `main` history. They run the full gate,
 generate checksums and an SPDX SBOM, and attest archives before protected
 publication. Production deploys accept only a full commit SHA in `origin/main`
-history and require the workflow itself to be dispatched from `main`.
+history and require the workflow itself to be dispatched from `main`. The
+protected verification job binds the documentation-impact base to the admitted
+exact SHA, so a later `main` advance cannot change the authority used to verify
+that deployment or a historical rollback.
 
 ## Browser response baseline
 

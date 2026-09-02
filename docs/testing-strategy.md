@@ -329,6 +329,10 @@ matrix rows.
 
 ## Existing baseline
 
+Production verification binds the contract-documentation base and tested head
+to the same admitted SHA. A regression fixture keeps a newer main tip present
+while proving that an older admitted revision remains independently verifiable.
+
 The current Air-combat baseline is BVR `1.3.0` plus WVR and transition at
 `1.2.0`. BVR and WVR produce generic `KILL`; transition produces `NO_EFFECT`.
 The BVR 1.95 s and WVR 20.65 s release-time controls each produce

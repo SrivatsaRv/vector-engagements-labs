@@ -1452,6 +1452,30 @@ test("a supplied merge base is exact and replay-bound", async (t) => {
   );
 });
 
+test("an admitted historical revision verifies against itself after main advances", async (t) => {
+  const fixture = await fixtureRepository();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const admittedSha = fixture.baseSha;
+  await writeFile(join(fixture.root, "lib", "example.ts"), "export const value = 2;\n");
+  await writeFile(join(fixture.root, "docs", "example.md"), "# Example\n\n## Contract\n\nVersion two.\n\n## Other\n\nStable.\n");
+  const newerMainSha = await commit(fixture.root, "advance main after admission");
+
+  const admitted = verifyContractDocImpact({
+    rootDirectory: fixture.root,
+    baseSha: admittedSha,
+    headSha: admittedSha,
+    mergeBaseSha: admittedSha,
+    declaration: { schemaVersion: DECLARATION_SCHEMA, families: [] },
+    policy: { ...policy, canonicalSha256: undefined },
+  });
+
+  assert.equal(runGit(fixture.root, ["rev-parse", "HEAD"]), newerMainSha);
+  assert.notEqual(newerMainSha, admittedSha);
+  assert.equal(admitted.state, "NO_RELEVANT_CHANGES");
+  assert.equal(admitted.baseSha, admittedSha);
+  assert.equal(admitted.headSha, admittedSha);
+});
+
 test("TEST_ONLY is restricted to the registered test surface", async (t) => {
   const fixture = await fixtureRepository();
   t.after(() => rm(fixture.root, { recursive: true, force: true }));

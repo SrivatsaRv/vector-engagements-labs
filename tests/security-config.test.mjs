@@ -43,6 +43,10 @@ test("release and deployment workflows admit reviewed, CI-green main history", a
   assert.match(deploy, /github\.ref == 'refs\/heads\/main'/);
   assert.match(deploy, /merge-base --is-ancestor/);
   assert.match(deploy, /Stage 4: Required PR Gate/);
+  const verifyJob = deploy.match(/\n  verify:\n([\s\S]*?)\n  migrate:/)?.[1];
+  assert.ok(verifyJob, "protected production verification job must exist");
+  assert.match(verifyJob, /ref: \$\{\{ needs\.admit\.outputs\.sha \}\}/);
+  assert.match(verifyJob, /VECTOR_CONTRACT_DOC_BASE_SHA: \$\{\{ needs\.admit\.outputs\.sha \}\}[\s\S]*?run: make ci-local/);
   assert.doesNotMatch(deploy, /npm run db:seed/);
 });
 
