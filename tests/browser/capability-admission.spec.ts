@@ -4,7 +4,13 @@ test("a disabled domain link cannot fall through to the A2A workbench", async ({
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
 
-  await page.goto("/workbench?scenario=a2g-emitter-corridor");
+  // This contract owns the server-rendered admission state, not completion of
+  // late map/telemetry resources left contending after the performance case.
+  // Waiting for the full load event made the first phone navigation depend on
+  // unrelated resource timing in hosted push runs.
+  await page.goto("/workbench?scenario=a2g-emitter-corridor", {
+    waitUntil: "domcontentloaded",
+  });
 
   await expect(page.getByRole("status")).toContainText("A2G unavailable");
   await expect(page.getByText(/outside the active release scope/i)).toBeVisible();
