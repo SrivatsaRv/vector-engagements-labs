@@ -298,8 +298,12 @@ profile/contact-sheet identities without admitting numeric values or equations.
 Hosted quality, web-contract, and post-build integration restore a digest-keyed
 renderer image built once from the SHA-pinned official Poppler 26.05.0 source
 on a pinned Ubuntu base. Both `pdftoppm` and `pdfinfo` come from that image, so
-the mandatory source suite cannot consume an ambient runner tool. Production
-quarantine now covers the entire `fixtures/` tree,
+the mandatory source suite cannot consume an ambient runner tool. Protected
+production verification now restores and validates the same image before
+`make ci-local`, blocking migration and publish when the renderer is absent or
+different. Admitted historical revisions skip the bootstrap only when their
+checked-out source predates the governed installer. The production quarantine
+now covers the entire `fixtures/` tree,
 including public-reference and performance subtrees.
 
 #### Simulation physics

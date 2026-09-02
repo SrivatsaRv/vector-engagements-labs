@@ -84,7 +84,10 @@ The bootstrap rejects any source digest except
 `6fef27ff04f37db43054c86bcdff6128c9fb1f6af4ef3c8b369a7e9abd68d0bb`.
 Its Docker image is cached under a key derived from the installer, Dockerfile,
 and network-denied wrapper, then restored by quality, web-contract, and
-post-build integration instead of compiling independently in each job. Both
+post-build integration instead of compiling independently in each job. The
+protected production verification job restores and validates the same pinned
+renderer before it runs `make ci-local`; deployment cannot proceed using an
+ambient or missing PDF renderer. Both
 `pdftoppm` and `pdfinfo` are built from that source and invoked through the
 same no-network container; Stage 2A depends on the setup job because `npm test`
 executes the mandatory source rerender regression. The cold x86-emulated reproduction completed in

@@ -212,6 +212,12 @@ spending limits and abuse monitoring remain deployment duties.
 
 ## Delivery trust
 
+The protected Cloudflare verification job restores and validates the governed,
+content-keyed Poppler renderer before `make ci-local`. Missing or substituted
+renderer tooling stops delivery before database migration or Worker publish.
+Historical rollback revisions may skip this step only when the admitted source
+does not contain the renderer bootstrap and its own gate does not require it.
+
 Migration 019, the regenerated #207 VSR inventory and the run-information
 projection are subject to existing contract-policy, immutable-record and CI
 checks. No deployment flag can promote unavailable tactical information into a
@@ -399,7 +405,12 @@ substituted community/game material is rejected.
 Hosted source checks resolve both `pdftoppm` and `pdfinfo` through the same
 network-denied, digest-keyed Poppler 26.05.0 image. Quality, web-contract, and
 integration jobs depend on that setup and cannot fall back to an ambient
-runner binary with an ungoverned version.
+runner binary with an ungoverned version. The protected production verifier
+restores and validates this same image before `make ci-local`; a missing or
+different renderer stops delivery before database migration or Worker publish.
+An admitted revision predating the governed bootstrap does not invent or fetch
+that newer toolchain; it executes the verification contract retained in its own
+checked-out source.
 
 Visual release review is a separate technical boundary. `RELEASE_OWNER_REVIEW`
 is manifest-bound to separately content-addressed Darwin-arm64 and Linux-amd64

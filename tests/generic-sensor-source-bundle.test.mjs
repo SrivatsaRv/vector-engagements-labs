@@ -727,11 +727,27 @@ test("release-owner semantic review is non-legal and bound to the exact render s
 
 test("hosted jobs provision the exact renderer before entering the offline gate", () => {
   const workflow = readFileSync(resolve(".github/workflows/ci.yml"), "utf8");
+  const deploymentWorkflow = readFileSync(resolve(".github/workflows/deploy-cloudflare.yml"), "utf8");
   const installerPath = resolve("scripts/install-pinned-poppler-ubuntu.sh");
   const installer = readFileSync(installerPath, "utf8");
   const dockerfile = readFileSync(resolve("scripts/pinned-poppler-ubuntu.Dockerfile"), "utf8");
   const wrapper = readFileSync(resolve("scripts/pinned-pdftoppm-wrapper.sh.in"), "utf8");
   assertHostedRendererProvisioning(workflow, installer, dockerfile, wrapper);
+  const deploymentVerifyJob = deploymentWorkflow.slice(
+    deploymentWorkflow.indexOf("  verify:\n"),
+    deploymentWorkflow.indexOf("  migrate:\n"),
+  );
+  const deploymentCacheAt = deploymentVerifyJob.indexOf("uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830");
+  const deploymentInstallAt = deploymentVerifyJob.indexOf("run: scripts/install-pinned-poppler-ubuntu.sh");
+  const deploymentVerifyAt = deploymentVerifyJob.indexOf("run: make ci-local");
+  assert.equal(
+    (deploymentVerifyJob.match(/if: \$\{\{ hashFiles\('scripts\/install-pinned-poppler-ubuntu\.sh'\) != '' \}\}/gu) ?? []).length,
+    2,
+    "deployment renderer setup must skip only admitted revisions that predate the governed bootstrap",
+  );
+  assert.ok(deploymentCacheAt >= 0, "deployment verification must restore the governed renderer cache");
+  assert.ok(deploymentInstallAt > deploymentCacheAt, "deployment verification must install the governed renderer after cache restore");
+  assert.ok(deploymentVerifyAt > deploymentInstallAt, "deployment verification must provision the renderer before the offline gate");
   assert.ok((statSync(installerPath).mode & 0o111) !== 0, "the hosted renderer bootstrap must be executable");
 
   assert.throws(
