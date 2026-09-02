@@ -12,9 +12,19 @@ test("a disabled domain link cannot fall through to the A2A workbench", async ({
     waitUntil: "domcontentloaded",
   });
 
+  const returnLink = page.getByRole("link", { name: /return to available scenarios/i });
+  await expect.poll(() => returnLink.evaluate((element) =>
+    Object.keys(element).some((key) =>
+      key.startsWith("__reactFiber$") || key.startsWith("__reactInternalInstance$"),
+    ),
+  )).toBe(true);
+  await page.evaluate(() => new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+  ));
+
   await expect(page.getByRole("status")).toContainText("A2G unavailable");
   await expect(page.getByText(/outside the active release scope/i)).toBeVisible();
-  await expect(page.getByRole("link", { name: /return to available scenarios/i })).toBeVisible();
+  await expect(returnLink).toBeVisible();
   await expect(page.getByText(/Su-30MKI \/ Astra versus F-16C/i)).toHaveCount(0);
   expect(runtimeErrors).toEqual([]);
 });
