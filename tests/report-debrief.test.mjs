@@ -109,7 +109,9 @@ test("canonical debrief joins authored profile metadata only to exact recorded c
 test("a DEGRADED effect retains its exact canonical wording without terminal KILL wording", () => {
   const definition = getScenarioDefinition("a2a-crossing-intercept");
   assert.ok(definition?.authoredProfile);
-  const result = simulate(definition.scenario);
+  const scenario = structuredClone(definition.scenario);
+  scenario.airMission.assignments[0].storeTransferPlan.requests[0].requestedTimeSeconds = 2.05;
+  const result = simulate(scenario);
   const debrief = buildCanonicalReportDebrief(result, definition, definition.scenario);
 
   assert.equal(debrief.targetEffect.presentation.effectClass, "DEGRADED");
@@ -142,10 +144,10 @@ test("report export preserves authored profile and debrief while legacy definiti
     exported.result.debrief.causalInputs.releaseRequests[0].installedDragAreaM2,
     0.03,
   );
-  assert.equal(exported.result.debrief.launch.frameIndex, 17);
+  assert.equal(exported.result.debrief.launch.frameIndex, 9);
   assert.equal(
     Number(exported.result.debrief.launch.rangeM.toFixed(6)),
-    36_792.145644,
+    35_478.100283,
   );
   assert.equal(exported.result.debrief.causalInputs.sides.BLUE.route.length, 4);
   assert.equal(exported.result.debrief.causalInputs.sides.RED.route.length, 4);
@@ -186,7 +188,7 @@ test("verified saved-run report preserves the exact optional authored profile", 
 
 test("all three report profiles retain exact causal starts, routes, duration, release, and observer evidence", () => {
   const expectations = [
-    ["a2a-crossing-intercept", "BVR", "direct", 4, 100, 275, 250, ["BOOST", "COAST", "TERMINAL_GUIDANCE", "INTERCEPT"]],
+    ["a2a-crossing-intercept", "BVR", "direct", 2, 100, 275, 250, ["BOOST", "COAST", "TERMINAL_GUIDANCE", "INTERCEPT"]],
     ["a2a-defensive-break", "WVR_BFM", "loft", 20, 45, 260, 235, ["BOOST", "INTERCEPT"]],
     ["a2a-high-energy-crossing-challenge", "UNRESTRICTED_TRANSITION", "direct", 50, 140, 268, 245, ["BOOST", "COAST", "TERMINAL_GUIDANCE", "INTERCEPT"]],
   ];
@@ -247,11 +249,11 @@ test("all three exact reports project canonical launch, aircraft-approach, and a
     blueAltitudeMslM: bvr.launch?.blueAltitudeMslM,
     redAltitudeMslM: bvr.launch?.redAltitudeMslM,
   }, {
-    frameIndex: 17,
-    modelTimeSeconds: 4,
+    frameIndex: 9,
+    modelTimeSeconds: 2,
     relationship: "WEAPON_TO_TARGET",
-    rangeM: 36_792.145644,
-    closureRateMps: 322.564273,
+    rangeM: 35_478.100283,
+    closureRateMps: 520.738483,
     blueAltitudeMslM: 9_500,
     redAltitudeMslM: 8_200,
   });

@@ -40,6 +40,11 @@ Blue uses blue and a round frame; Red uses red and a diamond frame; neutral or u
 
 ## Typed presentation grammar
 
+The BVR defensive-turn label remains an authored-intent annotation. It cannot
+be rendered as sensed threat reaction, autonomous pilot choice, defensive EW,
+data-link support or Red weapon employment; those capability states are
+unavailable in the current compiled run.
+
 The target-effect overlay is a separate typed presentation projection. It joins
 one canonical `TARGET_EFFECT_COMMITTED` event to the exact target frame carrying
 the same commit ID/state and renders nothing from symbol proximity. A terminated
@@ -108,6 +113,13 @@ not claim that a map marker is present. The selection and unavailable grammar
 remains independently testable in the entity legend and component contract;
 tests must not require a MapLibre marker from a fixture that deliberately
 aborts the tile transport.
+
+All three governed basemap modes use the `osm-derived-v1` same-origin proxy
+identity and OpenStreetMap tile authority. Minimal and tactical appearance is a
+renderer-only raster transform. The contract does not accept a successful image
+response from a key-required style endpoint as a valid alternative basemap.
+Launch event text is a four-model-second annotation; the event circle and typed
+record remain available after that label leaves the decluttered surface.
 
 Basemap choice uses the application transient Select, while layer, study-area,
 aircraft-evidence, and weapon-evidence content uses persistent Disclosures.

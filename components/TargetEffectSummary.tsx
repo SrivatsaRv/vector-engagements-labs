@@ -24,10 +24,13 @@ export function TargetEffectSummary({
       data-kill-claim-authorized={String(presentation.killClaimAuthorized)}
     >
       <span>{presentation.label}</span>
-      <strong>{presentation.headline}</strong>
+      <strong>{compact ? presentation.compactHeadline : presentation.headline}</strong>
       {!compact && <p>{presentation.detail}</p>}
       {presentation.assumptionLabel && (
-        <small>{presentation.assumptionLabel}{compact ? " · governed limitations recorded" : " · limitations shown above"}</small>
+        <small>
+          {presentation.assumptionLabel}
+          {!compact && " · limitations shown above"}
+        </small>
       )}
     </section>
   );

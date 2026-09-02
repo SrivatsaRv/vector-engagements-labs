@@ -35,6 +35,8 @@ test("server-renders the Vector Engagement Labs landing page", async () => {
   assert.match(html, /Build the scenario/);
   assert.match(html, /Pick a scenario/);
   assert.match(html, /Reference preview/);
+  assert.match(html, /Open source by design/);
+  assert.doesNotMatch(html, /Advanced tools/);
   assert.doesNotMatch(html, /Instructor Station|Tony Stark/i);
 });
 
@@ -49,7 +51,7 @@ test("server-renders the scenario library and configured workbench", async () =>
     libraryResponse.text(),
     workbenchResponse.text(),
   ]);
-  assert.match(library, /BVR offset and support: Su-30MKI versus F-16C/);
+  assert.match(library, /BVR mutual offset and defensive turn: Su-30MKI versus F-16C/);
   assert.match(library, /WVR one-circle defensive break: Su-30MKI versus F-16C/);
   assert.match(
     library,
@@ -57,13 +59,13 @@ test("server-renders the scenario library and configured workbench", async () =>
   );
   assert.match(library, /Su-30MKI carrying Astra Mk 1/);
   assert.match(library, /PAF F-16C Block 52 carrying AIM-120C-5/);
-  assert.match(library, /Scenario <!-- -->1\.2\.0/);
-  assert.match(library, /All scenarios/);
-  assert.match(library, />9</);
-  assert.match(workbench, /BVR offset and support: Su-30MKI versus F-16C/);
+  assert.match(library, /Scenario <!-- -->1\.3\.0/);
+  assert.doesNotMatch(library, /All scenarios|A2G|G2A|G2G/);
+  assert.doesNotMatch(library, /Air strike: hardened aircraft shelters/);
+  assert.match(workbench, /BVR mutual offset and defensive turn: Su-30MKI versus F-16C/);
   assert.match(
     workbench,
-    /BVR offset and support · Blue OFFSET → SUPPORT → RECOMMIT · Red BEAM → DRAG → EXTEND · authored routes, no autonomous pilot\./,
+    /BVR mutual offset and defensive turn · Blue OFFSET → RECOMMIT → EXTEND · Red OFFSET → DEFENSIVE_BREAK → EXTEND · authored routes, no autonomous pilot\./,
   );
   assert.match(workbench, /Review the configured experiment/);
   assert.match(workbench, /Run baseline/);
@@ -71,6 +73,17 @@ test("server-renders the scenario library and configured workbench", async () =>
     workbench,
     /This confirms model availability, not real-world performance/,
   );
+});
+
+test("server-renders the plain-language About and FAQ page", async () => {
+  const response = await render("/about");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /We are building a realistic warfare simulation platform/);
+  assert.match(html, /Runs fully in your browser/);
+  assert.match(html, /Why open source\?/);
+  assert.match(html, /What is coming next\?/);
+  assert.doesNotMatch(html, /—/);
 });
 
 test("server-renders model transparency and tactical-symbol references", async () => {
@@ -84,7 +97,7 @@ test("server-renders model transparency and tactical-symbol references", async (
     mathResponse.text(),
     symbolsResponse.text(),
   ]);
-  assert.match(math, /Math behind Vector Engagement Labs/);
+  assert.match(math, /How Vector calculates a run/);
   assert.match(math, /Proportional-navigation demand/);
   assert.match(math, /Run termination/);
   assert.match(math, /How a displayed result is traced/);
@@ -184,6 +197,11 @@ test("VECTOR map controls share the MIAR-derived navigation contract", async () 
   assert.match(controls, /BRG/);
   assert.match(mapContract, /TACTICAL/);
   assert.match(mapContract, /vector\.map\.basemap\.v1/);
+  assert.match(mapContract, /osm-derived-v1/);
+  assert.match(mapContract, /OpenStreetMap contributors/);
+  assert.match(mapContract, /vectorRaster/);
+  assert.doesNotMatch(mapContract, /vectorStandard|vectorMinimal|vectorTactical/);
+  assert.doesNotMatch(mapContract, /CARTO|cartocdn/);
   for (const surface of [engagement, authoring]) {
     assert.match(surface, /touchZoomRotate\.enableRotation\(\)/);
     assert.match(surface, /touchPitch\.disable\(\)/);

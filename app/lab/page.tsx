@@ -40,6 +40,7 @@ import { RouteTransitionInspector } from "@/components/RouteTransitionInspector"
 import { TargetEffectSummary } from "@/components/TargetEffectSummary";
 import { CanonicalReportDebrief } from "@/components/CanonicalReportDebrief";
 import { PlatformEvidence } from "@/components/PlatformEvidence";
+import { RunInformationCapabilityNotice } from "@/components/RunInformationCapabilityNotice";
 import { Disclosure } from "@/components/ui/OverlayPrimitives";
 import { applyTacticalLabelPolicy, presentTacticalSymbol } from "@/lib/tactical-symbol-contract";
 import {
@@ -71,8 +72,8 @@ import {
 } from "@/lib/simulation-models";
 import { ENGINE_VERSION } from "@/lib/engine/version";
 import {
+  DEPLOYMENT_CAPABILITIES,
   domainCapability,
-  optionalCapability,
 } from "@/lib/runtime/deployment-capabilities";
 import {
   BrowserSimulationCancelledError,
@@ -121,6 +122,8 @@ import {
   updateScenarioAirMissionRoutePoint,
 } from "@/lib/air-mission";
 import { CURRENT_COMPILED_MODEL_PACK } from "@/lib/engine/weapon-admission";
+import { runtimeObserverSensors } from "@/lib/engine/runtime-model-pack";
+import { projectRunInformationCapabilities } from "@/lib/frontend/information-capability";
 import { MAX_VECTOR_RECORD_BYTES } from "@/lib/record/vector-record";
 import { NumericAuthoringInput } from "@/components/NumericAuthoringInput";
 import {
@@ -659,6 +662,10 @@ function LabWorkbench({
   );
   const selectedGeometry = useMemo(
     () => selectCurrentGeometry(result, selectedDisplayFrame),
+    [result, selectedDisplayFrame],
+  );
+  const selectedTargetEffect = useMemo(
+    () => selectCanonicalTargetEffect(result, selectedDisplayFrame),
     [result, selectedDisplayFrame],
   );
   const selectedRouteTransitions = useMemo(
@@ -1226,7 +1233,7 @@ function LabWorkbench({
             </div>
           </section>
           <aside className="session-right">
-            <Outcome result={result} />
+            <Outcome result={result} targetEffect={selectedTargetEffect} />
             <TrackStateInspector
               selected={selectedTrackState}
               perspective={trackPerspective}
@@ -1766,7 +1773,7 @@ function ConfigureWorkspace({
           </button>
         ))}
       </aside>
-      <div className="builder">
+      <div className={`builder builder-step-${step}`}>
         <div className="builder-scroll">
           <header>
             <span>
@@ -1775,6 +1782,7 @@ function ConfigureWorkspace({
             <h1>{headings[step][1]}</h1>
             <p>{headings[step][2]}</p>
           </header>
+          <div className="builder-step-content">
         {step === 0 && (
           <>
             <div className="configured-note">
@@ -2301,7 +2309,7 @@ function ConfigureWorkspace({
                           <strong>{preset.label}</strong>
                           <small>{preset.description}</small>
                           <em>
-                            ISA {preset.temperatureOffsetC >= 0 ? "+" : ""}{preset.temperatureOffsetC} °C · wind {preset.windEastMps} E / {preset.windNorthMps} N m/s · visibility {preset.visibilityKm} km
+                            ISA {preset.temperatureOffsetC >= 0 ? "+" : ""}{preset.temperatureOffsetC} °C · wind {preset.windEastMps} E / {preset.windNorthMps} N m/s
                           </em>
                         </button>
                       ))}
@@ -2761,20 +2769,24 @@ function ConfigureWorkspace({
                 <dd>{Math.round(atmosphere.speedOfSoundMps)} m/s</dd>
                 <dt>Wind vector</dt>
                 <dd>{scenario.wind} E / {scenario.windNorth} N m/s</dd>
-                <dt>Visibility</dt>
-                <dd>{scenario.visibilityKm} km</dd>
-                <dt>Relative humidity</dt>
-                <dd>{scenario.humidityPercent}%</dd>
               </dl>
               <p>
-                Temperature and both wind components affect the engine. Visibility limits visual-track acquisition. Humidity is recorded for the run but does not yet alter propulsion, drag, radar, or seeker behavior.
+                Temperature changes the density and speed of sound used by the
+                aircraft and weapon models. Both wind components change
+                air-relative velocity. Those values therefore alter aerodynamic
+                drag; only the causal atmosphere values are shown here.
               </p>
             </article>
           </section>
         )}
         {step === 3 && (
           <section className="authoring-section">
-            <CapabilityNotice />
+            <RunInformationCapabilityNotice
+              capabilities={projectRunInformationCapabilities({
+                manifest: DEPLOYMENT_CAPABILITIES,
+                observerSensors: runtimeObserverSensors(CURRENT_COMPILED_MODEL_PACK),
+              })}
+            />
             <Range
               controlId="scenario.wind"
               label="Eastward wind velocity"
@@ -2861,6 +2873,7 @@ function ConfigureWorkspace({
             <ValidationList items={validations} />
           </section>
         )}
+          </div>
         </div>
         <footer className="builder-actions" data-vector-overlay-obstacle="persistent-action-rail">
           <span>
@@ -3390,13 +3403,26 @@ function Playback({
     </div>
   );
 }
-function Outcome({ result }: { result: SimulationResult }) {
+function Outcome({
+  result,
+  targetEffect,
+}: {
+  result: SimulationResult;
+  targetEffect: ReturnType<typeof selectCanonicalTargetEffect>;
+}) {
+  const earned = targetEffect.presentation.state === "RECORDED" ||
+    targetEffect.presentation.state === "NOT_MODELLED";
+  const unavailable = targetEffect.presentation.state === "UNAVAILABLE";
   return (
-    <section className={`outcome ${result.successful ? "success" : "caution"}`}>
-      <span>Model outcome</span>
-      <h2>{result.outcome}</h2>
-      <p>{result.reason}</p>
-      <div>
+    <section
+      className={`outcome ${earned && result.successful ? "success" : "caution"}`}
+      data-effect-state={targetEffect.presentation.state}
+      data-effect-class={targetEffect.presentation.effectClass ?? "NONE"}
+    >
+      <span>{earned ? "Model outcome" : "Selected frame"}</span>
+      <h2>{earned ? result.outcome : unavailable ? "Outcome unavailable" : "Outcome pending"}</h2>
+      <p>{targetEffect.presentation.compactHeadline}</p>
+      {earned && <div>
         <Metric
           label="Closest"
           value={`${Math.round(result.closestApproach)} m`}
@@ -3413,7 +3439,7 @@ function Outcome({ result }: { result: SimulationResult }) {
           label="Peak demand"
           value={`${result.peakDemand.toFixed(1)} g`}
         />
-      </div>
+      </div>}
     </section>
   );
 }
@@ -3446,30 +3472,6 @@ function Comparison({
             </div>
           );
         })}
-      </div>
-    </section>
-  );
-}
-function CapabilityNotice() {
-  const sensors = optionalCapability("sensors");
-  const datalink = optionalCapability("datalink");
-  const ew = optionalCapability("ew");
-  return (
-    <section className="configured-note" role="status">
-      <CircleAlert size={16} />
-      <div>
-        <strong>Information-state availability is deployment governed.</strong>
-        <p>
-          This run uses authored aircraft routes, admitted loadout, frozen
-          environmental inputs, and the admitted public-educational sensor
-          measurement model. Data link, airborne early warning, and virtual-
-          pilot behavior remain unavailable unless their own capability is admitted.
-        </p>
-        <p>
-          Sensors: {sensors.state.toLowerCase().replaceAll("_", " ")}. {sensors.reason}
-          {" "}Data link: {datalink.state.toLowerCase().replaceAll("_", " ")}. {datalink.reason}
-          {" "}EW: {ew.state.toLowerCase().replaceAll("_", " ")}. {ew.reason}
-        </p>
       </div>
     </section>
   );

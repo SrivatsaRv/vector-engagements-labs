@@ -11,6 +11,10 @@ one family must not imply changes to unrelated contracts.
 
 #### Model packs
 
+- Database verification for migration 019 now distinguishes the additional
+  retired BVR scenario version from the unchanged compiled model-pack,
+  intended-use, credibility, loadout, and named-performance authorities.
+
 - Keep the compiled generic aircraft, weapon, credibility and target-effect
   model-pack contracts byte-identical while three new scenario-package versions
   bind those existing identities. Authored tactic names and route profiles do
@@ -117,6 +121,13 @@ promotion remain downstream under #154, later #161 stages and #155.
 
 #### Database schema
 
+- Add forward-only migration 020 for `public-api-admission.v2`. Browser
+  telemetry receives its own 60-request-per-minute durable policy identity and
+  cannot consume the catalog or saved-run API budget; migration 011 remains
+  checksum-frozen.
+- Add forward-only migration 019 for BVR `1.3.0`, preserving and retiring the
+  exact BVR `1.2.0` row while leaving the current WVR and transition packages at
+  `1.2.0`; migration 018 is checksum-frozen and never rewritten.
 - Add forward-only migration 018 for the exact three Air-combat `1.2.0`
   packages, retaining their immutable superseded `1.1.0` rows as `RETIRED` and
   rejecting a conflicting pre-existing package identity on exact readback.
@@ -149,6 +160,9 @@ packages/hashes with canonical v4 packages and rejects mixed or residual rows.
 
 #### Engine ABI
 
+- Rebuild the production Rust/WASM artifact with the shared load-factor clamp
+  and `10^-3 N` aerodynamic-drag boundary. No exported symbol, scenario schema,
+  coefficient, or size ceiling changes.
 - Carry the scenario-owned run duration and governed scenario-package reference
   through the existing prepared-runtime envelope without adding an exported
   Rust/WASM symbol, changing the numerical ABI, or raising the production WASM
@@ -200,6 +214,10 @@ No pending family-specific entry.
 
 #### Generic target effect
 
+- Bind the BVR `1.3.0` package to a reproducible generic `KILL` at 36.000 s and
+  a release-time-only `NO_EFFECT` control at 1.950 s. Both aircraft transition
+  through authored turn legs; the result does not claim autonomous defence,
+  Red weapon employment, or named-system effectiveness.
 - Bind the three 1.2.0 Air-combat studies to the retained generic effect
   authority and prove the WVR `KILL` against a release-time-only non-kill
   control. Update selector, map, report, replay and legacy `NOT_MODELLED`
@@ -286,6 +304,11 @@ including public-reference and performance subtrees.
 
 #### Simulation physics
 
+- Use the exact admitted load-factor ceiling after route-command limiting and
+  canonicalize recorded aerodynamic-drag telemetry at `10^-3 N` after raw force
+  evaluation and on the exact airborne-transfer boundary frame. TypeScript and
+  Rust/WASM now retain identical VSR frame bytes across supported Linux and
+  macOS hosts without changing the force used for motion or thrust demand.
 - Consume a committed weapon-termination receipt and same-frame target state in
   one deterministic generic target-effect evaluator. Emit one causal
   `TARGET_EFFECT_COMMITTED` event and let it own any exactly-once target
@@ -344,6 +367,9 @@ No pending family-specific entry.
 
 #### Browser Worker protocol
 
+- Expand the unchanged built-Worker protocol gate to BVR `1.3.0`, WVR and
+  transition plus BVR/WVR release-only controls; regenerate and independently
+  reopen the five exact #207 records without changing message shapes.
 The prepared request now binds the optional governed scenario-package
 ID/version/content hash and scenario-owned run duration before execution. The
 message inventory and transfer protocol are unchanged; Worker admission rejects
@@ -372,6 +398,10 @@ No pending family-specific entry.
 
 #### Vector simulation records
 
+- Retain a new #207 evidence inventory for the three current studies and two
+  matched controls while preserving #197 as immutable historical evidence.
+  Exact package mismatch continues to fail without replacing the prior verified
+  record state.
 - Bind the exact governed scenario package ID, version and content hash across
   browser runtime and VSR compiled/manifest/report artifacts, with malformed and
   divergent-reference rejection and legacy read compatibility.
@@ -454,6 +484,11 @@ writer/reader, Worker, or replay behavior.
 
 #### Capability descriptors
 
+- Project run information availability from both deployment policy and the
+  exact compiled model pack. Missing sensors, data link, EW, or virtual-pilot
+  authority now remains visibly unavailable even if a deployment switch is on;
+  non-causal visibility and humidity values are removed from the authoring
+  atmosphere card.
 - Give live authoring controls stable semantic IDs and block Run while an
   editable numeric control contains raw text that has not passed syntax, range,
   integer and precision admission. Repeat structured type/range/precision,
@@ -473,6 +508,10 @@ writer/reader, Worker, or replay behavior.
 
 #### Mission scenarios
 
+- Publish governed BVR `1.3.0` with Blue offset/recommit and Red authored
+  defensive-turn geometry, a 2.000 s generic release, a canonical 36.000 s
+  `KILL`, and a one-field 1.950 s `NO_EFFECT` control. Red retains both AIM-120
+  stores and has no autonomous response or launch capability.
 - Publish governed `1.2.0` BVR offset/support, WVR one-circle/defensive-break,
   and beam/drag/extend/recommit Su-30MKI/F-16 study packages with exact
   four-point routes, explicit release times and scenario-owned run durations.
@@ -571,6 +610,19 @@ introduced.
 - Engineering principles for the open-source simulation-library boundary, SOLID design, twelve-factor operation, and release evidence.
 
 ### Changed
+
+- Public navigation now exposes only deployment-admitted Air-to-air studies,
+  adds a concise About and three-question FAQ page, serves the Vector `V` as a
+  framework-owned browser icon, and keeps expanded telemetry, reports, and
+  mathematical disclosures contained from 320-pixel phones through QHD
+  monitors without changing scenario or engine authority.
+- Corrected the Observe and saved-report presentation contract: all governed
+  basemap modes now share one versioned key-free OpenStreetMap raster source and
+  cache identity, launch annotations retire after four model seconds, compact
+  telemetry keeps `MODEL_ASSUMPTION` without duplicating detailed target-effect
+  prose, short-wide maps restore bounded tactical-label scale, and saved reports
+  retain exact run reasons plus semantic run/route tables and screen disclosures
+  that expand for print.
 
 - Docker Compose now runs self-contained production, migration, and local-seed
   bundles from one `VECTOR_IMAGE`; database and telemetry values are supplied

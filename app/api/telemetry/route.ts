@@ -15,7 +15,7 @@ function duration(value: unknown, maximumMs: number) {
 export async function POST(request: Request) {
   return withObservedRoute("/api/telemetry", request, async () => {
     try {
-      await enforceRateLimit(request, "PUBLIC_API_RATE_LIMITER");
+      await enforceRateLimit(request, "BROWSER_TELEMETRY_RATE_LIMITER");
       const raw = await readBoundedJson(request, MAX_TELEMETRY_BYTES);
       if (!raw || typeof raw !== "object") throw new PublicApiError(400, "invalid_telemetry_event");
       const payload = raw as Record<string, unknown>;

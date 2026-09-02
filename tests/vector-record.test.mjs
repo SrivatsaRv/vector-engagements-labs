@@ -1491,6 +1491,8 @@ test("VSR rejects a jointly resealed unretained target-effect authority before r
 
   const modelMaterial = structuredClone(retainedAuthority.models[0]);
   delete modelMaterial.digest;
+  modelMaterial.thresholds.killMaximumDistanceM = 1;
+  modelMaterial.thresholds.missionKillMaximumDistanceM = 2;
   modelMaterial.thresholds.degradedMaximumDistanceM = 24;
   const resealedModel = createTargetEffectModelForAuthority(modelMaterial);
   const resealedAuthority = createTargetEffectAuthority({
@@ -2901,7 +2903,7 @@ test("VSR rejects removal and replacement of the declared lifetime-minimum witne
   );
 });
 
-test("VSR rejects a geometric intercept whose target is terminal in the event frame", async () => {
+test("VSR rejects a kill-class geometric intercept whose target remains active in the event frame", async () => {
   const scenario = scenarioById("a2a-crossing-intercept");
   const result = simulate(scenario);
   assert.equal(result.engineRun.events.state, "AVAILABLE");
@@ -2922,8 +2924,8 @@ test("VSR rejects a geometric intercept whose target is terminal in the event fr
     (entity) => entity.id === terminal.payload.targetId,
   );
   assert.ok(target);
-  assert.equal(target.lifecycle, "ACTIVE");
-  target.lifecycle = "TERMINATED";
+  assert.equal(target.lifecycle, "TERMINATED");
+  target.lifecycle = "ACTIVE";
   const corrupt = await replaceRecordMember(
     record,
     "frames.arrow",
@@ -2933,7 +2935,7 @@ test("VSR rejects a geometric intercept whose target is terminal in the event fr
   const serialized = serializeVectorRecord(corrupt);
   await assert.rejects(
     openVectorSimulationRecord(serialized.buffer, serialized.byteLength),
-    /invalid authority, ownership, or achieved frame state/,
+    /invalid authority, causality, ownership, or frame state/,
   );
 });
 

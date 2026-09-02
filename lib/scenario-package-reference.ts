@@ -14,6 +14,7 @@ export type ScenarioPackageReference = {
 /** Append-only deployment authority; historical entries remain for VSR creation. */
 export const RETAINED_SCENARIO_PACKAGE_REFERENCES = Object.freeze([
   ["a2a-crossing-intercept", "1.2.0", "680bc9267b5c067e6d56560e112de5d2941380d04bfc59aa8743ba8dc5e2c090"],
+  ["a2a-crossing-intercept", "1.3.0", "37c9dbe963e7663562665e6368071f97aa563d60c45ee86cebe607b9437275e4"],
   ["a2a-defensive-break", "1.2.0", "83e6657dea3f9b246a19125a5d62a616c477a4d364d5fb6823aa608ec53534c5"],
   ["a2g-emitter-corridor", "1.1.0", "4ae5abeb246d0547e82e21e14cc0a7cf0511f02801465adb7f3268ba1a31d329"],
   ["a2g-protected-node", "1.1.0", "ee2aa9199f0241a7a705328a6d0eefe91d4cde0dffbc21647fe341cda084c2a6"],

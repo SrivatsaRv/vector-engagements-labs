@@ -35,7 +35,7 @@ export function verifyAirCombatEvidenceDirectory<TSignature>({
   assert.deepEqual(
     trackedInventory,
     inventory,
-    "Tracked issue #197 evidence inventory is missing or stale; regenerate it with --write-air-combat-evidence.",
+    "Tracked issue #207 evidence inventory is missing or stale; regenerate it with --write-air-combat-evidence.",
   );
   const expectedFiles = [
     "air-combat-study-evidence.json",
@@ -44,19 +44,19 @@ export function verifyAirCombatEvidenceDirectory<TSignature>({
   assert.deepEqual(
     readdirSync(directory).sort(),
     expectedFiles,
-    "Tracked issue #197 evidence directory must contain exactly the governed inventory and four VSRs.",
+    "Tracked issue #207 evidence directory must contain exactly the governed inventory and five VSRs.",
   );
   for (const artifact of generated) {
     const archiveBytes = readFileSync(resolve(directory, artifact.filename));
     assert.equal(
       archiveBytes.byteLength,
       artifact.byteLength,
-      `Tracked issue #197 evidence ${artifact.filename} has a stale byte length.`,
+      `Tracked issue #207 evidence ${artifact.filename} has a stale byte length.`,
     );
     assert.deepEqual(
       signatureOf(archiveBytes),
       artifact.signature,
-      `Tracked issue #197 evidence ${artifact.filename} is semantically stale.`,
+      `Tracked issue #207 evidence ${artifact.filename} is semantically stale.`,
     );
   }
 }

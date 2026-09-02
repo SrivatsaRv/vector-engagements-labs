@@ -46,33 +46,38 @@ const EDITORIAL_DIAGRAMS = {
 type EditorialDiagramId = keyof typeof EDITORIAL_DIAGRAMS;
 
 function renderMarkdown(tokens: Tokens.Generic[]): ReactNode[] {
-  return tokens.flatMap((token, index) => {
+  const rendered: ReactNode[] = [];
+  tokens.forEach((token, index) => {
     switch (token.type) {
       case "code":
         if (token.lang === "editorial-diagram") {
           const diagramId = token.text.trim() as EditorialDiagramId;
           const diagram = EDITORIAL_DIAGRAMS[diagramId];
           if (diagram) {
-            return [
+            rendered.push(
               <BlogEditorialDiagram
                 key={`editorial-diagram-${index}`}
                 {...diagram}
               />,
-            ];
+            );
+            return;
           }
         }
         if (token.lang === "mermaid") {
-          return [<MermaidDiagram key={`mermaid-${index}`} code={token.text} />];
+          rendered.push(<MermaidDiagram key={`mermaid-${index}`} code={token.text} />);
+          return;
         }
-        return [
+        rendered.push(
           <pre key={`pre-${index}`} className="blog-post-code">
             <code>{token.text}</code>
           </pre>,
-        ];
+        );
+        return;
       default:
-        return renderBlogMarkdown([token]);
+        rendered.push(...renderBlogMarkdown([token]));
     }
   });
+  return rendered;
 }
 
 export function generateStaticParams() {

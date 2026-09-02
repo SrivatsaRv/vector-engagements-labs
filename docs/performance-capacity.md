@@ -245,6 +245,11 @@ built Worker growth, Chromium initialization and 100-run retained-memory soak
 to the existing engine latency and capacity matrix. Passing parity does not
 waive any size, load, memory or scenario-throughput row.
 
+The shared load-factor clamp and millinewton aerodynamic-drag boundary do not add
+an iteration, allocation, Worker message, or frame column. Existing engine,
+record, browser cadence, memory, VSR-size, and optimized-WASM limits remain the
+release alarms for this numerical stabilization.
+
 Issue #190 preserves the 75 ms p95 limit for the eight historical scenario
 workloads and adds an explicit 110 ms p95 tier for the ninth high-energy
 crossing challenge. Each backend still runs two complete warmup rounds and 25
@@ -343,8 +348,9 @@ byte-for-byte flat from run one through run 100. The governed bounds are 16 MiB
 absolute retained growth, at most 10% relative regression, and zero additional
 growth after the first run.
 
-Issue #197 adds `performance:air-combat-studies:verify`, a focused exact-package
-gate over the BVR offset/support, WVR one-circle/defensive-break and
+Issue #207 retains `performance:air-combat-studies:verify` as a focused
+exact-package gate over the BVR mutual-offset/defensive-turn, WVR
+one-circle/defensive-break and
 beam/drag/extend/recommit transition studies through both TypeScript and
 Rust/WASM. Seven measured runs per package/backend retain separate nearest-rank
 p50, p95 and maximum values for engine execution, VSR creation/serialization,

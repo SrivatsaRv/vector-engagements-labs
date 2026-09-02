@@ -9,6 +9,7 @@ import {
 type SecurityRuntimeEnv = Cloudflare.Env & {
   METRICS_BEARER_TOKEN?: string;
   PUBLIC_API_RATE_LIMITER?: RateLimit;
+  BROWSER_TELEMETRY_RATE_LIMITER?: RateLimit;
   TILE_RATE_LIMITER?: RateLimit;
 };
 
@@ -63,7 +64,11 @@ export async function publicApiAdmissionStatus() {
     } as const;
   }
   const env = await runtimeEnv();
-  const ready = Boolean(env?.PUBLIC_API_RATE_LIMITER && env.TILE_RATE_LIMITER);
+  const ready = Boolean(
+    env?.PUBLIC_API_RATE_LIMITER &&
+      env.BROWSER_TELEMETRY_RATE_LIMITER &&
+      env.TILE_RATE_LIMITER,
+  );
   return {
     policyVersion: PUBLIC_API_ADMISSION_POLICY_VERSION,
     runtime: "cloudflare",

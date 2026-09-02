@@ -23,8 +23,8 @@ import {
 const EXPECTED = [
   {
     id: "a2a-crossing-intercept",
-    version: "1.2.0",
-    profileId: "bvr-offset-and-support",
+    version: "1.3.0",
+    profileId: "bvr-mutual-offset-defensive-turn",
     regime: "BVR",
     durationSeconds: 100,
     bluePoints: 4,
@@ -181,6 +181,72 @@ test("the WVR study records a canonical KILL and a release-time-only control doe
     controlled.frames.at(-1).entities.find(({ id }) => id === "red-object-1")?.lifecycle,
     "ACTIVE",
   );
+});
+
+test("the versioned BVR study records KILL after both authored route transitions and a nearby release control does not", () => {
+  const definition = SCENARIO_LIBRARY.find(({ id }) => id === "a2a-crossing-intercept");
+  assert.ok(definition);
+  const baseline = simulateWithCapabilitiesForVerification(
+    definition.scenario,
+    createVerificationDeploymentCapabilities("typescript", ["A2A"]),
+  );
+  const baselineEffect = effect(baseline);
+  const finalFrame = baseline.frames.at(-1);
+  const blue = finalFrame.entities.find(({ id }) => id === "blue-platform-1");
+  const red = finalFrame.entities.find(({ id }) => id === "red-object-1");
+
+  assert.equal(definition.version, "1.3.0");
+  assert.equal(baselineEffect.presentation.effectClass, "KILL");
+  assert.equal(baselineEffect.presentation.killClaimAuthorized, true);
+  assert.equal(baseline.timeOfFlight, 36);
+  assert.equal(Number(baseline.closestApproach.toFixed(6)), 2.438845);
+  assert.equal(blue?.aircraftControl?.routePointIndex, 2);
+  assert.equal(red?.aircraftControl?.routePointIndex, 2);
+  assert.equal(red?.lifecycle, "TERMINATED");
+  assert.deepEqual(red?.installedStoreIds, ["red-weapon-1", "red-weapon-2"]);
+
+  const control = structuredClone(definition.scenario);
+  control.airMission.assignments[0].storeTransferPlan.requests[0].requestedTimeSeconds = 1.95;
+  const controlled = simulateWithCapabilitiesForVerification(
+    control,
+    createVerificationDeploymentCapabilities("typescript", ["A2A"]),
+  );
+  assert.equal(effect(controlled).presentation.effectClass, "NO_EFFECT");
+  assert.equal(
+    controlled.frames.at(-1).entities.find(({ id }) => id === "red-object-1")?.lifecycle,
+    "ACTIVE",
+  );
+});
+
+test("the BVR KILL survives independently frozen defensive-turn geometry neighbors", () => {
+  const definition = SCENARIO_LIBRARY.find(({ id }) => id === "a2a-crossing-intercept");
+  assert.ok(definition);
+  const neighbors = [
+    [
+      { longitude: 74.24091543426084, latitude: 31.783046626235567, altitudeM: 8200, verticalDatum: "MSL" },
+      { longitude: 74.36738343622699, latitude: 31.746915627958533, altitudeM: 8200, verticalDatum: "MSL" },
+    ],
+    [
+      { longitude: 74.24063397998839, latitude: 31.78362764993978, altitudeM: 8200, verticalDatum: "MSL" },
+      { longitude: 74.36710288409927, latitude: 31.74749693155824, altitudeM: 8200, verticalDatum: "MSL" },
+    ],
+  ];
+
+  for (const [third, fourth] of neighbors) {
+    const scenario = structuredClone(definition.scenario);
+    scenario.spatialPlan.red.route[2] = third;
+    scenario.spatialPlan.red.route[3] = fourth;
+    const result = simulateWithCapabilitiesForVerification(
+      scenario,
+      createVerificationDeploymentCapabilities("typescript", ["A2A"]),
+    );
+    assert.equal(effect(result).presentation.effectClass, "KILL");
+    assert.ok(result.closestApproach < 4);
+    assert.equal(
+      result.frames.at(-1).entities.find(({ id }) => id === "red-object-1")?.aircraftControl?.routePointIndex,
+      2,
+    );
+  }
 });
 
 test("authored profile labels cannot change canonical engine state", () => {

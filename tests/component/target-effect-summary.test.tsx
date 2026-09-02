@@ -28,4 +28,20 @@ describe("TargetEffectSummary", () => {
     expect(summary).toHaveTextContent(/scored a modeled kill/i);
     expect(summary).toHaveTextContent(/MODEL_ASSUMPTION limitations:/);
   });
+
+  it("keeps the assumption authority in the compact template without repeating model detail", () => {
+    const result = createReferencePreview(
+      getScenarioDefinition("a2a-defensive-break")!.scenario,
+    );
+    const selection = selectCanonicalTargetEffect(
+      result,
+      selectDisplayFrame(result, result.timeOfFlight),
+    );
+    render(<TargetEffectSummary selection={selection} compact />);
+
+    const summary = screen.getByRole("region", { name: "Canonical target effect" });
+    expect(summary).toHaveTextContent(/Modeled kill.*F-16C Block 52 terminated at effect frame/i);
+    expect(summary).toHaveTextContent("MODEL_ASSUMPTION");
+    expect(summary).not.toHaveTextContent(/generic educational model|limitations shown above/i);
+  });
 });

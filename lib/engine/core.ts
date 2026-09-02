@@ -135,6 +135,7 @@ function refreshRuntimeStateSnapshot(target: RuntimeState, source: RuntimeState)
 
 const G0 = 9.80665;
 const PUBLISHED_NONNEGATIVE_EVENT_SCALAR_SCALE = 1_000_000;
+const CANONICAL_RECORDED_DRAG_SCALE = 1_000;
 
 function canonicalNonnegativeEventScalar(value: number) {
   if (!Number.isFinite(value) || value < 0) {
@@ -142,6 +143,14 @@ function canonicalNonnegativeEventScalar(value: number) {
   }
   return Math.round(value * PUBLISHED_NONNEGATIVE_EVENT_SCALAR_SCALE)
     / PUBLISHED_NONNEGATIVE_EVENT_SCALAR_SCALE;
+}
+
+function canonicalRecordedDragNewtons(value: number) {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error("Canonical aerodynamic drag is outside its domain.");
+  }
+  return Math.round(value * CANONICAL_RECORDED_DRAG_SCALE)
+    / CANONICAL_RECORDED_DRAG_SCALE;
 }
 
 function interpolateTable(table: import("./contracts.ts").EngineTable1D, input: number) {
@@ -582,6 +591,9 @@ function updateKinematicEntity(
   const steeringLimited =
     magnitude(requestedSteeringAcceleration) >
     magnitude(acceptedSteeringAcceleration) + 1e-9;
+  const acceptedSteeringG = steeringLimited
+    ? model.maximumCommandG
+    : magnitude(acceptedSteeringAcceleration) / G0;
   const environment = sampledEnvironment(scenario, environmentSampler, state.position, time);
   const atmosphere = environment.atmosphere;
   const airRelative = subtract(state.velocity, activeWind(scenario, time, environment.windEnuMps));
@@ -589,7 +601,7 @@ function updateKinematicEntity(
   let longitudinalAcceleration = 0;
   {
     const dynamicPressure = Math.max(1, 0.5 * atmosphere.densityKgM3 * airspeed * airspeed);
-    const steeringG = magnitude(acceptedSteeringAcceleration) / G0;
+    const steeringG = acceptedSteeringG;
     const loadFactor = Math.sqrt(1 + steeringG * steeringG);
     const liftCoefficient =
       (state.massKg * G0 * loadFactor) /
@@ -617,10 +629,12 @@ function updateKinematicEntity(
       model.emptyMassKg + state.storeMassKg,
       state.massKg - consumed,
     );
-    state.dragNewtons = drag;
+    // Motion retains the raw force above. Only recorded drag telemetry crosses
+    // this millinewton boundary, removing host-specific last-bit VSR drift.
+    state.dragNewtons = canonicalRecordedDragNewtons(drag);
     state.thrustNewtons = state.fuelKg > 0 ? thrustDemand : 0;
     longitudinalAcceleration =
-      (state.thrustNewtons - state.dragNewtons) / state.massKg;
+      (state.thrustNewtons - drag) / state.massKg;
     state.availableG = model.maximumCommandG;
   }
   const nextSpeed = Math.max(60, speed + longitudinalAcceleration * dt);
@@ -634,7 +648,7 @@ function updateKinematicEntity(
       : scale(normalize(steeredVelocity), nextSpeed);
   state.headingRad = Math.atan2(state.velocity.y, state.velocity.x);
   state.position = add(state.position, scale(state.velocity, dt));
-  state.commandedG = magnitude(acceptedSteeringAcceleration) / G0;
+  state.commandedG = acceptedSteeringG;
   state.phase = routePoint ? "Following route" : "Route complete";
   state.aircraftOperationalState = "ENROUTE";
   state.aircraftControl = {
@@ -694,7 +708,7 @@ function updateGroundAircraft(
   if (state.fuelKg < operation.minimumTakeoffFuelKg) {
     throw new Error("[GROUND_TAKEOFF_FUEL_EXHAUSTED] Fuel fell below the admitted takeoff minimum.");
   }
-  state.dragNewtons = drag;
+  state.dragNewtons = canonicalRecordedDragNewtons(drag);
   state.thrustNewtons = thrust;
   state.availableG = model.maximumCommandG;
 
@@ -899,7 +913,9 @@ function activateWeapon(
         0,
         priorDragAreaM2 - transfer.installedDragAreaM2,
       );
-      launcher.dragNewtons = Math.max(0, launcher.dragNewtons - transferredDragNewtons);
+      launcher.dragNewtons = canonicalRecordedDragNewtons(
+        Math.max(0, launcher.dragNewtons - transferredDragNewtons),
+      );
       launcher.storeMassKg -= weapon.launchMassKg;
       launcher.massKg -= weapon.launchMassKg;
       // The integrator retains the full binary64 value; only the published
@@ -957,7 +973,7 @@ function updateWeapon(
     );
     state.velocity = add(state.velocity, scale(acceleration, dt));
     state.position = add(state.position, scale(state.velocity, dt));
-    state.dragNewtons = drag;
+    state.dragNewtons = canonicalRecordedDragNewtons(drag);
     state.thrustNewtons = 0;
     state.commandedG = 0;
     state.phase = "Jettisoned";
@@ -994,8 +1010,7 @@ function updateWeapon(
   const airspeed = Math.max(1, magnitude(airRelativeVelocity));
   const direction = normalize(state.velocity);
   const dynamicPressure = 0.5 * atmosphere.densityKgM3 * airspeed * airspeed;
-  const drag =
-    dynamicPressure * weapon.dragCoefficient * weapon.referenceAreaM2;
+  const drag = dynamicPressure * weapon.dragCoefficient * weapon.referenceAreaM2;
   const burning = sinceLaunch >= 0 && sinceLaunch < weapon.burnSeconds;
   const taperStart = weapon.thrustTaperSpeedMps * 0.9;
   const taperEnd = weapon.thrustTaperSpeedMps * 1.08;
@@ -1095,7 +1110,7 @@ function updateWeapon(
   state.headingRad = Math.atan2(state.velocity.y, state.velocity.x);
   state.commandedG = magnitude(guidanceAcceleration) / G0;
   state.availableG = weapon.maximumCommandG;
-  state.dragNewtons = drag;
+  state.dragNewtons = canonicalRecordedDragNewtons(drag);
   state.thrustNewtons = thrust;
   state.phase = burning
     ? "Powered flight"

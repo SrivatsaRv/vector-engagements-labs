@@ -37,7 +37,7 @@ try {
   assert.equal(health.status, 200);
   const healthPayload = await health.json();
   assert.equal(healthPayload.status, "ready");
-  assert.equal(healthPayload.publicApiAdmission.policyVersion, "public-api-admission.v1");
+  assert.equal(healthPayload.publicApiAdmission.policyVersion, "public-api-admission.v2");
   assert.equal(healthPayload.publicApiAdmission.ready, true);
   assert.ok(
     ["postgres-fixed-window", "cloudflare-rate-limiting"].includes(
@@ -269,7 +269,7 @@ try {
   const mathPage = await fetch(`${baseUrl}/math`);
   assert.equal(mathPage.status, 200);
   const mathHtml = await mathPage.text();
-  assert.match(mathHtml, /Math behind Vector Engagement Labs/);
+  assert.match(mathHtml, /How Vector calculates a run/);
   assert.match(mathHtml, /How a displayed result is traced/);
   assert.match(mathHtml, /Subsonic trim flyout reproduced within tolerance/);
   assert.match(mathHtml, /maximum position error/);

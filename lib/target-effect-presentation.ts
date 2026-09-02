@@ -103,6 +103,7 @@ export type TargetEffectPresentation = {
   effectClass: TargetEffectClass | null;
   label: string;
   headline: string;
+  compactHeadline: string;
   detail: string;
   tone: "neutral" | "caution" | "adverse";
   assumptionLabel: "MODEL_ASSUMPTION" | null;
@@ -255,6 +256,7 @@ export function presentTargetEffect(
       effectClass: null,
       label: "Effect pending",
       headline: "No target effect has occurred at this frame",
+      compactHeadline: `Boundary ${selected.effectTimeSeconds.toFixed(3)} s`,
       detail: `The recorded effect boundary is frame ${selected.effectFrameIndex} at ${selected.effectTimeSeconds.toFixed(3)} s.`,
       tone: "neutral",
       assumptionLabel: null,
@@ -267,6 +269,7 @@ export function presentTargetEffect(
       effectClass: null,
       label: "Not modelled",
       headline: "Target effect was not modelled",
+      compactHeadline: "No governed result",
       detail: "The recorded weapon termination carries no governed target-effect result, and the target lifecycle is unchanged by it.",
       tone: "caution",
       assumptionLabel: null,
@@ -279,6 +282,7 @@ export function presentTargetEffect(
       effectClass: null,
       label: "Record unavailable",
       headline: "Target-effect evidence is unavailable",
+      compactHeadline: "Evidence unavailable",
       detail: `The selected frame cannot present a governed target-effect result (${selected.reason}).`,
       tone: "caution",
       assumptionLabel: null,
@@ -303,6 +307,7 @@ export function presentTargetEffect(
       ...common,
       label: "No modeled effect",
       headline: "The target retained its recorded capability state",
+      compactHeadline: "No effect recorded",
       detail: assumptionDetail,
       tone: "neutral",
     };
@@ -312,6 +317,7 @@ export function presentTargetEffect(
       ...common,
       label: "Target degraded",
       headline: "The model recorded degraded target capability",
+      compactHeadline: "Capability degraded",
       detail: assumptionDetail,
       tone: "caution",
     };
@@ -321,6 +327,7 @@ export function presentTargetEffect(
       ...common,
       label: "Mission-disabled",
       headline: "The model recorded loss of mission capability",
+      compactHeadline: "Mission capability lost",
       detail: assumptionDetail,
       tone: "adverse",
     };
@@ -330,6 +337,7 @@ export function presentTargetEffect(
       ...common,
       label: "Effect unavailable",
       headline: "No governed target-effect result is available",
+      compactHeadline: "Governed result unavailable",
       detail: assumptionDetail,
       tone: "caution",
     };
@@ -343,6 +351,7 @@ export function presentTargetEffect(
       effectClass: null,
       label: "Record unavailable",
       headline: "Target-effect evidence is unavailable",
+      compactHeadline: "Evidence unavailable",
       detail: "The recorded terminal-effect class does not agree with the target lifecycle at the exact effect frame.",
       tone: "caution",
       assumptionLabel: null,
@@ -355,6 +364,7 @@ export function presentTargetEffect(
     ...common,
     label: "Modeled kill",
     headline: `${weapon} scored a modeled kill against ${target}`,
+    compactHeadline: `${target} terminated at effect frame`,
     detail: assumptionDetail,
     tone: "adverse",
     killClaimAuthorized: true,

@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { CircleHelp, Layers3 } from "lucide-react";
 import { VectorMapControls, type MapCameraTelemetry } from "@/components/VectorMapControls";
 import { Disclosure } from "@/components/ui/OverlayPrimitives";
-import { TargetEffectSummary } from "@/components/TargetEffectSummary";
 import type { RaspTrack, SimulationResult } from "@/lib/simulation";
 import { tacticalSymbolMarkup } from "@/lib/tactical-symbol-markup";
 import {
@@ -344,10 +343,12 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
           filter: ["<=", ["get", "modelTime"], 0],
           minzoom: 6,
           layout: {
-            "text-field": ["concat", ["get", "label"], " · T+", ["to-string", ["get", "modelTime"]], "s"],
+            "text-field": ["concat", "Launch · ", ["to-string", ["get", "modelTime"]], " s"],
             "text-size": 10,
-            "text-offset": [7, 3.4],
+            "text-offset": [1.2, 1.8],
             "text-anchor": "top-left",
+            "text-allow-overlap": false,
+            "text-ignore-placement": false,
           },
           paint: { "text-color": "#34424c", "text-halo-color": "#ffffff", "text-halo-width": 1 },
         });
@@ -577,9 +578,17 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
         displayTimeSeconds,
       ];
       const launchLabelFilter: import("maplibre-gl").FilterSpecification = [
-        "<=",
-        ["get", "modelTime"],
-        displayTimeSeconds - result.engineRun.diagnostics.fixedStepSeconds / 2,
+        "all",
+        [
+          "<=",
+          ["get", "modelTime"],
+          displayTimeSeconds - result.engineRun.diagnostics.fixedStepSeconds / 2,
+        ],
+        [
+          ">=",
+          ["get", "modelTime"],
+          displayTimeSeconds - 4,
+        ],
       ];
       map.setFilter("launch-events", launchFilter);
       // At the exact transfer frame the guided-store marker is the primary
@@ -601,8 +610,8 @@ export function EngagementMap({ result, selected, installations, raspTrack, layo
       data-declared-route-feature-count={declaredRouteFeatureCount}
       data-achieved-trail-feature-count={achievedTrailFeatureCount}
       data-launched-store-count={launchedStoreCount}
+      data-launch-label-window-seconds="4"
     >
-      <TargetEffectSummary selection={targetEffect} compact />
       <div className="map-scope-switch" aria-label="Map extent">
         <button
           className={mapScope === "ENGAGEMENT" ? "active" : ""}

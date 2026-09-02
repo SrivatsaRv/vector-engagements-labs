@@ -12,18 +12,21 @@ export const BROWSER_PROJECTS = Object.freeze([
   "desktop-1440",
   "full-hd",
 ]);
-export const BROWSER_CASES_PER_PROJECT = 15;
+export const BROWSER_CASES_PER_PROJECT = 18;
 export const BROWSER_CASE_TITLES = Object.freeze([
   "a disabled domain link cannot fall through to the A2A workbench",
   "Peace Drive I evidence is visibly context-only and fitted EW remains unknown",
+  "public release pages stay simple and contained across supported displays",
   "canonical report debrief remains exact, contained, and printable",
   "the unedited BVR package remains MATCHED across canonical Map and 3D presentation",
+  "short-wide BVR playback keeps key-free tiles, labels, controls, and frame-earned copy separate",
   "browser presentation changes only at the canonical target-effect frame",
   "the close-merge WVR effect remains canonical and labels exact authored intent",
   "the BVR Air study keeps every playback and outcome surface on one canonical frame",
   "the WVR Air study keeps every playback and outcome surface on one canonical frame",
   "the transition Air study keeps every playback and outcome surface on one canonical frame",
   "an invalid non-spatial numeric draft cannot be bypassed by changing builder steps",
+  "QHD Define uses one readable task measure without a detached action rail",
   "duration and replay seed use governed raw admission before builder navigation",
   "shared transient controls hand off once and remain accessible, contained, and stable",
   "a current deployment manifest drives the real Worker run after route recovery",

@@ -115,6 +115,12 @@ Use the smallest complete set for a change. State why any applicable layer was o
 
 ## Pre-engine control admission regression
 
+The BVR `1.3.0` regression compiles the unedited package and the 1.950 s
+release-only control through the same structured and final mission admission
+path. Route, duration, speed, fuel, wind and temperature domains retain their
+shared numeric authorities; capability projection is presentation-only and
+cannot bypass admission or alter engine inputs.
+
 The #197 matrix adds scenario-owned run duration plus the BVR/WVR/transition
 route, release and guidance combinations. It proves identical frontend,
 compiler and Worker domains, malformed-draft persistence across step unmount,
@@ -322,6 +328,13 @@ runtime configuration contrasts and a CI artifact that reports uncovered
 matrix rows.
 
 ## Existing baseline
+
+The current Air-combat baseline is BVR `1.3.0` plus WVR and transition at
+`1.2.0`. BVR and WVR produce generic `KILL`; transition produces `NO_EFFECT`.
+The BVR 1.95 s and WVR 20.65 s release-time controls each produce
+`NO_EFFECT`. Capability-projection tests independently prove that deployment
+switches cannot advertise a sensor, EW, data-link or virtual-pilot model absent
+from the compiled run authority.
 
 Three independent Air-combat oracles now supplement the baseline: literal
 WGS84/MSL-to-ENU geometry, deterministic histories and TypeScript/Rust parity;

@@ -67,6 +67,17 @@ that prior digest and repeats the same no-build Compose operation.
 
 ## Migration, backup, and restore order
 
+Apply migration 020 after migration 019. It extends only the closed
+`public_api_rate_windows.policy_id` constraint for the independent browser
+telemetry budget. Existing window rows and all scenario/catalog data remain
+unchanged. Rollback uses the prior application image only after confirming no
+`BROWSER_TELEMETRY_RATE_LIMITER` rows remain; migration 011 is never rewritten.
+
+Apply migration 019 after the checksum-frozen migration 018. It inserts the
+exact BVR `1.3.0` package, verifies complete readback, and retires only BVR
+`1.2.0`; backup and restore must retain both identities and the unchanged WVR
+and transition `1.2.0` rows.
+
 Migration `017_weapon_termination_model.sql` follows 016 and appends the 1.1.0
 intended use, 0.9.0 pack, 1.3.0 credibility manifest and nine exact `1.1.0`
 scenario bindings. It also publishes the frozen 0.8.0 source, compiled pack and

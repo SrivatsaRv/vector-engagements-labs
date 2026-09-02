@@ -35,9 +35,9 @@ The application should accept platform-neutral ports and bind them at the edge:
 - `FRESH_DATABASE`: cache-disabled Hyperdrive access for writes and read-after-write flows;
 - `ARTIFACTS`: optional R2 bucket for immutable records and exports;
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: external telemetry collector;
-- `PUBLIC_API_RATE_LIMITER` and `TILE_RATE_LIMITER`: independent anonymous
-  traffic budgets, declared in `public-api-admission.v1` and mirrored by the
-  Node/Postgres adapter;
+- `PUBLIC_API_RATE_LIMITER`, `BROWSER_TELEMETRY_RATE_LIMITER`, and
+  `TILE_RATE_LIMITER`: independent anonymous traffic budgets, declared in
+  `public-api-admission.v2` and mirrored by the Node/Postgres adapter;
 - `METRICS_BEARER_TOKEN`: secret protecting production Prometheus output;
 - `APP_ENV`, `APP_VERSION`, and `LOG_LEVEL`: non-secret release configuration.
 
@@ -125,6 +125,18 @@ Migration 018 then produces 21 immutable scenario rows: nine `VALIDATED` rows
 (nine `1.0.0` and three superseded Air-combat `1.1.0`). Exact readback
 and conflicting-row rollback are required before the catalog API can publish
 the new current versions.
+
+Migration 019 versions only the crossing study from `1.2.0` to `1.3.0`. Fresh
+and upgraded verification therefore requires 22 immutable scenario rows: nine
+`VALIDATED` current templates and 13 `RETIRED` historical versions. The database
+gate derives the validated count from the nine-entry scenario library and
+separately asserts the four additional retained version generations, preventing
+the new BVR history row from being mistaken for duplicate current catalog data.
+
+Migration 020 extends the existing durable rate-window constraint with the
+`BROWSER_TELEMETRY_RATE_LIMITER` identity. It changes no scenario, catalog, or
+saved-record row. Fresh and upgraded databases must admit telemetry and public
+API counters independently before application readiness is accepted.
 
 The PostGIS gate now exercises both sides of the Air mission transition: current
 v3 production rows are valid pre-migration input, while post-migration and fresh

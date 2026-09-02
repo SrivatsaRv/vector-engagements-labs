@@ -32,6 +32,14 @@ test("canonical report debrief remains exact, contained, and printable", async (
   await expect(page.getByTestId("report-observer-track-availability")).toContainText(
     /IAF: sensor UNSUPPORTED · track UNSUPPORTED/i,
   );
+  const runTable = page.getByRole("table", { name: "Run summary" });
+  await expect(runTable).toBeVisible();
+  await expect(runTable.getByRole("columnheader")).toHaveCount(3);
+  await expect(runTable).toContainText(/Blue.*Su-30MKI.*Astra Mk[- ]I/i);
+  await expect(page.getByTestId("report-result-reason")).toContainText(
+    /engine-owned between-step closest approach/i,
+  );
+  await expect(page.getByRole("table", { name: "Authored route legs" })).toBeVisible();
 
   const originalViewport = page.viewportSize();
   const viewports = testInfo.project.name === "phone-390"
@@ -79,8 +87,19 @@ test("canonical report debrief remains exact, contained, and printable", async (
     ).breakInside,
     causalSides: [...document.querySelectorAll<HTMLElement>(".report-causal-side")]
       .map((side) => getComputedStyle(side).breakInside),
+    closedDisclosureChildren: [
+      ".report-evidence-disclosure",
+      ".report-detail-disclosure",
+      ".report-causal-inputs",
+      ".report-canonical-geometry",
+    ].flatMap((selector) =>
+      [...document.querySelectorAll<HTMLElement>(`${selector}:not([open]) > :not(summary)`)]
+        .map((child) => getComputedStyle(child).display),
+    ),
   }));
   expect(printBreaks.debrief).toBe("avoid");
   expect(printBreaks.causalInputs).toBe("avoid");
   expect(printBreaks.causalSides).toEqual(["avoid", "avoid"]);
+  expect(printBreaks.closedDisclosureChildren.length).toBeGreaterThan(0);
+  expect(printBreaks.closedDisclosureChildren).not.toContain("none");
 });

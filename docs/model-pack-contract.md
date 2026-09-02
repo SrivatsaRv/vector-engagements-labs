@@ -331,6 +331,10 @@ database.
 
 ## Intended use and credibility
 
+Issue #207 retains the existing generic intended-use and credibility identities;
+the database verifier treats migration 019 as scenario history only and rejects
+any accompanying model-pack promotion.
+
 The #197 BVR, WVR/BFM, and transition packages remain
 `PUBLIC_EDUCATIONAL` model-assumption studies under the existing intended-use
 contract. Their reproducible outcomes do not promote credibility or establish
@@ -488,6 +492,10 @@ compiler. Production admission cannot consume or relabel this adapter.
 
 ## Scenario binding and patches
 
+The BVR `1.3.0` package binds the same exact compiled model pack as its retained
+`1.2.0` predecessor. Its outcome change is authored geometry, not a model-pack
+patch or database-selected coefficient branch.
+
 #197 binds each 1.2.0 scenario to an exact
 `vector.scenario-package-reference.v1` `{ id, version, contentHash }` for
 Worker, saved-run, and VSR readback. Its optional
@@ -560,6 +568,9 @@ Draft patch addition creates a new revision.
 
 ## Loadout compatibility
 
+Migration 019 does not alter station, store, quantity, or compatibility
+authority; database readback continues to require the existing compiled graph.
+
 The #197 studies select their Su-30/Astra and F-16/AIM-120 teaching loadouts
 only through the existing station, store, quantity, and compatibility
 contracts. Their scenario package reference, authored profile, and duration do
@@ -624,6 +635,10 @@ incompatible data rejects the scenario; it never falls back to the legacy model
 authoring list or a weapon-name heuristic.
 
 ## Persistence
+
+After migration 019 the database contains nine validated current scenario rows
+and 13 immutable retired rows, while compiled model-pack, intended-use, and
+credibility counts remain unchanged.
 
 Forward migration 018 appends the three #197 scenario definitions at 1.2.0,
 retires their prior current rows without deleting them, and revalidates exact
@@ -898,17 +913,21 @@ validation. The runtime must not fill the gap with a scalar fallback.
 
 ## Verification
 
-#197 verification runs the three immutable 1.2.0 packages through normal
-compiler/Worker/VSR admission and checks the reproducible BVR `DEGRADED`, WVR
-presentation `KILL` (canonical `MISSION_KILL`), and transition `NO_EFFECT`
-results. An independent matched control changes only WVR loft release time from
-20 s to 20.65 s and requires `NO_EFFECT` with an active target; profile-label
+`scripts/verify-db.mjs` now asserts that exact 22-row scenario history beside
+unchanged model-pack identities, preventing a newly retained scenario version
+from being misclassified as a new or duplicated model pack.
+
+#207 verification runs BVR `1.3.0` and the two retained `1.2.0` packages through
+normal compiler/Worker/VSR admission and checks reproducible BVR `KILL`, WVR
+`KILL`, and transition `NO_EFFECT` results. Independent matched controls change
+only BVR release time from 2 s to 1.95 s and WVR loft release time from 20 s to
+20.65 s; each requires `NO_EFFECT` with an active target. Profile-label
 mutation must be invariant, while stale or corrupt package references and
 invalid duration precision fail admission. These checks exercise orchestration
 and record binding around the unchanged model-pack and engine contracts, not a
 new physics or engine-ABI claim.
 
-#197 also grants no binary-size exception: the historical 585,000-byte WASM
+#207 also grants no binary-size exception: the historical 585,000-byte WASM
 evidence gate and current strict sub-620,000-byte optimized WASM ceiling remain
 unchanged.
 

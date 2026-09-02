@@ -120,7 +120,9 @@ try {
   assert.equal(counts.environment_packs, 12);
   assert.equal(counts.study_areas, 6);
   assert.equal(counts.scenarios, SCENARIO_LIBRARY.length);
-  assert.equal(counts.retired_scenarios, SCENARIO_LIBRARY.length + 3);
+  // Migration 019 retains the superseded BVR 1.2.0 package as a fourth
+  // immutable retired version beside the three pre-existing retired rows.
+  assert.equal(counts.retired_scenarios, SCENARIO_LIBRARY.length + 4);
 
   const [geospatial] = await sql`SELECT
     ST_SRID(location)::int AS srid,

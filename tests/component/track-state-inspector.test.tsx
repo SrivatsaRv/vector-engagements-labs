@@ -37,8 +37,8 @@ describe("TrackStateInspector", () => {
     render(<TrackStateInspector selected={selected} perspective="IAF" onPerspectiveChange={onPerspectiveChange} />);
 
     expect(screen.getAllByText("UNSUPPORTED")).toHaveLength(2);
-    expect(screen.getByText("Unavailable")).toBeVisible();
-    expect(screen.getByText(/No position is displayed/i)).toBeVisible();
+    expect(screen.getByText(/No admitted sensor model; no track is shown/i)).toBeVisible();
+    expect(screen.getByText("Track evidence")).toBeVisible();
     expect(screen.queryByText(/80 km|420 m|red-object-1/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "PAF picture" }));
@@ -47,7 +47,7 @@ describe("TrackStateInspector", () => {
 
   it("does not replace a missing picture with zero-valued track data", () => {
     render(<TrackStateInspector selected={{ state: "UNAVAILABLE", perspective: "PAF", displayTimeSeconds: 18, reason: "PICTURE_NOT_RECORDED" }} perspective="PAF" onPerspectiveChange={() => undefined} />);
-    expect(screen.getByText(/No observer-picture sample was recorded at 18\.0 s/i)).toBeVisible();
+    expect(screen.getByText(/No observer picture is recorded at this frame.*18\.0 s/i)).toBeVisible();
     expect(screen.queryByText("0 m")).not.toBeInTheDocument();
   });
 

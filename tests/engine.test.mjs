@@ -884,6 +884,16 @@ test("aircraft records the guidance request separately from its load-factor-limi
   );
   assert.equal(frame.aircraftControl.requestedSteeringAccelerationMps2.x, 0);
   assert.equal(frame.aircraftControl.limiter, "LOAD_FACTOR");
+  assert.equal(
+    frame.commandedG,
+    testAircraftModel.maximumCommandG,
+    "a limited command must retain the admitted load-factor ceiling exactly",
+  );
+  assert.equal(
+    frame.dragNewtons,
+    Number(frame.dragNewtons.toFixed(3)),
+    "airborne drag must cross the shared millinewton force boundary",
+  );
   assert.ok(
     Math.hypot(
       frame.aircraftControl.acceptedSteeringAccelerationMps2.x,

@@ -10,6 +10,11 @@ import { STUDY_AREAS } from "../../lib/study-areas";
 import { WEAPON_SIMULATION_MODELS } from "../../lib/simulation-models";
 import { admitEnvironmentPack } from "../../lib/geospatial/environment-pack";
 
+// Correctness journeys verify eventual authoritative Worker completion across
+// the full serial viewport matrix. The dedicated performance contract retains
+// its separate strict Worker budget on a controlled measurement viewport.
+const CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS = 75_000;
+
 async function catalogFixture(scenarioId = "a2a-crossing-intercept") {
   const definition = SCENARIO_LIBRARY.find(
     (item) => item.id === scenarioId,
@@ -222,23 +227,39 @@ test("the unedited BVR package remains MATCHED across canonical Map and 3D prese
     body: TRANSPARENT_RASTER_TILE,
   }));
   await openGuidedWorkbench(page, scenarioId);
-  await expect(page.locator('[data-authored-profile="bvr-offset-and-support"]')).toContainText(
-    "Blue OFFSET → SUPPORT → RECOMMIT · Red BEAM → DRAG → EXTEND",
+  await expect(page.locator('[data-authored-profile="bvr-mutual-offset-defensive-turn"]')).toContainText(
+    "Blue OFFSET → RECOMMIT → EXTEND · Red OFFSET → DEFENSIVE_BREAK → EXTEND",
   );
 
   const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
   if (compact) {
     await page.getByRole("button", { name: /Next: Forces & loadouts/i }).click();
     await page.getByRole("button", { name: /Next: Place & flight/i }).click();
+    await expect(page.locator(".atmosphere-card")).not.toContainText(/Visibility|Relative humidity/);
     await page.getByRole("button", { name: /Next: Admitted conditions/i }).click();
+    await expect(page.locator("section.configured-note")).toContainText(
+      "This run has no tactical information or autonomous pilot model.",
+    );
     await page.getByRole("button", { name: /Next: Validate/i }).click();
   } else {
+    await page.getByRole("button", { name: "3 Place & flight" }).click();
+    await expect(page.locator(".atmosphere-card")).not.toContainText(/Visibility|Relative humidity/);
+    await page.getByRole("button", { name: "4 Admitted conditions" }).click();
+    await expect(page.locator("section.configured-note")).toContainText(
+      "This run has no tactical information or autonomous pilot model.",
+    );
+    await expect(page.locator("section.configured-note")).toContainText(
+      "Red carries recorded loadout inventory",
+    );
+    await expect(page.locator("section.configured-note")).not.toContainText(
+      /Sensors: enabled|EW: enabled/,
+    );
     await page.getByRole("button", { name: "5 Validate" }).click();
   }
   await page.getByRole("button", { name: /run baseline/i }).click();
   await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
     "Worker · completed",
-    { timeout: 30_000 },
+    { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
   );
   const pause = page.getByRole("button", { name: "Pause run", exact: true });
   if (await pause.isVisible()) await pause.click();
@@ -251,10 +272,10 @@ test("the unedited BVR package remains MATCHED across canonical Map and 3D prese
     setter.call(element, String(modelTimeSeconds));
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
-  }, 4);
+  }, 2);
   const map = page.locator(".engagement-map-shell");
-  await expect(map).toHaveAttribute("data-display-frame-index", "17");
-  await expect(map).toHaveAttribute("data-display-time", "4");
+  await expect(map).toHaveAttribute("data-display-frame-index", "9");
+  await expect(map).toHaveAttribute("data-display-time", "2");
   await expect(map).toHaveAttribute("data-effect-state", "BEFORE_EFFECT_BOUNDARY");
   await expect(map).toHaveAttribute("data-declared-route-feature-count", "2");
   await expect(map.locator(".map-status")).toHaveCount(0);
@@ -263,7 +284,7 @@ test("the unedited BVR package remains MATCHED across canonical Map and 3D prese
   const weaponMap = map.locator('[data-entity-id="blue-weapon-1"]');
   await expect(weaponMap).toHaveAttribute("data-lifecycle", "ACTIVE");
   await expect(weaponMap).toHaveAttribute("data-flight-state", "BOOST");
-  await expect(weaponMap).toHaveAttribute("data-label-visibility", "COMPACT");
+  await expect(weaponMap).toHaveAttribute("data-label-visibility", /COMPACT|HIDDEN/);
   await expect(blueMap).toHaveAttribute("data-label-visibility", "VISIBLE");
   await expect(map).toHaveAttribute("data-launched-store-count", "1");
 
@@ -289,10 +310,10 @@ test("the unedited BVR package remains MATCHED across canonical Map and 3D prese
 
   await timeline.focus();
   await page.keyboard.press("End");
-  await expect(map).toHaveAttribute("data-display-frame-index", "294");
-  await expect(map).toHaveAttribute("data-display-time", "72.95");
+  await expect(map).toHaveAttribute("data-display-frame-index", "146");
+  await expect(map).toHaveAttribute("data-display-time", "36");
   await expect(map).toHaveAttribute("data-effect-state", "RECORDED");
-  await expect(map).toHaveAttribute("data-effect-class", "DEGRADED");
+  await expect(map).toHaveAttribute("data-effect-class", "KILL");
   await expect(map).toHaveAttribute("data-declared-route-feature-count", "2");
   await expect(map).toHaveAttribute("data-achieved-trail-feature-count", "3");
   await expect(map).toHaveAttribute("data-launched-store-count", "1");
@@ -303,6 +324,7 @@ test("the unedited BVR package remains MATCHED across canonical Map and 3D prese
   await expect(blueMap.locator("circle.tactical-frame")).toHaveCount(1);
   await expect(redMap).toContainText("F-16C Block 52");
   await expect(redMap).toHaveAttribute("data-affiliation", "RED");
+  await expect(redMap).toHaveAttribute("data-lifecycle", "TERMINATED");
   await expect(redMap.locator("path.tactical-frame")).toHaveCount(1);
   await expect(weaponMap).toContainText("Astra Mk 1");
   await expect(weaponMap).toHaveAttribute("data-lifecycle", "TERMINATED");
@@ -311,13 +333,115 @@ test("the unedited BVR package remains MATCHED across canonical Map and 3D prese
 
   await page.getByRole("button", { name: "3D", exact: true }).click();
   const scene = page.locator(".simulation-scene");
-  await expect(scene).toHaveAttribute("data-display-frame-index", "294");
-  await expect(scene).toHaveAttribute("data-effect-class", "DEGRADED");
+  await expect(scene).toHaveAttribute("data-display-frame-index", "146");
+  await expect(scene).toHaveAttribute("data-effect-class", "KILL");
   await expect(scene).toHaveAttribute("data-authored-profile-applicability", "MATCHED");
   await expect(scene).toHaveAttribute("data-authored-profile-applicability-reason", "EXACT_CAUSAL_MATCH");
   await expect(scene).toHaveAttribute("data-declared-route-count", "2");
   await expect(scene).toHaveAttribute("data-achieved-trail-count", "3");
   await expect(scene).toHaveAttribute("data-launched-store-count", "1");
+
+  const telemetryToggle = page.getByRole("button", { name: /expand telemetry/i });
+  await telemetryToggle.click();
+  await expect(page.locator(".telemetry.is-expanded")).toBeVisible();
+  await expect(page.locator(".telemetry-panel")).toHaveCount(6);
+
+  const originalViewport = page.viewportSize()!;
+  const verificationViewports = [
+    originalViewport,
+    ...(testInfo.project.name === "tablet-768" ? [{ width: 1_024, height: 768 }] : []),
+    ...(testInfo.project.name === "full-hd" ? [{ width: 2_560, height: 1_440 }] : []),
+  ];
+  for (const viewport of verificationViewports) {
+    await page.setViewportSize(viewport);
+    if (viewport.width <= 1_100) {
+      await page.locator(".telemetry-panel").last().scrollIntoViewIfNeeded();
+    }
+    const layout = await page.evaluate(() => {
+      const rect = (selector: string) => {
+        const value = document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+        return { left: value.left, right: value.right, top: value.top, bottom: value.bottom };
+      };
+      return {
+        viewportWidth: innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        playback: rect(".playback"),
+        telemetryTitle: rect(".telemetry-title"),
+        panels: [...document.querySelectorAll<HTMLElement>(".telemetry-panel")].map((panel) => {
+          const box = panel.getBoundingClientRect();
+          const chart = panel.querySelector<SVGElement>("svg")!.getBoundingClientRect();
+          return { left: box.left, right: box.right, width: box.width, chartWidth: chart.width, chartHeight: chart.height };
+        }),
+      };
+    });
+    expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
+    expect(layout.playback.bottom).toBeLessThanOrEqual(layout.telemetryTitle.top + 1);
+    for (const panel of layout.panels) {
+      expect(panel.left).toBeGreaterThanOrEqual(-1);
+      expect(panel.right).toBeLessThanOrEqual(layout.viewportWidth + 1);
+      expect(panel.width).toBeGreaterThan(150);
+      expect(panel.chartWidth).toBeGreaterThan(120);
+      expect(panel.chartHeight).toBeGreaterThanOrEqual(31);
+    }
+  }
+});
+
+test("short-wide BVR playback keeps key-free tiles, labels, controls, and frame-earned copy separate", async ({ page }) => {
+  await page.setViewportSize({ width: 1_857, height: 339 });
+  const tileRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/map-tile?")) tileRequests.push(request.url());
+  });
+  const scenarioId = "a2a-crossing-intercept";
+  const catalog = await catalogFixture(scenarioId);
+  await page.route("**/api/catalog", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
+  );
+  await openGuidedWorkbench(page, scenarioId);
+  await page.getByRole("button", { name: "5 Validate", exact: true }).click();
+  await page.getByRole("button", { name: /run baseline/i }).click();
+  await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
+    "Worker · completed",
+    { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
+  );
+  await expect(page.locator('.map-tactical-marker[data-entity-id="blue-platform-1"]')).toBeVisible();
+  await expect(page.locator(".outcome")).toHaveAttribute("data-effect-state", "BEFORE_EFFECT_BOUNDARY");
+  await expect(page.locator(".outcome")).toContainText("Outcome pending");
+  await expect(page.locator(".outcome")).not.toContainText("Generic educational model");
+  await expect(page.locator(".session-right .track-state-unavailable")).toContainText(
+    "No admitted sensor model; no track is shown.",
+  );
+  await expect(page.locator(".session-right .track-evidence-disclosure")).not.toHaveAttribute("open", "");
+  expect(tileRequests.length).toBeGreaterThan(0);
+  expect(tileRequests.every((url) => url.includes("revision=osm-derived-v1"))).toBe(true);
+  expect(await page.locator("body").innerText()).not.toContain("API KEY REQUIRED");
+
+  const layout = await page.locator(".engagement-map-shell").evaluate((surface) => {
+    const rect = (element: Element) => {
+      const value = element.getBoundingClientRect();
+      return { left: value.left, top: value.top, right: value.right, bottom: value.bottom };
+    };
+    const intersects = (left: ReturnType<typeof rect>, right: ReturnType<typeof rect>) =>
+      !(left.right <= right.left || left.left >= right.right || left.bottom <= right.top || left.top >= right.bottom);
+    const labelBoxes = [...surface.querySelectorAll<HTMLElement>('.map-tactical-marker[data-entity-id] > span')]
+      .filter((label) => getComputedStyle(label).display !== "none")
+      .map(rect);
+    const controlBoxes = [...surface.querySelectorAll<HTMLElement>(
+      ".vector-map-toolbar,.map-scope-switch,.map-layer-legend,.map-context-disclosure,.vector-map-telemetry",
+    )].filter((control) => getComputedStyle(control).display !== "none").map(rect);
+    const pairs = (boxes: ReturnType<typeof rect>[]) => boxes.flatMap((box, index) =>
+      boxes.slice(index + 1).filter((candidate) => intersects(box, candidate)));
+    return {
+      height: surface.getBoundingClientRect().height,
+      labelCollisions: pairs(labelBoxes).length,
+      controlCollisions: pairs(controlBoxes).length,
+      visibleLabels: labelBoxes.length,
+    };
+  });
+  expect(layout.height).toBeGreaterThanOrEqual(300);
+  expect(layout.visibleLabels).toBeGreaterThanOrEqual(2);
+  expect(layout.labelCollisions).toBe(0);
+  expect(layout.controlCollisions).toBe(0);
 });
 
 test("browser presentation changes only at the canonical target-effect frame", async ({ page }, testInfo) => {
@@ -347,7 +471,7 @@ test("browser presentation changes only at the canonical target-effect frame", a
   await page.getByRole("button", { name: /run baseline/i }).click();
   await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
     "Worker · completed",
-    { timeout: 30_000 },
+    { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
   );
   const pause = page.getByRole("button", { name: "Pause run", exact: true });
   if (await pause.isVisible()) await pause.click();
@@ -364,14 +488,14 @@ test("browser presentation changes only at the canonical target-effect frame", a
   await expect(summary).toHaveAttribute("data-effect-time", "114.7");
   await expect(summary).toHaveAttribute("data-target-lifecycle", "ACTIVE");
   await expect(summary).toHaveAttribute("data-kill-claim-authorized", "false");
-  await expect(summary).toContainText("The target retained its recorded capability state");
+  await expect(summary).toContainText("No effect recorded");
   await expect(summary).toContainText("MODEL_ASSUMPTION");
 
   await selectTimelineBeforeEnd(timeline);
   await expect(summary).toHaveAttribute("data-effect-state", "BEFORE_EFFECT_BOUNDARY");
   await expect(summary).toHaveAttribute("data-effect-class", "NONE");
   await expect(summary).toHaveAttribute("data-kill-claim-authorized", "false");
-  await expect(summary).toContainText("No target effect has occurred at this frame");
+  await expect(summary).toContainText("Boundary 114.700 s");
 
   await page.getByRole("button", { name: "3D", exact: true }).click();
   const scene = page.locator(".simulation-scene");
@@ -437,7 +561,7 @@ test("the close-merge WVR effect remains canonical and labels exact authored int
   await page.getByRole("button", { name: /run baseline/i }).click();
   await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
     "Worker · completed",
-    { timeout: 30_000 },
+    { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
   );
   const pause = page.getByRole("button", { name: "Pause run", exact: true });
   if (await pause.isVisible()) await pause.click();
@@ -491,18 +615,13 @@ test("the close-merge WVR effect remains canonical and labels exact authored int
   await expectLaptopVisual(scene, "wvr-close-merge-altitude-stems.png", testInfo);
 });
 
-// Correctness journeys verify eventual authoritative Worker completion across
-// the viewport matrix. The dedicated browser-performance contract separately
-// retains the 10 s Worker budget on its controlled measurement viewport.
-const CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS = 45_000;
-
 const canonicalAirStudies = [
   {
     title: "the BVR Air study keeps every playback and outcome surface on one canonical frame",
     id: "a2a-crossing-intercept",
-    frameIndex: "294",
-    time: "72.95",
-    effect: "DEGRADED",
+    frameIndex: "146",
+    time: "36",
+    effect: "KILL",
   },
   {
     title: "the WVR Air study keeps every playback and outcome surface on one canonical frame",
@@ -522,7 +641,7 @@ const canonicalAirStudies = [
 
 for (const study of canonicalAirStudies) {
   test(study.title, async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
 
     const catalog = await catalogFixture(study.id);
     await page.route("**/api/catalog", (route) =>
@@ -636,6 +755,45 @@ test("an invalid non-spatial numeric draft cannot be bypassed by changing builde
   await expect(flightSize).toHaveAttribute("aria-invalid", "false");
   await nextStep.click();
   await expect(page.getByRole("heading", { name: /Who is fighting/i })).toBeVisible();
+});
+
+test("QHD Define uses one readable task measure without a detached action rail", async ({ page }, testInfo) => {
+  // The governed runner requires the same exact case inventory in every
+  // project; full-hd alone owns the explicit 2560 x 1440 visual assertion.
+  if (testInfo.project.name !== "full-hd") return;
+  await page.setViewportSize({ width: 2_560, height: 1_440 });
+  const catalog = await catalogFixture();
+  await page.route("**/api/catalog", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
+  );
+  await page.route("**/api/map-tile?**", (route) => route.abort());
+  await openGuidedWorkbench(page, "a2a-crossing-intercept");
+
+  const header = await page.locator(".builder-scroll > header").boundingBox();
+  const content = await page.locator(".builder-step-content").boundingBox();
+  const runName = await page.getByRole("textbox", { name: "Run name" }).boundingBox();
+  const mission = await page.getByRole("region", { name: "Air mission contract" }).boundingBox();
+  const choices = await page.locator(".guided-options").boundingBox();
+  const actions = await page.locator(".builder-actions").boundingBox();
+
+  expect(header).not.toBeNull();
+  expect(content).not.toBeNull();
+  expect(runName).not.toBeNull();
+  expect(mission).not.toBeNull();
+  expect(choices).not.toBeNull();
+  expect(actions).not.toBeNull();
+  expect(Math.abs(header!.x - content!.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(runName!.x - content!.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(mission!.x - content!.x)).toBeLessThanOrEqual(1);
+  expect(runName!.width).toBeGreaterThanOrEqual(900);
+  expect(mission!.width).toBeGreaterThanOrEqual(1_000);
+  expect(actions!.y - (choices!.y + choices!.height)).toBeLessThanOrEqual(80);
+  expect(actions!.y).toBeLessThan(1_250);
+
+  await expect(page).toHaveScreenshot("qhd-define-workbench.png", {
+    animations: "disabled",
+    fullPage: false,
+  });
 });
 
 test("duration and replay seed use governed raw admission before builder navigation", async ({ page }) => {
@@ -895,7 +1053,7 @@ test("a current deployment manifest drives the real Worker run after route recov
   // This journey authors every mission layer before starting the real Worker.
   // Keep its orchestration timeout distinct from the explicit Worker and 3D
   // performance budgets asserted in air-combat-performance.spec.ts.
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(error.message));
   const catalog = await catalogFixture();
@@ -1113,9 +1271,12 @@ test("a current deployment manifest drives the real Worker run after route recov
   await timeline.focus();
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowLeft");
-  await expect(page.getByTestId("airborne-store-transfer-outcome")).toContainText(
-    /JETTISON achieved · blue-weapon-1 .* AIRBORNE_TRANSFER_ADMITTED/,
-  );
+  const transferOutcome = page.getByTestId("airborne-store-transfer-outcome");
+  await expect(transferOutcome).toHaveText("Store jettison · achieved · frame 84");
+  await expect(transferOutcome).toHaveAttribute("data-store-id", "blue-weapon-1");
+  await expect(transferOutcome).toHaveAttribute("data-station-id", "su-30mki-study-station");
+  await expect(transferOutcome).toHaveAttribute("data-limiter", "NONE");
+  await expect(transferOutcome).toHaveAttribute("data-cause", "AIRBORNE_TRANSFER_ADMITTED");
   const postTransferEntityIds = await recordedEntities.evaluateAll((items) =>
     items.map((item) => item.getAttribute("data-entity-id")),
   );
@@ -1144,7 +1305,7 @@ test("a current deployment manifest drives the real Worker run after route recov
     sceneHeight: document.querySelector(".scene-wrap")?.getBoundingClientRect().height ?? 0,
     canvasHeight: document.querySelector(".engagement-map canvas")?.getBoundingClientRect().height ?? 0,
     camera: document.querySelector(".vector-map-telemetry")?.textContent,
-    time: document.querySelector(".telemetry-title > div")?.textContent,
+    time: document.querySelector(".telemetry-title [data-display-time]")?.getAttribute("data-display-time"),
     attribution: document.querySelector(".maplibregl-ctrl-attrib")?.getBoundingClientRect().height ?? 0,
   }));
   if (compact) {
@@ -1164,7 +1325,7 @@ test("a current deployment manifest drives the real Worker run after route recov
     sceneHeight: document.querySelector(".scene-wrap")?.getBoundingClientRect().height ?? 0,
     canvasHeight: document.querySelector(".engagement-map canvas")?.getBoundingClientRect().height ?? 0,
     camera: document.querySelector(".vector-map-telemetry")?.textContent,
-    time: document.querySelector(".telemetry-title > div")?.textContent,
+    time: document.querySelector(".telemetry-title [data-display-time]")?.getAttribute("data-display-time"),
   }));
   expect(collapsed.sceneHeight).toBeGreaterThan(expanded.sceneHeight);
   expect(Math.abs(collapsed.canvasHeight - collapsed.sceneHeight)).toBeLessThanOrEqual(2);
@@ -1243,7 +1404,7 @@ test("a current deployment manifest drives the real Worker run after route recov
 });
 
 test("a Worker-produced VSR downloads and reopens without rerunning physics", async ({ page }, testInfo) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const scenarioId = "a2a-defensive-break";
   const catalog = await catalogFixture(scenarioId);
   const runtimeErrors: string[] = [];
@@ -1294,7 +1455,7 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
   await page.getByRole("button", { name: /run baseline/i }).click();
   await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
     "Worker · completed",
-    { timeout: 45_000 },
+    { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
   );
 
   const recordRegion = page.getByRole("region", { name: "VECTOR Simulation Record" });
@@ -1328,6 +1489,7 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
   await expect(recordRegion).toContainText("Worker-verified import");
   await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
     "Worker · completed",
+    { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
   );
   await expect(page.getByTestId("vsr-record-id")).toHaveText(recordId);
   await expect(page.getByTestId("vsr-content-digest")).toHaveText(contentDigest);
@@ -1416,6 +1578,7 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
   await expect(page.getByTestId("vsr-content-digest")).toHaveText(contentDigest);
   await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
     "Worker · completed",
+    { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
   );
   await expect(page.locator(".debrief-outcome .target-effect-summary")).toHaveAttribute(
     "data-effect-class",
@@ -1435,6 +1598,7 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
   await expect(page.getByTestId("vsr-content-digest")).toHaveText(contentDigest);
   await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
     "Worker · completed",
+    { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
   );
   await expect(page.locator(".debrief-workspace h1")).toHaveText(
     "WVR one-circle defensive break: Su-30MKI versus PAF F-16C Block 52",

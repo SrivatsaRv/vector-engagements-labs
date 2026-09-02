@@ -40,6 +40,7 @@ export const AUTHORED_ROUTE_PROFILE_SCHEMA_VERSION =
   "vector.authored-route-profile.v1" as const;
 export type AuthoredRouteProfileId =
   | "bvr-offset-and-support"
+  | "bvr-mutual-offset-defensive-turn"
   | "wvr-one-circle-defensive-break"
   | "beam-drag-extend-recommit";
 export type AuthoredRouteLegIntent =
@@ -355,18 +356,18 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
   {
     ...PACKAGE_GOVERNANCE,
     id: "a2a-crossing-intercept",
-    version: "1.2.0",
+    version: "1.3.0",
     domain: "A2A",
-    title: "BVR offset and support: Su-30MKI versus F-16C",
+    title: "BVR mutual offset and defensive turn: Su-30MKI versus F-16C",
     summary:
-      "Compare an authored Blue offset/support route with a Red beam/drag route in a long-range generic Air-combat study.",
+      "Observe an authored Blue offset and Red defensive turn during one long-range generic Air-combat weapon fly-out.",
     blue: "Su-30MKI carrying Astra Mk 1",
     red: "PAF F-16C Block 52 carrying AIM-120C-5",
     targetProfile: "PAF F-16C Block 52",
     theatre: "Open training airspace",
     complexity: "Advanced",
     scope: "Generic assumption-backed BVR route and target-effect study; not named-aircraft, weapon, sensor, support, or pilot performance.",
-    tags: ["fighter vs fighter", "BVR", "authored offset", "authored beam drag"],
+    tags: ["fighter vs fighter", "BVR", "authored mutual offset", "authored defensive turn"],
     targetMotion: "moving",
     environment:
       "Sourced regional terrain and atmosphere · exact EnvironmentPack identity recorded",
@@ -374,42 +375,45 @@ export const SCENARIO_LIBRARY: ScenarioDefinition[] = [
     runVariants: movingRuns,
     presetRationale: {
       profile:
-        "A deterministic generic BVR authored-route profile under the current public-educational model pack.",
+        "A deterministic generic BVR KILL demonstration under the current public-educational model and target-effect packs.",
       geometry:
-        "Blue offsets after its explicit release while Red beams, drags, and extends through four exact WGS84/MSL points.",
+        "Blue and Red each transition to a second route leg during weapon fly-out. Red's route is an authored defensive turn, not a sensor-triggered response.",
       conditions:
-        "The route geometry is causal. Tactical labels, sensor state, adaptive support, and autonomous pilot decisions do not alter runtime behavior.",
+        "The route geometry, explicit release request, atmosphere, mass, fuel, and store state are causal. Sensor state, adaptive support, Red weapon employment, and autonomous pilot decisions are unavailable.",
     },
     authoredProfile: {
       schemaVersion: AUTHORED_ROUTE_PROFILE_SCHEMA_VERSION,
-      id: "bvr-offset-and-support",
-      label: "BVR offset and support",
+      id: "bvr-mutual-offset-defensive-turn",
+      label: "BVR mutual offset and defensive turn",
       authority: "AUTHORED_ROUTE",
-      blue: { legs: ["OFFSET", "SUPPORT", "RECOMMIT"] },
-      red: { legs: ["BEAM", "DRAG", "EXTEND"] },
-      limitations: ["The autonomous pilot and adaptive tactic-selection policy are not modelled."],
+      blue: { legs: ["OFFSET", "RECOMMIT", "EXTEND"] },
+      red: { legs: ["OFFSET", "DEFENSIVE_BREAK", "EXTEND"] },
+      limitations: [
+        "The autonomous pilot and adaptive tactic-selection policy are not modelled.",
+        "Red does not observe the launch or employ AIM-120; its turn is exact authored route intent.",
+      ],
     },
     scenario: authoredAirCombatScenario({
-      name: "BVR offset and support: Su-30MKI versus PAF F-16C Block 52",
+      name: "BVR mutual offset and defensive turn: Su-30MKI versus PAF F-16C Block 52",
       objective:
-        "Compare the canonical trajectory and generic target effect produced by explicit offset, support, beam, drag, and extension routes.",
+        "Observe one canonical generic weapon effect while both aircraft execute explicit offset and defensive-turn route geometry.",
       guidance: "direct",
       regime: "BVR",
       durationSeconds: 100,
-      releaseTimeSeconds: 4,
+      releaseTimeSeconds: 2,
       blueSpeedMps: 275,
       redSpeedMps: 250,
       blueRoute: [
-        [-18_200, -5_600, 9_500],
-        [-8_400, 1_400, 9_500],
-        [2_800, 8_400, 9_500],
-        [12_600, 8_400, 9_500],
+        [-18_000, -3_000, 9_500],
+        [-13_000, -3_000, 9_500],
+        [-5_000, 5_000, 9_500],
+        [6_000, 5_000, 9_500],
       ],
       redRoute: [
-        [18_200, 5_600, 8_200],
-        [18_200, -4_200, 8_200],
-        [25_200, -11_200, 8_200],
-        [36_400, -11_200, 8_200],
+        [18_000, 3_000, 8_200],
+        [13_105.663, 1_977.52, 8_200],
+        [3_866.868, -1_849.315, 8_200],
+        [15_866.868, -5_849.315, 8_200],
       ],
       blueLegRoles: ["INGRESS", "INTERCEPT_ATTACK", "EGRESS"],
     }),

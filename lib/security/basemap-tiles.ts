@@ -1,7 +1,8 @@
 import { incrementCounter, observeHistogram } from "@/lib/observability/metrics";
 import { PublicApiError } from "./public-api";
 
-export const BASEMAP_TILE_CACHE_SCHEMA = "vector-basemap-tile.v1";
+export const BASEMAP_TILE_CACHE_SCHEMA = "vector-basemap-tile.v3";
+export const BASEMAP_TILE_REVISION = "osm-derived-v1";
 export const BASEMAP_TILE_TTL_MS = 24 * 60 * 60 * 1000;
 export const BASEMAP_TILE_TIMEOUT_MS = 3_000;
 export const BASEMAP_TILE_MAX_BYTES = 4 * 1024 * 1024;
@@ -12,6 +13,7 @@ export type BasemapTileMode = "minimal" | "standard" | "tactical";
 
 export type CanonicalBasemapTile = Readonly<{
   schema: typeof BASEMAP_TILE_CACHE_SCHEMA;
+  revision: typeof BASEMAP_TILE_REVISION;
   mode: BasemapTileMode;
   z: number;
   x: number;
@@ -30,7 +32,7 @@ export type BasemapTileDependencies = {
   now: () => number;
 };
 
-const allowedKeys = new Set(["mode", "z", "x", "y"]);
+const allowedKeys = new Set(["revision", "mode", "z", "x", "y"]);
 const allowedModes = new Set<BasemapTileMode>(["minimal", "standard", "tactical"]);
 const inFlight = new Map<string, Promise<Response>>();
 
@@ -59,6 +61,7 @@ export function parseCanonicalBasemapTile(url: URL): CanonicalBasemapTile {
     values.set(key, value);
   }
   if (values.size !== allowedKeys.size) throw invalidTile();
+  if (values.get("revision") !== BASEMAP_TILE_REVISION) throw invalidTile();
   const mode = values.get("mode");
   if (!mode || !allowedModes.has(mode as BasemapTileMode)) throw invalidTile();
   const z = strictInteger(values.get("z"));
@@ -66,23 +69,38 @@ export function parseCanonicalBasemapTile(url: URL): CanonicalBasemapTile {
   const y = strictInteger(values.get("y"));
   const coordinateLimit = 2 ** z;
   if (z > BASEMAP_TILE_MAX_ZOOM || x >= coordinateLimit || y >= coordinateLimit) throw invalidTile();
-  return { schema: BASEMAP_TILE_CACHE_SCHEMA, mode: mode as BasemapTileMode, z, x, y };
+  return {
+    schema: BASEMAP_TILE_CACHE_SCHEMA,
+    revision: BASEMAP_TILE_REVISION,
+    mode: mode as BasemapTileMode,
+    z,
+    x,
+    y,
+  };
 }
 
 export function basemapTileCacheKey(tile: CanonicalBasemapTile) {
-  return `${tile.schema}/${tile.mode}/${tile.z}/${tile.x}/${tile.y}`;
+  return `${tile.schema}/${tile.revision}/${tile.z}/${tile.x}/${tile.y}`;
 }
 
 export function basemapTileUpstreamUrl(tile: CanonicalBasemapTile) {
-  if (tile.mode === "standard") return `https://tile.openstreetmap.org/${tile.z}/${tile.x}/${tile.y}.png`;
-  const style = tile.mode === "tactical" ? "dark_all" : "light_all";
-  return `https://a.basemaps.cartocdn.com/${style}/${tile.z}/${tile.x}/${tile.y}@2x.png`;
+  return `https://tile.openstreetmap.org/${tile.z}/${tile.x}/${tile.y}.png`;
 }
 
 function freshCachedResponse(cached: Response, now: number) {
   const expiresAt = Number(cached.headers.get("x-vector-cache-expires-at"));
   if (!Number.isFinite(expiresAt) || expiresAt <= now) return undefined;
   return new Response(cached.body, { status: cached.status, statusText: cached.statusText, headers: new Headers(cached.headers) });
+}
+
+function responseForRequestedMode(response: Response, tile: CanonicalBasemapTile) {
+  const headers = new Headers(response.headers);
+  headers.set("x-vector-basemap", tile.mode);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 async function readBoundedImage(response: Response) {
@@ -159,7 +177,7 @@ export async function serveBasemapTile(request: Request, dependencies: BasemapTi
     const fresh = cached && freshCachedResponse(cached, dependencies.now());
     if (fresh) {
       outcome = "hit";
-      return fresh;
+      return responseForRequestedMode(fresh, tile);
     }
     if (cached) {
       try { await dependencies.cache.delete(key); } catch { /* stale cache cannot block bounded relay */ }
@@ -169,7 +187,7 @@ export async function serveBasemapTile(request: Request, dependencies: BasemapTi
     inFlight.set(key, pending);
     try {
       const response = await pending;
-      return response.clone();
+      return responseForRequestedMode(response.clone(), tile);
     } finally {
       if (inFlight.get(key) === pending) inFlight.delete(key);
     }

@@ -3192,6 +3192,16 @@
       "testRules": [
         {
           "kind": "PREFIX",
+          "value": "fixtures/vector-record/issue-207/",
+          "facets": [
+            "digest",
+            "storage",
+            "verification",
+            "vsr"
+          ]
+        },
+        {
+          "kind": "PREFIX",
           "value": "fixtures/vector-record/issue-197/",
           "facets": [
             "digest",
@@ -3407,6 +3417,24 @@
         },
         {
           "kind": "EXACT",
+          "value": "lib/frontend/information-capability.ts",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "components/RunInformationCapabilityNotice.tsx",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "components/PlatformEvidence.tsx",
           "facets": [
             "admission",
@@ -3425,6 +3453,24 @@
         }
       ],
       "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/run-information-capability.test.mjs",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/component/run-information-capability-notice.test.tsx",
+          "facets": [
+            "admission",
+            "evidence",
+            "ui"
+          ]
+        },
         {
           "kind": "EXACT",
           "value": "tests/catalog-admission.test.mjs",
@@ -3814,6 +3860,20 @@
       "implementationRules": [
         {
           "kind": "EXACT",
+          "value": "app/about/page.tsx",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "app/icon.svg",
+          "facets": [
+            "ui"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "components/EngagementMap.tsx",
           "facets": [
             "ui"
@@ -4005,6 +4065,14 @@
         }
       ],
       "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/browser/public-presentation.spec.ts",
+          "facets": [
+            "ui",
+            "verification"
+          ]
+        },
         {
           "kind": "EXACT",
           "value": "tests/browser-contract-runner.test.mjs",
@@ -5362,7 +5430,15 @@
           ]
         }
       ],
-      "testRules": [],
+      "testRules": [
+        {
+          "kind": "EXACT",
+          "value": "tests/component/browser-telemetry.test.tsx",
+          "facets": [
+            "runtime"
+          ]
+        }
+      ],
       "generatedGroups": [],
       "owningSections": [
         {
@@ -5934,5 +6010,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "53b5a8eabe0b0bfd0487d54631fe2c024c98ff99a715ca9bd8621e906d50cbda"
+  "canonicalSha256": "1a6354d1fb75bb7a8c49ee9da5e0bb29000f756c91186a1ab8b44e2bf5292cab"
 }

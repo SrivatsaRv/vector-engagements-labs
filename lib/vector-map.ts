@@ -1,6 +1,7 @@
 export type VectorBasemap = "STANDARD" | "MINIMAL" | "TACTICAL";
 
 export const VECTOR_BASEMAP_STORAGE_KEY = "vector.map.basemap.v1";
+export const VECTOR_BASEMAP_TILE_REVISION = "osm-derived-v1";
 
 export function readVectorBasemap(): VectorBasemap {
   if (typeof window === "undefined") return "MINIMAL";
@@ -17,37 +18,50 @@ export function writeVectorBasemap(value: VectorBasemap) {
 }
 
 export function buildVectorMapStyle(active: VectorBasemap) {
-  const source = (mode: Lowercase<VectorBasemap>, attribution: string) => ({
+  const source = {
     type: "raster" as const,
-    tiles: [`/api/map-tile?mode=${mode}&z={z}&x={x}&y={y}`],
-    tileSize: 512,
-    attribution,
-  });
+    tiles: [`/api/map-tile?revision=${VECTOR_BASEMAP_TILE_REVISION}&mode=standard&z={z}&x={x}&y={y}`],
+    tileSize: 256,
+    attribution: "© OpenStreetMap contributors",
+  };
   return {
     version: 8 as const,
     sources: {
-      vectorStandard: source("standard", "© OpenStreetMap contributors"),
-      vectorMinimal: source("minimal", "© OpenStreetMap contributors © CARTO"),
-      vectorTactical: source("tactical", "© OpenStreetMap contributors © CARTO"),
+      vectorRaster: source,
     },
     layers: [
       {
         id: "basemap-standard",
         type: "raster" as const,
-        source: "vectorStandard",
+        source: "vectorRaster",
         layout: { visibility: active === "STANDARD" ? "visible" as const : "none" as const },
+        paint: { "raster-opacity": 1 },
       },
       {
         id: "basemap-minimal",
         type: "raster" as const,
-        source: "vectorMinimal",
+        source: "vectorRaster",
         layout: { visibility: active === "MINIMAL" ? "visible" as const : "none" as const },
+        paint: {
+          "raster-saturation": -0.72,
+          "raster-contrast": -0.14,
+          "raster-brightness-min": 0.12,
+          "raster-brightness-max": 0.96,
+          "raster-opacity": 0.84,
+        },
       },
       {
         id: "basemap-tactical",
         type: "raster" as const,
-        source: "vectorTactical",
+        source: "vectorRaster",
         layout: { visibility: active === "TACTICAL" ? "visible" as const : "none" as const },
+        paint: {
+          "raster-saturation": -0.82,
+          "raster-contrast": 0.2,
+          "raster-brightness-min": 0.02,
+          "raster-brightness-max": 0.48,
+          "raster-opacity": 0.9,
+        },
       },
     ],
   };
@@ -64,4 +78,3 @@ export function setVectorBasemapVisibility(
     }
   }
 }
-

@@ -24,6 +24,10 @@ Regional sampling resolves WGS84 longitude/latitude from the declared local ENU
 anchor and retains EGM2008 source heights as an explicit MSL runtime boundary;
 datum disagreement is never silently coerced.
 
+The issue #207 BVR evidence preserves authored WGS84 route points and MSL
+altitudes as causal inputs; the `osm-derived-v1` raster is display context only
+and cannot change the local-frame intercept calculation.
+
 VECTOR uses the WGS84 ellipsoid (`EPSG:7030`) and the transform contract
 `vector.wgs84-ecef-local.v1`:
 

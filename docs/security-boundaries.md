@@ -5,6 +5,10 @@ callers are treated as attacker controlled before database or upstream work.
 
 ## Saved runs
 
+Current BVR records remain content-addressed and package-bound. Opening a #197
+BVR `1.2.0` record in the `1.3.0` workbench is rejected as a package mismatch;
+the prior verified state remains visible and unchanged.
+
 Before simulation or storage, the server repeats the shared structured-number
 admission and the full Air-mission/scenario compiler. It rejects wrong JSON
 types, non-finite numbers, range and integer violations, and excess fractional
@@ -109,17 +113,21 @@ server-generated report. Request bodies are capped at 96 KiB, route plans at 64
 waypoints per side, and physics inputs at documented finite study limits.
 Database connections, locks, and statements have explicit timeouts.
 
-`public-api-admission.v1` is the versioned anonymous-admission policy. The
-Cloudflare edge uses its two declared Rate Limiting bindings; Node/container
+`public-api-admission.v2` is the versioned anonymous-admission policy. The
+Cloudflare edge uses its three declared Rate Limiting bindings; Node/container
 deployments use the same limits in Postgres-backed fixed windows. A deployed
 adapter that cannot enforce its declared limiter rejects the request with
 `rate_limit_unavailable`; it must not fall back to unlimited access. Rate-limit
 rejections use `rate_limit_exceeded` and include `Retry-After`.
 
+Browser telemetry has its own 60-request-per-minute binding. Its best-effort
+navigation, map, and sampled long-task events cannot consume the separate public
+API budget used by catalog and saved-run requests.
+
 `/api/health` is an admission-readiness check. It reports the non-secret
 policy version, runtime adapter, limiter identity, and `ready` state only after
 the deployment has configured the required limiter backend. A missing Node
-database URL or either Cloudflare limiter binding returns
+database URL or any Cloudflare limiter binding returns
 `rate_limit_unavailable` with HTTP 503. The normal health database query then
 proves the configured backing store is reachable; it does not expose a
 connection string, client identity, or limiter state.
@@ -179,15 +187,21 @@ The shared public-API rate-window table is declared in
 `db/schema/public-api-admission.ts`; its limiter and relay behavior are
 unchanged.
 
-The catalog is cached for five minutes. The tile relay uses the versioned
-`vector-basemap-tile.v1` tuple: exactly one `mode`, `z`, `x`, and `y`, all
-strictly canonical. Unknown, duplicate, encoded, empty, conflicting, leading-
-zero, or out-of-range input is rejected before cache or upstream work. Reordered
-valid query fields share one cache identity. The tuple selects a fixed HTTPS
-provider; it has a three-second timeout, accepts PNG or WebP only, buffers at
-most 4 MiB, coalesces identical misses, and caches only successful bounded
-responses for 24 hours. Cache schema appears in the response and cache key, so
-an intentional schema change invalidates prior entries without a broad purge.
+The catalog is cached for five minutes. The tile relay admits exactly one
+`revision`, `mode`, `z`, `x`, and `y`, all strictly canonical. Its versioned
+`vector-basemap-tile.v3` cache identity contains only `revision`, `z`, `x`, and
+`y`; presentation mode is echoed in the response but cannot duplicate identical
+OSM bytes. Revision `osm-derived-v1` admits a fixed public OSM HTTPS raster
+upstream for standard, minimal, and tactical presentation; no
+browser-visible provider key or key-bearing style URL is accepted. Unknown,
+duplicate, encoded, empty, conflicting, leading-zero, stale-revision, or out-of-
+range input is rejected before cache or upstream work. Reordered valid query
+fields and all three presentation modes share one cache identity. The browser
+uses one raster source and applies mode-specific paint locally. The relay has a three-second timeout, accepts
+PNG or WebP only, buffers at most 4 MiB, coalesces identical misses, and caches
+only successful bounded responses for 24 hours. Cache schema and revision appear
+in the response and cache key, so an intentional authority change invalidates
+prior entries without a broad purge.
 Expired responses are deleted and refetched; failed, timed-out, partial,
 oversized, and misleading-media responses are never cached. Node uses a bounded
 process cache and Workers use Cache API; both preserve the same tuple and
@@ -197,6 +211,11 @@ a separate binding. These are safety controls, not billing guarantees; account
 spending limits and abuse monitoring remain deployment duties.
 
 ## Delivery trust
+
+Migration 019, the regenerated #207 VSR inventory and the run-information
+projection are subject to existing contract-policy, immutable-record and CI
+checks. No deployment flag can promote unavailable tactical information into a
+trusted runtime capability.
 
 Migration 016's duplicated canonical package/readback bytes contain two visible
 `MODEL_ASSUMPTION` and two fixed duel-slot indicators. The runtime-stub ledger

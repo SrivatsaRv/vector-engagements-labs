@@ -11,6 +11,10 @@ or another existing public path.
 - Markdown body defines the rendered article.
 - The blog index, article page, Open Graph metadata, Twitter metadata, and
   JSON-LD all read from the same post record.
+- The article renderer builds one ordered, typed React-node sequence from the
+  parsed Markdown lines. Rendering does not depend on `flatMap` inference or a
+  client-only repair step, so the production server build and source order are
+  deterministic.
 - The landing-page mini simulation is not blog content authority. It consumes
   the same admitted scenario definition, canonical result, authored-profile
   binding, and read-only presentation selector as the Lab; it cannot derive a
@@ -64,6 +68,11 @@ Links may use `https`, `http`, `mailto`, a same-origin path, a relative path,
 or a fragment. Other schemes, including `javascript:` and `data:`, render as
 inert text. Mermaid diagrams use strict mode; do not use HTML labels or
 callback links in diagram code.
+
+The typed-node renderer preserves this boundary. It emits only the repository's
+approved Markdown components and treats raw HTML and disallowed link schemes as
+inert text; changing the array construction does not create an HTML execution
+path.
 
 Scenario/profile labels shown by the landing mini simulation come only from
 typed in-repository scenario definitions, and result statements come only from

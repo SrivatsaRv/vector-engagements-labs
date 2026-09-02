@@ -43,6 +43,14 @@ const localBindingConfig = {
       },
     },
     {
+      name: "BROWSER_TELEMETRY_RATE_LIMITER",
+      namespace_id: "22003",
+      simple: {
+        limit: PUBLIC_API_ADMISSION_POLICY.BROWSER_TELEMETRY_RATE_LIMITER.limit,
+        period: PUBLIC_API_ADMISSION_POLICY.BROWSER_TELEMETRY_RATE_LIMITER.periodSeconds as 60,
+      },
+    },
+    {
       name: "TILE_RATE_LIMITER",
       namespace_id: "22002",
       simple: {

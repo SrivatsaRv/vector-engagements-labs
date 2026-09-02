@@ -383,6 +383,7 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
   const challengeMigration = readFileSync(new URL("../db/migrations/016_high_energy_crossing_challenge.sql", import.meta.url), "utf8");
   const terminationMigration = readFileSync(new URL("../db/migrations/017_weapon_termination_model.sql", import.meta.url), "utf8");
   const airCombatStudyMigration = readFileSync(new URL("../db/migrations/018_three_air_combat_studies.sql", import.meta.url), "utf8");
+  const bvrKillMigration = readFileSync(new URL("../db/migrations/019_bvr_kill_demonstration.sql", import.meta.url), "utf8");
   assert.equal(
     createHash("sha256").update(environmentMigration).digest("hex"),
     "c40e91b0fbbf2ee5110ae601dba676d2feec1957ebb440db81703c1696cbd227",
@@ -403,12 +404,24 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
     "00e9fb16c04e7cc5543f19f50781e2fc35ea4cf8d450af2343b6b5d9ef8ed18d",
     "migration 017 remains the frozen historical weapon-termination snapshot",
   );
+  assert.equal(
+    createHash("sha256").update(airCombatStudyMigration).digest("hex"),
+    "278da504c99c5e02a0f2de1ac188de8477afb48782a062e4a2697b08ec9b6da2",
+    "migration 018 remains the frozen historical three-study snapshot",
+  );
   for (const definition of SCENARIO_LIBRARY) {
-    const isAirCombatStudy = definition.version === "1.2.0";
-    const migration = isAirCombatStudy ? airCombatStudyMigration : terminationMigration;
-    const tag = isAirCombatStudy
-      ? `vector_air_combat_018_${definition.id.replaceAll("-", "_")}`
-      : `vector_weapon_termination_${definition.id.replaceAll("-", "_")}`;
+    const isBvrKillVersion = definition.id === "a2a-crossing-intercept" && definition.version === "1.3.0";
+    const isHistoricalAirCombatStudy = definition.version === "1.2.0";
+    const migration = isBvrKillVersion
+      ? bvrKillMigration
+      : isHistoricalAirCombatStudy
+        ? airCombatStudyMigration
+        : terminationMigration;
+    const tag = isBvrKillVersion
+      ? "vector_bvr_kill_019_a2a_crossing_intercept"
+      : isHistoricalAirCombatStudy
+        ? `vector_air_combat_018_${definition.id.replaceAll("-", "_")}`
+        : `vector_weapon_termination_${definition.id.replaceAll("-", "_")}`;
     assert.ok(migration.includes(`$${tag}$${canonicalJson(definition)}$${tag}$::jsonb`), definition.id);
     assert.ok(
       migration.includes("INSERT INTO scenario_templates")
@@ -422,9 +435,10 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
     );
   }
   assert.ok(
-    SCENARIO_LIBRARY.filter(({ version }) => version === "1.2.0").length === 3
+    SCENARIO_LIBRARY.filter(({ version }) => version === "1.3.0").length === 1
+      && SCENARIO_LIBRARY.filter(({ version }) => version === "1.2.0").length === 2
       && SCENARIO_LIBRARY.filter(({ version }) => version === "1.1.0").length === 6,
-    "only the three governed Air-combat studies advance under migration 018",
+    "only the BVR demonstration advances under migration 019",
   );
   assert.match(terminationMigration, /ON CONFLICT \(id,version\) DO NOTHING/);
   assert.doesNotMatch(

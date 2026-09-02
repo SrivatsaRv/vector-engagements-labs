@@ -19,11 +19,17 @@ VECTOR keeps the compact A2A/A2G/G2A/G2G identifiers for scanning, but gives eac
 
 These labels are intentionally narrower than operational doctrine. VECTOR is a public-data educational model and does not claim to simulate the full counterair, counterland, strategic-attack, or targeting processes. UI copy names the configured platform, weapon, target, and information state whenever the catalog contains them; “abstract profile” is not used as a substitute for incomplete data.
 
-The scenario library contains nine governed entries. Its three current A2A
-`1.2.0` packages are distinct authored-route study profiles:
+The governed catalog retains nine current entries, but the public scenario page
+shows only entries admitted by the active deployment. The current release
+therefore shows three runnable A2A packages and hides the disabled A2G, G2A,
+and G2G entries instead of presenting unavailable choices. The A2A packages are
+distinct authored-route study profiles: BVR at `1.3.0`, with WVR and the
+transition study at `1.2.0`:
 
-- **BVR offset and support** compares a Blue offset/support/recommit route with
-  a Red beam/drag/extend route.
+- **BVR mutual offset and defensive turn** compares a Blue
+  offset/recommit/extend route with a Red offset/defensive-break/extend route.
+  The Red turn is authored, not selected in response to a launch, and Red does
+  not employ its retained AIM-120 inventory.
 - **WVR one-circle defensive break** compares a close merge and one-circle
   route with a defensive break and extension.
 - **Beam, drag, extend and recommit** is the unrestricted-transition study,
@@ -34,6 +40,13 @@ These names describe frozen route geometry, release timing, and recorded model
 inputs. They do not claim that the engine chooses tactics, that an autonomous
 pilot observes or responds to the opponent, or that a named aircraft, weapon,
 sensor, datalink, or pilot would achieve the recorded result.
+
+The public About page may describe Vector's direction as a realistic warfare
+simulation platform, its browser runtime, open-source development model, and
+planned capabilities. The same page must state that current public studies use
+generic educational models and are not real-world named-system performance
+predictions. Product direction never promotes a scenario assumption into model
+authority.
 
 For these profiles, `KILL`, `DEGRADED`, and `NO_EFFECT` are generic
 assumption-model result classes. UI and report copy may show “model-recorded

@@ -25,6 +25,7 @@ export type StoredScenarioPackage = {
 
 const PROFILE_IDS = new Set([
   "bvr-offset-and-support",
+  "bvr-mutual-offset-defensive-turn",
   "wvr-one-circle-defensive-break",
   "beam-drag-extend-recommit",
 ]);

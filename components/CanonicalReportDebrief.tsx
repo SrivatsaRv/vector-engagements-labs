@@ -36,7 +36,7 @@ export function CanonicalReportDebrief({
   const effectProjection = debrief.targetEffect.projection;
   return (
     <section
-      className="report-section"
+      className="report-section report-canonical-debrief"
       aria-label="Canonical run debrief"
       data-effect-event-id={debrief.targetEffect.eventId ?? "UNAVAILABLE"}
       data-effect-frame-index={"frameIndex" in effectProjection ? effectProjection.frameIndex : undefined}
@@ -58,38 +58,46 @@ export function CanonicalReportDebrief({
             </span>
           </p>
           {debrief.profile.applicability === "MATCHED" ? (
-            <dl>
-              {debrief.routeLegs.map((leg) => (
-                <div key={`${leg.affiliation}-${leg.legIndex}`}>
-                  <dt>{leg.affiliation} leg {leg.legIndex + 1}</dt>
-                  <dd>
-                    {leg.authoredIntent}
-                    {leg.compiledRole ? ` · compiled role ${leg.compiledRole}` : ""}
-                    {leg.transitionMethod ? ` · ${leg.transitionMethod}` : ""}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+            <table className="report-route-table" aria-label="Authored route legs">
+              <thead><tr><th scope="col">Side</th><th scope="col">Leg</th><th scope="col">Intent</th><th scope="col">Compiled role</th><th scope="col">Transition</th></tr></thead>
+              <tbody>
+                {debrief.routeLegs.map((leg) => (
+                  <tr key={`${leg.affiliation}-${leg.legIndex}`}>
+                    <th scope="row">{leg.affiliation}</th>
+                    <td>{leg.legIndex + 1}</td>
+                    <td>{leg.authoredIntent}</td>
+                    <td>{leg.compiledRole ?? "Not recorded"}</td>
+                    <td>{leg.transitionMethod ?? "Not recorded"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
             <p data-testid="report-profile-leg-intent-qualification">
               Source-profile leg intents are not asserted because the current
               causal inputs do not exactly match the retained profile basis.
             </p>
           )}
-          {debrief.profile.limitations.map((limitation) => (
-            <p key={limitation}>{limitation}</p>
-          ))}
+          <details className="report-detail-disclosure">
+            <summary>Profile limits</summary>
+            {debrief.profile.limitations.map((limitation) => (
+              <p key={limitation}>{limitation}</p>
+            ))}
+          </details>
         </div>
       )}
 
-      <p data-testid="report-canonical-effect-explanation">{debrief.explanation}</p>
+      <details className="report-detail-disclosure">
+        <summary>Canonical effect explanation</summary>
+        <p data-testid="report-canonical-effect-explanation">{debrief.explanation}</p>
+      </details>
 
-      <div
+      <details
         className="report-causal-inputs"
         data-testid="report-exact-causal-inputs"
         data-duration-authority={debrief.causalInputs.duration.authority}
       >
-        <h3>Exact causal inputs</h3>
+        <summary>Exact causal inputs</summary>
         <dl className="report-causal-summary">
           <dt>Run duration</dt>
           <dd>
@@ -153,14 +161,14 @@ export function CanonicalReportDebrief({
             </div>
           );
         })}
-      </div>
+      </details>
 
-      <section
+      <details
         className="report-canonical-geometry"
         data-testid="report-canonical-geometry"
         data-authored-transition-state={debrief.authoredTransitionGeometry?.state ?? "NOT_APPLICABLE"}
       >
-        <h3>Recorded geometry proof</h3>
+        <summary>Recorded geometry proof</summary>
         <dl>
           <dt>Weapon world-entry / launch frame</dt>
           <dd data-testid="report-launch-geometry">
@@ -205,8 +213,10 @@ export function CanonicalReportDebrief({
           events. Authored leg names describe an exactly matched route profile;
           they are not autonomous-pilot choices or named-system effectiveness.
         </small>
-      </section>
+      </details>
 
+      <details className="report-detail-disclosure report-recorded-state">
+        <summary>Recorded state and event identities</summary>
       <dl data-testid="report-recorded-causal-facts">
         <dt>Weapon entered world</dt>
         <dd>
@@ -290,6 +300,7 @@ export function CanonicalReportDebrief({
           ))}
         </dl>
       )}
+      </details>
     </section>
   );
 }
