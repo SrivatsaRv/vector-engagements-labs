@@ -4,6 +4,12 @@ VECTOR has one engine contract and two browser implementations. The authored sce
 
 ## Rust / WebAssembly
 
+Rust 1.97.1 is the repository-owned compiler for the production engine and both
+verification WASM artifacts. Hosted CI removes all three Cargo output
+directories before reconstructing and byte-checking those artifacts. Release
+and production workflows install the same compiler version; a floating channel
+or cached target directory is not artifact authority.
+
 The production module and TypeScript reference apply the same exact
 load-factor ceiling after route-command limiting and the same millinewton SI
 boundary to recorded aerodynamic-drag telemetry after force evaluation. The raw

@@ -332,6 +332,13 @@ matrix rows.
 
 ## Existing baseline
 
+The repository owns Rust 1.97.1 as the compiler for every committed WASM
+artifact. Hosted Rust verification deletes the Cargo outputs for the production
+engine, generic AAM verifier and TP-1538 verifier before rebuilding and
+byte-checking all three artifacts. Release and production workflows install the
+same exact compiler. A floating `stable` toolchain or cached target directory is
+not release evidence.
+
 Production verification binds the contract-documentation base and tested head
 to the same admitted SHA. A regression fixture keeps a newer main tip present
 while proving that an older admitted revision remains independently verifiable.

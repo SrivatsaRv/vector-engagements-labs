@@ -212,6 +212,12 @@ spending limits and abuse monitoring remain deployment duties.
 
 ## Delivery trust
 
+Production, release and pull-request workflows use repository-owned Rust
+1.97.1. Hosted pull-request verification starts the three committed WASM builds
+from empty Cargo output directories and compares their reconstructed bytes with
+the repository artifacts. Floating compiler updates and cached target outputs
+cannot supply release evidence.
+
 The protected Cloudflare verification job restores and validates the governed,
 content-keyed Poppler renderer before `make ci-local`. Missing or substituted
 renderer tooling stops delivery before database migration or Worker publish.

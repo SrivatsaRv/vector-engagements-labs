@@ -143,6 +143,14 @@
         },
         {
           "kind": "EXACT",
+          "value": "rust-toolchain.toml",
+          "facets": [
+            "delivery",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "Dockerfile",
           "facets": [
             "delivery"
@@ -6010,5 +6018,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "1a6354d1fb75bb7a8c49ee9da5e0bb29000f756c91186a1ab8b44e2bf5292cab"
+  "canonicalSha256": "49fc55eac1c1a45b9c887b1dfae84b7dab59418dddd01e436d822c1bd6be0e7f"
 }

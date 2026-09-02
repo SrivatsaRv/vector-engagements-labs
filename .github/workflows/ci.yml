@@ -109,7 +109,7 @@ jobs:
       - name: Set up Rust/WASM freshness toolchain
         uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
         with:
-          toolchain: stable
+          toolchain: 1.97.1
           target: wasm32-unknown-unknown
       - name: Cache Rust freshness builds
         uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16
@@ -254,15 +254,16 @@ jobs:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
         with:
-          toolchain: stable
+          toolchain: 1.97.1
           target: wasm32-unknown-unknown
           components: clippy,rustfmt
-      - name: Cache Rust builds
-        uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16
-        with:
-          workspaces: engine-rust
       - name: Install locked dependencies
         run: npm ci
+      - name: Remove cached Rust outputs before reproducibility checks
+        run: |
+          cargo clean --manifest-path engine-rust/Cargo.toml
+          cargo clean --manifest-path verification-rust/generic-aam/Cargo.toml
+          cargo clean --manifest-path verification-rust/tp1538-aero/Cargo.toml
       - name: Verify Rust, WASM, and parity contracts
         run: |
           npm run engine:rust:fmt
@@ -270,6 +271,16 @@ jobs:
           npm run engine:rust:verify
           npm run engine:rust:test
           npm run engine:rust:doc
+          npm run reference-aam:rust:fmt
+          npm run reference-aam:rust:clippy
+          npm run reference-aam:rust:verify
+          npm run reference-aam:rust:test
+          npm run reference-aam:rust:doc
+          npm run tp1538:aero:rust:fmt
+          npm run tp1538:aero:rust:clippy
+          npm run tp1538:aero:rust:verify
+          npm run tp1538:aero:rust:test
+          npm run tp1538:aero:rust:doc
           node --test tests/engine-backends.test.mjs tests/model-pack.test.mjs
 
   browser_tests:
@@ -316,7 +327,7 @@ jobs:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
         with:
-          toolchain: stable
+          toolchain: 1.97.1
       - name: Install pinned cargo-audit
         run: cargo install cargo-audit --locked --version 0.22.2
       - name: Audit locked Rust dependencies

@@ -160,6 +160,10 @@ packages/hashes with canonical v4 packages and rejects mixed or residual rows.
 
 #### Engine ABI
 
+- Pin Rust 1.97.1 across local, pull-request, release and production workflows,
+  and cold-rebuild all three committed WASM artifacts in hosted CI so compiler
+  drift or cached Cargo outputs cannot pass release verification.
+
 - Rebuild the production Rust/WASM artifact with the shared load-factor clamp
   and `10^-3 N` aerodynamic-drag boundary. No exported symbol, scenario schema,
   coefficient, or size ceiling changes.

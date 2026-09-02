@@ -28,6 +28,12 @@ Repository administrators retain emergency recovery authority but should not use
 
 ## Continuous integration
 
+All Rust jobs install repository-owned Rust 1.97.1 rather than a floating
+channel. The hosted Rust/WASM job removes cached outputs for the production
+engine and both verification crates, then reconstructs and byte-verifies every
+committed WASM artifact. A compiler update therefore requires an explicit,
+reviewed artifact transition and cannot first appear in production delivery.
+
 The protected Cloudflare verifier provisions the same content-keyed Poppler
 26.05.0 image required by `make ci-local` before entering that gate. A missing
 or substituted renderer therefore fails before migrations or Worker publish,

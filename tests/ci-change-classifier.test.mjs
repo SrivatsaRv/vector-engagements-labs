@@ -464,6 +464,7 @@ test("workflow changes fail closed through every available gate", () => {
     "container",
   ];
   assert.deepEqual(selected([".github/workflows/ci.yml"]), everyGate);
+  assert.deepEqual(selected(["rust-toolchain.toml"]), everyGate);
   assert.deepEqual(selected(["scripts/classify-ci-changes.mjs"]), everyGate);
   assert.deepEqual(selected(["governance/contract-doc-ownership.v1.json"]), everyGate);
   assert.deepEqual(selected(["scripts/lib/contract-doc-impact.mjs"]), everyGate);
