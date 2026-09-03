@@ -35,7 +35,7 @@ function assertHostedRendererProvisioning(workflow, installer, dockerfile, wrapp
   const jobSlices = [
     {
       job: workflow.slice(workflow.indexOf("  quality:\n"), workflow.indexOf("  security_js:\n")),
-      verifyCommand: "npm run generic-sensor:sources:verify",
+      verifyCommand: "run: make ci-quality-core",
     },
     {
       job: workflow.slice(workflow.indexOf("  web_tests:\n"), workflow.indexOf("  rust_tests:\n")),
@@ -755,8 +755,8 @@ test("hosted jobs provision the exact renderer before entering the offline gate"
     /poppler_version/,
   );
   const qualityWithLateInstall = workflow.replace(
-    "      - name: Install the pinned offline PDF renderer\n        run: scripts/install-pinned-poppler-ubuntu.sh",
-    "      - name: Enter the offline gate too early\n        run: npm run generic-sensor:sources:verify\n      - name: Install the pinned offline PDF renderer\n        run: scripts/install-pinned-poppler-ubuntu.sh",
+    "      - name: Install the pinned offline PDF renderer\n        run: scripts/install-pinned-poppler-ubuntu.sh\n      - name: Verify generated assets, lint, and types\n        run: make ci-quality-core",
+    "      - name: Verify generated assets, lint, and types\n        run: make ci-quality-core\n      - name: Install the pinned offline PDF renderer\n        run: scripts/install-pinned-poppler-ubuntu.sh",
   );
   assert.throws(
     () => assertHostedRendererProvisioning(qualityWithLateInstall, installer, dockerfile, wrapper),

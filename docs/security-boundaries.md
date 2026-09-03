@@ -5,6 +5,10 @@ callers are treated as attacker controlled before database or upstream work.
 
 ## Saved runs
 
+Production catalog verification now runs in a database-enforced read-only
+snapshot after migration. It cannot modify saved-run, scenario, model-pack, or
+catalog state while proving current readback.
+
 Current BVR records remain content-addressed and package-bound. Opening a #197
 BVR `1.2.0` record in the `1.3.0` workbench is rejected as a package mismatch;
 the prior verified state remains visible and unchanged.
@@ -212,6 +216,10 @@ spending limits and abuse monitoring remain deployment duties.
 
 ## Delivery trust
 
+Node 22.18.0, npm 10.9.3 and Rust 1.97.1 are exact local and hosted gate
+authorities. Local verification fails in one preflight before expensive work
+when Node, npm, Rust, the WASM target, or Poppler differs.
+
 Production, release and pull-request workflows use repository-owned Rust
 1.97.1. Hosted pull-request verification starts the three committed WASM builds
 from empty Cargo output directories and compares their reconstructed bytes with
@@ -357,6 +365,10 @@ identity, retention, or a production CSP report endpoint; those remain open
 items in #70.
 
 ## Offline reference-source quarantine
+
+The pinned renderer is provisioned in the hosted job before offline source
+verification. Renderer absence on a local macOS workstation cannot authorize
+source promotion or production exposure.
 
 The issue #148 source freeze is quarantined under
 `governance/generic-sensor-verification-sources/`. Production TypeScript,

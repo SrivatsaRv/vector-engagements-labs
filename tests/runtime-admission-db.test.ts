@@ -1,12 +1,35 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import postgres, { type Sql } from "postgres";
 
 import { withDatabase } from "../db";
 import { enforceRateLimit, PUBLIC_API_ADMISSION_POLICY, requestActorHash } from "../lib/security/runtime";
 import { admitSavedRun, releaseSavedRunAdmission } from "../lib/security/saved-run-admission";
 import { SAVED_RUN_LIFECYCLE_POLICY } from "../lib/security/admission-policy";
+import { runProductionReadOnlySnapshot } from "../scripts/verify-db.mjs";
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);
+
+test("production verification transaction rejects attempted database mutation", { skip: !hasDatabase }, async () => {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1 });
+  try {
+    const before = await sql`SELECT id, variant FROM platform_variants ORDER BY id`;
+    await assert.rejects(
+      () => runProductionReadOnlySnapshot(
+        sql,
+        (transaction: Sql) => transaction`UPDATE platform_variants SET variant=variant`,
+      ),
+      (error: unknown) => {
+        assert.equal((error as { code?: string }).code, "25006");
+        return true;
+      },
+    );
+    const after = await sql`SELECT id, variant FROM platform_variants ORDER BY id`;
+    assert.deepEqual(after, before);
+  } finally {
+    await sql.end();
+  }
+});
 
 test("Node adapter enforces the declared public limit in the durable database", { skip: !hasDatabase }, async () => {
   const previousRuntime = process.env.VECTOR_RUNTIME;

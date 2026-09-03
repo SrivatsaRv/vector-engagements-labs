@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import postgres from "postgres";
 import { canonicalJson } from "../lib/canonical-json.ts";
 import { admitEnvironmentPack } from "../lib/geospatial/environment-pack.ts";
@@ -14,13 +16,20 @@ import {
   CURRENT_MODEL_PACK_VERSION,
 } from "../lib/reference-model-pack.ts";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error("DATABASE_URL is required");
-const sql = postgres(connectionString, { max: 1 });
-const environmentUpgradeOnly = process.argv.includes("--environment-upgrade-only");
-if (process.argv.length > 2 && !environmentUpgradeOnly) throw new Error("Unknown verify-db argument.");
+export function parseDatabaseVerificationMode(args) {
+  const supported = new Set(["--environment-upgrade-only", "--production-read-only"]);
+  for (const argument of args) {
+    if (!supported.has(argument)) throw new Error(`Unknown verify-db argument: ${argument}`);
+  }
+  const environmentUpgradeOnly = args.includes("--environment-upgrade-only");
+  const productionReadOnly = args.includes("--production-read-only");
+  if (environmentUpgradeOnly && productionReadOnly) {
+    throw new Error("Environment-upgrade and production-read-only verification modes cannot be combined.");
+  }
+  return { environmentUpgradeOnly, productionReadOnly };
+}
 
-async function verifyEnvironmentUpgradeBeforeSeed() {
+async function verifyEnvironmentUpgradeBeforeSeed(sql) {
   const installationRows = await sql`SELECT id FROM installations
     WHERE id IN ${sql(PUBLIC_INSTALLATIONS.map((installation) => installation.id))}`;
   assert.equal(installationRows.length, PUBLIC_INSTALLATIONS.length, "migration must install every governed runway FK prerequisite");
@@ -90,9 +99,12 @@ async function verifyEnvironmentUpgradeBeforeSeed() {
   process.stdout.write(`verified migrate-without-seed: ${installationRows.length} installations, ${runwayRows.length} runways, ${packRows.length} EnvironmentPacks\n`);
 }
 
-try {
+export async function verifyDatabaseState(sql, {
+  environmentUpgradeOnly = false,
+  mutationProbes = true,
+} = {}) {
   if (environmentUpgradeOnly) {
-    await verifyEnvironmentUpgradeBeforeSeed();
+    await verifyEnvironmentUpgradeBeforeSeed(sql);
   } else {
   const [counts] = await sql`SELECT
     (SELECT count(*)::int FROM platform_variants) AS platforms,
@@ -159,7 +171,8 @@ try {
   assert.equal(regional.covered_areas, 6);
   assert.equal(regional.content_addressed, true);
 
-  const immutableMutations = [
+  if (mutationProbes) {
+    const immutableMutations = [
     ["id", (transaction) => transaction`UPDATE environment_packs SET id=id || ':mutated' WHERE ctid=(SELECT ctid FROM environment_packs LIMIT 1)`],
     ["version", (transaction) => transaction`UPDATE environment_packs SET version=version || '.mutated' WHERE ctid=(SELECT ctid FROM environment_packs LIMIT 1)`],
     ["digest", (transaction) => transaction`UPDATE environment_packs SET digest=${`sha256:${"0".repeat(64)}`} WHERE ctid=(SELECT ctid FROM environment_packs LIMIT 1)`],
@@ -179,21 +192,22 @@ try {
     ["installation_catalogue_digest", (transaction) => transaction`UPDATE environment_packs SET installation_catalogue_digest=${`sha256:${"0".repeat(64)}`} WHERE ctid=(SELECT ctid FROM environment_packs LIMIT 1)`],
     ["payload", (transaction) => transaction`UPDATE environment_packs SET payload=payload || '{"reviewMutation":true}'::jsonb WHERE ctid=(SELECT ctid FROM environment_packs LIMIT 1)`],
   ];
-  for (const [column, mutate] of immutableMutations) {
-    await assert.rejects(
-      sql.begin(async (transaction) => mutate(transaction)),
-      /environment pack content is immutable/u,
-      `published environment pack ${column} must reject in-place mutation`,
-    );
+    for (const [column, mutate] of immutableMutations) {
+      await assert.rejects(
+        sql.begin(async (transaction) => mutate(transaction)),
+        /environment pack content is immutable/u,
+        `published environment pack ${column} must reject in-place mutation`,
+      );
+    }
+    const [mutablePack] = await sql`SELECT id, version, digest, superseded_at FROM environment_packs ORDER BY id, version, digest LIMIT 1`;
+    const [superseded] = await sql`UPDATE environment_packs
+      SET superseded_at=COALESCE(superseded_at, now())
+      WHERE id=${mutablePack.id} AND version=${mutablePack.version} AND digest=${mutablePack.digest}
+      RETURNING superseded_at`;
+    assert.ok(superseded.superseded_at, "superseded_at is the only mutable EnvironmentPack lifecycle column");
+    await sql`UPDATE environment_packs SET superseded_at=${mutablePack.superseded_at}
+      WHERE id=${mutablePack.id} AND version=${mutablePack.version} AND digest=${mutablePack.digest}`;
   }
-  const [mutablePack] = await sql`SELECT id, version, digest, superseded_at FROM environment_packs ORDER BY id, version, digest LIMIT 1`;
-  const [superseded] = await sql`UPDATE environment_packs
-    SET superseded_at=COALESCE(superseded_at, now())
-    WHERE id=${mutablePack.id} AND version=${mutablePack.version} AND digest=${mutablePack.digest}
-    RETURNING superseded_at`;
-  assert.ok(superseded.superseded_at, "superseded_at is the only mutable EnvironmentPack lifecycle column");
-  await sql`UPDATE environment_packs SET superseded_at=${mutablePack.superseded_at}
-    WHERE id=${mutablePack.id} AND version=${mutablePack.version} AND digest=${mutablePack.digest}`;
 
   const [runwayGeometry] = await sql`SELECT
     count(*) FILTER (WHERE centreline IS NOT NULL AND ST_SRID(centreline)=4326 AND ST_IsValid(centreline))::int AS sourced_geometry,
@@ -346,6 +360,47 @@ try {
   });
   process.stdout.write(`database verified: ${JSON.stringify(counts)}\n`);
   }
-} finally {
-  await sql.end();
+}
+
+export async function runProductionReadOnlySnapshot(database, verification) {
+  return database.begin("isolation level repeatable read read only", verification);
+}
+
+export async function runDatabaseVerification({
+  connectionString,
+  args = [],
+  createClient = postgres,
+  verifyState = verifyDatabaseState,
+}) {
+  if (!connectionString) throw new Error("DATABASE_URL is required");
+  const mode = parseDatabaseVerificationMode(args);
+  const database = createClient(connectionString, { max: 1 });
+  try {
+    if (mode.productionReadOnly) {
+      return await runProductionReadOnlySnapshot(
+        database,
+        (transaction) => verifyState(transaction, {
+          environmentUpgradeOnly: false,
+          mutationProbes: false,
+        }),
+      );
+    }
+    return await verifyState(database, {
+      environmentUpgradeOnly: mode.environmentUpgradeOnly,
+      mutationProbes: true,
+    });
+  } finally {
+    await database.end();
+  }
+}
+
+async function run() {
+  await runDatabaseVerification({
+    connectionString: process.env.DATABASE_URL,
+    args: process.argv.slice(2),
+  });
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  await run();
 }

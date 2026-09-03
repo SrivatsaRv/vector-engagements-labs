@@ -101,6 +101,10 @@ promote a Stage-B identity.
 
 ## Closed requirements and evidence states
 
+Production catalog verification now reads these authorities inside a
+database-enforced read-only snapshot after migrations. It cannot promote an
+evidence state or alter a pack while checking it.
+
 Issue #207 does not add named-aircraft evidence: database verification counts
 the new retired scenario version while continuing to require the same exact
 intended-use, credibility, and generic model-pack authorities.
@@ -169,6 +173,10 @@ satisfy an aircraft requirement or repair an aircraft evidence gap; each family
 must pass its own admission contract before later scenario composition.
 
 ## Step-by-step onboarding
+
+The deployment preflight checks only the checksum-bound migration prefix. It
+does not run final pack admission against the old schema. Full pack readback
+runs after the pending migration suffix is applied.
 
 Migration 019 reuses the existing compiled pack and therefore adds no onboarding
 step; the database gate verifies that scenario versioning cannot create or
@@ -260,6 +268,10 @@ the repository policy.
 
 ## Anonymous worked example
 
+The production read-only mode verifies the same anonymous pack rows as the
+disposable integration verifier but omits deliberate UPDATE probes. It changes
+neither the example inputs nor their content digests.
+
 The issue #207 database readback is an additional negative control for this
 example: a new scenario version changes catalog history, not anonymous pack
 content, configuration coverage, or verification evidence.
@@ -302,6 +314,10 @@ payload. Pairing either example with a regional EnvironmentPack would create a
 separate scenario identity without changing the compiled aircraft-pack digest.
 
 ## Bounds, storage, and recovery
+
+Production verification holds one repeatable-read, read-only snapshot. The
+trigger and lifecycle mutation matrix remains confined to disposable databases,
+so verification cannot create a recovery event.
 
 Backup and recovery verification now expects 22 scenario rows after migration
 019 while preserving the existing compiled-model-pack and credibility rows
@@ -363,6 +379,10 @@ its aircraft research backup format.
 
 ## Performance evidence
 
+Migration-prefix admission and post-migration readback are release gates, not
+model-pack performance results. Existing engine and capacity budgets are
+unchanged.
+
 The additional retired scenario row is verified as catalog history and is not
 loaded into the per-tick model-pack runtime or counted as a new execution pack.
 
@@ -407,6 +427,10 @@ measurements are not folded into Stage-B compile, publication or reuse timing.
 | non-promotable until runtime admission lands | Stage B is being used as Stage D | complete #154 first, then the separately reviewed Worker/runtime/VSR admission stage |
 
 ## Nonclaims and deferred owners
+
+Successful read-only catalog verification proves migration and identity
+consistency only. It does not add named-platform fidelity or effectiveness
+authority.
 
 Neither the BVR KILL demonstration nor its retained database history admits
 named Su-30MKI, F-16C, Astra, AIM-120, sensor, or pilot performance.

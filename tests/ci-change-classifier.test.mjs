@@ -29,6 +29,10 @@ test("contract-documentation policy surfaces fail closed across every hosted gat
     "scripts/lib/git-name-status.mjs",
     "scripts/verify-contract-doc-impact.mjs",
     "tests/contract-doc-impact.test.mjs",
+    "scripts/lib/toolchain-authority.mjs",
+    "scripts/verify-toolchain.mjs",
+    "tests/toolchain-authority.test.mjs",
+    ".node-version",
     "package.json",
   ]) {
     assert.deepEqual(selected([path]), [
@@ -91,6 +95,28 @@ test("Rust physics implementation changes receive parity and built-browser tests
     "browser_tests",
     "rust_tests",
   ]);
+});
+
+test("engine freshness tests select the Rust contract", () => {
+  assert.deepEqual(selected(["tests/rust-engine-wasm-freshness.test.mjs"]), [
+    "policy",
+    "quality",
+    "security_js",
+    "web_tests",
+    "rust_tests",
+  ]);
+});
+
+test("migration ledger preflight changes select database integration", () => {
+  for (const path of [
+    "scripts/lib/migration-ledger.mjs",
+    "scripts/verify-db-migration-ledger.mjs",
+    "tests/migration-ledger-preflight.test.mjs",
+  ]) {
+    const gates = selected([path]);
+    assert.equal(gates.includes("integration"), true, `${path} must select database integration`);
+    assert.equal(gates.includes("web_tests"), true, `${path} must select contract tests`);
+  }
 });
 
 test("runtime and engine changes execute the built Worker browser verifier", () => {

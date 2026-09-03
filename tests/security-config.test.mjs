@@ -120,9 +120,10 @@ test("verification WASM builds replace host paths and ambient Rust flags", async
 });
 
 test("pull-request validation is change-aware with one stable required gate", async () => {
-  const [ci, scheduledCodeql] = await Promise.all([
+  const [ci, scheduledCodeql, makefile] = await Promise.all([
     read(".github/workflows/ci.yml"),
     read(".github/workflows/codeql.yml"),
+    read("Makefile"),
   ]);
   assert.match(ci, /classify:/);
   assert.match(ci, /classify-ci-changes\.mjs/);
@@ -130,17 +131,18 @@ test("pull-request validation is change-aware with one stable required gate", as
   assert.match(ci, /if: always\(\)/);
   assert.match(ci, /needs:\s*\n\s*- classify/);
   assert.match(ci, /npm run audit:production/);
-  assert.match(ci, /cargo audit/);
+  assert.match(ci, /make rust-audit-local/);
   assert.match(ci, /make integration-ci/);
   assert.match(ci, /name: "Stage 2D: Browser Contract"/);
   assert.match(ci, /npx playwright install --with-deps chromium/);
   assert.match(ci, /npm run test:component/);
   assert.match(ci, /npm run test:browser/);
-  assert.match(ci, /npm run environment:sources:verify/);
+  assert.match(ci, /make ci-quality-core/);
+  assert.match(makefile, /npm run environment:sources:verify/);
   assert.match(ci, /npm run generic-sensor:sources:verify/);
   assert.match(ci, /npm run build[\s\S]*npm run generic-sensor:sources:verify/);
-  assert.match(ci, /npm run policy:aircraft-evidence:verify/);
-  assert.match(ci, /npm run reference-aircraft:verify/);
+  assert.match(makefile, /npm run policy:aircraft-evidence:verify/);
+  assert.match(makefile, /npm run reference-aircraft:verify/);
   assert.doesNotMatch(ci, /performance-local|benchmark-engine/);
   assert.doesNotMatch(scheduledCodeql, /pull_request:|branches: \[main\]/);
 });

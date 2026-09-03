@@ -28,10 +28,21 @@ test("production operations admit one immutable reviewed commit and never seed p
   assert.doesNotMatch(workflow, /ref: \$\{\{ inputs\.ref \}\}/);
   assert.match(workflow, /wrangler hyperdrive get/);
   assert.match(workflow, /npm run db:migrate/);
-  assert.match(workflow, /npm run db:verify/);
+  assert.match(workflow, /node scripts\/verify-db\.mjs --production-read-only/);
+  assert.match(verifyJob, /ref: \$\{\{ github\.sha \}\}[\s\S]*path: \.trusted-release/);
+  assert.match(verifyJob, /node \.trusted-release\/scripts\/verify-db-migration-ledger\.mjs/);
   assert.doesNotMatch(workflow, /npm run db:seed/);
-  assert.doesNotMatch(verifyJob, /npm run db:migrate|npm run db:seed/);
+  assert.doesNotMatch(verifyJob, /npm run db:migrate|npm run db:verify|npm run db:seed/);
   assert.match(migrateJob, /if: inputs\.operation == 'deploy'/);
+  const migratePreflightAt = migrateJob.indexOf("node .trusted-release/scripts/verify-db-migration-ledger.mjs");
+  const migrateAt = migrateJob.indexOf("npm run db:migrate");
+  const fullVerifyAt = migrateJob.indexOf("node scripts/verify-db.mjs --production-read-only");
+  assert.ok(migratePreflightAt >= 0, "migration must repeat the trusted read-only preflight immediately before mutation");
+  assert.ok(
+    migratePreflightAt < migrateAt && migrateAt < fullVerifyAt,
+    "production database order must be read-only preflight, migration, then full verification",
+  );
+  assert.doesNotMatch(migrateJob, /npm run db:verify/);
   assert.match(workflow, /Verify deployed health/);
 });
 

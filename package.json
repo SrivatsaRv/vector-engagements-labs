@@ -11,9 +11,12 @@
     "url": "https://github.com/SrivatsaRv/vector-engagements-labs/issues"
   },
   "engines": {
-    "node": ">=22.13.0"
+    "node": "22.18.0",
+    "npm": "10.9.3"
   },
+  "packageManager": "npm@10.9.3",
   "scripts": {
+    "toolchain:verify": "node scripts/verify-toolchain.mjs",
     "predev": "npm run map:assets:prepare",
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
     "prebuild": "npm run map:assets:prepare",

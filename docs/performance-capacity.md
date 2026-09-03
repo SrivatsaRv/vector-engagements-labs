@@ -240,6 +240,10 @@ proof, x86-64 capacity result, or named-sensor performance claim.
 
 ## Required performance test matrix
 
+The stricter production-engine freshness check adds no runtime work and changes
+no latency, memory, Worker, or WASM-size limit. Its adversarial test runs before
+performance evidence and rejects alternate valid module bytes.
+
 Target-effect delivery adds exact baseline/candidate WASM raw/compressed size,
 built Worker growth, Chromium initialization and 100-run retained-memory soak
 to the existing engine latency and capacity matrix. Passing parity does not

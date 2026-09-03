@@ -331,6 +331,10 @@ database.
 
 ## Intended use and credibility
 
+Post-migration production verification reads intended-use and credibility
+records in one read-only snapshot. It cannot promote either state while
+checking the current catalog.
+
 Issue #207 retains the existing generic intended-use and credibility identities;
 the database verifier treats migration 019 as scenario history only and rejects
 any accompanying model-pack promotion.
@@ -492,6 +496,10 @@ compiler. Production admission cannot consume or relabel this adapter.
 
 ## Scenario binding and patches
 
+The migration preflight admits a pending checksum-bound migration suffix; it
+does not resolve a scenario against the old schema. Exact scenario-to-pack
+binding is verified only after migration.
+
 The BVR `1.3.0` package binds the same exact compiled model pack as its retained
 `1.2.0` predecessor. Its outcome change is authored geometry, not a model-pack
 patch or database-selected coefficient branch.
@@ -568,6 +576,10 @@ Draft patch addition creates a new revision.
 
 ## Loadout compatibility
 
+Production readback checks the current compatibility graph without issuing
+loadout or pack UPDATE probes. The mutating negative tests remain part of
+disposable integration.
+
 Migration 019 does not alter station, store, quantity, or compatibility
 authority; database readback continues to require the existing compiled graph.
 
@@ -635,6 +647,10 @@ incompatible data rejects the scenario; it never falls back to the legacy model
 authoring list or a weapon-name heuristic.
 
 ## Persistence
+
+Before migration, deployment accepts only an exact checksum-bound prefix of the
+selected revision's migration manifest. After migration, complete pack and
+scenario persistence is verified in a repeatable-read, read-only transaction.
 
 After migration 019 the database contains nine validated current scenario rows
 and 13 immutable retired rows, while compiled model-pack, intended-use, and
@@ -912,6 +928,11 @@ environment envelope rejects the pack during compilation and Rust/WASM
 validation. The runtime must not fill the gap with a scalar fallback.
 
 ## Verification
+
+`scripts/verify-db.mjs --production-read-only` executes the complete catalog
+readback after migration with PostgreSQL enforcing a read-only snapshot. The
+default integration mode retains immutable-trigger and lifecycle mutation
+probes against its disposable database.
 
 `scripts/verify-db.mjs` now asserts that exact 22-row scenario history beside
 unchanged model-pack identities, preventing a newly retained scenario version

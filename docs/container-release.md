@@ -148,8 +148,16 @@ it does not delete pack or runway evidence. Restore remains the recovery path
 for a migration failure.
 
 Forward-only migrations execute as a health-gated one-shot job before the
-application starts. Production never runs the `seed` profile/service. Before a
-release containing migrations, take a database-provider snapshot or an
+application starts. Production never runs the `seed` profile/service.
+Production delivery does not run the current final-state verifier before those
+migrations. Its preflight uses a repeatable-read, read-only transaction to
+require that `schema_migrations` is an exact checksum-bound prefix of the
+selected revision. A pending suffix is admitted. The mutating job repeats that
+preflight, applies the suffix, and then runs the complete catalog readback in a
+new database-enforced read-only transaction. Trigger and lifecycle mutation
+probes remain limited to disposable integration databases.
+
+Before a release containing migrations, take a database-provider snapshot or an
 encrypted logical backup and verify its retention and restore target outside
 the repository. A generic local logical backup is:
 

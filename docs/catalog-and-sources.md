@@ -222,6 +222,11 @@ airborne-placement-only.
 
 ## Generic sensor verification source freeze
 
+Hosted verifier jobs restore the content-keyed Poppler image before invoking
+the shared Make quality target. Local macOS may omit that hosted renderer; the
+source freeze remains blocked from production exposure until the hosted gate
+passes.
+
 `governance/generic-sensor-verification-sources/manifest.v1.json` is a separate
 Stage-0, content-addressed research-source record with intended use
 `ENGINE_VERIFICATION_ONLY_SOURCE_FREEZE`. It preserves exact public reference

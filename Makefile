@@ -1,4 +1,16 @@
-.PHONY: ci-local ci-quality ci-tests db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local capacity-baseline-local reference-aircraft-local reference-aam-local generic-sensor-sources-local generic-mission-policy-sources-local tp1538-adjudication-local tp1538-aero-local air-reference-local worker-local frontend-local browser-local clean-clone-local
+.PHONY: ci-local ci-quality ci-quality-core ci-tests toolchain-preflight rust-audit-local db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local capacity-baseline-local reference-aircraft-local reference-aam-local generic-sensor-sources-local generic-mission-policy-sources-local tp1538-adjudication-local tp1538-aero-local air-reference-local worker-local frontend-local browser-local clean-clone-local
+
+toolchain-preflight:
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		VECTOR_TOOLCHAIN_ALLOW_MISSING_POPPLER=1 npm run toolchain:verify; \
+	else \
+		npm run toolchain:verify; \
+	fi
+
+rust-audit-local:
+	cargo audit --file engine-rust/Cargo.lock
+	cargo audit --file verification-rust/generic-aam/Cargo.lock
+	cargo audit --file verification-rust/tp1538-aero/Cargo.lock
 
 db-up: compose-build
 	docker compose up -d database
@@ -118,6 +130,9 @@ clean-clone-local:
 
 ci-quality:
 	npm run policy:contract-docs:verify
+	$(MAKE) ci-quality-core
+
+ci-quality-core:
 	npm run environment:sources:verify
 	npm run generic-sensor:sources:verify
 	npm run environment:migration:verify
@@ -159,5 +174,7 @@ ci-tests:
 	npm test
 	npm run test:component
 
-ci-local: ci-quality ci-tests
+ci-local: toolchain-preflight
+	$(MAKE) ci-quality
+	$(MAKE) ci-tests
 	npm run audit:production

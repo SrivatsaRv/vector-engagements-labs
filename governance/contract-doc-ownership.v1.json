@@ -122,6 +122,22 @@
         },
         {
           "kind": "EXACT",
+          "value": "scripts/verify-toolchain.mjs",
+          "facets": [
+            "delivery",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/lib/toolchain-authority.mjs",
+          "facets": [
+            "delivery",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "Makefile",
           "facets": [
             "delivery"
@@ -130,6 +146,13 @@
         {
           "kind": "EXACT",
           "value": "package.json",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": ".node-version",
           "facets": [
             "delivery"
           ]
@@ -224,6 +247,13 @@
         {
           "kind": "EXACT",
           "value": "tests/contract-doc-impact.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/toolchain-authority.test.mjs",
           "facets": [
             "verification"
           ]
@@ -1512,6 +1542,22 @@
         },
         {
           "kind": "EXACT",
+          "value": "scripts/lib/migration-ledger.mjs",
+          "facets": [
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "scripts/verify-db-migration-ledger.mjs",
+          "facets": [
+            "schema",
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "scripts/node-postgres-adapter.mjs",
           "facets": [
             "storage"
@@ -1550,6 +1596,13 @@
         {
           "kind": "EXACT",
           "value": "tests/runtime-admission-db.test.ts",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/migration-ledger-preflight.test.mjs",
           "facets": [
             "verification"
           ]
@@ -1723,6 +1776,13 @@
         {
           "kind": "EXACT",
           "value": "tests/engine-backends.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/rust-engine-wasm-freshness.test.mjs",
           "facets": [
             "verification"
           ]
@@ -6032,5 +6092,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "6b02408b0d52397bbb68724e9ee76b3cee4d20a915d36244d4ec1fc98f419f89"
+  "canonicalSha256": "5da723533112ebfd0fe7b43628f16ccc4f79b68f8c37472280f7606607902048"
 }
