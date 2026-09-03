@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm as removePath, symlink, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -19,6 +19,12 @@ import { declarationTemplate, resolvePolicyBootstrap, resolvePushDeclaration, ru
 
 const sha = (character) => character.repeat(64);
 const commitSha = (character) => character.repeat(40);
+const rm = (path, options, remove = removePath) => remove(
+  path,
+  options?.recursive
+    ? { ...options, maxRetries: 5, retryDelay: 100 }
+    : options,
+);
 const canonicalJson = (value) => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value && typeof value === "object") {
@@ -39,6 +45,17 @@ const digest = "a".repeat(64);
 process.stdout.write(JSON.stringify({schemaVersion:"vector.contract-doc-probe-result.v1",probeId,familyId,disposition,baseSha,headSha,assertions:[{id:assertionId,status:"PASS",beforeSha256:digest,afterSha256:digest,evidenceSha256:digest}]}) + "\\n");
 `;
 const fixtureProbeSha256 = createHash("sha256").update(fixtureProbeSource).digest("hex");
+
+test("temporary fixture cleanup retries transient recursive removal races", async () => {
+  let invocation;
+  await rm("/fixture", { recursive: true, force: true }, async (path, options) => {
+    invocation = { path, options };
+  });
+  assert.deepEqual(invocation, {
+    path: "/fixture",
+    options: { recursive: true, force: true, maxRetries: 5, retryDelay: 100 },
+  });
+});
 
 const policy = {
   schemaVersion: "vector.contract-doc-ownership.v1",
@@ -154,6 +171,8 @@ async function fixtureRepository() {
   runGit(root, ["init", "--quiet"]);
   runGit(root, ["config", "user.email", "tests@example.invalid"]);
   runGit(root, ["config", "user.name", "VECTOR tests"]);
+  runGit(root, ["config", "gc.auto", "0"]);
+  runGit(root, ["config", "maintenance.auto", "false"]);
   await mkdir(join(root, "docs"), { recursive: true });
   await mkdir(join(root, "lib"), { recursive: true });
   await mkdir(join(root, "tests", "example"), { recursive: true });

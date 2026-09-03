@@ -9,6 +9,12 @@ verification WASM artifacts. Hosted CI removes all three Cargo output
 directories before reconstructing and byte-checking those artifacts. Release
 and production workflows install the same compiler version; a floating channel
 or cached target directory is not artifact authority.
+The production builder ignores caller-selected Cargo binaries, compiler
+wrappers, targets, profiles and Rust flags, uses its repository-owned target
+directory, and fixes locale, timezone and incremental compilation settings.
+Freshness requires the optimized bytes and complete generated source to equal
+the committed artifact. A valid module with matching exports but different
+bytes is rejected.
 The generic-AAM and TP-1538 builders also standardize on Linux/amd64, replace
 host workspace, Cargo and Rustup paths with canonical prefixes, and discard
 ambient Rust flags. A non-Linux-x64 workstation therefore builds those two
@@ -198,6 +204,12 @@ Rust/WASM retain exact frame and event-stream equality.
 Backend provenance now sits beside one content-addressed regional pack. A run
 is rejected when the runtime grid, source grids or compact pack binding do not
 match the archived EnvironmentPack digest.
+The embedded production-engine digest identifies the exact admitted module.
+The freshness gate cannot replace or reseal that digest from a caller-provided
+module; it accepts only the canonical source-derived artifact committed for the
+revision. WASM binaries are validated by their content digest and ABI exports;
+exact byte equality is not required across host architectures because
+Rust/WASM toolchains can emit platform-specific metadata.
 
 The selected production backend is owned by the content-addressed
 `DeploymentCapabilityManifest`; it is not a scenario field, URL parameter,
@@ -222,7 +234,7 @@ promotion against the unchanged full Air-mission authority.
 
 ## Build and verification
 
-Rebuilding the artifact requires Rust stable, Cargo on `PATH`, and the
+Rebuilding the artifact requires Rust 1.97.1, Cargo on `PATH`, and the
 `wasm32-unknown-unknown` target. The build then applies the exact
 `binaryen@131.0.0 -O3 -S2 --reorder-functions rust-wasm-features-v1` post-link policy before
 content-addressing and embedding the module. The optimizer identity participates
@@ -253,6 +265,9 @@ runtime.
 Backend eligibility includes the exact limited `commandedG` and canonical
 aerodynamic-drag value. A backend that reconstructs the clamp from vector magnitude
 or retains a host-specific last bit in that force cannot cross the swap boundary.
+Build admission is equally strict: matching ABI exports do not make alternate
+WASM bytes eligible. The fresh optimized module must equal the committed module
+before either its numerical parity or runtime selection evidence is accepted.
 
 The three #197 studies cross the existing swap boundary as ordinary compiled
 Air scenarios. `runDurationSeconds` changes only the existing terminal time

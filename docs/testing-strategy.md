@@ -57,6 +57,10 @@ remain mandatory to prove nonpromotion and regression safety.
 
 ## Generic sensor Stage-0 source freeze
 
+The hosted source-freeze job provisions the exact Poppler renderer before the
+shared quality gate. Its workflow assertion accepts the Make-owned verifier,
+so command ownership cannot drift between local and hosted checks.
+
 `npm run generic-sensor:sources:verify` first proves the generated manifest and
 all derived governance records are current, then verifies the offline bundle.
 Every generator, verifier, and focused adversarial test process preloads the
@@ -341,18 +345,29 @@ matrix rows.
 
 ## Existing baseline
 
-The repository owns Rust 1.97.1 as the compiler for every committed WASM
-artifact. Hosted Rust verification deletes the Cargo outputs for the production
+The repository owns Node 22.18.0, npm 10.9.3 and Rust 1.97.1 for the commit
+gate. `npm run toolchain:verify` reports every mismatch in one preflight so an
+incorrect workstation fails before builds or tests begin. macOS may omit the
+hosted-only pinned Poppler renderer; Linux CI and release gates require the
+exact renderer. The Stage 1A quality
+job calls the same `ci-quality-core` Make target used locally, including all
+four migration-freshness checks, instead of maintaining a shorter YAML copy.
+
+Rust 1.97.1 is the compiler for every committed WASM artifact. Hosted Rust
+verification deletes the Cargo outputs for the production
 engine, generic AAM verifier and TP-1538 verifier before rebuilding and
-byte-checking all three artifacts. Release and production workflows install the
+freshness-checking all three artifacts. Release and production workflows install the
 same exact compiler. A floating `stable` toolchain or cached target directory is
 not release evidence.
+The production engine freshness check compares the canonical generated source
+and embedded content integrity metadata. An alternate valid module with the same
+ABI exports is rejected by the regenerated metadata. RustSec admission uses one Make target that audits the
+production engine and both verification lockfiles.
 The verification builders additionally own Linux/amd64 as their artifact
 target, canonicalize workspace, Cargo and Rustup paths, and replace ambient Rust
-flags. Non-Linux-x64 local gates use the digest-pinned Rust 1.97.1 builder image;
-Linux x64 CI builds natively under the identical compiler, remap policy and
-Binaryen 131.0.0 optimizer. Regression coverage checks the platform decision,
-image digest, exact path-remap flags and both cold artifact freshness commands.
+flags. Linux x64 CI builds under the pinned compiler, remap policy and Binaryen
+131.0.0 optimizer. Regression coverage checks the platform decision, image
+digest, exact path-remap flags and both cold artifact freshness commands.
 
 Production verification binds the contract-documentation base and tested head
 to the same admitted SHA. A regression fixture keeps a newer main tip present
@@ -425,7 +440,11 @@ complete TypeScript/Rust-WASM state parity, bounded record readback, replacement
 Worker recovery, production isolation and the 500,000-byte WASM ceiling.
 
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and
-production-audit checks. It first runs the same contract-documentation impact
+production-audit checks. Before those expensive layers it requires exact Node
+22.18.0, npm 10.9.3, Rust 1.97.1, the `wasm32-unknown-unknown` target and
+Poppler 26.05.0. `.node-version`, `package.json` and `rust-toolchain.toml` are
+the local authority; a version range or ambient workstation default is not
+release evidence. It then runs the same contract-documentation impact
 validator used by hosted CI. Governed feature branches must supply an explicit
 declaration file or JSON value; an absent declaration fails as soon as the
 merge-base-to-worktree change set contains a registered family. The verifier

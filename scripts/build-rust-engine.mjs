@@ -14,12 +14,13 @@ import binaryen from "binaryen";
 
 const root = resolve(import.meta.dirname, "..");
 const manifest = resolve(root, "engine-rust/Cargo.toml");
+const targetDirectory = resolve(root, "engine-rust/target");
 const wasmPath = resolve(
-  root,
-  "engine-rust/target/wasm32-unknown-unknown/release/vector_engine.wasm",
+  targetDirectory,
+  "wasm32-unknown-unknown/release/vector_engine.wasm",
 );
 const generatedPath = resolve(root, "lib/engine/generated/vector-engine-wasm.ts");
-const cargo = process.env.CARGO ?? "cargo";
+const cargo = "cargo";
 const check = process.argv.includes("--check");
 const optimizer = "binaryen@131.0.0 -O3 -S2 --reorder-functions rust-wasm-features-v1";
 const optimizerFeatures =
@@ -29,6 +30,39 @@ const optimizerFeatures =
   binaryen.Features.SignExt |
   binaryen.Features.ReferenceTypes |
   binaryen.Features.BulkMemoryOpt;
+
+function rustEngineBuildEnvironment(sourceEnvironment = process.env) {
+  const environment = { ...sourceEnvironment };
+  const exactOverrides = new Set([
+    "CARGO",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "CARGO_INCREMENTAL",
+    "CARGO_TARGET_DIR",
+    "RUSTC",
+    "RUSTC_BOOTSTRAP",
+    "RUSTC_WRAPPER",
+    "RUSTC_WORKSPACE_WRAPPER",
+    "RUSTDOC",
+    "RUSTDOCFLAGS",
+    "RUSTFLAGS",
+    "RUSTUP_TOOLCHAIN",
+  ]);
+  for (const key of Object.keys(environment)) {
+    if (
+      exactOverrides.has(key) ||
+      key.startsWith("CARGO_BUILD_") ||
+      key.startsWith("CARGO_PROFILE_") ||
+      key.startsWith("CARGO_TARGET_")
+    ) {
+      delete environment[key];
+    }
+  }
+  environment.CARGO_INCREMENTAL = "0";
+  environment.LANG = "C";
+  environment.LC_ALL = "C";
+  environment.TZ = "UTC";
+  return environment;
+}
 
 function collectSourceFiles(directory) {
   return readdirSync(directory)
@@ -72,6 +106,13 @@ function verifyModule(bytes, label) {
   }
 }
 
+function moduleExportNames(bytes) {
+  return WebAssembly.Module.exports(new WebAssembly.Module(bytes))
+    .map(({ name }) => name)
+    .sort()
+    .join("\0");
+}
+
 try {
   execFileSync(
     cargo,
@@ -83,8 +124,10 @@ try {
       "wasm32-unknown-unknown",
       "--manifest-path",
       manifest,
+      "--target-dir",
+      targetDirectory,
     ],
-    { cwd: root, stdio: "inherit" },
+    { cwd: root, env: rustEngineBuildEnvironment(), stdio: "inherit" },
   );
 } catch (error) {
   if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
@@ -153,6 +196,9 @@ if (check) {
   }
   verifyModule(committedWasm, "Committed Rust/WASM module");
   verifyModule(wasm, "Freshly compiled Rust/WASM module");
+  if (moduleExportNames(committedWasm) !== moduleExportNames(wasm)) {
+    throw new Error("The freshly compiled Rust/WASM module exports do not match the committed engine module. Run npm run engine:rust:build.");
+  }
   process.stdout.write(`${JSON.stringify({ state: "verified", sourceSha256, sha256: committedSha, bytes: committedBytes })}\n`);
 } else {
   mkdirSync(dirname(generatedPath), { recursive: true });

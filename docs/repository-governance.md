@@ -33,16 +33,28 @@ channel. The hosted Rust/WASM job removes cached outputs for the production
 engine and both verification crates, then reconstructs and byte-verifies every
 committed WASM artifact. A compiler update therefore requires an explicit,
 reviewed artifact transition and cannot first appear in production delivery.
+The production-engine builder discards ambient Cargo, compiler, wrapper,
+target, profile and Rust-flag overrides and writes to its repository-owned
+target directory. Its check compares the complete fresh optimized bytes and
+canonical generated source with the committed module. Export-name and
+self-hash checks alone are not freshness evidence.
 The two verification artifacts additionally have one governed build target:
 Linux/amd64. Their builders replace workspace, Cargo-home and Rustup-home paths,
 discard ambient Rust flags, and use digest-pinned `rust@sha256:0e2bcaef…` on
 other developer hosts. This prevents host linker layout or registry paths from
 creating a locally green artifact that differs in deployment.
 
-The protected Cloudflare verifier provisions the same content-keyed Poppler
-26.05.0 image required by `make ci-local` before entering that gate. A missing
-or substituted renderer therefore fails before migrations or Worker publish,
-while the admitted commit remains the sole contract-document comparison base.
+Node 22.18.0 and npm 10.9.3 are exact repository authorities, recorded in
+`.node-version` and `package.json`. `make ci-local` checks Node, npm, Rust, the
+WASM target and Poppler before starting expensive work. Hosted jobs use the
+same values. A workstation with a different runtime fails immediately instead
+of producing evidence that cannot be compared with CI.
+
+The protected Cloudflare and tagged-release verifiers provision the same
+content-keyed Poppler 26.05.0 image required by `make ci-local` before entering
+that gate. A missing or substituted renderer therefore fails before migrations,
+release publication or Worker publish, while the admitted commit remains the
+sole contract-document comparison base.
 An admitted historical revision that predates the renderer contract skips only
 that absent bootstrap and remains subject to its own revision-local gates.
 
@@ -563,18 +575,19 @@ release-blocking until datum-compatible, cell-specific runway elevation
 evidence replaces that bounded public-educational assumption; it does not
 broaden `STUB-24` or turn the ground-performance envelope into sourced data.
 
-Browser/responsive checks and performance benchmarks are deliberately not run
-on GitHub-hosted pull-request runners. They remain explicit maintainer checks
-through `make integration-local` and `make performance-local`, where the
-browser, GPU/software renderer, display dimensions, and machine class are
-controlled and the evidence is interpretable. The scheduled `codeql.yml`
-workflow retains weekly security analysis without creating a second PR run.
+The change-selected browser contract runs on GitHub-hosted pull-request runners
+with pinned Chromium, five governed viewports, zero retries and retained
+failure evidence. Hardware-sensitive visual and performance claims remain
+explicit maintainer checks through `make integration-local` and
+`make performance-local`, where the renderer, display dimensions and machine
+class are controlled. The scheduled `codeql.yml` workflow retains weekly
+security analysis without creating a second PR run.
 
 Rust sources carry a deterministic source digest; the embedded module carries
 its own byte digest and required-export check; CI also compiles the module
-afresh on its runner. This avoids incorrectly requiring different compiler
-platforms to emit byte-identical WASM. Actions are pinned to immutable commit
-SHAs.
+afresh and requires exact equality with the committed bytes. Developer-host
+output is not release authority when its governed builder path differs.
+Actions are pinned to immutable commit SHAs.
 
 Pull requests receive CodeQL and dependency review inside the causal `ci.yml`
 pipeline. `codeql.yml` is reserved for the weekly scheduled scan and explicit
@@ -583,8 +596,9 @@ ecosystem, groups routine npm, Cargo, and Actions updates, and excludes major
 versions so they require an intentional maintainer proposal.
 
 The commit gate rejects high-severity production dependency advisories. Cargo
-manifest changes and releases also audit `engine-rust/Cargo.lock` with the
-pinned `cargo-audit` version and current RustSec advisory database. The
+manifest changes and releases audit all three lockfiles through one Make-owned
+target with the pinned `cargo-audit` version and current RustSec advisory
+database. The
 Cloudflare Vite adapter, Wrangler, and Workers type package are upgraded as one
 tested compatibility set. They are temporarily frozen at adapter `1.46.0`,
 Wrangler `4.113.0`, and Workers types `5.20260721.1` by
@@ -616,8 +630,10 @@ SPDX SBOM and SHA-256 manifest, and publishes the archive plus image through the
 protected `release` environment. The image is written to GHCR with only the
 exact SemVer and full commit-SHA tags, then attested and recorded by digest.
 There is no moving `latest`, major, or minor tag. Promotion and rollback change
-the `VECTOR_IMAGE` digest consumed by Compose; they never rebuild or retag the
-artifact. Tag pushes alone cannot execute release code. The `release`
+the `VECTOR_IMAGE` digest consumed by Compose; they do not retag the artifact.
+The current publication job still rebuilds the image after verification, so it
+does not yet prove build-once byte promotion. Issue #111 owns that remaining
+release-plane correction. Tag pushes alone cannot execute release code. The `release`
 environment accepts protected branches and requires an explicit maintainer
 approval before publication. Docker Hub is not configured.
 
@@ -625,10 +641,13 @@ Cloudflare delivery is deliberately manual and protected by the GitHub
 `production` environment. Both verification and deployment require a full
 40-character commit SHA from `main` with a successful Required PR Gate before
 any production credential is exposed. Verification checks source, Hyperdrive,
-and the production catalog read-only. Deployment alone applies forward-only
-migrations, deploys the admitted revision, and verifies production health. It
-never seeds production implicitly. The environment accepts protected branches
-and requires an explicit maintainer approval before credentials are released.
+and the checksum-bound production migration prefix in a read-only transaction.
+Deployment alone applies forward-only migrations, runs the full catalog
+verifier in a repeatable-read, read-only transaction, deploys the admitted
+revision, and verifies production health. Mutation probes remain confined to
+disposable integration databases. It never seeds production implicitly. The
+environment accepts protected branches and requires an explicit maintainer
+approval before credentials are released.
 The workflow requires two protected secrets and three non-secret environment
 variables:
 

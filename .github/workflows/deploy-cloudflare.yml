@@ -111,10 +111,16 @@ jobs:
         env:
           VECTOR_CONTRACT_DOC_BASE_SHA: ${{ needs.admit.outputs.sha }}
         run: make ci-local
-      - name: Verify production catalog without mutation
+      - name: Check out trusted production preflight
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          path: .trusted-release
+          sparse-checkout: scripts
+      - name: Verify production migration compatibility without mutation
         env:
           DATABASE_URL: ${{ secrets.DATABASE_ORIGIN_URL }}
-        run: npm run db:verify
+        run: node .trusted-release/scripts/verify-db-migration-ledger.mjs
 
   migrate:
     if: inputs.operation == 'deploy'
@@ -137,12 +143,19 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Migrate and verify production catalog
+      - name: Check out trusted production preflight
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          path: .trusted-release
+          sparse-checkout: scripts
+      - name: Recheck compatibility, migrate, and verify production catalog
         env:
           DATABASE_URL: ${{ secrets.DATABASE_ORIGIN_URL }}
         run: |
+          node .trusted-release/scripts/verify-db-migration-ledger.mjs
           npm run db:migrate
-          npm run db:verify
+          node scripts/verify-db.mjs --production-read-only
 
   deploy:
     if: inputs.operation == 'deploy'

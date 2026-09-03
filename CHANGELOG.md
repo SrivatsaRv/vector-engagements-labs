@@ -11,6 +11,10 @@ one family must not imply changes to unrelated contracts.
 
 #### Model packs
 
+- Keep every compiled model-pack identity and coefficient byte-identical while
+  deployment validates the existing migration prefix before applying a pending
+  suffix. This release-gate change does not alter model semantics or authority.
+
 - Database verification for migration 019 now distinguishes the additional
   retired BVR scenario version from the unchanged compiled model-pack,
   intended-use, credibility, loadout, and named-performance authorities.
@@ -121,6 +125,10 @@ promotion remain downstream under #154, later #161 stages and #155.
 
 #### Database schema
 
+- Validate the production migration ledger as an exact checksum-bound prefix,
+  apply only its pending suffix, then verify the resulting catalogue in a
+  PostgreSQL-enforced read-only transaction. No schema is changed by this gate.
+
 - Add forward-only migration 020 for `public-api-admission.v2`. Browser
   telemetry receives its own 60-request-per-minute durable policy identity and
   cannot consume the catalog or saved-run API budget; migration 011 remains
@@ -159,6 +167,10 @@ Forward-only migration `013_air_mission_contract.sql` replaces exact v3 scenario
 packages/hashes with canonical v4 packages and rejects mixed or residual rows.
 
 #### Engine ABI
+
+- Require production-engine freshness to compare freshly compiled optimized
+  WASM bytes and generated source exactly with the committed artifact after
+  scrubbing ambient Cargo and Rust overrides. No ABI or size limit changes.
 
 - Pin Rust 1.97.1 across local, pull-request, release and production workflows,
   and cold-rebuild all three committed WASM artifacts in hosted CI so compiler
@@ -299,6 +311,10 @@ No pending family-specific entry.
 
 #### Generic sensor source freeze
 
+- Keep the offline source freeze byte-identical while hosted jobs provision the
+  pinned renderer before the shared Make quality target. No source or evidence
+  authority changes.
+
 Added an immutable, offline-verifiable Stage-0 bundle for the exact Stone Soup
 v1.9.1 and four NASA generic sensor reference sources. The bundle remains
 outside every production runtime and model-pack boundary; execution,
@@ -415,6 +431,10 @@ identity before caching or executing a runtime adapter.
 No pending family-specific entry.
 
 #### Vector simulation records
+
+- Run production catalogue and saved-record verification inside a
+  PostgreSQL-enforced read-only transaction after migrations. No VSR schema,
+  replay rule or persisted record changes.
 
 - Retain a new #207 evidence inventory for the three current studies and two
   matched controls while preserving #197 as immutable historical evidence.

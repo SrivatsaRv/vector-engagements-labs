@@ -34,6 +34,8 @@ test("every declared verification layer has a named Make target", async () => {
   const makefile = await readFile("Makefile", "utf8");
   for (const target of [
     "ci-local",
+    "toolchain-preflight",
+    "rust-audit-local",
     "worker-local",
     "frontend-local",
     "integration-local",
