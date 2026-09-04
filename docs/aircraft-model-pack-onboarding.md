@@ -107,6 +107,9 @@ promote a Stage-B identity.
 
 ## Closed requirements and evidence states
 
+Release verification retains the complete immutable pack lineage; it must not
+reject a valid historical authority merely because it is no longer current.
+
 No requirement or evidence state is promoted by the migration correction. The
 pre-#54 definition remains historical and cannot authorize current model use.
 
@@ -182,6 +185,9 @@ satisfy an aircraft requirement or repair an aircraft evidence gap; each family
 must pass its own admission contract before later scenario composition.
 
 ## Step-by-step onboarding
+
+Publishing a successor never removes an earlier admitted pack; release
+verification counts the retained lineage as well as the current authority.
 
 The upgrade regression recreates the August 10 migration-and-seed sequence and
 proves that migration 017 neither updates nor deletes its historical row.
@@ -280,6 +286,9 @@ the repository policy.
 
 ## Anonymous worked example
 
+The example's pack identity remains independently retained after a successor is
+published, matching the release verifier's append-only catalog expectation.
+
 The anonymous model-pack proof is unchanged. The isolated database upgrade
 fixture is migration evidence, not a new model-validation result.
 
@@ -329,6 +338,9 @@ payload. Pairing either example with a regional EnvironmentPack would create a
 separate scenario identity without changing the compiled aircraft-pack digest.
 
 ## Bounds, storage, and recovery
+
+Recovery preserves every immutable compiled-pack row. A deployment verifier
+therefore validates the full retained count rather than only current rows.
 
 Recovery retains the allowlisted historical intended-use tuple exactly as it
 was stored; an unknown tuple still fails closed.
@@ -397,6 +409,9 @@ its aircraft research backup format.
 
 ## Performance evidence
 
+Retained historical packs remain evidence records only; counting them during
+release verification does not promote their performance authority.
+
 The added upgrade fixture runs only in database verification and does not alter
 simulation-tick, Worker, bundle-size, or browser performance budgets.
 
@@ -448,6 +463,9 @@ measurements are not folded into Stage-B compile, publication or reuse timing.
 | non-promotable until runtime admission lands | Stage B is being used as Stage D | complete #154 first, then the separately reviewed Worker/runtime/VSR admission stage |
 
 ## Nonclaims and deferred owners
+
+Historical-pack retention is a storage and verification invariant, not runtime
+admission of superseded or unsupported model authority.
 
 Recognizing the exact historical intended-use tuple adds no named-platform,
 weapon, sensor, pilot, or effectiveness claim.

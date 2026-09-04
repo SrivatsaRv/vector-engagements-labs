@@ -58,8 +58,8 @@ content identity cannot be rewritten by a later deploy or administrative seed.
 
 VECTOR uses a managed PostgreSQL origin with PostGIS enabled. The protected
 GitHub `production` environment owns the deployment credentials. It accepts
-only protected branches and requires explicit maintainer approval before a job
-can read its credentials:
+only protected branches; approval gates are disabled so an admitted `main`
+revision proceeds without a separate deployment approval:
 
 - `DATABASE_ORIGIN_URL` is an environment secret used only by the migration and
   verification job. It is never bundled into the Worker or exposed to the
@@ -149,10 +149,14 @@ artifact promotion remains separately owned by #111 and is not bypassed here.
 
 The migration gate upgrades the nine-template `1.0.0` catalog through
 `017_weapon_termination_model.sql` and requires 18 rows on readback:
-nine immutable retired historical versions and nine validated `1.1.0` versions. It also
-requires two intended-use versions, two compiled model packs and their exact
-model-pack credibility manifests. The existing platform, installation, runway
-and EnvironmentPack counts are not changed by migration 017. Migration 021
+nine immutable retired historical versions and nine validated `1.1.0` versions.
+It admits only two exact compiled-model catalog histories. A fresh database has
+the 0.8.0 and 0.9.0 packs plus engine manifest 0.7.0 and model manifests 1.2.0
+and 1.3.0. Long-lived production also retains the pre-migration 0.5.0 pack,
+engine manifest 0.5.0, and model manifest 1.0.0. Every identity, digest, subject,
+and pack-to-manifest binding is checked; any other missing, altered, or extra row
+blocks deployment. The existing platform, installation, runway and
+EnvironmentPack counts are not changed by migration 017. Migration 021
 separately advances the governed platform count from the known production seed
 of three to the current catalog count of four.
 Migration 018 then produces 21 immutable scenario rows: nine `VALIDATED` rows
