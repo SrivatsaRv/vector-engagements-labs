@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import postgres from "postgres";
@@ -15,6 +17,186 @@ import {
   CURRENT_MODEL_PACK_ID,
   CURRENT_MODEL_PACK_VERSION,
 } from "../lib/reference-model-pack.ts";
+
+const HISTORICAL_INTENDED_USE_ID = "vector.intended-use.geometry-teaching";
+const HISTORICAL_INTENDED_USE_VERSION = "1.0.0";
+const PRE_CREDIBILITY_GATE_HASH = "67deff50296d42c6ba9fbe78bbfa024f92e61346e62fa170f1960c578b168f47";
+const PRE_CREDIBILITY_GATE_DEFINITION = {
+  schemaVersion: "vector.intended-use.v1",
+  id: HISTORICAL_INTENDED_USE_ID,
+  version: HISTORICAL_INTENDED_USE_VERSION,
+  question: "How do relative geometry, altitude, aspect, closure, and deterministic recorded state evolve in a bounded teaching scenario?",
+  requiredCapabilities: ["coordinate-transform", "fixed-step-integration", "immutable-recording"],
+  supportedInterpretations: ["geometry teaching", "controlled comparison of declared inputs"],
+  unsupportedInterpretations: [
+    "named-aircraft handling or performance",
+    "named-weapon effectiveness or probability of kill",
+    "operational sensor, electronic-warfare, or launch-zone performance",
+  ],
+};
+
+async function loadMigrations() {
+  const directory = resolve("db/migrations");
+  const names = (await readdir(directory))
+    .filter((name) => /^\d{3}_[a-z0-9_]+\.sql$/u.test(name))
+    .sort();
+  return Promise.all(names.map(async (name) => ({
+    name,
+    body: await readFile(resolve(directory, name), "utf8"),
+  })));
+}
+
+async function applyMigration(database, schema, migration) {
+  await database.begin(async (transaction) => {
+    await transaction.unsafe("SET LOCAL client_min_messages TO warning");
+    await transaction.unsafe(`SET LOCAL search_path TO "${schema}", public`);
+    await transaction.unsafe(migration.body);
+  });
+}
+
+async function applyMigrationRange(database, schema, migrations, first, last) {
+  for (const migration of migrations.filter(({ name }) => name >= first && name <= last)) {
+    await applyMigration(database, schema, migration);
+  }
+}
+
+async function withIsolatedSchema(database, label, verification) {
+  const schema = `vector_${label}_${randomBytes(6).toString("hex")}`;
+  await database.unsafe(`CREATE SCHEMA "${schema}"`);
+  try {
+    await verification(schema);
+  } finally {
+    await database.begin(async (transaction) => {
+      await transaction.unsafe("SET LOCAL client_min_messages TO warning");
+      await transaction.unsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+    });
+  }
+}
+
+async function prepareProductionLineage(database, schema, migrations, { hash = PRE_CREDIBILITY_GATE_HASH } = {}) {
+  await applyMigrationRange(database, schema, migrations, "001_", "008_~");
+  await database.begin(async (transaction) => {
+    await transaction.unsafe(`SET LOCAL search_path TO "${schema}", public`);
+    await transaction`
+      UPDATE intended_use_contracts
+      SET definition=${transaction.json(PRE_CREDIBILITY_GATE_DEFINITION)}, content_hash=${hash}
+      WHERE id=${HISTORICAL_INTENDED_USE_ID} AND version=${HISTORICAL_INTENDED_USE_VERSION}
+    `;
+  });
+  await applyMigrationRange(database, schema, migrations, "009_", "016_~");
+}
+
+async function historicalIntendedUseRow(database, schema) {
+  return database.begin("read only", async (transaction) => {
+    await transaction.unsafe(`SET LOCAL search_path TO "${schema}", public`);
+    const [row] = await transaction`
+      SELECT id, version, schema_version, definition, content_hash, created_at
+      FROM intended_use_contracts
+      WHERE id=${HISTORICAL_INTENDED_USE_ID} AND version=${HISTORICAL_INTENDED_USE_VERSION}
+    `;
+    return row;
+  });
+}
+
+export async function verifyLegacyIntendedUseMigrationUpgrade(database) {
+  const migrations = await loadMigrations();
+  const migration017 = migrations.find(({ name }) => name.startsWith("017_"));
+  assert.ok(migration017, "migration 017 is missing");
+  assert.equal(
+    sha256HexSync(PRE_CREDIBILITY_GATE_DEFINITION),
+    PRE_CREDIBILITY_GATE_HASH,
+    "the admitted pre-#54 hash must match its exact canonical definition",
+  );
+
+  await withIsolatedSchema(database, "legacy_intended_use", async (schema) => {
+    await prepareProductionLineage(database, schema, migrations);
+    const before = await historicalIntendedUseRow(database, schema);
+
+    await applyMigration(database, schema, migration017);
+    const after = await historicalIntendedUseRow(database, schema);
+    assert.deepEqual(after, before, "migration 017 must preserve the exact pre-#54 intended-use tuple");
+
+    await applyMigration(database, schema, migration017);
+    assert.deepEqual(
+      await historicalIntendedUseRow(database, schema),
+      before,
+      "migration 017 must remain idempotent for the production lineage",
+    );
+
+    await database.begin("read only", async (transaction) => {
+      await transaction.unsafe(`SET LOCAL search_path TO "${schema}", public`);
+      const [current] = await transaction`SELECT
+        (SELECT count(*)::int FROM intended_use_contracts
+          WHERE id=${HISTORICAL_INTENDED_USE_ID} AND version='1.1.0') AS intended_use,
+        (SELECT count(*)::int FROM model_pack_sources
+          WHERE id='vector-scalar-study-models' AND version='0.9.0') AS source,
+        (SELECT count(*)::int FROM compiled_model_packs
+          WHERE id='vector-scalar-study-models' AND version='0.9.0') AS compiled_pack,
+        (SELECT count(*)::int FROM scenario_templates
+          WHERE version='1.1.0' AND status='VALIDATED') AS scenarios`;
+      assert.deepEqual(current, {
+        intended_use: 1,
+        source: 1,
+        compiled_pack: 1,
+        scenarios: 9,
+      });
+    });
+  });
+
+  await withIsolatedSchema(database, "unknown_intended_use", async (schema) => {
+    await prepareProductionLineage(database, schema, migrations, { hash: "0".repeat(64) });
+    await assert.rejects(
+      applyMigration(database, schema, migration017),
+      /Historical intended-use exact identity readback failed/u,
+      "migration 017 must reject an unrecognized historical tuple",
+    );
+    await database.begin("read only", async (transaction) => {
+      await transaction.unsafe(`SET LOCAL search_path TO "${schema}", public`);
+      const [current] = await transaction`SELECT count(*)::int AS count
+        FROM intended_use_contracts WHERE id=${HISTORICAL_INTENDED_USE_ID} AND version='1.1.0'`;
+      assert.equal(current.count, 0, "a rejected migration 017 must roll back its current rows");
+    });
+  });
+
+  await withIsolatedSchema(database, "current_collision", async (schema) => {
+    await prepareProductionLineage(database, schema, migrations);
+    await database.begin(async (transaction) => {
+      await transaction.unsafe(`SET LOCAL search_path TO "${schema}", public`);
+      await transaction`INSERT INTO intended_use_contracts
+        (id,version,schema_version,definition,content_hash)
+        VALUES (
+          ${HISTORICAL_INTENDED_USE_ID},'1.1.0','vector.intended-use.v1',
+          ${transaction.json({ schemaVersion: "vector.intended-use.v1", id: HISTORICAL_INTENDED_USE_ID, version: "1.1.0" })},
+          ${"f".repeat(64)}
+        )`;
+    });
+    await assert.rejects(
+      applyMigration(database, schema, migration017),
+      /Weapon termination intended-use exact identity readback failed/u,
+      "historical compatibility must not bypass a conflicting current identity",
+    );
+    await database.begin("read only", async (transaction) => {
+      await transaction.unsafe(`SET LOCAL search_path TO "${schema}", public`);
+      const [current] = await transaction`SELECT
+        (SELECT content_hash FROM intended_use_contracts
+          WHERE id=${HISTORICAL_INTENDED_USE_ID} AND version='1.1.0') AS intended_use_hash,
+        (SELECT count(*)::int FROM model_pack_sources
+          WHERE id='vector-scalar-study-models' AND version='0.9.0') AS source,
+        (SELECT count(*)::int FROM compiled_model_packs
+          WHERE id='vector-scalar-study-models' AND version='0.9.0') AS compiled_pack,
+        (SELECT count(*)::int FROM scenario_templates
+          WHERE version='1.1.0' AND status='VALIDATED') AS scenarios`;
+      assert.deepEqual(current, {
+        intended_use_hash: "f".repeat(64),
+        source: 0,
+        compiled_pack: 0,
+        scenarios: 0,
+      }, "a conflicting current identity must roll back every migration-017 insert");
+    });
+  });
+
+  process.stdout.write("legacy intended-use migration upgrade verified\n");
+}
 
 export function parseDatabaseVerificationMode(args) {
   const supported = new Set(["--environment-upgrade-only", "--production-read-only"]);
@@ -384,6 +566,9 @@ export async function runDatabaseVerification({
           mutationProbes: false,
         }),
       );
+    }
+    if (!mode.environmentUpgradeOnly) {
+      await verifyLegacyIntendedUseMigrationUpgrade(database);
     }
     return await verifyState(database, {
       environmentUpgradeOnly: mode.environmentUpgradeOnly,

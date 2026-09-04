@@ -59,12 +59,24 @@ WHERE version='1.0.0'
 
 DO $$
 BEGIN
+  -- Preserve either repository-produced historical representation. Migration
+  -- 007 wrote the identity-string hash; the pre-#54 seed wrote the longer
+  -- limitation wording with its canonical-content hash before migration 010
+  -- made the catalogue immutable. No other tuple is admitted.
   IF NOT EXISTS (
     SELECT 1 FROM intended_use_contracts
     WHERE id='vector.intended-use.geometry-teaching' AND version='1.0.0'
       AND schema_version='vector.intended-use.v1'
-      AND definition=$vector_weapon_termination_historical_intended_use${"id":"vector.intended-use.geometry-teaching","question":"How do relative geometry, altitude, aspect, closure, and deterministic recorded state evolve in a bounded teaching scenario?","requiredCapabilities":["coordinate-transform","fixed-step-integration","immutable-recording"],"schemaVersion":"vector.intended-use.v1","supportedInterpretations":["geometry teaching","controlled comparison of declared inputs"],"unsupportedInterpretations":["named-system performance","weapon effectiveness","operational sensor performance"],"version":"1.0.0"}$vector_weapon_termination_historical_intended_use$::jsonb
-      AND content_hash='18f377a0cc2465d49875d59c1a653d51f617da745d066d02de54161fee44a106'
+      AND (
+        (
+          definition=$vector_weapon_termination_historical_intended_use${"id":"vector.intended-use.geometry-teaching","question":"How do relative geometry, altitude, aspect, closure, and deterministic recorded state evolve in a bounded teaching scenario?","requiredCapabilities":["coordinate-transform","fixed-step-integration","immutable-recording"],"schemaVersion":"vector.intended-use.v1","supportedInterpretations":["geometry teaching","controlled comparison of declared inputs"],"unsupportedInterpretations":["named-system performance","weapon effectiveness","operational sensor performance"],"version":"1.0.0"}$vector_weapon_termination_historical_intended_use$::jsonb
+          AND content_hash='18f377a0cc2465d49875d59c1a653d51f617da745d066d02de54161fee44a106'
+        )
+        OR (
+          definition=$vector_weapon_termination_historical_seed_intended_use${"id":"vector.intended-use.geometry-teaching","question":"How do relative geometry, altitude, aspect, closure, and deterministic recorded state evolve in a bounded teaching scenario?","requiredCapabilities":["coordinate-transform","fixed-step-integration","immutable-recording"],"schemaVersion":"vector.intended-use.v1","supportedInterpretations":["geometry teaching","controlled comparison of declared inputs"],"unsupportedInterpretations":["named-aircraft handling or performance","named-weapon effectiveness or probability of kill","operational sensor, electronic-warfare, or launch-zone performance"],"version":"1.0.0"}$vector_weapon_termination_historical_seed_intended_use$::jsonb
+          AND content_hash='67deff50296d42c6ba9fbe78bbfa024f92e61346e62fa170f1960c578b168f47'
+        )
+      )
   ) THEN
     RAISE EXCEPTION 'Historical intended-use exact identity readback failed';
   END IF;

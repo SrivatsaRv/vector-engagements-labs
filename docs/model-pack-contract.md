@@ -10,6 +10,9 @@ recording, reports, and both engine backends.
 
 ## Artifact boundaries
 
+The migration correction changes no model-pack artifact. It only recognizes
+the two exact repository-produced historical intended-use tuples.
+
 #197 leaves every model-pack artifact boundary unchanged. Its exact
 `vector.scenario-package-reference.v1`, admitted `runDurationSeconds`, and
 optional `vector.authored-route-profile.v1` live in the outer scenario/VSR
@@ -49,6 +52,9 @@ scenario bindings; the resolved capacity and `MODEL_ASSUMPTION` envelope are
 compiled artifacts. Neither may be replaced by presentation or import labels.
 
 ## Versioned schemas
+
+No schema version changes. The pre-#54 intended-use row remains
+`vector.intended-use.v1` and is not rewritten.
 
 #197 introduces no `vector.model-pack-source.*` or
 `vector.compiled-model-pack.*` version. Scenario-package references and
@@ -132,6 +138,9 @@ Worker/runtime/VSR admission stages land. See the normative
 [`aircraft onboarding guide`](aircraft-model-pack-onboarding.md).
 
 ## Source definition
+
+The longer pre-#54 limitation wording is admitted only as the exact historical
+intended-use definition produced by the repository seed.
 
 The three #197 study routes, durations, regime labels, and expected outcomes are
 scenario-authored assumptions or verification descriptors, not model-pack
@@ -256,6 +265,9 @@ TrackStore mechanics only; no named aircraft sensor is thereby available.
 
 ## Compilation and digest
 
+Current model-pack and compiled-pack digests remain unchanged. Only the pending
+migration file checksum advances for this pre-production correction.
+
 #197 compiles route geometry and the admitted scenario duration through the
 existing scenario/mission compiler. `runDurationSeconds` becomes the existing
 `EngineScenario.durationSeconds`; omission retains the historical domain
@@ -330,6 +342,9 @@ numbers and indexes; it does not parse units, traverse source JSON, or query a
 database.
 
 ## Intended use and credibility
+
+The current 1.1.0 intended-use and credibility identities remain exact. The
+allowlisted 1.0.0 alternative is retained only as historical repository output.
 
 Post-migration production verification reads intended-use and credibility
 records in one read-only snapshot. It cannot promote either state while
@@ -496,6 +511,9 @@ compiler. Production admission cannot consume or relabel this adapter.
 
 ## Scenario binding and patches
 
+Scenario bindings and patch resolution are unchanged. Every current-row exact
+readback still executes after the historical compatibility check.
+
 The migration preflight admits a pending checksum-bound migration suffix; it
 does not resolve a scenario against the old schema. Exact scenario-to-pack
 binding is verified only after migration.
@@ -576,6 +594,9 @@ Draft patch addition creates a new revision.
 
 ## Loadout compatibility
 
+No loadout, station, store, capacity, or compatibility authority changes in
+this migration correction.
+
 Production readback checks the current compatibility graph without issuing
 loadout or pack UPDATE probes. The mutating negative tests remain part of
 disposable integration.
@@ -647,6 +668,10 @@ incompatible data rejects the scenario; it never falls back to the legacy model
 authoring list or a weapon-name heuristic.
 
 ## Persistence
+
+Migration 017 accepts the migration-007 tuple or the exact August 10 seed tuple
+for intended-use 1.0.0. Any other definition/hash pair aborts, and the accepted
+row is never updated or deleted.
 
 Before migration, deployment accepts only an exact checksum-bound prefix of the
 selected revision's migration manifest. After migration, complete pack and
@@ -928,6 +953,10 @@ environment envelope rejects the pack during compilation and Rust/WASM
 validation. The runtime must not fill the gap with a scalar fallback.
 
 ## Verification
+
+Database verification now recreates the August 10 production lineage in an
+isolated schema. It proves exact-row preservation and idempotence, rejects an
+unknown legacy tuple, and rejects a conflicting current intended-use row.
 
 `scripts/verify-db.mjs --production-read-only` executes the complete catalog
 readback after migration with PostgreSQL enforcing a read-only snapshot. The

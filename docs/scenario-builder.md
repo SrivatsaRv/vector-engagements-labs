@@ -65,6 +65,10 @@ The six initial study areas cover North Punjab, Rajasthan, Ladakh, the north-eas
 
 ## Scenario artifact
 
+This migration correction changes no scenario package, identity, schema, or
+builder admission rule. It only preserves the exact historical intended-use
+row referenced by earlier packages.
+
 The current BVR artifact is `a2a-crossing-intercept@1.3.0` with immutable
 content hash `37c9dbe963e7663562665e6368071f97aa563d60c45ee86cebe607b9437275e4`.
 Its prior `1.2.0` artifact remains retained and retired, never rewritten.
@@ -141,6 +145,9 @@ remain `UNSUPPORTED` with no inferred position because this deployment has no
 admitted sensor model.
 
 ## Air mission contract
+
+The Air mission contract is unchanged. Migration 017 still performs every
+current scenario and mission identity readback after its historical check.
 
 BVR `1.3.0` retains the same `vector.air-mission.v1` shape. It changes exact
 route points and the Blue release request to 2.000 s; Red's two AIM-120 stores
@@ -409,6 +416,8 @@ MapLibre, Three.js, browser-frame, Worker or engine-runtime performance. Those
 layers remain with #155, #87, #60 and the runtime owners.
 
 ## Builder expansion boundary
+
+No builder field or compiled artifact changes in this migration correction.
 
 The BVR template exposes causal route, release, atmosphere, speed, fuel and
 store inputs already supported by the general builder. Sensor, EW, data-link,

@@ -131,6 +131,12 @@ Use the smallest complete set for a change. State why any applicable layer was o
 
 ## Pre-engine control admission regression
 
+Database verification recreates the production lineage in an isolated schema:
+migrations 001-008, the exact pre-#54 intended-use seed tuple, then 009-017. It
+asserts exact stored-tuple preservation and idempotence, rejects an unknown legacy
+tuple, and proves historical compatibility cannot bypass a conflicting current
+identity. The ordinary fresh-database integration still applies 001-020.
+
 The BVR `1.3.0` regression compiles the unedited package and the 1.950 s
 release-only control through the same structured and final mission admission
 path. Route, duration, speed, fuel, wind and temperature domains retain their

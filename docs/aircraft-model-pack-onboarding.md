@@ -11,6 +11,9 @@ remain owned by #154, later #161 stages, and #155 in that causal order.
 
 ## Authority layers
 
+The migration-017 correction recognizes only the exact migration-007 and
+pre-#54 intended-use tuples. It adds no model authority.
+
 #197 adds no aircraft-model authority layer. Its exact scenario-package
 reference, bounded run duration, and optional authored-route profile belong to
 scenario orchestration and VSR binding downstream of the compiled model pack.
@@ -63,6 +66,9 @@ scenario/runtime boundary and never enter the Stage-B aircraft evidence chain.
 
 ## Schema and migration reference
 
+Pending migration 017 preserves the exact pre-#54 intended-use row while
+publishing the current model-pack rows beside it.
+
 Forward migration 018 publishes the three #197 `vector.scenario.v4` packages
 at 1.2.0 while retaining their retired 1.1.0 rows; migration 017 remains
 byte- and checksum-frozen. The `vector.scenario-package-reference.v1` and
@@ -100,6 +106,9 @@ separate persistence contracts; they do not add aircraft-pack keys or silently
 promote a Stage-B identity.
 
 ## Closed requirements and evidence states
+
+No requirement or evidence state is promoted by the migration correction. The
+pre-#54 definition remains historical and cannot authorize current model use.
 
 Production catalog verification now reads these authorities inside a
 database-enforced read-only snapshot after migrations. It cannot promote an
@@ -173,6 +182,9 @@ satisfy an aircraft requirement or repair an aircraft evidence gap; each family
 must pass its own admission contract before later scenario composition.
 
 ## Step-by-step onboarding
+
+The upgrade regression recreates the August 10 migration-and-seed sequence and
+proves that migration 017 neither updates nor deletes its historical row.
 
 The deployment preflight checks only the checksum-bound migration prefix. It
 does not run final pack admission against the old schema. Full pack readback
@@ -268,6 +280,9 @@ the repository policy.
 
 ## Anonymous worked example
 
+The anonymous model-pack proof is unchanged. The isolated database upgrade
+fixture is migration evidence, not a new model-validation result.
+
 The production read-only mode verifies the same anonymous pack rows as the
 disposable integration verifier but omits deliberate UPDATE probes. It changes
 neither the example inputs nor their content digests.
@@ -314,6 +329,9 @@ payload. Pairing either example with a regional EnvironmentPack would create a
 separate scenario identity without changing the compiled aircraft-pack digest.
 
 ## Bounds, storage, and recovery
+
+Recovery retains the allowlisted historical intended-use tuple exactly as it
+was stored; an unknown tuple still fails closed.
 
 Production verification holds one repeatable-read, read-only snapshot. The
 trigger and lifecycle mutation matrix remains confined to disposable databases,
@@ -379,6 +397,9 @@ its aircraft research backup format.
 
 ## Performance evidence
 
+The added upgrade fixture runs only in database verification and does not alter
+simulation-tick, Worker, bundle-size, or browser performance budgets.
+
 Migration-prefix admission and post-migration readback are release gates, not
 model-pack performance results. Existing engine and capacity budgets are
 unchanged.
@@ -427,6 +448,9 @@ measurements are not folded into Stage-B compile, publication or reuse timing.
 | non-promotable until runtime admission lands | Stage B is being used as Stage D | complete #154 first, then the separately reviewed Worker/runtime/VSR admission stage |
 
 ## Nonclaims and deferred owners
+
+Recognizing the exact historical intended-use tuple adds no named-platform,
+weapon, sensor, pilot, or effectiveness claim.
 
 Successful read-only catalog verification proves migration and identity
 consistency only. It does not add named-platform fidelity or effectiveness
