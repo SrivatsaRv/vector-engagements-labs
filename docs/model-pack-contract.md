@@ -678,9 +678,10 @@ authoring list or a weapon-name heuristic.
 
 ## Persistence
 
-Production verification counts all immutable compiled-pack rows: the retained
-migration-007 `0.5.0` authority plus migration 017's `0.8.0` and `0.9.0`
-authorities total three rows.
+Production verification accepts the exact retained pre-migration seed history:
+the 0.5.0, 0.8.0, and 0.9.0 pack identities with their four credibility
+manifests. A fresh migration accepts only 0.8.0 and 0.9.0 with its three
+credibility manifests. Other extra, missing, or altered rows fail closed.
 
 Migration 017 accepts the migration-007 tuple or the exact August 10 seed tuple
 for intended-use 1.0.0. Any other definition/hash pair aborts, and the accepted
@@ -967,8 +968,9 @@ validation. The runtime must not fill the gap with a scalar fallback.
 
 ## Verification
 
-The production catalog verifier asserts that exact three-row retained lineage;
-it does not delete or rewrite immutable historical packs during deployment.
+The production catalog verifier asserts the complete retained-seed identity and
+credibility lineage. It does not delete or rewrite immutable historical packs
+during deployment, and a matching row count alone never grants admission.
 
 Database verification now recreates the August 10 production lineage in an
 isolated schema. It proves exact-row preservation and idempotence, rejects an

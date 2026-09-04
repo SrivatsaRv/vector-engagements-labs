@@ -186,8 +186,9 @@ must pass its own admission contract before later scenario composition.
 
 ## Step-by-step onboarding
 
-Publishing a successor never removes an earlier admitted pack; release
-verification counts the retained lineage as well as the current authority.
+Publishing a successor never removes an earlier admitted pack. Release
+verification admits only an exact known history, including each retained and
+current identity and its credibility binding.
 
 The upgrade regression recreates the August 10 migration-and-seed sequence and
 proves that migration 017 neither updates nor deletes its historical row.
@@ -340,7 +341,8 @@ separate scenario identity without changing the compiled aircraft-pack digest.
 ## Bounds, storage, and recovery
 
 Recovery preserves every immutable compiled-pack row. A deployment verifier
-therefore validates the full retained count rather than only current rows.
+therefore validates the exact retained identities rather than relying on a row
+count or checking only current rows.
 
 Recovery retains the allowlisted historical intended-use tuple exactly as it
 was stored; an unknown tuple still fails closed.

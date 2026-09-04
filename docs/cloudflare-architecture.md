@@ -58,8 +58,8 @@ content identity cannot be rewritten by a later deploy or administrative seed.
 
 VECTOR uses a managed PostgreSQL origin with PostGIS enabled. The protected
 GitHub `production` environment owns the deployment credentials. It accepts
-only protected branches; approval gates are disabled so an admitted `main`
-revision proceeds without a separate deployment approval:
+only protected branches and requires explicit maintainer approval before a job
+can read its credentials:
 
 - `DATABASE_ORIGIN_URL` is an environment secret used only by the migration and
   verification job. It is never bundled into the Worker or exposed to the

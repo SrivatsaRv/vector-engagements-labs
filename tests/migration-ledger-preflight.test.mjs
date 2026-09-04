@@ -14,6 +14,7 @@ import {
   verifyDatabaseMigrationLedger,
 } from "../scripts/verify-db-migration-ledger.mjs";
 import {
+  assertAdmittedModelCatalogLineage,
   parseDatabaseVerificationMode,
   runDatabaseVerification,
 } from "../scripts/verify-db.mjs";
@@ -29,6 +30,94 @@ const ledgerCatalog = [
   { relation_kind: "r", column_name: "checksum", data_type: "text", not_null: true, primary_key: false },
   { relation_kind: "r", column_name: "name", data_type: "text", not_null: true, primary_key: true },
 ];
+const freshModelCatalog = {
+  compiledModelPacks: [
+    {
+      id: "vector-scalar-study-models",
+      version: "0.8.0",
+      schema_version: "vector.compiled-model-pack.v1",
+      digest: "199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73",
+      credibility_manifest_id: "vector-scalar-study-credibility",
+      credibility_manifest_version: "1.2.0",
+    },
+    {
+      id: "vector-scalar-study-models",
+      version: "0.9.0",
+      schema_version: "vector.compiled-model-pack.v1",
+      digest: "aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c",
+      credibility_manifest_id: "vector-scalar-study-credibility",
+      credibility_manifest_version: "1.3.0",
+    },
+  ],
+  credibilityManifests: [
+    {
+      id: "browser-point-mass-engine-credibility",
+      version: "0.7.0",
+      schema_version: "vector.credibility-manifest.v1",
+      subject_kind: "ENGINE",
+      subject_id: "browser-point-mass-v0.5",
+      subject_digest: "c59104464d75fa910f8ba79114d50a9ffae31c92875ab9ac6e65f62679ddc4aa",
+      content_hash: "7473759b423b19947592d9cf085365215bbbb73679221e7c16e1f76c72aa9b83",
+      approval_state: "DRAFT",
+    },
+    {
+      id: "vector-scalar-study-credibility",
+      version: "1.2.0",
+      schema_version: "vector.credibility-manifest.v1",
+      subject_kind: "MODEL_PACK",
+      subject_id: "vector-scalar-study-models",
+      subject_digest: "199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73",
+      content_hash: "9337bea52bea7c9d96ec3978e179f0af3f309892f6e779533dc6fce80325a22d",
+      approval_state: "DRAFT",
+    },
+    {
+      id: "vector-scalar-study-credibility",
+      version: "1.3.0",
+      schema_version: "vector.credibility-manifest.v1",
+      subject_kind: "MODEL_PACK",
+      subject_id: "vector-scalar-study-models",
+      subject_digest: "aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c",
+      content_hash: "c57aa54fc4765c4cf8d2ce30c32b67476395914df14cacd5e55a28d2b2719795",
+      approval_state: "DRAFT",
+    },
+  ],
+};
+const retainedProductionModelCatalog = {
+  compiledModelPacks: [
+    {
+      id: "vector-scalar-study-models",
+      version: "0.5.0",
+      schema_version: "vector.compiled-model-pack.v1",
+      digest: "181379ad76df8cdbf08666788bf1aace54b05651ce1d2e852487d651c6fb0e1d",
+      credibility_manifest_id: "vector-scalar-study-credibility",
+      credibility_manifest_version: "1.0.0",
+    },
+    ...freshModelCatalog.compiledModelPacks,
+  ],
+  credibilityManifests: [
+    {
+      id: "browser-point-mass-engine-credibility",
+      version: "0.5.0",
+      schema_version: "vector.credibility-manifest.v1",
+      subject_kind: "ENGINE",
+      subject_id: "browser-point-mass-v0.5",
+      subject_digest: "c59104464d75fa910f8ba79114d50a9ffae31c92875ab9ac6e65f62679ddc4aa",
+      content_hash: "cdb990dbd81e0ae3e946bb5defd1d128e8a91e94a957485f971ec57f638bb626",
+      approval_state: "DRAFT",
+    },
+    {
+      id: "vector-scalar-study-credibility",
+      version: "1.0.0",
+      schema_version: "vector.credibility-manifest.v1",
+      subject_kind: "MODEL_PACK",
+      subject_id: "vector-scalar-study-models",
+      subject_digest: "181379ad76df8cdbf08666788bf1aace54b05651ce1d2e852487d651c6fb0e1d",
+      content_hash: "9d9d06dc4fc27fb87a8f49a1b675d5956436e847820c902ac3a7513ad2becb36",
+      approval_state: "DRAFT",
+    },
+    ...freshModelCatalog.credibilityManifests.slice(1),
+  ],
+};
 
 test("migration ledger admits only an exact checksum-bound prefix", () => {
   assert.deepEqual(verifyMigrationLedger(expected, expected.slice(0, 2)), {
@@ -45,6 +134,60 @@ test("migration ledger admits only an exact checksum-bound prefix", () => {
     lastApplied: null,
     nextPending: "001_catalog.sql",
   });
+});
+
+test("database verifier admits only the two exact repository-produced model catalog histories", () => {
+  assert.equal(
+    assertAdmittedModelCatalogLineage(
+      freshModelCatalog.compiledModelPacks,
+      freshModelCatalog.credibilityManifests,
+    ),
+    "fresh-migrations",
+  );
+  assert.equal(
+    assertAdmittedModelCatalogLineage(
+      retainedProductionModelCatalog.compiledModelPacks,
+      retainedProductionModelCatalog.credibilityManifests,
+    ),
+    "retained-production-seed",
+  );
+  assert.equal(
+    assertAdmittedModelCatalogLineage(
+      freshModelCatalog.compiledModelPacks.map((row) => Object.assign(Object.create(null), row)),
+      freshModelCatalog.credibilityManifests.map((row) => Object.assign(Object.create(null), row)),
+    ),
+    "fresh-migrations",
+  );
+});
+
+test("database verifier rejects unknown, altered, missing, and incorrectly bound model history", () => {
+  const falsifiers = [
+    (catalog) => catalog.compiledModelPacks.push({
+      ...catalog.compiledModelPacks.at(-1),
+      version: "9.9.9",
+    }),
+    (catalog) => { catalog.compiledModelPacks[0].digest = "0".repeat(64); },
+    (catalog) => { catalog.compiledModelPacks[0].credibility_manifest_version = "1.3.0"; },
+    (catalog) => { catalog.compiledModelPacks.splice(0, 1); },
+    (catalog) => { catalog.credibilityManifests[0].content_hash = "f".repeat(64); },
+    (catalog) => { catalog.credibilityManifests.splice(0, 1); },
+    (catalog) => catalog.credibilityManifests.push({
+      ...catalog.credibilityManifests.at(-1),
+      version: "9.9.9",
+    }),
+  ];
+
+  for (const falsify of falsifiers) {
+    const catalog = structuredClone(retainedProductionModelCatalog);
+    falsify(catalog);
+    assert.throws(
+      () => assertAdmittedModelCatalogLineage(
+        catalog.compiledModelPacks,
+        catalog.credibilityManifests,
+      ),
+      /Unrecognized immutable model catalog lineage/u,
+    );
+  }
 });
 
 test("migration ledger rejects gaps, unknown rows, altered checksums, and a database ahead of source", () => {
