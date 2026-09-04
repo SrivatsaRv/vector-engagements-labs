@@ -129,6 +129,13 @@ ledger check and requires the live rows to be an exact checksum-bound prefix of
 the admitted revision. It then applies only the pending forward suffix and
 repeats catalogue verification in a repeatable-read, read-only transaction.
 
+Pending migration 017 recognizes the exact intended-use tuple produced by the
+August 10 pre-#54 seed as well as the migration-007 tuple. The integration gate
+recreates that production sequence and proves the row is preserved, unknown
+history is rejected, and all later exact readbacks remain active. Production
+had not applied migration 017 when its checksum was corrected. Build-once
+artifact promotion remains separately owned by #111 and is not bypassed here.
+
 The migration gate upgrades the nine-template `1.0.0` catalog through
 `017_weapon_termination_model.sql` and requires 18 rows on readback:
 nine immutable retired historical versions and nine validated `1.1.0` versions. It also

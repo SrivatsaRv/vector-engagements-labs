@@ -12,7 +12,7 @@ if (process.argv.slice(2).some((argument) => !["--check", "--write"].includes(ar
 // Migration 017 is published history. Later scenario-library versions must be
 // introduced by a forward migration and may never regenerate these bytes.
 const migrationPath = resolve("db/migrations/017_weapon_termination_model.sql");
-const frozenDigest = "00e9fb16c04e7cc5543f19f50781e2fc35ea4cf8d450af2343b6b5d9ef8ed18d";
+const frozenDigest = "85813006e7990bfcd993bcb3502decfc17770433c34a6bbb5b6dd82763d66d99";
 const actualDigest = createHash("sha256")
   .update(readFileSync(migrationPath))
   .digest("hex");

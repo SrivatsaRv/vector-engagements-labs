@@ -11,6 +11,10 @@ one family must not imply changes to unrelated contracts.
 
 #### Model packs
 
+- Correct pending migration 017 to recognize the two exact repository-produced
+  historical intended-use 1.0.0 tuples. Current model-pack identities,
+  coefficients, compilation, and runtime semantics are unchanged.
+
 - Keep every compiled model-pack identity and coefficient byte-identical while
   deployment validates the existing migration prefix before applying a pending
   suffix. This release-gate change does not alter model semantics or authority.
@@ -124,6 +128,10 @@ against an immutable measured workload. Scenario, Worker, runtime, VSR and UI
 promotion remain downstream under #154, later #161 stages and #155.
 
 #### Database schema
+
+- Correct pending migration 017 for the exact pre-#54 production seed tuple.
+  The historical row is neither updated nor deleted, and unknown tuples still
+  abort the migration before its ledger entry is recorded.
 
 - Validate the production migration ledger as an exact checksum-bound prefix,
   apply only its pending suffix, then verify the resulting catalogue in a
@@ -545,6 +553,10 @@ writer/reader, Worker, or replay behavior.
   virtual-pilot policy behavior.
 
 #### Mission scenarios
+
+- Keep scenario, Air mission, runtime, and VSR contracts unchanged while the
+  pending migration admits the exact historical intended-use tuple produced by
+  the August 10 repository seed.
 
 - Publish governed BVR `1.3.0` with Blue offset/recommit and Red authored
   defensive-turn geometry, a 2.000 s generic release, a canonical 36.000 s

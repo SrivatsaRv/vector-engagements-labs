@@ -401,7 +401,7 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
   );
   assert.equal(
     createHash("sha256").update(terminationMigration).digest("hex"),
-    "00e9fb16c04e7cc5543f19f50781e2fc35ea4cf8d450af2343b6b5d9ef8ed18d",
+    "85813006e7990bfcd993bcb3502decfc17770433c34a6bbb5b6dd82763d66d99",
     "migration 017 remains the frozen historical weapon-termination snapshot",
   );
   assert.equal(
@@ -465,6 +465,24 @@ test("forward migrations freeze every canonical v4 template and exact Environmen
     terminationMigration,
     /\"unsupportedInterpretations\":\[\"named-system performance\",\"weapon effectiveness\",\"operational sensor performance\"\]/,
     "migration 017 must read back migration 007's exact intended-use definition",
+  );
+  assert.match(
+    terminationMigration,
+    /67deff50296d42c6ba9fbe78bbfa024f92e61346e62fa170f1960c578b168f47/,
+    "migration 017 must admit the exact pre-#54 seed hash",
+  );
+  assert.match(
+    terminationMigration,
+    /\"unsupportedInterpretations\":\[\"named-aircraft handling or performance\",\"named-weapon effectiveness or probability of kill\",\"operational sensor, electronic-warfare, or launch-zone performance\"\]/,
+    "migration 017 must admit the exact pre-#54 seed definition",
+  );
+  assert.doesNotMatch(
+    terminationMigration.slice(
+      terminationMigration.indexOf("DO $$"),
+      terminationMigration.indexOf("Historical model-pack source exact identity readback failed"),
+    ),
+    /\bRETURN\s*;/u,
+    "historical compatibility must not bypass later exact readback checks",
   );
   assert.match(terminationMigration, /Historical credibility-manifest exact identity readback failed/);
   assert.match(terminationMigration, /Weapon termination scenario exact identity readback failed/);

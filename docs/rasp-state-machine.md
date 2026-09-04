@@ -8,6 +8,9 @@ is not admitted by the production deployment and makes no named-sensor claim.
 
 ## Canonical boundary
 
+The migration-017 correction changes no RASP state or transition. It only
+accepts the exact historical intended-use tuple produced by the old seed.
+
 BVR `1.3.0` changes scenario inputs, not the RASP schema. Its Blue and Red route
 transitions are ordinary authored aircraft-control changes; Red has no
 sensor-triggered transition or autonomous response state.
@@ -157,6 +160,9 @@ hides entities while this state is selected.
 
 ## Record and replay
 
+Record and replay schemas and resolution behavior are unchanged by this
+migration-only compatibility correction.
+
 Current #207 records preserve the same canonical frame/event contract. The BVR
 record commits generic `KILL` and Red `TERMINATED` at 36.000 s, while its
 1.950 s release-only control records `NO_EFFECT` and leaves Red `ACTIVE`.
@@ -253,6 +259,9 @@ typed final retained frame and is never inferred from range or guidance.
 
 ## Air mission record storage
 
+Air mission record storage is unchanged. The accepted historical intended-use
+row is preserved field-for-field and is never rewritten by migration 017.
+
 Migration 019 appends BVR `1.3.0` and retires without overwriting `1.2.0`.
 WVR and transition remain current at `1.2.0`; all historical versions remain
 addressable by exact package identity and digest.
@@ -347,6 +356,10 @@ This slice does not make tactical decisions, launch-authority, weapon-support,
 or Su-30MKI/F-16 radar claims. Parent issue #26 remains open.
 
 ## Regression evidence
+
+The database regression recreates migrations 001-008, the August 10 seed tuple,
+and migrations 009-017. It proves preservation, repeat application, rejection
+of an unknown tuple, and rejection of a conflicting current identity.
 
 Issue #207 freezes TypeScript/Rust full-frame and event parity, two nearby
 defensive-turn geometry contrasts, the BVR release-only non-kill control, built

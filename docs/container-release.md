@@ -89,10 +89,15 @@ older migration bytes are checked before 017 generation is accepted. Fixture
 seeding is insert-only for `(id, version)` and cannot repair drift by overwrite.
 Migration readback compares the full current and historical intended-use,
 source, credibility-manifest and compiled-pack rows with generated content; a
-partially deployed or administratively inserted conflicting identity aborts
-the transaction. The historical intended-use comparison deliberately preserves
-migration 007's exact definition and legacy identity-string content hash; it
-does not reinterpret that immutable row using today's canonical-content hash.
+partially deployed or administratively inserted conflicting current identity
+aborts the transaction. The corrected pending migration 017 accepts only the
+exact migration-007 tuple or the exact pre-#54 seed tuple for historical
+`vector.intended-use.geometry-teaching@1.0.0`. It never rewrites that row.
+At the failed production deployment, migration 017 rolled back and the ledger
+ended at 016. Databases that already recorded the earlier migration-017
+checksum are a different published history and are not rewritten automatically.
+They must stop for a separately governed backup-and-restore reconciliation;
+never edit the recorded checksum in place.
 
 Migration `018_three_air_combat_studies.sql` follows 017 and forward-publishes
 exact immutable `1.2.0` packages for `a2a-crossing-intercept`,
