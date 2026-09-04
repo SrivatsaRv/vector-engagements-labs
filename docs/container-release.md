@@ -67,6 +67,20 @@ that prior digest and repeats the same no-build Compose operation.
 
 ## Migration, backup, and restore order
 
+Apply migration 021 after the published migration 020. It reconciles the known
+pre-#133 three-platform production seed to the exact four-platform Peace Drive
+catalog. The F-16C and catalog-only F-16D rows, their source assertions, and the
+affected compatibility rows must match the current governed fixture. The
+migration clears only the retired ALQ-211(V)9 and DSCA authority and marks the
+affected compatibility rows `UNVERIFIED`. Fresh empty databases, the known
+legacy seed, and an already-current database are separate admitted paths. An
+empty migrate-before-seed database stays empty for the explicit seed job. The
+legacy path converges on the current rows, the current path is unchanged, and a
+conflict aborts and rolls back the complete migration. Take and verify a backup
+before 021. Restore that backup into a new database if reconciliation fails. Do
+not promote the production Worker until the post-migration read-only catalog
+verifier passes.
+
 Apply migration 020 after migration 019. It extends only the closed
 `public_api_rate_windows.policy_id` constraint for the independent browser
 telemetry budget. Existing window rows and all scenario/catalog data remain
@@ -93,9 +107,10 @@ partially deployed or administratively inserted conflicting current identity
 aborts the transaction. The corrected pending migration 017 accepts only the
 exact migration-007 tuple or the exact pre-#54 seed tuple for historical
 `vector.intended-use.geometry-teaching@1.0.0`. It never rewrites that row.
-At the failed production deployment, migration 017 rolled back and the ledger
-ended at 016. Databases that already recorded the earlier migration-017
-checksum are a different published history and are not rewritten automatically.
+The first failed production attempt rolled migration 017 back and left the
+ledger at 016. The corrected deployment later applied migrations 017 through
+020. Databases that recorded the earlier migration-017 checksum are a different
+published history and are not rewritten automatically.
 They must stop for a separately governed backup-and-restore reconciliation;
 never edit the recorded checksum in place.
 

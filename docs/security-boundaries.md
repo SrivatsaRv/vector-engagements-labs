@@ -257,6 +257,11 @@ performance, generic store-release aerodynamics, target-effect thresholds, or
 the fixed two-actor allocation. The migration remains useful as governed study
 evidence while every one of those limitations stays explicit and issue-owned.
 
+Migration 021 repeats nine `MODEL_ASSUMPTION` labels only to match, write, and
+read back the existing governed default-loadout status. The runtime-stub ledger
+classifies those copies as catalog vocabulary owned by #64 and #219. They add
+no coefficient, executable model value, or runtime authority.
+
 The Rust/WASM artifact now binds the exact Binaryen 131.0.0 optimization policy
 into its source identity and verifies optimized bytes, length and required ABI
 exports before embedding. The optimizer is build-time only and cannot be

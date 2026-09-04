@@ -129,6 +129,17 @@ ledger check and requires the live rows to be an exact checksum-bound prefix of
 the admitted revision. It then applies only the pending forward suffix and
 repeats catalogue verification in a repeatable-read, read-only transaction.
 
+Migration 021 follows the published migration 020. It reconciles the known
+pre-#133 three-platform production seed to the exact four-platform Peace Drive
+C/D catalog while keeping F-16D catalog-only. It clears only the retired
+ALQ-211(V)9 and DSCA authority, and marks the affected compatibility rows
+`UNVERIFIED`. Fresh empty, known legacy, and already-current paths have explicit
+outcomes: an empty migrate-before-seed database stays empty for the
+explicit seed job, the legacy path reaches the current rows, and the current
+path remains unchanged. A conflicting row rolls back the migration. Production
+Worker promotion remains blocked until the post-migration read-only catalog
+verifier passes.
+
 Pending migration 017 recognizes the exact intended-use tuple produced by the
 August 10 pre-#54 seed as well as the migration-007 tuple. The integration gate
 recreates that production sequence and proves the row is preserved, unknown
@@ -141,7 +152,9 @@ The migration gate upgrades the nine-template `1.0.0` catalog through
 nine immutable retired historical versions and nine validated `1.1.0` versions. It also
 requires two intended-use versions, two compiled model packs and their exact
 model-pack credibility manifests. The existing platform, installation, runway
-and EnvironmentPack counts remain unchanged.
+and EnvironmentPack counts are not changed by migration 017. Migration 021
+separately advances the governed platform count from the known production seed
+of three to the current catalog count of four.
 Migration 018 then produces 21 immutable scenario rows: nine `VALIDATED` rows
 (six unaffected `1.1.0` and three Air-combat `1.2.0`) plus 12 `RETIRED` rows
 (nine `1.0.0` and three superseded Air-combat `1.1.0`). Exact readback
