@@ -359,6 +359,21 @@ exact renderer. The Stage 1A quality
 job calls the same `ci-quality-core` Make target used locally, including all
 four migration-freshness checks, instead of maintaining a shorter YAML copy.
 
+That shared quality target starts with `deploy:verify`, Vinext's no-build and
+no-upload Cloudflare packaging preflight. It fails on a missing Wrangler source
+config or unsupported Vite plugin shape before expensive checks begin. The Node
+suite then verifies the actual generated Worker config produced by the build,
+including its single compatibility flag, asset binding, Hyperdrive binding,
+and three independent rate-limit bindings. Wrangler finally bundles that exact
+redirected output with `deploy --dry-run` and performs no upload.
+The shared local and pull-request gate supplies an exact nonzero Hyperdrive
+fixture and reserved `.invalid` custom-domain host, preventing fallback values
+or an empty route from satisfying the test. Protected verification repeats the
+same build with the real production binding identities before migration.
+The built-output test also compares both MapLibre worker modules with their
+locked package bytes. The deploy lifecycle prepares them before Vinext's
+internal build, so a clean runner cannot omit the external map worker silently.
+
 Rust 1.97.1 is the compiler for every committed WASM artifact. Hosted Rust
 verification deletes the Cargo outputs for the production
 engine, generic AAM verifier and TP-1538 verifier before rebuilding and

@@ -58,6 +58,19 @@ sole contract-document comparison base.
 An admitted historical revision that predates the renderer contract skips only
 that absent bootstrap and remains subject to its own revision-local gates.
 
+Cloudflare delivery has one checked-in static `wrangler.jsonc` authority plus a
+Vite overlay for environment-derived bindings. `make ci-local`, hosted quality,
+and protected production verification run Vinext's no-upload deploy preflight;
+production runs it before the complete source gate and before any migration.
+Quality then builds a production-shaped Worker with non-secret fixture bindings,
+asserts their exact generated values, and asks Wrangler to bundle the redirected
+artifact without upload. Protected verification repeats this with the real
+binding IDs. A dependency change therefore cannot make ordinary builds green
+while removing a deploy-only prerequisite or production route.
+The deploy lifecycle also prepares and byte-checks MapLibre's ignored public
+worker assets before Vinext's internal build, matching the existing application
+build prerequisite on a clean runner.
+
 Issue #207 extends the governed contract inventory for the run-information
 projection and the current Worker evidence directory. CI treats the new
 frontend projector, notice, unit/component regressions, migration 019 and

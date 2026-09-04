@@ -133,6 +133,8 @@ ci-quality:
 	$(MAKE) ci-quality-core
 
 ci-quality-core:
+	npm run deploy:verify
+	CLOUDFLARE_HYPERDRIVE_ID=11111111111111111111111111111111 VECTOR_PRODUCTION_HOST=vector-ci.invalid npm run deploy:configuration:verify
 	npm run environment:sources:verify
 	npm run generic-sensor:sources:verify
 	npm run environment:migration:verify

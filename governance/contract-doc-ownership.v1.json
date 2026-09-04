@@ -209,6 +209,13 @@
         },
         {
           "kind": "EXACT",
+          "value": "wrangler.jsonc",
+          "facets": [
+            "delivery"
+          ]
+        },
+        {
+          "kind": "EXACT",
           "value": "vitest.config.ts",
           "facets": [
             "delivery"
@@ -282,6 +289,13 @@
         {
           "kind": "EXACT",
           "value": "tests/required-pr-gate.test.mjs",
+          "facets": [
+            "verification"
+          ]
+        },
+        {
+          "kind": "EXACT",
+          "value": "tests/cloudflare-build-output.test.mjs",
           "facets": [
             "verification"
           ]
@@ -6092,5 +6106,5 @@
     "verification-rust/",
     "worker/"
   ],
-  "canonicalSha256": "5da723533112ebfd0fe7b43628f16ccc4f79b68f8c37472280f7606607902048"
+  "canonicalSha256": "c0b553dad6982ed2363c37a863bbb229478127b19cee73b17fb7994da8cd250d"
 }

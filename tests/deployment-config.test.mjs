@@ -29,6 +29,17 @@ test("production operations admit one immutable reviewed commit and never seed p
   assert.match(workflow, /wrangler hyperdrive get/);
   assert.match(workflow, /npm run db:migrate/);
   assert.match(workflow, /node scripts\/verify-db\.mjs --production-read-only/);
+  const packagingPreflightAt = verifyJob.indexOf("npm run deploy:verify");
+  const productionPackageAt = verifyJob.indexOf("npm run deploy:configuration:verify");
+  const sourceVerifyAt = verifyJob.indexOf("make ci-local");
+  assert.ok(
+    packagingPreflightAt >= 0,
+    "read-only verification must exercise the deploy packaging contract",
+  );
+  assert.ok(
+    packagingPreflightAt < productionPackageAt && productionPackageAt < sourceVerifyAt,
+    "source and production-shaped packaging preflights must run before the complete source gate",
+  );
   assert.match(verifyJob, /ref: \$\{\{ github\.sha \}\}[\s\S]*path: \.trusted-release/);
   assert.match(verifyJob, /node \.trusted-release\/scripts\/verify-db-migration-ledger\.mjs/);
   assert.doesNotMatch(workflow, /npm run db:seed/);
@@ -154,33 +165,77 @@ test("catalog credibility is admitted as one immutable database/API/UI chain", a
   assert.match(makefile, /npm run db:credibility:verify/);
 });
 
-test("Worker database adapter consumes the generated Hyperdrive binding", async () => {
-  const [viteConfig, databaseAdapter, runtimeBuilder] = await Promise.all([
+test("Worker packaging has one static authority and an environment-derived binding overlay", async () => {
+  const [
+    wranglerSource,
+    viteConfig,
+    packageJson,
+    makefile,
+    gitignore,
+    databaseAdapter,
+    runtimeBuilder,
+  ] = await Promise.all([
+    read("wrangler.jsonc"),
     read("vite.config.ts"),
+    read("package.json"),
+    read("Makefile"),
+    read(".gitignore"),
     read("db/index.ts"),
     read("scripts/build-runtime-bundles.mjs"),
   ]);
 
+  const wrangler = JSON.parse(wranglerSource);
+  assert.deepEqual(wrangler, {
+    $schema: "node_modules/wrangler/config-schema.json",
+    name: "vector-engagement-labs",
+    main: "./worker/index.ts",
+    compatibility_date: "2026-05-22",
+    compatibility_flags: ["nodejs_compat"],
+    assets: {
+      directory: "dist/client",
+      not_found_handling: "none",
+      binding: "ASSETS",
+    },
+    observability: { enabled: true },
+  });
+  assert.doesNotMatch(gitignore, /^\/?wrangler\.jsonc$/m);
+  assert.match(viteConfig, /import \{ cloudflare \} from "@cloudflare\/vite-plugin"/);
+  assert.doesNotMatch(viteConfig, /await import\("@cloudflare\/vite-plugin"\)/);
+  assert.match(viteConfig, /configPath: "\.\/wrangler\.jsonc"/);
+  assert.doesNotMatch(viteConfig, /compatibility_(?:date|flags):/);
+  assert.doesNotMatch(viteConfig, /name: "vector-engagement-labs"/);
+  assert.doesNotMatch(viteConfig, /main: "\.\/worker\/index\.ts"/);
+  assert.doesNotMatch(viteConfig, /observability:/);
   assert.match(viteConfig, /binding: "HYPERDRIVE"/);
   assert.match(viteConfig, /process\.env\.CLOUDFLARE_HYPERDRIVE_ID/);
   assert.match(viteConfig, /process\.env\.VECTOR_PRODUCTION_HOST/);
   assert.match(viteConfig, /custom_domain: true/);
-  const compatibilityDate = viteConfig.match(/compatibility_date: "([0-9-]+)"/)?.[1];
-  assert.ok(compatibilityDate, "Cloudflare compatibility date must be explicit");
   assert.ok(
-    compatibilityDate <= new Date().toISOString().slice(0, 10),
+    wrangler.compatibility_date <= new Date().toISOString().slice(0, 10),
     "Cloudflare compatibility date cannot be in the future in UTC",
   );
   assert.equal(
-    compatibilityDate,
+    wrangler.compatibility_date,
     "2026-05-22",
     "Compatibility date must match the pinned Wrangler/workerd support boundary",
   );
-  assert.match(viteConfig, /process\.env\.npm_lifecycle_event === "deploy"/);
   assert.match(
-    viteConfig,
-    /isVinextDeploy \? \{\} : \{ compatibility_flags: \["nodejs_compat"\] \}/,
-    "local builds need nodejs_compat while vinext deploy must not duplicate it",
+    packageJson,
+    /"deploy:verify": "WRANGLER_LOG_PATH=\.wrangler\/wrangler\.log vinext deploy --dry-run"/,
+  );
+  assert.match(
+    packageJson,
+    /"deploy:artifact:verify": "WRANGLER_LOG_PATH=\.wrangler\/wrangler\.log wrangler deploy --dry-run"/,
+  );
+  assert.match(
+    packageJson,
+    /"deploy:configuration:verify": "npm run map:assets:prepare && WRANGLER_LOG_PATH=\.wrangler\/wrangler\.log vinext build && node --test tests\/cloudflare-build-output\.test\.mjs && npm run deploy:artifact:verify"/,
+  );
+  assert.match(packageJson, /"predeploy": "npm run map:assets:prepare"/);
+  assert.match(packageJson, /"test": "[^"]*npm run deploy:artifact:verify"/);
+  assert.match(
+    makefile,
+    /ci-quality-core:\n\tnpm run deploy:verify\n\tCLOUDFLARE_HYPERDRIVE_ID=11111111111111111111111111111111 VECTOR_PRODUCTION_HOST=vector-ci\.invalid npm run deploy:configuration:verify/,
   );
   assert.match(databaseAdapter, /runtime\.HYPERDRIVE\?\.connectionString/);
   assert.match(
