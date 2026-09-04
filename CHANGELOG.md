@@ -129,6 +129,12 @@ promotion remain downstream under #154, later #161 stages and #155.
 
 #### Database schema
 
+- Add forward-only migration 021 to reconcile the known pre-#133 three-platform
+  production seed with the exact four-platform Peace Drive C/D catalog. The
+  F-16D remains catalog-only, exact legacy ALQ/DSCA authority is removed,
+  affected compatibility rows become `UNVERIFIED`, conflicts roll back, and
+  Worker promotion waits for post-migration read-only verification.
+
 - Correct pending migration 017 for the exact pre-#54 production seed tuple.
   The historical row is neither updated nor deleted, and unknown tuples still
   abort the migration before its ledger entry is recorded.

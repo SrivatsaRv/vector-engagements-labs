@@ -84,15 +84,22 @@ test("repository migration manifest is byte-hashed and requires contiguous numbe
   await assert.rejects(() => loadMigrationManifest(directory), /out of sequence; expected ordinal 003/u);
 });
 
-test("the last deployed 008 ledger is a compatible prefix of the current 020 manifest", async () => {
+test("deployed 008 and production 020 ledgers are compatible prefixes of the current 021 manifest", async () => {
   const manifest = await loadMigrationManifest(fileURLToPath(new URL("../db/migrations", import.meta.url)));
-  assert.equal(manifest.length, 20);
+  assert.equal(manifest.length, 21);
   assert.deepEqual(verifyMigrationLedger(manifest, manifest.slice(0, 8)), {
     state: "COMPATIBLE",
     appliedCount: 8,
-    pendingCount: 12,
+    pendingCount: 13,
     lastApplied: "008_blog_post_comments.sql",
     nextPending: "009_governed_study_area_catalog.sql",
+  });
+  assert.deepEqual(verifyMigrationLedger(manifest, manifest.slice(0, 20)), {
+    state: "COMPATIBLE",
+    appliedCount: 20,
+    pendingCount: 1,
+    lastApplied: "020_browser_telemetry_admission.sql",
+    nextPending: "021_aircraft_catalog_reconciliation.sql",
   });
 });
 
