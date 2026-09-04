@@ -151,11 +151,12 @@ The migration gate upgrades the nine-template `1.0.0` catalog through
 `017_weapon_termination_model.sql` and requires 18 rows on readback:
 nine immutable retired historical versions and nine validated `1.1.0` versions.
 It admits only two exact compiled-model catalog histories. A fresh database has
-the 0.8.0 and 0.9.0 packs plus engine manifest 0.7.0 and model manifests 1.2.0
-and 1.3.0. Long-lived production also retains the pre-migration 0.5.0 pack,
-engine manifest 0.5.0, and model manifest 1.0.0. Every identity, digest, subject,
-and pack-to-manifest binding is checked; any other missing, altered, or extra row
-blocks deployment. The existing platform, installation, runway and
+the 0.8.0 and 0.9.0 packs, engine manifest 0.7.0, and model manifests 1.2.0
+and 1.3.0. Long-lived production instead has the 0.5.0, 0.8.0, and 0.9.0
+packs, engine manifest 0.5.0, and model manifests 1.0.0, 1.2.0, and 1.3.0.
+Every identity, digest, subject, and pack-to-manifest binding is checked; any
+other missing, altered, or extra row blocks deployment. The existing platform,
+installation, runway and
 EnvironmentPack counts are not changed by migration 017. Migration 021
 separately advances the governed platform count from the known production seed
 of three to the current catalog count of four.
