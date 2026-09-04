@@ -11,6 +11,12 @@ one family must not imply changes to unrelated contracts.
 
 #### Model packs
 
+- Accept only the two exact immutable model-catalog histories produced by a
+  fresh migration or the retained production seed. The release verifier now
+  checks every pack digest and credibility binding instead of assuming both
+  databases contain the same number of historical rows. This does not alter
+  pack bytes or runtime authority.
+
 - Correct pending migration 017 to recognize the two exact repository-produced
   historical intended-use 1.0.0 tuples. Current model-pack identities,
   coefficients, compilation, and runtime semantics are unchanged.

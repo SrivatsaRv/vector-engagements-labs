@@ -343,6 +343,9 @@ database.
 
 ## Intended use and credibility
 
+Each retained pack keeps its own intended-use and credibility binding; release
+verification must account for the full immutable lineage.
+
 The current 1.1.0 intended-use and credibility identities remain exact. The
 allowlisted 1.0.0 alternative is retained only as historical repository output.
 
@@ -511,6 +514,9 @@ compiler. Production admission cannot consume or relabel this adapter.
 
 ## Scenario binding and patches
 
+Scenario bindings stay exact to their recorded pack identity even when that
+identity is historical and retained beside a newer current pack.
+
 Scenario bindings and patch resolution are unchanged. Every current-row exact
 readback still executes after the historical compatibility check.
 
@@ -594,6 +600,9 @@ Draft patch addition creates a new revision.
 
 ## Loadout compatibility
 
+Retaining a compiled pack for verification does not expand compatibility: a
+loadout remains bound only to its exact recorded model-pack identity.
+
 No loadout, station, store, capacity, or compatibility authority changes in
 this migration correction.
 
@@ -668,6 +677,11 @@ incompatible data rejects the scenario; it never falls back to the legacy model
 authoring list or a weapon-name heuristic.
 
 ## Persistence
+
+Production verification accepts the exact retained pre-migration seed history:
+the 0.5.0, 0.8.0, and 0.9.0 pack identities with their four credibility
+manifests. A fresh migration accepts only 0.8.0 and 0.9.0 with its three
+credibility manifests. Other extra, missing, or altered rows fail closed.
 
 Migration 017 accepts the migration-007 tuple or the exact August 10 seed tuple
 for intended-use 1.0.0. Any other definition/hash pair aborts, and the accepted
@@ -953,6 +967,10 @@ environment envelope rejects the pack during compilation and Rust/WASM
 validation. The runtime must not fill the gap with a scalar fallback.
 
 ## Verification
+
+The production catalog verifier asserts the complete retained-seed identity and
+credibility lineage. It does not delete or rewrite immutable historical packs
+during deployment, and a matching row count alone never grants admission.
 
 Database verification now recreates the August 10 production lineage in an
 isolated schema. It proves exact-row preservation and idempotence, rejects an

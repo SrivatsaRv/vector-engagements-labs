@@ -35,6 +35,115 @@ const PRE_CREDIBILITY_GATE_DEFINITION = {
   ],
 };
 
+const FRESH_MODEL_CATALOG_LINEAGE = {
+  name: "fresh-migrations",
+  compiledModelPacks: [
+    {
+      id: "vector-scalar-study-models",
+      version: "0.8.0",
+      schema_version: "vector.compiled-model-pack.v1",
+      digest: "199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73",
+      credibility_manifest_id: "vector-scalar-study-credibility",
+      credibility_manifest_version: "1.2.0",
+    },
+    {
+      id: "vector-scalar-study-models",
+      version: "0.9.0",
+      schema_version: "vector.compiled-model-pack.v1",
+      digest: "aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c",
+      credibility_manifest_id: "vector-scalar-study-credibility",
+      credibility_manifest_version: "1.3.0",
+    },
+  ],
+  credibilityManifests: [
+    {
+      id: "browser-point-mass-engine-credibility",
+      version: "0.7.0",
+      schema_version: "vector.credibility-manifest.v1",
+      subject_kind: "ENGINE",
+      subject_id: "browser-point-mass-v0.5",
+      subject_digest: "c59104464d75fa910f8ba79114d50a9ffae31c92875ab9ac6e65f62679ddc4aa",
+      content_hash: "7473759b423b19947592d9cf085365215bbbb73679221e7c16e1f76c72aa9b83",
+      approval_state: "DRAFT",
+    },
+    {
+      id: "vector-scalar-study-credibility",
+      version: "1.2.0",
+      schema_version: "vector.credibility-manifest.v1",
+      subject_kind: "MODEL_PACK",
+      subject_id: "vector-scalar-study-models",
+      subject_digest: "199356d524d6b3c85205ca9f16f701b6b7c8f5a7026918d9c6fd8ce6ad52fc73",
+      content_hash: "9337bea52bea7c9d96ec3978e179f0af3f309892f6e779533dc6fce80325a22d",
+      approval_state: "DRAFT",
+    },
+    {
+      id: "vector-scalar-study-credibility",
+      version: "1.3.0",
+      schema_version: "vector.credibility-manifest.v1",
+      subject_kind: "MODEL_PACK",
+      subject_id: "vector-scalar-study-models",
+      subject_digest: "aecedbb6868395bb6ee2b46c4867c032d358210b1aa5a719cb5a868b24f5917c",
+      content_hash: "c57aa54fc4765c4cf8d2ce30c32b67476395914df14cacd5e55a28d2b2719795",
+      approval_state: "DRAFT",
+    },
+  ],
+};
+
+const RETAINED_PRODUCTION_MODEL_CATALOG_LINEAGE = {
+  name: "retained-production-seed",
+  compiledModelPacks: [
+    {
+      id: "vector-scalar-study-models",
+      version: "0.5.0",
+      schema_version: "vector.compiled-model-pack.v1",
+      digest: "181379ad76df8cdbf08666788bf1aace54b05651ce1d2e852487d651c6fb0e1d",
+      credibility_manifest_id: "vector-scalar-study-credibility",
+      credibility_manifest_version: "1.0.0",
+    },
+    ...FRESH_MODEL_CATALOG_LINEAGE.compiledModelPacks,
+  ],
+  credibilityManifests: [
+    {
+      id: "browser-point-mass-engine-credibility",
+      version: "0.5.0",
+      schema_version: "vector.credibility-manifest.v1",
+      subject_kind: "ENGINE",
+      subject_id: "browser-point-mass-v0.5",
+      subject_digest: "c59104464d75fa910f8ba79114d50a9ffae31c92875ab9ac6e65f62679ddc4aa",
+      content_hash: "cdb990dbd81e0ae3e946bb5defd1d128e8a91e94a957485f971ec57f638bb626",
+      approval_state: "DRAFT",
+    },
+    {
+      id: "vector-scalar-study-credibility",
+      version: "1.0.0",
+      schema_version: "vector.credibility-manifest.v1",
+      subject_kind: "MODEL_PACK",
+      subject_id: "vector-scalar-study-models",
+      subject_digest: "181379ad76df8cdbf08666788bf1aace54b05651ce1d2e852487d651c6fb0e1d",
+      content_hash: "9d9d06dc4fc27fb87a8f49a1b675d5956436e847820c902ac3a7513ad2becb36",
+      approval_state: "DRAFT",
+    },
+    ...FRESH_MODEL_CATALOG_LINEAGE.credibilityManifests.slice(1),
+  ],
+};
+
+const ADMITTED_MODEL_CATALOG_LINEAGES = [
+  FRESH_MODEL_CATALOG_LINEAGE,
+  RETAINED_PRODUCTION_MODEL_CATALOG_LINEAGE,
+];
+
+export function assertAdmittedModelCatalogLineage(compiledModelPacks, credibilityManifests) {
+  const admitted = ADMITTED_MODEL_CATALOG_LINEAGES.find((lineage) => (
+    canonicalJson(compiledModelPacks) === canonicalJson(lineage.compiledModelPacks)
+    && canonicalJson(credibilityManifests) === canonicalJson(lineage.credibilityManifests)
+  ));
+  assert.ok(
+    admitted,
+    `Unrecognized immutable model catalog lineage: ${JSON.stringify({ compiledModelPacks, credibilityManifests })}`,
+  );
+  return admitted.name;
+}
+
 async function loadMigrations() {
   const directory = resolve("db/migrations");
   const names = (await readdir(directory))
@@ -132,12 +241,14 @@ export async function verifyLegacyIntendedUseMigrationUpgrade(database) {
           WHERE id='vector-scalar-study-models' AND version='0.9.0') AS source,
         (SELECT count(*)::int FROM compiled_model_packs
           WHERE id='vector-scalar-study-models' AND version='0.9.0') AS compiled_pack,
+        (SELECT count(*)::int FROM compiled_model_packs) AS total_compiled_packs,
         (SELECT count(*)::int FROM scenario_templates
           WHERE version='1.1.0' AND status='VALIDATED') AS scenarios`;
       assert.deepEqual(current, {
         intended_use: 1,
         source: 1,
         compiled_pack: 1,
+        total_compiled_packs: 2,
         scenarios: 9,
       });
     });
@@ -302,11 +413,23 @@ export async function verifyDatabaseState(sql, {
     (SELECT count(*)::int FROM study_areas) AS study_areas,
     (SELECT count(*)::int FROM scenario_templates WHERE status='VALIDATED') AS scenarios,
     (SELECT count(*)::int FROM scenario_templates WHERE status='RETIRED') AS retired_scenarios`;
+  const compiledModelPacks = await sql`SELECT id, version, schema_version, digest,
+      credibility_manifest_id, credibility_manifest_version
+    FROM compiled_model_packs
+    ORDER BY id, version`;
+  const credibilityManifests = await sql`SELECT id, version, schema_version,
+      subject_kind, subject_id, subject_digest, content_hash, approval_state
+    FROM credibility_manifests
+    ORDER BY id, version`;
+  const modelCatalogLineage = assertAdmittedModelCatalogLineage(
+    compiledModelPacks,
+    credibilityManifests,
+  );
   assert.equal(counts.platforms, 4);
   assert.equal(counts.weapons, 8);
   assert.equal(counts.models, 8);
-  assert.equal(counts.compiled_model_packs, 2);
-  assert.equal(counts.credibility_manifests, 3);
+  assert.equal(counts.compiled_model_packs, compiledModelPacks.length);
+  assert.equal(counts.credibility_manifests, credibilityManifests.length);
   assert.equal(counts.intended_uses, 2);
   assert.equal(counts.installations, 21);
   assert.equal(counts.runways, 24);
@@ -540,7 +663,7 @@ export async function verifyDatabaseState(sql, {
     subject_digest: CURRENT_MODEL_PACK_DIGEST,
     approval_state: "DRAFT",
   });
-  process.stdout.write(`database verified: ${JSON.stringify(counts)}\n`);
+  process.stdout.write(`database verified (${modelCatalogLineage}): ${JSON.stringify(counts)}\n`);
   }
 }
 
