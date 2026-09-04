@@ -1,26 +1,21 @@
 import vinext from "vinext";
+import { cloudflare } from "@cloudflare/vite-plugin";
 import { defineConfig } from "vite";
 import { PUBLIC_API_ADMISSION_POLICY } from "./lib/security/admission-policy.ts";
 
-const LOCAL_HYPERDRIVE_ID = "00000000-0000-4000-8000-000000000000";
+const LOCAL_HYPERDRIVE_ID = "00000000000000000000000000000000";
 const hyperdriveId =
   process.env.CLOUDFLARE_HYPERDRIVE_ID ?? LOCAL_HYPERDRIVE_ID;
 const productionHost = process.env.VECTOR_PRODUCTION_HOST;
-const isVinextDeploy = process.env.npm_lifecycle_event === "deploy";
+const includeLocalMetricsBinding =
+  !productionHost && process.env.npm_lifecycle_event !== "deploy";
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
-const localBindingConfig = {
-  name: "vector-engagement-labs",
-  main: "./worker/index.ts",
-  // Keep this at or below the newest date supported by the pinned local
-  // Wrangler/workerd runtime. Update it deliberately with that dependency.
-  compatibility_date: "2026-05-22",
-  // Local Cloudflare builds need nodejs_compat. During `vinext deploy`, vinext
-  // adds the same flag to its generated configuration, so omit our copy.
-  ...(isVinextDeploy ? {} : { compatibility_flags: ["nodejs_compat"] }),
-  observability: { enabled: true },
+// Static Worker structure lives in wrangler.jsonc. This overlay contains only
+// environment-derived bindings which cannot be committed to that file.
+const runtimeBindingConfig = {
   routes: productionHost
     ? [{ pattern: productionHost, custom_domain: true }]
     : [],
@@ -59,14 +54,14 @@ const localBindingConfig = {
       },
     },
   ],
-  ...(isVinextDeploy
-    ? {}
-    : {
+  ...(includeLocalMetricsBinding
+    ? {
         vars: {
           METRICS_BEARER_TOKEN:
             process.env.METRICS_BEARER_TOKEN ?? "vector-local-metrics",
         },
-      }),
+      }
+    : {}),
 };
 
 export default defineConfig(async () => {
@@ -75,9 +70,6 @@ export default defineConfig(async () => {
   process.env.WRANGLER_WRITE_LOGS ??= "false";
   process.env.WRANGLER_LOG_PATH ??= ".wrangler/logs";
   process.env.MINIFLARE_REGISTRY_PATH ??= ".wrangler/registry";
-
-  // Wrangler snapshots its log path while the Cloudflare plugin is imported.
-  const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
     define: {
@@ -100,8 +92,9 @@ export default defineConfig(async () => {
     plugins: [
       vinext(),
       cloudflare({
+        configPath: "./wrangler.jsonc",
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
-        config: localBindingConfig,
+        config: runtimeBindingConfig,
       }),
     ],
   };

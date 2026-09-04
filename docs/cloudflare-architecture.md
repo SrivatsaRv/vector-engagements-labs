@@ -104,25 +104,38 @@ otherwise not an exact prefix of the selected revision. Forward-schema rollback
 requires a separately reviewed compatibility contract; it is not inferred from
 an older image or commit.
 
-The Cloudflare Vite configuration owns the Worker name, compatibility date,
-observability switch, Hyperdrive binding, and custom-domain route. A separate
-`wrangler.jsonc` is intentionally not maintained because two configuration
-sources can silently diverge. The custom-domain route is included only when
-`VECTOR_PRODUCTION_HOST` is present during deployment.
+## Deployment gates
+
+Root `wrangler.jsonc` is the reviewed static Worker authority required by the
+pinned Vinext deployer. It owns the Worker name and entry point, compatibility
+date and flags, asset binding, and observability switch. The Cloudflare Vite
+plugin reads that exact file and overlays only environment-derived Hyperdrive,
+rate-limit, custom-domain, and local-development bindings. Its generated
+`dist/server/wrangler.json` is build output, not a second source of truth. The
+custom-domain route is included only when `VECTOR_PRODUCTION_HOST` is present.
 
 The compatibility date is pinned to `2026-05-22`, the newest date accepted by
 the repository's pinned Wrangler/workerd runtime. Dependency upgrades must
 advance and verify this date together; using the calendar date without checking
 the runtime support boundary can make the local Worker fail before health
-checks begin.
+checks begin. Both local and deployment builds inherit the single
+`nodejs_compat` declaration from `wrangler.jsonc`, so the framework and
+PostgreSQL adapter see the same contract without lifecycle-specific duplication.
 
-Local Cloudflare builds declare `nodejs_compat` through the Vite binding so the
-runtime can load the framework and PostgreSQL adapter. During `vinext deploy`,
-vinext owns the generated copy, so the Vite configuration omits its copy for
-that lifecycle. Cloudflare rejects duplicate compatibility flags before the
-Worker version is created.
-
-## Deployment gates
+The fast `deploy:verify` gate exercises Vinext's actual no-build, no-upload
+deployment preflight before the longer source gate and before production can
+migrate. It requires the root Wrangler scaffold and the supported static
+Cloudflare plugin import. Full tests then inspect the generated Worker config
+after a real build to prove that the static asset/runtime fields and dynamic
+Hyperdrive and rate-limit bindings survived the merge, then ask Wrangler to
+bundle that redirected artifact in dry-run mode without uploading it.
+Local and pull-request quality use a non-secret, nonzero Hyperdrive fixture and
+reserved `.invalid` host. Protected production verification repeats the same
+build against the real environment binding IDs before any migration runs.
+The real deploy lifecycle and the production-shaped verifier both prepare the
+pinned MapLibre worker modules before Vinext starts its internal build. Built
+output tests compare those copied bytes with the locked package, preventing a
+clean deployment runner from publishing a map whose worker URL returns 404.
 
 Before applying any migration, deployment opens a database-enforced read-only
 ledger check and requires the live rows to be an exact checksum-bound prefix of

@@ -107,6 +107,13 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_HYPERDRIVE_ID: ${{ vars.CLOUDFLARE_HYPERDRIVE_ID }}
         run: npx wrangler hyperdrive get "${CLOUDFLARE_HYPERDRIVE_ID}"
+      - name: Verify Cloudflare deployment packaging
+        run: npm run deploy:verify
+      - name: Verify production Worker configuration without upload
+        env:
+          CLOUDFLARE_HYPERDRIVE_ID: ${{ vars.CLOUDFLARE_HYPERDRIVE_ID }}
+          VECTOR_PRODUCTION_HOST: ${{ vars.VECTOR_PRODUCTION_HOST }}
+        run: npm run deploy:configuration:verify
       - name: Verify admitted source
         env:
           VECTOR_CONTRACT_DOC_BASE_SHA: ${{ needs.admit.outputs.sha }}
