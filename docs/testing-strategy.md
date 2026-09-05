@@ -113,6 +113,11 @@ store transfer, route position/altitude/radius, ETA and TOT. Boundary tests prov
 that valid three-decimal values survive both layers and that out-of-domain values
 cannot reach engine preparation.
 
+The #193 freshness regression binds one active run request to the canonical draft
+digest. It covers canonical key ordering, draft mutation, receipt tamper,
+cancellation during digest calculation, and a superseded response. The workbench
+discards a completion unless the active request and latest draft both match.
+
 The machine-readable inventory is
 `governance/air-combat-study-control-matrix.v1.json`. Its fourteen rows are
 strictly limited to controls required by #197 and exercised by the three

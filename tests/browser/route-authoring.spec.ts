@@ -757,6 +757,48 @@ test("an invalid non-spatial numeric draft cannot be bypassed by changing builde
   await expect(page.getByRole("heading", { name: /Who is fighting/i })).toBeVisible();
 });
 
+test("an edited draft discards its in-flight Worker completion", async ({ page }, testInfo) => {
+  if (testInfo.project.name !== "laptop-1366") return;
+  const catalog = await catalogFixture();
+  await page.route("**/api/catalog", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
+  );
+  await page.route("**/api/map-tile?**", (route) => route.abort());
+  await page.addInitScript(() => {
+    const nativePostMessage = Worker.prototype.postMessage;
+    Object.defineProperty(Worker.prototype, "postMessage", {
+      configurable: true,
+      writable: true,
+      value(this: Worker, message: unknown, transferOrOptions?: Transferable[] | StructuredSerializeOptions) {
+        if (message && typeof message === "object" && "type" in message && message.type === "run") {
+          window.setTimeout(() => nativePostMessage.call(this, message), 800);
+          return;
+        }
+        if (transferOrOptions === undefined) nativePostMessage.call(this, message);
+        else if (Array.isArray(transferOrOptions)) nativePostMessage.call(this, message, { transfer: transferOrOptions });
+        else nativePostMessage.call(this, message, transferOrOptions);
+      },
+    });
+  });
+  await openGuidedWorkbench(page, "a2a-crossing-intercept");
+
+  await page.getByRole("button", { name: "5 Validate" }).click();
+  const run = page.getByRole("button", { name: /Run baseline/i });
+  await expect(run).toBeEnabled();
+  await run.click();
+  await page.getByRole("button", { name: "1 Define" }).click();
+  await page.getByRole("textbox", { name: "Run name" }).fill("Changed while Worker was running");
+
+  await expect(page.getByRole("alert")).toContainText(
+    "The stale result was discarded; run again.",
+    { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
+  );
+  await expect(page.locator('.catalog-state[data-runtime-state="ready"]')).toHaveText("Worker · ready");
+  await expect(page.locator('[aria-label="VECTOR Simulation Record"]')).toHaveAttribute("data-record-source", "NONE");
+  await expect(page.getByRole("button", { name: "Explain & report", exact: true })).toBeDisabled();
+  await expect(page.locator(".session-layout")).toHaveCount(0);
+});
+
 test("QHD Define uses one readable task measure without a detached action rail", async ({ page }, testInfo) => {
   // The governed runner requires the same exact case inventory in every
   // project; full-hd alone owns the explicit 2560 x 1440 visual assertion.
