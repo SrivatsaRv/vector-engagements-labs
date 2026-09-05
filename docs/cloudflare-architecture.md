@@ -96,8 +96,10 @@ run. Admission happens before production credentials are exposed. Verify checks
 the candidate inventory and bytes, Hyperdrive, and migration-ledger
 compatibility without changing schema, data, or the deployed Worker. Deploy
 alone applies migrations, runs the catalog verifier, publishes the downloaded
-candidate with `--no-bundle`, records Wrangler's deployment output, and checks
-health, catalog, scenario, BVR workbench, and MapLibre asset routes.
+candidate with `--no-bundle`, and checks health, catalog, scenario, BVR
+workbench, and MapLibre asset routes. The pinned Wrangler action log is the
+deployment-version record. Its complete module log is not copied into an
+environment variable or a second summary step.
 
 Historical rollback fails closed when the live migration ledger is ahead of or
 otherwise not an exact prefix of the selected revision. Forward-schema rollback

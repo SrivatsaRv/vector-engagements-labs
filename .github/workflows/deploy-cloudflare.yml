@@ -135,7 +135,6 @@ jobs:
           node dist/admin/verify-db.mjs --production-read-only
       - name: Deploy exact CI candidate without rebuilding
         if: inputs.operation == 'deploy'
-        id: deploy
         uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -143,18 +142,6 @@ jobs:
           wranglerVersion: 4.113.0
           workingDirectory: candidate
           command: deploy --config release/wrangler.json --no-bundle --strict --no-autoconfig --message source:${{ needs.admit.outputs.sha }}
-      - name: Record deployed Worker version
-        if: inputs.operation == 'deploy'
-        env:
-          WRANGLER_OUTPUT: ${{ steps.deploy.outputs.command-output }}
-        run: |
-          {
-            echo "### Cloudflare Worker deployment"
-            echo
-            echo '```text'
-            printf '%s\n' "${WRANGLER_OUTPUT}"
-            echo '```'
-          } >> "${GITHUB_STEP_SUMMARY}"
       - name: Verify deployed application and static assets
         if: inputs.operation == 'deploy'
         env:
