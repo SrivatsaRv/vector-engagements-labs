@@ -131,6 +131,10 @@ checks the generated Worker configuration and MapLibre assets, runs Wrangler's
 dry-run packaging check, removes environment-local state, and writes a sorted
 SHA-256 inventory over the Worker, assets, database migration SQL, and bundled
 administration commands. The resulting artifact is retained for 30 days.
+Candidate publication uses an explicit `always()` condition and separately
+requires the Required PR Gate to succeed. This prevents intentionally skipped
+selective CI jobs from suppressing the candidate while still denying every
+failed or cancelled required gate.
 
 Production does not check out application source or run `npm ci`, Rust,
 Poppler, `make ci-local`, Vinext, or Wrangler bundling. It downloads the exact

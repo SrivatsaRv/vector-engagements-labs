@@ -403,7 +403,7 @@ jobs:
         run: node scripts/verify-required-gates.mjs
 
   cloudflare_candidate:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.gate.result == 'success'
     name: "Publish reusable Cloudflare candidate"
     needs: gate
     runs-on: ubuntu-24.04
