@@ -409,7 +409,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      CLOUDFLARE_HYPERDRIVE_ID: 11111111111111111111111111111111
+      CLOUDFLARE_HYPERDRIVE_ID: "11111111111111111111111111111111"
       VECTOR_PRODUCTION_HOST: vector-candidate.invalid
     steps:
       - name: Check out admitted main revision
