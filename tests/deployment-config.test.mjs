@@ -40,6 +40,8 @@ test("production operations admit one immutable reviewed commit and never seed p
     "deployment must not copy Wrangler's unbounded module log into an environment variable",
   );
   assert.doesNotMatch(workflow, /npm run db:seed/);
+  assert.match(promoteJob, /"\$\{origin\}\/api\/catalog"/);
+  assert.doesNotMatch(promoteJob, /\/api\/catalog\/status/);
   assert.match(promoteJob, /Verify production migration compatibility without mutation[\s\S]*?working-directory: candidate[\s\S]*?node dist\/admin\/verify-db-migration-ledger\.mjs/);
   const migratePreflightAt = promoteJob.indexOf("node dist/admin/verify-db-migration-ledger.mjs", promoteJob.indexOf("Apply forward-only migrations"));
   const migrateAt = promoteJob.indexOf("node dist/admin/migrate-db.mjs");
