@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import {
   admitRawNumber,
   authoritiesEqual,
-  resolveAirCombatStudyNumericControlAuthority,
+  resolveScenarioNumericControlAuthority,
   type NumericAuthority,
 } from "@/lib/scenario-control-authority";
 
@@ -25,9 +25,12 @@ export function NumericAuthoringInput({
   onChange: (value: number | null) => void;
   onValidityChange: (controlId: string, valid: boolean) => void;
 }) {
-  const governedAuthority = resolveAirCombatStudyNumericControlAuthority(controlId);
-  if (governedAuthority && !authoritiesEqual(governedAuthority, authority)) {
-    throw new TypeError(`${controlId} is not bound to its governed #197 numeric authority.`);
+  const governedAuthority = resolveScenarioNumericControlAuthority(controlId);
+  if (!governedAuthority) {
+    throw new TypeError(`${controlId} has no governed #193 numeric authority.`);
+  }
+  if (!authoritiesEqual(governedAuthority, authority)) {
+    throw new TypeError(`${controlId} is not bound to its governed #193 numeric authority.`);
   }
   const [draft, setDraft] = useState({
     raw: value == null ? "" : String(value),

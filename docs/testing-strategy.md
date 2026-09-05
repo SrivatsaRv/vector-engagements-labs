@@ -105,6 +105,14 @@ route, release and guidance combinations. It proves identical frontend,
 compiler and Worker domains, malformed-draft persistence across step unmount,
 and that profile labels cannot change compiled bytes while a causal input does.
 
+The current #193 numeric-authority regression fails closed when a raw numeric
+component is unregistered or locally redefines its range. The Air-mission
+compiler independently repeats the same boundaries for CAP staffing and
+distance, mission-area coordinates, weapon RTB threshold, ground readiness,
+store transfer, route position/altitude/radius, ETA and TOT. Boundary tests prove
+that valid three-decimal values survive both layers and that out-of-domain values
+cannot reach engine preparation.
+
 The machine-readable inventory is
 `governance/air-combat-study-control-matrix.v1.json`. Its fourteen rows are
 strictly limited to controls required by #197 and exercised by the three

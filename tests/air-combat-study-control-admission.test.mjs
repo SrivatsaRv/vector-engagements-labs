@@ -3,12 +3,17 @@ import test from "node:test";
 
 import {
   AIR_COMBAT_STUDY_ENUM_AUTHORITIES,
+  AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY,
+  AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY,
   AUTHORED_CROSSING_ANGLE_AUTHORITY,
+  AUTHORED_GROUND_START_DELAY_AUTHORITY,
   AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY,
   AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY,
   AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY,
+  AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY,
   AUTHORED_STORE_TRANSFER_TIME_AUTHORITY,
   AUTHORED_TRUE_HEADING_AUTHORITY,
+  AUTHORED_WEAPON_RTB_THRESHOLD_AUTHORITY,
   AUTHORED_WGS84_LATITUDE_AUTHORITY,
   AUTHORED_WGS84_LONGITUDE_AUTHORITY,
   ScenarioControlAdmissionError,
@@ -17,7 +22,7 @@ import {
   admitRawNumber,
   admitStructuredNumber,
   authoritiesEqual,
-  resolveAirCombatStudyNumericControlAuthority,
+  resolveScenarioNumericControlAuthority,
 } from "../lib/scenario-control-authority.ts";
 import {
   createVectorSimulationRecord,
@@ -109,9 +114,19 @@ test("#197 live raw text control IDs resolve to their exact shared numeric autho
     ["airMission.flightPlans[0].routePoints[3].acceptanceRadiusM", AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY],
     ["airMission.assignments[0].storeTransfer.requests[0].requestedTimeSeconds", AUTHORED_STORE_TRANSFER_TIME_AUTHORITY],
     ["airMission.assignments[0].storeTransfer.requests[0].installedDragAreaM2", AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY],
+    ["airMission.tasks.cap.onStationCount", AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY],
+    ["airMission.tasks.cap.flightSize", AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY],
+    ["airMission.tasks.cap.investigationLimitM", AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY],
+    ["airMission.tasks.cap.prosecutionLimitM", AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY],
+    ["airMission.tasks.cap.patrolArea.vertices[2].longitude", AUTHORED_WGS84_LONGITUDE_AUTHORITY],
+    ["airMission.tasks.cap.prosecutionArea.vertices[1].latitude", AUTHORED_WGS84_LATITUDE_AUTHORITY],
+    ["airMission.fuel.weaponRtbThreshold", AUTHORED_WEAPON_RTB_THRESHOLD_AUTHORITY],
+    ["airMission.start.readinessDelaySeconds", AUTHORED_GROUND_START_DELAY_AUTHORITY],
+    ["airMission.flightPlans[0].routePoints[2].etaSeconds", AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY],
+    ["airMission.flightPlans[0].routePoints[2].totalTimeOnTargetSeconds", AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY],
   ];
   for (const [controlId, expected] of bindings) {
-    const actual = resolveAirCombatStudyNumericControlAuthority(controlId);
+    const actual = resolveScenarioNumericControlAuthority(controlId);
     assert.ok(actual, controlId);
     if ("kind" in expected) {
       assert.equal(authoritiesEqual(actual, expected), true, controlId);
@@ -121,7 +136,7 @@ test("#197 live raw text control IDs resolve to their exact shared numeric autho
       assert.equal(actual.precision, expected.precision, controlId);
     }
   }
-  assert.equal(resolveAirCombatStudyNumericControlAuthority("airMission.tasks.cap.flightSize"), null);
+  assert.equal(resolveScenarioNumericControlAuthority("airMission.tasks.cap.unregistered"), null);
 });
 
 test("#197 enum authorities reject unknown, stale, and unsupported guidance, regime, turn, and leg values", () => {

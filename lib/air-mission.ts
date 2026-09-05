@@ -17,12 +17,21 @@ import {
 } from "./model-pack.ts";
 import {
   AIR_COMBAT_STUDY_ENUM_AUTHORITIES,
+  AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY,
+  AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY,
+  AUTHORED_GROUND_START_DELAY_AUTHORITY,
   AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY,
   AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY,
+  AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY,
+  AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY,
   AUTHORED_STORE_TRANSFER_TIME_AUTHORITY,
+  AUTHORED_WEAPON_RTB_THRESHOLD_AUTHORITY,
+  AUTHORED_WGS84_LATITUDE_AUTHORITY,
+  AUTHORED_WGS84_LONGITUDE_AUTHORITY,
   MAX_AUTHORED_SCALAR_FRACTION_DIGITS,
-  MAX_WGS84_FRACTION_DIGITS,
+  admitStructuredNumberDomain,
   hasDeclaredPrecision,
+  type NumericAuthority,
 } from "./scenario-control-authority.ts";
 
 export const AIR_MISSION_SCHEMA_VERSION = "vector.air-mission.v1" as const;
@@ -496,6 +505,11 @@ function requireAuthoredPrecision(value: unknown, precision: number, fieldPath: 
       `Round the authored value to at most ${precision} fractional digits; WGS84 source geometry remains separately governed.`,
     );
   }
+}
+
+function requiredNumberIsInAuthorityDomain(value: unknown, authority: NumericAuthority) {
+  const admitted = admitStructuredNumberDomain(value, authority);
+  return admitted.ok && admitted.value !== null;
 }
 
 function areaAround(longitude: number, latitude: number, id: string): MissionArea {
@@ -1012,11 +1026,15 @@ function validateArea(area: MissionArea, path: string, studyAreaId: string) {
   let twiceArea = 0;
   area.vertices.forEach((point, index) => {
     exactRecord(point, ["longitude", "latitude"], `${path}.vertices[${index}]`);
-    if (!Number.isFinite(point.longitude) || !Number.isFinite(point.latitude) || !isPointInsideStudyArea({ ...point, altitudeM: 0, verticalDatum: "MSL" }, studyArea)) {
+    if (
+      !requiredNumberIsInAuthorityDomain(point.longitude, AUTHORED_WGS84_LONGITUDE_AUTHORITY)
+      || !requiredNumberIsInAuthorityDomain(point.latitude, AUTHORED_WGS84_LATITUDE_AUTHORITY)
+      || !isPointInsideStudyArea({ ...point, altitudeM: 0, verticalDatum: "MSL" }, studyArea)
+    ) {
       fail("MISSION_AREA_INVALID", `${path}.vertices[${index}]`, "Mission-area vertices must be finite and inside the selected study area.", "Move the polygon inside environment coverage.");
     }
-    requireAuthoredPrecision(point.longitude, MAX_WGS84_FRACTION_DIGITS, `${path}.vertices[${index}].longitude`);
-    requireAuthoredPrecision(point.latitude, MAX_WGS84_FRACTION_DIGITS, `${path}.vertices[${index}].latitude`);
+    requireAuthoredPrecision(point.longitude, AUTHORED_WGS84_LONGITUDE_AUTHORITY.precision, `${path}.vertices[${index}].longitude`);
+    requireAuthoredPrecision(point.latitude, AUTHORED_WGS84_LATITUDE_AUTHORITY.precision, `${path}.vertices[${index}].latitude`);
     const next = area.vertices[(index + 1) % area.vertices.length];
     twiceArea += point.longitude * next.latitude - next.longitude * point.latitude;
   });
@@ -1069,18 +1087,24 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
       if (!isRecord(point.constraint.speed)) fail("MISSION_SCHEMA_INVALID", `${pointPath}.constraint.speed`, "Speed constraint is malformed.", "Choose TAS metres per second or Mach.");
       const speedKeys = point.constraint.speed.kind === "TAS" ? ["kind", "valueMps"] : ["kind", "value"];
       exactRecord(point.constraint.speed, speedKeys, `${pointPath}.constraint.speed`);
-      if (!nonEmptyText(point.id) || !(AIR_COMBAT_STUDY_ENUM_AUTHORITIES.routeTransition as readonly string[]).includes(point.turnMethod) || !Number.isFinite(point.acceptanceRadiusM) || point.acceptanceRadiusM < 1 || point.acceptanceRadiusM > 25_000 || !Number.isFinite(point.position.altitude.valueM) || point.position.altitude.valueM < AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY.minimum || point.position.altitude.valueM > AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY.maximum || (pointIndex === 0 && point.acceptanceRadiusM !== 1) || (point.turnMethod === "FLY_OVER" && point.acceptanceRadiusM !== 1) || (point.taskRef !== null && !nonEmptyText(point.taskRef)) || typeof point.constraint.locked !== "boolean" || !["MSL", "AGL"].includes(point.position.altitude.datum) || !["TAS", "MACH"].includes(point.constraint.speed.kind)) fail("MISSION_SCHEMA_INVALID", pointPath, "Route-point identity, turn, acceptance radius, altitude, datum, speed, lock, or task reference is invalid.", "Author an exact typed route point with bounded altitude and radius; START and FLY_OVER use 1 metre.");
-      requireAuthoredPrecision(point.position.longitude, MAX_WGS84_FRACTION_DIGITS, `${pointPath}.position.longitude`);
-      requireAuthoredPrecision(point.position.latitude, MAX_WGS84_FRACTION_DIGITS, `${pointPath}.position.latitude`);
-      requireAuthoredPrecision(point.position.altitude.valueM, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${pointPath}.position.altitude.valueM`);
-      requireAuthoredPrecision(point.acceptanceRadiusM, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${pointPath}.acceptanceRadiusM`);
+      if (!nonEmptyText(point.id) || !(AIR_COMBAT_STUDY_ENUM_AUTHORITIES.routeTransition as readonly string[]).includes(point.turnMethod) || !requiredNumberIsInAuthorityDomain(point.acceptanceRadiusM, AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY) || !requiredNumberIsInAuthorityDomain(point.position.altitude.valueM, AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY) || (pointIndex === 0 && point.acceptanceRadiusM !== 1) || (point.turnMethod === "FLY_OVER" && point.acceptanceRadiusM !== 1) || (point.taskRef !== null && !nonEmptyText(point.taskRef)) || typeof point.constraint.locked !== "boolean" || !["MSL", "AGL"].includes(point.position.altitude.datum) || !["TAS", "MACH"].includes(point.constraint.speed.kind)) fail("MISSION_SCHEMA_INVALID", pointPath, "Route-point identity, turn, acceptance radius, altitude, datum, speed, lock, or task reference is invalid.", "Author an exact typed route point with bounded altitude and radius; START and FLY_OVER use 1 metre.");
+      requireAuthoredPrecision(point.position.longitude, AUTHORED_WGS84_LONGITUDE_AUTHORITY.precision, `${pointPath}.position.longitude`);
+      requireAuthoredPrecision(point.position.latitude, AUTHORED_WGS84_LATITUDE_AUTHORITY.precision, `${pointPath}.position.latitude`);
+      requireAuthoredPrecision(point.position.altitude.valueM, AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY.precision, `${pointPath}.position.altitude.valueM`);
+      requireAuthoredPrecision(point.acceptanceRadiusM, AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY.precision, `${pointPath}.acceptanceRadiusM`);
       requireAuthoredPrecision(
         point.constraint.speed.kind === "TAS" ? point.constraint.speed.valueMps : point.constraint.speed.value,
         MAX_AUTHORED_SCALAR_FRACTION_DIGITS,
         `${pointPath}.constraint.speed`,
       );
-      if (point.constraint.etaSeconds !== undefined) requireAuthoredPrecision(point.constraint.etaSeconds, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${pointPath}.constraint.etaSeconds`);
-      if (point.constraint.totalTimeOnTargetSeconds !== undefined) requireAuthoredPrecision(point.constraint.totalTimeOnTargetSeconds, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${pointPath}.constraint.totalTimeOnTargetSeconds`);
+      if (point.constraint.etaSeconds !== undefined) {
+        if (!requiredNumberIsInAuthorityDomain(point.constraint.etaSeconds, AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY)) fail("MISSION_SCHEMA_INVALID", `${pointPath}.constraint.etaSeconds`, "Route ETA is outside its authored numeric authority.", "Provide model seconds from 0 through 86400.");
+        requireAuthoredPrecision(point.constraint.etaSeconds, AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY.precision, `${pointPath}.constraint.etaSeconds`);
+      }
+      if (point.constraint.totalTimeOnTargetSeconds !== undefined) {
+        if (!requiredNumberIsInAuthorityDomain(point.constraint.totalTimeOnTargetSeconds, AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY)) fail("MISSION_SCHEMA_INVALID", `${pointPath}.constraint.totalTimeOnTargetSeconds`, "Route TOT is outside its authored numeric authority.", "Provide model seconds from 0 through 86400.");
+        requireAuthoredPrecision(point.constraint.totalTimeOnTargetSeconds, AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY.precision, `${pointPath}.constraint.totalTimeOnTargetSeconds`);
+      }
       const expectedTaskRef = pointIndex === 0 ? "MISSION_START" : mission.missionClass;
       if (point.taskRef !== null && point.taskRef !== expectedTaskRef) fail("MISSION_REFERENCE_UNKNOWN", `${pointPath}.taskRef`, "Route point references a missing or unrelated mission task.", `Reference ${expectedTaskRef} or leave the optional task reference empty.`);
     });
@@ -1125,11 +1149,11 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
       assignment.storeTransferPlan.requests.forEach((request, requestIndex) => {
         const requestPath = `${path}.storeTransferPlan.requests[${requestIndex}]`;
         exactRecord(request, ["id", "launcherEntityId", "storeEntityId", "storeOrdinal", "stationId", "storeSourceObjectId", "operation", "requestedTimeSeconds", "installedDragAreaM2", "valueState", "evidenceRefIds", "limitationIds"], requestPath);
-        if (!nonEmptyText(request.id) || !nonEmptyText(request.launcherEntityId) || !nonEmptyText(request.storeEntityId) || !Number.isSafeInteger(request.storeOrdinal) || request.storeOrdinal < 1 || !nonEmptyText(request.stationId) || !nonEmptyText(request.storeSourceObjectId) || !["RELEASE", "JETTISON"].includes(request.operation) || !Number.isFinite(request.requestedTimeSeconds) || request.requestedTimeSeconds < AUTHORED_STORE_TRANSFER_TIME_AUTHORITY.minimum || request.requestedTimeSeconds > AUTHORED_STORE_TRANSFER_TIME_AUTHORITY.maximum || !Number.isFinite(request.installedDragAreaM2) || request.installedDragAreaM2 < AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY.minimum || request.installedDragAreaM2 > AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY.maximum || !["MODEL_ASSUMPTION", "USER_AUTHORED"].includes(request.valueState) || !Array.isArray(request.evidenceRefIds) || !request.evidenceRefIds.length || request.evidenceRefIds.some((id) => !nonEmptyText(id)) || !Array.isArray(request.limitationIds) || !request.limitationIds.length || request.limitationIds.some((id) => !nonEmptyText(id))) {
+        if (!nonEmptyText(request.id) || !nonEmptyText(request.launcherEntityId) || !nonEmptyText(request.storeEntityId) || !Number.isSafeInteger(request.storeOrdinal) || request.storeOrdinal < 1 || !nonEmptyText(request.stationId) || !nonEmptyText(request.storeSourceObjectId) || !["RELEASE", "JETTISON"].includes(request.operation) || !requiredNumberIsInAuthorityDomain(request.requestedTimeSeconds, AUTHORED_STORE_TRANSFER_TIME_AUTHORITY) || !requiredNumberIsInAuthorityDomain(request.installedDragAreaM2, AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY) || !["MODEL_ASSUMPTION", "USER_AUTHORED"].includes(request.valueState) || !Array.isArray(request.evidenceRefIds) || !request.evidenceRefIds.length || request.evidenceRefIds.some((id) => !nonEmptyText(id)) || !Array.isArray(request.limitationIds) || !request.limitationIds.length || request.limitationIds.some((id) => !nonEmptyText(id))) {
           fail("MISSION_SCHEMA_INVALID", requestPath, "Store-transfer request identity, operation, SI values, provenance, or authority is invalid.", "Author finite physical transfer intent with exact identities and evidence/limitation references.");
         }
-        requireAuthoredPrecision(request.requestedTimeSeconds, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${requestPath}.requestedTimeSeconds`);
-        requireAuthoredPrecision(request.installedDragAreaM2, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, `${requestPath}.installedDragAreaM2`);
+        requireAuthoredPrecision(request.requestedTimeSeconds, AUTHORED_STORE_TRANSFER_TIME_AUTHORITY.precision, `${requestPath}.requestedTimeSeconds`);
+        requireAuthoredPrecision(request.installedDragAreaM2, AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY.precision, `${requestPath}.installedDragAreaM2`);
       });
     }
     if (!nonEmptyText(assignment.id) || !nonEmptyText(assignment.flightPlanId) || !nonEmptyText(assignment.aircraftId) || !/^[0-9a-f]{64}$/.test(assignment.aircraftModelPackDigest) || assignment.loadout.schemaVersion !== "vector.loadout-plan.v1" || assignment.loadout.compatibility !== "COMPILED_MODEL_PACK" || assignment.groundCompatibility.schemaVersion !== "vector.aircraft-ground-envelope-binding.v1" || !nonEmptyText(assignment.groundCompatibility.envelopeId) || !/^[0-9a-f]{64}$/.test(assignment.groundCompatibility.envelopeDigest)) fail("MISSION_SCHEMA_INVALID", path, "Assignment identity, model binding, loadout, or ground-envelope binding is invalid.", "Bind one exact flight, aircraft model pack, loadout, and content-addressed assumption envelope.");
@@ -1175,7 +1199,7 @@ export function compileAirMissionDefinition(
       if (!point.id || pointIds.has(point.id)) fail("MISSION_ROUTE_INVALID", `${path}.id`, "Route-point IDs must be unique and stable.", "Assign each point a unique ID.");
       pointIds.add(point.id);
       if (point.position.altitude.datum === "AGL") fail("MISSION_TERRAIN_REQUIRED", `${path}.position.altitude.datum`, "AGL flight-plan points require admitted terrain sampling.", "Use MSL or admit an exact terrain dataset and conversion.");
-      if (!Number.isFinite(point.position.longitude) || !Number.isFinite(point.position.latitude) || !Number.isFinite(point.position.altitude.valueM) || point.position.altitude.valueM < 0) fail("MISSION_ROUTE_INVALID", `${path}.position`, "Route-point coordinates and altitude must be finite.", "Provide WGS84 longitude/latitude and non-negative metres MSL.");
+      if (!requiredNumberIsInAuthorityDomain(point.position.longitude, AUTHORED_WGS84_LONGITUDE_AUTHORITY) || !requiredNumberIsInAuthorityDomain(point.position.latitude, AUTHORED_WGS84_LATITUDE_AUTHORITY) || !requiredNumberIsInAuthorityDomain(point.position.altitude.valueM, AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY)) fail("MISSION_ROUTE_INVALID", `${path}.position`, "Route-point coordinates and altitude must satisfy their shared numeric authorities.", "Provide bounded WGS84 longitude/latitude and metres MSL.");
       if (!isPointInsideStudyArea({ longitude: point.position.longitude, latitude: point.position.latitude, altitudeM: point.position.altitude.valueM, verticalDatum: point.position.altitude.datum }, getStudyArea(mission.studyAreaId))) fail("MISSION_ROUTE_INVALID", `${path}.position`, "Route point is outside the admitted environment coverage.", "Move the WGS84 point inside the selected study area.");
       const speed = constrainedSpeedMps(point);
       if (!Number.isFinite(speed) || speed <= 0) fail("MISSION_ROUTE_INVALID", `${path}.constraint.speed`, "Route speed must be finite and positive.", "Provide TAS in m/s or positive Mach.");
@@ -1252,7 +1276,7 @@ export function compileAirMissionDefinition(
   });
   if (!Number.isFinite(mission.fuel.reservePercent) || mission.fuel.reservePercent < 0 || mission.fuel.reservePercent > 100) fail("MISSION_FUEL_INVALID", "fuel.reservePercent", "Fuel reserve must be from 0 to 100 percent.", "Provide an explicit bounded reserve.");
   requireAuthoredPrecision(mission.fuel.reservePercent, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "fuel.reservePercent");
-  if (!Number.isInteger(mission.fuel.weaponRtbThreshold) || mission.fuel.weaponRtbThreshold < 0 || mission.fuel.weaponRtbThreshold > context.scenario.blueWeaponQuantity) fail("MISSION_FUEL_INVALID", "fuel.weaponRtbThreshold", "Weapon RTB threshold must be a bounded store count.", "Choose an integer from zero through the admitted loadout quantity.");
+  if (!requiredNumberIsInAuthorityDomain(mission.fuel.weaponRtbThreshold, AUTHORED_WEAPON_RTB_THRESHOLD_AUTHORITY) || mission.fuel.weaponRtbThreshold > context.scenario.blueWeaponQuantity) fail("MISSION_FUEL_INVALID", "fuel.weaponRtbThreshold", "Weapon RTB threshold must be a bounded store count.", "Choose an integer from zero through the admitted loadout quantity.");
   if (mission.assignments.some((assignment) => assignment.initialFuelPercent <= mission.fuel.reservePercent)) fail("MISSION_FUEL_RESERVE_INSUFFICIENT", "fuel.reservePercent", "Initial fuel does not exceed the declared reserve.", "Increase initial fuel or reduce the reserve after reviewing recovery needs.");
   if (new Set(mission.assignedTargetIds).size !== mission.assignedTargetIds.length || mission.assignedTargetIds.length !== 1 || mission.assignedTargetIds[0] !== "red-object-1") fail("MISSION_REFERENCE_UNKNOWN", "assignedTargetIds", "The assigned target is missing, duplicated, or not present in the compiled scenario.", "Select the exact compiled target identity.");
   for (const field of ["recoveryInstallationId", "divertInstallationId"] as const) {
@@ -1332,8 +1356,8 @@ export function compileAirMissionDefinition(
     if (takeoffMassKg > groundDynamics.maximumTakeoffMassKg) fail("MISSION_RUNWAY_INVALID", "assignments[0].loadout", "Takeoff mass exceeds the admitted generic ground-dynamics projection.", "Reduce fuel or installed stores, or use a separately admitted projection.");
     if (runway.lengthM < groundEnvelope.minimumRunwayLengthM) fail("MISSION_RUNWAY_INVALID", "start.runway.lengthM", "Runway is shorter than the assigned aircraft ground envelope.", "Choose a longer runway or a different admitted aircraft configuration.");
     if (!groundEnvelope.compatibleSurfaces.includes(runway.surface)) fail("MISSION_RUNWAY_INVALID", "start.runway.surface", "Runway surface is incompatible with the assigned aircraft ground envelope.", "Choose a compatible surface.");
-    if (!Number.isFinite(groundStart.readinessDelaySeconds) || groundStart.readinessDelaySeconds < 0) fail("MISSION_RUNWAY_INVALID", "start.readinessDelaySeconds", "Readiness delay must be finite and non-negative.", "Provide seconds from model start.");
-    requireAuthoredPrecision(groundStart.readinessDelaySeconds, 0, "start.readinessDelaySeconds");
+    if (!requiredNumberIsInAuthorityDomain(groundStart.readinessDelaySeconds, AUTHORED_GROUND_START_DELAY_AUTHORITY)) fail("MISSION_RUNWAY_INVALID", "start.readinessDelaySeconds", "Readiness delay must be an admitted integer from 0 through 86400 seconds.", "Provide bounded integer seconds from model start.");
+    requireAuthoredPrecision(groundStart.readinessDelaySeconds, AUTHORED_GROUND_START_DELAY_AUTHORITY.precision, "start.readinessDelaySeconds");
     const runwayEnginePosition = geographicToEnginePosition({
       longitude: runway.threshold.longitude,
       latitude: runway.threshold.latitude,
@@ -1380,10 +1404,10 @@ export function compileAirMissionDefinition(
     case "COMBAT_AIR_PATROL":
       validateArea(mission.tasks.patrolArea, "tasks.patrolArea", mission.studyAreaId);
       if (mission.tasks.prosecutionArea) validateArea(mission.tasks.prosecutionArea, "tasks.prosecutionArea", mission.studyAreaId);
-      if (!Number.isInteger(mission.tasks.onStationCount) || mission.tasks.onStationCount <= 0 || !Number.isInteger(mission.tasks.flightSize) || mission.tasks.flightSize <= 0 || mission.tasks.onStationCount > mission.tasks.flightSize || !Number.isFinite(mission.tasks.onStationMinutes) || mission.tasks.onStationMinutes <= 0 || mission.tasks.patrolPattern !== "RACETRACK" || mission.tasks.relief !== "FUEL_OR_TIME" || !Number.isFinite(mission.tasks.investigationLimitM) || mission.tasks.investigationLimitM <= 0 || !Number.isFinite(mission.tasks.prosecutionLimitM) || mission.tasks.prosecutionLimitM < mission.tasks.investigationLimitM || !nonEmptyText(mission.tasks.completionCondition)) fail("MISSION_CLASS_FIELDS_MISMATCH", "tasks", "CAP geometry, staffing, duration, relief, investigation/prosecution limits, and completion must be valid.", "Provide visible CAP task values with on-station count within flight size and prosecution at least as large as investigation.");
+      if (!requiredNumberIsInAuthorityDomain(mission.tasks.onStationCount, AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY) || !requiredNumberIsInAuthorityDomain(mission.tasks.flightSize, AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY) || mission.tasks.onStationCount > mission.tasks.flightSize || !Number.isFinite(mission.tasks.onStationMinutes) || mission.tasks.onStationMinutes <= 0 || mission.tasks.patrolPattern !== "RACETRACK" || mission.tasks.relief !== "FUEL_OR_TIME" || !requiredNumberIsInAuthorityDomain(mission.tasks.investigationLimitM, AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY) || !requiredNumberIsInAuthorityDomain(mission.tasks.prosecutionLimitM, AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY) || mission.tasks.prosecutionLimitM < mission.tasks.investigationLimitM || !nonEmptyText(mission.tasks.completionCondition)) fail("MISSION_CLASS_FIELDS_MISMATCH", "tasks", "CAP geometry, staffing, duration, relief, investigation/prosecution limits, and completion must be valid.", "Provide visible CAP task values with on-station count within flight size and prosecution at least as large as investigation.");
       requireAuthoredPrecision(mission.tasks.onStationMinutes, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "tasks.onStationMinutes");
-      requireAuthoredPrecision(mission.tasks.investigationLimitM, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "tasks.investigationLimitM");
-      requireAuthoredPrecision(mission.tasks.prosecutionLimitM, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "tasks.prosecutionLimitM");
+      requireAuthoredPrecision(mission.tasks.investigationLimitM, AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY.precision, "tasks.investigationLimitM");
+      requireAuthoredPrecision(mission.tasks.prosecutionLimitM, AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY.precision, "tasks.prosecutionLimitM");
       break;
     case "FIGHTER_SWEEP":
       validateArea(mission.tasks.sweepArea, "tasks.sweepArea", mission.studyAreaId);
