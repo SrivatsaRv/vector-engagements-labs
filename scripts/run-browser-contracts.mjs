@@ -26,7 +26,7 @@ export const BROWSER_CASE_TITLES = Object.freeze([
   "the WVR Air study keeps every playback and outcome surface on one canonical frame",
   "the transition Air study keeps every playback and outcome surface on one canonical frame",
   "an invalid non-spatial numeric draft cannot be bypassed by changing builder steps",
-  "an edited draft discards its in-flight Worker completion",
+  "a raw invalid draft discards its in-flight Worker completion",
   "QHD Define uses one readable task measure without a detached action rail",
   "duration and replay seed use governed raw admission before builder navigation",
   "shared transient controls hand off once and remain accessible, contained, and stable",
