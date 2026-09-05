@@ -105,8 +105,8 @@ export const CLASSIFIER_DECISION_CONTRACT = deepFreeze({
       patterns: patternInventory(
         /^governance\/generic-sensor-verification-sources\//,
         /^governance\/nasa-historical-f16-store-source\//,
-        /^scripts\/(?:generate-generic-sensor-source-manifest|generate-nasa-f16-store-source-evidence|install-pinned-poppler-ubuntu|verify-generic-sensor-source-bundle|verify-nasa-f16-store-source)\.mjs$/,
-        /^scripts\/(?:pinned-pdftoppm-wrapper\.sh\.in|pinned-poppler-ubuntu\.Dockerfile)$/,
+        /^scripts\/(?:generate-generic-sensor-source-manifest|generate-nasa-f16-store-source-evidence|verify-generic-sensor-source-bundle|verify-nasa-f16-store-source)\.mjs$/,
+        /^scripts\/(?:install-pinned-poppler-ubuntu\.sh|pinned-pdftoppm-wrapper\.sh\.in|pinned-poppler-ubuntu\.Dockerfile)$/,
         /^scripts\/lib\/generic-sensor-source-verifier\.mjs$/,
         /^tests\/(?:generic-sensor-source-bundle|nasa-f16-store-source)\.test\.mjs$/,
       ),

@@ -73,6 +73,7 @@ test("PDF rendering is selected only by governed source-evidence changes", () =>
   for (const path of [
     "governance/generic-sensor-verification-sources/raw/nasa/19660021027.pdf",
     "governance/nasa-historical-f16-store-source/sources/TM74078.pdf",
+    "scripts/install-pinned-poppler-ubuntu.sh",
     "scripts/verify-generic-sensor-source-bundle.mjs",
     "scripts/verify-nasa-f16-store-source.mjs",
   ]) assert.equal(selected([path]).includes("source_evidence"), true, path);
