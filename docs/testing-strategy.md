@@ -116,7 +116,9 @@ cannot reach engine preparation.
 The #193 freshness regression binds one active run request to the canonical draft
 digest. It covers canonical key ordering, draft mutation, receipt tamper,
 cancellation during digest calculation, and a superseded response. The workbench
-discards a completion unless the active request and latest draft both match.
+discards a completion unless the active request and latest draft both match. The
+case is part of the governed browser inventory and runs across every admitted
+viewport; only the laptop case executes the delayed-Worker mutation sequence.
 
 The machine-readable inventory is
 `governance/air-combat-study-control-matrix.v1.json`. Its fourteen rows are
