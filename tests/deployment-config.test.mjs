@@ -34,6 +34,11 @@ test("production operations admit one immutable reviewed commit and never seed p
   assert.match(promoteJob, /command: hyperdrive get/);
   assert.match(promoteJob, /command: deploy --config release\/wrangler\.json --no-bundle/);
   assert.doesNotMatch(promoteJob, /npm ci|npm run build|make ci-local|setup-rust-toolchain|install-pinned-poppler/);
+  assert.doesNotMatch(
+    promoteJob,
+    /steps\.deploy\.outputs\.command-output|WRANGLER_OUTPUT|Record deployed Worker version/,
+    "deployment must not copy Wrangler's unbounded module log into an environment variable",
+  );
   assert.doesNotMatch(workflow, /npm run db:seed/);
   assert.match(promoteJob, /Verify production migration compatibility without mutation[\s\S]*?working-directory: candidate[\s\S]*?node dist\/admin\/verify-db-migration-ledger\.mjs/);
   const migratePreflightAt = promoteJob.indexOf("node dist/admin/verify-db-migration-ledger.mjs", promoteJob.indexOf("Apply forward-only migrations"));
