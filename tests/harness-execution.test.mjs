@@ -119,6 +119,17 @@ test("the script-based Required PR Gate checks out the tested revision", async (
   assert.doesNotMatch(gate, /CONTRACT_DOC_IMPACT_STATE/);
 });
 
+test("main candidate publication survives intentionally skipped selective CI jobs", async () => {
+  const workflow = await readFile(".github/workflows/ci.yml", "utf8");
+  const candidate = workflow.split(/^  cloudflare_candidate:/m)[1];
+  assert.ok(candidate, "Cloudflare candidate job is missing");
+  assert.match(candidate, /needs: gate/);
+  assert.match(
+    candidate,
+    /if: always\(\) && github\.event_name == 'push' && github\.ref == 'refs\/heads\/main' && needs\.gate\.result == 'success'/,
+  );
+});
+
 test("contract-document tooling is advisory and never blocks local or hosted delivery", async () => {
   const packageJson = JSON.parse(await readFile("package.json", "utf8"));
   assert.equal(packageJson.scripts["policy:contract-docs:verify"], "node scripts/verify-contract-doc-impact.mjs");
