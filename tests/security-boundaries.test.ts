@@ -198,6 +198,11 @@ test("saved reports are recomputed from admitted scenario inputs", async () => {
     },
   );
   assert.deepEqual(verified.admission, admission);
+  assert.equal(
+    Object.hasOwn(verified.report.packageProvenance ?? {}, "admission"),
+    false,
+    "the transport admission receipt must not leak into versioned report provenance",
+  );
   assert.ok(verified.result.frames.length > 1);
   assert.equal(verified.report.result, verified.result);
   assert.equal(verified.report.events[0]?.title, "Verified run started");

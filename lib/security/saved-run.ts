@@ -423,7 +423,9 @@ export async function buildVerifiedSavedRun(
     engine: ENGINE_VERSION,
     profileVersion: model ? `${model.id}@${model.version}` : "model-unavailable",
     packageProvenance: {
-      ...provenance,
+      schemaVersion: provenance.schemaVersion,
+      contentHash: provenance.contentHash,
+      draftRevision: provenance.draftRevision,
       intendedUse: template.intendedUse,
       modelPack: template.modelPack,
       ...(result.engineRun.scenario.airMission
