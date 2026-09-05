@@ -7,6 +7,7 @@ import { getScenarioDefinition } from "../lib/scenarios.ts";
 import { simulate } from "../lib/simulation.ts";
 import { evaluateTargetEffect } from "../lib/engine/target-effect.ts";
 import { buildVerifiedSavedRun } from "../lib/security/saved-run.ts";
+import { createScenarioDraftAdmissionReceipt } from "../lib/scenario-draft-admission.ts";
 import {
   buildAuthoredProfileBinding,
   projectReportCausalInputs,
@@ -172,6 +173,10 @@ test("report export preserves authored profile and debrief while legacy definiti
 test("verified saved-run report preserves the exact optional authored profile", async () => {
   const definition = getScenarioDefinition("a2a-crossing-intercept");
   assert.ok(definition?.authoredProfile);
+  const admission = await createScenarioDraftAdmissionReceipt(
+    definition.scenario,
+    "saved-run-authored-profile",
+  );
   const { report } = await buildVerifiedSavedRun(
     definition.scenario,
     definition,
@@ -179,6 +184,7 @@ test("verified saved-run report preserves the exact optional authored profile", 
       schemaVersion: "vector.scenario.v4",
       contentHash: "a".repeat(64),
       draftRevision: 0,
+      admission,
     },
   );
   assert.deepEqual(report.libraryScenario.authoredProfile, definition.authoredProfile);
@@ -349,6 +355,10 @@ test("edited saved runs retain source identity without asserting source leg inte
   assert.ok(definition?.authoredProfile);
   const edited = structuredClone(definition.scenario);
   edited.spatialPlan.red.route[2].longitude += 0.001;
+  const admission = await createScenarioDraftAdmissionReceipt(
+    edited,
+    "saved-run-edited-profile",
+  );
   const { scenario, result, report } = await buildVerifiedSavedRun(
     edited,
     definition,
@@ -356,6 +366,7 @@ test("edited saved runs retain source identity without asserting source leg inte
       schemaVersion: "vector.scenario.v4",
       contentHash: "b".repeat(64),
       draftRevision: 1,
+      admission,
     },
   );
   const debrief = buildCanonicalReportDebrief(

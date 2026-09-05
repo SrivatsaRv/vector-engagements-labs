@@ -4,6 +4,7 @@ import { ENGINE_VERSION } from "@/lib/engine/version";
 import { addGauge, incrementCounter, observeHistogram } from "@/lib/observability/metrics";
 import { withObservedRoute } from "@/lib/observability/server";
 import { isScenarioDefinition } from "@/lib/scenario-package";
+import { ScenarioDraftAdmissionError } from "@/lib/scenario-draft-admission";
 import {
   publicApiError,
   PublicApiError,
@@ -156,6 +157,7 @@ export async function POST(request: Request) {
           schemaVersion,
           contentHash,
           draftRevision: payload.draftRevision as number,
+          admission: payload.admission,
         });
         const outcome = verified.result.termination;
         incrementCounter("vector_scenario_runs_completed_total", { domain: templatePackage.domain, outcome, engine_version: ENGINE_VERSION });
@@ -199,12 +201,24 @@ export async function POST(request: Request) {
       `);
       snapshotPersisted = true;
       incrementCounter("vector_reports_total", { domain: scenario.domain, outcome: "saved" });
-        return Response.json(rows[0], { status: 201, headers: { "cache-control": "no-store" } });
+        return Response.json({
+          ...(rows[0] as Record<string, unknown>),
+          admission: verified.admission,
+        }, { status: 201, headers: { "cache-control": "no-store" } });
       } finally {
         await releaseSavedRunAdmission(admission, { persisted: snapshotPersisted });
       }
     } catch (error) {
       incrementCounter("vector_reports_total", { domain: "unknown", outcome: "failed" });
+      if (error instanceof ScenarioDraftAdmissionError) {
+        return publicApiError(new PublicApiError(
+          error.code === "DRAFT_ADMISSION_INVALID" ? 400 : 409,
+          error.code,
+          error.message,
+          undefined,
+          error.fieldPath,
+        ));
+      }
       return publicApiError(error, 503);
     }
   });

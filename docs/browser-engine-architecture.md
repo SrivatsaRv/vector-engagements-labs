@@ -96,9 +96,10 @@ atmosphere and wind payload; they never fetch provider or PostGIS data.
 Interactive workbench execution uses the module Worker in
 `lib/runtime/simulation.worker.ts`. This is a browser Web Worker and is unrelated
 to the Cloudflare application Worker in `worker/index.ts`. Its message contract is
-`vector.browser-runtime.v1` and its observable states are `initialization`,
+`vector.browser-runtime.v2` and its observable states are `initialization`,
 `ready`, `running`, `paused`, `cancelling`, `completed`, `failed`, and
-`terminated`.
+`terminated`. Version 2 requires every run request and completion to carry the
+same validated `vector.scenario-draft-admission.v1` receipt.
 
 The TypeScript backend advances an `EngineSession` in bounded `runTicks(count)`
 batches. It yields between batches so pause, cancellation, and bounded progress
@@ -165,7 +166,7 @@ model-pack contracts, not a new engine ABI, coefficient set, or named-platform
 physics claim.
 
 `npm run worker:verify -- --write-air-combat-evidence <directory>` writes the
-four transferred `.vector` records and a deterministic compact JSON inventory
+five transferred `.vector` records and a deterministic compact JSON inventory
 of package identity, record digest, duration, outcome, size and terminal
 lifecycle. The destination must be a distinct empty staging directory. Write
 mode validates and emits the newly generated set without consulting tracked
@@ -187,11 +188,14 @@ Plain `npm run worker:verify` is also the semantic freshness gate for those
 tracked artifacts. It requires the exact five-file inventory, matches record
 IDs and byte lengths, validates every archived member digest, compares every
 non-manifest member and compares the manifest after excluding only
-`createdAt` and the content digest derived from that timestamp. Missing or
-stale evidence therefore fails normal Worker CI. Whole-archive hashes are not
-used as the oracle because record creation intentionally records wall-clock
-creation time. The exact fixture-directory prefix is registered in contract
-governance and the verifier rejects missing, extra or renamed evidence files.
+`createdAt`, the content digest derived from that timestamp, and the browser
+transport protocol label. The protocol label is tested by the runtime contract;
+it is not simulation evidence and changing it does not justify rewriting five
+otherwise identical records. Missing or stale simulation evidence still fails
+normal Worker CI. Whole-archive hashes are not used as the oracle because record
+creation intentionally records wall-clock creation time. The exact
+fixture-directory prefix is registered in contract governance and the verifier
+rejects missing, extra or renamed evidence files.
 
 #207 grants no browser-artifact size allowance. The historical 585,000-byte
 evidence gate and the current strict sub-620,000-byte optimized WASM ceiling

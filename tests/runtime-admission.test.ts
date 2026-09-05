@@ -113,6 +113,23 @@ test("rate-limit rejection has a stable retry contract", async () => {
   assert.deepEqual(await response.json(), { error: "rate_limit_exceeded" });
 });
 
+test("public admission errors preserve a stable field path", async () => {
+  const response = publicApiError(
+    new PublicApiError(
+      409,
+      "DRAFT_ADMISSION_STALE_DRAFT",
+      "stale draft",
+      undefined,
+      "$.draftDigest",
+    ),
+  );
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), {
+    error: "DRAFT_ADMISSION_STALE_DRAFT",
+    fieldPath: "$.draftDigest",
+  });
+});
+
 test("unexpected public API failures emit a bounded structured log without exposing details", async () => {
   const recorded: unknown[][] = [];
   const originalError = console.error;

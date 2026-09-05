@@ -9,6 +9,11 @@ import {
   serializeVectorRecord,
 } from "../record/vector-record.ts";
 import { buildSimulationResult } from "../simulation.ts";
+import {
+  admitScenarioDraftReceipt,
+  ScenarioDraftAdmissionError,
+  type ScenarioDraftAdmissionReceipt,
+} from "../scenario-draft-admission.ts";
 import { CapabilityAdmissionError } from "./deployment-capabilities.ts";
 import { admitRuntimeModelPack } from "./model-pack-adapter.ts";
 import {
@@ -102,10 +107,15 @@ async function executeRun(request: Extract<BrowserRuntimeRequest, { type: "run" 
     resume: null,
   };
   active = run;
-  stateMessage(request.requestId, "running", request.runId);
   let engineRun: EngineRun;
+  let admission: ScenarioDraftAdmissionReceipt;
   let boundaryCalls = 0;
   try {
+    admission = await admitScenarioDraftReceipt(
+      request.admission,
+      pack.prepared.scenario,
+    );
+    stateMessage(request.requestId, "running", request.runId);
     if (backend === "typescript") {
       const session = new EngineSession(pack.prepared.engineScenario);
       let lastProgress = 0;
@@ -189,6 +199,7 @@ async function executeRun(request: Extract<BrowserRuntimeRequest, { type: "run" 
         type: "completed",
         state,
         runId: request.runId,
+        admission,
         backend,
         recordId: record.manifest.recordId,
         contentDigest: record.manifest.contentDigest,
@@ -209,9 +220,17 @@ async function executeRun(request: Extract<BrowserRuntimeRequest, { type: "run" 
       type: "failed",
       state,
       runId: request.runId,
-      code: "engine",
+      code: error instanceof ScenarioDraftAdmissionError ? error.code : "engine",
       message: error instanceof Error ? error.message : "Unknown simulation Worker failure.",
       recoverable: true,
+      ...(error instanceof ScenarioDraftAdmissionError
+        ? {
+            fieldPath: error.fieldPath,
+            stage: error.stage,
+            severity: error.severity,
+            correctiveGuidance: error.correctiveGuidance,
+          }
+        : {}),
     });
   }
 }

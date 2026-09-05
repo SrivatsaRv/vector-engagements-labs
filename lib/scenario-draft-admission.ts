@@ -37,7 +37,9 @@ export class ScenarioDraftAdmissionError extends Error {
 const STABLE_REQUEST_ID = /^[a-z0-9]+(?:[._:/-][a-z0-9]+)*$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 
-function validateReceipt(value: unknown): ScenarioDraftAdmissionReceipt {
+export function validateScenarioDraftAdmissionReceipt(
+  value: unknown,
+): ScenarioDraftAdmissionReceipt {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new ScenarioDraftAdmissionError(
       "DRAFT_ADMISSION_INVALID",
@@ -73,26 +75,74 @@ function validateReceipt(value: unknown): ScenarioDraftAdmissionReceipt {
   return Object.freeze(structuredClone(value) as ScenarioDraftAdmissionReceipt);
 }
 
+export async function createScenarioDraftAdmissionReceipt(
+  draft: unknown,
+  requestId: string,
+): Promise<ScenarioDraftAdmissionReceipt> {
+  if (requestId.length > 128 || !STABLE_REQUEST_ID.test(requestId)) {
+    throw new ScenarioDraftAdmissionError(
+      "DRAFT_ADMISSION_INVALID",
+      "$.requestId",
+      "Draft admission request ID must be a stable identifier.",
+      "Generate a lowercase request identifier before starting admission.",
+    );
+  }
+  return Object.freeze({
+    schemaVersion: SCENARIO_DRAFT_ADMISSION_SCHEMA_VERSION,
+    requestId,
+    draftDigest: await sha256Hex(draft),
+  });
+}
+
+export async function admitScenarioDraftReceipt(
+  receiptInput: unknown,
+  draft: unknown,
+): Promise<ScenarioDraftAdmissionReceipt> {
+  const receipt = validateScenarioDraftAdmissionReceipt(receiptInput);
+  if ((await sha256Hex(draft)) !== receipt.draftDigest) {
+    throw new ScenarioDraftAdmissionError(
+      "DRAFT_ADMISSION_STALE_DRAFT",
+      "$.draftDigest",
+      "The scenario draft does not match its admission receipt.",
+      "Discard this response and run the current scenario draft again.",
+    );
+  }
+  return receipt;
+}
+
+export function assertMatchingScenarioDraftAdmissionReceipt(
+  expectedInput: unknown,
+  actualInput: unknown,
+): ScenarioDraftAdmissionReceipt {
+  const expected = validateScenarioDraftAdmissionReceipt(expectedInput);
+  const actual = validateScenarioDraftAdmissionReceipt(actualInput);
+  if (actual.requestId !== expected.requestId) {
+    throw new ScenarioDraftAdmissionError(
+      "DRAFT_ADMISSION_STALE_REQUEST",
+      "$.requestId",
+      "The admission response belongs to a different request.",
+      "Discard this response and run the current scenario draft again.",
+    );
+  }
+  if (actual.draftDigest !== expected.draftDigest) {
+    throw new ScenarioDraftAdmissionError(
+      "DRAFT_ADMISSION_STALE_DRAFT",
+      "$.draftDigest",
+      "The admission response belongs to a different scenario draft.",
+      "Discard this response and run the current scenario draft again.",
+    );
+  }
+  return actual;
+}
+
 /** Owns one in-flight admission. Editing or cancellation invalidates its generation. */
 export class ScenarioDraftAdmissionTracker {
   private generation = 0;
   private active: ScenarioDraftAdmissionReceipt | null = null;
 
   async begin(draft: unknown, requestId: string): Promise<ScenarioDraftAdmissionReceipt> {
-    if (requestId.length > 128 || !STABLE_REQUEST_ID.test(requestId)) {
-      throw new ScenarioDraftAdmissionError(
-        "DRAFT_ADMISSION_INVALID",
-        "$.requestId",
-        "Draft admission request ID must be a stable identifier.",
-        "Generate a lowercase request identifier before starting admission.",
-      );
-    }
     const generation = this.generation;
-    const receipt = Object.freeze({
-      schemaVersion: SCENARIO_DRAFT_ADMISSION_SCHEMA_VERSION,
-      requestId,
-      draftDigest: await sha256Hex(draft),
-    });
+    const receipt = await createScenarioDraftAdmissionReceipt(draft, requestId);
     if (generation !== this.generation) {
       throw new ScenarioDraftAdmissionError(
         "DRAFT_ADMISSION_STALE_REQUEST",
@@ -111,7 +161,7 @@ export class ScenarioDraftAdmissionTracker {
   }
 
   async accept(receiptInput: unknown, currentDraft: unknown): Promise<ScenarioDraftAdmissionReceipt> {
-    const receipt = validateReceipt(receiptInput);
+    const receipt = validateScenarioDraftAdmissionReceipt(receiptInput);
     const generation = this.generation;
     if (!this.active || this.active.requestId !== receipt.requestId || this.active.draftDigest !== receipt.draftDigest) {
       throw new ScenarioDraftAdmissionError(
@@ -121,7 +171,7 @@ export class ScenarioDraftAdmissionTracker {
         "Discard this response and run the current scenario draft again.",
       );
     }
-    const currentDigest = await sha256Hex(currentDraft);
+    const admitted = await admitScenarioDraftReceipt(receipt, currentDraft);
     if (generation !== this.generation || !this.active || this.active.requestId !== receipt.requestId) {
       throw new ScenarioDraftAdmissionError(
         "DRAFT_ADMISSION_STALE_REQUEST",
@@ -130,16 +180,8 @@ export class ScenarioDraftAdmissionTracker {
         "Discard this response and run the current scenario draft again.",
       );
     }
-    if (currentDigest !== receipt.draftDigest) {
-      throw new ScenarioDraftAdmissionError(
-        "DRAFT_ADMISSION_STALE_DRAFT",
-        "$.draftDigest",
-        "The scenario draft changed while the run was in flight.",
-        "Discard this response and run the current scenario draft again.",
-      );
-    }
     this.active = null;
-    return receipt;
+    return admitted;
   }
 }
 

@@ -23,12 +23,18 @@ import { resolveBrowserWorkerAssets } from "./browser-worker-assets.ts";
 import { bindVerificationTrackModelPack } from "../lib/engine/verification-track-fixture.ts";
 import { TRACK_STORE_CAPACITY_WORKLOAD } from "../lib/validation/track-store-capacity.ts";
 import { publishOrVerifyAirCombatEvidence } from "./air-combat-evidence-policy.ts";
+import { SCENARIO_DRAFT_ADMISSION_SCHEMA_VERSION } from "../lib/scenario-draft-admission.ts";
 
 type RuntimeMessage = {
   type: string;
   state: string;
   code?: string;
   message?: string;
+  admission?: {
+    schemaVersion: string;
+    requestId: string;
+    draftDigest: string;
+  };
   backend: "typescript" | "rust-wasm";
   recordId: string;
   boundaryCalls: number;
@@ -144,6 +150,17 @@ function trackedAirCombatEvidenceSignature(
   const normalizedManifest = { ...manifest };
   delete normalizedManifest.createdAt;
   delete normalizedManifest.contentDigest;
+  if (
+    normalizedManifest.producer
+    && typeof normalizedManifest.producer === "object"
+    && !Array.isArray(normalizedManifest.producer)
+  ) {
+    const producer = {
+      ...(normalizedManifest.producer as Record<string, unknown>),
+    };
+    delete producer.runtimeProtocol;
+    normalizedManifest.producer = producer;
+  }
   return {
     archiveSchemaVersion: header.schemaVersion,
     normalizedManifest,
@@ -225,6 +242,11 @@ const prepareStudyPack = async (
 const studyPacks = await Promise.all(studyDefinitions.map(async (definition) => ({
   scenarioId: definition.id,
   control: false,
+  admission: {
+    schemaVersion: SCENARIO_DRAFT_ADMISSION_SCHEMA_VERSION,
+    requestId: `worker-study-${definition.id}`,
+    draftDigest: sha256HexSync(definition.scenario),
+  },
   pack: await prepareStudyPack(definition),
 })));
 const bvrDefinition = studyDefinitions.find(({ id }) => id === "a2a-crossing-intercept");
@@ -237,6 +259,11 @@ bvrControlRequest.requestedTimeSeconds = 1.95;
 studyPacks.push({
   scenarioId: bvrDefinition.id,
   control: true,
+  admission: {
+    schemaVersion: SCENARIO_DRAFT_ADMISSION_SCHEMA_VERSION,
+    requestId: "worker-study-bvr-control",
+    draftDigest: sha256HexSync(bvrControlScenario),
+  },
   pack: await prepareStudyPack(bvrDefinition, bvrControlScenario),
 });
 const wvrDefinition = studyDefinitions.find(({ id }) => id === "a2a-defensive-break");
@@ -249,6 +276,11 @@ wvrControlRequest.requestedTimeSeconds = 20.65;
 studyPacks.push({
   scenarioId: wvrDefinition.id,
   control: true,
+  admission: {
+    schemaVersion: SCENARIO_DRAFT_ADMISSION_SCHEMA_VERSION,
+    requestId: "worker-study-wvr-control",
+    draftDigest: sha256HexSync(wvrControlScenario),
+  },
   pack: await prepareStudyPack(wvrDefinition, wvrControlScenario),
 });
 const challenge = studyDefinitions.at(-1)!;
@@ -346,7 +378,7 @@ try {
     }>;
   } = await page.evaluate(
       async ({ studyPacks: selectedPacks, stalePack: rejectedPack, verificationPack: rejectedVerificationPack, workerUrl, emitEvidence }) => {
-        const protocol = "vector.browser-runtime.v1";
+        const protocol = "vector.browser-runtime.v2";
         const worker = new Worker(workerUrl, { name: "vector-simulation-runtime" });
         const states: string[] = [];
         let mainThreadTurns = 0;
@@ -419,12 +451,16 @@ try {
             requestId: `run-${results.length}`,
             type: "run",
             runId: `run-${results.length}`,
+            admission: selected.admission,
             packDigest: selected.pack.digest,
             scenarioRef: selected.pack.scenarioRef,
             batchTicks: 128,
             progressIntervalMs: 50,
           });
           const completion = await completed;
+          if (JSON.stringify(completion.admission) !== JSON.stringify(selected.admission)) {
+            throw new Error("Worker completion returned a different draft admission receipt.");
+          }
           const magic = new TextDecoder().decode(
             new Uint8Array(completion.recordBuffer, 0, 8),
           );
@@ -501,6 +537,17 @@ try {
           const normalizedManifest = { ...manifest };
           delete normalizedManifest.createdAt;
           delete normalizedManifest.contentDigest;
+          if (
+            normalizedManifest.producer
+            && typeof normalizedManifest.producer === "object"
+            && !Array.isArray(normalizedManifest.producer)
+          ) {
+            const producer = {
+              ...(normalizedManifest.producer as Record<string, unknown>),
+            };
+            delete producer.runtimeProtocol;
+            normalizedManifest.producer = producer;
+          }
           const evidenceSignature: AirCombatEvidenceSignature = {
             archiveSchemaVersion: archiveHeader.schemaVersion,
             normalizedManifest,
@@ -688,8 +735,8 @@ try {
   });
 
   const cancellation = await page.evaluate(
-    async ({ pack, workerUrl }) => {
-      const protocol = "vector.browser-runtime.v1";
+    async ({ pack, admission, workerUrl }) => {
+      const protocol = "vector.browser-runtime.v2";
       const worker = new Worker(workerUrl, { type: "module" });
       const messages: string[] = [];
       const waitFor = (accept: (message: RuntimeMessage) => boolean) =>
@@ -715,6 +762,7 @@ try {
         requestId: "r",
         type: "run",
         runId: "cancel-me",
+        admission,
         packDigest: pack.digest,
         scenarioRef: pack.scenarioRef,
         backend: "typescript",
@@ -754,7 +802,11 @@ try {
       worker.terminate();
       return { state: completion.state, messages };
     },
-    { pack, workerUrl: `${origin}/assets/${workerName}` },
+    {
+      pack,
+      admission: studyPacks[0]!.admission,
+      workerUrl: `${origin}/assets/${workerName}`,
+    },
   );
   assert.equal(cancellation.state, "ready");
   assert.ok(cancellation.messages.includes("progress"));

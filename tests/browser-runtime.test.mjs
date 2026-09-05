@@ -18,8 +18,8 @@ import { createVerificationDeploymentCapabilities } from "../lib/runtime/deploym
 import { retainedScenarioPackageReference } from "../lib/scenario-package-reference.ts";
 
 test("browser runtime protocol identity and message admission are versioned", () => {
-  assert.equal(BROWSER_RUNTIME_PROTOCOL, "vector.browser-runtime.v1");
-  assert.equal(BROWSER_RUNTIME_PROTOCOL_VERSION, 1);
+  assert.equal(BROWSER_RUNTIME_PROTOCOL, "vector.browser-runtime.v2");
+  assert.equal(BROWSER_RUNTIME_PROTOCOL_VERSION, 2);
   assert.equal(
     isRuntimeRequest({
       protocol: BROWSER_RUNTIME_PROTOCOL,
@@ -29,7 +29,7 @@ test("browser runtime protocol identity and message admission are versioned", ()
     true,
   );
   assert.equal(
-    isRuntimeRequest({ protocol: "vector.browser-runtime.v2", requestId: "x", type: "run" }),
+    isRuntimeRequest({ protocol: "vector.browser-runtime.v1", requestId: "x", type: "run" }),
     false,
   );
   assert.equal(
@@ -107,6 +107,7 @@ test("client retains exact Worker-produced VSR bytes while recycling the transfe
               type: "completed",
               state: "completed",
               runId: message.runId,
+              admission: message.admission,
               backend: "typescript",
               recordId,
               contentDigest,
@@ -127,6 +128,9 @@ test("client retains exact Worker-produced VSR bytes while recycling the transfe
   }
   const client = new BrowserSimulationClient(() => new CompletionWorker());
   const completion = await client.run(SCENARIO_LIBRARY[0].scenario);
+  const runRequest = requests.find((request) => request.type === "run");
+  assert.deepEqual(completion.admission, runRequest.admission);
+  assert.match(completion.admission.draftDigest, /^[a-f0-9]{64}$/);
   assert.equal(completion.serializedRecord.byteLength, expected.byteLength);
   assert.deepEqual(new Uint8Array(completion.serializedRecord), expected);
   const recycle = requests.find((request) => request.type === "recycle-buffer");
@@ -137,6 +141,104 @@ test("client retains exact Worker-produced VSR bytes while recycling the transfe
     new Uint8Array(completion.serializedRecord),
     expected,
     "recycling cannot mutate the retained exact-length VSR copy",
+  );
+  client.terminate();
+});
+
+test("client rejects a Worker success for a different admitted draft", async () => {
+  class StaleCompletionWorker extends EventTarget {
+    postMessage(message) {
+      if (message.type === "recycle-buffer") return;
+      const response = message.type === "initialize"
+        ? { type: "initialized", state: "ready" }
+        : message.type === "load-model-pack"
+          ? {
+              type: "model-pack-loaded",
+              state: "ready",
+              digest: message.pack.digest,
+              cached: false,
+            }
+          : {
+              type: "completed",
+              state: "completed",
+              runId: message.runId,
+              admission: { ...message.admission, draftDigest: "0".repeat(64) },
+              backend: "typescript",
+              recordId: "b".repeat(64),
+              contentDigest: "c".repeat(64),
+              byteLength: 12,
+              boundaryCalls: 1,
+              recordBuffer: new ArrayBuffer(12),
+              record: { manifest: {} },
+            };
+      queueMicrotask(() => this.dispatchEvent(new MessageEvent("message", {
+        data: {
+          protocol: BROWSER_RUNTIME_PROTOCOL,
+          requestId: message.requestId,
+          ...response,
+        },
+      })));
+    }
+    terminate() {}
+  }
+
+  const client = new BrowserSimulationClient(() => new StaleCompletionWorker());
+  await assert.rejects(
+    client.run(SCENARIO_LIBRARY[0].scenario),
+    {
+      name: "ScenarioDraftAdmissionError",
+      code: "DRAFT_ADMISSION_STALE_DRAFT",
+      fieldPath: "$.draftDigest",
+    },
+  );
+  client.terminate();
+});
+
+test("client preserves the Worker's stable draft-admission code and path", async () => {
+  class AdmissionFailureWorker extends EventTarget {
+    postMessage(message) {
+      const response = message.type === "initialize"
+        ? { type: "initialized", state: "ready" }
+        : message.type === "load-model-pack"
+          ? {
+              type: "model-pack-loaded",
+              state: "ready",
+              digest: message.pack.digest,
+              cached: false,
+            }
+          : {
+              type: "failed",
+              state: "failed",
+              runId: message.runId,
+              code: "DRAFT_ADMISSION_STALE_DRAFT",
+              fieldPath: "$.draftDigest",
+              stage: "LATEST_DRAFT",
+              severity: "BLOCKING",
+              correctiveGuidance: "Discard this response and run the current scenario draft again.",
+              message: "The scenario draft does not match its admission receipt.",
+              recoverable: true,
+            };
+      queueMicrotask(() => this.dispatchEvent(new MessageEvent("message", {
+        data: {
+          protocol: BROWSER_RUNTIME_PROTOCOL,
+          requestId: message.requestId,
+          ...response,
+        },
+      })));
+    }
+    terminate() {}
+  }
+
+  const client = new BrowserSimulationClient(() => new AdmissionFailureWorker());
+  await assert.rejects(
+    client.run(SCENARIO_LIBRARY[0].scenario),
+    {
+      name: "ScenarioDraftAdmissionError",
+      code: "DRAFT_ADMISSION_STALE_DRAFT",
+      fieldPath: "$.draftDigest",
+      stage: "LATEST_DRAFT",
+      severity: "BLOCKING",
+    },
   );
   client.terminate();
 });

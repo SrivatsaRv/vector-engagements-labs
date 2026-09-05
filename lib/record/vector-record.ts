@@ -83,7 +83,7 @@ export type VectorRecordManifest = {
   createdAt: string;
   producer: {
     name: "Vector Engagement Labs";
-    runtimeProtocol: "vector.browser-runtime.v1";
+    runtimeProtocol: "vector.browser-runtime.v1" | "vector.browser-runtime.v2";
   };
   backend: {
     selected: "typescript" | "rust-wasm";
@@ -733,7 +733,7 @@ export async function createVectorSimulationRecord(
     createdAt,
     producer: {
       name: "Vector Engagement Labs",
-      runtimeProtocol: "vector.browser-runtime.v1",
+      runtimeProtocol: "vector.browser-runtime.v2",
     },
     backend: {
       selected: prepared.capabilityManifest.engine.id,

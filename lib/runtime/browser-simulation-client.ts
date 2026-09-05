@@ -15,6 +15,14 @@ import {
   type ScenarioPackageReference,
 } from "../scenario-package-reference.ts";
 import {
+  admitScenarioDraftReceipt,
+  assertMatchingScenarioDraftAdmissionReceipt,
+  createScenarioDraftAdmissionReceipt,
+  ScenarioDraftAdmissionError,
+  type ScenarioDraftAdmissionIssueCode,
+  type ScenarioDraftAdmissionReceipt,
+} from "../scenario-draft-admission.ts";
+import {
   BROWSER_RUNTIME_PROTOCOL,
   type BrowserRuntimeRequest,
   type BrowserRuntimeResponse,
@@ -59,6 +67,7 @@ export type BrowserSimulationProgress = {
 export type BrowserSimulationCompletion = {
   result: SimulationResult;
   record: OpenedVectorRecord;
+  admission: ScenarioDraftAdmissionReceipt;
   /** Exact-length Worker-produced .vector bytes retained by the caller. */
   serializedRecord: ArrayBuffer;
   recordId: string;
@@ -67,6 +76,7 @@ export type BrowserSimulationCompletion = {
 };
 
 export type BrowserSimulationRunOptions = {
+  admission?: ScenarioDraftAdmissionReceipt;
   packageReference?: ScenarioPackageReference;
   timeoutMs?: number;
   batchTicks?: number;
@@ -88,6 +98,11 @@ type Pending = {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const CANCEL_GRACE_MS = 100;
+const DRAFT_ADMISSION_FAILURE_CODES = new Set<ScenarioDraftAdmissionIssueCode>([
+  "DRAFT_ADMISSION_INVALID",
+  "DRAFT_ADMISSION_STALE_REQUEST",
+  "DRAFT_ADMISSION_STALE_DRAFT",
+]);
 
 export class BrowserSimulationClient {
   private readonly workerFactory: WorkerFactory;
@@ -150,7 +165,20 @@ export class BrowserSimulationClient {
     if (message.type === "failed") {
       this.pending.delete(message.requestId);
       if (pending.timer) clearTimeout(pending.timer);
-      pending.reject(new Error(message.message));
+      if (
+        DRAFT_ADMISSION_FAILURE_CODES.has(message.code as ScenarioDraftAdmissionIssueCode)
+        && message.fieldPath
+        && message.correctiveGuidance
+      ) {
+        pending.reject(new ScenarioDraftAdmissionError(
+          message.code as ScenarioDraftAdmissionIssueCode,
+          message.fieldPath,
+          message.message,
+          message.correctiveGuidance,
+        ));
+      } else {
+        pending.reject(new Error(message.message));
+      }
       return;
     }
     if (pending.accept(message)) {
@@ -234,8 +262,12 @@ export class BrowserSimulationClient {
     }
     this.preparing = true;
     let pack: Awaited<ReturnType<typeof adaptPreparedSimulation>>;
+    let admission: ScenarioDraftAdmissionReceipt;
     try {
       await this.initialize();
+      const requestedAdmission = options.admission
+        ?? await createScenarioDraftAdmissionReceipt(scenario, this.nextId("admission"));
+      admission = await admitScenarioDraftReceipt(requestedAdmission, scenario);
       const prepared = prepareSimulation(scenario, profileId);
       if (options.packageReference) {
         assertRetainedScenarioPackageReference(options.packageReference);
@@ -273,6 +305,7 @@ export class BrowserSimulationClient {
           requestId,
           type: "run",
           runId,
+          admission,
           packDigest: pack.digest,
           scenarioRef: pack.scenarioRef,
           batchTicks: Math.max(1, Math.min(4_096, Math.floor(options.batchTicks ?? 128))),
@@ -288,6 +321,10 @@ export class BrowserSimulationClient {
         throw new BrowserSimulationCancelledError("Browser simulation run cancelled.");
       }
       if (response.type !== "completed") throw new Error("Browser simulation ended without a record.");
+      const completedAdmission = assertMatchingScenarioDraftAdmissionReceipt(
+        admission,
+        response.admission,
+      );
       if (response.backend !== pack.prepared.capabilityManifest.engine.id) {
         throw new Error("Browser simulation completion provenance is invalid.");
       }
@@ -310,6 +347,7 @@ export class BrowserSimulationClient {
         return {
           result: record.result,
           record,
+          admission: completedAdmission,
           serializedRecord: response.recordBuffer.slice(0, response.byteLength),
           recordId: response.recordId,
           contentDigest: response.contentDigest,

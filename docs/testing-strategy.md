@@ -324,12 +324,21 @@ saved-record verification to the simulation Worker. The built browser journey
 opens the Worker-produced VSR inside that Worker, so deterministic terminal
 replay cannot block the rendering thread.
 
+Draft-receipt regressions exercise the shared Worker/server boundary directly.
+They prove canonical key order produces one digest; stale drafts and mismatched
+success receipts fail with stable request/digest paths; every Worker run carries
+and returns its validated receipt; and the client rejects a success for another
+draft before reading its record. Saved-run recomputation requires the same
+receipt before validation or simulation, returns it to the route, and public
+admission errors preserve the stable field path. Focused report tests pass a
+valid receipt so ordinary saved-run behavior cannot bypass the new boundary.
+
 This baseline does not satisfy #193 by itself. Completion additionally requires
 machine-readable registration for every nested Air-mission and presentation
 control, deterministic constrained cross-field combinations, Worker/server
-admission parity, latest-draft digest binding, persistence/VSR/report readback,
-runtime configuration contrasts and a CI artifact that reports uncovered
-matrix rows.
+error parity beyond draft freshness, persistence/VSR/report digest readback,
+runtime configuration contrasts and a CI artifact that reports uncovered matrix
+rows.
 
 ## Existing baseline
 
