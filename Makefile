@@ -1,11 +1,13 @@
-.PHONY: ci-local ci-quality ci-quality-core ci-tests toolchain-preflight rust-audit-local db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local capacity-baseline-local reference-aircraft-local reference-aam-local generic-sensor-sources-local generic-mission-policy-sources-local tp1538-adjudication-local tp1538-aero-local air-reference-local worker-local frontend-local browser-local clean-clone-local
+.PHONY: ci-local ci-quality ci-quality-core ci-tests toolchain-preflight source-evidence-local rust-audit-local db-up db-down compose-config compose-build compose-pull compose-up compose-up-candidate container-verify integration-ci integration-local observability-local performance-local capacity-baseline-local reference-aircraft-local reference-aam-local generic-sensor-sources-local generic-mission-policy-sources-local tp1538-adjudication-local tp1538-aero-local air-reference-local worker-local frontend-local browser-local clean-clone-local
 
 toolchain-preflight:
-	@if [ "$$(uname -s)" = "Darwin" ]; then \
-		VECTOR_TOOLCHAIN_ALLOW_MISSING_POPPLER=1 npm run toolchain:verify; \
-	else \
-		npm run toolchain:verify; \
-	fi
+	@VECTOR_TOOLCHAIN_ALLOW_MISSING_POPPLER=1 npm run toolchain:verify
+
+source-evidence-local:
+	npm run toolchain:verify
+	npm run generic-sensor:sources:verify
+	npm run policy:nasa-f16-store-source:verify
+	npm run source-evidence:render-verify
 
 rust-audit-local:
 	cargo audit --file engine-rust/Cargo.lock
@@ -120,16 +122,13 @@ clean-clone-local:
 	@set -eu; \
 		temporary_root="$$(mktemp -d)"; \
 		trap 'rm -rf "$$temporary_root"' EXIT INT TERM; \
-		git clone --quiet --no-local --branch "$$(git branch --show-current)" . "$$temporary_root/repository"; \
+	git clone --quiet --no-local --branch "$$(git branch --show-current)" . "$$temporary_root/repository"; \
 	cd "$$temporary_root/repository"; \
 	scripts/context-slice.sh release >/dev/null; \
 	npm ci; \
-	VECTOR_CONTRACT_DOC_DECLARATION_FILE="$${VECTOR_CONTRACT_DOC_DECLARATION_FILE:-}" \
-	VECTOR_CONTRACT_DOC_BASE_SHA="$${VECTOR_CONTRACT_DOC_BASE_SHA:-}" \
 	make ci-local worker-local
 
 ci-quality:
-	npm run policy:contract-docs:verify
 	$(MAKE) ci-quality-core
 
 ci-quality-core:

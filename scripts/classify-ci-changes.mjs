@@ -54,6 +54,7 @@ export const CLASSIFIER_DECISION_CONTRACT = deepFreeze({
     security_js: false,
     web_tests: false,
     browser_tests: false,
+    source_evidence: false,
     rust_tests: false,
     rust_audit: false,
     integration: false,
@@ -96,6 +97,18 @@ export const CLASSIFIER_DECISION_CONTRACT = deepFreeze({
         /^scripts\/verify-toolchain\.mjs$/,
         /^tests\/contract-doc-impact\.test\.mjs$/,
         /^tests\/toolchain-authority\.test\.mjs$/,
+      ),
+    },
+    {
+      id: "SOURCE_EVIDENCE_RENDERING",
+      effect: ["source_evidence"],
+      patterns: patternInventory(
+        /^governance\/generic-sensor-verification-sources\//,
+        /^governance\/nasa-historical-f16-store-source\//,
+        /^scripts\/(?:generate-generic-sensor-source-manifest|generate-nasa-f16-store-source-evidence|install-pinned-poppler-ubuntu|verify-generic-sensor-source-bundle|verify-nasa-f16-store-source)\.mjs$/,
+        /^scripts\/(?:pinned-pdftoppm-wrapper\.sh\.in|pinned-poppler-ubuntu\.Dockerfile)$/,
+        /^scripts\/lib\/generic-sensor-source-verifier\.mjs$/,
+        /^tests\/(?:generic-sensor-source-bundle|nasa-f16-store-source)\.test\.mjs$/,
       ),
     },
     {

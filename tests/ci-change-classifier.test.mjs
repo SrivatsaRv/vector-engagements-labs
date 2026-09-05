@@ -41,6 +41,7 @@ test("contract-documentation policy surfaces fail closed across every hosted gat
       "security_js",
       "web_tests",
       "browser_tests",
+      "source_evidence",
       "rust_tests",
       "rust_audit",
       "integration",
@@ -64,6 +65,17 @@ test("documentation and project skills use only the stable policy gate", () => {
     ]),
     ["policy"],
   );
+});
+
+test("PDF rendering is selected only by governed source-evidence changes", () => {
+  assert.equal(selected(["components/SimulationScene.tsx"]).includes("source_evidence"), false);
+  assert.equal(selected(["db/migrations/021_aircraft_catalog_reconciliation.sql"]).includes("source_evidence"), false);
+  for (const path of [
+    "governance/generic-sensor-verification-sources/raw/nasa/19660021027.pdf",
+    "governance/nasa-historical-f16-store-source/sources/TM74078.pdf",
+    "scripts/verify-generic-sensor-source-bundle.mjs",
+    "scripts/verify-nasa-f16-store-source.mjs",
+  ]) assert.equal(selected([path]).includes("source_evidence"), true, path);
 });
 
 test("blog content builds and tests the web product without Rust or PostGIS", () => {
@@ -485,6 +497,7 @@ test("workflow changes fail closed through every available gate", () => {
     "security_js",
     "web_tests",
     "browser_tests",
+    "source_evidence",
     "rust_tests",
     "rust_audit",
     "integration",
@@ -507,6 +520,7 @@ test("unclassified paths fail closed through every available gate", () => {
     "security_js",
     "web_tests",
     "browser_tests",
+    "source_evidence",
     "rust_tests",
     "rust_audit",
     "integration",

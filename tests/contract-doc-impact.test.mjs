@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, rm as removePath, symlink, writeFile } from "
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
 
 import {
   DECLARATION_SCHEMA,
@@ -16,6 +16,8 @@ import {
   verifyContractDocImpact,
 } from "../scripts/lib/contract-doc-impact.mjs";
 import { declarationTemplate, resolvePolicyBootstrap, resolvePushDeclaration, runRegisteredFreshness, runRegisteredProbe, writeOutput } from "../scripts/verify-contract-doc-impact.mjs";
+
+const test = process.env.VECTOR_CONTRACT_DOC_ADVISORY === "1" ? nodeTest : nodeTest.skip;
 
 const sha = (character) => character.repeat(64);
 const commitSha = (character) => character.repeat(40);

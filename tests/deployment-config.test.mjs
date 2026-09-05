@@ -17,44 +17,34 @@ test("production workflow keeps credentials secret and binding IDs non-secret", 
 
 test("production operations admit one immutable reviewed commit and never seed production", async () => {
   const workflow = await read(".github/workflows/deploy-cloudflare.yml");
-  const verifyJob = workflow.match(/\n  verify:\n([\s\S]*?)\n  migrate:/)?.[1];
-  const migrateJob = workflow.match(/\n  migrate:\n([\s\S]*?)\n  deploy:/)?.[1];
+  const promoteJob = workflow.match(/\n  promote:\n([\s\S]*)$/)?.[1];
 
-  assert.ok(verifyJob, "verify job must exist");
-  assert.ok(migrateJob, "migrate job must exist");
+  assert.ok(promoteJob, "artifact promotion job must exist");
   assert.match(workflow, /\^\[0-9a-f\]\{40\}\$/);
-  assert.match(workflow, /Stage 4: Required PR Gate/);
-  assert.match(workflow, /check-runs/);
+  assert.match(workflow, /actions\/workflows\/ci\.yml\/runs\?branch=main&event=push&head_sha=/);
+  assert.match(workflow, /select\(\.conclusion == "success"\)/);
+  assert.match(workflow, /cloudflare-worker-\$\{REQUESTED_REF\}/);
+  assert.match(workflow, /artifact_count/);
   assert.doesNotMatch(workflow, /ref: \$\{\{ inputs\.ref \}\}/);
-  assert.match(workflow, /wrangler hyperdrive get/);
-  assert.match(workflow, /npm run db:migrate/);
-  assert.match(workflow, /node scripts\/verify-db\.mjs --production-read-only/);
-  const packagingPreflightAt = verifyJob.indexOf("npm run deploy:verify");
-  const productionPackageAt = verifyJob.indexOf("npm run deploy:configuration:verify");
-  const sourceVerifyAt = verifyJob.indexOf("make ci-local");
-  assert.ok(
-    packagingPreflightAt >= 0,
-    "read-only verification must exercise the deploy packaging contract",
-  );
-  assert.ok(
-    packagingPreflightAt < productionPackageAt && productionPackageAt < sourceVerifyAt,
-    "source and production-shaped packaging preflights must run before the complete source gate",
-  );
-  assert.match(verifyJob, /ref: \$\{\{ github\.sha \}\}[\s\S]*path: \.trusted-release/);
-  assert.match(verifyJob, /node \.trusted-release\/scripts\/verify-db-migration-ledger\.mjs/);
+  assert.match(promoteJob, /actions\/download-artifact@[0-9a-f]{40}/);
+  assert.match(promoteJob, /run-id: \$\{\{ needs\.admit\.outputs\.ci_run_id \}\}/);
+  assert.match(promoteJob, /name: cloudflare-worker-\$\{\{ needs\.admit\.outputs\.sha \}\}/);
+  assert.match(promoteJob, /node \.trusted-release\/scripts\/verify-cloudflare-candidate\.mjs candidate/);
+  assert.match(promoteJob, /node \.trusted-release\/scripts\/prepare-cloudflare-deployment\.mjs/);
+  assert.match(promoteJob, /command: hyperdrive get/);
+  assert.match(promoteJob, /command: deploy --config release\/wrangler\.json --no-bundle/);
+  assert.doesNotMatch(promoteJob, /npm ci|npm run build|make ci-local|setup-rust-toolchain|install-pinned-poppler/);
   assert.doesNotMatch(workflow, /npm run db:seed/);
-  assert.doesNotMatch(verifyJob, /npm run db:migrate|npm run db:verify|npm run db:seed/);
-  assert.match(migrateJob, /if: inputs\.operation == 'deploy'/);
-  const migratePreflightAt = migrateJob.indexOf("node .trusted-release/scripts/verify-db-migration-ledger.mjs");
-  const migrateAt = migrateJob.indexOf("npm run db:migrate");
-  const fullVerifyAt = migrateJob.indexOf("node scripts/verify-db.mjs --production-read-only");
+  assert.match(promoteJob, /Verify production migration compatibility without mutation[\s\S]*?working-directory: candidate[\s\S]*?node dist\/admin\/verify-db-migration-ledger\.mjs/);
+  const migratePreflightAt = promoteJob.indexOf("node dist/admin/verify-db-migration-ledger.mjs", promoteJob.indexOf("Apply forward-only migrations"));
+  const migrateAt = promoteJob.indexOf("node dist/admin/migrate-db.mjs");
+  const fullVerifyAt = promoteJob.indexOf("node dist/admin/verify-db.mjs --production-read-only");
   assert.ok(migratePreflightAt >= 0, "migration must repeat the trusted read-only preflight immediately before mutation");
   assert.ok(
     migratePreflightAt < migrateAt && migrateAt < fullVerifyAt,
     "production database order must be read-only preflight, migration, then full verification",
   );
-  assert.doesNotMatch(migrateJob, /npm run db:verify/);
-  assert.match(workflow, /Verify deployed health/);
+  assert.match(workflow, /Verify deployed application and static assets/);
 });
 
 test("governed study areas are migration data and local Compose keeps migration and fixture seeding separate", async () => {

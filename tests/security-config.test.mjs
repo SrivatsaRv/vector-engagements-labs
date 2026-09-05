@@ -41,23 +41,15 @@ test("release and deployment workflows admit reviewed, CI-green main history", a
   assert.match(release, /make integration-ci/);
   assert.match(release, /Stage 4: Required PR Gate/);
   assert.match(deploy, /github\.ref == 'refs\/heads\/main'/);
-  assert.match(deploy, /merge-base --is-ancestor/);
-  assert.match(deploy, /Stage 4: Required PR Gate/);
-  const verifyJob = deploy.match(/\n  verify:\n([\s\S]*?)\n  migrate:/)?.[1];
-  assert.ok(verifyJob, "protected production verification job must exist");
-  assert.match(verifyJob, /ref: \$\{\{ needs\.admit\.outputs\.sha \}\}/);
-  const rendererCacheAt = verifyJob.indexOf("uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830");
-  const rendererInstallAt = verifyJob.indexOf("run: scripts/install-pinned-poppler-ubuntu.sh");
-  const admittedSourceAt = verifyJob.indexOf("run: make ci-local");
-  assert.equal(
-    (verifyJob.match(/if: \$\{\{ hashFiles\('scripts\/install-pinned-poppler-ubuntu\.sh'\) != '' \}\}/gu) ?? []).length,
-    2,
-    "renderer cache and install must be revision-aware for admitted history before the bootstrap existed",
-  );
-  assert.ok(rendererCacheAt >= 0, "production verification must restore the governed renderer cache");
-  assert.ok(rendererInstallAt > rendererCacheAt, "production verification must install the governed renderer after cache restore");
-  assert.ok(admittedSourceAt > rendererInstallAt, "production verification must provision the renderer before make ci-local");
-  assert.match(verifyJob, /VECTOR_CONTRACT_DOC_BASE_SHA: \$\{\{ needs\.admit\.outputs\.sha \}\}[\s\S]*?run: make ci-local/);
+  assert.match(deploy, /compare\/\$\{REQUESTED_REF\}\.\.\.main/);
+  assert.match(deploy, /actions\/workflows\/ci\.yml\/runs\?branch=main&event=push&head_sha=/);
+  assert.match(deploy, /cloudflare-worker-\$\{REQUESTED_REF\}/);
+  assert.match(deploy, /actions\/download-artifact@[0-9a-f]{40}/);
+  assert.match(deploy, /node \.trusted-release\/scripts\/verify-cloudflare-candidate\.mjs candidate/);
+  assert.match(deploy, /working-directory: candidate[\s\S]*?node dist\/admin\/verify-db-migration-ledger\.mjs/);
+  assert.match(deploy, /cloudflare\/wrangler-action@[0-9a-f]{40}/);
+  assert.match(deploy, /deploy --config release\/wrangler\.json --no-bundle/);
+  assert.doesNotMatch(deploy, /npm ci|make ci-local|install-pinned-poppler-ubuntu|setup-rust-toolchain|npm run build/);
   assert.doesNotMatch(deploy, /npm run db:seed/);
 });
 

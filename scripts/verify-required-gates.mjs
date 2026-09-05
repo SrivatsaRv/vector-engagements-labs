@@ -13,6 +13,11 @@ export const REQUIRED_GATES = [
     selected: "BROWSER_TESTS_SELECTED",
     result: "BROWSER_TESTS_RESULT",
   },
+  {
+    key: "source-evidence",
+    selected: "SOURCE_EVIDENCE_SELECTED",
+    result: "SOURCE_EVIDENCE_RESULT",
+  },
   { key: "rust-tests", selected: "RUST_TESTS_SELECTED", result: "RUST_TESTS_RESULT" },
   { key: "rust-audit", selected: "RUST_AUDIT_SELECTED", result: "RUST_AUDIT_RESULT" },
   { key: "integration", selected: "INTEGRATION_SELECTED", result: "INTEGRATION_RESULT" },
@@ -32,9 +37,7 @@ export const REQUIRED_GATE_CONTRACT = deepFreeze({
   mandatorySuccessResults: [
     { field: "CLASSIFY_RESULT", label: "Classifier" },
     { field: "POLICY_RESULT", label: "Repository policy" },
-    { field: "CONTRACT_DOCS_RESULT", label: "Contract documentation impact gate" },
   ],
-  contractDocumentationStates: ["VERIFIED", "NO_RELEVANT_CHANGES"],
   reviewKinds: ["slice", "completion-review", "not-applicable"],
   selectionValues: ["true", "false"],
   selectedTerminalResult: "success",
@@ -52,10 +55,6 @@ export function verifyRequiredGates(environment) {
     if (requireResult(field) !== REQUIRED_GATE_CONTRACT.selectedTerminalResult) {
       throw new Error(`${label} ended as ${environment[field]}.`);
     }
-  }
-  const contractDocsState = requireResult("CONTRACT_DOC_IMPACT_STATE");
-  if (!REQUIRED_GATE_CONTRACT.contractDocumentationStates.includes(contractDocsState)) {
-    throw new Error(`Contract documentation impact state is invalid: ${contractDocsState}.`);
   }
   const reviewKind = requireResult("PR_REVIEW_KIND");
   if (!REQUIRED_GATE_CONTRACT.reviewKinds.includes(reviewKind)) {

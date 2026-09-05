@@ -27,31 +27,13 @@ function clone(value) {
 }
 
 function assertHostedRendererProvisioning(workflow, installer, dockerfile, wrapper) {
-  const setupJob = workflow.slice(workflow.indexOf("  generic_sensor_renderer:\n"), workflow.indexOf("  quality:\n"));
-  assert.match(setupJob, /needs\.classify\.outputs\.web_tests == 'true'/u);
-  assert.match(setupJob, /actions\/cache@0057852bfaa89a56745cba8c7296529d2fc39830/u);
-  assert.match(setupJob, /Build or load the pinned renderer once/u);
-  assert.match(setupJob, /scripts\/install-pinned-poppler-ubuntu\.sh/u);
-  const jobSlices = [
-    {
-      job: workflow.slice(workflow.indexOf("  quality:\n"), workflow.indexOf("  security_js:\n")),
-      verifyCommand: "run: make ci-quality-core",
-    },
-    {
-      job: workflow.slice(workflow.indexOf("  web_tests:\n"), workflow.indexOf("  rust_tests:\n")),
-      verifyCommand: "run: npm test",
-    },
-    {
-      job: workflow.slice(workflow.indexOf("  integration:\n"), workflow.indexOf("  container:\n")),
-      verifyCommand: "npm run generic-sensor:sources:verify",
-    },
-  ];
-  for (const { job, verifyCommand } of jobSlices) {
-    const installAt = job.indexOf("run: scripts/install-pinned-poppler-ubuntu.sh");
-    const verifyAt = job.indexOf(verifyCommand);
-    assert.ok(installAt >= 0 && verifyAt > installAt, "each hosted verifier job must provision the renderer first");
-  }
-  assert.match(jobSlices[1].job, /needs: \[classify, generic_sensor_renderer\]/u);
+  const sourceJob = workflow.slice(workflow.indexOf("  source_evidence:\n"), workflow.indexOf("  rust_audit:\n"));
+  assert.match(sourceJob, /needs\.classify\.outputs\.source_evidence == 'true'/u);
+  assert.match(sourceJob, /actions\/cache@0057852bfaa89a56745cba8c7296529d2fc39830/u);
+  const installAt = sourceJob.indexOf("run: scripts/install-pinned-poppler-ubuntu.sh");
+  const verifyAt = sourceJob.indexOf("npm run source-evidence:render-verify");
+  assert.ok(installAt >= 0 && verifyAt > installAt, "the selected source-evidence job must provision the renderer first");
+  assert.doesNotMatch(workflow, /^  generic_sensor_renderer:/mu);
   assert.match(installer, /readonly poppler_version="26\.05\.0"/u);
   assert.match(installer, /readonly poppler_sha256="6fef27ff04f37db43054c86bcdff6128c9fb1f6af4ef3c8b369a7e9abd68d0bb"/u);
   assert.match(installer, /sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517/u);
@@ -80,7 +62,7 @@ function assertHostedRendererProvisioning(workflow, installer, dockerfile, wrapp
   assert.match(wrapper, /docker run --rm --network none/u);
   assert.match(wrapper, /--entrypoint "\/opt\/poppler\/bin\/@@TOOL@@"/u);
   assert.match(wrapper, /--volume "\/tmp:\/tmp"/u);
-  assert.equal((workflow.match(/Restore the content-keyed renderer image/gu) ?? []).length, 4);
+  assert.equal((workflow.match(/Restore the content-keyed renderer image/gu) ?? []).length, 1);
 }
 
 function seal(value) {
@@ -733,21 +715,7 @@ test("hosted jobs provision the exact renderer before entering the offline gate"
   const dockerfile = readFileSync(resolve("scripts/pinned-poppler-ubuntu.Dockerfile"), "utf8");
   const wrapper = readFileSync(resolve("scripts/pinned-pdftoppm-wrapper.sh.in"), "utf8");
   assertHostedRendererProvisioning(workflow, installer, dockerfile, wrapper);
-  const deploymentVerifyJob = deploymentWorkflow.slice(
-    deploymentWorkflow.indexOf("  verify:\n"),
-    deploymentWorkflow.indexOf("  migrate:\n"),
-  );
-  const deploymentCacheAt = deploymentVerifyJob.indexOf("uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830");
-  const deploymentInstallAt = deploymentVerifyJob.indexOf("run: scripts/install-pinned-poppler-ubuntu.sh");
-  const deploymentVerifyAt = deploymentVerifyJob.indexOf("run: make ci-local");
-  assert.equal(
-    (deploymentVerifyJob.match(/if: \$\{\{ hashFiles\('scripts\/install-pinned-poppler-ubuntu\.sh'\) != '' \}\}/gu) ?? []).length,
-    2,
-    "deployment renderer setup must skip only admitted revisions that predate the governed bootstrap",
-  );
-  assert.ok(deploymentCacheAt >= 0, "deployment verification must restore the governed renderer cache");
-  assert.ok(deploymentInstallAt > deploymentCacheAt, "deployment verification must install the governed renderer after cache restore");
-  assert.ok(deploymentVerifyAt > deploymentInstallAt, "deployment verification must provision the renderer before the offline gate");
+  assert.doesNotMatch(deploymentWorkflow, /install-pinned-poppler-ubuntu|pdftoppm|make ci-local/u);
   assert.ok((statSync(installerPath).mode & 0o111) !== 0, "the hosted renderer bootstrap must be executable");
 
   assert.throws(
@@ -755,8 +723,8 @@ test("hosted jobs provision the exact renderer before entering the offline gate"
     /poppler_version/,
   );
   const qualityWithLateInstall = workflow.replace(
-    "      - name: Install the pinned offline PDF renderer\n        run: scripts/install-pinned-poppler-ubuntu.sh\n      - name: Verify generated assets, lint, and types\n        run: make ci-quality-core",
-    "      - name: Verify generated assets, lint, and types\n        run: make ci-quality-core\n      - name: Install the pinned offline PDF renderer\n        run: scripts/install-pinned-poppler-ubuntu.sh",
+    "      - name: Install the pinned offline source renderer\n        run: scripts/install-pinned-poppler-ubuntu.sh\n      - name: Verify source bytes and reproduce selected pages",
+    "      - name: Verify source bytes and reproduce selected pages",
   );
   assert.throws(
     () => assertHostedRendererProvisioning(qualityWithLateInstall, installer, dockerfile, wrapper),

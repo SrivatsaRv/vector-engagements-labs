@@ -1,13 +1,10 @@
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import postgres from "postgres";
 import {
   loadMigrationManifest,
   verifyMigrationLedger,
 } from "./lib/migration-ledger.mjs";
-
-const requireFromWorkspace = createRequire(resolve("package.json"));
-const postgres = requireFromWorkspace("postgres");
 
 export async function readAppliedMigrationLedger(sql) {
   return sql.begin("isolation level repeatable read read only", async (transaction) => {

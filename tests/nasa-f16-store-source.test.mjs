@@ -39,19 +39,21 @@ const metadataFiles = Object.fromEntries(manifest.artifacts.map((artifact) => [
   readFileSync(resolve(governedRoot, artifact.metadata.repositoryPath)),
 ]));
 
-test("the required policy command cannot omit committed-source rerender verification", () => {
+test("routine policy verification is byte-based and render reproduction is explicit", () => {
   const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
   assert.match(
     packageJson.scripts["policy:nasa-f16-store-source:verify"],
-    /scripts\/verify-nasa-f16-store-source\.mjs --source-dir governance\/nasa-historical-f16-store-source\/sources/u,
+    /scripts\/verify-nasa-f16-store-source\.mjs --source-dir governance\/nasa-historical-f16-store-source\/sources --integrity-only/u,
   );
+  assert.match(packageJson.scripts["policy:nasa-f16-store-source:render-verify"], /scripts\/verify-nasa-f16-store-source\.mjs --source-dir governance\/nasa-historical-f16-store-source\/sources/u);
+  assert.doesNotMatch(packageJson.scripts["policy:nasa-f16-store-source:render-verify"], /--integrity-only/u);
   const omitted = spawnSync(
     process.execPath,
     ["--require", "./scripts/lib/generic-sensor-network-deny.cjs", "scripts/verify-nasa-f16-store-source.mjs"],
     { encoding: "utf8" },
   );
   assert.notEqual(omitted.status, 0);
-  assert.match(omitted.stderr, /CLI verification requires exactly --source-dir/u);
+  assert.match(omitted.stderr, /CLI verification requires --source-dir/u);
 });
 
 const mutate = (apply) => {
@@ -204,12 +206,12 @@ test("the verifier rejects changed, truncated, swapped, linked, and undeclared l
     ? resolve(process.env.VECTOR_F16_SOURCE_DIR)
     : resolve(governedRoot, "sources");
 
-  const result = await verifySourceDirectory(manifest, sourceDirectory);
+  const result = await verifySourceDirectory(manifest, sourceDirectory, { render: false });
   assert.equal(result.artifacts, 3);
   assert.equal(result.metadataRecords, 3);
   assert.equal(result.admissionEligible, false);
   assert.equal(result.networkAccessed, false);
-  assert.equal(result.renders, 16);
+  assert.equal(result.renders, 0);
 
   const expectedFiles = manifest.artifacts.flatMap(({ pdf, metadata }) => [pdf.fileName, metadata.fileName]);
   const attack = async (apply, pattern) => {
@@ -217,7 +219,7 @@ test("the verifier rejects changed, truncated, swapped, linked, and undeclared l
     try {
       for (const file of expectedFiles) copyFileSync(resolve(sourceDirectory, file), resolve(directory, file));
       apply(directory);
-      await assert.rejects(() => verifySourceDirectory(manifest, directory), pattern);
+      await assert.rejects(() => verifySourceDirectory(manifest, directory, { render: false }), pattern);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

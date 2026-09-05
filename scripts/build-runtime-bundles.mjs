@@ -28,6 +28,16 @@ await Promise.all([
   }),
   build({
     ...common,
+    entryPoints: ["scripts/verify-db-migration-ledger.mjs"],
+    outfile: "dist/admin/verify-db-migration-ledger.mjs",
+  }),
+  build({
+    ...common,
+    entryPoints: ["scripts/verify-db.mjs"],
+    outfile: "dist/admin/verify-db.mjs",
+  }),
+  build({
+    ...common,
     entryPoints: ["scripts/node-postgres-adapter.mjs"],
     outfile: "dist/server/node-postgres.mjs",
   }),

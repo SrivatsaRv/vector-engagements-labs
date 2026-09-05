@@ -57,61 +57,18 @@ remain mandatory to prove nonpromotion and regression safety.
 
 ## Generic sensor Stage-0 source freeze
 
-The hosted source-freeze job provisions the exact Poppler renderer before the
-shared quality gate. Its workflow assertion accepts the Make-owned verifier,
-so command ownership cannot drift between local and hosted checks.
+Routine quality checks verify the frozen PDF bytes, manifests, permissions,
+page mappings, production isolation, and hostile mutations without rendering
+PDFs. They run under the tracked deny-all network guard. PDF-to-PNG reproduction
+is review evidence for the imported research pages; no browser, report, or
+simulation runtime consumes those PNGs.
 
-`npm run generic-sensor:sources:verify` first proves the generated manifest and
-all derived governance records are current, then verifies the offline bundle.
-Every generator, verifier, and focused adversarial test process preloads the
-tracked deny-all Node network guard; the regression first proves that raw TCP,
-HTTP, and every callback, promise, resolver-instance, and ESM DNS lookup,
-`resolve*`, and reverse call fail. The same verifier runs again after `npm run build` in
-`worker-local` and hosted integration so `.next` and every other production
-output are present when source-bundle exclusion is measured.
-The verifier pins the complete canonical manifest digest and rejects
-caller-resealed source identities, substituted PDFs, relabelled renders, erased
-claims, and relaxed numeric/equation extraction policy even when every local
-hash, byte total, and dependent artifact is updated consistently. This command
-is mandatory in `make ci-quality`; `make generic-sensor-sources-local` exposes
-the same focused gate.
-
-The same command independently rerenders all 44 declared NASA source pages
-from the exact PDFs with the closed Poppler profile selected by operating
-system and architecture, requires byte-identical PNG output within that
-profile, rejects blank or structurally invalid images, reproduces the three
-upright display derivatives, and checks every source/display page mapping.
-Darwin arm64 and Linux amd64 are separately content-addressed because Poppler's
-lossless PNG bytes are not cross-platform identical. No tolerance or
-cross-platform-byte claim is used. The manifest binds the release owner's
-semantic review to both exact 44-page render sets and all eight profile/contact
-sheet identities, including cross-profile mapping, structure, orientation, and
-limitation consistency. It does not use OCR or extracted text to supply numeric
-values or equations.
-
-A dedicated hosted renderer job builds Poppler 26.05.0 once from the official
-release archive through `scripts/install-pinned-poppler-ubuntu.sh`, inside the
-Ubuntu 24.04 image pinned at
-`sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517`.
-The bootstrap rejects any source digest except
-`6fef27ff04f37db43054c86bcdff6128c9fb1f6af4ef3c8b369a7e9abd68d0bb`.
-Its Docker image is cached under a key derived from the installer, Dockerfile,
-and network-denied wrapper, then restored by quality, web-contract, and
-post-build integration instead of compiling independently in each job. The
-protected production verification job restores and validates the same pinned
-renderer before it runs `make ci-local`; deployment cannot proceed using an
-ambient or missing PDF renderer. Both
-`pdftoppm` and `pdfinfo` are built from that source and invoked through the
-same no-network container; Stage 2A depends on the setup job because `npm test`
-executes the mandatory source rerender regression. The cold x86-emulated reproduction completed in
-6m31s; the setup job has a 15-minute budget while the existing 20-minute
-quality/integration budgets remain unchanged. The verifier container has no
-network and every Linux render must match its committed profile byte-for-byte.
-The built executables and their Poppler shared library live under `/opt/poppler`;
-they cannot be placed below `/tmp`, because the network-denied wrapper mounts
-the host temporary tree there for exact input and output paths. Bootstrap also
-expands every workspace placeholder before the wrapper's version probe, so no
-literal template token can survive into a hosted mount target.
+Only changes to the governed source PDFs, render manifests, renderer bootstrap,
+or their focused tests select Stage 2E. That job provisions the pinned Poppler
+26.05.0 container once, reproduces the selected 44 generic-sensor and 16 F-16
+review pages, and compares their exact Linux-profile bytes. The explicit local
+equivalent is `make source-evidence-local`. `make ci-local`, tagged release, and
+Cloudflare promotion do not install or invoke Poppler.
 
 Testing is part of the implementation contract. An executable action is incomplete until its behavior is covered at the appropriate test layers and the result is recorded. The project uses focused tests for fast feedback and staged integration evidence for release confidence.
 
@@ -119,7 +76,7 @@ Testing is part of the implementation contract. An executable action is incomple
 
 - **Unit:** pure math, coordinate transforms, parsers, reducers, validators, compilers, and state machines.
 - **Contract and regression:** schemas, canonical hashes, lifecycle transitions, backend boundaries, saved records, error cases, and every bug fix.
-- **Documentation impact:** base/head policy ownership, rename/copy endpoints, exact owning-section identities, structured dispositions, and hostile declaration inputs.
+- **Documentation maintenance:** advisory base/head ownership and rename/copy analysis; it is not a release gate.
 - **Engine:** Rust unit/integration tests, TypeScript reference tests, strict lint/Clippy/rustdoc, and deterministic parity fixtures.
 - **Database and API integration:** empty-database migration, upgrade migration, deterministic seed/verifier, route admission, persistence, report replay, and failure paths.
 - **Frontend:** component and interaction tests for builder, maps, playback, reports, keyboard/touch behavior, loading, cancellation and errors.
@@ -353,9 +310,8 @@ matrix rows.
 
 The repository owns Node 22.18.0, npm 10.9.3 and Rust 1.97.1 for the commit
 gate. `npm run toolchain:verify` reports every mismatch in one preflight so an
-incorrect workstation fails before builds or tests begin. macOS may omit the
-hosted-only pinned Poppler renderer; Linux CI and release gates require the
-exact renderer. The Stage 1A quality
+incorrect workstation fails before builds or tests begin. Poppler is required
+only by the explicit source-evidence reproduction target. The Stage 1A quality
 job calls the same `ci-quality-core` Make target used locally, including all
 four migration-freshness checks, instead of maintaining a shorter YAML copy.
 
@@ -368,8 +324,8 @@ and three independent rate-limit bindings. Wrangler finally bundles that exact
 redirected output with `deploy --dry-run` and performs no upload.
 The shared local and pull-request gate supplies an exact nonzero Hyperdrive
 fixture and reserved `.invalid` custom-domain host, preventing fallback values
-or an empty route from satisfying the test. Protected verification repeats the
-same build with the real production binding identities before migration.
+or an empty route from satisfying the test. A green `main` run then builds and
+verifies one environment-neutral candidate for later production promotion.
 The built-output test also compares both MapLibre worker modules with their
 locked package bytes. The deploy lifecycle prepares them before Vinext's
 internal build, so a clean runner cannot omit the external map worker silently.
@@ -377,9 +333,10 @@ internal build, so a clean runner cannot omit the external map worker silently.
 Rust 1.97.1 is the compiler for every committed WASM artifact. Hosted Rust
 verification deletes the Cargo outputs for the production
 engine, generic AAM verifier and TP-1538 verifier before rebuilding and
-freshness-checking all three artifacts. Release and production workflows install the
-same exact compiler. A floating `stable` toolchain or cached target directory is
-not release evidence.
+freshness-checking all three artifacts. Tagged release uses the same exact
+compiler; Cloudflare promotion consumes the already-built candidate and has no
+Rust toolchain. A floating `stable` toolchain or cached target directory is not
+release evidence.
 The production engine freshness check compares the canonical generated source
 and embedded content integrity metadata. An alternate valid module with the same
 ABI exports is rejected by the regenerated metadata. RustSec admission uses one Make target that audits the
@@ -390,9 +347,8 @@ flags. Linux x64 CI builds under the pinned compiler, remap policy and Binaryen
 131.0.0 optimizer. Regression coverage checks the platform decision, image
 digest, exact path-remap flags and both cold artifact freshness commands.
 
-Production verification binds the contract-documentation base and tested head
-to the same admitted SHA. A regression fixture keeps a newer main tip present
-while proving that an older admitted revision remains independently verifiable.
+Production admission selects the successful `main` CI run for the requested SHA
+and requires exactly one unexpired SHA-named Worker candidate.
 
 The current Air-combat baseline is BVR `1.3.0` plus WVR and transition at
 `1.2.0`. BVR and WVR produce generic `KILL`; transition produces `NO_EFFECT`.
@@ -462,22 +418,11 @@ Worker recovery, production isolation and the 500,000-byte WASM ceiling.
 
 `make ci-local` runs quality, Rust, TypeScript, contract, parity and
 production-audit checks. Before those expensive layers it requires exact Node
-22.18.0, npm 10.9.3, Rust 1.97.1, the `wasm32-unknown-unknown` target and
-Poppler 26.05.0. `.node-version`, `package.json` and `rust-toolchain.toml` are
-the local authority; a version range or ambient workstation default is not
-release evidence. It then runs the same contract-documentation impact
-validator used by hosted CI. Governed feature branches must supply an explicit
-declaration file or JSON value; an absent declaration fails as soon as the
-merge-base-to-worktree change set contains a registered family. The verifier
-constructs an isolated temporary Git snapshot for dirty and untracked files,
-so pre-commit validation neither ignores edits nor mutates the real index. The
-post-commit clean-clone run validates the exact immutable candidate and carries
-the declaration path forward. Registry regression also resolves each newly
-introduced family to its exact implementation and maintained section, and
-checks changelog-heading uniqueness against the live inventory rather than a
-fixed family count. The #193 admission section is part of that exact owner
-inventory, so mission implementation and test rules cannot gain admission or
-schema facets without selecting its regression contract. It then verifies the machine-readable runtime stub
+22.18.0, npm 10.9.3, Rust 1.97.1 and the `wasm32-unknown-unknown` target.
+`.node-version`, `package.json` and `rust-toolchain.toml` are the local
+authority; a version range or ambient workstation default is not release
+evidence. The former contract-document declaration is not a local or hosted
+gate. The suite verifies the machine-readable runtime stub
 ledger. A new or removed production fallback, temporary adapter, model
 assumption, named-duel identifier, scripted guidance hold, or source-less public
 reference must update its owning ledger entry; an
@@ -598,42 +543,10 @@ copy records use `--find-copies-harder` and retain both endpoints without
 trimming legal path bytes. Invalid UTF-8, control characters, absolute paths,
 dot segments, backslashes, symlink traversal, and unregistered additions fail
 closed.
-`scripts/verify-contract-doc-impact.mjs` independently maps those endpoints to
-the base and head versions of `governance/contract-doc-ownership.v1.json`,
-validates the one structured declaration, resolves every registered Markdown
-file and heading from exact Git blobs, derives the changed semantic facets, and
-compares only their exact registered sections. Every test path belongs to its
-actual model, engine, evidence, Worker, VSR, UI, security, mission, geospatial,
-content, data, or delivery family rather than a generic test-only owner.
-Regression coverage changes a test and two independent owning sections in one
-fixture, proving the test-selected facet cannot hide the second changed contract
-section; migration headings remain a distinct requirement inventory.
-The ownership baseline also binds the shared overlay implementation and its
-focused ObjectPicker/overlay regressions to `UI_RESPONSIVE_INTERACTION`,
-including its dedicated shared-overlay section, so future primitive changes
-cannot bypass responsive interaction evidence.
-The template command runs the same analysis without accepting a declaration and
-emits the exact required family/section inventory for the current diff. Hosted
-verification writes the subsequently validated declaration to the visible job
-summary. Regression coverage also proves changelog headings are family-unique,
-the aggregate Drizzle facade has only generic database ownership, and each
-domain schema module selects only its generic plus truthful domain owners.
-Post-bootstrap section-introduction fixtures cover both a wholly new family and
-a new facet on an existing family. They require the exact owning document and a
-semantic declaration in the introducing revision, and reject dormant relabels,
-empty new sections, unchanged or unrelated headings, and every non-semantic or
-docs-current disposition. The same core is exercised through dirty-tree,
-pull-request exact-head, and associated-main-push adapters.
-Placeholder-only section regressions reject non-rendered HTML comments, empty
-raw tags, subordinate headings without material rendered content, invisible
-Unicode/HTML entities, reference definitions, empty links, and non-textual raw
-style content. Hidden, styled, titled, dialog/details, cross-block containers,
-cross-block stylesheets, and every other raw-HTML-bearing section fail closed;
-raw HTML is never permitted to establish new contract authority. Positive
-controls admit ordinary prose, code/list content, and a visible Markdown
-autolink through the pinned renderer and decoded-DOM policy. Hosted Stage 0.6
-installs the exact JavaScript lockfile with lifecycle scripts disabled before
-running this parser-backed gate, while Stage 0/0.5 remain dependency-free.
+`scripts/verify-contract-doc-impact.mjs` and the ownership inventory remain
+available as advisory maintenance tools. They are not invoked by `make
+ci-local`, pull-request CI, `main` CI, release, or Cloudflare promotion, and the
+pull-request template carries no machine declaration block.
 Classifier probe regressions exercise the shared dependency-free name-status
 parser from a clean materialized tree, bind its source digest to the classifier,
 and require passing unchanged V1 and V2 self-comparisons before hostile
@@ -676,23 +589,15 @@ The Required PR Gate invariant probe binds its complete mandatory-field,
 review-kind, state, gate, selection, terminal-result, and decision-function
 identity as well as the positive/negative matrix. An unsampled new rule or
 admitted value therefore changes the identity. Probe evidence still does not
-certify the technical adequacy of the contract. A generated-only disposition executes
-the policy-registered direct argv after
-Stage 0.6 provisions its closed Node or Rust/WASM toolchain;
-it cannot be redirected by editing `package.json`. The command runs against a
-temporary exact-head archive and tracked-file mutation fails. The hosted checkout is the
-exact pull-request head rather than GitHub's synthetic merge tree. Semantic
-schema/storage/VSR facets
-additionally require their registered
-Unreleased migration section. Repository-policy tests always run, and an
+certify the technical adequacy of the contract. Repository-policy tests always run, and an
 unknown or unclassified tracked path makes policy validation fail. Documentation and agent-harness
 changes do not consume application, Rust, container, or PostGIS runners. Web,
 simulation, database/API, dependency, workflow, and infrastructure paths each
 add their owning gates. Shared mission, scenario, environment, model, Worker and
 Vector Simulation Record contracts select the Rust/parity and integration gates
 that consume them. The single Required PR Gate is always emitted and verifies
-that the documentation-impact job succeeded, every selected job passed, and
-every unselected job was skipped. Failed,
+that repository policy passed, every selected job passed, and every unselected
+job was skipped. Failed,
 cancelled, timed-out, action-required or unexpectedly skipped selected jobs all
 fail the gate. Workflow-level path exclusions are not used because they can
 strand a required check.
@@ -857,8 +762,6 @@ still require migration before #62 can close.
 
 The release steward requires passing unit, contract, parity, migration, API, frontend, browser, visual, security, performance, observability, cancellation, recovery, load and soak evidence for the applicable release scope. Targets in [`performance-capacity.md`](performance-capacity.md) remain targets until a reproducible benchmark record marks them measured.
 
-Release evidence must also include the exact contract-documentation declaration,
-base/head/merge-base identities, affected family inventory, and the Stage 0.6
-verdict. A passing policy job does not substitute for that independent result;
-failure, cancellation, skip, missing PR association, or stale section evidence
-must remain visible to the Required PR Gate.
+Cloudflare release evidence includes the candidate source SHA, candidate
+manifest digest, successful producing CI run, migration verification, Wrangler
+deployment output, and post-deploy smoke results.

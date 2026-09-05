@@ -90,14 +90,14 @@ migration check, but its value must never be committed or copied into
 `.env.example`.
 
 The manual workflow defaults to `verify`. Both operations require a full
-40-character commit SHA that is contained in `main` and has a successful
-Required PR Gate. Admission happens before untrusted revision code can access
-the production environment. Verify checks Cloudflare access, Hyperdrive, source
-gates, and migration-ledger compatibility without changing schema, data, or the
-deployed Worker. Deploy alone applies migrations, runs the full catalog
-verifier without its disposable-database mutation probes, publishes the same
-admitted revision, and checks `/api/health` and
-`/blogs` on the configured production host.
+40-character commit SHA contained in `main`, a successful completed `main` CI
+run for that SHA, and exactly one unexpired SHA-named Worker candidate from that
+run. Admission happens before production credentials are exposed. Verify checks
+the candidate inventory and bytes, Hyperdrive, and migration-ledger
+compatibility without changing schema, data, or the deployed Worker. Deploy
+alone applies migrations, runs the catalog verifier, publishes the downloaded
+candidate with `--no-bundle`, records Wrangler's deployment output, and checks
+health, catalog, scenario, BVR workbench, and MapLibre asset routes.
 
 Historical rollback fails closed when the live migration ledger is ahead of or
 otherwise not an exact prefix of the selected revision. Forward-schema rollback
@@ -122,20 +122,19 @@ checks begin. Both local and deployment builds inherit the single
 `nodejs_compat` declaration from `wrangler.jsonc`, so the framework and
 PostgreSQL adapter see the same contract without lifecycle-specific duplication.
 
-The fast `deploy:verify` gate exercises Vinext's actual no-build, no-upload
-deployment preflight before the longer source gate and before production can
-migrate. It requires the root Wrangler scaffold and the supported static
-Cloudflare plugin import. Full tests then inspect the generated Worker config
-after a real build to prove that the static asset/runtime fields and dynamic
-Hyperdrive and rate-limit bindings survived the merge, then ask Wrangler to
-bundle that redirected artifact in dry-run mode without uploading it.
-Local and pull-request quality use a non-secret, nonzero Hyperdrive fixture and
-reserved `.invalid` host. Protected production verification repeats the same
-build against the real environment binding IDs before any migration runs.
-The real deploy lifecycle and the production-shaped verifier both prepare the
-pinned MapLibre worker modules before Vinext starts its internal build. Built
-output tests compare those copied bytes with the locked package, preventing a
-clean deployment runner from publishing a map whose worker URL returns 404.
+The fast `deploy:verify` gate exercises Vinext's no-build, no-upload packaging
+preflight during local and pull-request verification. After the Required PR
+Gate passes on `main`, the candidate job performs the one production build,
+checks the generated Worker configuration and MapLibre assets, runs Wrangler's
+dry-run packaging check, removes environment-local state, and writes a sorted
+SHA-256 inventory over the Worker, assets, database migration SQL, and bundled
+administration commands. The resulting artifact is retained for 30 days.
+
+Production does not check out application source or run `npm ci`, Rust,
+Poppler, `make ci-local`, Vinext, or Wrangler bundling. It downloads the exact
+artifact selected by the successful CI run, rejects missing, extra, linked, or
+changed files, derives a small production-only Wrangler overlay, and promotes
+the already-tested bytes.
 
 Before applying any migration, deployment opens a database-enforced read-only
 ledger check and requires the live rows to be an exact checksum-bound prefix of
@@ -199,8 +198,9 @@ Deployment verifies 12 exact environment packs, 24 runway rows, 12 eligible
 starts, geometry/SRID validity, immutable-update rejection and live catalog API
 readback before browser verification.
 
-- The exact release commit has a successful Required PR Gate; release and
-  deployment workflows re-run the gates appropriate to their authority.
+- The exact release commit has a successful Required PR Gate and a reusable
+  candidate produced by the successful `main` CI run; deployment verifies and
+  promotes that candidate without rebuilding it.
 - `make ci-local`, integration, responsive, observability, and performance checks pass against the release commit.
 - Database migrations are reviewed, forward-only, and tested on a production-like PostGIS version.
 - Production verification is read-only, production is never seeded implicitly,
