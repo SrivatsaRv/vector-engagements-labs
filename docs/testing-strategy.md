@@ -153,6 +153,13 @@ precision checks after parsing and prove the frontend validator, saved-run
 server and final engine preparation reject the same stable code and field path.
 A hidden-field poison inventory requires an explicit remove,
 migrate, derive or show-read-only disposition for every non-visible authority.
+The static dropdown regression exhausts all ten shared Air-mission enum
+families and every admitted option. It rejects unknown, retired, empty,
+non-string and null values before compilation, while the compiler imports the
+same allowlists for mission class, regime, start posture, route transition, leg
+role, CAP pattern, emission policy, weapon policy and store operation. Dynamic
+catalog identities and route task references are validated by their owning
+immutable or closed-reference authority instead of a closed enum.
 
 Component regressions exercise the actual raw numeric authoring control. They
 prove malformed atomic values remain visible and invalid without being
