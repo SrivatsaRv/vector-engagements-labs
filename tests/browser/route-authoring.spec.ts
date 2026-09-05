@@ -1654,3 +1654,92 @@ test("a Worker-produced VSR downloads and reopens without rerunning physics", as
   expect(await workerRequestTypes()).not.toContain("run");
   expect(runtimeErrors).toEqual([]);
 });
+
+test("saved-run success is accepted only for the exact Worker-admitted draft", async ({ page }) => {
+  test.setTimeout(120_000);
+  const scenarioId = "a2a-crossing-intercept";
+  const catalog = await catalogFixture(scenarioId);
+  const savedPayloads: Array<Record<string, unknown>> = [];
+  let saveAttempts = 0;
+
+  await page.route("**/api/catalog", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(catalog) }),
+  );
+  await page.route("**/api/map-tile?**", (route) => route.abort());
+  await page.route("**/api/runs", async (route) => {
+    const payload = route.request().postDataJSON() as Record<string, unknown>;
+    savedPayloads.push(payload);
+    saveAttempts += 1;
+    const admission = structuredClone(payload.admission) as {
+      schemaVersion: string;
+      requestId: string;
+      draftDigest: string;
+    };
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: "3636df68-b29b-4a1a-8130-6918da1119ce",
+        admission: saveAttempts === 1
+          ? { ...admission, draftDigest: "0".repeat(64) }
+          : admission,
+      }),
+    });
+  });
+  await page.addInitScript(() => {
+    const admissions: unknown[] = [];
+    Object.defineProperty(window, "__vectorWorkerRunAdmissions", {
+      configurable: true,
+      value: admissions,
+    });
+    const nativePostMessage = Worker.prototype.postMessage;
+    Object.defineProperty(Worker.prototype, "postMessage", {
+      configurable: true,
+      writable: true,
+      value(this: Worker, message: unknown, transferOrOptions?: Transferable[] | StructuredSerializeOptions) {
+        if (message && typeof message === "object" && "type" in message && (message as { type: unknown }).type === "run") {
+          admissions.push(structuredClone((message as { admission?: unknown }).admission));
+        }
+        return Reflect.apply(
+          nativePostMessage,
+          this,
+          transferOrOptions === undefined ? [message] : [message, transferOrOptions],
+        );
+      },
+    });
+  });
+
+  await openGuidedWorkbench(page, scenarioId);
+  const compact = (page.viewportSize()?.width ?? 1_366) <= 768;
+  if (compact) {
+    await page.getByRole("button", { name: /Next: Forces & loadouts/i }).click();
+    await page.getByRole("button", { name: /Next: Place & flight/i }).click();
+    await page.getByRole("button", { name: /Next: Admitted conditions/i }).click();
+    await page.getByRole("button", { name: /Next: Validate/i }).click();
+  } else {
+    await page.getByRole("button", { name: "5 Validate" }).click();
+  }
+  await page.getByRole("button", { name: /run baseline/i }).click();
+  await expect(page.locator('.catalog-state[data-runtime-state="completed"]')).toHaveText(
+    "Worker · completed",
+    { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
+  );
+  if ((page.viewportSize()?.width ?? 1_366) < 600) {
+    await page.getByRole("button", { name: "Explain & report", exact: true }).click();
+  }
+
+  const workerAdmission = await page.evaluate(() =>
+    (window as unknown as { __vectorWorkerRunAdmissions: unknown[] }).__vectorWorkerRunAdmissions.at(-1));
+  const saveButton = page.getByRole("button", { name: "Save run", exact: true }).first();
+  const viewReportButton = page.getByRole("button", { name: /^View(?: full)? report$/ }).first();
+  await saveButton.click();
+  await expect.poll(() => saveAttempts).toBe(1);
+  expect((savedPayloads[0] as { admission: unknown }).admission).toEqual(workerAdmission);
+  await expect(saveButton).toBeVisible();
+  await expect(viewReportButton).toHaveCount(0);
+
+  await saveButton.click();
+  await expect(viewReportButton).toBeVisible();
+  expect(saveAttempts).toBe(2);
+  expect((savedPayloads[1] as { admission: unknown }).admission).toEqual(workerAdmission);
+});

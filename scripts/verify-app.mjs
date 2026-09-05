@@ -9,6 +9,7 @@ import {
   CURRENT_MODEL_PACK_ID,
   CURRENT_MODEL_PACK_VERSION,
 } from "../lib/reference-model-pack.ts";
+import { createScenarioDraftAdmissionReceipt } from "../lib/scenario-draft-admission.ts";
 import { SCENARIO_LIBRARY } from "../lib/scenarios.ts";
 
 const baseUrl = process.env.VECTOR_URL ?? "http://127.0.0.1:4317";
@@ -16,6 +17,13 @@ const connectionString = process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required");
 const sql = postgres(connectionString, { max: 1 });
 let createdId;
+
+async function withDraftAdmission(payload, requestId) {
+  return {
+    ...payload,
+    admission: await createScenarioDraftAdmissionReceipt(payload.initialState, requestId),
+  };
+}
 
 async function waitForReady() {
   let lastError;
@@ -255,14 +263,14 @@ try {
   const retiredRun = await fetch(`${baseUrl}/api/runs`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
+    body: JSON.stringify(await withDraftAdmission({
       scenarioId: "a2a-crossing-intercept",
       scenarioVersion: "1.0.0",
       scenarioSchemaVersion: historicalTemplate.schema_version,
       scenarioContentHash: historicalTemplate.content_hash,
       draftRevision: 0,
       initialState: historicalTemplate.package.scenario,
-    }),
+    }, "integration-retired-run")),
   });
   assert.equal(retiredRun.status, 409);
 
@@ -277,31 +285,34 @@ try {
   const stalePackage = await fetch(`${baseUrl}/api/runs`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
+    body: JSON.stringify(await withDraftAdmission({
       scenarioId: "a2a-crossing-intercept",
       scenarioVersion: crossingDefinition.version,
       scenarioSchemaVersion: template.schema_version,
       scenarioContentHash: "0".repeat(64),
       draftRevision: 0,
       initialState: template.package.scenario,
-    }),
+    }, "integration-stale-package")),
   });
   assert.equal(stalePackage.status, 409);
 
+  const savedPayload = await withDraftAdmission({
+    scenarioId: "a2a-crossing-intercept",
+    scenarioVersion: crossingDefinition.version,
+    scenarioSchemaVersion: template.schema_version,
+    scenarioContentHash: template.content_hash,
+    draftRevision: 0,
+    initialState: template.package.scenario,
+  }, "integration-saved-run");
   const saved = await fetch(`${baseUrl}/api/runs`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      scenarioId: "a2a-crossing-intercept",
-      scenarioVersion: crossingDefinition.version,
-      scenarioSchemaVersion: template.schema_version,
-      scenarioContentHash: template.content_hash,
-      draftRevision: 0,
-      initialState: template.package.scenario,
-    }),
+    body: JSON.stringify(savedPayload),
   });
   assert.equal(saved.status, 201);
-  createdId = (await saved.json()).id;
+  const savedResponse = await saved.json();
+  assert.deepEqual(savedResponse.admission, savedPayload.admission);
+  createdId = savedResponse.id;
   assert.equal(typeof createdId, "string");
 
   const loaded = await fetch(

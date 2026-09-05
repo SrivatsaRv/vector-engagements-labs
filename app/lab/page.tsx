@@ -92,9 +92,12 @@ import {
 } from "@/lib/scenario-spatial";
 import { sha256Hex } from "@/lib/canonical-json";
 import {
+  admitScenarioDraftReceipt,
+  assertMatchingScenarioDraftAdmissionReceipt,
   cancelActiveDraftAdmission,
   ScenarioDraftAdmissionError,
   ScenarioDraftAdmissionTracker,
+  type ScenarioDraftAdmissionReceipt,
 } from "@/lib/scenario-draft-admission";
 import {
   isScenarioDefinition,
@@ -156,12 +159,20 @@ type EventItem = {
   title: string;
   detail: string;
 };
-type WorkbenchVectorRecord = {
-  source: "WORKER_RUN" | "VERIFIED_IMPORT";
-  serializedRecord: ArrayBuffer;
-  recordId: string;
-  contentDigest: string;
-};
+type WorkbenchVectorRecord =
+  | {
+      source: "WORKER_RUN";
+      serializedRecord: ArrayBuffer;
+      recordId: string;
+      contentDigest: string;
+      admission: ScenarioDraftAdmissionReceipt;
+    }
+  | {
+      source: "VERIFIED_IMPORT";
+      serializedRecord: ArrayBuffer;
+      recordId: string;
+      contentDigest: string;
+    };
 const CONFIGURE_STEPS = [
   "Define",
   "Forces & loadouts",
@@ -585,11 +596,12 @@ function LabWorkbench({
       );
       admissionStarted = true;
       const completion = await simulationClient.run(submittedScenario, submittedScenario.profile, {
+        admission,
         packageReference: scenarioPackageReference,
         onState: setRuntimeState,
         onProgress: ({ progress }) => setRunProgress(progress),
       });
-      await draftAdmissionTracker.accept(admission, scenarioRef.current);
+      await draftAdmissionTracker.accept(completion.admission, scenarioRef.current);
       const next = completion.result;
       setResult(next);
       setVectorRecord({
@@ -597,6 +609,7 @@ function LabWorkbench({
         serializedRecord: completion.serializedRecord,
         recordId: completion.recordId,
         contentDigest: completion.contentDigest,
+        admission: completion.admission,
       });
     } catch (error) {
       if (error instanceof ScenarioDraftAdmissionError) {
@@ -786,6 +799,7 @@ function LabWorkbench({
         serializedRecord: completion.serializedRecord,
         recordId: completion.recordId,
         contentDigest: completion.contentDigest,
+        admission: completion.admission,
       });
       setVectorRecordError(null);
     } catch (error) {
@@ -907,6 +921,10 @@ function LabWorkbench({
       downloadVectorRecord();
       return null;
     }
+    if (!vectorRecord || vectorRecord.source !== "WORKER_RUN") {
+      setSaveError("The completed Worker run has no draft admission receipt. Conduct the run again.");
+      return null;
+    }
     if (savedRunId) return savedRunId;
     setSaving(true);
     setSaveError(null);
@@ -920,11 +938,23 @@ function LabWorkbench({
           scenarioSchemaVersion: templateIdentity.schemaVersion,
           scenarioContentHash: templateIdentity.contentHash,
           draftRevision: runDraftRevision,
+          admission: vectorRecord.admission,
           initialState: scenario,
         }),
       });
       if (!response.ok) throw new Error("save");
-      const data = (await response.json()) as { id: string };
+      const data = (await response.json()) as {
+        id: string;
+        admission: ScenarioDraftAdmissionReceipt;
+      };
+      const responseAdmission = await admitScenarioDraftReceipt(
+        data.admission,
+        scenarioRef.current,
+      );
+      assertMatchingScenarioDraftAdmissionReceipt(
+        vectorRecord.admission,
+        responseAdmission,
+      );
       setSavedRunId(data.id);
       return data.id;
     } catch {

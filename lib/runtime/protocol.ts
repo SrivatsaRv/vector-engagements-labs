@@ -1,10 +1,11 @@
 import type { EngineBackendId } from "../engine/contracts.ts";
 import type { CompiledModelPack } from "../model-pack.ts";
 import type { OpenedVectorRecord } from "../record/vector-record.ts";
+import type { ScenarioDraftAdmissionReceipt } from "../scenario-draft-admission.ts";
 import type { PreparedSimulation } from "../simulation.ts";
 
-export const BROWSER_RUNTIME_PROTOCOL = "vector.browser-runtime.v1" as const;
-export const BROWSER_RUNTIME_PROTOCOL_VERSION = 1 as const;
+export const BROWSER_RUNTIME_PROTOCOL = "vector.browser-runtime.v2" as const;
+export const BROWSER_RUNTIME_PROTOCOL_VERSION = 2 as const;
 
 export type BrowserRuntimeState =
   | "initialization"
@@ -42,6 +43,7 @@ export type BrowserRuntimeRequest =
   | (RuntimeRequestBase & {
       type: "run";
       runId: string;
+      admission: ScenarioDraftAdmissionReceipt;
       packDigest: string;
       scenarioRef: string;
       batchTicks: number;
@@ -90,6 +92,7 @@ export type BrowserRuntimeResponse =
   | (RuntimeResponseBase & {
       type: "completed";
       runId: string;
+      admission: ScenarioDraftAdmissionReceipt;
       backend: EngineBackendId;
       recordId: string;
       contentDigest: string;
@@ -115,9 +118,16 @@ export type BrowserRuntimeResponse =
         | "timeout"
         | "engine"
         | "record"
-        | "capability-manifest-stale";
+        | "capability-manifest-stale"
+        | "DRAFT_ADMISSION_INVALID"
+        | "DRAFT_ADMISSION_STALE_REQUEST"
+        | "DRAFT_ADMISSION_STALE_DRAFT";
       message: string;
       recoverable: boolean;
+      fieldPath?: string;
+      stage?: "LATEST_DRAFT";
+      severity?: "BLOCKING";
+      correctiveGuidance?: string;
     })
   | (RuntimeResponseBase & { type: "terminated" });
 

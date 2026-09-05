@@ -11,6 +11,7 @@ import { createDefaultSpatialPlan } from "../lib/scenario-spatial";
 import { getStudyArea } from "../lib/study-areas";
 import { createDefaultAirMissionDefinition } from "../lib/air-mission";
 import { CURRENT_COMPILED_MODEL_PACK } from "../lib/engine/weapon-admission";
+import { createScenarioDraftAdmissionReceipt } from "../lib/scenario-draft-admission";
 
 test("bounded JSON admission rejects an oversized streamed body", async () => {
   const request = new Request("https://labs.reachdefence.com/api/telemetry", {
@@ -182,10 +183,25 @@ test("saved-run admission rejects stale selected-installation and runway identit
 });
 
 test("saved reports are recomputed from admitted scenario inputs", async () => {
+  const admission = await createScenarioDraftAdmissionReceipt(
+    DEFAULT_SCENARIO_DEFINITION.scenario,
+    "saved-run-security-boundary",
+  );
   const verified = await buildVerifiedSavedRun(
     DEFAULT_SCENARIO_DEFINITION.scenario,
     DEFAULT_SCENARIO_DEFINITION,
-    { schemaVersion: "vector.scenario.v4", contentHash: "a".repeat(64), draftRevision: 0 },
+    {
+      schemaVersion: "vector.scenario.v4",
+      contentHash: "a".repeat(64),
+      draftRevision: 0,
+      admission,
+    },
+  );
+  assert.deepEqual(verified.admission, admission);
+  assert.equal(
+    Object.hasOwn(verified.report.packageProvenance ?? {}, "admission"),
+    false,
+    "the transport admission receipt must not leak into versioned report provenance",
   );
   assert.ok(verified.result.frames.length > 1);
   assert.equal(verified.report.result, verified.result);
@@ -202,6 +218,32 @@ test("saved reports are recomputed from admitted scenario inputs", async () => {
       (limitation) => /named-aircraft/.test(limitation.statement),
     ),
     "a saved report must retain the blocking named-aircraft limitation",
+  );
+});
+
+test("saved-run backend rejects a stale draft receipt before recomputation", async () => {
+  const admission = await createScenarioDraftAdmissionReceipt(
+    DEFAULT_SCENARIO_DEFINITION.scenario,
+    "saved-run-stale-draft",
+  );
+  const edited = structuredClone(DEFAULT_SCENARIO_DEFINITION.scenario);
+  edited.launcherSpeed += 1;
+  await assert.rejects(
+    buildVerifiedSavedRun(
+      edited,
+      DEFAULT_SCENARIO_DEFINITION,
+      {
+        schemaVersion: "vector.scenario.v4",
+        contentHash: "a".repeat(64),
+        draftRevision: 1,
+        admission,
+      },
+    ),
+    {
+      name: "ScenarioDraftAdmissionError",
+      code: "DRAFT_ADMISSION_STALE_DRAFT",
+      fieldPath: "$.draftDigest",
+    },
   );
 });
 

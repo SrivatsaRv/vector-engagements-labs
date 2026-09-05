@@ -64,7 +64,10 @@ export async function readBoundedJson(
 
 export function publicApiError(error: unknown, fallbackStatus = 500) {
   if (error instanceof PublicApiError) {
-    return Response.json({ error: error.code }, {
+    return Response.json({
+      error: error.code,
+      ...(error.fieldPath ? { fieldPath: error.fieldPath } : {}),
+    }, {
       status: error.status,
       headers: error.headers,
     });

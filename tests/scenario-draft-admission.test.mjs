@@ -2,10 +2,55 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  admitScenarioDraftReceipt,
+  assertMatchingScenarioDraftAdmissionReceipt,
   cancelActiveDraftAdmission,
+  createScenarioDraftAdmissionReceipt,
   ScenarioDraftAdmissionError,
   ScenarioDraftAdmissionTracker,
 } from "../lib/scenario-draft-admission.ts";
+
+test("#193 Worker and server boundaries admit one exact canonical draft receipt", async () => {
+  const draft = { speed: 275, route: { altitudeM: 9_500 } };
+  const receipt = await createScenarioDraftAdmissionReceipt(draft, "run-shared-boundary");
+  const admitted = await admitScenarioDraftReceipt(
+    receipt,
+    { route: { altitudeM: 9_500 }, speed: 275 },
+  );
+  assert.deepEqual(admitted, receipt);
+  assert.deepEqual(
+    assertMatchingScenarioDraftAdmissionReceipt(receipt, admitted),
+    receipt,
+  );
+});
+
+test("#193 boundary admission rejects stale drafts and mismatched success receipts at stable paths", async () => {
+  const receipt = await createScenarioDraftAdmissionReceipt({ speed: 275 }, "run-boundary");
+  await assert.rejects(
+    admitScenarioDraftReceipt(receipt, { speed: 276 }),
+    (error) => error instanceof ScenarioDraftAdmissionError
+      && error.code === "DRAFT_ADMISSION_STALE_DRAFT"
+      && error.fieldPath === "$.draftDigest",
+  );
+  assert.throws(
+    () => assertMatchingScenarioDraftAdmissionReceipt(
+      receipt,
+      { ...receipt, requestId: "run-another" },
+    ),
+    (error) => error instanceof ScenarioDraftAdmissionError
+      && error.code === "DRAFT_ADMISSION_STALE_REQUEST"
+      && error.fieldPath === "$.requestId",
+  );
+  assert.throws(
+    () => assertMatchingScenarioDraftAdmissionReceipt(
+      receipt,
+      { ...receipt, draftDigest: "0".repeat(64) },
+    ),
+    (error) => error instanceof ScenarioDraftAdmissionError
+      && error.code === "DRAFT_ADMISSION_STALE_DRAFT"
+      && error.fieldPath === "$.draftDigest",
+  );
+});
 
 test("#193 latest-draft admission accepts only the exact active canonical draft", async () => {
   const tracker = new ScenarioDraftAdmissionTracker();

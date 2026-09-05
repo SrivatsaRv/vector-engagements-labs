@@ -537,11 +537,12 @@ either matched control through the normal record-open path; use
 duration, effect, closest approach and terminal lifecycle before comparing the
 visualization or report.
 
-The ordinary `npm run worker:verify` CI gate regenerates the same four runs in
+The ordinary `npm run worker:verify` CI gate regenerates the same five runs in
 memory and fails if this directory is missing or semantically stale. Freshness
 means exact inventory, record ID, byte length, all non-manifest members and a
 normalized manifest; only the wall-clock `createdAt` field and its derived
-manifest digest may differ between generations.
+manifest digest, plus the separately tested browser transport protocol label,
+may differ between generations.
 
 Each configured route now compiles a `vector.route-plan.v2` constraint with one
 acceptance radius and one transition mode per route point. The initial point has
@@ -858,9 +859,8 @@ distances, WGS84 area vertices, weapon RTB threshold, ground-start delay,
 store-transfer values, and route position, altitude, radius, ETA and TOT. Range
 sliders retain their browser min/max interaction boundary but still require
 compiler admission. Complete enum and nested control-matrix registration,
-constrained cross-control coverage, backend admission-response digest parity,
-complete control-to-runtime contrasts and retirement of the parallel legacy
-intake remain required before #193 can close.
+constrained cross-control coverage, complete control-to-runtime contrasts and
+retirement of the parallel legacy intake remain required before #193 can close.
 
 Run dispatch now creates one request-scoped admission receipt from the canonical
 scenario draft bytes. Structured edits invalidate the active receipt. Raw
@@ -870,8 +870,19 @@ receipt before awaiting the Worker, closing the serialization-time cancellation
 race. A Worker completion is accepted only when both its request identity and
 the latest canonical draft digest still match; cancelled, superseded, or
 edited-draft completions are discarded and cannot enable results, saving, or
-reporting. This is the browser freshness slice; backend admission-response
-digest parity remains part of #193.
+reporting. Backend admission-response digest parity is enforced by the same
+receipt contract at the boundaries below.
+
+The browser run request now carries that receipt into the simulation Worker.
+The Worker recomputes the digest from the exact admitted scenario inside its
+loaded pack and echoes the validated receipt in its completion. The client
+rejects a success with a different request ID or draft digest. Saving sends the
+same Worker-validated receipt with the scenario; the backend checks the digest
+before scenario validation, engine recomputation or persistence and returns the
+same receipt. The workbench accepts the saved ID only after checking that
+response against both the current scenario and the Worker receipt. Invalid or
+stale receipts use the same `DRAFT_ADMISSION_*` code and `$.requestId` or
+`$.draftDigest` path at Worker and HTTP boundaries.
 
 An authored area of interest is not a substitute for the study-area preset. If
 a later workflow needs a smaller AOI, it is a separate optional geometry inside

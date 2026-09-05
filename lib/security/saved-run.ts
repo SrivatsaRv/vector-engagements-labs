@@ -44,6 +44,9 @@ import {
   ScenarioControlAdmissionError,
 } from "../scenario-control-authority.ts";
 import { buildAuthoredProfileBinding } from "../report-profile.ts";
+import {
+  admitScenarioDraftReceipt,
+} from "../scenario-draft-admission.ts";
 
 const domains = new Set(["A2A", "A2G", "G2A", "G2G"]);
 const profiles = new Set(["short", "medium", "sustained"]);
@@ -381,8 +384,14 @@ export function validateSavedScenario(value: unknown, template: ScenarioDefiniti
 export async function buildVerifiedSavedRun(
   input: unknown,
   template: ScenarioDefinition,
-  provenance: { schemaVersion: string; contentHash: string; draftRevision: number },
+  provenance: {
+    schemaVersion: string;
+    contentHash: string;
+    draftRevision: number;
+    admission: unknown;
+  },
 ) {
+  const admission = await admitScenarioDraftReceipt(provenance.admission, input);
   const scenario = validateSavedScenario(input, template);
   const modelPackBundle = await compileModelPack(createCurrentModelPackSource());
   if (
@@ -414,7 +423,9 @@ export async function buildVerifiedSavedRun(
     engine: ENGINE_VERSION,
     profileVersion: model ? `${model.id}@${model.version}` : "model-unavailable",
     packageProvenance: {
-      ...provenance,
+      schemaVersion: provenance.schemaVersion,
+      contentHash: provenance.contentHash,
+      draftRevision: provenance.draftRevision,
       intendedUse: template.intendedUse,
       modelPack: template.modelPack,
       ...(result.engineRun.scenario.airMission
@@ -455,5 +466,5 @@ export async function buildVerifiedSavedRun(
         : {}),
     },
   };
-  return { scenario, result, report };
+  return { scenario, result, report, admission };
 }

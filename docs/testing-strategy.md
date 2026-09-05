@@ -324,12 +324,21 @@ saved-record verification to the simulation Worker. The built browser journey
 opens the Worker-produced VSR inside that Worker, so deterministic terminal
 replay cannot block the rendering thread.
 
+Draft-receipt regressions exercise the shared Worker/server boundary directly.
+They prove canonical key order produces one digest; stale drafts and mismatched
+success receipts fail with stable request/digest paths; every Worker run carries
+and returns its validated receipt; and the client rejects a success for another
+draft before reading its record. Saved-run recomputation requires the same
+receipt before validation or simulation, returns it to the route, and public
+admission errors preserve the stable field path. Focused report tests pass a
+valid receipt so ordinary saved-run behavior cannot bypass the new boundary.
+
 This baseline does not satisfy #193 by itself. Completion additionally requires
 machine-readable registration for every nested Air-mission and presentation
 control, deterministic constrained cross-field combinations, Worker/server
-admission parity, latest-draft digest binding, persistence/VSR/report readback,
-runtime configuration contrasts and a CI artifact that reports uncovered
-matrix rows.
+error parity beyond draft freshness, persistence/VSR/report digest readback,
+runtime configuration contrasts and a CI artifact that reports uncovered matrix
+rows.
 
 ## Existing baseline
 
@@ -691,15 +700,15 @@ checks that the log remains readable, and binds the same port again to prove
 cleanup. This process evidence is separate from the Browser Contract runner. CI
 builds the application once, then `scripts/run-browser-contracts.mjs` executes
 the five Playwright projects serially with a fresh managed Wrangler/Workerd
-process group for each viewport. The policy is `RUN_ALL_PROJECTS_ONCE`: all 75
+process group for each viewport. The policy is `RUN_ALL_PROJECTS_ONCE`: all 100
 cases execute without retries even after one project fails, so later-viewport
 evidence is not suppressed. An external `SIGINT` or `SIGTERM` is different: it
 terminates the active server and test process groups, records the interruption,
 does not start later projects, and exits nonzero. Any project, server,
 interruption, cleanup, or evidence-retention failure makes the aggregate command
 fail. A pass requires a nonempty managed-server log and parseable Playwright JSON
-bound to the expected project, exactly fifteen executed cases, and their successful
-statuses. The fifteen governed case identities are exact and distinct, including
+bound to the expected project, exactly twenty executed cases, and their successful
+statuses. The twenty governed case identities are exact and distinct, including
 three independently isolated BVR, WVR and transition study journeys; global or
 per-result errors cannot coexist with a passing status. Every governed project
 entry must bind to the selected project's isolated output directory.
