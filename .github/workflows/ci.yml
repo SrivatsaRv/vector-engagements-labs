@@ -25,6 +25,7 @@ jobs:
       security_js: ${{ steps.changes.outputs.security_js }}
       web_tests: ${{ steps.changes.outputs.web_tests }}
       browser_tests: ${{ steps.changes.outputs.browser_tests }}
+      source_evidence: ${{ steps.changes.outputs.source_evidence }}
       rust_tests: ${{ steps.changes.outputs.rust_tests }}
       rust_audit: ${{ steps.changes.outputs.rust_audit }}
       integration: ${{ steps.changes.outputs.integration }}
@@ -84,64 +85,10 @@ jobs:
             tests/runtime-stub-ledger.test.mjs \
             tests/security-config.test.mjs
 
-  contract_docs:
-    name: "Stage 0.6: Contract Documentation Impact"
-    needs: classify
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      contract_docs_state: ${{ steps.contract_docs.outputs.contract_docs_state }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out source and history
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: 22.18.0
-      - name: Install locked JavaScript dependencies without lifecycle scripts
-        run: npm ci --ignore-scripts
-      - name: Set up Rust/WASM freshness toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
-        with:
-          toolchain: 1.97.1
-          target: wasm32-unknown-unknown
-      - name: Cache Rust freshness builds
-        uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16
-        with:
-          workspaces: engine-rust
-      - name: Verify contract documentation ownership and declaration
-        id: contract_docs
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/verify-contract-doc-impact.mjs --github-event
-
-  generic_sensor_renderer:
-    if: needs.classify.outputs.quality == 'true' || needs.classify.outputs.web_tests == 'true' || needs.classify.outputs.integration == 'true'
-    name: "Stage 0.7: Pinned Generic Sensor Renderer"
-    needs: classify
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-      - name: Restore the content-keyed renderer image
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: ${{ runner.tool_cache }}/vector-poppler-26.05.0-ubuntu24-amd64
-          key: vector-poppler-ubuntu24-amd64-${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh', 'scripts/pinned-poppler-ubuntu.Dockerfile', 'scripts/pinned-pdftoppm-wrapper.sh.in') }}
-      - name: Build or load the pinned renderer once
-        run: scripts/install-pinned-poppler-ubuntu.sh
-
   quality:
     if: needs.classify.outputs.quality == 'true'
     name: "Stage 1A: Web Quality"
-    needs: [classify, generic_sensor_renderer]
+    needs: classify
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -159,13 +106,6 @@ jobs:
           components: rustfmt
       - name: Install locked dependencies
         run: npm ci
-      - name: Restore the content-keyed renderer image
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: ${{ runner.tool_cache }}/vector-poppler-26.05.0-ubuntu24-amd64
-          key: vector-poppler-ubuntu24-amd64-${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh', 'scripts/pinned-poppler-ubuntu.Dockerfile', 'scripts/pinned-pdftoppm-wrapper.sh.in') }}
-      - name: Install the pinned offline PDF renderer
-        run: scripts/install-pinned-poppler-ubuntu.sh
       - name: Verify generated assets, lint, and types
         run: make ci-quality-core
 
@@ -208,7 +148,7 @@ jobs:
   web_tests:
     if: needs.classify.outputs.web_tests == 'true'
     name: "Stage 2A: Web and Contract Tests"
-    needs: [classify, generic_sensor_renderer]
+    needs: classify
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -221,13 +161,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Restore the content-keyed renderer image
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: ${{ runner.tool_cache }}/vector-poppler-26.05.0-ubuntu24-amd64
-          key: vector-poppler-ubuntu24-amd64-${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh', 'scripts/pinned-poppler-ubuntu.Dockerfile', 'scripts/pinned-pdftoppm-wrapper.sh.in') }}
-      - name: Install the pinned offline PDF renderer
-        run: scripts/install-pinned-poppler-ubuntu.sh
       - name: Build and run JavaScript and TypeScript contracts
         run: npm test
 
@@ -309,6 +242,35 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  source_evidence:
+    if: needs.classify.outputs.source_evidence == 'true'
+    name: "Stage 2E: Source Evidence Reproduction"
+    needs: classify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Restore the content-keyed renderer image
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.tool_cache }}/vector-poppler-26.05.0-ubuntu24-amd64
+          key: vector-poppler-ubuntu24-amd64-${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh', 'scripts/pinned-poppler-ubuntu.Dockerfile', 'scripts/pinned-pdftoppm-wrapper.sh.in') }}
+      - name: Install the pinned offline source renderer
+        run: scripts/install-pinned-poppler-ubuntu.sh
+      - name: Verify source bytes and reproduce selected pages
+        run: |
+          npm run generic-sensor:sources:verify
+          npm run policy:nasa-f16-store-source:verify
+          npm run source-evidence:render-verify
+
   rust_audit:
     if: needs.classify.outputs.rust_audit == 'true'
     name: "Stage 2C: Rust Dependency Audit"
@@ -330,7 +292,7 @@ jobs:
   integration:
     if: needs.classify.outputs.integration == 'true'
     name: "Stage 3A: Database and API Integration"
-    needs: [classify, generic_sensor_renderer]
+    needs: classify
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
@@ -361,13 +323,6 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Restore the content-keyed renderer image
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: ${{ runner.tool_cache }}/vector-poppler-26.05.0-ubuntu24-amd64
-          key: vector-poppler-ubuntu24-amd64-${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh', 'scripts/pinned-poppler-ubuntu.Dockerfile', 'scripts/pinned-pdftoppm-wrapper.sh.in') }}
-      - name: Install the pinned offline PDF renderer
-        run: scripts/install-pinned-poppler-ubuntu.sh
       - name: Build application
         run: |
           npm run build
@@ -404,12 +359,11 @@ jobs:
     needs:
       - classify
       - policy
-      - contract_docs
-      - generic_sensor_renderer
       - quality
       - security_js
       - web_tests
       - browser_tests
+      - source_evidence
       - rust_tests
       - rust_audit
       - integration
@@ -419,9 +373,6 @@ jobs:
     env:
       CLASSIFY_RESULT: ${{ needs.classify.result }}
       POLICY_RESULT: ${{ needs.policy.result }}
-      CONTRACT_DOCS_RESULT: ${{ needs.contract_docs.result }}
-      CONTRACT_DOC_IMPACT_STATE: ${{ needs.contract_docs.outputs.contract_docs_state }}
-      GENERIC_SENSOR_RENDERER_RESULT: ${{ needs.generic_sensor_renderer.result }}
       PR_REVIEW_KIND: ${{ needs.policy.outputs.pr_review_kind }}
       QUALITY_SELECTED: ${{ needs.classify.outputs.quality }}
       QUALITY_RESULT: ${{ needs.quality.result }}
@@ -431,6 +382,8 @@ jobs:
       WEB_TESTS_RESULT: ${{ needs.web_tests.result }}
       BROWSER_TESTS_SELECTED: ${{ needs.classify.outputs.browser_tests }}
       BROWSER_TESTS_RESULT: ${{ needs.browser_tests.result }}
+      SOURCE_EVIDENCE_SELECTED: ${{ needs.classify.outputs.source_evidence }}
+      SOURCE_EVIDENCE_RESULT: ${{ needs.source_evidence.result }}
       RUST_TESTS_SELECTED: ${{ needs.classify.outputs.rust_tests }}
       RUST_TESTS_RESULT: ${{ needs.rust_tests.result }}
       RUST_AUDIT_SELECTED: ${{ needs.classify.outputs.rust_audit }}
@@ -448,3 +401,38 @@ jobs:
           node-version: 22.18.0
       - name: Verify every selected gate passed
         run: node scripts/verify-required-gates.mjs
+
+  cloudflare_candidate:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: "Publish reusable Cloudflare candidate"
+    needs: gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_HYPERDRIVE_ID: 11111111111111111111111111111111
+      VECTOR_PRODUCTION_HOST: vector-candidate.invalid
+    steps:
+      - name: Check out admitted main revision
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22.18.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build the deployable Worker once
+        run: |
+          npm run build
+          node --test tests/cloudflare-build-output.test.mjs
+          npm run deploy:artifact:verify
+          node scripts/create-cloudflare-candidate.mjs --source-sha "${GITHUB_SHA}"
+          node scripts/verify-cloudflare-candidate.mjs outputs/cloudflare-candidate "${GITHUB_SHA}"
+      - name: Upload immutable Worker candidate
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: cloudflare-worker-${{ github.sha }}
+          path: outputs/cloudflare-candidate
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30

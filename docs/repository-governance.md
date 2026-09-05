@@ -45,28 +45,20 @@ other developer hosts. This prevents host linker layout or registry paths from
 creating a locally green artifact that differs in deployment.
 
 Node 22.18.0 and npm 10.9.3 are exact repository authorities, recorded in
-`.node-version` and `package.json`. `make ci-local` checks Node, npm, Rust, the
-WASM target and Poppler before starting expensive work. Hosted jobs use the
-same values. A workstation with a different runtime fails immediately instead
-of producing evidence that cannot be compared with CI.
-
-The protected Cloudflare and tagged-release verifiers provision the same
-content-keyed Poppler 26.05.0 image required by `make ci-local` before entering
-that gate. A missing or substituted renderer therefore fails before migrations,
-release publication or Worker publish, while the admitted commit remains the
-sole contract-document comparison base.
-An admitted historical revision that predates the renderer contract skips only
-that absent bootstrap and remains subject to its own revision-local gates.
+`.node-version` and `package.json`. `make ci-local` checks Node, npm, Rust and
+the WASM target before starting expensive work. PDF rendering is not a product
+build prerequisite. The pinned Poppler 26.05.0 image runs only in the selected
+source-evidence reproduction job or the explicit `source-evidence-local` target.
 
 Cloudflare delivery has one checked-in static `wrangler.jsonc` authority plus a
-Vite overlay for environment-derived bindings. `make ci-local`, hosted quality,
-and protected production verification run Vinext's no-upload deploy preflight;
-production runs it before the complete source gate and before any migration.
-Quality then builds a production-shaped Worker with non-secret fixture bindings,
-asserts their exact generated values, and asks Wrangler to bundle the redirected
-artifact without upload. Protected verification repeats this with the real
-binding IDs. A dependency change therefore cannot make ordinary builds green
-while removing a deploy-only prerequisite or production route.
+Vite overlay for environment-derived bindings. Pull-request and local gates
+exercise the no-upload packaging contract. After a green `main` run, CI builds
+the Worker once with non-secret fixture bindings, verifies the generated output,
+normalizes environment-owned values, inventories every byte, and uploads that
+exact candidate. Production downloads and verifies the candidate, applies the
+real binding overlay, and asks Wrangler to deploy with `--no-bundle`. It does
+not install application dependencies, rebuild Vinext, run Rust, render PDFs, or
+repeat `make ci-local`.
 The deploy lifecycle also prepares and byte-checks MapLibre's ignored public
 worker assets before Vinext's internal build, matching the existing application
 build prerequisite on a clean runner.
@@ -93,17 +85,13 @@ changes; the new family cannot be hidden inside one of those broader contracts.
 #193 registers the raw numeric authoring component and the legacy Scenario
 control-authority inventory as exact UI-authoring and mission-contract paths.
 Their focused parser/matrix and component regressions are part of `ci-local`;
-new contract-looking controls or tests must be assigned to the same owning
-families instead of bypassing documentation-impact selection.
+new contract-looking controls or tests must retain focused regression coverage.
 The #28 gate verifies the forward-only weapon-termination migration, the
 between-step closest-approach oracle, model-pack admission, TypeScript/Rust
-event parity and the production Worker/VSR result. New termination contract
-paths must be registered in the contract-document ownership policy.
+event parity and the production Worker/VSR result.
 
-#182 adds the generic ground-dynamics migration generator to the existing
-mission-scenario owner. The declaration gate therefore covers its schema,
-digest and storage facets alongside the generated forward migration; it does
-not classify the generator as tooling-only or create a second contract family.
+#182 adds the generic ground-dynamics migration generator and its schema,
+digest, storage, and forward-migration regressions.
 
 #187 registers its composed takeoff-plus-transfer workload, benchmark and
 focused regression as exact engine-verification paths. The existing #182
@@ -154,68 +142,11 @@ changes deliberately fail closed through every gate. Stage 4 retains the one
 stable branch-protection context and fails unless every selected job passed;
 jobs skipped by the classifier are not treated as missing evidence.
 
-Stage 0.6 separately enforces the versioned
-`vector.contract-doc-ownership.v1` policy. Every tracked path is either owned by
-a contract family or belongs to one closed, exact non-contract class; there is
-no blanket documentation or product-runtime escape hatch. Each governed
-change supplies exactly one bounded `vector.contract-doc-impact-declaration.v1`
-block naming every affected family and its exact stable Markdown section IDs.
-New issue-owned contract families are registered in the introducing semantic
-revision with exact executable, test, maintained-document and changelog paths;
-the policy regression suite proves their paths have one owner and that every
-changelog-owning family retains a distinct heading without a fixed family-count
-ceiling.
-Rules carry a closed semantic-facet inventory (`schema`, `unit`, `datum`,
-`evidence`, `admission`, `validity`, `digest`, `runtime`, `vsr`, `ui`,
-`storage`, `delivery`, and `verification`), so only the sections and
-migration/changelog records owned by the affected facets are required. The
-required inventory is the union of sections selected by executable/test facets
-and every independently changed owning section. Migration/changelog sections
-are tracked separately, so they cannot broaden owning-document requirements and
-an executable or test change cannot mask a second changed contract section. The
-validator proves every registered document is a regular Git blob with exactly
-one registered heading, reads section bodies at the merge base and head,
-retains both endpoints of rename/copy records with `--find-copies-harder`, and
-rejects invalid UTF-8, control-bearing paths, whitespace-only changes, and
-unrelated-section churn. For policy changes it
-audits old endpoints under the base policy and new endpoints under the head
-policy; existing ownership cannot be erased by the policy being reviewed. The
-head policy may introduce a new family or add an owning or migration section to
-an existing family only when that exact document changes in the same revision.
-The exact heading must be absent from the merge-base document, exist
-exactly once as a regular tracked blob at head, contain material contract
-content visible after Markdown rendering, and appear in the diff-derived
-declaration under `SEMANTIC`. HTML comments, raw empty tags, and empty heading
-hierarchies do not count as contract content. The validator uses the pinned
-Markdown lexer and renderer, rejects the whole candidate section from
-establishing authority when any raw-HTML token appears anywhere, excludes
-headings and definitions, extracts decoded DOM text, ignores Unicode separator,
-control, and formatting code points, and requires a rendered letter or number.
-Reference definitions, empty links, whitespace-only entities, hidden/style/
-title/dialog HTML, cross-block HTML containers or stylesheets, and HTML-wrapped
-placeholder text therefore do not create contract authority, while visible
-Markdown prose, code, lists, and autolinks remain admissible. `marked` is a
-direct locked development dependency. Stage 0.6 installs the exact lockfile
-with lifecycle scripts disabled before executing the parser-backed validator.
-The classifier and the documentation verifier share one dependency-free
-name-status parser; the trusted classifier adapter materializes and hashes that
-parser beside the classifier, so Stage 0, Stage 0.5, and isolated probes require
-no package installation.
-The immutable V1 classifier probe remains executable compatibility authority as
-well as historical ledger evidence; the classifier therefore owns the one
-dependency-free parser implementation without importing the narrow helper. V2
-is the current probe and additionally binds the helper that re-exports that
-same parser authority. Both unchanged self-comparisons must pass. A new
-registration cannot relabel an unchanged pre-existing heading or use
-`DOCS_ALREADY_CURRENT`, `TEST_ONLY`, `GENERATED_ARTIFACT_ONLY`,
-`INTERNAL_REFACTOR`, or `NO_SEMANTIC_CHANGE` in its introducing revision.
-Existing registered sections remain governed solely by the merge-base policy
-and retain the normal material-change and anti-weakening rules. The initial
-#162 landing is the only explicit bootstrap and is bound to exact base
-`661d280699f260e32c53d6a1b0a6f5cf3415dde7`; both the integration tip and the
-merge base must lack the policy. A stale branch whose integration tip already
-has the policy must rebase. Later missing, malformed, weakened, unclassified,
-or unmapped policy state fails closed.
+The former Stage 0.6 contract-document declaration gate is not part of local,
+pull-request, `main`, release, or deployment admission. Documentation remains a
+normal reviewed change. The ownership inventory and template command remain
+available as advisory maintenance tools, but their declaration is never a
+required check and is not consumed by the Required PR Gate.
 
 The `UI_RESPONSIVE_INTERACTION` family owns the shared overlay implementation,
 its focused component regressions, and the dedicated responsive overlay
@@ -258,17 +189,11 @@ That command now verifies both the legacy v1 fixture and the two v2 anonymous
 research archives through registered generator and input rules, so one clean
 archive check detects drift across the whole model-pack fixture family.
 
-The historical F-16 external-store source gate runs its evidence generator,
-committed quarantine inventory, source-terms/release-owner verification,
-production-isolation scan, and hostile regressions under the shared deny-all
-network preload. Every required package, local CI, clean-clone, and hosted
-quality/web-contract/integration invocation supplies the exact committed source directory
-and reproduces all 16 pages with the pinned Poppler and Sharp versions; the CLI
-has no source-omission success path. The normal quality gate does not fetch
-mutable NTRS or policy URLs. Local Worker and
-hosted integration builds rerun the same production-isolation check after the
-built output exists; an absent build directory is not accepted as that final
-evidence.
+The historical F-16 external-store source gate runs byte, quarantine,
+source-terms, release-owner, production-isolation, and hostile regressions under
+the shared deny-all network preload. Routine gates do not render its PDFs. The
+selected source-evidence job alone reproduces the 16 review pages with pinned
+Poppler and Sharp versions. No gate fetches mutable NTRS or policy URLs.
 
 Governed `EXACT` implementation, test, or generated rules may leave the active
 inventory only through an append-only `ruleRetirements` tombstone. The
@@ -296,50 +221,6 @@ Retiring a generated output is always semantic documentation work and cannot
 claim `GENERATED_ARTIFACT_ONLY`, `INTERNAL_REFACTOR`, `NO_SEMANTIC_CHANGE`, or
 another exemption; freshness and probes govern ordinary changes, not removal
 of the output contract itself.
-
-Pull requests obtain the declaration from the single structured template block.
-`npm run --silent policy:contract-docs:template` derives the exact affected
-family, owning-section, and migration-section inventory from the current
-base/head diff; it does not emit an arbitrary first-family example. The hosted
-job copies the exact validated declaration, including rationale and evidence,
-into its visible GitHub step summary so the HTML-comment transport does not
-hide the review record from reviewers or assistive-reading flows.
-An edited body reruns CI. A `main` push resolves exactly one associated merged
-pull request through the read-only GitHub API and binds its merge commit, base
-commit, source-head identity, target branch, and declaration to the push;
-zero, multiple, stale, or revision-mismatched associations fail. Local verification uses the same core and
-an explicit `VECTOR_CONTRACT_DOC_DECLARATION_FILE` or
-`VECTOR_CONTRACT_DOC_DECLARATION_JSON`. A dirty checkout is evaluated through a
-temporary Git index/tree/commit without changing the developer's branch or
-index. Missing local input is accepted only when the exact diff has no governed
-families. The Stage 4 gate requires the independent documentation-impact job to
-finish successfully with `VERIFIED` or `NO_RELEVANT_CHANGES`; cancelled,
-skipped, malformed, or unavailable evidence cannot be aggregated as success.
-
-This mechanism binds paths, identities, registered evidence, and owned section
-changes. It does not certify that prose is technically adequate and cannot
-replace CODEOWNER or human review of a policy that modifies its own verifier.
-Generated-only exemptions invoke the policy's closed direct argv (`node` or the
-job-provisioned Rust/WASM toolchain), never a declaration-provided or mutable
-package script alias. Stage 0.6 checks out the exact pull-request head and
-provisions each registered generated group's closed toolchain before executing
-the same validator used locally and on push. Freshness runs in a temporary
-archive of the exact head commit, with secrets and tool overrides absent, and
-rejects any mutation of tracked head content. Refactor and no-semantic-change
-declarations contain only versioned probe IDs. The merge-base policy—not the
-pull request—owns each adapter path, exact adapter digest, family, disposition,
-path coverage, and assertion inventory. The validator executes the immutable
-base adapter twice in a scrubbed, bounded child process. That trusted adapter
-materializes each exact Git blob and executes candidate decision code only in a
-second child process; the adapter parent computes all source, comparison, and
-evidence digests without importing candidate code. It accepts only an exact,
-deterministic result whose base/head identity digests are equal. A probe
-introduced by a pull request cannot authorize that pull request, probes are
-unavailable during bootstrap, a head-added generated group cannot self-exempt,
-and declaration-authored commands, hashes, or
-prose never become exemption authority. `DOCS_ALREADY_CURRENT` separately
-binds every applicable owning and migration/changelog section to the same exact
-earlier ancestor and content digest.
 
 The classifier and Required PR Gate expose complete, versioned decision
 inventories that their production implementations consume. The classifier
@@ -377,10 +258,9 @@ Compose, runtime-binding, dependency, and workflow changes add an image rebuild
 and the integration gates. Unknown paths run everything until ownership is
 declared in `scripts/classify-ci-changes.mjs`.
 
-Protected production verification checks out the admitted exact SHA and binds
-the contract-documentation base to that same SHA. A later `main` advance cannot
-change the source or documentation authority used to re-verify an admitted
-deployment or rollback revision.
+Protected production promotion selects the successful `main` CI run for the
+admitted SHA and downloads its one unexpired, SHA-named Worker candidate. A
+later `main` advance cannot substitute different application bytes.
 
 Tracked record, mission/spatial-admission, frontend-selector, runtime-security,
 compiled-model, governed-environment-source, Worker, and VSR paths have explicit
@@ -652,15 +532,15 @@ approval before publication. Docker Hub is not configured.
 
 Cloudflare delivery is deliberately manual and protected by the GitHub
 `production` environment. Both verification and deployment require a full
-40-character commit SHA from `main` with a successful Required PR Gate before
-any production credential is exposed. Verification checks source, Hyperdrive,
-and the checksum-bound production migration prefix in a read-only transaction.
+40-character commit SHA from `main`, one successful completed `main` CI run,
+and its exact unexpired Worker candidate before any production credential is
+exposed. Verification checks candidate bytes, Hyperdrive, and the
+checksum-bound production migration prefix in a read-only transaction.
 Deployment alone applies forward-only migrations, runs the full catalog
-verifier in a repeatable-read, read-only transaction, deploys the admitted
-revision, and verifies production health. Mutation probes remain confined to
-disposable integration databases. It never seeds production implicitly. The
-environment accepts protected branches and requires an explicit maintainer
-approval before credentials are released.
+verifier in a repeatable-read, read-only transaction, deploys the already-built
+candidate without bundling, records Wrangler's deployment output, and verifies
+production health and critical static assets. Mutation probes remain confined
+to disposable integration databases. It never seeds production implicitly.
 The workflow requires two protected secrets and three non-secret environment
 variables:
 

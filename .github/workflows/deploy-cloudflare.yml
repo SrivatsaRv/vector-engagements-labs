@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Read-only verification or deployment of an immutable reviewed revision
+        description: Verify or deploy the exact Worker candidate produced by main CI
         required: true
         type: choice
         default: verify
@@ -17,8 +17,9 @@ on:
         type: string
 
 permissions:
-  contents: read
+  actions: read
   checks: read
+  contents: read
 
 concurrency:
   group: cloudflare-production
@@ -27,17 +28,14 @@ concurrency:
 jobs:
   admit:
     if: github.ref == 'refs/heads/main'
-    name: Admit immutable reviewed revision
+    name: Admit CI-built Worker candidate
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
+      ci_run_id: ${{ steps.admission.outputs.ci_run_id }}
       sha: ${{ steps.admission.outputs.sha }}
     steps:
-      - name: Check out trusted workflow source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          fetch-depth: 0
-      - name: Require immutable CI-green main revision
+      - name: Require an immutable CI-green main candidate
         id: admission
         env:
           GH_TOKEN: ${{ github.token }}
@@ -48,164 +46,125 @@ jobs:
             echo "Production operations require a full 40-character commit SHA." >&2
             exit 1
           fi
-          git fetch origin main --no-tags
-          test "$(git rev-parse "${REQUESTED_REF}^{commit}")" = "${REQUESTED_REF}"
-          git merge-base --is-ancestor "${REQUESTED_REF}" origin/main
-          gate_count="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${REQUESTED_REF}/check-runs?per_page=100" --jq '[.check_runs[] | select(.name == "Stage 4: Required PR Gate" and .conclusion == "success")] | length')"
-          test "${gate_count}" -ge 1
+          comparison_status="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${REQUESTED_REF}...main" --jq '.status')"
+          if [[ "${comparison_status}" != "ahead" && "${comparison_status}" != "identical" ]]; then
+            echo "Requested revision is not contained in main." >&2
+            exit 1
+          fi
+
+          ci_run_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=main&event=push&head_sha=${REQUESTED_REF}&status=completed&per_page=100" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success")] | sort_by(.run_attempt) | last | .id // empty')"
+          test -n "${ci_run_id}"
+
+          artifact_count="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${ci_run_id}/artifacts?per_page=100" \
+            --jq "[.artifacts[] | select(.name == \"cloudflare-worker-${REQUESTED_REF}\" and .expired == false)] | length")"
+          test "${artifact_count}" -eq 1
+          echo "ci_run_id=${ci_run_id}" >> "${GITHUB_OUTPUT}"
           echo "sha=${REQUESTED_REF}" >> "${GITHUB_OUTPUT}"
 
-  verify:
-    name: Verify production dependencies read-only
+  promote:
+    name: Verify and promote CI-built Worker
     needs: admit
     environment: production
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
-      - name: Check out admitted revision
+      - name: Download exact CI candidate
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.admit.outputs.ci_run_id }}
+          name: cloudflare-worker-${{ needs.admit.outputs.sha }}
+          path: candidate
+      - name: Check out trusted release scripts only
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.admit.outputs.sha }}
-      - name: Set up Node.js
+          path: .trusted-release
+          sparse-checkout: |
+            scripts/lib/cloudflare-candidate.mjs
+            scripts/prepare-cloudflare-deployment.mjs
+            scripts/verify-cloudflare-candidate.mjs
+          sparse-checkout-cone-mode: false
+      - name: Set up deployment runtime
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: 22.18.0
-          cache: npm
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659
-        with:
-          toolchain: 1.97.1
-          target: wasm32-unknown-unknown
-          components: clippy,rustfmt
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Restore the content-keyed renderer image
-        if: ${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh') != '' }}
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: ${{ runner.tool_cache }}/vector-poppler-26.05.0-ubuntu24-amd64
-          key: vector-poppler-ubuntu24-amd64-${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh', 'scripts/pinned-poppler-ubuntu.Dockerfile', 'scripts/pinned-pdftoppm-wrapper.sh.in') }}
-      - name: Install the pinned offline PDF renderer
-        if: ${{ hashFiles('scripts/install-pinned-poppler-ubuntu.sh') != '' }}
-        run: scripts/install-pinned-poppler-ubuntu.sh
-      - name: Require production bindings
+      - name: Require production bindings and verify candidate bytes
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_HYPERDRIVE_ID: ${{ vars.CLOUDFLARE_HYPERDRIVE_ID }}
           VECTOR_PRODUCTION_HOST: ${{ vars.VECTOR_PRODUCTION_HOST }}
           DATABASE_URL: ${{ secrets.DATABASE_ORIGIN_URL }}
+          VECTOR_SOURCE_SHA: ${{ needs.admit.outputs.sha }}
         run: |
+          set -euo pipefail
           test -n "${CLOUDFLARE_API_TOKEN}"
           test -n "${CLOUDFLARE_ACCOUNT_ID}"
           test -n "${CLOUDFLARE_HYPERDRIVE_ID}"
           test -n "${VECTOR_PRODUCTION_HOST}"
           test -n "${DATABASE_URL}"
-      - name: Verify Hyperdrive configuration
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_HYPERDRIVE_ID: ${{ vars.CLOUDFLARE_HYPERDRIVE_ID }}
-        run: npx wrangler hyperdrive get "${CLOUDFLARE_HYPERDRIVE_ID}"
-      - name: Verify Cloudflare deployment packaging
-        run: npm run deploy:verify
-      - name: Verify production Worker configuration without upload
-        env:
-          CLOUDFLARE_HYPERDRIVE_ID: ${{ vars.CLOUDFLARE_HYPERDRIVE_ID }}
-          VECTOR_PRODUCTION_HOST: ${{ vars.VECTOR_PRODUCTION_HOST }}
-        run: npm run deploy:configuration:verify
-      - name: Verify admitted source
-        env:
-          VECTOR_CONTRACT_DOC_BASE_SHA: ${{ needs.admit.outputs.sha }}
-        run: make ci-local
-      - name: Check out trusted production preflight
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: ${{ github.sha }}
-          path: .trusted-release
-          sparse-checkout: scripts
+          node .trusted-release/scripts/verify-cloudflare-candidate.mjs candidate "${VECTOR_SOURCE_SHA}"
+          node .trusted-release/scripts/prepare-cloudflare-deployment.mjs \
+            candidate \
+            "${VECTOR_SOURCE_SHA}" \
+            candidate/release/wrangler.json
       - name: Verify production migration compatibility without mutation
+        working-directory: candidate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_ORIGIN_URL }}
-        run: node .trusted-release/scripts/verify-db-migration-ledger.mjs
-
-  migrate:
-    if: inputs.operation == 'deploy'
-    name: Apply forward-only production migrations
-    needs:
-      - admit
-      - verify
-    environment: production
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Check out admitted revision
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        run: node dist/admin/verify-db-migration-ledger.mjs
+      - name: Verify Hyperdrive configuration
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd
         with:
-          ref: ${{ needs.admit.outputs.sha }}
-      - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: 22.18.0
-          cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Check out trusted production preflight
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: ${{ github.sha }}
-          path: .trusted-release
-          sparse-checkout: scripts
-      - name: Recheck compatibility, migrate, and verify production catalog
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: 4.113.0
+          command: hyperdrive get ${{ vars.CLOUDFLARE_HYPERDRIVE_ID }}
+      - name: Apply forward-only migrations and verify catalog
+        if: inputs.operation == 'deploy'
+        working-directory: candidate
         env:
           DATABASE_URL: ${{ secrets.DATABASE_ORIGIN_URL }}
         run: |
-          node .trusted-release/scripts/verify-db-migration-ledger.mjs
-          npm run db:migrate
-          node scripts/verify-db.mjs --production-read-only
-
-  deploy:
-    if: inputs.operation == 'deploy'
-    name: Deploy immutable production Worker
-    needs:
-      - admit
-      - migrate
-    environment: production
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - name: Check out admitted revision
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+          set -euo pipefail
+          node dist/admin/verify-db-migration-ledger.mjs
+          node dist/admin/migrate-db.mjs
+          node dist/admin/verify-db.mjs --production-read-only
+      - name: Deploy exact CI candidate without rebuilding
+        if: inputs.operation == 'deploy'
+        id: deploy
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd
         with:
-          ref: ${{ needs.admit.outputs.sha }}
-      - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: 22.18.0
-          cache: npm
-      - name: Install locked dependencies
-        run: npm ci
-      - name: Deploy immutable source revision
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: 4.113.0
+          workingDirectory: candidate
+          command: deploy --config release/wrangler.json --no-bundle --strict --no-autoconfig --message source:${{ needs.admit.outputs.sha }}
+      - name: Record deployed Worker version
+        if: inputs.operation == 'deploy'
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_HYPERDRIVE_ID: ${{ vars.CLOUDFLARE_HYPERDRIVE_ID }}
-          VECTOR_PRODUCTION_HOST: ${{ vars.VECTOR_PRODUCTION_HOST }}
-        run: npm run deploy
-
-  smoke:
-    if: inputs.operation == 'deploy'
-    name: Verify deployed health
-    needs: deploy
-    environment: production
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - name: Verify deployed health
+          WRANGLER_OUTPUT: ${{ steps.deploy.outputs.command-output }}
+        run: |
+          {
+            echo "### Cloudflare Worker deployment"
+            echo
+            echo '```text'
+            printf '%s\n' "${WRANGLER_OUTPUT}"
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Verify deployed application and static assets
+        if: inputs.operation == 'deploy'
         env:
           VECTOR_PRODUCTION_HOST: ${{ vars.VECTOR_PRODUCTION_HOST }}
         run: |
           set -euo pipefail
-          test -n "${VECTOR_PRODUCTION_HOST}"
-          curl --fail --silent --show-error --retry 10 --retry-all-errors --max-time 15 "https://${VECTOR_PRODUCTION_HOST}/api/health"
-          curl --fail --silent --show-error --retry 10 --retry-all-errors --max-time 15 "https://${VECTOR_PRODUCTION_HOST}/blogs" > /dev/null
+          origin="https://${VECTOR_PRODUCTION_HOST}"
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --max-time 15 "${origin}/api/health"
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --max-time 15 "${origin}/api/catalog/status" > /dev/null
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --max-time 15 "${origin}/scenarios" > /dev/null
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --max-time 15 "${origin}/workbench?scenario=a2a-crossing-intercept" > /dev/null
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --max-time 15 "${origin}/vendor/maplibre/maplibre-gl-worker.mjs" > /dev/null
+          curl --fail --silent --show-error --retry 10 --retry-all-errors --max-time 15 "${origin}/vendor/maplibre/maplibre-gl-shared.mjs" > /dev/null

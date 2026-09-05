@@ -622,9 +622,9 @@ async function verifyRenders(manifest, sourceDirectory) {
   }
 }
 
-export async function verifySourceDirectory(manifest, sourceDirectory) {
+export async function verifySourceDirectory(manifest, sourceDirectory, { render = true } = {}) {
   verifyManifest(manifest);
-  assertToolVersion("pdfinfo", manifest.renderRecipe.rendererVersion);
+  if (render) assertToolVersion("pdfinfo", manifest.renderRecipe.rendererVersion);
   const directoryInfo = lstatSync(sourceDirectory);
   if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) fail("source directory must be a real directory");
   const expectedFiles = manifest.artifacts.flatMap(({ pdf, metadata }) => [pdf.fileName, metadata.fileName]).sort();
@@ -655,14 +655,16 @@ export async function verifySourceDirectory(manifest, sourceDirectory) {
     ) fail(`${artifact.metadata.fileName} identity differs from its manifest`);
     if (metadata.distribution !== artifact.rightsFacts.distribution || metadata.copyright?.determinationType !== artifact.rightsFacts.determinationType || metadata.copyright?.containsThirdPartyMaterial !== artifact.rightsFacts.containsThirdPartyMaterial || metadata.exportControl?.isExportControl !== artifact.rightsFacts.isExportControl || metadata.exportControl?.ear !== artifact.rightsFacts.ear || metadata.exportControl?.itar !== artifact.rightsFacts.itar) fail(`${artifact.metadata.fileName} rights/export facts differ from its manifest`);
 
-    const pdfPath = assertRegularContainedFile(sourceDirectory, artifact.pdf.fileName);
-    const info = spawnSync("pdfinfo", [pdfPath], { encoding: "utf8" });
-    if (info.status !== 0) fail(`pdfinfo failed for ${artifact.pdf.fileName}: ${info.stderr.trim()}`);
-    const match = /^Pages:\s+(\d+)$/m.exec(info.stdout);
-    if (!match || Number(match[1]) !== artifact.pdf.pageCount) fail(`${artifact.pdf.fileName} page count differs from its manifest`);
+    if (render) {
+      const pdfPath = assertRegularContainedFile(sourceDirectory, artifact.pdf.fileName);
+      const info = spawnSync("pdfinfo", [pdfPath], { encoding: "utf8" });
+      if (info.status !== 0) fail(`pdfinfo failed for ${artifact.pdf.fileName}: ${info.stderr.trim()}`);
+      const match = /^Pages:\s+(\d+)$/m.exec(info.stdout);
+      if (!match || Number(match[1]) !== artifact.pdf.pageCount) fail(`${artifact.pdf.fileName} page count differs from its manifest`);
+    }
   }
 
-  const renders = await verifyRenders(manifest, sourceDirectory);
+  const renders = render ? await verifyRenders(manifest, sourceDirectory) : 0;
   return {
     admissionEligible: false,
     artifacts: manifest.artifacts.length,
@@ -813,10 +815,12 @@ async function run() {
   const result = verifyManifest(manifest);
   const inventory = verifyCommittedInventory(resolve("."));
   const arguments_ = process.argv.slice(2);
-  if (arguments_.length !== 2 || arguments_[0] !== "--source-dir" || !arguments_[1]) {
-    fail("CLI verification requires exactly --source-dir <committed-source-directory>");
+  const integrityOnly = arguments_.includes("--integrity-only");
+  const sourceArguments = arguments_.filter((argument) => argument !== "--integrity-only");
+  if (sourceArguments.length !== 2 || sourceArguments[0] !== "--source-dir" || !sourceArguments[1]) {
+    fail("CLI verification requires --source-dir <committed-source-directory> and optionally --integrity-only");
   }
-  const sources = await verifySourceDirectory(manifest, resolve(arguments_[1]));
+  const sources = await verifySourceDirectory(manifest, resolve(sourceArguments[1]), { render: !integrityOnly });
   const isolation = verifyProductionIsolation(resolve("."));
   process.stdout.write(`${JSON.stringify({ ...result, inventory, isolation, sources })}\n`);
 }

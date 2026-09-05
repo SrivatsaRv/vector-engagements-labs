@@ -9,6 +9,14 @@ All notable changes will be documented here. The project follows Semantic Versio
 Each governed contract family records its own release impact below. A change to
 one family must not imply changes to unrelated contracts.
 
+#### Delivery pipeline
+
+- Build the Cloudflare Worker once after the required `main` CI gate, retain the
+  SHA-named candidate for 30 days, and promote those verified bytes without
+  reinstalling application dependencies or rebuilding in production.
+- Remove the contract-document declaration from required CI and isolate pinned
+  PDF-to-PNG reproduction to changes in the governed source-evidence inputs.
+
 #### Model packs
 
 - Accept only the two exact immutable model-catalog histories produced by a

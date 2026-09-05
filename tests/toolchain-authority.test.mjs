@@ -94,9 +94,10 @@ test("Make and hosted workflows consume the same bounded gate commands", async (
   const dryRun = spawnSync("make", ["--dry-run", "ci-local"], { encoding: "utf8" });
   assert.equal(dryRun.status, 0, dryRun.stderr);
   assert.ok(
-    dryRun.stdout.indexOf("npm run toolchain:verify") < dryRun.stdout.indexOf("npm run policy:contract-docs:verify"),
+    dryRun.stdout.indexOf("npm run toolchain:verify") < dryRun.stdout.indexOf("npm run policy:runtime-stubs:verify"),
     "toolchain admission must fail before expensive verification starts",
   );
+  assert.doesNotMatch(dryRun.stdout, /policy:contract-docs:verify/u);
   assert.match(makefile, /^ci-quality-core:[\s\S]*?npm run environment:migration:verify[\s\S]*?npm run air-combat-studies:migration:verify/mu);
   assert.match(ci, /name: "Stage 1A: Web Quality"[\s\S]*?run: make ci-quality-core/u);
 
@@ -108,10 +109,9 @@ test("Make and hosted workflows consume the same bounded gate commands", async (
 
   const releaseVerify = release.split(/^  verify:/mu)[1]?.split(/^  publish:/mu)[0];
   assert.ok(releaseVerify, "release verification job is missing");
-  assert.ok(
-    releaseVerify.indexOf("scripts/install-pinned-poppler-ubuntu.sh") < releaseVerify.indexOf("make ci-local"),
-    "release must provision the pinned renderer before local-equivalent verification",
-  );
+  assert.match(releaseVerify, /make ci-local/u);
+  assert.doesNotMatch(releaseVerify, /install-pinned-poppler-ubuntu/u);
+  assert.match(ci, /name: "Stage 2E: Source Evidence Reproduction"[\s\S]*?scripts\/install-pinned-poppler-ubuntu\.sh[\s\S]*?npm run source-evidence:render-verify/u);
   assert.match(ci, /name: "Stage 2C: Rust Dependency Audit"[\s\S]*?run: make rust-audit-local/u);
   assert.match(releaseVerify, /cargo install cargo-audit[\s\S]*?make rust-audit-local/u);
   const rustAudit = makefile.split(/^rust-audit-local:/mu)[1]?.split(/^db-up:/mu)[0];
