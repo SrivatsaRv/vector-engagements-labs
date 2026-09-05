@@ -757,7 +757,7 @@ test("an invalid non-spatial numeric draft cannot be bypassed by changing builde
   await expect(page.getByRole("heading", { name: /Who is fighting/i })).toBeVisible();
 });
 
-test("an edited draft discards its in-flight Worker completion", async ({ page }, testInfo) => {
+test("a raw invalid draft discards its in-flight Worker completion", async ({ page }, testInfo) => {
   if (testInfo.project.name !== "laptop-1366") return;
   const catalog = await catalogFixture();
   await page.route("**/api/catalog", (route) =>
@@ -787,9 +787,11 @@ test("an edited draft discards its in-flight Worker completion", async ({ page }
   await expect(run).toBeEnabled();
   await run.click();
   await page.getByRole("button", { name: "1 Define" }).click();
-  await page.getByRole("textbox", { name: "Run name" }).fill("Changed while Worker was running");
+  const duration = page.getByRole("textbox", { name: "Run duration" });
+  await duration.fill("1e");
+  await expect(duration).toHaveAttribute("aria-invalid", "true");
 
-  await expect(page.getByRole("alert")).toContainText(
+  await expect(page.locator('.save-error[role="alert"]')).toContainText(
     "The stale result was discarded; run again.",
     { timeout: CORRECTNESS_WORKER_COMPLETION_TIMEOUT_MS },
   );

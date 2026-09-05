@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  cancelActiveDraftAdmission,
   ScenarioDraftAdmissionError,
   ScenarioDraftAdmissionTracker,
 } from "../lib/scenario-draft-admission.ts";
@@ -51,4 +52,22 @@ test("#193 latest-draft admission rejects cancellation during hashing and a supe
       && error.code === "DRAFT_ADMISSION_STALE_REQUEST",
   );
   await tracker.accept(second, { speed: 276 });
+});
+
+test("#193 cancellation revokes publication authority before invoking the Worker", async () => {
+  const tracker = new ScenarioDraftAdmissionTracker();
+  const draft = { speed: 275 };
+  const receipt = await tracker.begin(draft, "run-cancel-race");
+  let cancellationObservedRevocation = false;
+
+  await cancelActiveDraftAdmission(tracker, async () => {
+    await assert.rejects(
+      tracker.accept(receipt, draft),
+      (error) => error instanceof ScenarioDraftAdmissionError
+        && error.code === "DRAFT_ADMISSION_STALE_REQUEST",
+    );
+    cancellationObservedRevocation = true;
+  });
+
+  assert.equal(cancellationObservedRevocation, true);
 });

@@ -142,3 +142,12 @@ export class ScenarioDraftAdmissionTracker {
     return receipt;
   }
 }
+
+/** Revoke publication authority synchronously before cancellation crosses an async boundary. */
+export function cancelActiveDraftAdmission(
+  tracker: ScenarioDraftAdmissionTracker,
+  cancel: () => void | Promise<void>,
+): Promise<void> {
+  tracker.invalidate();
+  return Promise.resolve(cancel());
+}

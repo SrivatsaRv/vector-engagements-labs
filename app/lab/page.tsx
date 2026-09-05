@@ -92,6 +92,7 @@ import {
 } from "@/lib/scenario-spatial";
 import { sha256Hex } from "@/lib/canonical-json";
 import {
+  cancelActiveDraftAdmission,
   ScenarioDraftAdmissionError,
   ScenarioDraftAdmissionTracker,
 } from "@/lib/scenario-draft-admission";
@@ -357,6 +358,7 @@ function LabWorkbench({
     [definition.id, definition.version, templateIdentity],
   );
   const setAuthoringControlValidity = useCallback((controlId: string, valid: boolean) => {
+    if (!valid) draftAdmissionTracker.invalidate();
     setInvalidAuthoringControls((current) => {
       const next = new Set(current);
       if (valid) next.delete(controlId);
@@ -364,7 +366,11 @@ function LabWorkbench({
       if (next.size === current.size && [...next].every((id) => current.has(id))) return current;
       return next;
     });
-  }, []);
+  }, [draftAdmissionTracker]);
+  const setSpatialControlValidity = useCallback((valid: boolean) => {
+    if (!valid) draftAdmissionTracker.invalidate();
+    setSpatialInputsValid(valid);
+  }, [draftAdmissionTracker]);
   const validations = useMemo(() => {
     const items = validateScenario(definition, scenario);
     return spatialInputsValid && authoringInputsValid
@@ -637,6 +643,13 @@ function LabWorkbench({
       },
     ]);
   }, [authoringInputsValid, catalogState, definition, draftAdmissionTracker, draftRevision, scenario, scenarioPackageReference, simulationClient, spatialInputsValid]);
+
+  const cancelRun = useCallback(() => {
+    // Revoke the request before cancellation crosses the Worker boundary. The
+    // Worker may already be serializing its record after its last cooperative
+    // cancellation check; that completion must still be rejected here.
+    void cancelActiveDraftAdmission(draftAdmissionTracker, () => simulationClient.cancel());
+  }, [draftAdmissionTracker, simulationClient]);
 
   useEffect(() => {
     if (!playing) return;
@@ -974,7 +987,7 @@ function LabWorkbench({
               : `Worker · ${runtimeState}`}
           </span>
           {runtimeBusy && runtimeState !== "initialization" && (
-            <button onClick={() => void simulationClient.cancel()}>
+            <button onClick={cancelRun}>
               <CircleX size={14} /> Cancel run
             </button>
           )}
@@ -1100,7 +1113,7 @@ function LabWorkbench({
           environmentPacks={catalogEnvironmentPacks}
           spatialInputsValid={spatialInputsValid}
           authoringInputsValid={authoringInputsValid}
-          onSpatialValidityChange={setSpatialInputsValid}
+          onSpatialValidityChange={setSpatialControlValidity}
           onAuthoringControlValidity={setAuthoringControlValidity}
           run={run}
         />
