@@ -111,7 +111,7 @@ jobs:
           tar -czf "vector-engagement-labs-${RELEASE_TAG}.tar.gz" dist docs engine-rust/src engine-rust/Cargo.toml engine-rust/Cargo.lock engine-rust/README.md lib/engine Dockerfile compose.yaml .env.example README.md LICENSE NOTICE CHANGELOG.md
           shasum -a 256 "vector-engagement-labs-${RELEASE_TAG}.tar.gz" > SHA256SUMS
       - name: Generate SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26
         with:
           path: .
           format: spdx-json
