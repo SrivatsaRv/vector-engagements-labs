@@ -187,6 +187,11 @@ export function SpatialEntityEditor({
 
   useEffect(() => onValidityChange(valid && !dirty), [dirty, onValidityChange, valid]);
 
+  // A raw spatial edit is not authoritative until blur/Enter commits it. Mark
+  // the editor invalid synchronously so an in-flight run cannot publish the
+  // previous admitted value during that gap.
+  const markDraftChanged = () => onValidityChange(false);
+
   const commitStart = () => {
     if (startError) return;
     const position = toPoint(start);
@@ -259,9 +264,10 @@ export function SpatialEntityEditor({
             aria-describedby={startError ? `${id}-start-error` : undefined}
             inputMode="decimal"
             value={start.longitude}
-            onChange={(event) =>
+            onChange={(event) => {
+              markDraftChanged();
               setStart((current) => updatePointDraft(current, "longitude", event.target.value))
-            }
+            }}
             onBlur={commitStart}
             onKeyDown={blurOnEnter}
           />
@@ -274,9 +280,10 @@ export function SpatialEntityEditor({
             aria-describedby={startError ? `${id}-start-error` : undefined}
             inputMode="decimal"
             value={start.latitude}
-            onChange={(event) =>
+            onChange={(event) => {
+              markDraftChanged();
               setStart((current) => updatePointDraft(current, "latitude", event.target.value))
-            }
+            }}
             onBlur={commitStart}
             onKeyDown={blurOnEnter}
           />
@@ -289,9 +296,10 @@ export function SpatialEntityEditor({
             aria-describedby={startError ? `${id}-start-error` : undefined}
             inputMode="decimal"
             value={start.altitudeM}
-            onChange={(event) =>
+            onChange={(event) => {
+              markDraftChanged();
               setStart((current) => updatePointDraft(current, "altitudeM", event.target.value))
-            }
+            }}
             onBlur={commitStart}
             onKeyDown={blurOnEnter}
           />
@@ -304,7 +312,10 @@ export function SpatialEntityEditor({
             aria-describedby={headingError ? `${id}-heading-error` : undefined}
             inputMode="decimal"
             value={heading}
-            onChange={(event) => setHeading(event.target.value)}
+            onChange={(event) => {
+              markDraftChanged();
+              setHeading(event.target.value);
+            }}
             onBlur={commitHeading}
             onKeyDown={blurOnEnter}
           />
@@ -317,7 +328,10 @@ export function SpatialEntityEditor({
             aria-describedby={speedError ? `${id}-speed-error` : undefined}
             inputMode="decimal"
             value={speed}
-            onChange={(event) => setSpeed(event.target.value)}
+            onChange={(event) => {
+              markDraftChanged();
+              setSpeed(event.target.value);
+            }}
             onBlur={commitSpeed}
             onKeyDown={blurOnEnter}
           />
@@ -375,7 +389,8 @@ export function SpatialEntityEditor({
                   inputMode="decimal"
                   value={draft[field]}
                   disabled={field === "acceptanceRadiusM" && draft.transition === "FLY_OVER"}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    markDraftChanged();
                     setWaypoints((current) =>
                       current.map((point, pointIndex) =>
                         pointIndex === index
@@ -383,7 +398,7 @@ export function SpatialEntityEditor({
                           : point,
                       ),
                     )
-                  }
+                  }}
                   onBlur={() => commitWaypoint(index)}
                   onKeyDown={blurOnEnter}
                 />
@@ -395,7 +410,8 @@ export function SpatialEntityEditor({
                 data-control-id={`spatial.${team}.route[*].transition`}
                 data-vector-overlay-exempt="ua-native-select"
                 value={draft.transition}
-                onChange={(event) =>
+                onChange={(event) => {
+                  markDraftChanged();
                   setWaypoints((current) => current.map((point, pointIndex) =>
                     pointIndex === index
                       ? {
@@ -405,7 +421,7 @@ export function SpatialEntityEditor({
                         }
                       : point,
                   ))
-                }
+                }}
                 onBlur={() => commitWaypoint(index)}
               >
                 <option value="FLY_BY">Fly-by</option>

@@ -70,6 +70,11 @@ export function NumericAuthoringInput({
           const nextRaw = event.target.value;
           setDraft({ raw: nextRaw, sourceValue: value });
           const next = admitRawNumber(nextRaw, authority);
+          // Report raw validity in the input event itself. A Worker completion
+          // can race React effects, so the workbench must be able to revoke an
+          // in-flight admission before a malformed draft is ever committed to
+          // the structured Scenario.
+          onValidityChange(controlId, disabled || next.ok);
           if (next.ok) onChange(next.value);
         }}
       />

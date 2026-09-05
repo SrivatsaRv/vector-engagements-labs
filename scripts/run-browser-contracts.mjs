@@ -12,7 +12,7 @@ export const BROWSER_PROJECTS = Object.freeze([
   "desktop-1440",
   "full-hd",
 ]);
-export const BROWSER_CASES_PER_PROJECT = 18;
+export const BROWSER_CASES_PER_PROJECT = 19;
 export const BROWSER_CASE_TITLES = Object.freeze([
   "a disabled domain link cannot fall through to the A2A workbench",
   "Peace Drive I evidence is visibly context-only and fitted EW remains unknown",
@@ -26,6 +26,7 @@ export const BROWSER_CASE_TITLES = Object.freeze([
   "the WVR Air study keeps every playback and outcome surface on one canonical frame",
   "the transition Air study keeps every playback and outcome surface on one canonical frame",
   "an invalid non-spatial numeric draft cannot be bypassed by changing builder steps",
+  "a raw invalid draft discards its in-flight Worker completion",
   "QHD Define uses one readable task measure without a detached action rail",
   "duration and replay seed use governed raw admission before builder navigation",
   "shared transient controls hand off once and remain accessible, contained, and stable",

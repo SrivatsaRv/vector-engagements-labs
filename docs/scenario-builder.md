@@ -848,10 +848,21 @@ The Air-mission compiler repeats those same scalar domains for CAP counts and
 distances, WGS84 area vertices, weapon RTB threshold, ground-start delay,
 store-transfer values, and route position, altitude, radius, ETA and TOT. Range
 sliders retain their browser min/max interaction boundary but still require
-compiler admission. Exact draft-digest freshness, complete enum and nested
-control-matrix registration, constrained cross-control coverage, complete
-control-to-runtime contrasts and retirement of the parallel legacy intake remain
-required before #193 can close.
+compiler admission. Complete enum and nested control-matrix registration,
+constrained cross-control coverage, backend admission-response digest parity,
+complete control-to-runtime contrasts and retirement of the parallel legacy
+intake remain required before #193 can close.
+
+Run dispatch now creates one request-scoped admission receipt from the canonical
+scenario draft bytes. Structured edits invalidate the active receipt. Raw
+numeric and spatial edits revoke it synchronously, including malformed drafts
+that have no structured scenario value. The Cancel action likewise revokes the
+receipt before awaiting the Worker, closing the serialization-time cancellation
+race. A Worker completion is accepted only when both its request identity and
+the latest canonical draft digest still match; cancelled, superseded, or
+edited-draft completions are discarded and cannot enable results, saving, or
+reporting. This is the browser freshness slice; backend admission-response
+digest parity remains part of #193.
 
 An authored area of interest is not a substitute for the study-area preset. If
 a later workflow needs a smaller AOI, it is a separate optional geometry inside
