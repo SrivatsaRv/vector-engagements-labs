@@ -47,6 +47,18 @@ test("production operations admit one immutable reviewed commit and never seed p
   assert.match(workflow, /Verify deployed application and static assets/);
 });
 
+test("the main CI candidate uses a string-valued synthetic Hyperdrive identifier", async () => {
+  const workflow = await read(".github/workflows/ci.yml");
+  assert.match(
+    workflow,
+    /CLOUDFLARE_HYPERDRIVE_ID: ["']11111111111111111111111111111111["']/,
+  );
+  assert.doesNotMatch(
+    workflow,
+    /^\s*CLOUDFLARE_HYPERDRIVE_ID: 11111111111111111111111111111111\s*$/m,
+  );
+});
+
 test("governed study areas are migration data and local Compose keeps migration and fixture seeding separate", async () => {
   const [migration, compose, makefile, packageJson, dockerignore] = await Promise.all([
     read("db/migrations/009_governed_study_area_catalog.sql"),
