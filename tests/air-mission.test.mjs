@@ -628,6 +628,59 @@ test("CAP defaults are visible, editable, and causally change compiled patrol an
   assert.equal(changed.airMission.authored.fuel.reservePercent, 25);
 });
 
+test("#193 Air-mission compiler repeats shared raw numeric authority domains", () => {
+  const admittedCap = fixture("COMBAT_AIR_PATROL");
+  admittedCap.airMission.tasks.investigationLimitM = 40_000.123;
+  admittedCap.airMission.tasks.prosecutionLimitM = 60_000.123;
+  assert.equal(
+    prepareSimulation(admittedCap).engineScenario.airMission.authored.tasks.investigationLimitM,
+    40_000.123,
+    "three-decimal CAP input admitted by the editor must remain valid at compilation",
+  );
+
+  const cases = [
+    {
+      name: "CAP flight size above the shared maximum",
+      scenario: fixture("COMBAT_AIR_PATROL"),
+      mutate: (scenario) => { scenario.airMission.tasks.flightSize = 65; },
+      code: "MISSION_CLASS_FIELDS_MISMATCH",
+      fieldPath: "tasks",
+    },
+    {
+      name: "CAP distance above the shared maximum",
+      scenario: fixture("COMBAT_AIR_PATROL"),
+      mutate: (scenario) => { scenario.airMission.tasks.prosecutionLimitM = 2_000_000.001; },
+      code: "MISSION_CLASS_FIELDS_MISMATCH",
+      fieldPath: "tasks",
+    },
+    {
+      name: "route ETA above the shared maximum",
+      scenario: fixture(),
+      mutate: (scenario) => { scenario.airMission.flightPlans[0].routePoints[1].constraint.etaSeconds = 86_400.001; },
+      code: "MISSION_SCHEMA_INVALID",
+      fieldPath: "flightPlans[0].routePoints[1].constraint.etaSeconds",
+    },
+    {
+      name: "ground readiness delay above the shared maximum",
+      scenario: admittedGroundFixture("GROUND_ALERT_QRA"),
+      mutate: (scenario) => { scenario.airMission.start.readinessDelaySeconds = 86_401; },
+      code: "MISSION_RUNWAY_INVALID",
+      fieldPath: "start.readinessDelaySeconds",
+    },
+  ];
+
+  for (const { name, scenario, mutate, code, fieldPath } of cases) {
+    mutate(scenario);
+    assert.throws(
+      () => prepareSimulation(scenario),
+      (error) => error instanceof AirMissionAdmissionError
+        && error.code === code
+        && error.fieldPath === fieldPath,
+      name,
+    );
+  }
+});
+
 test("route, fuel, loadout and model identities must agree with the authored mission", () => {
   const cases = [
     ["route point", (scenario) => { scenario.airMission.flightPlans[0].routePoints[0].position.longitude += 0.1; }, "MISSION_ROUTE_START_MISMATCH", "flightPlans[0].routePoints[0].position"],

@@ -97,6 +97,21 @@ export const AUTHORED_STORE_TRANSFER_TIME_AUTHORITY = Object.freeze(
 export const AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY = Object.freeze(
   number(0.001, 1, "m2", MAX_AUTHORED_SCALAR_FRACTION_DIGITS),
 );
+export const AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY = Object.freeze(
+  number(1, 64, "aircraft", 0, true),
+);
+export const AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY = Object.freeze(
+  number(1, 2_000_000, "m", MAX_AUTHORED_SCALAR_FRACTION_DIGITS),
+);
+export const AUTHORED_WEAPON_RTB_THRESHOLD_AUTHORITY = Object.freeze(
+  number(0, 64, "stores", 0, true),
+);
+export const AUTHORED_GROUND_START_DELAY_AUTHORITY = Object.freeze(
+  number(0, 86_400, "s", 0, true),
+);
+export const AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY = Object.freeze(
+  number(0, 86_400, "s", MAX_AUTHORED_SCALAR_FRACTION_DIGITS, false, true),
+);
 
 export const AIR_COMBAT_STUDY_ENUM_AUTHORITIES = Object.freeze({
   guidance: Object.freeze(["direct", "loft"] as const),
@@ -222,11 +237,8 @@ export const LEGACY_SCENARIO_CONTROL_AUTHORITY = {
   runDurationSeconds: authored("runDurationSeconds", "ENGINE_CONSUMED", "$.durationSeconds", "engine/terminal-tick", number(0.001, 3_600, "s", MAX_AUTHORED_SCALAR_FRACTION_DIGITS, false, true)),
 } satisfies Record<keyof Scenario, ScenarioFieldAuthority>;
 
-/**
- * Resolves only the raw text controls exercised by the three #197 studies.
- * Other workspace controls remain owned by #193 and deliberately return null.
- */
-export function resolveAirCombatStudyNumericControlAuthority(
+/** Resolves every raw-text numeric control currently mounted by the workspace. */
+export function resolveScenarioNumericControlAuthority(
   controlId: string,
 ): NumericAuthority | null {
   if (controlId === "scenario.runDurationSeconds") {
@@ -265,6 +277,27 @@ export function resolveAirCombatStudyNumericControlAuthority(
   }
   if (controlId === "airMission.assignments[0].storeTransfer.requests[0].installedDragAreaM2") {
     return AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY;
+  }
+  if (/^airMission\.tasks\.cap\.(?:onStationCount|flightSize)$/.test(controlId)) {
+    return AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY;
+  }
+  if (/^airMission\.tasks\.cap\.(?:investigationLimitM|prosecutionLimitM)$/.test(controlId)) {
+    return AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY;
+  }
+  if (/^airMission\.tasks\.cap\.(?:patrolArea|prosecutionArea)\.vertices\[\d+\]\.longitude$/.test(controlId)) {
+    return AUTHORED_WGS84_LONGITUDE_AUTHORITY;
+  }
+  if (/^airMission\.tasks\.cap\.(?:patrolArea|prosecutionArea)\.vertices\[\d+\]\.latitude$/.test(controlId)) {
+    return AUTHORED_WGS84_LATITUDE_AUTHORITY;
+  }
+  if (controlId === "airMission.fuel.weaponRtbThreshold") {
+    return AUTHORED_WEAPON_RTB_THRESHOLD_AUTHORITY;
+  }
+  if (controlId === "airMission.start.readinessDelaySeconds") {
+    return AUTHORED_GROUND_START_DELAY_AUTHORITY;
+  }
+  if (/^airMission\.flightPlans\[0\]\.routePoints\[\d+\]\.(?:etaSeconds|totalTimeOnTargetSeconds)$/.test(controlId)) {
+    return AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY;
   }
   return null;
 }
@@ -358,7 +391,7 @@ export function hasDeclaredPrecision(value: number, precision: number): boolean 
   return Math.abs(scaled - Math.round(scaled)) <= tolerance;
 }
 
-function admitStructuredNumberDomain(
+export function admitStructuredNumberDomain(
   value: unknown,
   authority: NumericAuthority,
 ): RawNumberAdmission {

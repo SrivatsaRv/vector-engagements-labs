@@ -4,21 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 import { NumericAuthoringInput } from "@/components/NumericAuthoringInput";
 import type { NumericAuthority } from "@/lib/scenario-control-authority";
 import {
+  AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY,
   AUTHORED_STORE_TRANSFER_TIME_AUTHORITY,
   AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY,
   AUTHORED_WGS84_LONGITUDE_AUTHORITY,
   LEGACY_SCENARIO_CONTROL_AUTHORITY,
 } from "@/lib/scenario-control-authority";
 
-const authority: NumericAuthority = {
-  kind: "NUMBER",
-  minimum: 1,
-  maximum: 64,
-  integer: true,
-  nullable: false,
-  precision: 0,
-  unit: "aircraft",
-};
+const authority: NumericAuthority = AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY;
 
 describe("NumericAuthoringInput", () => {
   it("keeps a cleared required replay seed invalid without committing null", () => {
@@ -57,7 +50,7 @@ describe("NumericAuthoringInput", () => {
         onChange={onChange}
         onValidityChange={onValidityChange}
       />,
-    )).toThrow(/governed #197 numeric authority/);
+    )).toThrow(/governed #193 numeric authority/);
 
     render(
       <NumericAuthoringInput
@@ -70,6 +63,19 @@ describe("NumericAuthoringInput", () => {
       />,
     );
     expect(screen.getByRole("textbox", { name: "Store transfer requested time" })).toHaveValue("4");
+  });
+
+  it("fails closed when a raw numeric control has no registered authority", () => {
+    expect(() => render(
+      <NumericAuthoringInput
+        controlId="airMission.tasks.cap.unregistered"
+        ariaLabel="Unregistered value"
+        value={2}
+        authority={authority}
+        onChange={vi.fn()}
+        onValidityChange={vi.fn()}
+      />,
+    )).toThrow(/has no governed #193 numeric authority/);
   });
 
   it.each([" ", "+", ".", "1e", "NaN", "Infinity", "1,5", "１２", "12 aircraft"])(
@@ -133,29 +139,24 @@ describe("NumericAuthoringInput", () => {
   it("preserves an admitted decimal draft while the parent accepts its numeric value", () => {
     const onChange = vi.fn();
     const onValidityChange = vi.fn();
-    const decimalAuthority: NumericAuthority = {
-      ...authority,
-      integer: false,
-      precision: 3,
-      unit: "m/s",
-    };
+    const decimalAuthority = LEGACY_SCENARIO_CONTROL_AUTHORITY.runDurationSeconds.numeric!;
     const { rerender } = render(
       <NumericAuthoringInput
-        controlId="scenario.wind"
-        ariaLabel="Eastward wind velocity"
+        controlId="scenario.runDurationSeconds"
+        ariaLabel="Run duration"
         value={1}
         authority={decimalAuthority}
         onChange={onChange}
         onValidityChange={onValidityChange}
       />,
     );
-    const input = screen.getByRole("textbox", { name: "Eastward wind velocity" });
+    const input = screen.getByRole("textbox", { name: "Run duration" });
 
     fireEvent.change(input, { target: { value: "1." } });
     rerender(
       <NumericAuthoringInput
-        controlId="scenario.wind"
-        ariaLabel="Eastward wind velocity"
+        controlId="scenario.runDurationSeconds"
+        ariaLabel="Run duration"
         value={1}
         authority={decimalAuthority}
         onChange={onChange}
@@ -167,8 +168,8 @@ describe("NumericAuthoringInput", () => {
     fireEvent.change(input, { target: { value: "1.25" } });
     rerender(
       <NumericAuthoringInput
-        controlId="scenario.wind"
-        ariaLabel="Eastward wind velocity"
+        controlId="scenario.runDurationSeconds"
+        ariaLabel="Run duration"
         value={1.25}
         authority={decimalAuthority}
         onChange={onChange}

@@ -127,16 +127,19 @@ import { projectRunInformationCapabilities } from "@/lib/frontend/information-ca
 import { MAX_VECTOR_RECORD_BYTES } from "@/lib/record/vector-record";
 import { NumericAuthoringInput } from "@/components/NumericAuthoringInput";
 import {
+  AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY,
+  AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY,
+  AUTHORED_GROUND_START_DELAY_AUTHORITY,
   AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY,
   AUTHORED_CROSSING_ANGLE_AUTHORITY,
   AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY,
   AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY,
+  AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY,
   AUTHORED_STORE_TRANSFER_TIME_AUTHORITY,
+  AUTHORED_WEAPON_RTB_THRESHOLD_AUTHORITY,
   AUTHORED_WGS84_LATITUDE_AUTHORITY,
   AUTHORED_WGS84_LONGITUDE_AUTHORITY,
   LEGACY_SCENARIO_CONTROL_AUTHORITY,
-  MAX_WGS84_FRACTION_DIGITS,
-  type NumericAuthority,
 } from "@/lib/scenario-control-authority";
 
 type Workspace = "configure" | "run" | "results";
@@ -1901,7 +1904,7 @@ function ConfigureWorkspace({
                           controlId="airMission.tasks.cap.onStationCount"
                           ariaLabel="CAP on-station count"
                           value={scenario.airMission.tasks.onStationCount}
-                          authority={numericAuthority(1, 64, 0, "aircraft", true)}
+                          authority={AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY}
                           onChange={(value) => updateCapTasks({ onStationCount: value! })}
                           onValidityChange={onAuthoringControlValidity}
                         />
@@ -1912,7 +1915,7 @@ function ConfigureWorkspace({
                           controlId="airMission.tasks.cap.flightSize"
                           ariaLabel="CAP flight size"
                           value={scenario.airMission.tasks.flightSize}
-                          authority={numericAuthority(1, 64, 0, "aircraft", true)}
+                          authority={AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY}
                           onChange={(value) => updateCapTasks({ flightSize: value! })}
                           onValidityChange={onAuthoringControlValidity}
                         />
@@ -1929,7 +1932,7 @@ function ConfigureWorkspace({
                           controlId="airMission.tasks.cap.investigationLimitM"
                           ariaLabel="CAP investigation limit"
                           value={scenario.airMission.tasks.investigationLimitM}
-                          authority={numericAuthority(1, 2_000_000, 0, "m")}
+                          authority={AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY}
                           onChange={(value) => updateCapTasks({ investigationLimitM: value! })}
                           onValidityChange={onAuthoringControlValidity}
                         />
@@ -1940,7 +1943,7 @@ function ConfigureWorkspace({
                           controlId="airMission.tasks.cap.prosecutionLimitM"
                           ariaLabel="CAP prosecution limit"
                           value={scenario.airMission.tasks.prosecutionLimitM}
-                          authority={numericAuthority(1, 2_000_000, 0, "m")}
+                          authority={AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY}
                           onChange={(value) => updateCapTasks({ prosecutionLimitM: value! })}
                           onValidityChange={onAuthoringControlValidity}
                         />
@@ -1964,7 +1967,7 @@ function ConfigureWorkspace({
                           controlId="airMission.fuel.weaponRtbThreshold"
                           ariaLabel="CAP weapon RTB threshold"
                           value={scenario.airMission.fuel.weaponRtbThreshold}
-                          authority={numericAuthority(0, 64, 0, "stores", true)}
+                          authority={AUTHORED_WEAPON_RTB_THRESHOLD_AUTHORITY}
                           onChange={(value) => update("airMission", { ...scenario.airMission!, fuel: { ...scenario.airMission!.fuel, weaponRtbThreshold: value! } })}
                           onValidityChange={onAuthoringControlValidity}
                         />
@@ -2030,7 +2033,7 @@ function ConfigureWorkspace({
                                     controlId={`airMission.tasks.cap.${areaKey}.vertices[${index}].longitude`}
                                     ariaLabel={`${areaKey} vertex ${index + 1} longitude`}
                                     value={vertex.longitude}
-                                    authority={numericAuthority(-180, 180, MAX_WGS84_FRACTION_DIGITS, "deg_WGS84")}
+                                    authority={AUTHORED_WGS84_LONGITUDE_AUTHORITY}
                                     onChange={(value) => updateCapAreaVertex(areaKey, index, "longitude", value!)}
                                     onValidityChange={onAuthoringControlValidity}
                                   />
@@ -2041,7 +2044,7 @@ function ConfigureWorkspace({
                                     controlId={`airMission.tasks.cap.${areaKey}.vertices[${index}].latitude`}
                                     ariaLabel={`${areaKey} vertex ${index + 1} latitude`}
                                     value={vertex.latitude}
-                                    authority={numericAuthority(-90, 90, MAX_WGS84_FRACTION_DIGITS, "deg_WGS84")}
+                                    authority={AUTHORED_WGS84_LATITUDE_AUTHORITY}
                                     onChange={(value) => updateCapAreaVertex(areaKey, index, "latitude", value!)}
                                     onValidityChange={onAuthoringControlValidity}
                                   />
@@ -2379,7 +2382,7 @@ function ConfigureWorkspace({
                           controlId="airMission.start.readinessDelaySeconds"
                           ariaLabel="Readiness delay"
                           value={scenario.airMission.start.readinessDelaySeconds}
-                          authority={numericAuthority(0, 86_400, 0, "s")}
+                          authority={AUTHORED_GROUND_START_DELAY_AUTHORITY}
                           onChange={(value) => update("airMission", {
                             ...scenario.airMission!,
                             start: { ...scenario.airMission!.start, readinessDelaySeconds: value! } as NonNullable<Scenario["airMission"]>["start"],
@@ -2546,7 +2549,7 @@ function ConfigureWorkspace({
                             controlId={`airMission.flightPlans[0].routePoints[${index}].etaSeconds`}
                             ariaLabel={`${point.id} ETA`}
                             value={point.constraint.etaSeconds}
-                            authority={numericAuthority(0, 86_400, 3, "s", false, true)}
+                            authority={AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY}
                             onChange={(value) => updateMissionRoutePoint(index, {
                               constraint: {
                                 ...point.constraint,
@@ -2562,7 +2565,7 @@ function ConfigureWorkspace({
                             controlId={`airMission.flightPlans[0].routePoints[${index}].totalTimeOnTargetSeconds`}
                             ariaLabel={`${point.id} total time on target`}
                             value={point.constraint.totalTimeOnTargetSeconds}
-                            authority={numericAuthority(0, 86_400, 3, "s", false, true)}
+                            authority={AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY}
                             onChange={(value) => updateMissionRoutePoint(index, {
                               constraint: {
                                 ...point.constraint,
@@ -3321,23 +3324,6 @@ function Range({
     </label>
   );
 }
-
-const numericAuthority = (
-  minimum: number,
-  maximum: number,
-  precision: number,
-  unit: string,
-  integer = false,
-  nullable = false,
-): NumericAuthority => ({
-  kind: "NUMBER",
-  minimum,
-  maximum,
-  integer,
-  nullable,
-  precision,
-  unit,
-});
 
 function Playback({
   result,

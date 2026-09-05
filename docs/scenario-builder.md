@@ -841,12 +841,17 @@ current deterministic runtime. This is a migration authority, not a second
 scenario schema: `vector.air-mission.v1` and the cross-domain scenario kernel
 remain the canonical target contracts.
 
-The current #193 slice applies strict raw admission to the editable Air-mission
-number fields and to start/route coordinate editors. Range sliders retain their
-browser min/max interaction boundary but still require compiler admission.
-Exact draft-digest freshness, complete nested control-matrix registration,
-constrained cross-control coverage, complete control-to-runtime contrasts and
-retirement of the parallel legacy intake remain required before #193 can close.
+The current #193 slice requires every mounted raw-text numeric control to resolve
+one shared authority before it can render. An unregistered control or a component
+whose local authority differs from the shared definition fails immediately.
+The Air-mission compiler repeats those same scalar domains for CAP counts and
+distances, WGS84 area vertices, weapon RTB threshold, ground-start delay,
+store-transfer values, and route position, altitude, radius, ETA and TOT. Range
+sliders retain their browser min/max interaction boundary but still require
+compiler admission. Exact draft-digest freshness, complete enum and nested
+control-matrix registration, constrained cross-control coverage, complete
+control-to-runtime contrasts and retirement of the parallel legacy intake remain
+required before #193 can close.
 
 An authored area of interest is not a substitute for the study-area preset. If
 a later workflow needs a smaller AOI, it is a separate optional geometry inside
