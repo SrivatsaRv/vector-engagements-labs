@@ -844,6 +844,15 @@ remain the canonical target contracts.
 The current #193 slice requires every mounted raw-text numeric control to resolve
 one shared authority before it can render. An unregistered control or a component
 whose local authority differs from the shared definition fails immediately.
+Every static Air-mission dropdown now resolves through the same shared enum
+allowlist at pre-engine admission and compilation. The exhaustive regression
+enumerates mission class, regime, start posture, route transition, leg role,
+CAP pattern, emission policy, weapon policy, store operation, and guidance
+options, then rejects unknown, retired, empty, non-string and null
+values at stable field paths. Dynamic catalog identities remain governed by
+their content-addressed model, installation and environment authorities rather
+than being misclassified as closed enums. Route task references retain their
+separate closed-reference validation and nullable semantics.
 The Air-mission compiler repeats those same scalar domains for CAP counts and
 distances, WGS84 area vertices, weapon RTB threshold, ground-start delay,
 store-transfer values, and route position, altitude, radius, ETA and TOT. Range

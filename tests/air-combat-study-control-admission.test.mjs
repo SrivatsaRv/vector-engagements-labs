@@ -19,6 +19,7 @@ import {
   ScenarioControlAdmissionError,
   ScenarioEnumAdmissionError,
   ScenarioSpatialAdmissionError,
+  admitsAirCombatStudyEnum,
   admitRawNumber,
   admitStructuredNumber,
   authoritiesEqual,
@@ -139,18 +140,51 @@ test("#197 live raw text control IDs resolve to their exact shared numeric autho
   assert.equal(resolveScenarioNumericControlAuthority("airMission.tasks.cap.unregistered"), null);
 });
 
+test("#193 static dropdown authorities exhaust every admitted option", () => {
+  assert.deepEqual(AIR_COMBAT_STUDY_ENUM_AUTHORITIES, {
+    guidance: ["direct", "loft"],
+    missionClass: ["TACTICAL_INTERCEPT", "COMBAT_AIR_PATROL", "FIGHTER_SWEEP", "ESCORT"],
+    engagementRegime: ["BVR", "WVR_BFM", "UNRESTRICTED_TRANSITION"],
+    startPosture: ["AIRBORNE", "PARKING", "RUNWAY", "GROUND_ALERT_QRA"],
+    routeTransition: ["START", "FLY_BY", "FLY_OVER"],
+    flightLegRole: [
+      "DEPARTURE", "TRANSIT", "INGRESS", "INTERCEPT_ATTACK", "ON_STATION_PATROL",
+      "REFUEL", "EGRESS", "RECOVERY", "DIVERT",
+    ],
+    patrolPattern: ["RACETRACK"],
+    emissionPolicy: ["ACTIVE", "SILENT"],
+    weaponPolicy: ["HOLD", "TIGHT", "FREE_WITHIN_BOUNDARY"],
+    storeOperation: ["RELEASE", "JETTISON"],
+  });
+  for (const [authority, values] of Object.entries(AIR_COMBAT_STUDY_ENUM_AUTHORITIES)) {
+    assert.ok(values.length > 0, `${authority} has no options`);
+    assert.equal(new Set(values).size, values.length, `${authority} repeats an option`);
+    for (const value of values) {
+      assert.equal(admitsAirCombatStudyEnum(authority, value), true, `${authority} rejected ${value}`);
+    }
+    for (const value of ["UNKNOWN", "RETIRED_V0", "", 42, null]) {
+      assert.equal(admitsAirCombatStudyEnum(authority, value), false, `${authority} admitted ${JSON.stringify(value)}`);
+    }
+  }
+});
+
 test("#197 enum authorities reject unknown, stale, and unsupported guidance, regime, turn, and leg values", () => {
   const definition = getScenarioDefinition("a2a-crossing-intercept");
   assert.ok(definition?.scenario.airMission);
+  assert.ok(definition.scenario.airMission.assignments[0].storeTransferPlan?.requests[0]);
   const cases = [
     ["guidance", "$.guidance", (scenario, value) => { scenario.guidance = value; }],
+    ["missionClass", "$.airMission.missionClass", (scenario, value) => { scenario.airMission.missionClass = value; }],
     ["engagementRegime", "$.airMission.regime", (scenario, value) => { scenario.airMission.regime = value; }],
+    ["startPosture", "$.airMission.start.posture", (scenario, value) => { scenario.airMission.start.posture = value; }],
+    ["emissionPolicy", "$.airMission.policies.emission", (scenario, value) => { scenario.airMission.policies.emission = value; }],
+    ["weaponPolicy", "$.airMission.policies.weapon", (scenario, value) => { scenario.airMission.policies.weapon = value; }],
+    ["storeOperation", "$.airMission.assignments[0].storeTransferPlan.requests[0].operation", (scenario, value) => { scenario.airMission.assignments[0].storeTransferPlan.requests[0].operation = value; }],
     ["routeTransition", "$.airMission.flightPlans[0].routePoints[1].turnMethod", (scenario, value) => { scenario.airMission.flightPlans[0].routePoints[1].turnMethod = value; }],
     ["flightLegRole", "$.airMission.flightPlans[0].legs[0].role", (scenario, value) => { scenario.airMission.flightPlans[0].legs[0].role = value; }],
   ];
   for (const [authority, fieldPath, mutate] of cases) {
-    for (const value of ["UNKNOWN", "RETIRED_V0", "", 42]) {
-      assert.equal(AIR_COMBAT_STUDY_ENUM_AUTHORITIES[authority].includes(value), false);
+    for (const value of ["UNKNOWN", "RETIRED_V0", "", 42, null]) {
       const scenario = structuredClone(definition.scenario);
       mutate(scenario, value);
       assert.throws(
@@ -160,6 +194,27 @@ test("#197 enum authorities reject unknown, stale, and unsupported guidance, reg
       );
     }
   }
+
+  const cap = structuredClone(definition.scenario);
+  cap.airMission.missionClass = "COMBAT_AIR_PATROL";
+  cap.airMission.tasks = {
+    kind: "COMBAT_AIR_PATROL",
+    patrolArea: structuredClone(cap.airMission.tasks.defendedArea),
+    prosecutionArea: null,
+    onStationCount: 2,
+    flightSize: 2,
+    patrolPattern: "INVALID_PATTERN",
+    onStationMinutes: 30,
+    relief: "FUEL_OR_TIME",
+    investigationLimitM: 50_000,
+    prosecutionLimitM: 100_000,
+    completionCondition: "Complete after the authored station period.",
+  };
+  assert.throws(
+    () => prepareSimulation(cap),
+    (error) => error instanceof ScenarioEnumAdmissionError
+      && error.fieldPath === "$.airMission.tasks.patrolPattern",
+  );
 });
 
 test("#197 saved-run repeats spatial precision and guidance admission before recomputation", () => {

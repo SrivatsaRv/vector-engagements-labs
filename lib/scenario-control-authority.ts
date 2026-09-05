@@ -115,12 +115,20 @@ export const AUTHORED_ROUTE_TIME_CONSTRAINT_AUTHORITY = Object.freeze(
 
 export const AIR_COMBAT_STUDY_ENUM_AUTHORITIES = Object.freeze({
   guidance: Object.freeze(["direct", "loft"] as const),
+  missionClass: Object.freeze([
+    "TACTICAL_INTERCEPT", "COMBAT_AIR_PATROL", "FIGHTER_SWEEP", "ESCORT",
+  ] as const),
   engagementRegime: Object.freeze(["BVR", "WVR_BFM", "UNRESTRICTED_TRANSITION"] as const),
+  startPosture: Object.freeze(["AIRBORNE", "PARKING", "RUNWAY", "GROUND_ALERT_QRA"] as const),
   routeTransition: Object.freeze(["START", "FLY_BY", "FLY_OVER"] as const),
   flightLegRole: Object.freeze([
     "DEPARTURE", "TRANSIT", "INGRESS", "INTERCEPT_ATTACK", "ON_STATION_PATROL",
     "REFUEL", "EGRESS", "RECOVERY", "DIVERT",
   ] as const),
+  patrolPattern: Object.freeze(["RACETRACK"] as const),
+  emissionPolicy: Object.freeze(["ACTIVE", "SILENT"] as const),
+  weaponPolicy: Object.freeze(["HOLD", "TIGHT", "FREE_WITHIN_BOUNDARY"] as const),
+  storeOperation: Object.freeze(["RELEASE", "JETTISON"] as const),
 });
 
 export type AirCombatStudyEnumAuthority = keyof typeof AIR_COMBAT_STUDY_ENUM_AUTHORITIES;
@@ -618,8 +626,48 @@ export function assertAirCombatStudyScenarioEnums(value: unknown): void {
   const mission = scenario.airMission;
   if (!mission || typeof mission !== "object" || Array.isArray(mission)) return;
   const authored = mission as Record<string, unknown>;
+  if (!admitsAirCombatStudyEnum("missionClass", authored.missionClass)) {
+    throw new ScenarioEnumAdmissionError("$.airMission.missionClass");
+  }
   if (!admitsAirCombatStudyEnum("engagementRegime", authored.regime)) {
     throw new ScenarioEnumAdmissionError("$.airMission.regime");
+  }
+  if (authored.start && typeof authored.start === "object" && !Array.isArray(authored.start)) {
+    if (!admitsAirCombatStudyEnum("startPosture", (authored.start as Record<string, unknown>).posture)) {
+      throw new ScenarioEnumAdmissionError("$.airMission.start.posture");
+    }
+  }
+  if (authored.policies && typeof authored.policies === "object" && !Array.isArray(authored.policies)) {
+    const policies = authored.policies as Record<string, unknown>;
+    if (!admitsAirCombatStudyEnum("emissionPolicy", policies.emission)) {
+      throw new ScenarioEnumAdmissionError("$.airMission.policies.emission");
+    }
+    if (!admitsAirCombatStudyEnum("weaponPolicy", policies.weapon)) {
+      throw new ScenarioEnumAdmissionError("$.airMission.policies.weapon");
+    }
+  }
+  if (authored.tasks && typeof authored.tasks === "object" && !Array.isArray(authored.tasks)) {
+    const tasks = authored.tasks as Record<string, unknown>;
+    if (tasks.kind === "COMBAT_AIR_PATROL" && !admitsAirCombatStudyEnum("patrolPattern", tasks.patrolPattern)) {
+      throw new ScenarioEnumAdmissionError("$.airMission.tasks.patrolPattern");
+    }
+  }
+  if (Array.isArray(authored.assignments)) {
+    authored.assignments.forEach((assignment, assignmentIndex) => {
+      if (!assignment || typeof assignment !== "object" || Array.isArray(assignment)) return;
+      const plan = (assignment as Record<string, unknown>).storeTransferPlan;
+      if (!plan || typeof plan !== "object" || Array.isArray(plan)) return;
+      const requests = (plan as Record<string, unknown>).requests;
+      if (!Array.isArray(requests)) return;
+      requests.forEach((request, requestIndex) => {
+        if (!request || typeof request !== "object" || Array.isArray(request)) return;
+        if (!admitsAirCombatStudyEnum("storeOperation", (request as Record<string, unknown>).operation)) {
+          throw new ScenarioEnumAdmissionError(
+            `$.airMission.assignments[${assignmentIndex}].storeTransferPlan.requests[${requestIndex}].operation`,
+          );
+        }
+      });
+    });
   }
   const flightPlans = authored.flightPlans;
   if (!Array.isArray(flightPlans)) return;
@@ -629,7 +677,8 @@ export function assertAirCombatStudyScenarioEnums(value: unknown): void {
     if (Array.isArray(typedPlan.routePoints)) {
       typedPlan.routePoints.forEach((point, pointIndex) => {
         if (!point || typeof point !== "object" || Array.isArray(point)) return;
-        if (!admitsAirCombatStudyEnum("routeTransition", (point as Record<string, unknown>).turnMethod)) {
+        const typedPoint = point as Record<string, unknown>;
+        if (!admitsAirCombatStudyEnum("routeTransition", typedPoint.turnMethod)) {
           throw new ScenarioEnumAdmissionError(`$.airMission.flightPlans[${planIndex}].routePoints[${pointIndex}].turnMethod`);
         }
       });

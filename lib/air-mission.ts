@@ -16,7 +16,6 @@ import {
   type CompiledModelPack,
 } from "./model-pack.ts";
 import {
-  AIR_COMBAT_STUDY_ENUM_AUTHORITIES,
   AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY,
   AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY,
   AUTHORED_GROUND_START_DELAY_AUTHORITY,
@@ -29,6 +28,7 @@ import {
   AUTHORED_WGS84_LATITUDE_AUTHORITY,
   AUTHORED_WGS84_LONGITUDE_AUTHORITY,
   MAX_AUTHORED_SCALAR_FRACTION_DIGITS,
+  admitsAirCombatStudyEnum,
   admitStructuredNumberDomain,
   hasDeclaredPrecision,
   type NumericAuthority,
@@ -1064,7 +1064,7 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
   const rootKeys = ["schemaVersion", "id", "version", "objective", "side", "missionClass", "regime", "studyAreaId", "weatherPresetId", "assignedTargetIds", "flightPlans", "start", "assignments", "tasks", "policies", "fuel", "completionCondition", "abortCondition", "disengagementCondition", "recoveryCondition", "intendedUse", "provenance", "assumptions", "validityLimits"];
   exactRecord(value, rootKeys, "airMission");
   const mission = value as unknown as AirMissionDefinition;
-  if (mission.schemaVersion !== AIR_MISSION_SCHEMA_VERSION || !nonEmptyText(mission.id) || !nonEmptyText(mission.version) || !nonEmptyText(mission.objective) || !["BLUE", "RED"].includes(mission.side) || !["TACTICAL_INTERCEPT", "COMBAT_AIR_PATROL", "FIGHTER_SWEEP", "ESCORT"].includes(mission.missionClass) || !(AIR_COMBAT_STUDY_ENUM_AUTHORITIES.engagementRegime as readonly string[]).includes(mission.regime) || !nonEmptyText(mission.studyAreaId) || !nonEmptyText(mission.weatherPresetId)) {
+  if (mission.schemaVersion !== AIR_MISSION_SCHEMA_VERSION || !nonEmptyText(mission.id) || !nonEmptyText(mission.version) || !nonEmptyText(mission.objective) || !["BLUE", "RED"].includes(mission.side) || !admitsAirCombatStudyEnum("missionClass", mission.missionClass) || !admitsAirCombatStudyEnum("engagementRegime", mission.regime) || !nonEmptyText(mission.studyAreaId) || !nonEmptyText(mission.weatherPresetId)) {
     fail("MISSION_SCHEMA_INVALID", "airMission", "The Air mission identity, taxonomy, or objective is invalid.", "Select a supported class/regime and provide stable identity and objective.");
   }
   if (mission.side !== "BLUE") fail("MISSION_SIDE_UNSUPPORTED", "side", "The current Air mission runtime admits the BLUE launcher-side mission only.", "Author the BLUE launcher-side mission; RED-side mission mapping is not available in vector.air-mission.v1.");
@@ -1087,7 +1087,7 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
       if (!isRecord(point.constraint.speed)) fail("MISSION_SCHEMA_INVALID", `${pointPath}.constraint.speed`, "Speed constraint is malformed.", "Choose TAS metres per second or Mach.");
       const speedKeys = point.constraint.speed.kind === "TAS" ? ["kind", "valueMps"] : ["kind", "value"];
       exactRecord(point.constraint.speed, speedKeys, `${pointPath}.constraint.speed`);
-      if (!nonEmptyText(point.id) || !(AIR_COMBAT_STUDY_ENUM_AUTHORITIES.routeTransition as readonly string[]).includes(point.turnMethod) || !requiredNumberIsInAuthorityDomain(point.acceptanceRadiusM, AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY) || !requiredNumberIsInAuthorityDomain(point.position.altitude.valueM, AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY) || (pointIndex === 0 && point.acceptanceRadiusM !== 1) || (point.turnMethod === "FLY_OVER" && point.acceptanceRadiusM !== 1) || (point.taskRef !== null && !nonEmptyText(point.taskRef)) || typeof point.constraint.locked !== "boolean" || !["MSL", "AGL"].includes(point.position.altitude.datum) || !["TAS", "MACH"].includes(point.constraint.speed.kind)) fail("MISSION_SCHEMA_INVALID", pointPath, "Route-point identity, turn, acceptance radius, altitude, datum, speed, lock, or task reference is invalid.", "Author an exact typed route point with bounded altitude and radius; START and FLY_OVER use 1 metre.");
+      if (!nonEmptyText(point.id) || !admitsAirCombatStudyEnum("routeTransition", point.turnMethod) || !requiredNumberIsInAuthorityDomain(point.acceptanceRadiusM, AUTHORED_ROUTE_ACCEPTANCE_RADIUS_AUTHORITY) || !requiredNumberIsInAuthorityDomain(point.position.altitude.valueM, AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY) || (pointIndex === 0 && point.acceptanceRadiusM !== 1) || (point.turnMethod === "FLY_OVER" && point.acceptanceRadiusM !== 1) || (point.taskRef !== null && !nonEmptyText(point.taskRef)) || typeof point.constraint.locked !== "boolean" || !["MSL", "AGL"].includes(point.position.altitude.datum) || !["TAS", "MACH"].includes(point.constraint.speed.kind)) fail("MISSION_SCHEMA_INVALID", pointPath, "Route-point identity, turn, acceptance radius, altitude, datum, speed, lock, or task reference is invalid.", "Author an exact typed route point with bounded altitude and radius; START and FLY_OVER use 1 metre.");
       requireAuthoredPrecision(point.position.longitude, AUTHORED_WGS84_LONGITUDE_AUTHORITY.precision, `${pointPath}.position.longitude`);
       requireAuthoredPrecision(point.position.latitude, AUTHORED_WGS84_LATITUDE_AUTHORITY.precision, `${pointPath}.position.latitude`);
       requireAuthoredPrecision(point.position.altitude.valueM, AUTHORED_ROUTE_ALTITUDE_MSL_AUTHORITY.precision, `${pointPath}.position.altitude.valueM`);
@@ -1111,11 +1111,11 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
     plan.legs.forEach((leg, legIndex) => {
       const legPath = `${planPath}.legs[${legIndex}]`;
       exactRecord(leg, ["id", "fromPointId", "toPointId", "role"], legPath);
-      if (!nonEmptyText(leg.id) || !nonEmptyText(leg.fromPointId) || !nonEmptyText(leg.toPointId) || !(AIR_COMBAT_STUDY_ENUM_AUTHORITIES.flightLegRole as readonly string[]).includes(leg.role)) fail("MISSION_SCHEMA_INVALID", legPath, "Flight-plan leg identity, endpoints, or role is invalid.", "Use an existing route-point pair and supported leg role.");
+      if (!nonEmptyText(leg.id) || !nonEmptyText(leg.fromPointId) || !nonEmptyText(leg.toPointId) || !admitsAirCombatStudyEnum("flightLegRole", leg.role)) fail("MISSION_SCHEMA_INVALID", legPath, "Flight-plan leg identity, endpoints, or role is invalid.", "Use an existing route-point pair and supported leg role.");
     });
   });
 
-  if (!isRecord(mission.start) || !["AIRBORNE", "PARKING", "RUNWAY", "GROUND_ALERT_QRA"].includes(mission.start.posture)) fail("MISSION_SCHEMA_INVALID", "start", "Start posture is missing or unsupported.", "Select Airborne, Parking, Runway, or Ground alert/QRA.");
+  if (!isRecord(mission.start) || !admitsAirCombatStudyEnum("startPosture", mission.start.posture)) fail("MISSION_SCHEMA_INVALID", "start", "Start posture is missing or unsupported.", "Select Airborne, Parking, Runway, or Ground alert/QRA.");
   if (mission.start.posture === "AIRBORNE") {
     exactRecord(mission.start, ["posture", "flightPlanId", "routePointId"], "start");
     if (!nonEmptyText(mission.start.flightPlanId) || !nonEmptyText(mission.start.routePointId)) fail("MISSION_SCHEMA_INVALID", "start", "Airborne start references are empty.", "Reference the first route point of an admitted flight plan.");
@@ -1149,7 +1149,7 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
       assignment.storeTransferPlan.requests.forEach((request, requestIndex) => {
         const requestPath = `${path}.storeTransferPlan.requests[${requestIndex}]`;
         exactRecord(request, ["id", "launcherEntityId", "storeEntityId", "storeOrdinal", "stationId", "storeSourceObjectId", "operation", "requestedTimeSeconds", "installedDragAreaM2", "valueState", "evidenceRefIds", "limitationIds"], requestPath);
-        if (!nonEmptyText(request.id) || !nonEmptyText(request.launcherEntityId) || !nonEmptyText(request.storeEntityId) || !Number.isSafeInteger(request.storeOrdinal) || request.storeOrdinal < 1 || !nonEmptyText(request.stationId) || !nonEmptyText(request.storeSourceObjectId) || !["RELEASE", "JETTISON"].includes(request.operation) || !requiredNumberIsInAuthorityDomain(request.requestedTimeSeconds, AUTHORED_STORE_TRANSFER_TIME_AUTHORITY) || !requiredNumberIsInAuthorityDomain(request.installedDragAreaM2, AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY) || !["MODEL_ASSUMPTION", "USER_AUTHORED"].includes(request.valueState) || !Array.isArray(request.evidenceRefIds) || !request.evidenceRefIds.length || request.evidenceRefIds.some((id) => !nonEmptyText(id)) || !Array.isArray(request.limitationIds) || !request.limitationIds.length || request.limitationIds.some((id) => !nonEmptyText(id))) {
+        if (!nonEmptyText(request.id) || !nonEmptyText(request.launcherEntityId) || !nonEmptyText(request.storeEntityId) || !Number.isSafeInteger(request.storeOrdinal) || request.storeOrdinal < 1 || !nonEmptyText(request.stationId) || !nonEmptyText(request.storeSourceObjectId) || !admitsAirCombatStudyEnum("storeOperation", request.operation) || !requiredNumberIsInAuthorityDomain(request.requestedTimeSeconds, AUTHORED_STORE_TRANSFER_TIME_AUTHORITY) || !requiredNumberIsInAuthorityDomain(request.installedDragAreaM2, AUTHORED_INSTALLED_DRAG_AREA_AUTHORITY) || !["MODEL_ASSUMPTION", "USER_AUTHORED"].includes(request.valueState) || !Array.isArray(request.evidenceRefIds) || !request.evidenceRefIds.length || request.evidenceRefIds.some((id) => !nonEmptyText(id)) || !Array.isArray(request.limitationIds) || !request.limitationIds.length || request.limitationIds.some((id) => !nonEmptyText(id))) {
           fail("MISSION_SCHEMA_INVALID", requestPath, "Store-transfer request identity, operation, SI values, provenance, or authority is invalid.", "Author finite physical transfer intent with exact identities and evidence/limitation references.");
         }
         requireAuthoredPrecision(request.requestedTimeSeconds, AUTHORED_STORE_TRANSFER_TIME_AUTHORITY.precision, `${requestPath}.requestedTimeSeconds`);
@@ -1162,7 +1162,7 @@ function validateMissionShape(value: unknown): asserts value is AirMissionDefini
   exactRecord(mission.policies, ["emission", "weapon", "deterministicPolicyVersion"], "policies");
   exactRecord(mission.fuel, ["reservePercent", "weaponRtbThreshold", "recoveryInstallationId", "divertInstallationId"], "fuel");
   exactRecord(mission.provenance, ["valueState", "sourceIds"], "provenance");
-  if (!["ACTIVE", "SILENT"].includes(mission.policies.emission) || !["HOLD", "TIGHT", "FREE_WITHIN_BOUNDARY"].includes(mission.policies.weapon) || mission.policies.deterministicPolicyVersion !== "vector.air-mission-policy.v1" || !Array.isArray(mission.provenance.sourceIds) || mission.provenance.sourceIds.some((id) => !nonEmptyText(id)) || !["MODEL_ASSUMPTION", "USER_AUTHORED"].includes(mission.provenance.valueState)) fail("MISSION_SCHEMA_INVALID", "policies", "Policy or provenance taxonomy is invalid.", "Use the supported deterministic policy and explicit provenance classification.");
+  if (!admitsAirCombatStudyEnum("emissionPolicy", mission.policies.emission) || !admitsAirCombatStudyEnum("weaponPolicy", mission.policies.weapon) || mission.policies.deterministicPolicyVersion !== "vector.air-mission-policy.v1" || !Array.isArray(mission.provenance.sourceIds) || mission.provenance.sourceIds.some((id) => !nonEmptyText(id)) || !["MODEL_ASSUMPTION", "USER_AUTHORED"].includes(mission.provenance.valueState)) fail("MISSION_SCHEMA_INVALID", "policies", "Policy or provenance taxonomy is invalid.", "Use the supported deterministic policy and explicit provenance classification.");
 
   if (!isRecord(mission.tasks) || !["TACTICAL_INTERCEPT", "COMBAT_AIR_PATROL", "FIGHTER_SWEEP", "ESCORT"].includes(mission.tasks.kind)) fail("MISSION_CLASS_FIELDS_MISMATCH", "tasks", "Mission-specific fields are missing or unsupported.", "Author the required task object for the selected mission class.");
   if (mission.tasks.kind !== mission.missionClass) fail("MISSION_CLASS_FIELDS_MISMATCH", "tasks.kind", "Mission-specific fields do not match the selected class.", "Load or author the required fields for the selected mission class.");
@@ -1404,7 +1404,7 @@ export function compileAirMissionDefinition(
     case "COMBAT_AIR_PATROL":
       validateArea(mission.tasks.patrolArea, "tasks.patrolArea", mission.studyAreaId);
       if (mission.tasks.prosecutionArea) validateArea(mission.tasks.prosecutionArea, "tasks.prosecutionArea", mission.studyAreaId);
-      if (!requiredNumberIsInAuthorityDomain(mission.tasks.onStationCount, AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY) || !requiredNumberIsInAuthorityDomain(mission.tasks.flightSize, AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY) || mission.tasks.onStationCount > mission.tasks.flightSize || !Number.isFinite(mission.tasks.onStationMinutes) || mission.tasks.onStationMinutes <= 0 || mission.tasks.patrolPattern !== "RACETRACK" || mission.tasks.relief !== "FUEL_OR_TIME" || !requiredNumberIsInAuthorityDomain(mission.tasks.investigationLimitM, AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY) || !requiredNumberIsInAuthorityDomain(mission.tasks.prosecutionLimitM, AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY) || mission.tasks.prosecutionLimitM < mission.tasks.investigationLimitM || !nonEmptyText(mission.tasks.completionCondition)) fail("MISSION_CLASS_FIELDS_MISMATCH", "tasks", "CAP geometry, staffing, duration, relief, investigation/prosecution limits, and completion must be valid.", "Provide visible CAP task values with on-station count within flight size and prosecution at least as large as investigation.");
+      if (!requiredNumberIsInAuthorityDomain(mission.tasks.onStationCount, AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY) || !requiredNumberIsInAuthorityDomain(mission.tasks.flightSize, AUTHORED_CAP_AIRCRAFT_COUNT_AUTHORITY) || mission.tasks.onStationCount > mission.tasks.flightSize || !Number.isFinite(mission.tasks.onStationMinutes) || mission.tasks.onStationMinutes <= 0 || !admitsAirCombatStudyEnum("patrolPattern", mission.tasks.patrolPattern) || mission.tasks.relief !== "FUEL_OR_TIME" || !requiredNumberIsInAuthorityDomain(mission.tasks.investigationLimitM, AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY) || !requiredNumberIsInAuthorityDomain(mission.tasks.prosecutionLimitM, AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY) || mission.tasks.prosecutionLimitM < mission.tasks.investigationLimitM || !nonEmptyText(mission.tasks.completionCondition)) fail("MISSION_CLASS_FIELDS_MISMATCH", "tasks", "CAP geometry, staffing, duration, relief, investigation/prosecution limits, and completion must be valid.", "Provide visible CAP task values with on-station count within flight size and prosecution at least as large as investigation.");
       requireAuthoredPrecision(mission.tasks.onStationMinutes, MAX_AUTHORED_SCALAR_FRACTION_DIGITS, "tasks.onStationMinutes");
       requireAuthoredPrecision(mission.tasks.investigationLimitM, AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY.precision, "tasks.investigationLimitM");
       requireAuthoredPrecision(mission.tasks.prosecutionLimitM, AUTHORED_CAP_DISTANCE_LIMIT_AUTHORITY.precision, "tasks.prosecutionLimitM");
