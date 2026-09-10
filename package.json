@@ -170,7 +170,7 @@
     "typescript": "5.9.3",
     "vinext": "0.2.1",
     "vite": "8.2.1",
-    "vitest": "^4.1.10",
+    "vitest": "^4.1.11",
     "wrangler": "4.113.0"
   },
   "type": "module"
