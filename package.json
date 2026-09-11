@@ -129,7 +129,7 @@
     "gray-matter": "^4.0.3",
     "lucide-react": "^1.31.0",
     "maplibre-gl": "^6.4.0",
-    "next": "^16.3.1",
+    "next": "^16.3.4",
     "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
