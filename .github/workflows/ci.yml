@@ -269,6 +269,7 @@ jobs:
         run: |
           npm run generic-sensor:sources:verify
           npm run policy:nasa-f16-store-source:verify
+          npm run policy:research-sources:verify
           npm run source-evidence:render-verify
 
   rust_audit:

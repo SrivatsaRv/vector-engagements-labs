@@ -77,6 +77,7 @@
     "policy:contract-docs:verify": "node scripts/verify-contract-doc-impact.mjs",
     "policy:contract-docs:test": "VECTOR_CONTRACT_DOC_ADVISORY=1 node --test tests/contract-doc-impact.test.mjs",
     "policy:contract-docs:template": "node scripts/verify-contract-doc-impact.mjs --print-template",
+    "policy:research-sources:verify": "node scripts/verify-research-source-freeze.mjs",
     "environment:sources:verify": "node scripts/verify-environment-source-assets.mjs",
     "generic-sensor:sources:verify": "node --require ./scripts/lib/generic-sensor-network-deny.cjs scripts/generate-generic-sensor-source-manifest.mjs && node --require ./scripts/lib/generic-sensor-network-deny.cjs --test tests/generic-sensor-source-bundle.test.mjs",
     "generic-sensor:sources:render-verify": "node --require ./scripts/lib/generic-sensor-network-deny.cjs scripts/verify-generic-sensor-source-bundle.mjs",

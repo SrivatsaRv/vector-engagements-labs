@@ -1,0 +1,582 @@
+{
+  "schemaVersion": "vector.research-source-freeze.v1",
+  "version": "1.0.0",
+  "ownerIssue": "#201",
+  "dependentIssues": [
+    "#38",
+    "#39"
+  ],
+  "policy": {
+    "admission": "A record classifies a public research source into one explicit VECTOR role. No record admits public research as aircraft truth, weapon truth, operational doctrine, or executable runtime authority.",
+    "codeCandidate": "A CODE_CANDIDATE reference must resolve to an exact commit or tag with an archived digest. A moving branch name is not sufficient and cannot be promoted.",
+    "license": "Code, data, weights, and paper license status are reviewed and recorded independently. A repository-level license is never silently applied to bundled data or weights.",
+    "recency": "A preprint or repository younger than a defined maturity window is CONTEXT_ONLY pending independent reproduction, regardless of its claimed results."
+  },
+  "sources": [
+    {
+      "id": "darpa-ace-air-venom",
+      "kind": "PROGRAMME_DESCRIPTION",
+      "title": "DARPA Air Combat Evolution (ACE) / Artificial Intelligence Reinforcements (AIR) / VENOM",
+      "authority": "DARPA",
+      "uri": "https://www.darpa.mil/research/programs/air-combat-evolution",
+      "additionalUris": [
+        "https://www.darpa.mil/research/programs/artificial-intelligence-reinforcements"
+      ],
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "NOT_APPLICABLE",
+      "vectorSourceRole": "ARCHITECTURE_INSPIRATION",
+      "secondaryRole": "CONTEXT_ONLY",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "UNDISCLOSED",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "UNDISCLOSED",
+        "trainingMethod": "UNDISCLOSED",
+        "evaluationMethod": "UNDISCLOSED"
+      },
+      "validityLimits": "Official programme material supports hierarchy, trust progression, integrated sensing/open-world challenges, and explicit human/AI control handoff. It does not publish a reusable combat policy or confer combat approval.",
+      "scope": "Programme-level context only. No reusable source code, weights, or dataset is published by these pages.",
+      "locatorStability": "DYNAMIC",
+      "licenseClassification": "NOT_APPLICABLE",
+      "documentDigest": null,
+      "claimLocator": "PENDING_REVIEW",
+      "adoptionByUse": {
+        "architectureStudy": "ADOPTED"
+      }
+    },
+    {
+      "id": "pope-et-al-alphadogfight-2021",
+      "kind": "PAPER",
+      "title": "Pope et al., AlphaDogfight (arXiv:2105.00990 / IEEE TAI)",
+      "authority": "arXiv / IEEE",
+      "uri": "https://arxiv.org/abs/2105.00990",
+      "sha256": "f34edd3a6b7cd26b290dae22c7df71f75c91d441194c832dabb80c59da8ea0ba",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "PENDING",
+      "vectorSourceRole": "ALGORITHM_REFERENCE",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "UNDISCLOSED",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "UNDISCLOSED",
+        "trainingMethod": "hierarchical selector over specialized low-level policies, expert-informed reward shaping",
+        "evaluationMethod": "reported AlphaDogfight tournament results"
+      },
+      "validityLimits": "Supports a high-level selector architecture and expert-informed reward shaping concept only. No public implementation was verified; reported results are not transferable validation.",
+      "scope": "Algorithmic architecture reference only. No code, data, or weights are admitted from this record.",
+      "locatorStability": "PINNED",
+      "licenseClassification": "UNKNOWN",
+      "documentDigest": "f34edd3a6b7cd26b290dae22c7df71f75c91d441194c832dabb80c59da8ea0ba",
+      "claimLocator": "PENDING_REVIEW",
+      "adoptionByUse": {
+        "architectureStudy": "ADOPTED"
+      }
+    },
+    {
+      "id": "bvrgym-xcwoid",
+      "kind": "REPOSITORY",
+      "title": "BVR Gym",
+      "authority": "xcwoid (GitHub)",
+      "uri": "https://github.com/xcwoid/BVRGym",
+      "exactCommit": "05e21890bb4c88515f895d6cf7afa574bef3fa53",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "REVIEWED",
+      "declaredLicense": "GPL-3.0",
+      "vectorSourceRole": "ARCHITECTURE_INSPIRATION",
+      "secondaryRole": "CODE_CANDIDATE",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "UNDISCLOSED",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "simplified weapon launch",
+        "trainingMethod": "behavior-tree baseline, Gym-like decomposition",
+        "evaluationMethod": "UNDISCLOSED"
+      },
+      "validityLimits": "Reported training simplifies decision cadence, initial geometry, search space, and weapon launch. GPL-3.0 licensing blocks CODE_CANDIDATE promotion into any non-GPL-compatible production path by default.",
+      "scope": "Architecture and behavior-tree decomposition reference. Code quarantined pending exact-commit and license-compatibility review; not promotable as-is.",
+      "locatorStability": "PINNED",
+      "licenseClassification": "GPL",
+      "repositoryOrigin": "https://github.com/xcwoid/BVRGym.git",
+      "subpath": null,
+      "archivedDigest": null,
+      "adoptionByUse": {
+        "architectureStudy": "ADOPTED",
+        "codeReuse": "QUARANTINED"
+      }
+    },
+    {
+      "id": "lag-liuqh16",
+      "kind": "REPOSITORY",
+      "title": "LAG (Light Aircraft Game)",
+      "authority": "liuqh16 (GitHub)",
+      "uri": "https://github.com/liuqh16/LAG",
+      "exactCommit": "ebd3a38e64d49c38c3e4ee04cdc1a1541be0da08",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "REVIEWED",
+      "declaredLicense": "GPL-3.0",
+      "vectorSourceRole": "ARCHITECTURE_INSPIRATION",
+      "secondaryRole": "CODE_CANDIDATE",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "UNDISCLOSED",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "JSBSim-backed, proportional guidance",
+        "trainingMethod": "hierarchical upper/lower control, 1v1/2v2 curriculum, PPO/MAPPO, self-play",
+        "evaluationMethod": "curriculum self-play benchmarks"
+      },
+      "validityLimits": "Hierarchical control and curriculum design are useful references. Its JSBSim and proportional-guidance models are not VECTOR validation. GPL-3.0 blocks default CODE_CANDIDATE promotion.",
+      "scope": "Architecture and curriculum-design reference. Code quarantined pending exact-commit license-compatibility review; not promotable as-is.",
+      "locatorStability": "PINNED",
+      "licenseClassification": "GPL",
+      "repositoryOrigin": "https://github.com/liuqh16/LAG.git",
+      "subpath": null,
+      "archivedDigest": null,
+      "adoptionByUse": {
+        "architectureStudy": "ADOPTED",
+        "codeReuse": "QUARANTINED"
+      }
+    },
+    {
+      "id": "b-ace-andrekuros",
+      "kind": "REPOSITORY",
+      "title": "B-ACE",
+      "authority": "andrekuros (GitHub)",
+      "uri": "https://github.com/andrekuros/B-ACE",
+      "exactCommit": "35d94ce48ab56aba75eb5506d5d3d08847ade5c3",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "REVIEWED",
+      "declaredLicense": "MIT",
+      "vectorSourceRole": "ARCHITECTURE_INSPIRATION",
+      "secondaryRole": "EVALUATION_REFERENCE",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "PettingZoo multi-agent adapter",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "explicitly simplified BVR dynamics",
+        "trainingMethod": "FSM opponents, headless/rendered loop",
+        "evaluationMethod": "PettingZoo-based evaluation loop"
+      },
+      "validityLimits": "Repo explicitly calls its BVR dynamics simplified. MIT license permits CODE_CANDIDATE consideration only after an exact-commit review is separately completed; not yet promoted.",
+      "scope": "PettingZoo adapter and FSM-opponent architecture reference. Possible future MIT CODE_CANDIDATE pending exact-commit review; not currently adopted.",
+      "locatorStability": "PINNED",
+      "licenseClassification": "PERMISSIVE",
+      "adoptionByUse": {
+        "architectureStudy": "ADOPTED"
+      }
+    },
+    {
+      "id": "harfang-dogfight-sandbox",
+      "kind": "REPOSITORY",
+      "title": "Harfang Dogfight Sandbox",
+      "authority": "harfang3d (GitHub)",
+      "uri": "https://github.com/harfang3d/dogfight-sandbox-hg2",
+      "exactCommit": "8bf49a6ddd9763dd0685e3d31e9164e38fc32045",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "REVIEWED",
+      "declaredLicense": "GPL-3.0",
+      "vectorSourceRole": "ARCHITECTURE_INSPIRATION",
+      "secondaryRole": "CONTEXT_ONLY",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "UNDISCLOSED",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "UNDISCLOSED",
+        "trainingMethod": "UNDISCLOSED",
+        "evaluationMethod": "UNDISCLOSED"
+      },
+      "validityLimits": "Environment/engine context only; sandbox and engine licensing require separate review before any code or asset use.",
+      "scope": "Environment/context reference only. Separate environment, code, data, and weight records required if this is pursued further; not currently adopted.",
+      "locatorStability": "PINNED",
+      "licenseClassification": "GPL",
+      "adoptionByUse": {
+        "architectureStudy": "ADOPTED"
+      }
+    },
+    {
+      "id": "ffi-imitation-learning-air-combat",
+      "kind": "PAPER",
+      "title": "Imitation Learning for Modelling Air Combat Behaviour: An Exploratory Study",
+      "authority": "FFI (Norwegian Defence Research Establishment)",
+      "uri": "https://www.ffi.no/en/publications-archive/imitation-learning-for-modelling-air-combat-behaviour-an-exploratory-study",
+      "sha256": "1b15e9d69c4f6f7707a0129659ad8bee9ec8b46a73aaf7bedd944a5498591f2f",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "PENDING",
+      "vectorSourceRole": "EVALUATION_REFERENCE",
+      "secondaryRole": "CONTEXT_ONLY",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "UNDISCLOSED",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "UNDISCLOSED",
+        "trainingMethod": "expert-demonstration / behavior-network exploration",
+        "evaluationMethod": "simulator time-management/throughput analysis"
+      },
+      "validityLimits": "Supports expert-demonstration/behavior-network exploration and documents simulator time-management/throughput limitations. Does not supply reusable doctrine or data.",
+      "scope": "Reference-only study. No reusable doctrine, dataset, or code is admitted from this record.",
+      "locatorStability": "PINNED",
+      "licenseClassification": "UNKNOWN",
+      "documentDigest": "1b15e9d69c4f6f7707a0129659ad8bee9ec8b46a73aaf7bedd944a5498591f2f",
+      "claimLocator": "PENDING_REVIEW",
+      "directPdfUri": "https://ffi-publikasjoner.archive.knowledgearc.net/bitstream/handle/20.500.12242/3136/22-02423.pdf",
+      "adoptionByUse": {
+        "architectureStudy": "ADOPTED"
+      }
+    },
+    {
+      "id": "nasa-ntrs-20240007986",
+      "kind": "PAPER",
+      "title": "NASA NTRS 20240007986",
+      "authority": "NASA NTRS",
+      "uri": "https://ntrs.nasa.gov/citations/20240007986",
+      "sha256": "0f393969de4473d7a75375bddcf26100937eca601a9d93dab5ed75f070b0fa6d",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "PENDING",
+      "vectorSourceRole": "ARCHITECTURE_INSPIRATION",
+      "secondaryRole": "CONTEXT_ONLY",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "UNDISCLOSED",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "UNDISCLOSED",
+        "trainingMethod": "UNDISCLOSED",
+        "evaluationMethod": "UNDISCLOSED"
+      },
+      "validityLimits": "Supports a provider-independent monitor plus trusted reversionary behavior concept only.",
+      "scope": "Architectural reference for safety-shielding/runtime-assurance concepts only.",
+      "locatorStability": "PINNED",
+      "licenseClassification": "UNKNOWN",
+      "documentDigest": "0f393969de4473d7a75375bddcf26100937eca601a9d93dab5ed75f070b0fa6d",
+      "claimLocator": "PENDING_REVIEW",
+      "directPdfUri": "https://ntrs.nasa.gov/api/citations/20240007986/downloads/DASC_submit_slagel_v01.pdf",
+      "adoptionByUse": {
+        "architectureStudy": "ADOPTED"
+      }
+    },
+    {
+      "id": "alshiekh-et-al-shielding-2017",
+      "kind": "PAPER",
+      "title": "Alshiekh et al., Safe Reinforcement Learning via Shielding",
+      "authority": "arXiv",
+      "uri": "https://arxiv.org/abs/1708.08611",
+      "sha256": "f8b87dcbd1932ffce5c2d6d2e84f788cc1d44dae3b1a4d001dbbee3c28567282",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "PENDING",
+      "vectorSourceRole": "ARCHITECTURE_INSPIRATION",
+      "secondaryRole": "CONTEXT_ONLY",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "UNDISCLOSED",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "UNDISCLOSED",
+        "trainingMethod": "shielded reinforcement learning",
+        "evaluationMethod": "UNDISCLOSED"
+      },
+      "validityLimits": "Supports a provider-independent monitor plus trusted reversionary behavior concept only.",
+      "scope": "Architectural reference for safety-shielding/runtime-assurance concepts only, paired with NASA NTRS 20240007986.",
+      "locatorStability": "PINNED",
+      "licenseClassification": "UNKNOWN",
+      "documentDigest": "f8b87dcbd1932ffce5c2d6d2e84f788cc1d44dae3b1a4d001dbbee3c28567282",
+      "claimLocator": "PENDING_REVIEW",
+      "adoptionByUse": {
+        "architectureStudy": "ADOPTED"
+      }
+    },
+    {
+      "id": "pettingzoo-farama",
+      "kind": "REPOSITORY",
+      "title": "PettingZoo",
+      "authority": "Farama Foundation (GitHub)",
+      "uri": "https://github.com/Farama-Foundation/PettingZoo",
+      "exactCommit": "7221e4b15873a8b16555fda038a77a6ae595e88d",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "REVIEWED",
+      "declaredLicense": "MIT",
+      "vectorSourceRole": "EVALUATION_REFERENCE",
+      "secondaryRole": "CONTEXT_ONLY",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "multi-agent Gym-like API",
+        "actionSpace": "multi-agent Gym-like API",
+        "aircraftWeaponAbstraction": "NOT_APPLICABLE",
+        "trainingMethod": "NOT_APPLICABLE",
+        "evaluationMethod": "lab-edge multi-agent API"
+      },
+      "validityLimits": "Provides the lab-edge multi-agent API only. Does not become a production runtime contract.",
+      "scope": "Evaluation-harness API reference only.",
+      "locatorStability": "PINNED",
+      "licenseClassification": "PERMISSIVE",
+      "additionalUris": [
+        "https://proceedings.neurips.cc/paper/2021/file/7ed2d3454c5eea71148b11d0c25104ff-Paper.pdf"
+      ],
+      "companionPaperNote": "Official NeurIPS 2021 paper for PettingZoo. Was listed in #201's primary sources but not yet given its own record; linked here as lineage rather than duplicated.",
+      "adoptionByUse": {
+        "architectureStudy": "ADOPTED"
+      }
+    },
+    {
+      "id": "rliable-google-research",
+      "kind": "REPOSITORY",
+      "title": "rliable",
+      "authority": "Google Research (GitHub, archived)",
+      "uri": "https://github.com/google-research/rliable",
+      "exactCommit": "3ccd9f4dea577a04d3d2b557f259aac08badbd81",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "REVIEWED",
+      "declaredLicense": "Apache-2.0",
+      "vectorSourceRole": "EVALUATION_REFERENCE",
+      "secondaryRole": "CONTEXT_ONLY",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "NOT_APPLICABLE",
+        "actionSpace": "NOT_APPLICABLE",
+        "aircraftWeaponAbstraction": "NOT_APPLICABLE",
+        "trainingMethod": "NOT_APPLICABLE",
+        "evaluationMethod": "uncertainty-aware statistical reporting"
+      },
+      "validityLimits": "Provides uncertainty-aware reporting tools only. Repository is archived (no further upstream changes expected). Does not become a production runtime contract.",
+      "scope": "Evaluation/statistics tooling reference only.",
+      "locatorStability": "PINNED",
+      "licenseClassification": "PERMISSIVE",
+      "additionalUris": [
+        "https://arxiv.org/abs/2108.13264"
+      ],
+      "companionPaperNote": "arXiv:2108.13264, 'Deep Reinforcement Learning at the Edge of the Statistical Precipice' (Agarwal et al.) \u2014 the paper this tool implements. Was listed in #201's primary sources but not yet given its own record; linked here as lineage rather than duplicated.",
+      "companionPaperDigest": "a6a5abb49e58a9e4a0be8556c8351ce8c3b52e70216bffc9fa80eac0823ec5ed",
+      "adoptionByUse": {
+        "architectureStudy": "ADOPTED"
+      }
+    },
+    {
+      "id": "dstg-ace-zero",
+      "kind": "PROGRAMME_DESCRIPTION",
+      "title": "DSTG Ace Zero (Australian Defence Science and Technology Group air-combat research simulator)",
+      "authority": "Defence Science and Technology Group (Australia)",
+      "uri": "https://www.dst.defence.gov.au",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "NOT_APPLICABLE",
+      "vectorSourceRole": "CONTEXT_ONLY",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "UNDISCLOSED",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "UNDISCLOSED",
+        "trainingMethod": "UNDISCLOSED",
+        "evaluationMethod": "UNDISCLOSED"
+      },
+      "validityLimits": "No verified public source repository was located for this simulator as of 2026-09-01. Must be explicitly disambiguated from Niantic's unrelated 'acezero' computer-vision project by owner, title, and paper locator. Name-only resolution is rejected.",
+      "scope": "UNRESOLVED. URI points to the parent organization's general site only, pending location of an exact, citable artifact. This record exists to prevent silent name-collision with unrelated projects, per the required source-freeze additions.",
+      "requiresDisambiguation": true,
+      "collisionRisk": {
+        "similarNames": [
+          "Niantic acezero (github.com/naver/roma / computer-vision repo)"
+        ],
+        "distinguishingFacts": "DSTG Ace Zero is an Australian air-combat research simulator with no confirmed public repository. Niantic's 'acezero' is an unrelated computer-vision project. Name similarity alone must never resolve this record's identity."
+      },
+      "locatorStability": "DYNAMIC",
+      "licenseClassification": "NOT_APPLICABLE",
+      "documentDigest": null,
+      "claimLocator": "PENDING_REVIEW",
+      "adoptionByUse": {
+        "architectureStudy": "NOT_ADOPTED"
+      }
+    },
+    {
+      "id": "bvr-sim-2608-25419",
+      "kind": "PAPER",
+      "title": "BVR Sim (arXiv:2608.25419v1)",
+      "authority": "arXiv",
+      "uri": "https://arxiv.org/abs/2608.25419",
+      "additionalUris": [
+        "https://github.com/lizi-Margin/bvr_sim"
+      ],
+      "sha256": "39743a1c0311c2a0610ecf57c80bfe86ad27fef1cb82f7cab7ac3f74335feac2",
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "VERIFIED",
+      "licenseReviewState": "PENDING",
+      "declaredLicense": "GPL-3.0",
+      "vectorSourceRole": "CONTEXT_ONLY",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "high-level heading/altitude/speed/fire interface",
+        "actionSpace": "heading/altitude/speed/fire",
+        "aircraftWeaponAbstraction": "aircraft-specific controllers above high-level interface",
+        "trainingMethod": "MARL adapters",
+        "evaluationMethod": "rule-based opponents, replay"
+      },
+      "validityLimits": "Submitted 2026-08-26 \u2014 too new to treat as a mature baseline. Time-sensitive CONTEXT_ONLY pending independent resolution of the claimed repository, exact commit, license, and reproduced results.",
+      "scope": "Preprint-recency hold. Not promotable until independently reproduced and the repository/commit/license are separately confirmed.",
+      "locatorStability": "PINNED",
+      "licenseClassification": "GPL",
+      "documentDigest": "39743a1c0311c2a0610ecf57c80bfe86ad27fef1cb82f7cab7ac3f74335feac2",
+      "claimLocator": "PENDING_REVIEW",
+      "recencyReview": {
+        "policyVersion": "1.0.0",
+        "maturityWindowDays": 180,
+        "ageAtReviewDays": 6,
+        "decision": "HOLD_CONTEXT_ONLY"
+      },
+      "publishedAt": "2026-08-26",
+      "adoptionByUse": {
+        "architectureStudy": "NOT_ADOPTED"
+      }
+    },
+    {
+      "id": "hirl4ucav-code",
+      "kind": "REPOSITORY",
+      "title": "HIRL4UCAV (code)",
+      "authority": "zrc0622 (GitHub)",
+      "uri": "https://github.com/zrc0622/HIRL4UCAV",
+      "exactCommit": "8ec839e67788a570612a3581fb0d0d25c3b165dd",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "REVIEWED",
+      "declaredLicense": "MIT",
+      "licenseClassification": "PERMISSIVE",
+      "locatorStability": "PINNED",
+      "vectorSourceRole": "ALGORITHM_REFERENCE",
+      "secondaryRole": "CODE_CANDIDATE",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "UNDISCLOSED",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "UNDISCLOSED",
+        "trainingMethod": "hierarchical imitation-RL",
+        "evaluationMethod": "UNDISCLOSED"
+      },
+      "validityLimits": "Code itself is MIT-licensed and permissive, but quarantined pending its own independent exact-commit review. Its associated data and weights are governed by separate records below with independent license status.",
+      "scope": "Code-only record. Does not admit the associated expert-demonstration data or trained weights, which are separately hosted and separately reviewed.",
+      "repositoryOrigin": "https://github.com/zrc0622/HIRL4UCAV.git",
+      "subpath": null,
+      "archivedDigest": null,
+      "adoptionByUse": {
+        "architectureStudy": "ADOPTED",
+        "codeReuse": "QUARANTINED"
+      }
+    },
+    {
+      "id": "hirl4ucav-data",
+      "kind": "DATA",
+      "title": "HIRL4UCAV (expert-demonstration dataset)",
+      "authority": "zrc0622 (separately hosted, exact location not yet confirmed)",
+      "uri": "https://github.com/zrc0622/HIRL4UCAV",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "PENDING",
+      "declaredLicense": null,
+      "licenseClassification": "UNKNOWN",
+      "locatorStability": "DYNAMIC",
+      "vectorSourceRole": "DATA_CANDIDATE",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "UNDISCLOSED",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "UNDISCLOSED",
+        "trainingMethod": "expert demonstrations for imitation learning",
+        "evaluationMethod": "UNDISCLOSED"
+      },
+      "validityLimits": "Repository code license (MIT) does not apply to this dataset. Exact hosting location, license, and lineage are unconfirmed as of this review; remains quarantined/context-only until independently established.",
+      "scope": "Data-only record, independent from the MIT-licensed code. UNKNOWN license classification blocks any promotion by default.",
+      "adoptionByUse": {
+        "dataReuse": "NOT_ADOPTED"
+      }
+    },
+    {
+      "id": "hirl4ucav-weights",
+      "kind": "WEIGHTS",
+      "title": "HIRL4UCAV (trained policy weights)",
+      "authority": "zrc0622 (separately hosted, exact location not yet confirmed)",
+      "uri": "https://github.com/zrc0622/HIRL4UCAV",
+      "sha256": null,
+      "retrievalState": "DECLARED_REMOTE",
+      "hashReviewState": "PENDING",
+      "licenseReviewState": "PENDING",
+      "declaredLicense": null,
+      "licenseClassification": "UNKNOWN",
+      "locatorStability": "DYNAMIC",
+      "vectorSourceRole": "WEIGHT_CANDIDATE",
+      "reviewer": "SrivatsaRv",
+      "reviewedAt": "2026-09-01",
+      "supersedes": null,
+      "notRuntimeAuthority": true,
+      "claimedEnvironment": {
+        "observationSpace": "UNDISCLOSED",
+        "actionSpace": "UNDISCLOSED",
+        "aircraftWeaponAbstraction": "UNDISCLOSED",
+        "trainingMethod": "hierarchical imitation-RL checkpoint",
+        "evaluationMethod": "UNDISCLOSED"
+      },
+      "validityLimits": "Repository code license (MIT) does not apply to these weights. Exact hosting location, license, and training/evaluation lineage are unconfirmed; remains quarantined/context-only until independently established.",
+      "scope": "Weights-only record, independent from the MIT-licensed code. UNKNOWN license classification blocks any promotion by default.",
+      "adoptionByUse": {
+        "weightReuse": "NOT_ADOPTED"
+      }
+    }
+  ]
+}

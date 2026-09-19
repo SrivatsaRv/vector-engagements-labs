@@ -112,6 +112,15 @@ export const CLASSIFIER_DECISION_CONTRACT = deepFreeze({
       ),
     },
     {
+      id: "RESEARCH_SOURCE_FREEZE",
+      effect: ["source_evidence"],
+      patterns: patternInventory(
+        /^governance\/research-source-freeze\.v1\.json$/,
+        /^scripts\/verify-research-source-freeze\.mjs$/,
+        /^tests\/research-source-freeze\.test\.mjs$/,
+      ),
+    },
+    {
       id: "WEB_SOURCE",
       effect: ["quality", "web_tests"],
       patterns: patternInventory(
