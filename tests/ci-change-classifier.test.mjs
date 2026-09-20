@@ -78,6 +78,14 @@ test("PDF rendering is selected only by governed source-evidence changes", () =>
     "scripts/verify-nasa-f16-store-source.mjs",
   ]) assert.equal(selected([path]).includes("source_evidence"), true, path);
 });
+test("research source freeze changes select only source_evidence", () => {
+  assert.equal(selected(["app/some-unrelated-file.tsx"]).includes("source_evidence"), false);
+  for (const path of [
+    "governance/research-source-freeze.v1.json",
+    "scripts/verify-research-source-freeze.mjs",
+    "tests/research-source-freeze.test.mjs",
+  ]) assert.equal(selected([path]).includes("source_evidence"), true, path);
+});
 
 test("blog content builds and tests the web product without Rust or PostGIS", () => {
   assert.deepEqual(selected(["content/blog/new-post.md", "public/blog/thumb.webp"]), [
